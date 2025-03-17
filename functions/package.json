@@ -7,7 +7,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "swagger": "node api/v2/swagger.js"
+    "swagger": "node api/v2/swagger.js",
+    "deps": "taze --interactive"
   },
   "main": "index.js",
   "dependencies": {
