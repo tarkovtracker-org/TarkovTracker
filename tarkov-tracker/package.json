@@ -25,7 +25,7 @@
     "graphql-tag": "^2.12.6",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
-    "pinia": "^2.0.23",
+    "pinia": "^3.0.1",
     "pinia-plugin-persistedstate": "^1.6.3",
     "qrcode": "^1.5.1",
     "roboto-fontface": "*",
