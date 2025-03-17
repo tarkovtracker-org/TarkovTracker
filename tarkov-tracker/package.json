@@ -16,7 +16,7 @@
     "@mdi/font": "^7.0.96",
     "@vue/apollo-composable": "^4.0.0-beta.1",
     "@vueuse/core": "^8.7.3",
-    "chart.js": "^3.8.0",
+    "chart.js": "^4.4.8",
     "d3": "^7.8.0",
     "firebase": "^9.23.0",
     "firebaseui": "^6.0.1",
