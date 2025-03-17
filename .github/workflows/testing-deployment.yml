@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Testing
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
