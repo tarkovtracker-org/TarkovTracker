@@ -1,0 +1,59 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/tarkov-tracker/"
+    schedule:
+      interval: "weekly"
+      day: "monday" # Start the week with fresh updates
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "tarkov-tracker"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "dev-deps"
+      include: "scope"
+    versioning-strategy: "auto"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "*eslint*"
+          - "*prettier*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+    
+  - package-ecosystem: "npm"
+    directory: "/functions/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "functions"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "dev-deps"
+      include: "scope"
+    versioning-strategy: "auto"
+    
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "ci-cd"
+      - "github-actions"
