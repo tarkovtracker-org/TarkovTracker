@@ -14,7 +14,7 @@
   "dependencies": {
     "firebase-admin": "^10.3.0",
     "firebase-functions": "^4.9.0",
-    "graphql-request": "^5.1.0",
+    "graphql-request": "^7.1.2",
     "graphql-tag": "^2.12.6",
     "swagger-jsdoc": "^6.2.7",
     "uid-generator": "^2.0.0"
