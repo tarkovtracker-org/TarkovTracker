@@ -8,7 +8,8 @@
     "lint": "eslint --ext .js,.vue --ignore-path .gitignore --fix src",
     "dev": "vite",
     "format": "prettier .  --write",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deps": "taze --interactive"
   },
   "dependencies": {
     "@apollo/client": "^3.7.2",
@@ -17,7 +18,7 @@
     "@vueuse/core": "^8.7.3",
     "chart.js": "^3.8.0",
     "d3": "^7.8.0",
-    "firebase": "^9.8.3",
+    "firebase": "^9.23.0",
     "firebaseui": "^6.0.1",
     "graphology": "^0.25.1",
     "graphql": "^16.6.0",
@@ -47,7 +48,7 @@
     "sass": "^1.52.3",
     "vite": "^2.9.16",
     "vite-plugin-eslint": "^1.6.1",
-    "vite-plugin-firebase": "^0.5.0",
+    "vite-plugin-firebase": "^0.6.1",
     "vite-plugin-vuetify": "^1.0.0-alpha.0",
     "vue-cli-plugin-vuetify": "~2.5.1",
     "vue-eslint-parser": "^9.0.2"

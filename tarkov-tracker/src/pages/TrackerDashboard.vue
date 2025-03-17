@@ -2,21 +2,8 @@
   <tracker-tip tip="welcomett3"></tracker-tip>
 
   <v-container class="mt-2">
-    <v-alert density="compact" color="green-darken-4" title="Wipe Update">Escape From Tarkov 0.14.0.0 is here - Changes to
-      quests and
-      hideout upgrades will be pulled automatically
-      from <a href='http://tarkov.dev/'>tarkov.dev</a> as they are discovered and confirmed.
-    </v-alert>
-    <v-alert density="compact" type="success" title="Automatic Quest Completion" class="mt-3">Thanks to the
-      wonderful folks over at <a href='http://tarkov.dev/'>tarkov.dev</a>, its easier than ever to keep your TarkovTracker
-      progress up to date with your in-game progress. They've worked on a new open-source tool which watches the log files
-      for the game for messages about quest completions. If you link a TarkovTracker API token with the tool, it can
-      automatically mark off the quest for you via the free TarkovTracker API. Check out the project on <a
-        href='https://github.com/the-hideout/TarkovMonitor'>GitHub</a> and download it from the project's <a
-        href='https://github.com/the-hideout/TarkovMonitor/releases/latest'>Releases</a></v-alert>
-    <v-alert density="compact" color="#607D8B3F" title="Known Issues" class="mb-6 mt-3">There is currently a bug with the
-      objective maps floors showing objectives incorrectly. This should mainly affect later quests, and should be fixed in
-      the next 24 hours.
+    <v-alert density="compact" color="green-darken-4" title="Wipe Update" class="mb-6">
+    Changes from patch 0.15.5.1.33420 will be pulled automatically from <a href='http://tarkov.dev/'>tarkov.dev</a> as they are discovered and confirmed.
     </v-alert>
     <v-row justify="center">
       <v-col cols="12" sm="8" md="6" lg="4" xl="3">
@@ -24,7 +11,7 @@
           <template #stat>
             {{ $t("page.dashboard.stats.allTasks.stat") }}
           </template>
-          <template #value> {{ completedTasks }}/{{ totalTasks }} </template>
+          <template #value> {{ completedTasks }}/{{ totalTasks }} ({{ ((completedTasks / totalTasks) * 100).toFixed(1) }}%)</template>
           <template #details>
             {{ $t("page.dashboard.stats.allTasks.details") }}
           </template>
@@ -36,7 +23,7 @@
             {{ $t("page.dashboard.stats.allObjectives.stat") }}
           </template>
           <template #value>
-            {{ completedObjectives }}/{{ totalObjectives }}
+            {{ completedObjectives }}/{{ totalObjectives }} ({{ ((completedObjectives / totalObjectives) * 100).toFixed(1) }}%)
           </template>
           <template #details>
             {{ $t("page.dashboard.stats.allObjectives.details") }}
@@ -49,7 +36,7 @@
             {{ $t("page.dashboard.stats.taskItems.stat") }}
           </template>
           <template #value>
-            {{ completedTaskItems }}/{{ totalTaskItems }}
+            {{ completedTaskItems }}/{{ totalTaskItems }} ({{ ((completedTaskItems / totalTaskItems) * 100).toFixed(1) }}%)
           </template>
           <template #details>
             {{ $t("page.dashboard.stats.taskItems.details") }}
@@ -60,11 +47,10 @@
   </v-container>
 </template>
 <script setup>
-import { inject, computed } from "vue";
-import { defineAsyncComponent } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useProgressStore } from "@/stores/progress";
 import { useTarkovStore } from "@/stores/tarkov.js";
+import { computed, defineAsyncComponent } from "vue";
 const TrackerStat = defineAsyncComponent(() =>
   import("@/components/TrackerStat.vue")
 );
