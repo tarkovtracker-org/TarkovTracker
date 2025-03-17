@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "firebase-functions-test": "^0.2.0",
-    "prettier": "^2.8.8"
+    "prettier": "^3.5.3"
   },
   "private": true
 }
