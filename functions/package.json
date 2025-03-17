@@ -16,7 +16,7 @@
     "firebase-functions": "^4.9.0",
     "graphql-request": "^5.1.0",
     "graphql-tag": "^2.12.6",
-    "swagger-jsdoc": "^6.2.7",
+    "swagger-jsdoc": "^6.2.8",
     "uid-generator": "^2.0.0"
   },
   "devDependencies": {
