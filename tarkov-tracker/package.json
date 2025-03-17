@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.7.2",
-    "@mdi/font": "^7.0.96",
+    "@mdi/font": "^7.4.47",
     "@vue/apollo-composable": "^4.0.0-beta.1",
     "@vueuse/core": "^8.7.3",
     "chart.js": "^3.8.0",
