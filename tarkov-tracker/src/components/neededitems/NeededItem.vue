@@ -1,20 +1,32 @@
 <template>
   <template v-if="props.itemStyle == 'mediumCard'">
     <v-col v-if="showItemFilter" cols="12" sm="6" md="4" lg="3" xl="2">
-      <NeededItemMediumCard :need="props.need" @decrease-count="decreaseCount()" @toggle-count="toggleCount()"
-        @increase-count="increaseCount()" />
+      <NeededItemMediumCard
+        :need="props.need"
+        @decrease-count="decreaseCount()"
+        @toggle-count="toggleCount()"
+        @increase-count="increaseCount()"
+      />
     </v-col>
   </template>
   <template v-else-if="props.itemStyle == 'smallCard'">
     <v-col v-if="showItemFilter" cols="auto">
-      <NeededItemSmallCard :need="props.need" @decrease-count="decreaseCount()" @toggle-count="toggleCount()"
-        @increase-count="increaseCount()" />
+      <NeededItemSmallCard
+        :need="props.need"
+        @decrease-count="decreaseCount()"
+        @toggle-count="toggleCount()"
+        @increase-count="increaseCount()"
+      />
     </v-col>
   </template>
   <template v-else-if="props.itemStyle == 'row'">
     <v-col v-if="showItemFilter" cols="12" class="pt-1">
-      <NeededItemRow :need="props.need" @decrease-count="decreaseCount()" @toggle-count="toggleCount()"
-        @increase-count="increaseCount()" />
+      <NeededItemRow
+        :need="props.need"
+        @decrease-count="decreaseCount()"
+        @toggle-count="toggleCount()"
+        @increase-count="increaseCount()"
+      />
     </v-col>
   </template>
 </template>
@@ -214,8 +226,7 @@ const imageItem = computed(() => {
   } else {
     return item.value;
   }
-})
-
+});
 
 // Helper functions and data to calculate the item's progress
 // These are passed to the child components via provide/inject
@@ -249,8 +260,6 @@ const relatedTask = computed(() => {
     return null;
   }
 });
-
-
 
 const item = computed(() => {
   if (props.need.needType == "taskObjective") {
@@ -291,7 +300,8 @@ const selfCompletedNeed = computed(() => {
     return (
       progressStore.tasksCompletions[props.need.taskId]["self"] ||
       progressStore.objectiveCompletions[props.need.id]["self"] ||
-      relatedTask.value.factionName != "Any" && relatedTask.value.factionName != tarkovStore.getPMCFaction
+      (relatedTask.value.factionName != "Any" &&
+        relatedTask.value.factionName != tarkovStore.getPMCFaction)
     );
   } else if (props.need.needType == "hideoutModule") {
     return (
@@ -329,8 +339,16 @@ const teamNeeds = computed(() => {
     // Find all of the users that need this objective
     Object.entries(progressStore.objectiveCompletions[props.need.id]).forEach(
       ([user, completed]) => {
-        if (!completed && !progressStore.tasksCompletions[props.need.taskId][user]) {
-          needingUsers.push({ user: user, count: progressStore.teamStores[user].getObjectiveCount(props.need.id) });
+        if (
+          !completed &&
+          !progressStore.tasksCompletions[props.need.taskId][user]
+        ) {
+          needingUsers.push({
+            user: user,
+            count: progressStore.teamStores[user].getObjectiveCount(
+              props.need.id
+            ),
+          });
         }
       }
     );
@@ -339,7 +357,12 @@ const teamNeeds = computed(() => {
     Object.entries(progressStore.modulePartCompletions[props.need.id]).forEach(
       ([user, completed]) => {
         if (!completed) {
-          needingUsers.push({ user: user, count: progressStore.teamStores[user].getHideoutPartCount(props.need.id) });
+          needingUsers.push({
+            user: user,
+            count: progressStore.teamStores[user].getHideoutPartCount(
+              props.need.id
+            ),
+          });
         }
       }
     );
@@ -347,7 +370,7 @@ const teamNeeds = computed(() => {
   return needingUsers;
 });
 
-provide('neededitem', {
+provide("neededitem", {
   item,
   relatedTask,
   relatedStation,
@@ -357,8 +380,8 @@ provide('neededitem', {
   neededCount,
   levelRequired,
   teamNeeds,
-  imageItem
-})
+  imageItem,
+});
 </script>
 <style lang="scss">
 .item-panel {
