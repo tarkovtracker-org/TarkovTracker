@@ -119,7 +119,8 @@
 <script setup>
 import { defineAsyncComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { fireapp, fireuser } from "@/plugins/firebase";
+import { fireuser, functions } from "@/plugins/firebase";
+import { httpsCallable } from "firebase/functions";
 import { useLiveData } from "@/composables/livedata";
 import { useUserStore } from "@/stores/user";
 import { useTarkovStore } from "@/stores/tarkov";
@@ -139,9 +140,8 @@ const createTeamSnackbar = ref(false);
 const createTeam = async () => {
   creatingTeam.value = true;
   try {
-    createTeamResult.value = await fireapp
-      .functions()
-      .httpsCallable("createTeam")({});
+    const createTeamFunction = httpsCallable(functions, "createTeam");
+    createTeamResult.value = await createTeamFunction({});
     createTeamResult.value = t("page.team.card.myteam.create_team_success");
     createTeamSnackbar.value = true;
   } catch (error) {
@@ -159,9 +159,8 @@ const leaveTeamSnackbar = ref(false);
 const leaveTeam = async () => {
   leavingTeam.value = true;
   try {
-    leaveTeamResult.value = await fireapp
-      .functions()
-      .httpsCallable("leaveTeam")({});
+    const leaveTeamFunction = httpsCallable(functions, "leaveTeam");
+    leaveTeamResult.value = await leaveTeamFunction({});
     if (systemStore.userTeamIsOwn) {
       leaveTeamResult.value = t("page.team.card.myteam.disband_team_success");
     } else {
