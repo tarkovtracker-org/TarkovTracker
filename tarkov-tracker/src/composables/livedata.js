@@ -1,12 +1,12 @@
 import { computed, ref, watch } from "vue";
-import { fireuser, fireapp } from "@/plugins/firebase";
+import { fireuser, firestore } from "@/plugins/firebase";
 import { doc, collection, onSnapshot } from "firebase/firestore";
 import { defineStore, storeToRefs } from "pinia";
 import { getters, actions, defaultState } from "@/shared_state.js";
 import { useTarkovStore } from "@/stores/tarkov";
 import { useUserStore } from "@/stores/user";
 
-const firedb = fireapp.firestore();
+const firedb = firestore;
 
 const useSystemStore = defineStore("system", {
   state: () => ({}),
