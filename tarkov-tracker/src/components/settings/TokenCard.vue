@@ -64,11 +64,10 @@
 <script setup>
 import { fireapp } from "@/plugins/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { defineProps, computed, onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import QRCode from "qrcode";
-import availablePermissions from "@/utils/api_permissions.js";
 import { useUserStore } from "@/stores/user";
 
 // Get locale for use in calculating relative time
