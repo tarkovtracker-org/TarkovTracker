@@ -32,10 +32,11 @@
   </v-list>
 </template>
 <script setup>
-import { fireapp, fireuser } from "@/plugins/firebase";
+import { fireuser, auth } from "@/plugins/firebase";
 import { defineAsyncComponent } from "vue";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
+import { signOut } from "firebase/auth";
 const { mdAndDown } = useDisplay();
 const appStore = useAppStore();
 
@@ -44,7 +45,7 @@ const DrawerItem = defineAsyncComponent(() =>
 );
 
 function logout() {
-  fireapp.auth().signOut();
+  signOut(auth);
 }
 </script>
 <style lang="scss" scoped>
