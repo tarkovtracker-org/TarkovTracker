@@ -36,8 +36,9 @@
       </v-row>
       <v-row dense justify="space-between">
         <v-col cols="auto">
-          <i18n-t keypath="page.team.card.manageteam.membercard.taskscomplete" scope="global"
-            v-if="!userStore.teamIsHidden(props.teammember)">
+          <i18n-t
+v-if="!userStore.teamIsHidden(props.teammember)" keypath="page.team.card.manageteam.membercard.taskscomplete"
+            scope="global">
             <template #completed>
               <b>
                 {{ completedTaskCount }}
@@ -51,7 +52,8 @@
           </i18n-t>
         </v-col>
         <v-col cols="auto">
-          <v-btn :disabled="props.teammember == fireuser.uid || userStore.taskTeamAllHidden
+          <v-btn
+:disabled="props.teammember == fireuser.uid || userStore.taskTeamAllHidden
             " variant="outlined" :icon="props.teammember != fireuser.uid &&
     userStore.teamIsHidden(props.teammember)
     ? 'mdi-eye-off'
@@ -62,7 +64,8 @@
     : 'green'
     " size="x-small" @click="userStore.toggleHidden(props.teammember)"></v-btn>
           <!-- Button to delete the token -->
-          <v-btn v-if="props.teammember != fireuser.uid && teamStore.isOwner" variant="outlined" icon="mdi-account-minus"
+          <v-btn
+v-if="props.teammember != fireuser.uid && teamStore.isOwner" variant="outlined" icon="mdi-account-minus"
             class="mx-1" color="red" size="x-small" @click="kickTeammate()"></v-btn>
         </v-col>
       </v-row>
