@@ -20,8 +20,8 @@
       style="font-size: smaller; margin-top: 1px; margin-bottom: 1px"
     >
       <v-col
-        cols="auto"
         v-if="itemObjectiveTypes.includes(fullObjective.type)"
+        cols="auto"
         class="pa-0 d-flex align-center"
       >
         <v-sheet
@@ -40,14 +40,20 @@
         </v-sheet>
       </v-col>
       <v-col
-        cols="auto"
         v-if="systemStore.userTeam && userNeeds.length > 0"
+        cols="auto"
         class="pa-0"
       >
         <span v-for="(user, userIndex) in userNeeds" :key="userIndex">
           <v-icon size="x-small" class="ml-1">mdi-account-child-circle</v-icon
           >{{ progressStore.teammemberNames[user] }}
         </span>
+      </v-col>
+      <v-col v-if="objective.type === 'mark'" cols="auto">
+        <!-- Mark specific content -->
+      </v-col>
+      <v-col v-if="objective.type === 'zone'" cols="auto">
+        <!-- Zone specific content -->
       </v-col>
     </v-row>
   </span>
