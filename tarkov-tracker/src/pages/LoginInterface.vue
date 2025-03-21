@@ -19,14 +19,15 @@ import { onMounted, defineAsyncComponent } from "vue";
 import * as firebaseui from "firebaseui";
 import { firebase, fireapp, fireuser } from "@/plugins/firebase";
 import { useRouter } from "vue-router";
-import { FirebaseError } from "@firebase/util";
+import { getAuth } from "firebase/auth";
+
 const TrackerTip = defineAsyncComponent(() =>
   import("@/components/TrackerTip.vue")
 );
 const router = useRouter();
+const auth = getAuth(fireapp);
 const ui =
-  firebaseui.auth.AuthUI.getInstance() ||
-  new firebaseui.auth.AuthUI(fireapp.auth());
+  firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth);
 
 onMounted(() => {
   // Initialize the FirebaseUI Widget using Firebase.
@@ -51,9 +52,9 @@ const uiConfig = {
   signInSuccessUrl: "/",
   signInOptions: [
     // Leave the lines as is for the providers you want to offer your users.
-    firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-    firebase.auth.GithubAuthProvider.PROVIDER_ID,
-    firebase.auth.TwitterAuthProvider.PROVIDER_ID,
+    firebase.GoogleAuthProvider.PROVIDER_ID,
+    firebase.GithubAuthProvider.PROVIDER_ID,
+    firebase.TwitterAuthProvider.PROVIDER_ID,
     {
       provider: "microsoft.com",
       loginHintKey: "login_hint",
