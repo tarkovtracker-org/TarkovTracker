@@ -5,8 +5,19 @@
       <v-col lg="4" md="12">
         <!-- Primary views (all, maps, traders) -->
         <v-card>
-          <v-tabs v-model="activePrimaryView" bg-color="accent" slider-color="secondary" align-tabs="center" show-arrows>
-            <v-tab v-for="(view, index) in primaryViews" :key="index" :value="view.view" :prepend-icon="view.icon">
+          <v-tabs
+            v-model="activePrimaryView"
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+            show-arrows
+          >
+            <v-tab
+              v-for="(view, index) in primaryViews"
+              :key="index"
+              :value="view.view"
+              :prepend-icon="view.icon"
+            >
               {{ view.title }}
             </v-tab>
           </v-tabs>
@@ -15,7 +26,11 @@
       <v-col v-show="activePrimaryView == 'all'" lg="8" md="12">
         <!-- The user has selected all quests, no need to filter by a sub-category -->
         <v-card>
-          <v-tabs bg-color="accent" slider-color="secondary" align-tabs="center">
+          <v-tabs
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+          >
             <v-tab value="all">
               {{ $t("page.tasks.showing_all_sources") }}
             </v-tab>
@@ -25,11 +40,27 @@
       <v-col v-show="activePrimaryView == 'maps'" lg="8" md="12">
         <!-- The user has selected quests by map -->
         <v-card>
-          <v-tabs v-model="activeMapView" bg-color="accent" slider-color="secondary" align-tabs="center" show-arrows>
-            <v-tab v-for="(map, index) in maps" :key="index" :value="map.id" prepend-icon="mdi-compass">
+          <v-tabs
+            v-model="activeMapView"
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+            show-arrows
+          >
+            <v-tab
+              v-for="(map, index) in maps"
+              :key="index"
+              :value="map.id"
+              prepend-icon="mdi-compass"
+            >
               <template v-if="mapTaskTotals[map.id] > 0">
-                <v-badge color="secondary" :content="mapTaskTotals[map.id]" :label="String(mapTaskTotals[map.id])"
-                  offset-y="-5" offset-x="-10">
+                <v-badge
+                  color="secondary"
+                  :content="mapTaskTotals[map.id]"
+                  :label="String(mapTaskTotals[map.id])"
+                  offset-y="-5"
+                  offset-x="-10"
+                >
                   {{ map.name }}
                 </v-badge>
               </template>
@@ -43,8 +74,18 @@
       <v-col v-show="activePrimaryView == 'traders'" lg="8" md="12">
         <!-- The user has selected quests by trader -->
         <v-card>
-          <v-tabs v-model="activeTraderView" bg-color="accent" slider-color="secondary" align-tabs="center" show-arrows>
-            <v-tab v-for="(trader, index) in traders" :key="index" :value="trader.id">
+          <v-tabs
+            v-model="activeTraderView"
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+            show-arrows
+          >
+            <v-tab
+              v-for="(trader, index) in traders"
+              :key="index"
+              :value="trader.id"
+            >
               <v-avatar color="primary" size="2em" class="mr-2">
                 <v-img :src="traderAvatar(trader.id)" />
               </v-avatar>
@@ -58,9 +99,19 @@
       <v-col lg="4" md="12">
         <!-- Secondary views (available, locked, completed) -->
         <v-card>
-          <v-tabs v-model="activeSecondaryView" bg-color="accent" slider-color="secondary" align-tabs="center"
-            show-arrows>
-            <v-tab v-for="(view, index) in secondaryViews" :key="index" :value="view.view" :prepend-icon="view.icon">
+          <v-tabs
+            v-model="activeSecondaryView"
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+            show-arrows
+          >
+            <v-tab
+              v-for="(view, index) in secondaryViews"
+              :key="index"
+              :value="view.view"
+              :prepend-icon="view.icon"
+            >
               {{ view.title }}
             </v-tab>
           </v-tabs>
@@ -69,9 +120,20 @@
       <v-col lg="8" md="12">
         <!-- User view -->
         <v-card>
-          <v-tabs v-model="activeUserView" bg-color="accent" slider-color="secondary" align-tabs="center">
-            <v-tab v-for="view in userViews" :key="view.view" :value="view.view" :disabled="view.view == 'all' && activeSecondaryView != 'available'
-              ">
+          <v-tabs
+            v-model="activeUserView"
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+          >
+            <v-tab
+              v-for="view in userViews"
+              :key="view.view"
+              :value="view.view"
+              :disabled="
+                view.view == 'all' && activeSecondaryView != 'available'
+              "
+            >
               {{ view.title }}
             </v-tab>
           </v-tabs>
@@ -81,7 +143,11 @@
     <v-row justify="center">
       <v-col v-if="loadingTasks || reloadingTasks" cols="12" align="center">
         <!-- If we're still waiting on tasks from tarkov.dev API -->
-        <v-progress-circular indeterminate color="secondary" class="mx-2"></v-progress-circular>
+        <v-progress-circular
+          indeterminate
+          color="secondary"
+          class="mx-2"
+        ></v-progress-circular>
         {{ $t("page.tasks.loading") }}
         <refresh-button />
       </v-col>
@@ -89,24 +155,42 @@
     <v-row v-if="!loadingTasks && !reloadingTasks && visibleTasks.length == 0">
       <v-col cols="12">
         <v-alert icon="mdi-clipboard-search">
-          {{ $t("page.tasks.notasksfound") }}</v-alert>
+          {{ $t("page.tasks.notasksfound") }}</v-alert
+        >
       </v-col>
     </v-row>
     <v-row v-show="!loadingTasks && !reloadingTasks" justify="center">
-      <v-col v-if="activePrimaryView == 'maps' && visibleGPS.length > 0" cols="12" class="my-1">
+      <v-col
+        v-if="activePrimaryView == 'maps' && visibleGPS.length > 0"
+        cols="12"
+        class="my-1"
+      >
         <v-expansion-panels v-model="expandMap">
           <v-expansion-panel>
-            <v-expansion-panel-title>Objective Locations<span v-show="activeMapView != '55f2d3fd4bdc2d5f408b4567'">&nbsp;-&nbsp;{{ timeValue }}</span></v-expansion-panel-title>
+            <v-expansion-panel-title
+              >Objective Locations<span
+                v-show="activeMapView != '55f2d3fd4bdc2d5f408b4567'"
+                >&nbsp;-&nbsp;{{ timeValue }}</span
+              ></v-expansion-panel-title
+            >
             <v-expansion-panel-text>
-              <tarkov-map :map="maps.find((m) => m.id == activeMapView)" :marks="visibleGPS" />
+              <tarkov-map
+                :map="maps.find((m) => m.id == activeMapView)"
+                :marks="visibleGPS"
+              />
             </v-expansion-panel-text>
           </v-expansion-panel>
         </v-expansion-panels>
       </v-col>
       <v-col cols="12" class="my-1">
-        <v-lazy v-for="(task, taskIndex) in visibleTasks" :key="taskIndex" :options="{
-          threshold: 0.5,
-        }" min-height="100">
+        <v-lazy
+          v-for="(task, taskIndex) in visibleTasks"
+          :key="taskIndex"
+          :options="{
+            threshold: 0.5,
+          }"
+          min-height="100"
+        >
           <task-card :task="task" class="my-1" />
         </v-lazy>
       </v-col>
@@ -251,30 +335,34 @@ const traderAvatar = (id) => {
   return `/img/traders/${id}.jpg`;
 };
 
-
-const timeValue = ref('');
-setTimeout(() => { timeUpdate(); }, 500);
+const timeValue = ref("");
+setTimeout(() => {
+  timeUpdate();
+}, 500);
 
 function timeUpdate() {
-  var oneHour = 60*60*1000;
+  var oneHour = 60 * 60 * 1000;
   var currentDate = new Date();
   // Tarkov's time runs at 7 times the speed ...
-  var timeAtTarkovSpeed = (currentDate.getTime() * 7) % (24*oneHour);
+  var timeAtTarkovSpeed = (currentDate.getTime() * 7) % (24 * oneHour);
   // ... and it is offset by 3 hours from UTC (because that's Moscow's time zone)
-  var tarkovTime = new Date(timeAtTarkovSpeed + (3*oneHour));
+  var tarkovTime = new Date(timeAtTarkovSpeed + 3 * oneHour);
   var tarkovHour = tarkovTime.getUTCHours();
   var tarkovMinute = tarkovTime.getUTCMinutes();
-  var tarkovSecondHour = (tarkovHour+12) % 24;
-  timeValue.value = 
-    tarkovHour.toString().padStart(2,'0')+':'+tarkovMinute.toString().padStart(2,'0')
-    +" / "+
-    tarkovSecondHour.toString().padStart(2,'0')+':'+tarkovMinute.toString().padStart(2,'0');
+  var tarkovSecondHour = (tarkovHour + 12) % 24;
+  timeValue.value =
+    tarkovHour.toString().padStart(2, "0") +
+    ":" +
+    tarkovMinute.toString().padStart(2, "0") +
+    " / " +
+    tarkovSecondHour.toString().padStart(2, "0") +
+    ":" +
+    tarkovMinute.toString().padStart(2, "0");
 
   setTimeout(() => {
     timeUpdate();
   }, 3000);
 }
-
 
 const loadingTasks = computed(() => {
   return tasksLoading.value;
@@ -314,7 +402,7 @@ const visibleGPS = computed(() => {
           var users = unlockedUsers.filter(
             (user) =>
               progressStore.objectiveCompletions[objective.id][user] == false
-          )
+          );
           if (users) {
             // Were a valid, unlocked, uncompleted objective, so add it to the list
             visibleGPS.push({ ...objective, users: users });
@@ -322,7 +410,7 @@ const visibleGPS = computed(() => {
         } else {
           if (
             progressStore.objectiveCompletions[objective.id][
-            activeUserView.value
+              activeUserView.value
             ] == false
           ) {
             // Were a valid, unlocked, uncompleted objective, so add it to the list
@@ -336,7 +424,10 @@ const visibleGPS = computed(() => {
 });
 
 function objectiveHasLocation(objective) {
-  if (objective?.possibleLocations?.length > 0 || objective?.zones?.length > 0) {
+  if (
+    objective?.possibleLocations?.length > 0 ||
+    objective?.zones?.length > 0
+  ) {
     return true;
   } else {
     return false;
@@ -365,10 +456,12 @@ const mapTaskTotals = computed(() => {
           progressStore.unlockedTasks[task.id][activeUserView.value]
         ) {
           let anyObjectiveLeft = false;
-          for (const objective of task.objectives){
+          for (const objective of task.objectives) {
             if (objective.maps.includes(map.id)) {
-              if (progressStore.objectiveCompletions[objective.id].self !== true) {
-                anyObjectiveLeft=true;
+              if (
+                progressStore.objectiveCompletions[objective.id].self !== true
+              ) {
+                anyObjectiveLeft = true;
                 break;
               }
             }
@@ -434,7 +527,7 @@ const updateVisibleTasks = async function () {
       visibleTaskList = visibleTaskList.filter(
         (task) =>
           progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] !=
-          true &&
+            true &&
           progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] != true
       );
     } else if (activeSecondaryView.value == "completed") {
