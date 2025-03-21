@@ -8,7 +8,7 @@ to the project, please search for an existing issue, then create your own if non
 related exist.
 
 If you are contributing via a Pull Request, please verify that the commit is
-working locally by running the Firebase Emulator and visting a local version of
+working locally by running the Firebase Emulator and visiting a local version of
 the project. When making your pull request, please wait for sign-off from a core
 contributor, once sign-off is complete, you may merge your pull request yourself.
 As this is a new project, there will be limited core contributors for some time,
@@ -88,9 +88,9 @@ members of the project's leadership.
 ## Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage], version 1.4,
-available at https://www.contributor-covenant.org/version/1/4/code-of-conduct.html
+available at <https://www.contributor-covenant.org/version/1/4/code-of-conduct.html>
 
 [homepage]: https://www.contributor-covenant.org
 
 For answers to common questions about this code of conduct, see
-https://www.contributor-covenant.org/faq
+<https://www.contributor-covenant.org/faq>
