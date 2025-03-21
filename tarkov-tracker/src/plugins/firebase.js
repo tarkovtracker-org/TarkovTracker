@@ -8,10 +8,10 @@ import "firebase/compat/auth";
 const { hostname } = new URL(document.location.href);
 
 const firebaseConfig =
-  hostname == "tarkovtracker.io"
+  hostname == "tarkovtracker.org"
     ? {
         apiKey: "AIzaSyCRgDK1U5wjeQA8RbRFTAj_jprsG4hF0zw",
-        authDomain: "auth.tarkovtracker.io",
+        authDomain: "auth.tarkovtracker.org",
         projectId: "tarkovtracker-production",
         storageBucket: "tarkovtracker-production.appspot.com",
         messagingSenderId: "140836645499",
