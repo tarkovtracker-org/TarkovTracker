@@ -27,7 +27,7 @@
             >
               <template #github>
                 <a
-                  href="https://github.com/TarkovTracker/TarkovTracker"
+                  href="https://github.com/DysektAI/TarkovTracker"
                   target="_blank"
                   class="info-link"
                 >
@@ -37,40 +37,6 @@
               </template>
             </i18n-t>
           </div>
-          <div class="mt-1">
-            <i18n-t
-              keypath="footer.call_to_action.patreon_phrase"
-              scope="global"
-            >
-              <template #patreon>
-                <a
-                  href="https://www.patreon.com/apologist"
-                  target="_blank"
-                  class="info-link"
-                >
-                  <v-icon class="mr-1">mdi-patreon</v-icon
-                  >{{ $t("footer.call_to_action.patreon") }}
-                </a>
-              </template>
-            </i18n-t>
-          </div>
-        </v-col>
-        <v-col cols="12" md="4" align-self="center">
-          <v-img
-            src="/img/UkraineDove.svg"
-            class="custom-svg"
-            alt="Ukraine Dove"
-          />
-          <i18n-t keypath="footer.ukraine.support_phrase" scope="global">
-            <template #support_ukraine>
-              <a
-                href="https://www.icrc.org/en/donate/ukraine"
-                target="_blank"
-                class="info-link"
-                >{{ $t("footer.ukraine.support_link") }}</a
-              >
-            </template>
-          </i18n-t>
         </v-col>
       </v-row>
       <!-- Notice of Battlestate Games copy/trade notices -->
@@ -81,9 +47,6 @@
         </div>
         <div class="mt-2">
           TarkovTracker &copy; 2020 - {{ new Date().getFullYear() }}
-          <router-link :to="{ path: '/contributors' }" class="info-link"
-            >TarkovTracker contributors</router-link
-          >
         </div>
         <div class="mt-0">
           <router-link to="/terms" target="_blank" class="info-link"

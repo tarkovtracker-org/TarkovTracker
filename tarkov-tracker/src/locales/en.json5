@@ -243,16 +243,10 @@
   },
   footer: {
     call_to_action: {
-      discord_phrase: "Report bugs/retask features on {discord}",
+      discord_phrase: "Report bugs/request features on {discord}",
       github_phrase: "Contribute to the open source project on {github}",
-      patreon_phrase: "Support project costs on {patreon}",
       discord: "Discord",
       github: "GitHub",
-      patreon: "Patreon",
-    },
-    ukraine: {
-      support_link: "Support Ukrainians",
-      support_phrase: "{support_ukraine} via the ICRC",
     },
   },
   module: {

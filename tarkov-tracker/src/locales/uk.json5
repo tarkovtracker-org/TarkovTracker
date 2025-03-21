@@ -224,14 +224,8 @@
     call_to_action: {
       discord_phrase: "Повідомити про помилки/запитати функції в {discord}",
       github_phrase: "Зробити внесок у проект із відкритим вихідним кодом на {github}",
-      patreon_phrase: "Підтримайте проект на {patreon}",
       discord: "Discord",
       github: "GitHub",
-      patreon: "Patreon",
-    },
-    ukraine: {
-      support_link: "Підтримка України",
-      support_phrase: "{support_ukraine} через ICRC",
     },
   },
   module: {
