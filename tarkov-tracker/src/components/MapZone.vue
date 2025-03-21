@@ -1,16 +1,23 @@
 <template>
-  <div :style="zoneStyle" :class="zoneColor" @mouseenter="showTooltip()" @mouseleave="hideTooltip()"
-    @click="forceTooltipToggle()">
-  </div>
+  <div
+    :style="zoneStyle"
+    :class="zoneColor"
+    @mouseenter="showTooltip()"
+    @mouseleave="hideTooltip()"
+    @click="forceTooltipToggle()"
+  ></div>
   <div v-if="tooltipVisible" :style="tooltipStyle">
     <v-sheet class="ma-0 elevation-3 rounded px-1 pt-2" color="primary">
       <task-link :task="relatedTask" show-wiki-link />
-      <task-objective v-if="props.mark.id" :objective="objectives.find((obj) => obj.id == props.mark.id)" />
+      <task-objective
+        v-if="props.mark.id"
+        :objective="objectives.find((obj) => obj.id == props.mark.id)"
+      />
     </v-sheet>
   </div>
 </template>
 <script setup>
-import { defineProps, computed, defineAsyncComponent, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata.js";
 
 const TaskObjective = defineAsyncComponent(() =>
@@ -32,6 +39,7 @@ const props = defineProps({
   selectedFloor: {
     type: String,
     required: false,
+    default: "",
   },
   map: {
     type: Object,
@@ -68,8 +76,8 @@ const relatedTask = computed(() => {
 });
 
 const zoneColor = computed(() => {
-  if (tooltipVisible.value) return 'text-green';
-  return props.mark.users.includes('self') ? 'text-red' : 'text-orange';
+  if (tooltipVisible.value) return "text-green";
+  return props.mark.users.includes("self") ? "text-red" : "text-orange";
 });
 
 const relativeLocation = computed(() => {
@@ -77,10 +85,14 @@ const relativeLocation = computed(() => {
   // Take the bounds of the map and figure out the initial relative position
   let mapLeft = props.map.svg.bounds[0][0];
   let mapTop = props.map.svg.bounds[0][1];
-  let mapWidth = Math.max(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]) - Math.min(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]);
-  let mapHeight = Math.max(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]) - Math.min(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]);
+  let mapWidth =
+    Math.max(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]) -
+    Math.min(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]);
+  let mapHeight =
+    Math.max(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]) -
+    Math.min(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]);
 
-  let outlinePercents = []
+  let outlinePercents = [];
   props.zoneLocation.outline.forEach((outline) => {
     // Calculate relative values using the coordinate system of the map
     let relativeLeft = Math.abs(outline.x - mapLeft);
@@ -91,8 +103,8 @@ const relativeLocation = computed(() => {
     outlinePercents.push({
       leftPercent: relativeLeftPercent,
       topPercent: relativeTopPercent,
-    })
-  })
+    });
+  });
 
   // Find the bounds of the outline
   let leftPercent = outlinePercents.reduce((min, current) => {
@@ -112,15 +124,18 @@ const relativeLocation = computed(() => {
   }, outlinePercents[0].topPercent);
 
   // Now, calculate the percentages internally to the div based on the bounds
-  let internalPercents = []
+  let internalPercents = [];
   outlinePercents.forEach((outline) => {
-    let internalLeftPercent = ((outline.leftPercent - leftPercent) / (rightPercent - leftPercent)) * 100;
-    let internalTopPercent = ((outline.topPercent - topPercent) / (bottomPercent - topPercent)) * 100;
+    let internalLeftPercent =
+      ((outline.leftPercent - leftPercent) / (rightPercent - leftPercent)) *
+      100;
+    let internalTopPercent =
+      ((outline.topPercent - topPercent) / (bottomPercent - topPercent)) * 100;
     internalPercents.push({
       leftPercent: internalLeftPercent,
       topPercent: internalTopPercent,
-    })
-  })
+    });
+  });
 
   return {
     leftPercent: leftPercent,
@@ -136,12 +151,25 @@ const zoneStyle = computed(() => {
     position: "absolute",
     top: relativeLocation.value.topPercent + "%",
     left: relativeLocation.value.leftPercent + "%",
-    width: relativeLocation.value.rightPercent - relativeLocation.value.leftPercent + "%",
-    height: relativeLocation.value.bottomPercent - relativeLocation.value.topPercent + "%",
-    "clip-path": "polygon(" + relativeLocation.value.internalPercents.map((point) => {
-      return point.leftPercent + "% " + point.topPercent + "%";
-    }).join(", ") + ")",
-    background: tooltipVisible.value ? "linear-gradient(90deg, rgba(155, 165, 0, 0.5) 0%, rgba(155, 165, 0, 0.5) 100%)" : "linear-gradient(90deg, rgba(255, 165, 0, 0.2) 0%, rgba(255, 165, 0, 0.2) 100%)",
+    width:
+      relativeLocation.value.rightPercent -
+      relativeLocation.value.leftPercent +
+      "%",
+    height:
+      relativeLocation.value.bottomPercent -
+      relativeLocation.value.topPercent +
+      "%",
+    "clip-path":
+      "polygon(" +
+      relativeLocation.value.internalPercents
+        .map((point) => {
+          return point.leftPercent + "% " + point.topPercent + "%";
+        })
+        .join(", ") +
+      ")",
+    background: tooltipVisible.value
+      ? "linear-gradient(90deg, rgba(155, 165, 0, 0.5) 0%, rgba(155, 165, 0, 0.5) 100%)"
+      : "linear-gradient(90deg, rgba(255, 165, 0, 0.2) 0%, rgba(255, 165, 0, 0.2) 100%)",
     "border-style": "dashed",
     // cursor: props.mark.floor === props.selectedFloor ? "pointer" : "inherit",
     // opacity: props.mark.floor === props.selectedFloor ? 1 : 0.2,
