@@ -14,7 +14,9 @@
       ></v-app-bar-nav-icon>
     </template>
 
-    <v-toolbar-title>{{ $t(`page.${route.name}.title`) }}</v-toolbar-title>
+    <v-toolbar-title>{{
+      $t(`page.${route.name.replace("-", "_")}.title`)
+    }}</v-toolbar-title>
 
     <span v-if="dataError">
       <!-- Show an icon and tooltip if we have a GraphQL error -->
