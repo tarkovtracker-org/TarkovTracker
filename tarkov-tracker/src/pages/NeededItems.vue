@@ -5,33 +5,62 @@
       <v-col cols="12" sm="12" md="3" lg="3">
         <!-- Primary views (all, maps, traders) -->
         <v-card>
-          <v-tabs v-model="activeNeededView" bg-color="accent" slider-color="secondary" align-tabs="center" show-arrows>
-            <v-tab v-for="(view, index) in neededViews" :key="index" :value="view.view" :prepend-icon="view.icon">
+          <v-tabs
+            v-model="activeNeededView"
+            bg-color="accent"
+            slider-color="secondary"
+            align-tabs="center"
+            show-arrows
+          >
+            <v-tab
+              v-for="(view, index) in neededViews"
+              :key="index"
+              :value="view.view"
+              :prepend-icon="view.icon"
+            >
               {{ view.title }}
             </v-tab>
           </v-tabs>
         </v-card>
       </v-col>
       <v-col cols="9" sm="10" md="8" lg="8">
-        <v-text-field v-model="itemFilterNameText" label="Search by item name" variant="solo" hide-details
-          density="comfortable"></v-text-field>
+        <v-text-field
+          v-model="itemFilterNameText"
+          label="Search by item name"
+          variant="solo"
+          hide-details
+          density="comfortable"
+        ></v-text-field>
       </v-col>
       <v-col cols="3" sm="2" md="1" lg="1">
         <v-dialog v-model="settingsDialog" scrim="#9A8866">
           <template #activator="{ props }">
-            <v-btn v-bind="props" variant="tonal" style="width: 100%; height: 48px" class="px-0">
+            <v-btn
+              v-bind="props"
+              variant="tonal"
+              style="width: 100%; height: 48px"
+              class="px-0"
+            >
               <v-icon>mdi-cog</v-icon>
             </v-btn>
           </template>
           <v-row class="justify-center">
             <v-col cols="auto">
-              <v-card :title="$t('page.neededitems.options.title')" style="width: fit-content">
+              <v-card
+                :title="$t('page.neededitems.options.title')"
+                style="width: fit-content"
+              >
                 <v-card-text>
                   <v-container class="ma-0 pa-0">
                     <v-row dense>
                       <!-- Choose needed items layout style -->
                       <v-col cols="12">
-                        <v-btn-toggle v-model="neededItemsStyle" rounded="0" group variant="outlined">
+                        <v-btn-toggle
+                          v-model="neededItemsStyle"
+                          rounded="0"
+                          group
+                          variant="outlined"
+                        >
                           <v-btn value="mediumCard" icon="mdi-view-grid">
                           </v-btn>
 
@@ -44,23 +73,58 @@
                       </v-col>
                       <!-- Hide Task Items that aren't needed found in raid option-->
                       <v-col cols="12">
-                        <v-switch v-model="hideFIR" :label="$t(hideFIRLabel)" inset true-icon="mdi-eye-off"
-                          false-icon="mdi-eye" :color="hideFIRColor" hide-details density="compact"></v-switch>
-                        <v-switch v-model="itemsHideAll" :label="$t(itemsHideAllLabel)" inset true-icon="mdi-eye-off"
-                          false-icon="mdi-eye" :color="itemsHideAllColor" hide-details density="compact"></v-switch>
-                        <v-switch v-model="itemsHideNonFIR" :disabled="itemsHideAll" :label="$t(itemsHideNonFIRLabel)"
-                          inset true-icon="mdi-eye-off" false-icon="mdi-eye" :color="itemsHideNonFIRColor" hide-details
-                          density="compact"></v-switch>
-                        <v-switch v-model="itemsHideHideout" :disabled="itemsHideAll" :label="$t(itemsHideHideoutLabel)"
-                          inset true-icon="mdi-eye-off" false-icon="mdi-eye" :color="itemsHideHideoutColor" hide-details
-                          density="compact"></v-switch>
+                        <v-switch
+                          v-model="hideFIR"
+                          :label="$t(hideFIRLabel)"
+                          inset
+                          true-icon="mdi-eye-off"
+                          false-icon="mdi-eye"
+                          :color="hideFIRColor"
+                          hide-details
+                          density="compact"
+                        ></v-switch>
+                        <v-switch
+                          v-model="itemsHideAll"
+                          :label="$t(itemsHideAllLabel)"
+                          inset
+                          true-icon="mdi-eye-off"
+                          false-icon="mdi-eye"
+                          :color="itemsHideAllColor"
+                          hide-details
+                          density="compact"
+                        ></v-switch>
+                        <v-switch
+                          v-model="itemsHideNonFIR"
+                          :disabled="itemsHideAll"
+                          :label="$t(itemsHideNonFIRLabel)"
+                          inset
+                          true-icon="mdi-eye-off"
+                          false-icon="mdi-eye"
+                          :color="itemsHideNonFIRColor"
+                          hide-details
+                          density="compact"
+                        ></v-switch>
+                        <v-switch
+                          v-model="itemsHideHideout"
+                          :disabled="itemsHideAll"
+                          :label="$t(itemsHideHideoutLabel)"
+                          inset
+                          true-icon="mdi-eye-off"
+                          false-icon="mdi-eye"
+                          :color="itemsHideHideoutColor"
+                          hide-details
+                          density="compact"
+                        ></v-switch>
                       </v-col>
-
                     </v-row>
                     <v-row justify="end">
                       <v-col cols="12" md="6">
-                        <v-btn color="primary" block @click="settingsDialog = false">{{
-                          $t("page.neededitems.options.close") }}</v-btn>
+                        <v-btn
+                          color="primary"
+                          block
+                          @click="settingsDialog = false"
+                          >{{ $t("page.neededitems.options.close") }}</v-btn
+                        >
                       </v-col>
                     </v-row>
                   </v-container>
@@ -73,17 +137,35 @@
     </v-row>
     <v-row v-if="loading || hideoutLoading" justify="center">
       <v-col cols="12" align="center">
-        <v-progress-circular indeterminate color="secondary" class="mx-2"></v-progress-circular>
+        <v-progress-circular
+          indeterminate
+          color="secondary"
+          class="mx-2"
+        ></v-progress-circular>
         {{ $t("page.neededitems.loading") }} <refresh-button />
       </v-col>
     </v-row>
-    <v-row v-show="activeNeededView == 'all' || activeNeededView == 'tasks'" justify="space-between">
-      <needed-item v-for="(neededItem, itemIndex) in neededTaskItems" :key="itemIndex" :need="neededItem"
-        :itemStyle="neededItemsStyle" />
+    <v-row
+      v-show="activeNeededView == 'all' || activeNeededView == 'tasks'"
+      justify="space-between"
+    >
+      <needed-item
+        v-for="(neededItem, itemIndex) in neededTaskItems"
+        :key="itemIndex"
+        :need="neededItem"
+        :item-style="neededItemsStyle"
+      />
     </v-row>
-    <v-row v-show="activeNeededView == 'all' || activeNeededView == 'hideout'" justify="space-between">
-      <needed-item v-for="(neededItem, itemIndex) in neededHideoutItems" :key="itemIndex" :need="neededItem"
-        :itemStyle="neededItemsStyle" />
+    <v-row
+      v-show="activeNeededView == 'all' || activeNeededView == 'hideout'"
+      justify="space-between"
+    >
+      <needed-item
+        v-for="(neededItem, itemIndex) in neededHideoutItems"
+        :key="itemIndex"
+        :need="neededItem"
+        :item-style="neededItemsStyle"
+      />
     </v-row>
   </v-container>
 </template>
