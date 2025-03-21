@@ -1,6 +1,11 @@
 <template>
-  <div :style="markerStyle" :class="markerColor" @mouseenter="showTooltip()" @mouseleave="hideTooltip()"
-    @click="forceTooltipToggle()">
+  <div
+    :style="markerStyle"
+    :class="markerColor"
+    @mouseenter="showTooltip()"
+    @mouseleave="hideTooltip()"
+    @click="forceTooltipToggle()"
+  >
     <v-icon>{{
       tooltipVisible == true ? "mdi-map-marker-radius" : "mdi-map-marker"
     }}</v-icon>
@@ -8,12 +13,15 @@
   <div v-if="tooltipVisible" :style="tooltipStyle">
     <v-sheet class="ma-0 elevation-3 rounded px-1 pt-2" color="primary">
       <task-link :task="relatedTask" show-wiki-link />
-      <task-objective v-if="props.mark.id" :objective="objectives.find((obj) => obj.id == props.mark.id)" />
+      <task-objective
+        v-if="props.mark.id"
+        :objective="objectives.find((obj) => obj.id == props.mark.id)"
+      />
     </v-sheet>
   </div>
 </template>
 <script setup>
-import { defineProps, computed, defineAsyncComponent, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata.js";
 
 const TaskObjective = defineAsyncComponent(() =>
@@ -35,6 +43,7 @@ const props = defineProps({
   selectedFloor: {
     type: String,
     required: false,
+    default: "",
   },
   map: {
     type: Object,
@@ -71,15 +80,19 @@ const relatedTask = computed(() => {
 });
 
 const markerColor = computed(() => {
-  return props.mark.users.includes('self') ? 'text-red' : 'text-orange';
+  return props.mark.users.includes("self") ? "text-red" : "text-orange";
 });
 
 const relativeLocation = computed(() => {
   // Take the bounds of the map and figure out the initial relative position
   let mapLeft = props.map.svg.bounds[0][0];
   let mapTop = props.map.svg.bounds[0][1];
-  let mapWidth = Math.max(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]) - Math.min(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]);
-  let mapHeight = Math.max(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]) - Math.min(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]);
+  let mapWidth =
+    Math.max(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]) -
+    Math.min(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]);
+  let mapHeight =
+    Math.max(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]) -
+    Math.min(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]);
   let relativeLeft = Math.abs(props.markLocation.positions[0].x - mapLeft);
   let relativeTop = Math.abs(props.markLocation.positions[0].z - mapTop);
   let relativeLeftPercent = (relativeLeft / mapWidth) * 100;
