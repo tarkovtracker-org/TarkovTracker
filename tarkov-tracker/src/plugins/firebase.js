@@ -15,13 +15,13 @@ import {
 const { hostname } = new URL(document.location.href);
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBsKRL4E1x1gJvpAxfz928tZkFG6Yarp8k",
-  authDomain: "tarkovtracker-org.firebaseapp.com",
-  projectId: "tarkovtracker-org",
-  storageBucket: "tarkovtracker-org.firebasestorage.app",
-  messagingSenderId: "818747951766",
-  appId: "1:818747951766:web:84aa73880ab4bd651510b7",
-  measurementId: "G-T1EESKHZPE",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
