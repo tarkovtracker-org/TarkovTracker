@@ -17,9 +17,9 @@
               hide-details
               :active="factionMenuActive"
             >
-              <template v-slot:item="{ item, props }">
-                <v-list-item v-bind="props">
-                  <template v-slot:prepend>
+              <template #item="{ item }">
+                <v-list-item>
+                  <template #prepend>
                     <v-img
                       :src="factionImage(item.value)"
                       width="1.5em"
@@ -28,7 +28,7 @@
                   </template>
                 </v-list-item>
               </template>
-              <template v-slot:prepend-inner>
+              <template #prepend-inner>
                 <v-img
                   :src="factionImage(currentPMCFaction)"
                   width="1em"
