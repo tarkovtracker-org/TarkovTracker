@@ -54,11 +54,6 @@ const uiConfig = {
     // Leave the lines as is for the providers you want to offer your users.
     firebase.GoogleAuthProvider.PROVIDER_ID,
     firebase.GithubAuthProvider.PROVIDER_ID,
-    firebase.TwitterAuthProvider.PROVIDER_ID,
-    {
-      provider: "microsoft.com",
-      loginHintKey: "login_hint",
-    },
   ],
   signInFlow: "popup",
   // Terms of Service
