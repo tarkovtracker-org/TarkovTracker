@@ -12,14 +12,24 @@
                 appStore.drawerUseRail(mdAndDown) ? 'd-flex fake-link' : ''
               "
             >
-              <v-img :src="fireuser.photoURL" />
+              <v-img
+                :src="
+                  userStore.getStreamerMode
+                    ? '/img/default-avatar.svg'
+                    : fireuser.photoURL
+                "
+              />
             </v-avatar>
           </template>
           <template v-else>
             <v-list-item
               v-bind="props"
-              :title="fireuser.displayName"
-              :prepend-avatar="fireuser.photoURL"
+              :title="userStore.getStreamerMode ? 'User' : fireuser.displayName"
+              :prepend-avatar="
+                userStore.getStreamerMode
+                  ? '/img/default-avatar.svg'
+                  : fireuser.photoURL
+              "
             ></v-list-item>
           </template>
         </template>
@@ -35,10 +45,12 @@
 import { fireuser, auth } from "@/plugins/firebase";
 import { defineAsyncComponent } from "vue";
 import { useAppStore } from "@/stores/app.js";
+import { useUserStore } from "@/stores/user.js";
 import { useDisplay } from "vuetify";
 import { signOut } from "firebase/auth";
 const { mdAndDown } = useDisplay();
 const appStore = useAppStore();
+const userStore = useUserStore();
 
 const DrawerItem = defineAsyncComponent(() =>
   import("@/components/drawer/DrawerItem.vue")
