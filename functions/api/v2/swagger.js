@@ -11,7 +11,7 @@ const swaggerOptions = {
       version: "2.0",
       contact: {
         name: "TarkovTracker GitHub",
-        url: "https://github.com/TarkovTracker/TarkovTracker",
+        url: "https://github.com/DysektAI/TarkovTracker",
       },
       license: {
         name: "GNU General Public License v3.0",
@@ -19,7 +19,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: "https://tarkovtracker.io/api/v2",
+        url: "https://tarkovtracker.org/api/v2",
         description: "TarkovTracker API v2 endpoint",
       },
     ],
@@ -37,7 +37,7 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: ["api/v2/api*.js", "api/v2/index.js", "api/v2/components*.js"],
+  apis: ["./api/v2/routes/*.js"],
 };
 
 const openapiSpecification = swaggerJsdoc(swaggerOptions);
