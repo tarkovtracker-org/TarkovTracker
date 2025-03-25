@@ -81,7 +81,8 @@
 <script setup>
 import { ref, defineAsyncComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { fireapp } from "@/plugins/firebase";
+import { functions } from "@/plugins/firebase";
+import { httpsCallable } from "firebase/functions";
 import { useLiveData } from "@/composables/livedata";
 import availablePermissions from "@/utils/api_permissions.js";
 const TokenCard = defineAsyncComponent(() =>
@@ -132,23 +133,27 @@ const createToken = async () => {
 
   creatingToken.value = true;
   try {
-    tokenResult.value = await fireapp.functions().httpsCallable("createToken")({
+    console.log("Creating token with:", {
       note: tokenName.value,
       permissions: selectedPermissions.value,
     });
+    const createTokenFn = httpsCallable(functions, "createToken");
+    tokenResult.value = await createTokenFn({
+      note: tokenName.value,
+      permissions: selectedPermissions.value,
+    });
+    console.log("Token creation result:", tokenResult.value);
     newTokenForm.value.reset();
     selectedPermissions.value = [];
     tokenResult.value = t("page.settings.card.apitokens.create_token_success");
     newTokenSnackbar.value = true;
   } catch (error) {
+    console.error("Token creation error:", error);
     tokenResult.value = t("page.settings.card.apitokens.create_token_error");
     newTokenSnackbar.value = true;
   }
 
   creatingToken.value = false;
 };
-
-// Tokens
-//const systemStore = useSystemStore();
 </script>
 <style lang="scss" scoped></style>

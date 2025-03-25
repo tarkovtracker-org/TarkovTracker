@@ -62,8 +62,9 @@
   </v-sheet>
 </template>
 <script setup>
-import { fireapp } from "@/plugins/firebase";
+import { firestore, functions } from "@/plugins/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { computed, onMounted } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -85,7 +86,7 @@ const userStore = useUserStore();
 
 // Ref to store tokenData when retrieved from Firestore
 const tokenDataRef = ref(null);
-const tokenDoc = doc(fireapp.firestore(), "token", props.token);
+const tokenDoc = doc(firestore, "token", props.token);
 // Retrieve the data from the document then store it in tokenDataRef
 getDoc(tokenDoc)
   .then((doc) => {
@@ -136,21 +137,25 @@ const copyToken = () => {
 const deleting = ref(false);
 
 // Delete token function
-const deleteToken = () => {
+const deleteToken = async () => {
   // Use the firebase callable function to delete the token
-  const deleteToken = fireapp.functions().httpsCallable("revokeToken");
+  const revokeTokenFn = httpsCallable(functions, "revokeToken");
   // Set deleting to true to disable the button
   deleting.value = true;
-  // Call the function and then read the result
-  deleteToken({ token: props.token }).then((result) => {
+  try {
+    // Call the function and then read the result
+    const result = await revokeTokenFn({ token: props.token });
     // Read result of the Cloud Function.
     if (result.data.error) {
       // If there was an error, log it
       console.error(result.data.error);
     }
+  } catch (error) {
+    console.error("Error revoking token:", error);
+  } finally {
     // Set deleting to false to re-enable the button
     deleting.value = false;
-  });
+  }
 };
 
 // Ref to store whether the QR code is being shown
