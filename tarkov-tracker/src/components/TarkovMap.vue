@@ -52,7 +52,7 @@
   </v-container>
 </template>
 <script setup>
-import { defineProps, ref, onMounted, defineAsyncComponent, watch } from "vue";
+import { ref, onMounted, defineAsyncComponent, watch } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import * as d3 from "d3";
 const randomMapId = ref(uuidv4());

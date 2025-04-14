@@ -96,7 +96,7 @@
       </v-col>
     </v-row>
     <v-row dense>
-      <v-col lg="4" md="12">
+      <v-col lg="6" md="6">
         <!-- Secondary views (available, locked, completed) -->
         <v-card>
           <v-tabs
@@ -105,6 +105,7 @@
             slider-color="secondary"
             align-tabs="center"
             show-arrows
+            density="comfortable"
           >
             <v-tab
               v-for="(view, index) in secondaryViews"
@@ -117,14 +118,15 @@
           </v-tabs>
         </v-card>
       </v-col>
-      <v-col lg="8" md="12">
+      <v-col lg="6" md="6" class="d-flex align-center">
         <!-- User view -->
-        <v-card>
+        <v-card width="100%">
           <v-tabs
             v-model="activeUserView"
             bg-color="accent"
             slider-color="secondary"
             align-tabs="center"
+            density="comfortable"
           >
             <v-tab
               v-for="view in userViews"

@@ -2,7 +2,7 @@
   <tracker-tip tip="neededitems"></tracker-tip>
   <v-container>
     <v-row align="center" dense>
-      <v-col cols="12" sm="12" md="3" lg="3">
+      <v-col cols="9" sm="8" md="9" lg="8">
         <!-- Primary views (all, maps, traders) -->
         <v-card>
           <v-tabs
@@ -23,13 +23,15 @@
           </v-tabs>
         </v-card>
       </v-col>
-      <v-col cols="9" sm="10" md="8" lg="8">
+      <v-col cols="3" sm="4" md="3" lg="3">
         <v-text-field
           v-model="itemFilterNameText"
           label="Search by item name"
           variant="solo"
           hide-details
           density="comfortable"
+          :append-inner-icon="itemFilterNameText ? 'mdi-close-circle' : ''"
+          @click:append-inner="clearItemFilterNameText"
         ></v-text-field>
       </v-col>
       <v-col cols="3" sm="2" md="1" lg="1">
@@ -196,6 +198,9 @@ const {
 const progressStore = useProgressStore();
 const userStore = useUserStore();
 const itemFilterNameText = ref("");
+function clearItemFilterNameText() {
+  if (itemFilterNameText.value) itemFilterNameText.value = "";
+}
 const itemFilterName = ref("");
 provide("itemFilterName", itemFilterName);
 watch(
