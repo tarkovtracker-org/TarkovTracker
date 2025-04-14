@@ -3,9 +3,7 @@
 
 ## Process
 
-If you have a suggestion, or request that you aren't able to contribute yourself
-to the project, please search for an existing issue, then create your own if none
-related exist.
+If you have a suggestion, or request that you aren't able to contribute yourself to the project, please search for an existing issue, then create your own if there are no current issues related.
 
 If you are contributing via a Pull Request, please verify that the commit is
 working locally by running the Firebase Emulator and visiting a local version of
@@ -75,7 +73,7 @@ a project may be further defined and clarified by project maintainers.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team via email at [t AT tarkovtracker DOT io]. All
+reported by contacting the project (Fork) maintainer via [report@TarkovTracker.org](mailto:report@TarkovTracker.org). All
 complaints will be reviewed and investigated and will result in a response that
 is deemed necessary and appropriate to the circumstances. The project team is
 obligated to maintain confidentiality with regard to the reporter of an incident.
