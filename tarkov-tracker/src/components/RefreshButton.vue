@@ -1,12 +1,13 @@
 <template>
-  <v-btn v-show="refreshEnabled" variant="tonal" @click="refresh()">{{
-    $t("common.refreshbutton")
-  }}</v-btn>
+  <v-btn v-show="refreshEnabled" variant="tonal" @click="refresh()">{{ t("common.refreshbutton") }}</v-btn>
 </template>
 <script setup>
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useRouter } from "vue-router";
+
+const { t } = useI18n();
 const { loading, hideoutLoading } = useTarkovData();
 const router = useRouter();
 const refreshEnabled = ref(false);

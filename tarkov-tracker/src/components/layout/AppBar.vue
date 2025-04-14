@@ -15,7 +15,7 @@
     </template>
 
     <v-toolbar-title>{{
-      $t(`page.${route.name.replace("-", "_")}.title`)
+      t(`page.${route.name.replace("-", "_")}.title`)
     }}</v-toolbar-title>
 
     <span v-if="dataError">
@@ -64,6 +64,9 @@ import { useDisplay } from "vuetify";
 import { useRoute } from "vue-router";
 import { reactive } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata.js";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const state = reactive({ menu: null });
 
