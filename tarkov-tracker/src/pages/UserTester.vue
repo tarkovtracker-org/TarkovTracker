@@ -16,7 +16,7 @@
 </template>
 <script setup>
 import { defineAsyncComponent, ref } from "vue";
-import { fireapp, fireuser } from "@/plugins/firebase";
+import { app as fireapp, fireuser } from "@/plugins/firebase.ts";
 import { useRouter } from "vue-router";
 const TrackerTip = defineAsyncComponent(() =>
   import("@/components/TrackerTip.vue")
