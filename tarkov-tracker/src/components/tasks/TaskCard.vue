@@ -38,7 +38,7 @@
                   <v-icon icon="mdi-menu-right" />
                 </v-col>
                 <v-col>
-                  <i18n-t keypath="page.tasks.questcard.level" scope="global">
+                  <i18n-t keypath="page.tasks.questcard.level">
                     <template #count>
                       {{ props.task.minPlayerLevel }}
                     </template>
@@ -50,10 +50,7 @@
                   <v-icon icon="mdi-lock-open-outline" />
                 </v-col>
                 <v-col>
-                  <i18n-t
-                    keypath="page.tasks.questcard.lockedbefore"
-                    scope="global"
-                  >
+                  <i18n-t keypath="page.tasks.questcard.lockedbefore">
                     <template #count>
                       {{ lockedBefore }}
                     </template>
@@ -65,10 +62,7 @@
                   <v-icon icon="mdi-lock" />
                 </v-col>
                 <v-col>
-                  <i18n-t
-                    keypath="page.tasks.questcard.lockedbehind"
-                    scope="global"
-                  >
+                  <i18n-t keypath="page.tasks.questcard.lockedbehind">
                     <template #count>
                       {{ lockedBehind }}
                     </template>
@@ -86,7 +80,7 @@
               <v-row v-if="nonKappa" no-gutters class="mb-1">
                 <v-col cols="auto" class="mr-1">
                   <v-chip size="x-small" color="red" variant="outlined">
-                    {{ $t("page.tasks.questcard.nonkappa") }}
+                    {{ t("page.tasks.questcard.nonkappa") }}
                   </v-chip>
                 </v-col>
               </v-row>
@@ -101,7 +95,7 @@
                       <v-icon icon="mdi-information-outline" />
                     </v-col>
                     <v-col>
-                      {{ $t("page.tasks.questcard.wiki") }}
+                      {{ t("page.tasks.questcard.wiki") }}
                     </v-col>
                   </v-row>
                 </a>
@@ -133,7 +127,6 @@
                   >
                     <i18n-t
                       keypath="page.tasks.questcard.keysneeded"
-                      scope="global"
                       :plural="keyMap.keys.length"
                     >
                       <template #keys>
@@ -179,7 +172,6 @@
                 <v-icon size="x-small" class="mr-1">mdi-eye-off</v-icon>
                 <i18n-t
                   keypath="page.tasks.questcard.objectiveshidden"
-                  scope="global"
                   :plural="
                     props.task.objectives.length - relevantViewObjectives.length
                   "
@@ -217,11 +209,11 @@
                   class="mx-1 my-1"
                   @click="markTaskComplete()"
                   ><v-icon class="mr-2">mdi-check-all</v-icon
-                  >{{ $t("page.tasks.questcard.completebutton") }}</v-btn
+                  >{{ t("page.tasks.questcard.completebutton") }}</v-btn
                 >
                 <template v-if="props.task.alternatives?.length > 0">
                   <div class="d-flex justify-center">
-                    {{ $t("page.tasks.questcard.alternatives") }}
+                    {{ t("page.tasks.questcard.alternatives") }}
                   </div>
                   <div
                     v-for="(alternative, altIndex) in props.task.alternatives"
@@ -242,7 +234,7 @@
                     class="mx-1 my-1"
                     @click="markTaskComplete()"
                     ><v-icon class="mr-2">mdi-check-all</v-icon
-                    >{{ $t("page.tasks.questcard.completebutton") }}</v-btn
+                    >{{ t("page.tasks.questcard.completebutton") }}</v-btn
                   >
                 </div>
               </template>
@@ -256,11 +248,11 @@
                   class="mx-1 my-1"
                   @click="markTaskUncomplete()"
                   ><v-icon class="mr-2">mdi-undo</v-icon
-                  >{{ $t("page.tasks.questcard.uncompletebutton") }}</v-btn
+                  >{{ t("page.tasks.questcard.uncompletebutton") }}</v-btn
                 >
                 <template v-if="props.task.alternatives?.length > 0">
                   <div class="d-flex justify-center">
-                    {{ $t("page.tasks.questcard.alternativefailed") }}
+                    {{ t("page.tasks.questcard.alternativefailed") }}
                   </div>
                   <div
                     v-for="(alternative, altIndex) in props.task.alternatives"
@@ -281,13 +273,13 @@
                     class="mx-1 my-1"
                     @click="markTaskUncomplete()"
                     ><v-icon class="mr-2">mdi-undo</v-icon
-                    >{{ $t("page.tasks.questcard.uncompletebutton") }}</v-btn
+                    >{{ t("page.tasks.questcard.uncompletebutton") }}</v-btn
                   >
                 </div>
               </template>
             </template>
             <template v-else-if="!isOurFaction">
-              {{ $t("page.tasks.questcard.differentfaction") }}
+              {{ t("page.tasks.questcard.differentfaction") }}
             </template>
             <template v-else-if="isLocked">
               <!-- We are a locked quest, so the primary button is the unlock one -->
@@ -298,7 +290,7 @@
                   class="mx-1 my-1"
                   @click="markTaskAvailable()"
                   ><v-icon class="mr-2">mdi-fast-forward</v-icon
-                  >{{ $t("page.tasks.questcard.availablebutton") }}</v-btn
+                  >{{ t("page.tasks.questcard.availablebutton") }}</v-btn
                 >
                 <v-btn
                   size="x-large"
@@ -306,7 +298,7 @@
                   class="mx-1 my-1"
                   @click="markTaskComplete()"
                   ><v-icon class="mr-2">mdi-check-all</v-icon
-                  >{{ $t("page.tasks.questcard.completebutton") }}</v-btn
+                  >{{ t("page.tasks.questcard.completebutton") }}</v-btn
                 >
               </template>
               <template v-else>
@@ -317,7 +309,7 @@
                     class="mx-1 my-1"
                     @click="markTaskAvailable()"
                     ><v-icon class="mr-2">mdi-fast-forward</v-icon
-                    >{{ $t("page.tasks.questcard.availablebutton") }}</v-btn
+                    >{{ t("page.tasks.questcard.availablebutton") }}</v-btn
                   >
                   <v-btn
                     size="small"
@@ -325,7 +317,7 @@
                     class="mx-1 my-1"
                     @click="markTaskComplete()"
                     ><v-icon class="mr-2">mdi-check-all</v-icon
-                    >{{ $t("page.tasks.questcard.completebutton") }}</v-btn
+                    >{{ t("page.tasks.questcard.completebutton") }}</v-btn
                   >
                 </div>
               </template>
@@ -359,7 +351,7 @@ const props = defineProps({
     required: true,
   },
 });
-const { t } = useI18n({ useScope: "global" });
+const { t } = useI18n();
 const tarkovStore = useTarkovStore();
 const progressStore = useProgressStore();
 const userStore = useUserStore();
@@ -449,14 +441,17 @@ const markTaskComplete = () => {
     tarkovStore.setTaskObjectiveComplete(o.id);
   });
   // For each alternative task, mark it as failed
-  props.task.alternatives.forEach((a) => {
-    tarkovStore.setTaskFailed(a);
-    tasks.value
-      .find((task) => task.id == a)
-      .objectives.forEach((o) => {
-        tarkovStore.setTaskObjectiveComplete(o.id);
-      });
-  });
+  if (Array.isArray(props.task.alternatives)) {
+    props.task.alternatives.forEach((a) => {
+      tarkovStore.setTaskFailed(a);
+      const alternativeTask = tasks.value.find((task) => task.id == a);
+      if (alternativeTask && Array.isArray(alternativeTask.objectives)) {
+        alternativeTask.objectives.forEach((o) => {
+          tarkovStore.setTaskObjectiveComplete(o.id);
+        });
+      }
+    });
+  }
   //if the player is not at the task level, set it to the task level
   if (tarkovStore.playerLevel < props.task.minPlayerLevel) {
     tarkovStore.setLevel(props.task.minPlayerLevel);
@@ -475,14 +470,17 @@ const markTaskUncomplete = () => {
     tarkovStore.setTaskObjectiveUncomplete(o.id);
   });
   // For each alternative task, mark it as uncomplete
-  props.task.alternatives.forEach((a) => {
-    tarkovStore.setTaskUncompleted(a);
-    tasks.value
-      .find((task) => task.id == a)
-      .objectives.forEach((o) => {
-        tarkovStore.setTaskObjectiveUncomplete(o.id);
-      });
-  });
+  if (Array.isArray(props.task.alternatives)) {
+    props.task.alternatives.forEach((a) => {
+      tarkovStore.setTaskUncompleted(a);
+      const alternativeTask = tasks.value.find((task) => task.id == a);
+      if (alternativeTask && Array.isArray(alternativeTask.objectives)) {
+        alternativeTask.objectives.forEach((o) => {
+          tarkovStore.setTaskObjectiveUncomplete(o.id);
+        });
+      }
+    });
+  }
   taskStatus.value = t("page.tasks.questcard.statusuncomplete", {
     name: props.task.name,
   });

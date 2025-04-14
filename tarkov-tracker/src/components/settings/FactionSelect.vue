@@ -17,7 +17,7 @@
               hide-details
               :active="factionMenuActive"
             >
-            <template #item="{ item, props }">
+              <template #item="{ item, props }">
                 <v-list-item v-bind="props">
                   <template #prepend>
                     <v-img

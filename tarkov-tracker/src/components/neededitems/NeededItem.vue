@@ -69,6 +69,7 @@ const showItemFilter = computed(() => {
     return showItem.value;
   } else {
     return (
+      item.value &&
       (item.value.shortName
         .toLowerCase()
         .includes(filterString.value.toLowerCase()) ||
@@ -82,9 +83,15 @@ const showItemFilter = computed(() => {
 
 const showItem = computed(() => {
   if (props.need.needType == "taskObjective") {
-    return isTaskObjectiveNeeded(props.need);
+    // ONLY allow 'giveItem' objectives, and ensure an item exists
+    if (props.need.type !== 'giveItem') {
+      return false;
+    }
+    // Check if a valid item exists and other filters pass
+    return item.value && isTaskObjectiveNeeded(props.need);
   } else if (props.need.needType == "hideoutModule") {
-    return isHideoutModuleNeeded(props.need);
+    // Check if a valid item exists and other filters pass
+    return item.value && isHideoutModuleNeeded(props.need);
   } else {
     return false;
   }
@@ -221,7 +228,10 @@ const toggleCount = () => {
 };
 
 const imageItem = computed(() => {
-  if (item.value?.properties?.defaultPreset) {
+  if (!item.value) {
+    return null;
+  }
+  if (item.value.properties?.defaultPreset) {
     return item.value.properties.defaultPreset;
   } else {
     return item.value;
@@ -263,18 +273,15 @@ const relatedTask = computed(() => {
 
 const item = computed(() => {
   if (props.need.needType == "taskObjective") {
-    if (props.need.type == "mark") {
-      return props.need.markerItem;
-    } else if (props.need.type == "buildWeapon") {
-      return props.need.item;
-    } else if (props.need.type == "plantItem") {
-      return props.need.item;
-    } else if (props.need.type == "giveItem") {
+    // Only return an item if the objective type is 'giveItem'
+    if (props.need.type == "giveItem") {
       return props.need.item;
     } else {
+      // For other task objective types (mark, plant, find, build), return null in this context
       return null;
     }
   } else if (props.need.needType == "hideoutModule") {
+    // For hideout modules, return the associated item
     return props.need.item;
   } else {
     return null;

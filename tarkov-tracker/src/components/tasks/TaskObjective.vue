@@ -12,15 +12,16 @@
     </div>
     <v-row
       v-if="
-        (systemStore.userTeam && userNeeds.length > 0) ||
-        itemObjectiveTypes.includes(fullObjective.type)
+        fullObjective &&
+        ((systemStore.userTeam && userNeeds.length > 0) ||
+          itemObjectiveTypes.includes(fullObjective.type))
       "
       align="center"
       class="pa-0 ml-0"
       style="font-size: smaller; margin-top: 1px; margin-bottom: 1px"
     >
       <v-col
-        v-if="itemObjectiveTypes.includes(fullObjective.type)"
+        v-if="fullObjective && itemObjectiveTypes.includes(fullObjective.type)"
         cols="auto"
         class="pa-0 d-flex align-center"
       >
@@ -91,6 +92,9 @@ const fullObjective = computed(() => {
 const itemObjectiveTypes = ["giveItem", "mark", "buildWeapon", "plantItem"];
 
 const relatedItem = computed(() => {
+  if (!fullObjective.value) {
+    return null;
+  }
   // Select case fullObjective.type
   switch (fullObjective.value.type) {
     case "giveItem":

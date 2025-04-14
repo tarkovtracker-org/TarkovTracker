@@ -29,7 +29,7 @@
           <v-icon icon="mdi-information-outline" />
         </v-col>
         <v-col>
-          {{ $t("page.tasks.questcard.wiki") }}
+          {{ t("page.tasks.questcard.wiki") }}
         </v-col>
       </v-row>
     </a>
@@ -38,6 +38,8 @@
 <script setup>
 import { computed } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata";
+import { useI18n } from "vue-i18n";
+
 // Define the props for the component
 const props = defineProps({
   task: {
@@ -52,6 +54,7 @@ const props = defineProps({
 });
 
 const { tasks } = useTarkovData();
+const { t } = useI18n();
 
 // Check if there are two faction tasks for this task
 const isFactionTask = computed(() => {

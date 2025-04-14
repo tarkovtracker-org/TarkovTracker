@@ -15,7 +15,10 @@
               style="overflow: -moz-hidden-unscrollable"
             >
               <span class="d-block">
-                <v-img :src="imageItem.iconLink" :class="itemImageClasses">
+                <v-img
+                  :src="imageItem?.iconLink ?? ''"
+                  :class="itemImageClasses"
+                >
                   <template #placeholder>
                     <v-row
                       class="fill-height ma-0"

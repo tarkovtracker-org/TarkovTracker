@@ -8,7 +8,7 @@
   },
   "functions": [
     {
-      "runtime": "nodejs18",
+      "runtime": "nodejs22",
       "source": "functions",
       "codebase": "default",
       "ignore": [

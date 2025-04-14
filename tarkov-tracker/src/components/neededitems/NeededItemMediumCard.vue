@@ -7,6 +7,7 @@
           <!-- Item image -->
           <div class="d-flex align-self-stretch item-panel">
             <v-img
+              v-if="imageItem"
               :src="imageItem.image512pxLink"
               :lazy-src="imageItem.baseImageLink"
               :class="itemImageClasses"
@@ -22,7 +23,7 @@
             </v-img>
           </div>
           <!-- Item name, directly below item image -->
-          <div class="d-flex align-self-center mt-2 mx-2">
+          <div v-if="item" class="d-flex align-self-center mt-2 mx-2">
             <div class="text-center px-2" style="white-space: pre-line">
               {{ item.name }}
               <v-icon v-if="props.need.foundInRaid" size="x-small"
