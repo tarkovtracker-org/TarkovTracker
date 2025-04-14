@@ -19,7 +19,7 @@
           </div> -->
           <div class="d-flex justify-center align-center">
             <span style="line-height: 0px">
-              <img :src="groupIcon" contain style="max-width: 64px;" />
+              <img :src="groupIcon" contain style="max-width: 64px" />
             </span>
             <span>
               <div style="font-size: 0.7em" class="text-center mb-1">
@@ -37,8 +37,10 @@
       <v-row dense justify="space-between">
         <v-col cols="auto">
           <i18n-t
-v-if="!userStore.teamIsHidden(props.teammember)" keypath="page.team.card.manageteam.membercard.taskscomplete"
-            scope="global">
+            v-if="!userStore.teamIsHidden(props.teammember)"
+            keypath="page.team.card.manageteam.membercard.taskscomplete"
+            scope="global"
+          >
             <template #completed>
               <b>
                 {{ completedTaskCount }}
@@ -53,20 +55,36 @@ v-if="!userStore.teamIsHidden(props.teammember)" keypath="page.team.card.managet
         </v-col>
         <v-col cols="auto">
           <v-btn
-:disabled="props.teammember == fireuser.uid || userStore.taskTeamAllHidden
-            " variant="outlined" :icon="props.teammember != fireuser.uid &&
-    userStore.teamIsHidden(props.teammember)
-    ? 'mdi-eye-off'
-    : 'mdi-eye'
-    " class="mx-1" :color="props.teammember != fireuser.uid &&
-    userStore.teamIsHidden(props.teammember)
-    ? 'red'
-    : 'green'
-    " size="x-small" @click="userStore.toggleHidden(props.teammember)"></v-btn>
+            :disabled="
+              props.teammember == fireuser.uid || userStore.taskTeamAllHidden
+            "
+            variant="outlined"
+            :icon="
+              props.teammember != fireuser.uid &&
+              userStore.teamIsHidden(props.teammember)
+                ? 'mdi-eye-off'
+                : 'mdi-eye'
+            "
+            class="mx-1"
+            :color="
+              props.teammember != fireuser.uid &&
+              userStore.teamIsHidden(props.teammember)
+                ? 'red'
+                : 'green'
+            "
+            size="x-small"
+            @click="userStore.toggleHidden(props.teammember)"
+          ></v-btn>
           <!-- Button to delete the token -->
           <v-btn
-v-if="props.teammember != fireuser.uid && teamStore.isOwner" variant="outlined" icon="mdi-account-minus"
-            class="mx-1" color="red" size="x-small" @click="kickTeammate()"></v-btn>
+            v-if="props.teammember != fireuser.uid && teamStore.isOwner"
+            variant="outlined"
+            icon="mdi-account-minus"
+            class="mx-1"
+            color="red"
+            size="x-small"
+            @click="kickTeammate()"
+          ></v-btn>
         </v-col>
       </v-row>
     </v-container>
@@ -111,8 +129,9 @@ const completedTaskCount = computed(() => {
 });
 
 const groupIcon = computed(() => {
-  return `/img/levelgroups/${Math.floor(progressStore.getLevel(props.teammember) / 5) + 1
-    }.png`;
+  return `/img/levelgroups/${
+    Math.floor(progressStore.getLevel(props.teammember) / 5) + 1
+  }.png`;
 });
 
 const factionIcon = computed(() => {

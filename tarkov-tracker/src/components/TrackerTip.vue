@@ -9,7 +9,7 @@
           border
           prominent
         >
-          {{ $t("tips." + props.tip + ".description") }}
+          {{ t("tips." + props.tip + ".description") }}
           <v-container class="align-right pa-0 pt-2" fluid>
             <v-btn
               variant="tonal"
@@ -17,7 +17,7 @@
               style="opacity: 0.75"
               @click="hideTip"
             >
-              {{ $t("tips.hide_tip") }}
+              {{ t("tips.hide_tip") }}
             </v-btn>
           </v-container>
         </v-alert>
@@ -27,6 +27,9 @@
 </template>
 <script setup>
 import { useUserStore } from "@/stores/user.js";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   icon: {

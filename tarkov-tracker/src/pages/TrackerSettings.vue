@@ -118,81 +118,88 @@
           </template>
         </fitted-card>
       </v-col>
-      <v-col cols="12" sm="12" md="6" lg="4" xl="4">
-        <fitted-card icon="mdi-restart-alert" icon-color="white">
+      <v-col v-if="fireuser.loggedIn" cols="12" sm="12" md="6" lg="4" xl="4">
+        <data-migration-card />
+      </v-col>
+    </v-row>
+
+    <!-- Reset section in a separate row at the bottom -->
+    <v-row justify="center" class="mt-4">
+      <v-col cols="12" sm="8" md="6" lg="4" xl="4">
+        <fitted-card
+          icon="mdi-restart-alert"
+          icon-color="white"
+          class="reset-card"
+        >
           <template #title>
             {{ $t("page.settings.card.reset.title") }}
           </template>
           <template #content>
-            {{ $t("page.settings.card.reset.description") }}
-            <v-container>
-              <v-row justify="center">
-                <v-col cols="auto">
-                  <v-dialog v-model="resetDialog">
-                    <template #activator="{ props }">
-                      <v-btn
-                        color="warning"
-                        prepend-icon="mdi-alert"
-                        v-bind="props"
-                      >
-                        {{ $t("page.settings.card.reset.button") }}
-                      </v-btn>
-                    </template>
-                    <v-row class="justify-center">
-                      <v-col cols="auto">
-                        <v-card
-                          :title="$t('page.settings.card.reset.confirmtitle')"
-                          style="width: fit-content"
-                        >
-                          <v-card-text>
-                            <v-container class="ma-0 pa-0">
-                              <v-row no-gutters>
-                                <v-col cols="12">
-                                  {{
-                                    $t("page.settings.card.reset.confirmation")
-                                  }}
-                                </v-col>
-                              </v-row>
-                              <v-row>
-                                <v-col cols="12" md="6">
-                                  <v-btn
-                                    color="red"
-                                    block
-                                    prepend-icon="mdi-alert"
-                                    @click="
-                                      tarkovStore.$reset();
-                                      resetDialog = false;
-                                    "
-                                  >
-                                    {{
-                                      $t(
-                                        "page.settings.card.reset.confirmresetbutton"
-                                      )
-                                    }}
-                                  </v-btn>
-                                </v-col>
-                                <v-col cols="12" md="6">
-                                  <v-btn
-                                    color="primary"
-                                    block
-                                    @click="resetDialog = false"
-                                    >{{
-                                      $t(
-                                        "page.settings.card.reset.confirmcancelbutton"
-                                      )
-                                    }}</v-btn
-                                  >
-                                </v-col>
-                              </v-row>
-                            </v-container>
-                          </v-card-text>
-                        </v-card>
-                      </v-col>
-                    </v-row>
-                  </v-dialog>
-                </v-col>
-              </v-row>
-            </v-container>
+            <div class="text-center">
+              <p class="mb-3">
+                {{ $t("page.settings.card.reset.description") }}
+              </p>
+              <v-dialog v-model="resetDialog">
+                <template #activator="{ props }">
+                  <v-btn
+                    color="warning"
+                    prepend-icon="mdi-alert"
+                    v-bind="props"
+                  >
+                    {{ $t("page.settings.card.reset.button") }}
+                  </v-btn>
+                </template>
+                <v-row class="justify-center">
+                  <v-col cols="auto">
+                    <v-card
+                      :title="$t('page.settings.card.reset.confirmtitle')"
+                      style="width: fit-content"
+                    >
+                      <v-card-text>
+                        <v-container class="ma-0 pa-0">
+                          <v-row no-gutters>
+                            <v-col cols="12">
+                              {{ $t("page.settings.card.reset.confirmation") }}
+                            </v-col>
+                          </v-row>
+                          <v-row>
+                            <v-col cols="12" md="6">
+                              <v-btn
+                                color="red"
+                                block
+                                prepend-icon="mdi-alert"
+                                @click="
+                                  tarkovStore.$reset();
+                                  resetDialog = false;
+                                "
+                              >
+                                {{
+                                  $t(
+                                    "page.settings.card.reset.confirmresetbutton",
+                                  )
+                                }}
+                              </v-btn>
+                            </v-col>
+                            <v-col cols="12" md="6">
+                              <v-btn
+                                color="primary"
+                                block
+                                @click="resetDialog = false"
+                                >{{
+                                  $t(
+                                    "page.settings.card.reset.confirmcancelbutton",
+                                  )
+                                }}</v-btn
+                              >
+                            </v-col>
+                          </v-row>
+                        </v-container>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </v-dialog>
+            </div>
           </template>
         </fitted-card>
       </v-col>
@@ -200,22 +207,19 @@
   </v-container>
 </template>
 <script setup>
+import { ref, defineAsyncComponent, computed } from "vue";
+import { useUserStore } from "@/stores/user";
+import { useTarkovStore } from "@/stores/tarkov";
 import { fireuser } from "@/plugins/firebase";
-import { defineAsyncComponent, computed, ref } from "vue";
-import { useTarkovStore } from "@/stores/tarkov.js";
-import { useUserStore } from "@/stores/user.js";
-const FittedCard = defineAsyncComponent(() =>
-  import("@/components/FittedCard.vue")
+import QuestFilter from "@/components/settings/QuestFilter.vue";
+import FactionSelect from "@/components/settings/FactionSelect.vue";
+import ApiTokens from "@/components/settings/ApiTokens.vue";
+import DataMigrationCard from "@/components/settings/DataMigrationCard.vue";
+
+const FittedCard = defineAsyncComponent(
+  () => import("@/components/FittedCard.vue"),
 );
-const ApiTokens = defineAsyncComponent(() =>
-  import("@/components/settings/ApiTokens.vue")
-);
-const FactionSelect = defineAsyncComponent(() =>
-  import("@/components/settings/FactionSelect.vue")
-);
-const QuestFilter = defineAsyncComponent(() =>
-  import("@/components/settings/QuestFilter.vue")
-);
+
 const tarkovStore = useTarkovStore();
 const userStore = useUserStore();
 
@@ -255,5 +259,9 @@ a:visited {
 
 .info-link {
   text-decoration: none;
+}
+
+.reset-card {
+  border-top: 2px solid rgba(var(--v-theme-warning), 0.5);
 }
 </style>

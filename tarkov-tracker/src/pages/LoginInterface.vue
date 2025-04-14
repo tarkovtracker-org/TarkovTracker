@@ -1,78 +1,114 @@
 <template>
-  <tracker-tip tip="login"></tracker-tip>
-  <v-container>
-    <v-row>
-      <v-col cols="12">
-        <div v-if="fireuser?.uid" class="text-center">
-          You are already signed in!
-        </div>
-        <div
-          v-show="fireuser?.uid == null"
-          id="firebaseui-auth-container"
-        ></div>
-      </v-col>
-    </v-row>
-  </v-container>
+  <div class="login-page">
+    <tracker-tip tip="login"></tracker-tip>
+    <v-container class="fill-height">
+      <v-row align="center" justify="center">
+        <v-col cols="12">
+          <div
+            v-if="fireuser?.uid && !showingMigrationDialog"
+            class="text-center"
+          >
+            <v-card
+              class="auth-success-card mx-auto"
+              max-width="400"
+              color="rgb(18, 25, 30)"
+            >
+              <v-card-title class="text-h5 text-center py-4 font-weight-bold">
+                You're already signed in!
+              </v-card-title>
+              <v-card-text class="text-center">
+                <v-icon size="64" color="success" class="mb-4"
+                  >mdi-check-circle</v-icon
+                >
+                <p class="text-body-1">
+                  Welcome back, {{ fireuser.displayName || "User" }}!
+                </p>
+                <v-btn color="primary" class="mt-4" to="/">
+                  Go to Dashboard
+                </v-btn>
+              </v-card-text>
+            </v-card>
+          </div>
+          <auth-buttons
+            v-else
+            @migration-dialog-shown="showingMigrationDialog = true"
+            @migration-dialog-closed="showingMigrationDialog = false"
+          />
+        </v-col>
+      </v-row>
+    </v-container>
+  </div>
 </template>
+
 <script setup>
-import { onMounted, defineAsyncComponent } from "vue";
-import * as firebaseui from "firebaseui";
-import { firebase, fireapp, fireuser } from "@/plugins/firebase";
-import { useRouter } from "vue-router";
-import { getAuth } from "firebase/auth";
+import { defineAsyncComponent, ref, onMounted, watch } from "vue";
+import { fireuser } from "@/plugins/firebase.ts";
 
-const TrackerTip = defineAsyncComponent(() =>
-  import("@/components/TrackerTip.vue")
-);
-const router = useRouter();
-const auth = getAuth(fireapp);
-const ui =
-  firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth);
+// Track if the migration dialog is currently being shown
+const showingMigrationDialog = ref(false);
 
+// Debug logging for tracking state
 onMounted(() => {
-  // Initialize the FirebaseUI Widget using Firebase.
-  // The start method will wait until the DOM is loaded.
-  ui.start("#firebaseui-auth-container", uiConfig);
+  console.log("LoginInterface mounted, user logged in:", !!fireuser.uid);
 });
-// FirebaseUI config.
-const uiConfig = {
-  callbacks: {
-    signInSuccessWithAuthResult: function () {
-      // User successfully signed in.
-      // Return type determines whether we continue the redirect automatically
-      // or whether we leave that to developer to handle.
-      router.push("/");
-      return false;
-    },
-    uiShown: function () {
-      // The widget is rendered.
-      // Hide the loader.
-    },
-  },
-  signInSuccessUrl: "/",
-  signInOptions: [
-    // Leave the lines as is for the providers you want to offer your users.
-    firebase.GoogleAuthProvider.PROVIDER_ID,
-    firebase.GithubAuthProvider.PROVIDER_ID,
-  ],
-  signInFlow: "popup",
-  // Terms of Service
-  tosUrl: "https://www.termsfeed.com/live/d3a09e33-cd8e-4e08-8533-9c7a270d9ac1",
-  // Privacy policy url/callback.
-  privacyPolicyUrl:
-    "https://www.termsfeed.com/live/b6d6f7fd-adc4-4717-8a2b-83daf9d8ddb9",
-};
-</script>
-<style lang="scss" scoped>
-@import "https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.css";
 
-:deep(.firebaseui-tos) {
-  text-decoration: none;
-  color: #ffffff;
+// Watch for changes to fireuser.uid to help debug
+watch(
+  () => fireuser.uid,
+  (newVal, oldVal) => {
+    console.log("User auth state changed:", oldVal, "→", newVal);
+  },
+);
+
+// Watch migration dialog state
+watch(showingMigrationDialog, (newVal) => {
+  console.log("Migration dialog state changed:", newVal);
+});
+
+const TrackerTip = defineAsyncComponent(
+  () => import("@/components/TrackerTip.vue"),
+);
+const AuthButtons = defineAsyncComponent(
+  () => import("@/components/AuthButtons.vue"),
+);
+</script>
+
+<style scoped>
+.login-page {
+  min-height: 100vh;
+  background-color: rgba(0, 0, 0, 0.75);
+  position: relative;
+  background-image:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(50, 50, 50, 0.15) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 70% 65%,
+      rgba(40, 40, 40, 0.1) 0%,
+      transparent 50%
+    );
 }
 
-:deep(.firebaseui-link) {
-  text-decoration: none;
-  color: rgba(var(--v-theme-link), 1) !important;
+.login-page::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    linear-gradient(45deg, rgba(0, 0, 0, 0.5) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.5) 25%, transparent 25%);
+  background-size: 60px 60px;
+  opacity: 0.03;
+  z-index: -1;
+}
+
+.auth-success-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgb(18, 25, 30);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 </style>

@@ -84,15 +84,29 @@ const markerColor = computed(() => {
 });
 
 const relativeLocation = computed(() => {
+  // Add safety check for bounds
+  const bounds = props.map?.svg?.bounds;
+  if (!bounds || !Array.isArray(bounds) || bounds.length < 2 || !Array.isArray(bounds[0]) || !Array.isArray(bounds[1])) {
+    console.warn("MapMarker: Invalid or missing map bounds for map:", props.map?.name);
+    return { leftPercent: 0, topPercent: 0 }; // Return default if bounds are invalid
+  }
+
   // Take the bounds of the map and figure out the initial relative position
-  let mapLeft = props.map.svg.bounds[0][0];
-  let mapTop = props.map.svg.bounds[0][1];
+  let mapLeft = bounds[0][0];
+  let mapTop = bounds[0][1];
   let mapWidth =
-    Math.max(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]) -
-    Math.min(props.map.svg.bounds[0][0], props.map.svg.bounds[1][0]);
+    Math.max(bounds[0][0], bounds[1][0]) -
+    Math.min(bounds[0][0], bounds[1][0]);
   let mapHeight =
-    Math.max(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]) -
-    Math.min(props.map.svg.bounds[0][1], props.map.svg.bounds[1][1]);
+    Math.max(bounds[0][1], bounds[1][1]) -
+    Math.min(bounds[0][1], bounds[1][1]);
+
+  // Prevent division by zero if width or height is 0
+  if (mapWidth === 0 || mapHeight === 0) {
+      console.warn("MapMarker: Map width or height is zero for map:", props.map?.name);
+      return { leftPercent: 0, topPercent: 0 };
+  }
+
   let relativeLeft = Math.abs(props.markLocation.positions[0].x - mapLeft);
   let relativeTop = Math.abs(props.markLocation.positions[0].z - mapTop);
   let relativeLeftPercent = (relativeLeft / mapWidth) * 100;

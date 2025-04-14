@@ -8,7 +8,6 @@ import { computed } from "vue";
 
 const { teammateStores } = useLiveData();
 const userStore = useUserStore();
-const { tasks, traders, hideoutStations, hideoutModules } = useTarkovData();
 
 const gameEditions = [
   { version: 1, value: 0.0, defaultStashLevel: 1 },
@@ -18,6 +17,9 @@ const gameEditions = [
 ];
 
 export const useProgressStore = defineStore("progress", () => {
+  const { tasks, traders, hideoutStations, hideoutModules, objectives } =
+    useTarkovData();
+
   const teamStores = computed(() => {
     let stores = {};
     stores["self"] = useTarkovStore();
@@ -84,7 +86,7 @@ export const useProgressStore = defineStore("progress", () => {
             for (const traderStanding of task.finishRewards.traderStanding) {
               rep[teamId][traderStanding.trader.id] =
                 rep[teamId]?.[traderStanding.trader.id] +
-                traderStanding.standing || traderStanding.standing;
+                  traderStanding.standing || traderStanding.standing;
             }
           }
         }
@@ -160,8 +162,8 @@ export const useProgressStore = defineStore("progress", () => {
           }
           if (task.taskRequirements?.length > 0) {
             // For each of the requirements which require status failed, check if the task is failed. If it is not, mark the task as not available
-            for (const req of task.taskRequirements.filter((req) =>
-              req.status.includes("failed") && req.status.length == 1
+            for (const req of task.taskRequirements.filter(
+              (req) => req.status.includes("failed") && req.status.length == 1
             )) {
               if (!visibleTeamStores.value[teamId].isTaskFailed(req.task.id)) {
                 parentTasksComplete = false;

@@ -240,13 +240,24 @@ const activeNeededView = computed({
 });
 
 const neededTaskItems = computed(() => {
-  return JSON.parse(JSON.stringify(neededItemTaskObjectives.value)).sort(
-    (a, b) => {
-      let aCount = 0;
-      tasks.value
-        .find((task) => task.id == a.taskId)
-        .predecessors.forEach((predecessor) => {
-          // Check if the predecessor is completed
+  // Capture dependencies' values at the start using optional chaining on .value access
+  const objectives = neededItemTaskObjectives?.value;
+  const taskList = tasks?.value;
+
+  // Check if captured values are valid arrays
+  if (!Array.isArray(objectives) || !Array.isArray(taskList)) {
+    return [];
+  }
+
+  try {
+    // Use the captured, validated arrays
+    return JSON.parse(JSON.stringify(objectives)).sort(
+      // Use objectives
+      (a, b) => {
+        let aCount = 0;
+        // Use taskList, still needs optional chaining for find
+        const taskA = taskList?.find((task) => task.id == a.taskId);
+        taskA?.predecessors.forEach((predecessor) => {
           if (
             progressStore.tasksCompletions?.[predecessor]?.["self"] === false
           ) {
@@ -254,36 +265,51 @@ const neededTaskItems = computed(() => {
           }
         });
 
-      let bCount = 0;
-      tasks.value
-        .find((task) => task.id == b.taskId)
-        .predecessors.forEach((predecessor) => {
-          // Check if the predecessor is completed
+        let bCount = 0;
+        // Use taskList, still needs optional chaining for find
+        const taskB = taskList?.find((task) => task.id == b.taskId);
+        taskB?.predecessors.forEach((predecessor) => {
           if (
             progressStore.tasksCompletions?.[predecessor]?.["self"] === false
           ) {
             bCount++;
           }
         });
-      if (aCount > bCount) {
-        return 1;
-      } else if (aCount < bCount) {
-        return -1;
+        if (aCount > bCount) {
+          return 1;
+        } else if (aCount < bCount) {
+          return -1;
+        }
+        return 0;
       }
-      return 0;
-    }
-  );
+    );
+  } catch (error) {
+    console.error("Error processing neededTaskItems:", error);
+    return [];
+  }
 });
 
 const neededHideoutItems = computed(() => {
-  let hideoutNeeds = JSON.parse(
-    JSON.stringify(neededItemHideoutModules.value)
-  ).sort((a, b) => {
-    let aCount = 0;
-    hideoutModules.value
-      .find((hModule) => hModule.id == a.hideoutModule.id)
-      .predecessors.forEach((predecessor) => {
-        // Check if the predecessor is completed
+  // Capture dependencies' values at the start using optional chaining on .value access
+  const modulesNeeded = neededItemHideoutModules?.value;
+  const moduleList = hideoutModules?.value;
+
+  // Check if captured values are valid arrays
+  if (!Array.isArray(modulesNeeded) || !Array.isArray(moduleList)) {
+    return [];
+  }
+
+  try {
+    // Use the captured, validated arrays
+    let hideoutNeeds = JSON.parse(
+      JSON.stringify(modulesNeeded) // Use modulesNeeded
+    ).sort((a, b) => {
+      let aCount = 0;
+      // Use moduleList, still needs optional chaining for find and hideoutModule access
+      const moduleA = moduleList?.find(
+        (hModule) => hModule.id == a.hideoutModule?.id
+      );
+      moduleA?.predecessors.forEach((predecessor) => {
         if (
           progressStore.moduleCompletions?.[predecessor]?.["self"] === false
         ) {
@@ -291,25 +317,30 @@ const neededHideoutItems = computed(() => {
         }
       });
 
-    let bCount = 0;
-    hideoutModules.value
-      .find((hModule) => hModule.id == b.hideoutModule.id)
-      .predecessors.forEach((predecessor) => {
-        // Check if the predecessor is completed
+      let bCount = 0;
+      // Use moduleList, still needs optional chaining for find and hideoutModule access
+      const moduleB = moduleList?.find(
+        (hModule) => hModule.id == b.hideoutModule?.id
+      );
+      moduleB?.predecessors.forEach((predecessor) => {
         if (
           progressStore.moduleCompletions?.[predecessor]?.["self"] === false
         ) {
           bCount++;
         }
       });
-    if (aCount > bCount) {
-      return 1;
-    } else if (aCount < bCount) {
-      return -1;
-    }
-    return 0;
-  });
-  return hideoutNeeds;
+      if (aCount > bCount) {
+        return 1;
+      } else if (aCount < bCount) {
+        return -1;
+      }
+      return 0;
+    });
+    return hideoutNeeds;
+  } catch (error) {
+    console.error("Error processing neededHideoutItems:", error);
+    return [];
+  }
 });
 
 const hideFIR = computed({

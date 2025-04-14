@@ -45,7 +45,7 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { fireapp } from "@/plugins/firebase";
+import { app as fireapp } from "@/plugins/firebase.ts";
 import { useLiveData } from "@/composables/livedata";
 
 const { useSystemStore } = useLiveData();

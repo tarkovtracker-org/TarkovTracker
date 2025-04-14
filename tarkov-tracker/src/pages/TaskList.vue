@@ -32,7 +32,7 @@
             align-tabs="center"
           >
             <v-tab value="all">
-              {{ $t("page.tasks.showing_all_sources") }}
+              {{ t("page.tasks.showing_all_sources") }}
             </v-tab>
           </v-tabs>
         </v-card>
@@ -148,14 +148,14 @@
           color="secondary"
           class="mx-2"
         ></v-progress-circular>
-        {{ $t("page.tasks.loading") }}
+        {{ t("page.tasks.loading") }}
         <refresh-button />
       </v-col>
     </v-row>
     <v-row v-if="!loadingTasks && !reloadingTasks && visibleTasks.length == 0">
       <v-col cols="12">
         <v-alert icon="mdi-clipboard-search">
-          {{ $t("page.tasks.notasksfound") }}</v-alert
+          {{ t("page.tasks.notasksfound") }}</v-alert
         >
       </v-col>
     </v-row>
@@ -198,7 +198,14 @@
   </v-container>
 </template>
 <script setup>
-import { defineAsyncComponent, computed, watch, ref, shallowRef } from "vue";
+import {
+  defineAsyncComponent,
+  computed,
+  watch,
+  ref,
+  shallowRef,
+  watchEffect,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useUserStore } from "@/stores/user";
 import { useTarkovData } from "@/composables/tarkovdata";
@@ -447,7 +454,7 @@ const mapTaskTotals = computed(() => {
       if (hideGlobalTasks.value && task.map == null) {
         continue;
       }
-      if (task.locations.includes(map.id)) {
+      if (Array.isArray(task.locations) && task.locations.includes(map.id)) {
         if (
           (activeUserView.value == "all" &&
             Object.values(progressStore.unlockedTasks[task.id]).some(
@@ -479,32 +486,74 @@ const mapTaskTotals = computed(() => {
 });
 
 const updateVisibleTasks = async function () {
+  // Guard clause: Wait until necessary data is loaded/available
+  if (tasksLoading.value) {
+    console.warn(
+      "updateVisibleTasks: TarkovData (tasks) still loading, deferring update."
+    );
+    return; // Exit if core task data isn't loaded
+  }
+
+  // Guard clause: Ensure userStore getter is available (should always return boolean due to || false)
+  // Accessing the computed ref here might trigger dependencies prematurely, check the source directly if possible.
+  // We already define `hideNonKappaTasks = computed(...)`, let's trust it exists but check its value source's readiness indirectly
+  // A simple check on tasks.value existing is a good proxy for data readiness post-loading
+  if (!tasks.value) {
+    console.warn(
+      "updateVisibleTasks: tasks.value is not ready, deferring update."
+    );
+    return;
+  }
+
+  // Guard clause: Ensure disabledTasks ref exists AND its value is an array
+  if (!disabledTasks || !Array.isArray(disabledTasks)) {
+    console.warn(
+      "updateVisibleTasks: disabledTasks ref or its value is not ready, deferring update."
+    );
+    return; // Exit if disabledTasks ref or its value isn't ready
+  }
+
+  // Guard clause: Check critical progressStore computed properties are ready
+  // These depend on tasks.value and store state, which might have their own timings.
+  if (
+    !progressStore.unlockedTasks ||
+    !progressStore.tasksCompletions ||
+    !progressStore.playerFaction
+  ) {
+    console.warn(
+      "updateVisibleTasks: Progress store computed values not ready, deferring update."
+    );
+    return; // Exit if progress store data isn't ready
+  }
+
+  reloadingTasks.value = true; // Indicate we are starting the actual processing
+
   let visibleTaskList = JSON.parse(JSON.stringify(tasks.value));
+
+  console.log(`updateVisibleTasks: Start - ${visibleTaskList.length} tasks`); // LOG START
+
   // First, filter tasks by the primary view
   if (activePrimaryView.value == "maps") {
-    // If the map view is set to to factory, filter by either night factory or factory id, otherwise match by map id
-    if (activeMapView.value == "55f2d3fd4bdc2d5f408b4567") {
-      visibleTaskList = visibleTaskList.filter(
-        (task) =>
-          task.locations.includes("55f2d3fd4bdc2d5f408b4567") ||
-          task.locations.includes("59fc81d786f774390775787e")
+    visibleTaskList = visibleTaskList.filter((task) => {
+      const primaryMapMatch = task.map?.id === activeMapView.value;
+      const objectiveMapMatch = task.objectives?.some(obj =>
+        obj.maps?.some(map => map.id === activeMapView.value)
       );
-    } else {
-      visibleTaskList = visibleTaskList.filter((task) =>
-        task.locations.includes(activeMapView.value)
-      );
-    }
-    if (hideGlobalTasks.value) {
-      visibleTaskList = visibleTaskList.filter((task) => task.map != null);
-    }
+
+      return primaryMapMatch || objectiveMapMatch;
+    });
   } else if (activePrimaryView.value == "traders") {
     visibleTaskList = visibleTaskList.filter(
-      (task) => task.trader.id == activeTraderView.value
+      (task) => task.trader?.id == activeTraderView.value
     );
   }
 
+  console.log(
+    `updateVisibleTasks: After Primary Filter - ${visibleTaskList.length} tasks`
+  ); // LOG AFTER PRIMARY
+
   if (activeUserView.value == "all") {
-    // We want to show tasks by their availablity to any team member
+    // We want to show tasks by their availability to any team member
     if (activeSecondaryView.value == "available") {
       visibleTaskList = visibleTaskList.filter((task) =>
         Object.values(progressStore.unlockedTasks?.[task.id]).some(
@@ -514,6 +563,10 @@ const updateVisibleTasks = async function () {
     } else {
       // In theory, we should never be in this situation (we don't show locked or completed tasks for all users)
       // But just in case, we'll do nothing here
+      // Consider clearing the list or logging a warning if this state is reached unexpectedly
+      console.warn(
+        "updateVisibleTasks: 'all' user view combined with non-'available' secondary view - unexpected state."
+      );
     }
   } else {
     // We want to show tasks by their availablity to a specific team member
@@ -547,16 +600,33 @@ const updateVisibleTasks = async function () {
       );
     });
   }
+  console.log(
+    `updateVisibleTasks: After Secondary/User Filter - ${visibleTaskList.length} tasks`
+  ); // LOG AFTER SECONDARY/USER
+
   // Remove any disabled tasks from the view
   visibleTaskList = visibleTaskList.filter(
-    (task) => disabledTasks.includes(task.id) == false
+    (task) =>
+      task &&
+      typeof task.id === "string" &&
+      // Simplified check: since watchEffect guarantees disabledTasks.value is an array,
+      // we only need to check if the task ID is *not* included.
+      !disabledTasks.includes(task.id)
   );
+  console.log(
+    `updateVisibleTasks: After Disabled Filter - ${visibleTaskList.length} tasks`
+  ); // LOG AFTER DISABLED
 
-  if (hideNonKappaTasks.value) {
+  // Use optional chaining to safely access .value
+  if (hideNonKappaTasks?.value) {
     visibleTaskList = visibleTaskList.filter(
       (task) => task.kappaRequired == true
     );
   }
+  console.log(
+    `updateVisibleTasks: After Kappa Filter - ${visibleTaskList.length} tasks`
+  ); // LOG AFTER KAPPA
+
   // Finally, map the tasks to their IDs
   //visibleTaskList = visibleTaskList.map((task) => task.id)
 
@@ -568,6 +638,32 @@ const updateVisibleTasks = async function () {
   reloadingTasks.value = false;
   visibleTasks.value = visibleTaskList;
 };
+
+// Watch for changes that affect visible tasks and update accordingly
+watchEffect(async () => {
+  // Explicitly check core readiness *before* calling the main function
+  // These checks ensure that we don't run the potentially expensive
+  // updateVisibleTasks function until all required async data is available.
+  if (
+    tasksLoading.value || // Check if tasks are still loading
+    !tasks.value || // Check if tasks data structure exists
+    !disabledTasks ||
+    !Array.isArray(disabledTasks) || // Corrected: Check the array directly, not .value
+    !progressStore.unlockedTasks || // Check progressStore readiness
+    !progressStore.tasksCompletions ||
+    !progressStore.playerFaction
+  ) {
+    // One of the core dependencies isn't ready yet.
+    // watchEffect will re-run automatically when they change.
+    // No need to log here, as the effect will just silently wait.
+    return;
+  }
+
+  // All checks passed, now it's safe to run the full update.
+  reloadingTasks.value = true;
+  await updateVisibleTasks();
+  // reloadingTasks.value = false; // This is handled inside updateVisibleTasks
+});
 
 // Watch for changes to all of the views, and update the visible tasks
 watch(
@@ -583,7 +679,6 @@ watch(
     () => tarkovStore.playerLevel,
   ],
   async () => {
-    reloadingTasks.value = true;
     await updateVisibleTasks();
   },
   { immediate: true }

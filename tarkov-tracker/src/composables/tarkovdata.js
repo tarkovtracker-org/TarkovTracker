@@ -1,14 +1,47 @@
 import { useQuery, provideApolloClient } from "@vue/apollo-composable";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, watchEffect, onMounted } from "vue";
 import apolloClient from "@/plugins/apollo";
 import tarkovDataQuery from "@/utils/tarkovdataquery.js";
 import tarkovHideoutQuery from "@/utils/tarkovhideoutquery.js";
 import languageQuery from "@/utils/languagequery.js";
-import i18n from "@/plugins/i18n";
+import { useI18n } from 'vue-i18n';
 // Import graphlib so that we can use it in the watch function
 import Graph from "graphology";
 
 provideApolloClient(apolloClient);
+
+// --- Singleton State ---
+const isInitialized = ref(false);
+const availableLanguages = ref(null);
+const queryErrors = ref(null);
+const queryResults = ref(null);
+const lastQueryTime = ref(null);
+const queryHideoutErrors = ref(null);
+const queryHideoutResults = ref(null);
+const lastHideoutQueryTime = ref(null);
+const hideoutStations = ref([]);
+const hideoutModules = ref([]);
+const hideoutGraph = ref({});
+const tasks = ref([]);
+const taskGraph = ref({});
+const objectiveMaps = ref({});
+const alternativeTasks = ref({});
+const objectiveGPS = ref({});
+const mapTasks = ref({});
+const neededItemTaskObjectives = ref([]);
+const neededItemHideoutModules = ref([]);
+const loading = ref(false); // Combine loading states if needed, or keep separate
+const hideoutLoading = ref(false);
+const staticMapData = ref(null); // Add ref for static map data
+// --- End Singleton State ---
+
+// Mapping from GraphQL map names (potentially different) to static data keys
+const mapNameMapping = {
+  "night factory": "factory",
+  "the lab": "lab",
+  "ground zero 21+": "groundzero",
+  "the labyrinth": "streetsoftarkov", // Assuming 'The Labyrinth' maps to 'streetsoftarkov'
+};
 
 // Function to recursively get all of the predecessors for a task
 function getPredecessors(graph, nodeId, visited = []) {
@@ -54,143 +87,19 @@ function getSuccessors(graph, nodeId, visited = []) {
   return successors;
 }
 
-const availableLanguages = ref(null);
-const languageQueryErrors = ref(null);
-const languageQueryResults = ref(null);
-const {
-  onResult: languageOnResult,
-  onError: languageOnError,
-} = useQuery(languageQuery, null, {
-  fetchPolicy: "cache-and-network",
-  notifyOnNetworkStatusChange: true,
-  errorPolicy: "all",
-});
-languageOnResult((result) => {
-  availableLanguages.value = result.data.__type.enumValues.map((enumValue) => enumValue.name)
-});
-languageOnError((error) => {
-  // Default to English if the language query fails
-  console.error(error);
-  availableLanguages.value = ["en"];
-});
-
-function extractLanguageCode() {
-  const locale = i18n.global.locale.value;
+function extractLanguageCode(localeRef) {
+  const localeValue = localeRef.value;
   // Return only the language code remove any dash or underscore and what comes after
-  let browserLocale = locale.split(/[-_]/)[0];
+  let browserLocale = localeValue.split(/[-_]/)[0];
   // If the available languages include the browser locale, return the browser locale
   // otherwise, default to English
   if (availableLanguages.value?.includes(browserLocale)) {
     return browserLocale;
   } else {
+    // Default to 'en' if languages haven't loaded yet or browser locale isn't supported
     return "en";
   }
 }
-
-const queryErrors = ref(null);
-const queryResults = ref(null);
-const lastQueryTime = ref(null);
-
-const languageCode = computed(() => extractLanguageCode());
-
-const {
-  onResult: taskOnResult,
-  onError: taskOnError,
-  loading,
-  refetch: taskRefetch,
-} = useQuery(tarkovDataQuery, { lang: languageCode.value }, {
-  fetchPolicy: "cache-and-network",
-  notifyOnNetworkStatusChange: true,
-  errorPolicy: "all",
-});
-taskOnResult((result) => {
-  lastQueryTime.value = Date.now();
-  queryResults.value = result.data;
-});
-taskOnError((error) => {
-  queryErrors.value = error;
-  console.error(queryErrors);
-});
-
-const queryHideoutErrors = ref(null);
-const queryHideoutResults = ref(null);
-const lastHideoutQueryTime = ref(null);
-const {
-  onResult: hideoutOnResult,
-  onError: hideoutOnError,
-  loading: hideoutLoading,
-  refetch: hideoutRefetch,
-} = useQuery(tarkovHideoutQuery, { lang: languageCode.value }, {
-  fetchPolicy: "cache-and-network",
-  notifyOnNetworkStatusChange: true,
-  errorPolicy: "all",
-});
-hideoutOnResult((result) => {
-  lastHideoutQueryTime.value = Date.now();
-  queryHideoutResults.value = result.data;
-  console.debug(queryResults);
-});
-hideoutOnError((error) => {
-  queryHideoutErrors.value = error;
-  console.error(queryErrors);
-});
-
-const hideoutStations = ref([]);
-const hideoutModules = ref([]);
-const hideoutGraph = ref({});
-watch(queryHideoutResults, async (newValue, oldValue) => {
-  if (newValue?.hideoutStations) {
-    let newHideoutGraph = new Graph();
-    newValue.hideoutStations.forEach((station) => {
-      console.info(station);
-      station.levels.forEach((level) => {
-        console.info(level);
-        newHideoutGraph.mergeNode(level.id);
-        level.stationLevelRequirements.forEach((requirement) => {
-          if (requirement != null) {
-            let requiredStation = newValue.hideoutStations.find(
-              (s) => s.id === requirement.station.id
-            );
-            let requiredLevel = requiredStation.levels.find(
-              (l) => l.level === requirement.level
-            );
-            newHideoutGraph.mergeNode(requiredLevel.id);
-            newHideoutGraph.mergeEdge(requiredLevel.id, level.id);
-          }
-        });
-      });
-    });
-
-    let newModules = [];
-    newValue.hideoutStations.forEach((station) => {
-      station.levels.forEach((level) => {
-        newModules.push({
-          ...level,
-          stationId: station.id,
-          predecessors: [
-            ...new Set(getPredecessors(newHideoutGraph, level.id)),
-          ],
-          successors: [...new Set(getSuccessors(newHideoutGraph, level.id))],
-          parents: newHideoutGraph.inNeighbors(level.id),
-          children: newHideoutGraph.outNeighbors(level.id),
-        });
-      });
-    });
-    hideoutModules.value = newModules;
-    hideoutGraph.value = newHideoutGraph;
-    hideoutStations.value = newValue.hideoutStations;
-  }
-});
-
-const tasks = ref([]);
-
-const taskGraph = ref({});
-
-const objectiveMaps = ref({});
-const alternativeTasks = ref({});
-const objectiveGPS = ref({});
-
-const mapTasks = ref({});
 
 const disabledTasks = [
   "61e6e5e0f5b9633f6719ed95",
@@ -200,31 +109,93 @@ const disabledTasks = [
   "61e6e60c5ca3b3783662be27",
 ];
 
+// --- Watchers defined outside useTarkovData to modify singleton state ---
+
+watch(queryHideoutResults, async (newValue, oldValue) => {
+  if (newValue?.hideoutStations) {
+    let newHideoutGraph = new Graph();
+    newValue.hideoutStations?.forEach((station) => {
+      station.levels?.forEach((level) => {
+        newHideoutGraph.mergeNode(level.id);
+        level.stationLevelRequirements?.forEach((requirement) => {
+          if (requirement != null) {
+            let requiredStation = newValue.hideoutStations?.find(
+              (s) => s.id === requirement.station?.id
+            );
+            let requiredLevel = requiredStation?.levels?.find(
+              (l) => l.level === requirement.level
+            );
+            if (requiredLevel) {
+              newHideoutGraph.mergeNode(requiredLevel.id);
+              newHideoutGraph.mergeEdge(requiredLevel.id, level.id);
+            } else {
+              console.warn(
+                `Could not find required level for station ${requirement.station?.id} level ${requirement.level} needed by ${level.id}`
+              );
+            }
+          }
+        });
+      });
+    });
+
+    let newModules = [];
+    let tempNeededModules = [];
+    newValue.hideoutStations?.forEach((station) => {
+      station.levels?.forEach((level) => {
+        const moduleData = {
+          ...level,
+          stationId: station.id,
+          predecessors: [
+            ...new Set(getPredecessors(newHideoutGraph, level.id)),
+          ],
+          successors: [...new Set(getSuccessors(newHideoutGraph, level.id))],
+          parents: newHideoutGraph.inNeighbors(level.id),
+          children: newHideoutGraph.outNeighbors(level.id),
+        };
+        newModules.push(moduleData);
+
+        level.itemRequirements?.forEach((req) => {
+          if (req?.item?.id) {
+            tempNeededModules.push({
+              id: req.id,
+              needType: "hideoutModule",
+              hideoutModule: moduleData,
+              item: req.item,
+              count: req.count,
+              foundInRaid: req.foundInRaid,
+            });
+          }
+        });
+      });
+    });
+    hideoutModules.value = newModules;
+    neededItemHideoutModules.value = tempNeededModules;
+    hideoutGraph.value = newHideoutGraph;
+    hideoutStations.value = newValue.hideoutStations;
+  } else {
+    hideoutModules.value = [];
+    neededItemHideoutModules.value = [];
+    hideoutGraph.value = new Graph();
+    hideoutStations.value = [];
+  }
+});
+
 // Watch for changes to queryResults.value?.tasks and update the task graph
 watch(queryResults, async (newValue, oldValue) => {
   if (newValue?.tasks) {
     let newTaskGraph = new Graph();
     let activeRequirements = [];
 
-    // Loop through all of the tasks and add them to the graph
-    for (let task of newValue.tasks) {
+    for (let task of newValue.tasks || []) {
       newTaskGraph.mergeNode(task.id);
-      // If the task has requirements, add an edge from the requirement to the task
       if (task.taskRequirements?.length > 0) {
         for (let requirement of task.taskRequirements) {
-          if (requirement?.status.includes("active")) {
-            // This task doesn't require the task to be completed, but just to be active
-            // This means that the task shares predecessors with the task that it requires
-            // So add the requirements after we've built the rest of the graph
+          if (!requirement?.task) continue;
+
+          if (requirement?.status?.includes("active")) {
             activeRequirements.push({ task, requirement });
-            // } else if (requirement?.status.includes("failed")) {
-            //   // This is a failed requirement
-            //   debugger
           } else {
-            if (
-              requirement?.task &&
-              newValue.tasks.find((t) => t.id === requirement.task.id)
-            ) {
+            if (newValue.tasks?.find((t) => t.id === requirement.task.id)) {
               newTaskGraph.mergeNode(requirement.task.id);
               newTaskGraph.mergeEdge(requirement.task.id, task.id);
             }
@@ -233,243 +204,364 @@ watch(queryResults, async (newValue, oldValue) => {
       }
     }
 
-    // Add the active requirements to the graph
     for (let activeRequirement of activeRequirements) {
-      // Get the incoming edges for the required task
-      // Find a node in newTaskGraph that matches the activeRequirement.requirement.task.id
-      for (let neighbor of newTaskGraph.inNeighbors(
-        activeRequirement.requirement.task.id
-      )) {
-        newTaskGraph.mergeEdge(neighbor, activeRequirement.task.id);
+      const requiredTaskNodeId = activeRequirement.requirement.task.id;
+      if (!newTaskGraph.hasNode(requiredTaskNodeId)) continue;
+
+      const requiredTaskPredecessors =
+        newTaskGraph.inNeighbors(requiredTaskNodeId);
+      for (let predecessor of requiredTaskPredecessors) {
+        if (!newTaskGraph.hasNode(activeRequirement.task.id)) continue;
+        newTaskGraph.mergeEdge(predecessor, activeRequirement.task.id);
       }
     }
 
-    taskGraph.value = newTaskGraph;
+    mapTasks.value = {};
+    objectiveMaps.value = {};
+    objectiveGPS.value = {};
+    alternativeTasks.value = {};
 
-    // Get the latest objective maps from tarkovdata
-    await fetch(
-      "https://tarkovtracker.github.io/tarkovdata/objective_maps.json"
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        objectiveMaps.value = data;
-      });
+    let newTasks = [];
+    let tempMapTasks = {};
+    let tempNeededObjectives = [];
 
-    await fetch(
-      "https://tarkovtracker.github.io/tarkovdata/task_alternatives.json"
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        alternativeTasks.value = data;
-      });
+    for (let task of newValue.tasks || []) {
+      newTaskGraph.mergeNode(task.id);
 
-    await fetch("https://tarkovtracker.github.io/tarkovdata/objective_gps.json")
-      .then((response) => response.json())
-      .then((data) => {
-        objectiveGPS.value = data;
-      });
+      let taskPredecessors = [
+        ...new Set(getPredecessors(newTaskGraph, task.id)),
+      ];
+      let taskSuccessors = [...new Set(getSuccessors(newTaskGraph, task.id))];
 
-    // Loop through all of the tasks and add them to the graph
-    let updatedTasks = [];
-    for (let task of newValue.tasks) {
-      let locations = new Set();
-      let objectives = [];
-      // For each objective in the task, set the maps property to the objectiveMaps value for that objective if it exists
-      for (let objective of task.objectives) {
-        let objMaps = [];
-        let objGPS = null;
-        if (objectiveMaps.value[objective.id]) {
-          // Add all of the objective maps to the locations set
-          for (let map of objectiveMaps.value[objective.id]) {
-            locations.add(map);
-          }
-          objMaps = objectiveMaps.value[objective.id];
-        } else {
-          // Add any objective maps to the locations set
-          if (objective.maps) {
-            for (let map of objective.maps) {
-              locations.add(map.id);
+      let taskParents = newTaskGraph.inNeighbors(task.id);
+      let taskChildren = newTaskGraph.outNeighbors(task.id);
+
+      if (Array.isArray(task.finishRewards)) {
+        task.finishRewards.forEach((reward) => {
+          if (reward?.__typename === "QuestStatusReward") {
+            if (reward.status === "Fail" && reward.quest?.id) {
+              if (!alternativeTasks.value[reward.quest.id]) {
+                alternativeTasks.value[reward.quest.id] = [];
+              }
+              alternativeTasks.value[reward.quest.id].push(task.id);
             }
           }
-          objMaps = objective.maps.map((m) => m.id);
-        }
-
-        if (objectiveGPS.value[objective.id]) {
-          objGPS = objectiveGPS.value[objective.id];
-        }
-
-        objectives.push({ ...objective, maps: objMaps, gps: objGPS });
-      }
-      // For each map in locations, add the task to the mapTasks object
-      for (let location of locations) {
-        if (!mapTasks.value[location]) {
-          mapTasks.value[location] = [];
-        }
-        mapTasks.value[location].push(task.id);
+        });
       }
 
-      let alternatives = [];
+      if (task.objectives?.length > 0) {
+        for (let objective of task.objectives) {
+          if (objective?.location?.id) {
+            let mapId = objective.location.id;
+            if (!tempMapTasks[mapId]) {
+              tempMapTasks[mapId] = [];
+            }
+            tempMapTasks[mapId].push(task.id);
 
-      if (alternativeTasks.value[task.id]) {
-        alternatives = alternativeTasks.value[task.id];
-      }
-
-      updatedTasks.push({
-        ...task,
-        locations: [...locations],
-        objectives: objectives,
-        predecessors: [...new Set(getPredecessors(taskGraph.value, task.id))],
-        successors: [...new Set(getSuccessors(taskGraph.value, task.id))],
-        parents: newTaskGraph.inNeighbors(task.id),
-        children: newTaskGraph.outNeighbors(task.id),
-        alternatives: alternatives,
-      });
-    }
-
-    tasks.value = updatedTasks;
-  } else {
-    console.error("No tasks found on first load");
-  }
-});
-
-const neededItemTaskObjectives = computed(() => {
-  // Create a list of all task objectives that require items
-  let neededItemObjectives = [];
-  let relevantObjectiveTypes = ["mark", "buildWeapon", "plantItem", "giveItem"];
-  for (const task of tasks.value) {
-    if (disabledTasks.includes(task.id)) {
-      continue;
-    }
-    for (const objective of task.objectives) {
-      if (
-        relevantObjectiveTypes.includes(objective.type) &&
-        objective.optional != true
-      ) {
-        if (objective.type == "giveItem") {
-          let matchingObjective = task.objectives.find(
-            (fiObj) =>
-              fiObj.type == "findItem" &&
-              fiObj.item.id == objective.item.id &&
-              fiObj.count == objective.count &&
-              fiObj.foundInRaid == objective.foundInRaid &&
-              fiObj.dogTagLevel == objective.dogTagLevel &&
-              fiObj.maxDurability == objective.maxDurability &&
-              fiObj.minDurability == objective.minDurability
-          );
-          if (!matchingObjective) {
-            console.debug("No matching findItem objective", objective.id);
+            if (!objectiveMaps.value[task.id]) {
+              objectiveMaps.value[task.id] = [];
+            }
+            objectiveMaps.value[task.id].push({
+              objectiveID: objective.id,
+              mapID: mapId,
+            });
+            if (!objectiveGPS.value[task.id]) {
+              objectiveGPS.value[task.id] = [];
+            }
+            objectiveGPS.value[task.id].push({
+              objectiveID: objective.id,
+              x: objective.x,
+              y: objective.y,
+            });
           }
-          neededItemObjectives.push({
-            ...objective,
-            taskId: task.id,
-            findObjective: matchingObjective,
-            predecessors: task.predecessors,
-          });
-        } else {
-          neededItemObjectives.push({
-            ...objective,
-            taskId: task.id,
-            predecessors: task.predecessors,
-          });
+
+          if (objective?.item?.id || objective?.markerItem?.id) {
+            tempNeededObjectives.push({
+              id: objective.id,
+              needType: "taskObjective",
+              taskId: task.id,
+              type: objective.type,
+              item: objective.item,
+              markerItem: objective.markerItem,
+              count: objective.count,
+              foundInRaid: objective.foundInRaid,
+            });
+          }
         }
       }
+
+      newTasks.push({
+        ...task,
+        traderIcon: task.trader?.imageLink,
+        predecessors: taskPredecessors,
+        successors: taskSuccessors,
+        parents: taskParents,
+        children: taskChildren,
+      });
     }
+
+    tasks.value = newTasks;
+    neededItemTaskObjectives.value = tempNeededObjectives;
+    taskGraph.value = newTaskGraph;
+    mapTasks.value = tempMapTasks;
+  } else {
+    tasks.value = [];
+    neededItemTaskObjectives.value = [];
+    taskGraph.value = new Graph();
+    mapTasks.value = {};
+    objectiveMaps.value = {};
+    objectiveGPS.value = {};
+    alternativeTasks.value = {};
   }
-  return neededItemObjectives.map((neededItemObjective) => {
-    return { ...neededItemObjective, needType: "taskObjective" };
-  });
 });
 
-const neededItemHideoutModules = computed(() => {
-  let neededItemModules = [];
-  hideoutModules.value.forEach((hModule) => {
-    if (hModule?.itemRequirements?.length > 0) {
-      hModule.itemRequirements.forEach((itemRequirement) => {
-        neededItemModules.push({ ...itemRequirement, hideoutModule: hModule });
+// Define objectives computed property
+const objectives = computed(() => {
+  if (!queryResults.value?.tasks) {
+    return []; // Return empty if tasks data isn't available
+  }
+  const allObjectives = [];
+  queryResults.value.tasks.forEach((task) => {
+    if (task && task.objectives) {
+      // Add task context if needed, e.g., taskId
+      task.objectives.forEach((obj) => {
+        if (obj) {
+          // Ensure objective object exists
+          allObjectives.push({ ...obj, taskId: task.id }); // Spread obj and add taskId
+        }
       });
     }
   });
-  return neededItemModules.map((neededItemObjective) => {
-    return { ...neededItemObjective, needType: "hideoutModule" };
-  });
+  return allObjectives;
 });
 
-const tarkovDataMaps = ref({});
-fetch("https://tarkovtracker.github.io/tarkovdata/maps.json")
-  .then((response) => response.json())
-  .then((data) => {
-    tarkovDataMaps.value = data;
-  });
-
-const objectives = computed(() => {
-  return (
-    tasks.value?.reduce(
-      (acc, task) =>
-        acc.concat(
-          task.objectives.map((objective) => ({
-            ...objective,
-            taskId: task.id,
-            kappaRequired: task.kappaRequired && objective.optional != true,
-          }))
-        ),
-      []
-    ) || []
-  );
-});
-
-const levels = computed(() => {
-  return queryResults.value?.playerLevels;
-});
-
-const rawMaps = computed(() => {
-  return queryResults.value?.maps;
-});
-
+// --- Add New Computed Property for Maps ---
 const maps = computed(() => {
-  // Remove Night Factory from the maps list (we just care about "Factory")
-  if (!rawMaps.value) return [];
-  let noNightFactory = rawMaps.value.filter(
-    (map) => map.id != "59fc81d786f774390775787e"
-  );
-  let processedMaps = [];
-  // Link the svg property from tarkovdata to the map object from tarkov.dev API
-  noNightFactory.forEach((map) => {
-    let tempMap = { ...map };
-    tempMap.svg =
-      Object.values(tarkovDataMaps.value).find(
-        (tdm) => String(tdm.tdevId) == String(map.id)
-      )?.svg || null;
-    processedMaps.push(tempMap);
+  if (!queryResults.value?.maps || !staticMapData.value) {
+    // Return empty array if either query results or static data isn't ready
+    // Or if static data failed to load
+    return [];
+  }
+
+  // Merge GraphQL map data with static SVG data
+  const mergedMaps = queryResults.value.maps.map((map) => {
+    const lowerCaseName = map.name.toLowerCase(); // Get lowercase name with spaces
+    let mapKey;
+
+    // 1. Check if an explicit mapping exists for the name with spaces
+    if (mapNameMapping[lowerCaseName]) {
+      mapKey = mapNameMapping[lowerCaseName];
+    } else {
+      // 2. If no explicit mapping, normalize the name (remove spaces/symbols) as a fallback key
+      mapKey = lowerCaseName.replace(/\s+|\+/g, ''); // Remove spaces and '+' for keys like groundzero21+
+    }
+
+    // Use the determined mapKey to find static data
+    const staticData = staticMapData.value[mapKey];
+
+    if (staticData && staticData.svg) {
+      // Merge the svg object from static data
+      return {
+        ...map,
+        svg: staticData.svg,
+      };
+    } else {
+      console.warn(`Static SVG data not found for map: ${map.name} (lookup key: ${mapKey})`);
+      // Return the map without SVG data if no match found
+      return map;
+    }
   });
-  return processedMaps;
-});
 
-const traders = computed(() => {
-  return queryResults.value?.traders;
+  // Sort maps alphabetically by name
+  return [...mergedMaps].sort((a, b) => a.name.localeCompare(b.name));
 });
+// --- End New Computed Property ---
 
-const error = computed(() => {
-  return queryErrors.value !== null;
-});
-
-// We keep the state outside of the function so that it acts as a singleton
+// --- Main Exported Composable ---
 export function useTarkovData() {
+  // Obtain i18n context using the composable
+  const { locale } = useI18n();
+
+  // Define languageCode computed property here, using the locale from useI18n
+  const languageCode = computed(() => extractLanguageCode(locale));
+
+  // Fetch static map data when the composable is mounted
+  onMounted(async () => {
+    try {
+      const response = await fetch('https://tarkovtracker.github.io/tarkovdata/maps.json');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      staticMapData.value = await response.json();
+      console.log("Static map data loaded successfully:", staticMapData.value);
+    } catch (error) {
+      console.error("Failed to fetch static map data:", error);
+      // Handle error appropriately, maybe set a default or show a message
+      staticMapData.value = {}; // Set to empty object on error
+    }
+  });
+
+  // Initialize queries only once
+  if (!isInitialized.value) {
+    isInitialized.value = true; // Set flag immediately
+
+    // === Language Query ===
+    const { onResult: languageOnResult, onError: languageOnError } = useQuery(
+      languageQuery,
+      null, // No variables needed
+      {
+        fetchPolicy: "cache-first", // Cache first for languages
+        notifyOnNetworkStatusChange: true,
+        errorPolicy: "all",
+      }
+    );
+
+    languageOnResult((result) => {
+      // Use optional chaining for safety
+      availableLanguages.value = result.data?.__type?.enumValues.map(
+        (enumValue) => enumValue.name
+      ) ?? ["en"]; // Default to English array if chain fails
+    });
+
+    languageOnError((error) => {
+      console.error("Language query failed:", error);
+      availableLanguages.value = ["en"]; // Default to English on error
+    });
+
+    // === Task Query ===
+    const {
+      result: taskResultRef, // Direct ref to result
+      error: taskErrorRef, // Direct ref to error
+      loading: taskLoadingRef, // Direct ref to loading
+      refetch: taskRefetch,
+    } = useQuery(
+      tarkovDataQuery,
+      () => ({ lang: languageCode.value }), // Make variables reactive
+      {
+        fetchPolicy: "cache-and-network",
+        notifyOnNetworkStatusChange: true,
+        errorPolicy: "all",
+        enabled: computed(() => !!availableLanguages.value), // Only enable after languages are loaded
+      }
+    );
+
+    // Watch the direct refs and update singleton state
+    watch(
+      taskResultRef,
+      (newResult) => {
+        if (newResult) {
+          lastQueryTime.value = Date.now();
+          queryResults.value = newResult; // Update singleton state
+        }
+      },
+      { immediate: true }
+    );
+
+    watch(
+      taskErrorRef,
+      (newError) => {
+        if (newError) {
+          queryErrors.value = newError; // Update singleton state
+          console.error("Task query error:", newError);
+        }
+      },
+      { immediate: true }
+    );
+
+    watch(
+      taskLoadingRef,
+      (newLoading) => {
+        loading.value = newLoading; // Update singleton state
+      },
+      { immediate: true }
+    );
+
+    // === Hideout Query ===
+    const {
+      result: hideoutResultRef,
+      error: hideoutErrorRef,
+      loading: hideoutLoadingRef,
+      refetch: hideoutRefetch,
+    } = useQuery(
+      tarkovHideoutQuery,
+      () => ({ lang: languageCode.value }), // Make variables reactive
+      {
+        fetchPolicy: "cache-and-network",
+        notifyOnNetworkStatusChange: true,
+        errorPolicy: "all",
+        enabled: computed(() => !!availableLanguages.value), // Only enable after languages are loaded
+      }
+    );
+
+    // Watch the direct refs and update singleton state
+    watch(
+      hideoutResultRef,
+      (newResult) => {
+        if (newResult) {
+          lastHideoutQueryTime.value = Date.now();
+          queryHideoutResults.value = newResult; // Update singleton state
+          console.debug("Hideout query results updated");
+        }
+      },
+      { immediate: true }
+    );
+
+    watch(
+      hideoutErrorRef,
+      (newError) => {
+        if (newError) {
+          queryHideoutErrors.value = newError; // Update singleton state
+          console.error("Hideout query error:", newError);
+        }
+      },
+      { immediate: true }
+    );
+
+    watch(
+      hideoutLoadingRef,
+      (newLoading) => {
+        hideoutLoading.value = newLoading; // Update singleton state
+      },
+      { immediate: true }
+    );
+
+    // Refetch data when language changes
+    watchEffect(() => {
+      const currentLang = languageCode.value; // Dependency
+      if (availableLanguages.value && isInitialized.value) {
+        // Ensure initialized and languages are loaded
+        console.log(`Language changed to ${currentLang}, refetching data...`);
+        taskRefetch({ lang: currentLang });
+        hideoutRefetch({ lang: currentLang });
+      }
+    });
+  } // End of initialization block
+
+  // --- Return the singleton reactive refs ---
   return {
-    tasks,
-    objectives,
-    maps,
-    levels,
-    traders,
-    loading,
-    error,
-    rawMaps,
-    disabledTasks,
+    availableLanguages,
+    languageCode,
+    queryErrors,
+    queryResults,
+    lastQueryTime,
+    loading, // Return combined or specific loading states
     hideoutLoading,
+    queryHideoutErrors,
+    queryHideoutResults,
+    lastHideoutQueryTime,
     hideoutStations,
     hideoutModules,
-    taskRefetch,
-    hideoutRefetch,
+    hideoutGraph,
+    tasks,
+    taskGraph,
+    objectiveMaps,
+    alternativeTasks,
+    objectiveGPS,
+    mapTasks,
+    objectives,
+    maps,
     neededItemTaskObjectives,
     neededItemHideoutModules,
+    disabledTasks,
   };
 }

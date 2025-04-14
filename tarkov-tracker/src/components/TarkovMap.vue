@@ -2,17 +2,19 @@
   <v-container>
     <v-row>
       <v-col cols="12">
-        <template
-          v-for="(floor, floorIndex) in props.map.svg.floors"
-          :key="floorIndex"
-        >
-          <v-btn
-            variant="tonal"
-            :color="floor == selectedFloor ? 'green' : ''"
-            class="mx-2"
-            @click="setFloor(floor)"
-            >{{ floor.replace("_", " ") }}</v-btn
+        <template v-if="props.map?.svg?.floors?.length > 0">
+          <template
+            v-for="(floor, floorIndex) in props.map.svg.floors"
+            :key="floorIndex"
           >
+            <v-btn
+              variant="tonal"
+              :color="floor == selectedFloor ? 'green' : ''"
+              class="mx-2"
+              @click="setFloor(floor)"
+              >{{ floor.replace("_", " ") }}</v-btn
+            >
+          </template>
         </template>
       </v-col>
       <v-col cols="12">
@@ -24,7 +26,7 @@
               ) in mark.possibleLocations"
               :key="markLocationIndex"
             >
-              <map-marker
+              <MapMarker
                 v-if="markLocation.map.id === props.map.id"
                 :key="markLocationIndex"
                 :mark="mark"
@@ -37,7 +39,7 @@
               v-for="(zoneLocation, zoneLocationIndex) in mark.zones"
               :key="zoneLocationIndex"
             >
-              <map-zone
+              <MapZone
                 v-if="zoneLocation.map.id === props.map.id"
                 :key="zoneLocationIndex"
                 :mark="mark"
@@ -64,6 +66,7 @@ import {
 import { useUserStore } from "@/stores/user.js";
 import { v4 as uuidv4 } from "uuid";
 import * as d3 from "d3";
+
 const randomMapId = ref(uuidv4());
 const emit = defineEmits(["gpsclick"]);
 const props = defineProps({
@@ -77,14 +80,15 @@ const props = defineProps({
     default: () => [],
   },
 });
+
 const MapMarker = defineAsyncComponent(() =>
   import("@/components/MapMarker.vue")
 );
 const MapZone = defineAsyncComponent(() => import("@/components/MapZone.vue"));
 
-// selectedFloor is a ref which defaults to the last item in the floors array
+// selectedFloor is a ref which defaults to the last item in the floors array, or null if unavailable
 const selectedFloor = ref(
-  props.map.svg.floors[props.map.svg.floors.length - 1]
+  props.map?.svg?.floors?.[props.map.svg.floors.length - 1] ?? null // Use optional chaining and nullish coalescing
 );
 
 const setFloor = (floor) => {
@@ -94,13 +98,24 @@ const setFloor = (floor) => {
 
 watch(
   () => props.map,
-  () => {
+  (newMap) => {
     draw();
-    selectedFloor.value = props.map.svg.floors[props.map.svg.floors.length - 1];
+    // Safely update selectedFloor only if floors exist
+    selectedFloor.value =
+      newMap?.svg?.floors?.[newMap.svg.floors.length - 1] ?? null;
   }
 );
 
 const draw = async () => {
+  // Add check for map svg data before proceeding
+  if (!props.map?.svg?.file) {
+    console.warn("Map SVG file info missing, skipping draw.");
+    // Clear existing SVG if any
+    d3.select(document.getElementById(randomMapId.value))
+      .selectAll("svg")
+      .remove();
+    return;
+  }
   const svg = await d3.svg(
     `https://tarkovtracker.github.io/tarkovdata/maps/${props.map.svg.file}`
   );
@@ -116,16 +131,21 @@ const draw = async () => {
   d3.select(document.getElementById(randomMapId.value))
     .select("svg")
     .style("height", "100%");
-  // Calculate the index of the selected floor
-  const selectedFloorIndex = props.map.svg.floors.indexOf(selectedFloor.value);
-  props.map.svg.floors.forEach((floor, index) => {
-    if (index > selectedFloorIndex) {
-      d3.select(document.getElementById(randomMapId.value))
-        .select("svg")
-        .select(`#${floor}`)
-        .style("opacity", 0.02);
+  // Calculate the index of the selected floor - Add safety check
+  const floors = props.map?.svg?.floors;
+  if (selectedFloor.value && floors && floors.length > 0) {
+    const selectedFloorIndex = floors.indexOf(selectedFloor.value);
+    if (selectedFloorIndex !== -1) { // Ensure floor exists in the array
+      floors.forEach((floor, index) => {
+        if (index > selectedFloorIndex) {
+          d3.select(document.getElementById(randomMapId.value))
+            .select("svg")
+            .select(`#${floor}`)
+            .style("opacity", 0.02);
+        }
+      }, this);
     }
-  }, this);
+  }
 };
 
 onMounted(() => {
