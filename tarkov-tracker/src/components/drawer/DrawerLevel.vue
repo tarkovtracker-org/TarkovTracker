@@ -12,7 +12,7 @@
     </span>
     <span>
       <div style="font-size: 0.7em" class="text-center mb-1">
-        {{ $t("navigation_drawer.level") }}
+        {{ t("navigation_drawer.level") }}
       </div>
       <div class="text-center">
         <h1 style="font-size: 2.5em; line-height: 0.8em">
@@ -55,6 +55,10 @@ import { computed } from "vue";
 import { useTarkovStore } from "@/stores/tarkov.js";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 const { mdAndDown } = useDisplay();
 const tarkovStore = useTarkovStore();
 const appStore = useAppStore();

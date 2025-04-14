@@ -13,7 +13,7 @@
     </div>
     <div v-if="!appStore.drawerUseRail(mdAndDown)">
       <div class="text-h5 text-center mt-2 font-weight-medium">
-        {{ $t("site_name") }}
+        {{ t("site_name") }}
       </div>
     </div>
   </v-list-item>
@@ -23,6 +23,10 @@
 import { computed } from "vue";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 const { mdAndDown } = useDisplay();
 const appStore = useAppStore();
 

@@ -61,11 +61,13 @@ function logout() {
 }
 </script>
 <style lang="scss" scoped>
-:global(body
-    > div.v-overlay-container
-    > div.allow-overflow
-    > div.v-overlay__content
-    > div.v-sheet) {
+:global(
+    body
+      > div.v-overlay-container
+      > div.allow-overflow
+      > div.v-overlay__content
+      > div.v-sheet
+  ) {
   overflow-y: visible;
 }
 

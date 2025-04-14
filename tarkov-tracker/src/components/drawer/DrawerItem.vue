@@ -19,7 +19,7 @@
       style="display: inline-flex"
     >
       <template v-if="props.localeKey">
-        {{ $t(`navigation_drawer.${props.localeKey}`) }}
+        {{ t(`navigation_drawer.${props.localeKey}`) }}
       </template>
       <template v-else-if="props.text">
         {{ props.text }}
@@ -32,6 +32,10 @@
 import { computed } from "vue";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 const { mdAndDown } = useDisplay();
 
 const props = defineProps({
