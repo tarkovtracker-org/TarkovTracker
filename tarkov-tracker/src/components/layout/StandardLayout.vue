@@ -6,27 +6,24 @@
   <app-bar />
 
   <!-- Main View -->
-  <v-main class="" style="min-height: 100%">
+  <v-main style="min-height: 100vh; display: flex; flex-direction: column;">
     <!-- <div id="tracker-page-background"> -->
-    <div id="tracker-page-background">
-      <div id="tracker-page-background-blur" class="d-flex flex-column">
-        <div class="mt-2 mx-2">
+    <div id="tracker-page-background" style="flex: 1 1 auto; display: flex; flex-direction: column;">
+      <div id="tracker-page-background-blur" class="d-flex flex-column justify-space-between" style="flex: 1 1 auto; min-height: 100%;">
+        <div class="flex-grow-1" style="padding: 8px 8px 0;">
           <router-view />
         </div>
-        <app-footer />
+        <app-footer style="margin-top: auto; flex-shrink: 0;" />
       </div>
     </div>
     <!-- </div> -->
   </v-main>
 </template>
-
 <script setup>
 import { computed } from "vue";
 import { defineAsyncComponent } from "vue";
 import { useRoute } from "vue-router";
-
 const route = useRoute();
-
 const backgroundImage = computed(() => {
   if (route.meta.background) {
     return `url(/img/background/${route.meta.background}.webp)`;
@@ -34,7 +31,6 @@ const backgroundImage = computed(() => {
     return "";
   }
 });
-
 // const backgroundImage = computed(() => {
 //   if (route.meta.background) {
 //     return `/img/background/${route.meta.background}.webp`
@@ -42,7 +38,6 @@ const backgroundImage = computed(() => {
 //     return ''
 //   }
 // })
-
 const NavDrawer = defineAsyncComponent(() =>
   import("@/components/layout/NavDrawer.vue")
 );
@@ -61,7 +56,6 @@ const AppBar = defineAsyncComponent(() =>
   background-position: center;
   height: 100%;
 }
-
 #tracker-page-background-blur {
   background: rgba(
     255,
@@ -73,7 +67,6 @@ const AppBar = defineAsyncComponent(() =>
   min-height: 100%;
   min-width: 100%;
 }
-
 .main-content {
   flex: 1;
 }

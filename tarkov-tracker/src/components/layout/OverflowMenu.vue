@@ -38,7 +38,6 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app.js";
 import { useUserStore } from "@/stores/user.js";
-
 const userStore = useUserStore();
 const unhideTips = () => {
   userStore.unhideTips();
@@ -46,10 +45,8 @@ const unhideTips = () => {
 const enableHideAllTips = () => {
   userStore.enableHideAllTips();
 };
-
 const appStore = useAppStore();
 const { availableLocales, locale } = useI18n({ useScope: "global" });
-
 const localeItems = computed(() => {
   return availableLocales.map((localeCode) => {
     const languageNames = new Intl.DisplayNames([localeCode], {
@@ -58,12 +55,11 @@ const localeItems = computed(() => {
     return { title: languageNames.of(localeCode), value: localeCode };
   });
 });
-
 const currentLocale = computed({
   get() {
     return (
       localeItems.value.filter(
-        (localeItem) => localeItem.value == locale.value
+        (localeItem) => localeItem.value == locale.value,
       )[0] || "en"
     );
   },

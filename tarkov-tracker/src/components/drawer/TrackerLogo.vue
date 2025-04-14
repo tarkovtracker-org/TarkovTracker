@@ -6,30 +6,26 @@
     to="/"
   >
     <div
-      :class="appStore.drawerUseRail(mdAndDown) ? 'v-logo-rail' : 'v-logo-full'"
-      style="height: auto; margin: 20px auto"
+      :class="appStore.drawerUseRail(mdAndDown) ? 'v-logo-rail' : 'v-logo-full compact-logo'"
+      style="height: auto; margin: 8px auto"
     >
       <v-img :src="logo" lazy-src="/favicon-32x32.png" />
     </div>
     <div v-if="!appStore.drawerUseRail(mdAndDown)">
-      <div class="text-h5 text-center mt-2 font-weight-medium">
+      <div class="text-subtitle1 text-center mt-1 font-weight-medium compact-site-name">
         {{ t("site_name") }}
       </div>
     </div>
   </v-list-item>
 </template>
-
 <script setup>
 import { computed } from "vue";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
 import { useI18n } from "vue-i18n";
-
 const { t } = useI18n();
-
 const { mdAndDown } = useDisplay();
 const appStore = useAppStore();
-
 const logo = computed(() => {
   return appStore.drawerUseRail(mdAndDown.value)
     ? "/img/tarkovtrackerlogo-mini.png"
@@ -42,11 +38,15 @@ const logo = computed(() => {
 :global(#app-logo-item > .v-list-item__overlay) {
   opacity: 0 !important;
 }
-
 // We set deep for this so that it is carried down into child componets (vuetify components)
-:deep(.v-logo-full) {
-  width: 85%;
-  min-width: 80%;
+:deep(.v-logo-full), :deep(.compact-logo) {
+  width: 55%;
+  min-width: 50%;
+  max-width: 100px;
+}
+.compact-site-name {
+  font-size: 1.1rem !important;
+  line-height: 1.1;
 }
 
 // We set deep for this so that it is carried down into child componets (vuetify components)

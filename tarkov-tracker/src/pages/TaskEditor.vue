@@ -36,15 +36,12 @@ import { computed, ref } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { defineAsyncComponent } from "vue";
 import { useEditorStore } from "@/stores/editor";
-const EditorTaskCard = defineAsyncComponent(() =>
-  import("@/components/editor/EditorTaskCard.vue")
+const EditorTaskCard = defineAsyncComponent(
+  () => import("@/components/editor/EditorTaskCard.vue"),
 );
 const editorStore = useEditorStore();
-
 const { tasks, maps, traders } = useTarkovData();
-
 const updatedTasks = ref({});
-
 const allTasks = computed({
   get() {
     return JSON.parse(JSON.stringify(tasks.value));
@@ -53,22 +50,19 @@ const allTasks = computed({
     updatedTasks.value = newTasks;
   },
 });
-
 const copyObjectiveMaps = async () => {
   navigator.clipboard.writeText(
-    JSON.stringify(editorStore.getObjectiveMapsFull, null, 2)
+    JSON.stringify(editorStore.getObjectiveMapsFull, null, 2),
   );
 };
-
 const copyAlternativeTasks = async () => {
   navigator.clipboard.writeText(
-    JSON.stringify(editorStore.getAlternativeTasksFull, null, 2)
+    JSON.stringify(editorStore.getAlternativeTasksFull, null, 2),
   );
 };
-
 const copyGPSLocations = async () => {
   navigator.clipboard.writeText(
-    JSON.stringify(editorStore.getObjectiveGPSFull, null, 2)
+    JSON.stringify(editorStore.getObjectiveGPSFull, null, 2),
   );
 };
 </script>

@@ -4,6 +4,8 @@
     theme="dark"
     image="/img/sidebar-background.webp"
     :rail="appStore.drawerUseRail(mdAndDown)"
+    :width="appStore.drawerUseRail(mdAndDown) ? 56 : 180"
+    class="compact-nav-drawer"
   >
     <tracker-logo />
     <v-divider class="mx-3 my-1" />
@@ -19,12 +21,9 @@
 <script setup>
 import { defineAsyncComponent } from "vue";
 import { useAppStore } from "@/stores/app.js";
-
 import { useDisplay } from "vuetify";
 const { mdAndDown } = useDisplay();
-
 const appStore = useAppStore();
-
 // Set up component loading
 const TrackerLogo = defineAsyncComponent(() =>
   import("@/components/drawer/TrackerLogo.vue")
@@ -47,4 +46,9 @@ const DrawerExternalLinks = defineAsyncComponent(() =>
   padding-inline-start: 0 !important;
   padding-left: 8px !important;
 }
+.compact-nav-drawer {
+  /* Remove width: auto, use fixed width for proper collapse */
+  box-sizing: border-box !important;
+}
+
 </style>

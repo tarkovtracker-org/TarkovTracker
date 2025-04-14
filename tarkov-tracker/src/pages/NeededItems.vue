@@ -63,10 +63,8 @@
                         >
                           <v-btn value="mediumCard" icon="mdi-view-grid">
                           </v-btn>
-
                           <v-btn value="smallCard" icon="mdi-view-comfy">
                           </v-btn>
-
                           <v-btn value="row" icon="mdi-view-sequential">
                           </v-btn>
                         </v-btn-toggle>
@@ -197,25 +195,20 @@ const {
 } = useTarkovData();
 const progressStore = useProgressStore();
 const userStore = useUserStore();
-
 const itemFilterNameText = ref("");
 const itemFilterName = ref("");
 provide("itemFilterName", itemFilterName);
-
 watch(
   itemFilterNameText,
   debounce((newVal) => {
     itemFilterName.value = newVal;
   }, 500)
 );
-
 const neededItemsStyle = computed({
   get: () => userStore.getNeededItemsStyle,
   set: (value) => userStore.setNeededItemsStyle(value),
 });
-
 const settingsDialog = ref(false);
-
 const neededViews = [
   {
     title: t("page.neededitems.neededviews.all"),
@@ -233,22 +226,18 @@ const neededViews = [
     view: "hideout",
   },
 ];
-
 const activeNeededView = computed({
   get: () => userStore.getNeededTypeView,
   set: (value) => userStore.setNeededTypeView(value),
 });
-
 const neededTaskItems = computed(() => {
   // Capture dependencies' values at the start using optional chaining on .value access
   const objectives = neededItemTaskObjectives?.value;
   const taskList = tasks?.value;
-
   // Check if captured values are valid arrays
   if (!Array.isArray(objectives) || !Array.isArray(taskList)) {
     return [];
   }
-
   try {
     // Use the captured, validated arrays
     return JSON.parse(JSON.stringify(objectives)).sort(
@@ -264,7 +253,6 @@ const neededTaskItems = computed(() => {
             aCount++;
           }
         });
-
         let bCount = 0;
         // Use taskList, still needs optional chaining for find
         const taskB = taskList?.find((task) => task.id == b.taskId);
@@ -288,17 +276,14 @@ const neededTaskItems = computed(() => {
     return [];
   }
 });
-
 const neededHideoutItems = computed(() => {
   // Capture dependencies' values at the start using optional chaining on .value access
   const modulesNeeded = neededItemHideoutModules?.value;
   const moduleList = hideoutModules?.value;
-
   // Check if captured values are valid arrays
   if (!Array.isArray(modulesNeeded) || !Array.isArray(moduleList)) {
     return [];
   }
-
   try {
     // Use the captured, validated arrays
     let hideoutNeeds = JSON.parse(
@@ -316,7 +301,6 @@ const neededHideoutItems = computed(() => {
           aCount++;
         }
       });
-
       let bCount = 0;
       // Use moduleList, still needs optional chaining for find and hideoutModule access
       const moduleB = moduleList?.find(
@@ -342,7 +326,6 @@ const neededHideoutItems = computed(() => {
     return [];
   }
 });
-
 const hideFIR = computed({
   get: () => userStore.itemsNeededHideNonFIR,
   set: (value) => userStore.setItemsNeededHideNonFIR(value),
@@ -355,7 +338,6 @@ const hideFIRLabel = computed(() =>
 const hideFIRColor = computed(() =>
   userStore.itemsNeededHideNonFIR ? "error" : "success"
 );
-
 const itemsHideAll = computed({
   get: () => userStore.itemsTeamAllHidden,
   set: (value) => userStore.setItemsTeamHideAll(value),
@@ -368,7 +350,6 @@ const itemsHideAllLabel = computed(() =>
 const itemsHideAllColor = computed(() =>
   userStore.itemsTeamAllHidden ? "error" : "success"
 );
-
 const itemsHideNonFIR = computed({
   get: () => userStore.itemsTeamNonFIRHidden,
   set: (value) => userStore.setItemsTeamHideNonFIR(value),
@@ -381,7 +362,6 @@ const itemsHideNonFIRLabel = computed(() =>
 const itemsHideNonFIRColor = computed(() =>
   userStore.itemsTeamNonFIRHidden ? "error" : "success"
 );
-
 const itemsHideHideout = computed({
   get: () => userStore.itemsTeamHideoutHidden,
   set: (value) => userStore.setItemsTeamHideHideout(value),

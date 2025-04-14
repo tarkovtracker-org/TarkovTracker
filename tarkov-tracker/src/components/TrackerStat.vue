@@ -12,6 +12,9 @@
     </div>
     <div class="text-h4 text-right pa-2 pt-0">
       <slot name="value"></slot>
+      <div class="stat-percentage" style="font-size: 0.5em; line-height: 1.2;">
+        <slot name="percentage"></slot>
+      </div>
     </div>
     <div
       v-if="$slots.details"
@@ -24,7 +27,6 @@
     </div>
   </v-sheet>
 </template>
-
 <script setup>
 // eslint-disable-next-line no-unused-vars
 const props = defineProps({

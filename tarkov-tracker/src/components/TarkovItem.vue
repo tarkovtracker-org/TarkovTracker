@@ -90,40 +90,29 @@ const props = defineProps({
     default: null,
   },
 });
-
 const linkHover = ref(false);
-
 const itemIconUrl = computed(() => {
   return `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
 });
-
 const openTarkovDevLink = () => {
   window.open(props.devLink, "_blank");
 };
-
 const openWikiLink = () => {
   window.open(props.wikiLink, "_blank");
 };
 </script>
 <style lang="scss" scoped>
-.tarkov-item-name {
-  //color: rgba(var(--v-theme-tasklink), 1) !important;
-}
-
 .blur-item {
   filter: blur(1px);
 }
-
 .external-link {
   cursor: pointer;
 }
-
 .float-container {
   position: relative;
   width: 100%;
   height: 100%;
 }
-
 .float-link {
   position: absolute;
   top: 0;

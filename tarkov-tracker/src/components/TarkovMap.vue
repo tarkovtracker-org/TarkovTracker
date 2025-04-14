@@ -3,10 +3,7 @@
     <v-row>
       <v-col cols="12">
         <template v-if="props.map?.svg?.floors?.length > 0">
-          <template
-            v-for="(floor, floorIndex) in props.map.svg.floors"
-            :key="floorIndex"
-          >
+          <template v-for="floor in props.map.svg.floors" :key="floorIndex">
             <v-btn
               variant="tonal"
               :color="floor == selectedFloor ? 'green' : ''"
@@ -55,18 +52,9 @@
   </v-container>
 </template>
 <script setup>
-import {
-  defineProps,
-  computed,
-  ref,
-  onMounted,
-  defineAsyncComponent,
-  watch,
-} from "vue";
-import { useUserStore } from "@/stores/user.js";
+import { defineProps, ref, onMounted, defineAsyncComponent, watch } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import * as d3 from "d3";
-
 const randomMapId = ref(uuidv4());
 const emit = defineEmits(["gpsclick"]);
 const props = defineProps({
@@ -80,22 +68,18 @@ const props = defineProps({
     default: () => [],
   },
 });
-
-const MapMarker = defineAsyncComponent(() =>
-  import("@/components/MapMarker.vue")
+const MapMarker = defineAsyncComponent(
+  () => import("@/components/MapMarker.vue"),
 );
 const MapZone = defineAsyncComponent(() => import("@/components/MapZone.vue"));
-
 // selectedFloor is a ref which defaults to the last item in the floors array, or null if unavailable
 const selectedFloor = ref(
-  props.map?.svg?.floors?.[props.map.svg.floors.length - 1] ?? null // Use optional chaining and nullish coalescing
+  props.map?.svg?.floors?.[props.map.svg.floors.length - 1] ?? null, // Use optional chaining and nullish coalescing
 );
-
 const setFloor = (floor) => {
   selectedFloor.value = floor;
   draw();
 };
-
 watch(
   () => props.map,
   (newMap) => {
@@ -103,9 +87,8 @@ watch(
     // Safely update selectedFloor only if floors exist
     selectedFloor.value =
       newMap?.svg?.floors?.[newMap.svg.floors.length - 1] ?? null;
-  }
+  },
 );
-
 const draw = async () => {
   // Add check for map svg data before proceeding
   if (!props.map?.svg?.file) {
@@ -117,7 +100,7 @@ const draw = async () => {
     return;
   }
   const svg = await d3.svg(
-    `https://tarkovtracker.github.io/tarkovdata/maps/${props.map.svg.file}`
+    `https://tarkovtracker.github.io/tarkovdata/maps/${props.map.svg.file}`,
   );
   d3.select(document.getElementById(randomMapId.value))
     .selectAll("svg")
@@ -135,7 +118,8 @@ const draw = async () => {
   const floors = props.map?.svg?.floors;
   if (selectedFloor.value && floors && floors.length > 0) {
     const selectedFloorIndex = floors.indexOf(selectedFloor.value);
-    if (selectedFloorIndex !== -1) { // Ensure floor exists in the array
+    if (selectedFloorIndex !== -1) {
+      // Ensure floor exists in the array
       floors.forEach((floor, index) => {
         if (index > selectedFloorIndex) {
           d3.select(document.getElementById(randomMapId.value))
@@ -147,11 +131,8 @@ const draw = async () => {
     }
   }
 };
-
 onMounted(() => {
   draw();
 });
-
-const userStore = useUserStore();
 </script>
 <style lang="scss" scoped></style>

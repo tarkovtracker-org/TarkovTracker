@@ -25,14 +25,12 @@
         </v-sheet>
       </span>
     </div>
-
     <div v-if="currentLevel" class="text-center text-caption mt-4 mb-2 mx-2">
       {{ currentLevel.description }}
     </div>
     <div v-else class="text-center text-caption mt-4 mb-2 mx-2">
       {{ nextLevel.description }}
     </div>
-
     <v-sheet
       v-if="props.station.id == '5d484fc0654e76006657e0ab'"
       class="text-center pa-2"
@@ -45,7 +43,6 @@
         $t("page.hideout.stationcard.settingsbutton")
       }}</v-btn>
     </v-sheet>
-
     <v-sheet v-if="nextLevel" color="accent" class="mb-1">
       <div class="text-center pa-2">
         <div class="text-subtitle-1 mb-2">
@@ -123,7 +120,6 @@
         >{{ $t("page.hideout.stationcard.maxlevel") }}
       </div>
     </v-sheet>
-
     <div class="mb-2">
       <v-row
         v-if="!upgradeDisabled"
@@ -225,13 +221,11 @@ const highlightClasses = computed(() => {
   }
   return classes;
 });
-
 const upgradeDisabled = computed(() => {
   return !Object.values(progressStore.visibleStations).find(
     (station) => station.id === props.station.id
   );
 });
-
 const downgradeDisabled = computed(() => {
   if (props.station.id == "5d484fc0654e76006657e0ab") {
     if (
@@ -245,10 +239,8 @@ const downgradeDisabled = computed(() => {
   }
   return false;
 });
-
 const moduleStatusUpdated = ref(false);
 const moduleStatus = ref("");
-
 const upgradeStation = () => {
   // Store next level to a variable because it can change mid-function
   let upgradeLevel = nextLevel.value;
@@ -263,7 +255,6 @@ const upgradeStation = () => {
   });
   moduleStatusUpdated.value = true;
 };
-
 const downgradeStation = () => {
   // Store current level to a variable because it can change mid-function
   let downgradeLevel = currentLevel.value;
@@ -278,7 +269,6 @@ const downgradeStation = () => {
   });
   moduleStatusUpdated.value = true;
 };
-
 const nextLevel = computed(() => {
   return (
     props.station.levels.find(
@@ -288,7 +278,6 @@ const nextLevel = computed(() => {
     ) || null
   );
 });
-
 const currentLevel = computed(() => {
   return (
     props.station.levels.find(
@@ -297,7 +286,6 @@ const currentLevel = computed(() => {
     ) || null
   );
 });
-
 const stationAvatar = computed(() => {
   return `/img/hideout/${props.station.id}.png`;
 });
@@ -313,7 +301,6 @@ const stationAvatar = computed(() => {
   background-clip: padding-box;
   border-radius: 10px 10px 10px 0px;
 }
-
 .highlight-secondary {
   background: linear-gradient(
     135deg,
@@ -322,7 +309,6 @@ const stationAvatar = computed(() => {
     rgba(154, 136, 102, 1) 100%
   );
 }
-
 .highlight-green {
   background: linear-gradient(
     90deg,

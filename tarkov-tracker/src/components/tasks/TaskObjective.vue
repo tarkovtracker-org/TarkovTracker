@@ -77,20 +77,16 @@ const props = defineProps({
 const TarkovItem = defineAsyncComponent(() =>
   import("@/components/TarkovItem.vue")
 );
-const { objectives, neededItemTaskObjectives } = useTarkovData();
+const { objectives } = useTarkovData();
 const tarkovStore = useTarkovStore();
 const progressStore = useProgressStore();
-
 const isComplete = computed(() => {
   return tarkovStore.isTaskObjectiveComplete(props.objective.id);
 });
-
 const fullObjective = computed(() => {
   return objectives.value.find((o) => o.id == props.objective.id);
 });
-
 const itemObjectiveTypes = ["giveItem", "mark", "buildWeapon", "plantItem"];
-
 const relatedItem = computed(() => {
   if (!fullObjective.value) {
     return null;
@@ -109,7 +105,6 @@ const relatedItem = computed(() => {
       return null;
   }
 });
-
 const userNeeds = computed(() => {
   let needingUsers = [];
   if (fullObjective.value == undefined) {
@@ -128,17 +123,13 @@ const userNeeds = computed(() => {
   });
   return needingUsers;
 });
-
 const isHovered = ref(false);
-
 const objectiveMouseEnter = () => {
   isHovered.value = true;
 };
-
 const objectiveMouseLeave = () => {
   isHovered.value = false;
 };
-
 const objectiveIcon = computed(() => {
   if (isHovered.value) {
     if (isComplete.value) {
@@ -171,7 +162,6 @@ const objectiveIcon = computed(() => {
   };
   return iconMap[props.objective.type] || "mdi-help-circle";
 });
-
 const toggleObjectiveCompletion = () => {
   tarkovStore.toggleTaskObjectiveComplete(props.objective.id);
 };
@@ -185,7 +175,6 @@ const toggleObjectiveCompletion = () => {
     rgba(var(--v-theme-complete), 0) 75%
   );
 }
-
 .clickable {
   cursor: pointer;
 }

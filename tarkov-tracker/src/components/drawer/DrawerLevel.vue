@@ -15,9 +15,20 @@
         {{ t("navigation_drawer.level") }}
       </div>
       <div class="text-center">
-        <h1 style="font-size: 2.5em; line-height: 0.8em">
+        <h1 v-if="!editingLevel" style="font-size: 2.5em; line-height: 0.8em; cursor: pointer;" @click="startEditingLevel">
           {{ tarkovStore.playerLevel }}
         </h1>
+        <input
+          v-else
+          ref="levelInput"
+          type="number"
+          min="1"
+          max="79"
+          v-model.number="levelInputValue"
+          @blur="saveLevel"
+          @keyup.enter="saveLevel"
+          style="font-size: 2.5em; width: 2.5em; text-align: center;"
+        />
       </div>
     </span>
     <span v-if="!appStore.drawerUseRail(mdAndDown)">
@@ -44,45 +55,60 @@
     </span>
   </div>
   <!-- <template v-if="appStore.drawerUseRail(mdAndDown)">
-      
+
     </template>
     <template v-else>
       {{ tarkovStore.storeSelected }}
     </template> -->
 </template>
 <script setup>
-import { computed } from "vue";
+import { computed, ref, nextTick } from "vue";
 import { useTarkovStore } from "@/stores/tarkov.js";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
 import { useI18n } from "vue-i18n";
-
 const { t } = useI18n();
-
 const { mdAndDown } = useDisplay();
 const tarkovStore = useTarkovStore();
 const appStore = useAppStore();
-
 const pmcFactionIcon = computed(() => {
   return `/img/factions/${tarkovStore.getPMCFaction}.webp`;
 });
-
 const groupIcon = computed(() => {
   return `/img/levelgroups/${Math.floor(tarkovStore.playerLevel / 5) + 1}.png`;
 });
+
+// Manual level editing logic
+const editingLevel = ref(false);
+const levelInputValue = ref(tarkovStore.playerLevel);
+const levelInput = ref(null);
+
+function startEditingLevel() {
+  editingLevel.value = true;
+  levelInputValue.value = tarkovStore.playerLevel;
+  nextTick(() => {
+    if (levelInput.value) levelInput.value.focus();
+  });
+}
+
+function saveLevel() {
+  let newLevel = parseInt(levelInputValue.value, 10);
+  if (isNaN(newLevel)) newLevel = 1;
+  newLevel = Math.max(1, Math.min(79, newLevel));
+  tarkovStore.setLevel(newLevel);
+  editingLevel.value = false;
+}
 </script>
 <style lang="scss" scoped>
 .faction-icon {
   filter: invert(1);
 }
-
 .crossfade {
   position: relative;
   width: 64px;
   height: 64px;
   overflow: hidden;
 }
-
 .crossfade-faction {
   position: absolute;
   top: 0;
@@ -92,7 +118,6 @@ const groupIcon = computed(() => {
   margin-top: 8px;
   transition: opacity 1s ease-in-out;
 }
-
 .crossfade-level {
   position: absolute;
   top: 0;
@@ -101,11 +126,9 @@ const groupIcon = computed(() => {
   opacity: 1;
   transition: opacity 1s ease-in-out;
 }
-
 .crossfade:hover .crossfade-faction {
   opacity: 1;
 }
-
 .crossfade:hover .crossfade-level {
   opacity: 0;
 }

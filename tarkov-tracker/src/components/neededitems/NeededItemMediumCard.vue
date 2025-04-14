@@ -189,11 +189,11 @@ import { useUserStore } from "@/stores/user";
 import { useProgressStore } from "@/stores/progress";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useTarkovStore } from "@/stores/tarkov";
-const TaskLink = defineAsyncComponent(() =>
-  import("@/components/tasks/TaskLink.vue")
+const TaskLink = defineAsyncComponent(
+  () => import("@/components/tasks/TaskLink.vue"),
 );
-const StationLink = defineAsyncComponent(() =>
-  import("@/components/hideout/StationLink.vue")
+const StationLink = defineAsyncComponent(
+  () => import("@/components/hideout/StationLink.vue"),
 );
 const props = defineProps({
   need: {
@@ -201,15 +201,10 @@ const props = defineProps({
     required: true,
   },
 });
-
 defineEmits(["increaseCount", "decreaseCount", "toggleCount"]);
-
-const userStore = useUserStore();
 const progressStore = useProgressStore();
 const tarkovStore = useTarkovStore();
-
-const { tasks, hideoutStations } = useTarkovData();
-
+useTarkovData();
 const {
   selfCompletedNeed,
   relatedTask,
@@ -222,7 +217,6 @@ const {
   teamNeeds,
   imageItem,
 } = inject("neededitem");
-
 const itemImageClasses = computed(() => {
   return {
     [`item-bg-${item.value.backgroundColor}`]: true,
@@ -233,7 +227,6 @@ const itemImageClasses = computed(() => {
     "fill-height": true,
   };
 });
-
 const itemCardClasses = computed(() => {
   return {
     "item-complete":
@@ -250,48 +243,37 @@ const itemCardClasses = computed(() => {
     rgba(var(--v-theme-surface), 1) 75%
   ) !important;
 }
-
 .item-panel {
   aspect-ratio: 16/9;
   min-height: 138px;
 }
-
 .item-image {
   min-height: 90px;
 }
-
 .item-bg-violet {
   background-color: #2c232f;
 }
-
 .item-bg-grey {
   background-color: #1e1e1e;
 }
-
 .item-bg-yellow {
   background-color: #343421;
 }
-
 .item-bg-orange {
   background-color: #261d14;
 }
-
 .item-bg-green {
   background-color: #1a2314;
 }
-
 .item-bg-red {
   background-color: #38221f;
 }
-
 .item-bg-default {
   background-color: #3a3c3b;
 }
-
 .item-bg-black {
   background-color: #141614;
 }
-
 .item-bg-blue {
   background-color: #202d32;
 }

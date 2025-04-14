@@ -28,9 +28,7 @@
 <script setup>
 import { useUserStore } from "@/stores/user.js";
 import { useI18n } from "vue-i18n";
-
 const { t } = useI18n();
-
 const props = defineProps({
   icon: {
     type: String,
@@ -53,9 +51,7 @@ const props = defineProps({
     required: true,
   },
 });
-
 const userStore = useUserStore();
-
 const hideTip = () => {
   userStore.hideTip(props.tip);
 };

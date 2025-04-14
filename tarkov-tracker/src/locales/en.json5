@@ -256,7 +256,7 @@
     },
   },
   navigation_drawer: {
-    home: "Home",
+    home: "Dashboard",
     settings: "Settings",
     login: "Log In",
     logout: "Log Out",
@@ -289,7 +289,7 @@
     },
     login: {
       title: "Login",
-      description: "As a heads up, logging in is not necessary to use TarkovTracker to track your progress in the game. The only reason to log in is to enable sharing your progress with your friends live and coordinate raids, or to keep data across devices or through clearing browser data. If you aren't planning on doing that, you can continue to use TarkovTracker without logging in. Your data will be stored locally in your browser.",
+      description: "You don't need to log in to use TarkovTracker. Log in only if you want to sync or share your progress. Otherwise, your data stays safely in your browser.",
     },
     hideout: {
       title: "Hideout",

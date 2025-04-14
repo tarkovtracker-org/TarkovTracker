@@ -1,77 +1,109 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+import functions from "firebase-functions"; // Use import
+import admin from "firebase-admin"; // Use import
+import UIDGenerator from "uid-generator"; // Use import
 
-// Create an API token for the user
-// This is a Firebase callable function (not part of the REST API)
-module.exports = functions.https.onCall(async (data, context) => {
+// Core logic extracted into a separate, testable function
+async function _createTokenLogic(data, context) {
   const db = admin.firestore();
-
-  functions.logger.log("Starting create token", {
+  functions.logger.log("Starting create token logic", {
     data: data,
-    owner: context.auth.uid,
+    owner: context?.auth?.uid, // Add safe navigation for tests
   });
 
-  if (data.note == null || !(data.permissions.length > 0)) {
-    return { error: "Invalid token parameters" };
+  // Basic validation
+  if (!context?.auth?.uid) {
+      functions.logger.error("Authentication context missing.");
+      // Use functions.https.HttpsError for standard callable errors
+      throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+  }
+  if (data.note == null || !data.permissions || !(data.permissions.length > 0)) {
+      functions.logger.warn("Invalid token parameters received.", { data });
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid token parameters: note and permissions array are required.');
   }
 
   const systemRef = db.collection("system").doc(context.auth.uid);
-  const systemDoc = await systemRef.get();
-  // If the system document doesn't exist, create it
-  if (!systemDoc.exists) {
-    await systemRef.set({
-      tokens: [],
-    });
-  }
+  const tokenRef = db.collection("token"); // Reference to the collection
 
-  if (systemDoc?.data()?.tokens?.length >= 5) {
-    // We have too many tokens already
-    return { error: "You have the maximum number of tokens" };
-  }
-
-  // Generate a random token
-  const UIDGenerator = require("uid-generator");
-  const uidgen = new UIDGenerator(128);
-  const token = await uidgen.generate();
-  const tokenRef = db.collection("token").doc(token);
   // Run a transaction to create the token and add it to the system document
   try {
+    let generatedToken = ""; // Variable to store the token outside transaction scope
     await db.runTransaction(async (transaction) => {
-      // Ensure the token doesn't already exist
-      const tokenDoc = await transaction.get(tokenRef);
-      if (tokenDoc.exists) {
-        functions.logger.error("Token already existed", {
-          owner: context.auth.uid,
-          token: token,
-        });
-        // The user won the losing 2^128 lottery
-        throw new Error("Tried to create a token that already existed");
+      const systemDoc = await transaction.get(systemRef);
+
+      // Check token limit
+      if (systemDoc.exists && systemDoc.data()?.tokens?.length >= 5) {
+        throw new functions.https.HttpsError('resource-exhausted', 'You have the maximum number of tokens (5).');
       }
-      transaction.set(tokenRef, {
+
+      // Generate a unique token (handle potential collisions, though unlikely)
+      let tokenExists = true;
+      let attempts = 0;
+      const uidgen = new UIDGenerator(128); // Use specific length
+      let potentialToken = "";
+      let potentialTokenRef;
+
+      while (tokenExists && attempts < 5) { // Limit attempts to prevent infinite loops
+          potentialToken = await uidgen.generate();
+          potentialTokenRef = tokenRef.doc(potentialToken); // Use collection ref
+          const existingTokenDoc = await transaction.get(potentialTokenRef);
+          tokenExists = existingTokenDoc.exists;
+          attempts++;
+      }
+
+      if (tokenExists) {
+          // Extremely unlikely scenario
+          functions.logger.error("Failed to generate a unique token after multiple attempts.", { owner: context.auth.uid });
+          throw new functions.https.HttpsError('internal', 'Failed to generate a unique token.');
+      }
+
+      generatedToken = potentialToken; // Store the successfully generated token
+
+      // Create token document
+      transaction.set(potentialTokenRef, {
         owner: context.auth.uid,
         note: data.note,
         permissions: data.permissions,
-        token: token,
+        // token: generatedToken, // Storing token in doc might be redundant if doc ID is the token
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      transaction.update(systemRef, {
-        tokens: admin.firestore.FieldValue.arrayUnion(token),
-      });
+
+      // Update system document
+      if (systemDoc.exists) {
+          transaction.update(systemRef, {
+            tokens: admin.firestore.FieldValue.arrayUnion(generatedToken),
+          });
+      } else {
+          // Create system document if it doesn't exist
+          transaction.set(systemRef, {
+            tokens: [generatedToken],
+            // Add any other default system fields here
+          });
+      }
     });
-    functions.logger.log("Created token", {
+
+    functions.logger.log("Created token successfully", {
       owner: context.auth.uid,
-      token: token,
+      token: generatedToken, // Log the actual token created
     });
-    return { token: token };
+    // Return only the token to the client
+    return { token: generatedToken };
+
   } catch (e) {
-    functions.logger.error("Failed to create token", {
+    functions.logger.error("Failed to create token transaction", {
       owner: context.auth.uid,
-      token: token,
-      error: e,
+      error: e.message || e.toString(), // Log error message
+      code: e.code, // Log HttpsError code if available
+      details: e.details,
     });
-    return {
-      error: "Error during token creation transaction",
-      timestamp: Date.now(),
-    };
+    // Re-throw HttpsErrors or wrap other errors
+    if (e instanceof functions.https.HttpsError) {
+        throw e;
+    } else {
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred during token creation.', e.message);
+    }
   }
-});
+}
+
+// Export the wrapped function for Firebase deployment using ESM export
+const createToken = functions.https.onCall(_createTokenLogic);
+export { createToken, _createTokenLogic }; // Export both wrapped and logic function

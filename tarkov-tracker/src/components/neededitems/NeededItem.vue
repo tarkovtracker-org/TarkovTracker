@@ -36,14 +36,14 @@ import { useUserStore } from "@/stores/user";
 import { useProgressStore } from "@/stores/progress";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useTarkovStore } from "@/stores/tarkov";
-const NeededItemMediumCard = defineAsyncComponent(() =>
-  import("@/components/neededitems/NeededItemMediumCard.vue")
+const NeededItemMediumCard = defineAsyncComponent(
+  () => import("@/components/neededitems/NeededItemMediumCard.vue"),
 );
-const NeededItemSmallCard = defineAsyncComponent(() =>
-  import("@/components/neededitems/NeededItemSmallCard.vue")
+const NeededItemSmallCard = defineAsyncComponent(
+  () => import("@/components/neededitems/NeededItemSmallCard.vue"),
 );
-const NeededItemRow = defineAsyncComponent(() =>
-  import("@/components/neededitems/NeededItemRow.vue")
+const NeededItemRow = defineAsyncComponent(
+  () => import("@/components/neededitems/NeededItemRow.vue"),
 );
 const props = defineProps({
   need: {
@@ -58,9 +58,7 @@ const props = defineProps({
 const userStore = useUserStore();
 const progressStore = useProgressStore();
 const tarkovStore = useTarkovStore();
-
 const { tasks, hideoutStations } = useTarkovData();
-
 // Helper functions and data to calculate if the item should be shown based
 // on the user's/team's progress and the user's filters
 const filterString = inject("itemFilterName");
@@ -80,11 +78,10 @@ const showItemFilter = computed(() => {
     );
   }
 });
-
 const showItem = computed(() => {
   if (props.need.needType == "taskObjective") {
     // ONLY allow 'giveItem' objectives, and ensure an item exists
-    if (props.need.type !== 'giveItem') {
+    if (props.need.type !== "giveItem") {
       return false;
     }
     // Check if a valid item exists and other filters pass
@@ -96,7 +93,6 @@ const showItem = computed(() => {
     return false;
   }
 });
-
 function isTaskObjectiveNeeded(need) {
   if (userStore.itemsNeededHideNonFIR) {
     if (
@@ -111,18 +107,16 @@ function isTaskObjectiveNeeded(need) {
       }
     }
   }
-
   if (userStore.hideNonKappaTasks && !relatedTask.value.kappaRequired) {
     return false;
   }
-
   if (userStore.itemsTeamAllHidden) {
     // Only show if the objective is needed by ourself
     return (
       !progressStore.tasksCompletions[need.taskId]?.self &&
       !progressStore.objectiveCompletions[need.id]?.self &&
       ["Any", tarkovStore.getPMCFaction].some(
-        (faction) => faction == relatedTask.value.factionName
+        (faction) => faction == relatedTask.value.factionName,
       )
     );
   } else if (userStore.itemsTeamNonFIRHidden) {
@@ -133,15 +127,15 @@ function isTaskObjectiveNeeded(need) {
       Object.entries(progressStore.tasksCompletions[need.taskId]).some(
         ([userTeamId, userStatus]) =>
           ["Any", progressStore.playerFaction[userTeamId]].some(
-            (faction) => faction == relatedTask.value.factionName
-          ) && userStatus === false
+            (faction) => faction == relatedTask.value.factionName,
+          ) && userStatus === false,
       ) &&
       // Check if any user has not completed the objective (and that its a relevant faction task for them)
       Object.entries(progressStore.objectiveCompletions[need.id]).some(
         ([userTeamId, userStatus]) =>
           ["Any", progressStore.playerFaction[userTeamId]].some(
-            (faction) => faction == relatedTask.value.factionName
-          ) && userStatus === false
+            (faction) => faction == relatedTask.value.factionName,
+          ) && userStatus === false,
       )
     );
   } else {
@@ -149,19 +143,18 @@ function isTaskObjectiveNeeded(need) {
       Object.entries(progressStore.tasksCompletions[need.taskId]).some(
         ([userTeamId, userStatus]) =>
           ["Any", progressStore.playerFaction[userTeamId]].some(
-            (faction) => faction == relatedTask.value.factionName
-          ) && userStatus === false
+            (faction) => faction == relatedTask.value.factionName,
+          ) && userStatus === false,
       ) &&
       Object.entries(progressStore.objectiveCompletions[need.id]).some(
         ([userTeamId, userStatus]) =>
           ["Any", progressStore.playerFaction[userTeamId]].some(
-            (faction) => faction == relatedTask.value.factionName
-          ) && userStatus === false
+            (faction) => faction == relatedTask.value.factionName,
+          ) && userStatus === false,
       )
     );
   }
 }
-
 function isHideoutModuleNeeded(need) {
   if (userStore.itemsTeamAllHidden || userStore.itemsTeamHideoutHidden) {
     // Only show if the objective is needed by ourself
@@ -172,15 +165,14 @@ function isHideoutModuleNeeded(need) {
   } else {
     return (
       Object.values(
-        progressStore.moduleCompletions[need.hideoutModule.id]
+        progressStore.moduleCompletions[need.hideoutModule.id],
       ).some((userStatus) => userStatus === false) &&
       Object.values(progressStore.modulePartCompletions[need.id]).some(
-        (userStatus) => userStatus === false
+        (userStatus) => userStatus === false,
       )
     );
   }
 }
-
 // Emit functions to update the user's progress towards the need
 // the child functions emit these functions and we watch for them here
 const decreaseCount = () => {
@@ -194,7 +186,6 @@ const decreaseCount = () => {
     }
   }
 };
-
 const increaseCount = () => {
   if (props.need.needType == "taskObjective") {
     if (currentCount.value < neededCount.value) {
@@ -206,7 +197,6 @@ const increaseCount = () => {
     }
   }
 };
-
 const toggleCount = () => {
   if (props.need.needType == "taskObjective") {
     if (currentCount.value === 0) {
@@ -226,7 +216,6 @@ const toggleCount = () => {
     }
   }
 };
-
 const imageItem = computed(() => {
   if (!item.value) {
     return null;
@@ -237,7 +226,6 @@ const imageItem = computed(() => {
     return item.value;
   }
 });
-
 // Helper functions and data to calculate the item's progress
 // These are passed to the child components via provide/inject
 const currentCount = computed(() => {
@@ -252,7 +240,6 @@ const currentCount = computed(() => {
     return 0;
   }
 });
-
 const neededCount = computed(() => {
   if (props.need.needType == "taskObjective" && props.need.count) {
     return props.need.count;
@@ -262,7 +249,6 @@ const neededCount = computed(() => {
     return 1;
   }
 });
-
 const relatedTask = computed(() => {
   if (props.need.needType == "taskObjective") {
     return tasks.value.find((t) => t.id == props.need.taskId);
@@ -270,7 +256,6 @@ const relatedTask = computed(() => {
     return null;
   }
 });
-
 const item = computed(() => {
   if (props.need.needType == "taskObjective") {
     // Only return an item if the objective type is 'giveItem'
@@ -287,21 +272,19 @@ const item = computed(() => {
     return null;
   }
 });
-
 const lockedBefore = computed(() => {
   if (props.need.needType == "taskObjective") {
     return relatedTask.value.predecessors.filter(
-      (s) => !tarkovStore.isTaskComplete(s)
+      (s) => !tarkovStore.isTaskComplete(s),
     ).length;
   } else if (props.need.needType == "hideoutModule") {
     return props.need.hideoutModule.predecessors.filter(
-      (s) => !tarkovStore.isHideoutModuleComplete(s)
+      (s) => !tarkovStore.isHideoutModuleComplete(s),
     ).length;
   } else {
     return 0;
   }
 });
-
 const selfCompletedNeed = computed(() => {
   if (props.need.needType == "taskObjective") {
     return (
@@ -319,17 +302,15 @@ const selfCompletedNeed = computed(() => {
     return false;
   }
 });
-
 const relatedStation = computed(() => {
   if (props.need.needType == "hideoutModule") {
     return Object.values(hideoutStations.value).find(
-      (s) => s.id == props.need.hideoutModule.stationId
+      (s) => s.id == props.need.hideoutModule.stationId,
     );
   } else {
     return null;
   }
 });
-
 const levelRequired = computed(() => {
   if (props.need.needType == "taskObjective") {
     return relatedTask.value.minPlayerLevel;
@@ -339,7 +320,6 @@ const levelRequired = computed(() => {
     return 0;
   }
 });
-
 const teamNeeds = computed(() => {
   let needingUsers = [];
   if (props.need.needType == "taskObjective") {
@@ -353,11 +333,11 @@ const teamNeeds = computed(() => {
           needingUsers.push({
             user: user,
             count: progressStore.teamStores[user].getObjectiveCount(
-              props.need.id
+              props.need.id,
             ),
           });
         }
-      }
+      },
     );
   } else if (props.need.needType == "hideoutModule") {
     // Find all of the users that need this module
@@ -367,16 +347,15 @@ const teamNeeds = computed(() => {
           needingUsers.push({
             user: user,
             count: progressStore.teamStores[user].getHideoutPartCount(
-              props.need.id
+              props.need.id,
             ),
           });
         }
-      }
+      },
     );
   }
   return needingUsers;
 });
-
 provide("neededitem", {
   item,
   relatedTask,
@@ -395,43 +374,33 @@ provide("neededitem", {
   aspect-ratio: 16/9;
   min-height: 100px;
 }
-
 .item-image {
   min-height: 90px;
 }
-
 .item-bg-violet {
   background-color: #2c232f;
 }
-
 .item-bg-grey {
   background-color: #1e1e1e;
 }
-
 .item-bg-yellow {
   background-color: #343421;
 }
-
 .item-bg-orange {
   background-color: #261d14;
 }
-
 .item-bg-green {
   background-color: #1a2314;
 }
-
 .item-bg-red {
   background-color: #38221f;
 }
-
 .item-bg-default {
   background-color: #3a3c3b;
 }
-
 .item-bg-black {
   background-color: #141614;
 }
-
 .item-bg-blue {
   background-color: #202d32;
 }

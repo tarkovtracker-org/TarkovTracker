@@ -41,10 +41,8 @@ const props = defineProps({
   },
 });
 const editorStore = useEditorStore();
-const { tasks, rawMaps: maps, traders } = useTarkovData();
-
+const { tasks } = useTarkovData();
 const alternativeEditor = ref(false);
-
 const taskAlternatives = computed({
   get() {
     if (editorStore.getAlternativeTasks(props.task.id)?.length > 0) {
@@ -59,7 +57,6 @@ const taskAlternatives = computed({
     editorStore.setAlternativeTasks(props.task.id, newAlternatives);
   },
 });
-
 const alternativeTaskString = computed(() => {
   return taskAlternatives.value.map((m) => m.name).join(", ");
 });

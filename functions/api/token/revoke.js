@@ -1,57 +1,92 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+import functions from "firebase-functions"; // Use import
+import admin from "firebase-admin"; // Use import
 
-// Remove an API token for the user
-// This is a Firebase callable function (not part of the REST API)
-module.exports = functions.https.onCall(async (data, context) => {
+// Core logic extracted into a separate, testable function
+async function _revokeTokenLogic(data, context) {
   const db = admin.firestore();
+  functions.logger.log("Starting revoke token logic", {
+    data: data,
+    owner: context?.auth?.uid, // Safe navigation
+  });
 
-  if (data.token == null) {
-    functions.logger.error("No token specified", { owner: context.auth.uid });
-    return { error: "Invalid token parameters", timestamp: Date.now() };
+  // Basic validation
+  if (!context?.auth?.uid) {
+    functions.logger.error("Authentication context missing.");
+    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+  }
+  if (!data.token) {
+    functions.logger.warn("Invalid revoke parameters: token is required.", { data });
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid token parameters: token is required.');
   }
 
   const systemRef = db.collection("system").doc(context.auth.uid);
   const tokenRef = db.collection("token").doc(data.token);
 
-  // Run a transaction to remove the token from the system document and delete the token document
+  // Run a transaction to revoke the token
   try {
     await db.runTransaction(async (transaction) => {
-      // Ensure the token doesn't already exist
       const tokenDoc = await transaction.get(tokenRef);
-      const systemDoc = await transaction.get(systemRef);
-      // If tokenDoc or systemDoc doesn't exist, there's something wrong
-      if (!tokenDoc.exists || !systemDoc.exists) {
-        functions.logger.error("Token or system document doesn't exist", {
+      const systemDoc = await transaction.get(systemRef); // Get system doc within transaction
+
+      if (!tokenDoc.exists) {
+        functions.logger.warn("Attempted to revoke non-existent token.", {
           owner: context.auth.uid,
           token: data.token,
-          tokenDoc: tokenDoc.exists,
-          systemDoc: systemDoc.exists,
         });
-        throw new Error("Token or system document doesn't exist");
-      }
-      // If the token doesn't belong to the user, there's something wrong
-      if (tokenDoc.data().owner != context.auth.uid) {
-        throw new Error("Token doesn't belong to user");
+        throw new functions.https.HttpsError('not-found', 'Token not found.');
       }
 
-      // Assuming everything is fine, remove the token from the system document and delete the token document
-      transaction.update(systemRef, {
-        tokens: admin.firestore.FieldValue.arrayRemove(data.token),
-      });
+      const tokenData = tokenDoc.data();
+      if (tokenData.owner !== context.auth.uid) {
+        functions.logger.warn("Permission denied to revoke token.", {
+          owner: context.auth.uid,
+          tokenOwner: tokenData.owner,
+          token: data.token,
+        });
+        throw new functions.https.HttpsError('permission-denied', 'You do not have permission to revoke this token.');
+      }
+
+      // Delete the token document
       transaction.delete(tokenRef);
+
+      // Remove the token from the user's system document
+      if (systemDoc.exists) {
+        transaction.update(systemRef, {
+          tokens: admin.firestore.FieldValue.arrayRemove(data.token),
+        });
+      } else {
+        // This case should ideally not happen if a user has tokens, but handle defensively
+        functions.logger.warn("System document not found for user while revoking token.", {
+            owner: context.auth.uid,
+            token: data.token,
+        });
+      }
     });
-    functions.logger.log("Removed token", {
+
+    functions.logger.log("Revoked token successfully", {
       owner: context.auth.uid,
       token: data.token,
     });
     return { revoked: true };
+
   } catch (e) {
-    functions.logger.error("Failed to create token", {
+    functions.logger.error("Failed to revoke token transaction", {
       owner: context.auth.uid,
       token: data.token,
-      error: e,
+      error: e.message || e.toString(),
+      code: e.code,
+      details: e.details,
     });
-    return { error: "Error during token deletion", timestamp: Date.now() };
+    // Re-throw HttpsErrors or wrap other errors
+    if (e instanceof functions.https.HttpsError) {
+        throw e;
+    } else {
+        // Provide a more generic internal error message
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred during token revocation.');
+    }
   }
-});
+}
+
+// Export the wrapped function for Firebase deployment using ESM export
+const revokeToken = functions.https.onCall(_revokeTokenLogic);
+export { revokeToken, _revokeTokenLogic }; // Export both wrapped and logic function

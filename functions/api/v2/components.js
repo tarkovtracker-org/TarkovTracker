@@ -124,5 +124,5 @@
  *           description: "Number of items collected for a given hideout part objective"
  *         id:
  *           type: "string"
- *           description: "UUID correlating to invidiual hideout station level item requirements' ID available via the tarkov.dev API"
+ *           description: "UUID correlating to individual hideout station level item requirements' ID available via the tarkov.dev API"
  */

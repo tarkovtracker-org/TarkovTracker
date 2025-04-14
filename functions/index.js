@@ -1,35 +1,53 @@
-// eslint-disable-next-line no-unused-vars
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+import admin from "firebase-admin"; // Use import
+import functions from "firebase-functions";
+import { logger } from "firebase-functions/v2";
+import { onSchedule } from "firebase-functions/v2/scheduler"; // Keep v2 for scheduler
+import { request, gql } from "graphql-request"; // Use import
+import UIDGenerator from "uid-generator"; // Use import
+import fetch from "node-fetch"; // Assuming node-fetch is needed, use import
+
+// Import API and token functions using ESM
+import apiv2 from "./api/v2/index.js"; // Default import
+import { createToken } from "./api/token/create.js"; // Named import
+import { revokeToken } from "./api/token/revoke.js"; // Named import
+
+console.log("Firebase Functions Environment:", process.env.NODE_ENV);
+// console.log('Firebase Admin SDK Version:', admin.SDK_VERSION); // Use admin.SDK_VERSION if available/needed
+// console.log('Firebase Functions Version:', functions.SDK_VERSION); // Use functions.SDK_VERSION if available/needed
 
 admin.initializeApp();
 
-// Export the v2 API
-exports.apiv2 = require("./api/v2/index.js");
+// Export the v2 API using ESM
+export default apiv2;
 
-// Export the token management functions
-exports.createToken = require("./api/token/create.js");
-exports.revokeToken = require("./api/token/revoke.js");
+// Export the token management functions using ESM
+export { createToken, revokeToken };
 
-// Export the team management functions
-exports.leaveTeam = functions.https.onCall(async (data, context) => {
+// --- Team Management Logic Functions (for testing) ---
+
+async function _leaveTeamLogic(data, context) {
   const db = admin.firestore();
-
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required.",
+    );
+  }
   try {
+    let originalTeam = null; // Define outside transaction scope
     await db.runTransaction(async (transaction) => {
       const systemRef = db.collection("system").doc(context.auth.uid);
       const systemDoc = await transaction.get(systemRef);
-      const originalTeam = systemDoc?.data()?.team;
+      originalTeam = systemDoc?.data()?.team; // Assign inside transaction
+
       if (systemDoc?.data()?.team) {
-        // We are in a team, time to get out
         const teamRef = db.collection("team").doc(systemDoc.data().team);
         const teamDoc = await transaction.get(teamRef);
         if (teamDoc?.data()?.owner == context.auth.uid) {
-          // We are the room owner, which means we need to disband the team
-          // For each member, remove the team from their system document and then delete the team document
+          // Disband team
           teamDoc.data()?.members.forEach((member) => {
-            functions.logger.log("Removing team from member", {
-              member: member,
+            logger.log("Removing team from member", {
+              member,
               team: originalTeam,
             });
             transaction.set(
@@ -38,19 +56,18 @@ exports.leaveTeam = functions.https.onCall(async (data, context) => {
                 team: null,
                 lastLeftTeam: admin.firestore.FieldValue.serverTimestamp(),
               },
-              { merge: true }
+              { merge: true },
             );
           });
-
           transaction.delete(teamRef);
         } else {
-          // We are not the room owner, remove ourself from the team
+          // Leave team
           transaction.set(
             teamRef,
             {
               members: admin.firestore.FieldValue.arrayRemove(context.auth.uid),
             },
-            { merge: true }
+            { merge: true },
           );
           transaction.set(
             systemRef,
@@ -58,126 +75,151 @@ exports.leaveTeam = functions.https.onCall(async (data, context) => {
               team: null,
               lastLeftTeam: admin.firestore.FieldValue.serverTimestamp(),
             },
-            { merge: true }
+            { merge: true },
           );
         }
       } else {
-        // We are not in a team, oops
-        throw new Error("User is not in a team");
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "User is not in a team",
+        );
       }
-      functions.logger.log("Left team", {
+      logger.log("Left team", {
         user: context.auth.uid,
         team: originalTeam,
       });
     });
-    functions.logger.log("Finished leave team", { user: context.auth.uid });
+    logger.log("Finished leave team", { user: context.auth.uid });
     return { left: true };
   } catch (e) {
-    functions.logger.error("Failed to leave team", {
+    logger.error("Failed to leave team", {
       owner: context.auth.uid,
       error: e,
     });
-    return { error: "Error during team leave", timestamp: Date.now() };
+    if (e instanceof functions.https.HttpsError) {
+      throw e;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Error during team leave",
+      e.message,
+    );
   }
-});
-
-function difference(setA, setB) {
-  let _difference = new Set(setA);
-  for (let elem of setB) {
-    _difference.delete(elem);
-  }
-  return _difference;
 }
 
-exports.joinTeam = functions.https.onCall(async (data, context) => {
+async function _joinTeamLogic(data, context) {
   const db = admin.firestore();
-
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required.",
+    );
+  }
   try {
     await db.runTransaction(async (transaction) => {
       const systemRef = db.collection("system").doc(context.auth.uid);
       const systemDoc = await transaction.get(systemRef);
 
       if (systemDoc?.data()?.team) {
-        // We are already in a team, oops
-        throw new Error("User is already in a team");
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "User is already in a team",
+        );
+      }
+      if (!data.id || !data.password) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Team ID and password required.",
+        );
       }
 
       const teamRef = db.collection("team").doc(data.id);
       const teamDoc = await transaction.get(teamRef);
 
       if (!teamDoc?.exists) {
-        // Team doesn't exist, oops
-        throw new Error("Team doesn't exist");
+        throw new functions.https.HttpsError("not-found", "Team doesn't exist");
       }
-
       if (teamDoc?.data()?.password != data.password) {
-        // Wrong password, oops
-        throw new Error("Wrong password");
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Wrong password",
+        );
+      }
+      if (
+        teamDoc?.data()?.members.length >=
+        (teamDoc?.data()?.maximumMembers || 10)
+      ) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "Team is full",
+        );
       }
 
-      if (teamDoc?.data()?.members.length >= 10) {
-        // Team is full, oops
-        throw new Error("Team is full");
-      }
-      // Add the user to the team
       transaction.set(
         teamRef,
-        {
-          members: admin.firestore.FieldValue.arrayUnion(context.auth.uid),
-        },
-        { merge: true }
+        { members: admin.firestore.FieldValue.arrayUnion(context.auth.uid) },
+        { merge: true },
       );
-      transaction.set(
-        systemRef,
-        {
-          team: data.id,
-        },
-        { merge: true }
-      );
+      transaction.set(systemRef, { team: data.id }, { merge: true });
     });
-    functions.logger.log("Joined team", {
+    logger.log("Joined team", {
       user: context.auth.uid,
       team: data.id,
     });
     return { joined: true };
   } catch (e) {
-    functions.logger.error("Failed to join team", {
+    logger.error("Failed to join team", {
       user: context.auth.uid,
       team: data.id,
       error: e,
     });
-    return { error: "Error during team join", timestamp: Date.now() };
+    if (e instanceof functions.https.HttpsError) {
+      throw e;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Error during team join",
+      e.message,
+    );
   }
-});
+}
 
-exports.createTeam = functions.https.onCall(async (data, context) => {
+async function _createTeamLogic(data, context) {
   const db = admin.firestore();
+  logger.log("Auth context in _createTeamLogic:", context.auth);
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required.",
+    );
+  }
   const systemRef = db.collection("system").doc(context.auth.uid);
   const myTeamRef = db.collection("team").doc(context.auth.uid);
 
-  functions.logger.log("Creating team", { owner: context.auth.uid });
+  logger.log("Creating team", { owner: context.auth.uid });
 
   try {
     await db.runTransaction(async (transaction) => {
       const systemDoc = await transaction.get(systemRef);
 
-      // Check if the user is already in a team
       if (systemDoc?.data()?.team) {
-        throw new Error("User already in a team");
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "User already in a team",
+        );
       }
 
-      // Check if the user's team document exists, if it does, we can't create a team
       const myTeamDoc = await transaction.get(myTeamRef);
       if (myTeamDoc.exists) {
-        throw new Error("Team already exists");
+        throw new functions.https.HttpsError(
+          "already-exists",
+          "Team already exists",
+        );
       }
 
-      // Generate a random password
-      const UIDGenerator = require("uid-generator");
       const uidgen = new UIDGenerator(64);
       const password = await uidgen.generate();
 
-      // Create the team document
       transaction.set(myTeamRef, {
         owner: context.auth.uid,
         password: password,
@@ -186,64 +228,74 @@ exports.createTeam = functions.https.onCall(async (data, context) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Set our team to our own team
-      transaction.set(
-        systemRef,
-        {
-          team: context.auth.uid,
-        },
-        { merge: true }
-      );
+      transaction.set(systemRef, { team: context.auth.uid }, { merge: true });
     });
-    functions.logger.info("Created team", { owner: context.auth.uid });
+    logger.info("Created team", { owner: context.auth.uid });
     return { team: context.auth.uid };
   } catch (e) {
-    functions.logger.error("Failed to create team", {
+    logger.error("Failed to create team", {
       owner: context.auth.uid,
       error: e,
     });
-    return { error: "Error during team creation", timestamp: Date.now() };
+    if (e instanceof functions.https.HttpsError) {
+      throw e;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Error during team creation",
+      e.message,
+    );
   }
-});
+}
 
-exports.kickTeamMember = functions.https.onCall(async (data, context) => {
+async function _kickTeamMemberLogic(data, context) {
   const db = admin.firestore();
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication required.",
+    );
+  }
+  if (!data.kicked) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Kicked user ID required.",
+    );
+  }
 
   try {
     await db.runTransaction(async (transaction) => {
-      const teamRef = db.collection("team").doc(context.auth.uid);
+      const teamRef = db.collection("team").doc(context.auth.uid); // Team ID is owner's UID
       const teamDoc = await transaction.get(teamRef);
-
       const kickedRef = db.collection("system").doc(data.kicked);
       const kickedDoc = await transaction.get(kickedRef);
 
       if (!teamDoc?.exists) {
-        // Team doesn't exist, oops
-        throw new Error("Team doesn't exist");
+        throw new functions.https.HttpsError("not-found", "Team doesn't exist");
       }
-
       if (teamDoc?.data()?.owner != context.auth.uid) {
-        // We are not the room owner, oops
-        throw new Error("User is not the owner of the team");
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "User is not the owner of the team",
+        );
       }
-
       if (!kickedDoc?.exists) {
-        // Kicked user doesn't exist, oops
-        throw new Error("Kicked user doesn't exist");
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Kicked user doesn't exist",
+        );
       }
-
       if (kickedDoc?.data()?.team != context.auth.uid) {
-        // Kicked user is not in our team, oops
-        throw new Error("Kicked user is not in our team");
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Kicked user is not in our team",
+        );
       }
 
-      // Remove the user from the team
       transaction.set(
         teamRef,
-        {
-          members: admin.firestore.FieldValue.arrayRemove(data.kicked),
-        },
-        { merge: true }
+        { members: admin.firestore.FieldValue.arrayRemove(data.kicked) },
+        { merge: true },
       );
       transaction.set(
         kickedRef,
@@ -251,46 +303,75 @@ exports.kickTeamMember = functions.https.onCall(async (data, context) => {
           team: null,
           lastLeftTeam: admin.firestore.FieldValue.serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
     });
-    functions.logger.log("Kicked team member", {
+    logger.log("Kicked team member", {
       user: context.auth.uid,
       kicked: data.kicked,
     });
     return { kicked: true };
   } catch (e) {
-    functions.logger.error("Failed to kick team member", {
+    logger.error("Failed to kick team member", {
       owner: context.auth.uid,
       kicked: data.kicked,
       error: e,
     });
-    return { error: "Error during team kick", timestamp: Date.now() };
+    if (e instanceof functions.https.HttpsError) {
+      throw e;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      "Error during team kick",
+      e.message,
+    );
   }
-});
+}
 
-exports.updateTarkovdata = functions.pubsub
-  .schedule("every 60 minutes")
-  .onRun(async (context) => {
+// --- Wrapped Cloud Functions (for deployment) ---
+const leaveTeam = functions.https.onCall(_leaveTeamLogic);
+const joinTeam = functions.https.onCall(_joinTeamLogic);
+const createTeam = functions.https.onCall(_createTeamLogic);
+const kickTeamMember = functions.https.onCall(_kickTeamMemberLogic);
+
+// Export wrapped team functions using ESM
+export { leaveTeam, joinTeam, createTeam, kickTeamMember };
+// Export core logic functions for testing
+export {
+  _leaveTeamLogic,
+  _joinTeamLogic,
+  _createTeamLogic,
+  _kickTeamMemberLogic,
+};
+
+// --- Tarkov Data Update Functions ---
+
+// Use v2 onSchedule
+const updateTarkovdata = onSchedule(
+  { schedule: "every 60 minutes" },
+  async (event) => {
     await retrieveTarkovdata();
     return null;
-  });
+  },
+);
 
 // Using the scheduled function does not play nice with the emulators, so we use this instead to call it during local development
 // This should be commented out when deploying to production
-exports.updateTarkovdataHTTPS = functions.https.onRequest(
+const updateTarkovdataHTTPS = functions.https.onRequest(
   async (request, response) => {
     await retrieveTarkovdata();
     response.status(200).send("OK");
-  }
+  },
 );
 
-async function retrieveTarkovdata() {
-  console.log("Retrieving tarkovdata");
-  // Import the tarkovdata hideout query
-  //const hideoutQuery = require('./tarkovdata/hideoutQuery.js')
+// Export tarkovdata functions using ESM
+export { updateTarkovdata, updateTarkovdataHTTPS };
 
-  const { request, gql } = require("graphql-request");
+async function retrieveTarkovdata() {
+  logger.log("Retrieving tarkovdata");
+  // Import the tarkovdata hideout query
+  //const hideoutQuery = require('./tarkovdata/hideoutQuery.js') // Keep commented
+
   const db = admin.firestore();
 
   // Requiring this from another file causes problems, so unfortunately we need to stick it here
@@ -318,20 +399,14 @@ async function retrieveTarkovdata() {
       "https://api.tarkov.dev/graphql",
       hideoutQuery,
       {},
-      { "User-Agent": "tarkov-tracker-functions" }
+      { "User-Agent": "tarkov-tracker-functions" },
     );
-    functions.logger.debug(
-      "Successfully pulled hideout data from tarkov.dev",
-      results
-    );
+    logger.debug("Successfully pulled hideout data from tarkov.dev", results);
 
     const hideoutRef = db.collection("tarkovdata").doc("hideout");
     await hideoutRef.set(results);
   } catch (e) {
-    functions.logger.error(
-      "Error while pulling hideout data from tarkov.dev:",
-      e
-    );
+    logger.error("Error while pulling hideout data from tarkov.dev:", e);
   }
 
   // Next, retrieve the tarkovdata tasks
@@ -376,21 +451,20 @@ async function retrieveTarkovdata() {
       "https://api.tarkov.dev/graphql",
       tasksQuery,
       {},
-      { "User-Agent": "tarkov-tracker-functions" }
+      { "User-Agent": "tarkov-tracker-functions" },
     );
-    functions.logger.debug(
-      "Successfully pulled tasks data from tarkov.dev",
-      results
-    );
+    logger.debug("Successfully pulled tasks data from tarkov.dev", results);
 
     // Next, retrieve https://raw.githubusercontent.com/TarkovTracker/tarkovdata/master/task_alternatives.json and store it in the database
-    const taskAlternatives = await fetch(
-      "https://raw.githubusercontent.com/TarkovTracker/tarkovdata/master/task_alternatives.json"
-    ).then((res) => res.json());
+    const taskAlternativesResponse = await fetch(
+      // Use imported fetch
+      "https://raw.githubusercontent.com/TarkovTracker/tarkovdata/master/task_alternatives.json",
+    );
+    const taskAlternatives = await taskAlternativesResponse.json();
 
-    functions.logger.debug(
+    logger.debug(
       "Successfully pulled task alternatives from tarkovdata repo",
-      taskAlternatives
+      taskAlternatives,
     );
     // For each taskAlternative, find it in the tasks data and update it to include the alternatives
     Object.entries(taskAlternatives).forEach(([taskId, alternatives]) => {
@@ -400,7 +474,7 @@ async function retrieveTarkovdata() {
       if (taskToUpdate) {
         taskToUpdate.alternatives = alternatives;
       } else {
-        functions.logger.debug("Task not found in tasks data", {
+        logger.debug("Task not found in tasks data", {
           taskId: taskId,
           alternatives: alternatives,
         });
@@ -410,9 +484,8 @@ async function retrieveTarkovdata() {
     const tasksRef = db.collection("tarkovdata").doc("tasks");
     await tasksRef.set(results);
   } catch (e) {
-    functions.logger.error(
-      "Error while pulling tasks data from tarkov.dev:",
-      e
-    );
+    logger.error("Error while pulling tasks data from tarkov.dev:", e);
   }
 }
+
+// Removed difference function as it wasn't used

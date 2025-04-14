@@ -38,7 +38,6 @@
             Start fresh (existing data will be discarded)
           </v-btn>
         </div>
-
         <!-- Debug info -->
         <div class="debug-info mt-6 pa-2">
           <p>Debug Info:</p>
@@ -52,15 +51,12 @@
     </v-card>
   </div>
 </template>
-
 <script setup>
 import { ref, watch, onMounted, computed } from "vue";
 import DataMigrationService from "@/services/DataMigrationService";
 import { initializeStore } from "@/plugins/store-initializer";
-
 // No direct import of the store - we'll dynamically import it only when needed
 let tarkovStore = null;
-
 const props = defineProps({
   userId: {
     type: String,
@@ -71,12 +67,9 @@ const props = defineProps({
     default: false,
   },
 });
-
 const emit = defineEmits(["close"]);
-
 const dialog = ref(false);
 const loading = ref(false);
-
 // Get the local user level to display in the dialog
 const localUserLevel = computed(() => {
   try {
@@ -88,16 +81,13 @@ const localUserLevel = computed(() => {
     return 1;
   }
 });
-
 // Use the store initializer to safely get the store
 const getTarkovStore = async () => {
   if (tarkovStore) return tarkovStore;
-
   try {
     // Dynamically import the store module
     const storeModule = await import("@/stores/tarkov");
     console.log("Tarkov store module imported successfully");
-
     // Use the store initializer to safely initialize
     tarkovStore = await initializeStore("tarkov", storeModule.useTarkovStore);
     console.log("Tarkov store initialized successfully:", tarkovStore);
@@ -107,15 +97,12 @@ const getTarkovStore = async () => {
     return null;
   }
 };
-
 onMounted(async () => {
   console.log("DataMigrationDialog mounted with userId:", props.userId);
   console.log("Show prop value:", props.show);
-
   // First make the dialog visible
   dialog.value = true;
   console.warn("MIGRATION DIALOG MOUNTED - SHOULD BE VISIBLE");
-
   // Force dialog to be visible with a timeout
   setTimeout(() => {
     if (!dialog.value) {
@@ -123,14 +110,12 @@ onMounted(async () => {
       dialog.value = true;
     }
   }, 100);
-
   // Then initialize store in a non-blocking way
   setTimeout(async () => {
     const store = await getTarkovStore();
     console.log("Store initialized in mounted:", !!store);
   }, 300);
 });
-
 // Watch for changes to the show prop
 watch(
   () => props.show,
@@ -140,7 +125,6 @@ watch(
   },
   { immediate: true },
 );
-
 // Close the dialog when dialog is closed
 watch(dialog, (newVal) => {
   console.log("Dialog value changed to:", newVal);
@@ -148,7 +132,6 @@ watch(dialog, (newVal) => {
     emit("close");
   }
 });
-
 // Migrate the data from localStorage to the user's account
 const migrateData = async () => {
   console.log("Migrate data button clicked");
@@ -157,27 +140,22 @@ const migrateData = async () => {
     // Step 1: Get the local data (level 18, etc.)
     const localData = DataMigrationService.getLocalData();
     console.log("Local data to migrate:", localData);
-
     if (!localData) {
       console.warn("No local data found to migrate");
       loading.value = false;
       return;
     }
-
     // Step 2: Migrate the data to the user's account
     console.log("Starting migration for user:", props.userId);
     const result = await DataMigrationService.migrateDataToUser(props.userId);
     console.log("Migration result:", result);
-
     if (result) {
       console.log("🎉 Migration successful! Rebinding store...");
-
       // Step 3: If successful, rebind the store to Firebase to show the migrated data
       const store = await getTarkovStore();
       if (store && typeof store.firebindAll === "function") {
         console.log("Rebinding store to user account with migrated data");
         store.firebindAll();
-
         // Add a short delay before closing to ensure data is loaded
         setTimeout(() => {
           dialog.value = false;
@@ -204,11 +182,9 @@ const migrateData = async () => {
     loading.value = false;
   }
 };
-
 // Start fresh with a new account
 const startFresh = async () => {
   console.log("Start fresh button clicked");
-
   try {
     // Rebind the store to Firebase to get a fresh state
     const store = await getTarkovStore();
@@ -225,12 +201,10 @@ const startFresh = async () => {
   } catch (error) {
     console.error("Error rebinding store:", error);
   }
-
   // Close the dialog
   dialog.value = false;
 };
 </script>
-
 <style scoped>
 .migration-dialog-overlay {
   position: fixed !important;
@@ -245,7 +219,6 @@ const startFresh = async () => {
   z-index: 9999999 !important; /* Super high z-index to ensure visibility */
   padding: 20px !important;
 }
-
 .migration-dialog {
   background-color: rgb(18, 25, 30) !important;
   border: 2px solid rgba(255, 193, 7, 0.8) !important;
@@ -257,7 +230,6 @@ const startFresh = async () => {
   position: relative !important;
   z-index: 10000000 !important; /* Even higher z-index */
 }
-
 @keyframes pulse {
   0% {
     box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
@@ -269,7 +241,6 @@ const startFresh = async () => {
     box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
   }
 }
-
 .debug-info {
   font-size: 12px;
   opacity: 0.7;

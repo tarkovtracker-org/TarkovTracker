@@ -1,5 +1,5 @@
 <template>
-  <v-footer class="px-0 pb-0 d-flex align-end" color="transparent">
+  <v-footer class="px-0 py-1 d-flex" color="transparent" style="min-height: auto !important; height: auto !important;">
     <v-container class="text-center footer-background mx-0">
       <v-row justify="center" style="font-size: 12px">
         <v-col cols="12" md="4" align-self="center">
@@ -77,38 +77,30 @@
     </v-container>
   </v-footer>
 </template>
-
 <script setup>
 import { useI18n } from "vue-i18n";
-
 const { t } = useI18n();
 </script>
-
 <style lang="scss" scoped>
 .footer-background {
   background-color: rgba(0, 0, 0, 0.3);
   max-width: 100% !important;
 }
-
 a:link,
 a:active,
 a:visited {
   color: rgba(var(--v-theme-link), 1);
 }
-
 .info-link {
   text-decoration: none;
 }
-
 .icon-link {
   color: #7289da !important; /* Discord brand color */
 }
-
 /* Target the specific Discord icon class */
 :deep(.mdi-discord) {
   color: #7289da !important;
 }
-
 .custom-svg {
   height: 4em;
 }

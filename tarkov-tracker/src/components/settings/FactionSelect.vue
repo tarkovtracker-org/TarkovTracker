@@ -46,31 +46,23 @@
 import { useI18n } from "vue-i18n";
 import { defineAsyncComponent, computed, ref } from "vue";
 import { useTarkovStore } from "@/stores/tarkov.js";
-
-const FittedCard = defineAsyncComponent(() =>
-  import("@/components/FittedCard.vue")
+const FittedCard = defineAsyncComponent(
+  () => import("@/components/FittedCard.vue"),
 );
-
 const { t } = useI18n({ useScope: "global" });
-
 const tarkovStore = useTarkovStore();
-
 const PMCFactions = [
   { title: t("page.settings.card.pmcfaction.factions.USEC"), value: "USEC" },
   { title: t("page.settings.card.pmcfaction.factions.BEAR"), value: "BEAR" },
 ];
-
 const factionMenuActive = ref(true);
-
 const setFaction = (faction) => {
   currentPMCFaction.value = faction;
   factionMenuActive.value = false;
 };
-
 const factionImage = (faction) => {
   return `img/factions/${faction}.webp`;
 };
-
 const currentPMCFaction = computed({
   get() {
     return tarkovStore.getPMCFaction;
@@ -86,11 +78,9 @@ a:active,
 a:visited {
   color: rgba(var(--v-theme-link), 1);
 }
-
 .faction-invert {
   filter: invert(1);
 }
-
 .info-link {
   text-decoration: none;
 }

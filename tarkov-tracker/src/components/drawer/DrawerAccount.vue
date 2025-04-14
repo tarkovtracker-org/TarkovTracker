@@ -51,11 +51,9 @@ import { signOut } from "firebase/auth";
 const { mdAndDown } = useDisplay();
 const appStore = useAppStore();
 const userStore = useUserStore();
-
 const DrawerItem = defineAsyncComponent(() =>
   import("@/components/drawer/DrawerItem.vue")
 );
-
 function logout() {
   signOut(auth);
 }
@@ -70,7 +68,6 @@ function logout() {
   ) {
   overflow-y: visible;
 }
-
 .fake-link {
   cursor: pointer;
 }

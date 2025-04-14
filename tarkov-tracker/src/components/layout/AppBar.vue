@@ -13,11 +13,9 @@
         @click.stop="changeNavigationDrawer"
       ></v-app-bar-nav-icon>
     </template>
-
     <v-toolbar-title>{{
       t(`page.${route.name.replace("-", "_")}.title`)
     }}</v-toolbar-title>
-
     <span v-if="dataError">
       <!-- Show an icon and tooltip if we have a GraphQL error -->
       <v-tooltip activator="parent" location="left">
@@ -55,43 +53,32 @@
     </template>
   </v-app-bar>
 </template>
-
 <script setup>
 import { computed } from "vue";
-import { defineAsyncComponent, inject } from "vue";
+import { defineAsyncComponent } from "vue";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
 import { useRoute } from "vue-router";
 import { reactive } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata.js";
 import { useI18n } from "vue-i18n";
-
 const { t } = useI18n();
-
 const state = reactive({ menu: null });
-
 const appStore = useAppStore();
-
 const route = useRoute();
-
 const navBarIcon = computed(() => {
   return appStore.drawerShow && appStore.drawerRail
     ? "mdi-menu-open"
     : "mdi-menu";
 });
-
 const OverflowMenu = defineAsyncComponent(() =>
   import("/src/components/layout/OverflowMenu.vue")
 );
-
 const {
   loading: dataLoading,
   error: dataError,
   hideoutLoading,
 } = useTarkovData();
-
-// Change how the navigation bar is modified based upon the screen size
-// Either change between open/close or rail/full
 const { mdAndDown } = useDisplay();
 function changeNavigationDrawer() {
   if (mdAndDown.value) {

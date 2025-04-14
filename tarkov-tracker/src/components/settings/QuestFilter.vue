@@ -36,30 +36,23 @@
 </template>
 <script setup>
 import { useI18n } from "vue-i18n";
-import { defineAsyncComponent, computed, ref } from "vue";
+import { defineAsyncComponent, computed } from "vue";
 import { useTarkovStore } from "@/stores/tarkov.js";
 import { useUserStore } from "@/stores/user";
-
 const FittedCard = defineAsyncComponent(() =>
   import("@/components/FittedCard.vue")
 );
-
 const { t } = useI18n({ useScope: "global" });
-
 const tarkovStore = useTarkovStore();
-
 const userStore = useUserStore();
-
 const hideGlobalTasks = computed({
   get: () => userStore.getHideGlobalTasks,
   set: (value) => userStore.setHideGlobalTasks(value),
 });
-
 const hideNonKappaTasks = computed({
   get: () => userStore.getHideNonKappaTasks,
   set: (value) => userStore.setHideNonKappaTasks(value),
 });
-
 const hideGlobalTasksLabel = computed(() =>
   hideGlobalTasks.value
     ? "page.settings.card.questfilter.hide_global_tasks"
@@ -83,11 +76,9 @@ a:active,
 a:visited {
   color: rgba(var(--v-theme-link), 1);
 }
-
 .faction-invert {
   filter: invert(1);
 }
-
 .info-link {
   text-decoration: none;
 }

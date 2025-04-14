@@ -29,10 +29,8 @@ const useSystemStore = defineStore("system", {
     },
   },
 });
-
 const systemStore = useSystemStore();
 const userStore = useUserStore();
-
 const systemRef = computed(() => {
   if (fireuser.loggedIn) {
     return doc(collection(firedb, "system"), fireuser.uid);
@@ -40,9 +38,7 @@ const systemRef = computed(() => {
     return null;
   }
 });
-
 const systemUnsubscribe = ref(null);
-
 function clearState(store, newState) {
   try {
     // Find all of the properties that are missing from store.$state that exist in newState
@@ -66,7 +62,6 @@ function clearState(store, newState) {
     console.error(error);
   }
 }
-
 function startStoreWatcher(store, ref, unsubscribe) {
   return watch(
     ref,
@@ -111,9 +106,7 @@ function startStoreWatcher(store, ref, unsubscribe) {
     { immediate: true }
   );
 }
-
 startStoreWatcher(systemStore, systemRef, systemUnsubscribe);
-
 const teamRef = computed(
   () => {
     if (fireuser.loggedIn) {
@@ -164,7 +157,6 @@ const useTeamStore = defineStore("team", {
 });
 const teamStore = useTeamStore();
 startStoreWatcher(teamStore, teamRef, teamUnsubscribe);
-
 const teammateUnsubscribes = ref({});
 const teammateStores = ref({});
 const { teammates } = storeToRefs(teamStore);
@@ -229,7 +221,6 @@ watch(
   },
   { immediate: true }
 );
-
 const useProgressStore = defineStore("progress", () => {
   const teamStores = computed(() => {
     let stores = {};
@@ -239,7 +230,6 @@ const useProgressStore = defineStore("progress", () => {
     }
     return stores;
   });
-
   const visibleTeamStores = computed(() => {
     let visibleStores = {};
     if (this?.teamStores) {
@@ -251,7 +241,6 @@ const useProgressStore = defineStore("progress", () => {
     }
     return visibleStores;
   });
-
   const getTeamIndex = function (teamId) {
     if (teamId == fireuser.uid) {
       return "self";
@@ -259,18 +248,15 @@ const useProgressStore = defineStore("progress", () => {
       return teamId;
     }
   };
-
   const getDisplayName = function (teamId) {
     return (
       this.teamStores[this.getTeamIndex(teamId)].getDisplayName ||
       teamId.substring(0, 6)
     );
   };
-
   const getLevel = function (teamId) {
     return this.teamStores[this.getTeamIndex(teamId)].playerLevel || 1;
   };
-
   return {
     teamStores,
     getDisplayName,
@@ -279,7 +265,6 @@ const useProgressStore = defineStore("progress", () => {
     getLevel,
   };
 });
-
 // We keep the state outside of the function so that it acts as a singleton
 export function useLiveData() {
   return {

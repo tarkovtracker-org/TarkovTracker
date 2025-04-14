@@ -22,7 +22,6 @@ const props = defineProps({
     required: true,
   },
 });
-
 const stationIcon = computed(() => {
   return `/img/hideout/${props.station.id}.png`;
 });

@@ -17,15 +17,10 @@
 <script setup>
 import { defineAsyncComponent, ref } from "vue";
 import { app as fireapp, fireuser } from "@/plugins/firebase.ts";
-import { useRouter } from "vue-router";
 const TrackerTip = defineAsyncComponent(() =>
   import("@/components/TrackerTip.vue")
 );
-
-const router = useRouter();
-
 const customToken = ref("");
-
 const signIn = () => {
   fireapp
     .auth()

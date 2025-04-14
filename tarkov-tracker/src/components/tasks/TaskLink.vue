@@ -39,7 +39,6 @@
 import { computed } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useI18n } from "vue-i18n";
-
 // Define the props for the component
 const props = defineProps({
   task: {
@@ -52,23 +51,18 @@ const props = defineProps({
     default: false,
   },
 });
-
-const { tasks } = useTarkovData();
+useTarkovData();
 const { t } = useI18n();
-
 // Check if there are two faction tasks for this task
 const isFactionTask = computed(() => {
   return props.task?.factionName != "Any";
 });
-
 const factionImage = computed(() => {
   return `/img/factions/${props.task.factionName}.webp`;
 });
-
 const traderAvatar = computed(() => {
   return `/img/traders/${props.task?.trader?.id}.jpg`;
 });
-
 const scrollToTask = () => {
   const taskCard = document.getElementById(`task-${props.task.id}`);
   taskCard?.scrollIntoView({
@@ -81,13 +75,11 @@ a:any-link {
   color: rgba(var(--v-theme-tasklink), 1) !important;
   text-decoration: none;
 }
-
 .faction-icon {
   filter: invert(1);
   max-width: 24px;
   max-height: 24px;
 }
-
 .wiki-link {
   font-size: 12px;
   white-space: nowrap;

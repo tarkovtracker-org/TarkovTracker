@@ -74,7 +74,7 @@
   </v-row>
 </template>
 <script setup>
-import { inject, computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { defineAsyncComponent } from "vue";
 import { useEditorStore } from "@/stores/editor";
@@ -88,16 +88,9 @@ const props = defineProps({
   },
 });
 const editorStore = useEditorStore();
-const { tasks, rawMaps: maps, maps: processedMaps, traders } = useTarkovData();
-
-// Watch procesedMaps to see changes
-// watch(processedMaps, (newMaps) => {
-//   console.log(newMaps)
-// }, { immediate: true })
-
+const { rawMaps: maps, maps: processedMaps } = useTarkovData();
 const mapEditor = ref(false);
 const gpsEditor = ref(false);
-
 const objectiveMaps = computed({
   get() {
     if (editorStore.getObjectiveMaps(props.objective.id)?.length > 0) {
@@ -116,15 +109,12 @@ const objectiveMaps = computed({
     editorStore.setObjectiveMaps(props.objective.id, newMaps);
   },
 });
-
 const catchGPS = (gps) => {
   editorStore.setObjectiveGPS(props.objective.id, gps);
 };
-
 const clearObjectiveMarker = () => {
   editorStore.setObjectiveGPS(props.objective.id, undefined);
 };
-
 const objectiveMarkers = computed(() => {
   if (editorStore.getObjectiveGPS(props.objective.id)) {
     return [editorStore.getObjectiveGPS(props.objective.id)];
@@ -132,7 +122,6 @@ const objectiveMarkers = computed(() => {
     return [];
   }
 });
-
 const properMaps = computed(() => {
   let finalMaps = {};
   objectiveMaps.value.forEach((map) => {
@@ -148,11 +137,8 @@ const properMaps = computed(() => {
       }
     }
   });
-  // Remove any maps from finalMaps that have duplicate IDS
-
   return Object.values(finalMaps);
 });
-
 const validGPS = computed(() => {
   if (properMaps.value.length == 1) {
     return true;
@@ -160,7 +146,6 @@ const validGPS = computed(() => {
     return false;
   }
 });
-
 const gpsMap = computed(() => {
   if (validGPS.value == true) {
     if (properMaps.value.length == 1) {
@@ -172,7 +157,6 @@ const gpsMap = computed(() => {
     return {};
   }
 });
-
 // const validGPS = computed(() => {
 //   if (objectiveMaps.value.length == 1) {
 //     if (objectiveMaps.value[0] == '59fc81d786f774390775787e') {
@@ -198,7 +182,6 @@ const gpsMap = computed(() => {
 //     return false
 //   }
 // })
-
 const objectiveMapString = computed(() => {
   return objectiveMaps.value
     .map((m) =>

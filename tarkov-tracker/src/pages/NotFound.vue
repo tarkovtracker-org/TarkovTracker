@@ -6,9 +6,7 @@
 <script>
 export default {
   name: "TrackerDashboard",
-
   components: {},
-
   data: () => ({}),
 };
 </script>

@@ -356,7 +356,6 @@ const tarkovStore = useTarkovStore();
 const progressStore = useProgressStore();
 const userStore = useUserStore();
 const { tasks } = useTarkovData();
-
 const TaskLink = defineAsyncComponent(() =>
   import("@/components/tasks/TaskLink.vue")
 );
@@ -366,24 +365,19 @@ const TaskObjective = defineAsyncComponent(() =>
 const TarkovItem = defineAsyncComponent(() =>
   import("@/components/TarkovItem.vue")
 );
-
 const { xs } = useDisplay();
-
 const isComplete = computed(() => {
   return tarkovStore.isTaskComplete(props.task.id);
 });
-
 const isFailed = computed(() => {
   return tarkovStore.isTaskFailed(props.task.id);
 });
-
 const isLocked = computed(() => {
   return (
     progressStore.unlockedTasks[props.task.id]["self"] != true &&
     !isComplete.value
   );
 });
-
 const isOurFaction = computed(() => {
   // Check if the task is faction 'Any' or the user's faction
   return (
@@ -391,24 +385,20 @@ const isOurFaction = computed(() => {
     props.task.factionName == tarkovStore.getPMCFaction
   );
 });
-
 const lockedBehind = computed(() => {
   // Calculate how many of the successors are uncompleted (should be all, but someone might have marked off one)
   return props.task.successors.filter((s) => !tarkovStore.isTaskComplete(s.id))
     .length;
 });
-
 const lockedBefore = computed(() => {
   // Calculate how many of the predecessors are uncompleted
   return props.task.predecessors.filter(
     (s) => !tarkovStore.isTaskComplete(s.id)
   ).length;
 });
-
 const nonKappa = computed(() => {
   return !props.task.kappaRequired;
 });
-
 const relevantViewObjectives = computed(() => {
   if (onMapView.value) {
     return props.task.objectives.filter((o) =>
@@ -418,22 +408,18 @@ const relevantViewObjectives = computed(() => {
     return props.task.objectives;
   }
 });
-
 const factionImage = computed(() => {
   return `/img/factions/${props.task.factionName}.webp`;
 });
-
 const uncompletedIrrelevantObjectives = computed(() => {
   return props.task.objectives
     .filter((o) => !o?.maps.includes(userStore.getTaskMapView))
     .filter((o) => !tarkovStore.isTaskObjectiveComplete(o.id));
 });
-
 const onMapView = computed(() => {
   // If the primary task view is set to map, then we are on the map page
   return userStore.getTaskPrimaryView == "maps";
 });
-
 const markTaskComplete = () => {
   tarkovStore.setTaskComplete(props.task.id);
   // For each objective, mark it as complete
@@ -456,13 +442,11 @@ const markTaskComplete = () => {
   if (tarkovStore.playerLevel < props.task.minPlayerLevel) {
     tarkovStore.setLevel(props.task.minPlayerLevel);
   }
-
   taskStatus.value = t("page.tasks.questcard.statuscomplete", {
     name: props.task.name,
   });
   taskStatusUpdated.value = true;
 };
-
 const markTaskUncomplete = () => {
   tarkovStore.setTaskUncompleted(props.task.id);
   // For each objective, mark it as uncomplete
@@ -486,7 +470,6 @@ const markTaskUncomplete = () => {
   });
   taskStatusUpdated.value = true;
 };
-
 const markTaskAvailable = () => {
   // Go through all the predecessors and mark them as complete
   props.task.predecessors.forEach((p) => {
@@ -506,7 +489,6 @@ const markTaskAvailable = () => {
   });
   taskStatusUpdated.value = true;
 };
-
 const taskStatusUpdated = ref(false);
 const taskStatus = ref("");
 </script>
@@ -515,7 +497,6 @@ const taskStatus = ref("");
   position: relative;
   overflow: hidden;
 }
-
 .taskContainerBackground {
   margin: 3rem;
   position: absolute;
@@ -528,7 +509,6 @@ const taskStatus = ref("");
   color: #c6afaf;
   opacity: 0.2;
 }
-
 .task-complete {
   background: linear-gradient(
     135deg,
@@ -536,7 +516,6 @@ const taskStatus = ref("");
     rgba(var(--v-theme-complete), 0) 75%
   );
 }
-
 .task-locked {
   background: linear-gradient(
     135deg,
@@ -544,16 +523,13 @@ const taskStatus = ref("");
     rgba(var(--v-theme-failure), 0) 75%
   );
 }
-
 .wiki-link {
   text-decoration: none;
   color: rgba(var(--v-theme-tasklink), 1) !important;
 }
-
 .hidden-objectives {
   opacity: 0.5;
 }
-
 .faction-icon {
   filter: invert(1);
   max-width: 24px;

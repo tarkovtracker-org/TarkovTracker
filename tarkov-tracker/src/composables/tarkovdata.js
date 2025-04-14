@@ -4,12 +4,10 @@ import apolloClient from "@/plugins/apollo";
 import tarkovDataQuery from "@/utils/tarkovdataquery.js";
 import tarkovHideoutQuery from "@/utils/tarkovhideoutquery.js";
 import languageQuery from "@/utils/languagequery.js";
-import { useI18n } from 'vue-i18n';
+import { useI18n } from "vue-i18n";
 // Import graphlib so that we can use it in the watch function
 import Graph from "graphology";
-
 provideApolloClient(apolloClient);
-
 // --- Singleton State ---
 const isInitialized = ref(false);
 const availableLanguages = ref(null);
@@ -34,7 +32,6 @@ const loading = ref(false); // Combine loading states if needed, or keep separat
 const hideoutLoading = ref(false);
 const staticMapData = ref(null); // Add ref for static map data
 // --- End Singleton State ---
-
 // Mapping from GraphQL map names (potentially different) to static data keys
 const mapNameMapping = {
   "night factory": "factory",
@@ -42,7 +39,6 @@ const mapNameMapping = {
   "ground zero 21+": "groundzero",
   "the labyrinth": "streetsoftarkov", // Assuming 'The Labyrinth' maps to 'streetsoftarkov'
 };
-
 // Function to recursively get all of the predecessors for a task
 function getPredecessors(graph, nodeId, visited = []) {
   let predecessors = [];
@@ -59,13 +55,12 @@ function getPredecessors(graph, nodeId, visited = []) {
         continue;
       }
       predecessors = predecessors.concat(
-        getPredecessors(graph, predecessor, visited)
+        getPredecessors(graph, predecessor, visited),
       );
     }
   }
   return predecessors;
 }
-
 // Function to recursively get all of the successors for a task
 function getSuccessors(graph, nodeId, visited = []) {
   let successors = [];
@@ -86,7 +81,6 @@ function getSuccessors(graph, nodeId, visited = []) {
   }
   return successors;
 }
-
 function extractLanguageCode(localeRef) {
   const localeValue = localeRef.value;
   // Return only the language code remove any dash or underscore and what comes after
@@ -100,7 +94,6 @@ function extractLanguageCode(localeRef) {
     return "en";
   }
 }
-
 const disabledTasks = [
   "61e6e5e0f5b9633f6719ed95",
   "61e6e60223374d168a4576a6",
@@ -108,9 +101,7 @@ const disabledTasks = [
   "61e6e615eea2935bc018a2c5",
   "61e6e60c5ca3b3783662be27",
 ];
-
 // --- Watchers defined outside useTarkovData to modify singleton state ---
-
 watch(queryHideoutResults, async (newValue, oldValue) => {
   if (newValue?.hideoutStations) {
     let newHideoutGraph = new Graph();
@@ -120,24 +111,23 @@ watch(queryHideoutResults, async (newValue, oldValue) => {
         level.stationLevelRequirements?.forEach((requirement) => {
           if (requirement != null) {
             let requiredStation = newValue.hideoutStations?.find(
-              (s) => s.id === requirement.station?.id
+              (s) => s.id === requirement.station?.id,
             );
             let requiredLevel = requiredStation?.levels?.find(
-              (l) => l.level === requirement.level
+              (l) => l.level === requirement.level,
             );
             if (requiredLevel) {
               newHideoutGraph.mergeNode(requiredLevel.id);
               newHideoutGraph.mergeEdge(requiredLevel.id, level.id);
             } else {
               console.warn(
-                `Could not find required level for station ${requirement.station?.id} level ${requirement.level} needed by ${level.id}`
+                `Could not find required level for station ${requirement.station?.id} level ${requirement.level} needed by ${level.id}`,
               );
             }
           }
         });
       });
     });
-
     let newModules = [];
     let tempNeededModules = [];
     newValue.hideoutStations?.forEach((station) => {
@@ -153,7 +143,6 @@ watch(queryHideoutResults, async (newValue, oldValue) => {
           children: newHideoutGraph.outNeighbors(level.id),
         };
         newModules.push(moduleData);
-
         level.itemRequirements?.forEach((req) => {
           if (req?.item?.id) {
             tempNeededModules.push({
@@ -179,19 +168,16 @@ watch(queryHideoutResults, async (newValue, oldValue) => {
     hideoutStations.value = [];
   }
 });
-
 // Watch for changes to queryResults.value?.tasks and update the task graph
 watch(queryResults, async (newValue, oldValue) => {
   if (newValue?.tasks) {
     let newTaskGraph = new Graph();
     let activeRequirements = [];
-
     for (let task of newValue.tasks || []) {
       newTaskGraph.mergeNode(task.id);
       if (task.taskRequirements?.length > 0) {
         for (let requirement of task.taskRequirements) {
           if (!requirement?.task) continue;
-
           if (requirement?.status?.includes("active")) {
             activeRequirements.push({ task, requirement });
           } else {
@@ -203,11 +189,9 @@ watch(queryResults, async (newValue, oldValue) => {
         }
       }
     }
-
     for (let activeRequirement of activeRequirements) {
       const requiredTaskNodeId = activeRequirement.requirement.task.id;
       if (!newTaskGraph.hasNode(requiredTaskNodeId)) continue;
-
       const requiredTaskPredecessors =
         newTaskGraph.inNeighbors(requiredTaskNodeId);
       for (let predecessor of requiredTaskPredecessors) {
@@ -215,27 +199,21 @@ watch(queryResults, async (newValue, oldValue) => {
         newTaskGraph.mergeEdge(predecessor, activeRequirement.task.id);
       }
     }
-
     mapTasks.value = {};
     objectiveMaps.value = {};
     objectiveGPS.value = {};
     alternativeTasks.value = {};
-
     let newTasks = [];
     let tempMapTasks = {};
     let tempNeededObjectives = [];
-
     for (let task of newValue.tasks || []) {
       newTaskGraph.mergeNode(task.id);
-
       let taskPredecessors = [
         ...new Set(getPredecessors(newTaskGraph, task.id)),
       ];
       let taskSuccessors = [...new Set(getSuccessors(newTaskGraph, task.id))];
-
       let taskParents = newTaskGraph.inNeighbors(task.id);
       let taskChildren = newTaskGraph.outNeighbors(task.id);
-
       if (Array.isArray(task.finishRewards)) {
         task.finishRewards.forEach((reward) => {
           if (reward?.__typename === "QuestStatusReward") {
@@ -248,7 +226,6 @@ watch(queryResults, async (newValue, oldValue) => {
           }
         });
       }
-
       if (task.objectives?.length > 0) {
         for (let objective of task.objectives) {
           if (objective?.location?.id) {
@@ -257,7 +234,6 @@ watch(queryResults, async (newValue, oldValue) => {
               tempMapTasks[mapId] = [];
             }
             tempMapTasks[mapId].push(task.id);
-
             if (!objectiveMaps.value[task.id]) {
               objectiveMaps.value[task.id] = [];
             }
@@ -274,7 +250,6 @@ watch(queryResults, async (newValue, oldValue) => {
               y: objective.y,
             });
           }
-
           if (objective?.item?.id || objective?.markerItem?.id) {
             tempNeededObjectives.push({
               id: objective.id,
@@ -289,7 +264,6 @@ watch(queryResults, async (newValue, oldValue) => {
           }
         }
       }
-
       newTasks.push({
         ...task,
         traderIcon: task.trader?.imageLink,
@@ -299,7 +273,6 @@ watch(queryResults, async (newValue, oldValue) => {
         children: taskChildren,
       });
     }
-
     tasks.value = newTasks;
     neededItemTaskObjectives.value = tempNeededObjectives;
     taskGraph.value = newTaskGraph;
@@ -314,7 +287,6 @@ watch(queryResults, async (newValue, oldValue) => {
     alternativeTasks.value = {};
   }
 });
-
 // Define objectives computed property
 const objectives = computed(() => {
   if (!queryResults.value?.tasks) {
@@ -334,7 +306,6 @@ const objectives = computed(() => {
   });
   return allObjectives;
 });
-
 // --- Add New Computed Property for Maps ---
 const maps = computed(() => {
   if (!queryResults.value?.maps || !staticMapData.value) {
@@ -342,23 +313,19 @@ const maps = computed(() => {
     // Or if static data failed to load
     return [];
   }
-
   // Merge GraphQL map data with static SVG data
   const mergedMaps = queryResults.value.maps.map((map) => {
     const lowerCaseName = map.name.toLowerCase(); // Get lowercase name with spaces
     let mapKey;
-
     // 1. Check if an explicit mapping exists for the name with spaces
     if (mapNameMapping[lowerCaseName]) {
       mapKey = mapNameMapping[lowerCaseName];
     } else {
       // 2. If no explicit mapping, normalize the name (remove spaces/symbols) as a fallback key
-      mapKey = lowerCaseName.replace(/\s+|\+/g, ''); // Remove spaces and '+' for keys like groundzero21+
+      mapKey = lowerCaseName.replace(/\s+|\+/g, ""); // Remove spaces and '+' for keys like groundzero21+
     }
-
     // Use the determined mapKey to find static data
     const staticData = staticMapData.value[mapKey];
-
     if (staticData && staticData.svg) {
       // Merge the svg object from static data
       return {
@@ -366,29 +333,29 @@ const maps = computed(() => {
         svg: staticData.svg,
       };
     } else {
-      console.warn(`Static SVG data not found for map: ${map.name} (lookup key: ${mapKey})`);
+      console.warn(
+        `Static SVG data not found for map: ${map.name} (lookup key: ${mapKey})`,
+      );
       // Return the map without SVG data if no match found
       return map;
     }
   });
-
   // Sort maps alphabetically by name
   return [...mergedMaps].sort((a, b) => a.name.localeCompare(b.name));
 });
 // --- End New Computed Property ---
-
 // --- Main Exported Composable ---
 export function useTarkovData() {
   // Obtain i18n context using the composable
   const { locale } = useI18n();
-
   // Define languageCode computed property here, using the locale from useI18n
   const languageCode = computed(() => extractLanguageCode(locale));
-
   // Fetch static map data when the composable is mounted
   onMounted(async () => {
     try {
-      const response = await fetch('https://tarkovtracker.github.io/tarkovdata/maps.json');
+      const response = await fetch(
+        "https://tarkovtracker.github.io/tarkovdata/maps.json",
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -400,11 +367,9 @@ export function useTarkovData() {
       staticMapData.value = {}; // Set to empty object on error
     }
   });
-
   // Initialize queries only once
   if (!isInitialized.value) {
     isInitialized.value = true; // Set flag immediately
-
     // === Language Query ===
     const { onResult: languageOnResult, onError: languageOnError } = useQuery(
       languageQuery,
@@ -413,21 +378,18 @@ export function useTarkovData() {
         fetchPolicy: "cache-first", // Cache first for languages
         notifyOnNetworkStatusChange: true,
         errorPolicy: "all",
-      }
+      },
     );
-
     languageOnResult((result) => {
       // Use optional chaining for safety
       availableLanguages.value = result.data?.__type?.enumValues.map(
-        (enumValue) => enumValue.name
+        (enumValue) => enumValue.name,
       ) ?? ["en"]; // Default to English array if chain fails
     });
-
     languageOnError((error) => {
       console.error("Language query failed:", error);
       availableLanguages.value = ["en"]; // Default to English on error
     });
-
     // === Task Query ===
     const {
       result: taskResultRef, // Direct ref to result
@@ -442,9 +404,8 @@ export function useTarkovData() {
         notifyOnNetworkStatusChange: true,
         errorPolicy: "all",
         enabled: computed(() => !!availableLanguages.value), // Only enable after languages are loaded
-      }
+      },
     );
-
     // Watch the direct refs and update singleton state
     watch(
       taskResultRef,
@@ -454,9 +415,8 @@ export function useTarkovData() {
           queryResults.value = newResult; // Update singleton state
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
-
     watch(
       taskErrorRef,
       (newError) => {
@@ -465,17 +425,15 @@ export function useTarkovData() {
           console.error("Task query error:", newError);
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
-
     watch(
       taskLoadingRef,
       (newLoading) => {
         loading.value = newLoading; // Update singleton state
       },
-      { immediate: true }
+      { immediate: true },
     );
-
     // === Hideout Query ===
     const {
       result: hideoutResultRef,
@@ -490,9 +448,8 @@ export function useTarkovData() {
         notifyOnNetworkStatusChange: true,
         errorPolicy: "all",
         enabled: computed(() => !!availableLanguages.value), // Only enable after languages are loaded
-      }
+      },
     );
-
     // Watch the direct refs and update singleton state
     watch(
       hideoutResultRef,
@@ -503,9 +460,8 @@ export function useTarkovData() {
           console.debug("Hideout query results updated");
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
-
     watch(
       hideoutErrorRef,
       (newError) => {
@@ -514,17 +470,15 @@ export function useTarkovData() {
           console.error("Hideout query error:", newError);
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
-
     watch(
       hideoutLoadingRef,
       (newLoading) => {
         hideoutLoading.value = newLoading; // Update singleton state
       },
-      { immediate: true }
+      { immediate: true },
     );
-
     // Refetch data when language changes
     watchEffect(() => {
       const currentLang = languageCode.value; // Dependency
@@ -536,7 +490,6 @@ export function useTarkovData() {
       }
     });
   } // End of initialization block
-
   // --- Return the singleton reactive refs ---
   return {
     availableLanguages,

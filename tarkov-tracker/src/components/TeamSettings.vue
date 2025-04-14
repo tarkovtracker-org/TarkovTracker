@@ -17,7 +17,6 @@
     </template>
   </icon-card>
 </template>
-
 <script setup>
 import { defineAsyncComponent } from "vue";
 const IconCard = defineAsyncComponent(() =>

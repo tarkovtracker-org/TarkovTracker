@@ -478,11 +478,11 @@ import { useProgressStore } from "@/stores/progress";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useTarkovStore } from "@/stores/tarkov";
 import { useDisplay } from "vuetify";
-const TaskLink = defineAsyncComponent(() =>
-  import("@/components/tasks/TaskLink.vue")
+const TaskLink = defineAsyncComponent(
+  () => import("@/components/tasks/TaskLink.vue"),
 );
-const StationLink = defineAsyncComponent(() =>
-  import("@/components/hideout/StationLink.vue")
+const StationLink = defineAsyncComponent(
+  () => import("@/components/hideout/StationLink.vue"),
 );
 const props = defineProps({
   need: {
@@ -490,17 +490,11 @@ const props = defineProps({
     required: true,
   },
 });
-
 const { smAndDown, mdAndUp } = useDisplay();
-
-const userStore = useUserStore();
 const progressStore = useProgressStore();
 const tarkovStore = useTarkovStore();
-
-const { tasks, hideoutStations } = useTarkovData();
-
+useTarkovData();
 const smallDialog = ref(false);
-
 const {
   selfCompletedNeed,
   relatedTask,
@@ -513,7 +507,6 @@ const {
   teamNeeds,
   imageItem,
 } = inject("neededitem");
-
 const itemImageClasses = computed(() => {
   return {
     [`item-bg-${item.value.backgroundColor}`]: true,
@@ -522,7 +515,6 @@ const itemImageClasses = computed(() => {
     "item-row-image": true,
   };
 });
-
 const itemImageDialogClasses = computed(() => {
   return {
     [`item-bg-${item.value.backgroundColor}`]: true,
@@ -530,14 +522,12 @@ const itemImageDialogClasses = computed(() => {
     "pa-1": true,
   };
 });
-
 const itemRowClasses = computed(() => {
   return {
     "item-complete-row":
       selfCompletedNeed.value || currentCount.value >= neededCount.value,
   };
 });
-
 const emit = defineEmits(["decreaseCount", "increaseCount", "toggleCount"]);
 </script>
 <style lang="scss">
@@ -548,50 +538,39 @@ const emit = defineEmits(["decreaseCount", "increaseCount", "toggleCount"]);
     rgba(var(--v-theme-surface), 1) 100%
   ) !important;
 }
-
 .item-panel {
   aspect-ratio: 16/9;
   min-height: 100px;
 }
-
 .item-row-image {
   aspect-ratio: 1/1;
   min-height: 64px;
   max-height: 64px;
 }
-
 .item-bg-violet {
   background-color: #2c232f;
 }
-
 .item-bg-grey {
   background-color: #1e1e1e;
 }
-
 .item-bg-yellow {
   background-color: #343421;
 }
-
 .item-bg-orange {
   background-color: #261d14;
 }
-
 .item-bg-green {
   background-color: #1a2314;
 }
-
 .item-bg-red {
   background-color: #38221f;
 }
-
 .item-bg-default {
   background-color: #3a3c3b;
 }
-
 .item-bg-black {
   background-color: #141614;
 }
-
 .item-bg-blue {
   background-color: #202d32;
 }

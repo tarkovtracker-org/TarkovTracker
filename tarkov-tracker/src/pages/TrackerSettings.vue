@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container class="h-100 pb-0 mb-0" style="min-height: calc(100vh - 210px); margin-bottom: 0 !important; padding-bottom: 0 !important;">
     <v-row justify="center">
       <v-col v-if="fireuser.loggedIn" cols="12" sm="12" md="12" lg="12" xl="12">
         <fitted-card icon="mdi-key-chain" icon-color="white">
@@ -122,7 +122,6 @@
         <data-migration-card />
       </v-col>
     </v-row>
-
     <!-- Reset section in a separate row at the bottom -->
     <v-row justify="center" class="mt-4">
       <v-col cols="12" sm="8" md="6" lg="4" xl="4">
@@ -215,23 +214,18 @@ import QuestFilter from "@/components/settings/QuestFilter.vue";
 import FactionSelect from "@/components/settings/FactionSelect.vue";
 import ApiTokens from "@/components/settings/ApiTokens.vue";
 import DataMigrationCard from "@/components/settings/DataMigrationCard.vue";
-
 const FittedCard = defineAsyncComponent(
   () => import("@/components/FittedCard.vue"),
 );
-
 const tarkovStore = useTarkovStore();
 const userStore = useUserStore();
-
 const resetDialog = ref(false);
-
 const gameEditions = [
   { title: "Standard Edition", value: 1 },
   { title: "Left Behind Edition", value: 2 },
   { title: "Prepare for Escape Edition", value: 3 },
   { title: "Edge of Darkness Limited Edition", value: 4 },
 ];
-
 const currentGameEdition = computed({
   get() {
     return tarkovStore.getGameEdition;
@@ -240,7 +234,6 @@ const currentGameEdition = computed({
     tarkovStore.setGameEdition(newValue);
   },
 });
-
 const streamerMode = computed({
   get() {
     return userStore.getStreamerMode;
@@ -256,11 +249,9 @@ a:active,
 a:visited {
   color: rgba(var(--v-theme-link), 1);
 }
-
 .info-link {
   text-decoration: none;
 }
-
 .reset-card {
   border-top: 2px solid rgba(var(--v-theme-warning), 0.5);
 }

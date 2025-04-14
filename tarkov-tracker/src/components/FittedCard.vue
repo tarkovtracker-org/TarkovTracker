@@ -27,7 +27,6 @@
 </template>
 <script setup>
 import { computed } from "vue";
-
 const props = defineProps({
   icon: {
     type: String,
@@ -50,7 +49,6 @@ const props = defineProps({
     required: false,
   },
 });
-
 const highlightClasses = computed(() => {
   let classes = {};
   classes[`highlight-${props.highlightColor}`] = true;
@@ -70,7 +68,6 @@ const highlightClasses = computed(() => {
   background-clip: padding-box;
   border-radius: 0px 0px 10px 0px;
 }
-
 .highlight-green {
   background: linear-gradient(
     90deg,
@@ -79,7 +76,6 @@ const highlightClasses = computed(() => {
     rgba(0, 83, 0, 0.15) 100%
   );
 }
-
 .highlight-blue {
   background: linear-gradient(
     90deg,
@@ -88,7 +84,6 @@ const highlightClasses = computed(() => {
     rgba(0, 0, 83, 0.15) 100%
   );
 }
-
 .highlight-red {
   background: linear-gradient(
     90deg,
@@ -97,7 +92,6 @@ const highlightClasses = computed(() => {
     rgba(83, 0, 0, 0.15) 100%
   );
 }
-
 .highlight-tan {
   background: linear-gradient(
     90deg,
@@ -106,7 +100,6 @@ const highlightClasses = computed(() => {
     rgba(83, 83, 0, 0.15) 100%
   );
 }
-
 .highlight-purple {
   background: linear-gradient(
     90deg,
@@ -115,7 +108,6 @@ const highlightClasses = computed(() => {
     rgba(83, 0, 83, 0.15) 100%
   );
 }
-
 .highlight-accent {
   background: linear-gradient(
     135deg,
@@ -124,7 +116,6 @@ const highlightClasses = computed(() => {
     rgba(35, 49, 56, 1) 100%
   );
 }
-
 .highlight-secondary {
   background: linear-gradient(
     135deg,
@@ -133,7 +124,6 @@ const highlightClasses = computed(() => {
     rgba(154, 136, 102, 1) 100%
   );
 }
-
 .corner-highlight-parent {
   overflow: hidden;
 }

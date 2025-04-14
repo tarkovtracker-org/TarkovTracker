@@ -24,22 +24,21 @@ import { fireuser } from "@/plugins/firebase";
 import { useLiveData } from "@/composables/livedata";
 import { useRoute } from "vue-router";
 import { defineAsyncComponent } from "vue";
-const TeamMembers = defineAsyncComponent(() =>
-  import("@/components/teams/TeamMembers.vue")
+const TeamMembers = defineAsyncComponent(
+  () => import("@/components/teams/TeamMembers.vue"),
 );
-const TeamOptions = defineAsyncComponent(() =>
-  import("@/components/teams/TeamOptions.vue")
+const TeamOptions = defineAsyncComponent(
+  () => import("@/components/teams/TeamOptions.vue"),
 );
-const MyTeam = defineAsyncComponent(() =>
-  import("@/components/teams/MyTeam.vue")
+const MyTeam = defineAsyncComponent(
+  () => import("@/components/teams/MyTeam.vue"),
 );
-const TrackerTip = defineAsyncComponent(() =>
-  import("@/components/TrackerTip.vue")
+const TrackerTip = defineAsyncComponent(
+  () => import("@/components/TrackerTip.vue"),
 );
-const TeamInvite = defineAsyncComponent(() =>
-  import("@/components/teams/TeamInvite.vue")
+const TeamInvite = defineAsyncComponent(
+  () => import("@/components/teams/TeamInvite.vue"),
 );
-
 const { useSystemStore } = useLiveData();
 const systemStore = useSystemStore();
 const route = useRoute();

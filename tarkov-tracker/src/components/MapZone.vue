@@ -19,7 +19,6 @@
 <script setup>
 import { computed, defineAsyncComponent, ref } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata.js";
-
 const TaskObjective = defineAsyncComponent(() =>
   import("@/components/tasks/TaskObjective.vue")
 );
@@ -46,40 +45,31 @@ const props = defineProps({
     required: true,
   },
 });
-
 const forceTooltip = ref(false);
 const hoverTooltip = ref(false);
-
 const forceTooltipToggle = () => {
   forceTooltip.value = !forceTooltip.value;
 };
-
 const showTooltip = () => {
   hoverTooltip.value = true;
 };
-
 const hideTooltip = () => {
   hoverTooltip.value = false;
 };
-
 const tooltipVisible = computed(() => {
   //if (props.mark.floor !== props.selectedFloor) return false;
   return forceTooltip.value || hoverTooltip.value;
 });
-
 const relatedObjective = computed(() => {
   return objectives.value.find((obj) => obj.id == props.mark.id);
 });
-
 const relatedTask = computed(() => {
   return tasks.value.find((task) => task.id == relatedObjective.value?.taskId);
 });
-
 const zoneColor = computed(() => {
   if (tooltipVisible.value) return "text-green";
   return props.mark.users.includes("self") ? "text-red" : "text-orange";
 });
-
 const relativeLocation = computed(() => {
   // Determine the leftmost x position in the array of zone positions
   // Take the bounds of the map and figure out the initial relative position
@@ -105,24 +95,19 @@ const relativeLocation = computed(() => {
       topPercent: relativeTopPercent,
     });
   });
-
   // Find the bounds of the outline
   let leftPercent = outlinePercents.reduce((min, current) => {
     return current.leftPercent < min ? current.leftPercent : min;
   }, outlinePercents[0].leftPercent);
-
   let topPercent = outlinePercents.reduce((min, current) => {
     return current.topPercent < min ? current.topPercent : min;
   }, outlinePercents[0].topPercent);
-
   let rightPercent = outlinePercents.reduce((max, current) => {
     return current.leftPercent > max ? current.leftPercent : max;
   }, outlinePercents[0].leftPercent);
-
   let bottomPercent = outlinePercents.reduce((max, current) => {
     return current.topPercent > max ? current.topPercent : max;
   }, outlinePercents[0].topPercent);
-
   // Now, calculate the percentages internally to the div based on the bounds
   let internalPercents = [];
   outlinePercents.forEach((outline) => {
@@ -136,7 +121,6 @@ const relativeLocation = computed(() => {
       topPercent: internalTopPercent,
     });
   });
-
   return {
     leftPercent: leftPercent,
     topPercent: topPercent,
@@ -145,7 +129,6 @@ const relativeLocation = computed(() => {
     internalPercents: internalPercents,
   };
 });
-
 const zoneStyle = computed(() => {
   return {
     position: "absolute",
@@ -177,7 +160,6 @@ const zoneStyle = computed(() => {
     opacity: 1,
   };
 });
-
 const tooltipStyle = computed(() => {
   return {
     position: "absolute",

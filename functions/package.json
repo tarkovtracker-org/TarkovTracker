@@ -1,27 +1,41 @@
 {
-  "name": "functions",
+  "name": "tarkovtracker-cloud-functions",
   "description": "Cloud Functions for Firebase",
+  "private": true,
+  "version": "3.0.0",
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
+    "test": "vitest",
+    "lint": "eslint .",
     "swagger": "node api/v2/swagger.js",
     "deps": "taze --interactive"
   },
+  "type": "module",
   "main": "index.js",
   "dependencies": {
-    "firebase-admin": "^10.3.0",
-    "firebase-functions": "^4.9.0",
-    "graphql-request": "^5.1.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.2.0",
+    "firebase-functions": "^6.3.2",
+    "graphql-request": "^7.1.2",
     "graphql-tag": "^2.12.6",
-    "swagger-jsdoc": "^6.2.7",
+    "swagger-jsdoc": "^6.2.8",
     "uid-generator": "^2.0.0"
   },
   "devDependencies": {
-    "firebase-functions-test": "^0.2.0",
-    "prettier": "^2.8.8"
-  },
-  "private": true
+    "@vitest/coverage-istanbul": "^3.1.1",
+    "@vitest/coverage-v8": "^3.1.1",
+    "eslint": "^9.24.0",
+    "firebase-functions-test": "^3.4.1",
+    "prettier": "^3.5.3",
+    "vitest": "^3.1.1"
+  }
 }

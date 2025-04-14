@@ -1,8 +1,8 @@
 <template>
   <div class="login-page">
     <tracker-tip tip="login"></tracker-tip>
-    <v-container class="fill-height">
-      <v-row align="center" justify="center">
+    <v-container class="h-100 d-flex align-center mb-0 pb-0" style="margin-bottom:0 !important; padding-bottom:0 !important; min-height: calc(100vh - 210px);">
+      <v-row align="center" justify="center" class="w-100 mb-0 pb-0" style="margin-bottom:0 !important; padding-bottom:0 !important;">
         <v-col cols="12">
           <div
             v-if="fireuser?.uid && !showingMigrationDialog"
@@ -39,19 +39,15 @@
     </v-container>
   </div>
 </template>
-
 <script setup>
 import { defineAsyncComponent, ref, onMounted, watch } from "vue";
 import { fireuser } from "@/plugins/firebase.ts";
-
 // Track if the migration dialog is currently being shown
 const showingMigrationDialog = ref(false);
-
 // Debug logging for tracking state
 onMounted(() => {
   console.log("LoginInterface mounted, user logged in:", !!fireuser.uid);
 });
-
 // Watch for changes to fireuser.uid to help debug
 watch(
   () => fireuser.uid,
@@ -59,12 +55,10 @@ watch(
     console.log("User auth state changed:", oldVal, "→", newVal);
   },
 );
-
 // Watch migration dialog state
 watch(showingMigrationDialog, (newVal) => {
   console.log("Migration dialog state changed:", newVal);
 });
-
 const TrackerTip = defineAsyncComponent(
   () => import("@/components/TrackerTip.vue"),
 );
@@ -72,10 +66,8 @@ const AuthButtons = defineAsyncComponent(
   () => import("@/components/AuthButtons.vue"),
 );
 </script>
-
 <style scoped>
 .login-page {
-  min-height: 100vh;
   background-color: rgba(0, 0, 0, 0.75);
   position: relative;
   background-image:
@@ -90,7 +82,6 @@ const AuthButtons = defineAsyncComponent(
       transparent 50%
     );
 }
-
 .login-page::before {
   content: "";
   position: absolute;
@@ -105,7 +96,6 @@ const AuthButtons = defineAsyncComponent(
   opacity: 0.03;
   z-index: -1;
 }
-
 .auth-success-card {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background-color: rgb(18, 25, 30);

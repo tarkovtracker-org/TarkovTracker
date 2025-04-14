@@ -70,7 +70,6 @@
   </v-container>
   <v-snackbar v-model="newTokenSnackbar" :timeout="4000" color="accent">
     {{ tokenResult }}
-
     <template #actions>
       <v-btn color="white" variant="text" @click="newTokenSnackbar = false">
         Close
@@ -89,10 +88,8 @@ const TokenCard = defineAsyncComponent(() =>
   import("@/components/settings/TokenCard.vue")
 );
 const { t } = useI18n({ useScope: "global" });
-
 const { useSystemStore } = useLiveData();
 const systemStore = useSystemStore();
-
 // New token form
 const selectOneError = ref(false);
 const newTokenForm = ref(null);
@@ -123,14 +120,12 @@ const createToken = async () => {
     }
     return;
   }
-
   if (selectedPermissionsCount.value == 0) {
     selectOneError.value = true;
     return;
   } else {
     selectOneError.value = false;
   }
-
   creatingToken.value = true;
   try {
     console.log("Creating token with:", {
@@ -152,7 +147,6 @@ const createToken = async () => {
     tokenResult.value = t("page.settings.card.apitokens.create_token_error");
     newTokenSnackbar.value = true;
   }
-
   creatingToken.value = false;
 };
 </script>

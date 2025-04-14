@@ -27,7 +27,6 @@ import {
   connectStorageEmulator,
   FirebaseStorage,
 } from "firebase/storage";
-
 // Define a comprehensive type for our reactive user state
 type FireUser = {
   uid: string | null;
@@ -40,7 +39,6 @@ type FireUser = {
   lastLoginAt: string | null;
   createdAt: string | null;
 };
-
 // Ensure all required environment variables are present
 const requiredEnvVars = [
   "VITE_FIREBASE_API_KEY",
@@ -50,18 +48,15 @@ const requiredEnvVars = [
   "VITE_FIREBASE_MESSAGING_SENDER_ID",
   "VITE_FIREBASE_APP_ID",
 ] as const;
-
 // Check for missing environment variables
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !import.meta.env[varName],
 );
-
 if (missingEnvVars.length > 0) {
   throw new Error(
     `Missing required environment variables: ${missingEnvVars.join(", ")}`,
   );
 }
-
 // Use environment variables for Firebase config with proper typing
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -72,7 +67,6 @@ const firebaseConfig: FirebaseOptions = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // Optional: for Google Analytics
 };
-
 // Initialize Firebase with error handling
 let app;
 let analytics: Analytics;
@@ -80,7 +74,6 @@ let auth: Auth;
 let firestore: Firestore;
 let functions: Functions;
 let storage: FirebaseStorage;
-
 try {
   app = initializeApp(firebaseConfig);
   analytics = getAnalytics(app);
@@ -92,7 +85,6 @@ try {
   console.error("Error initializing Firebase:", error);
   throw error;
 }
-
 // Set up a reactive object for our user state with comprehensive properties
 const fireuser = reactive<FireUser>({
   uid: null,
@@ -105,7 +97,6 @@ const fireuser = reactive<FireUser>({
   lastLoginAt: null,
   createdAt: null,
 });
-
 // Handle auth state changes with comprehensive user data
 onAuthStateChanged(auth, (user: User | null) => {
   if (user) {
@@ -133,9 +124,11 @@ onAuthStateChanged(auth, (user: User | null) => {
     });
   }
 });
-
-// Use emulators if we're on localhost
-if (window.location.hostname === "localhost") {
+// Use emulators if we're on localhost or 127.0.0.1
+if (
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+) {
   try {
     connectFirestoreEmulator(firestore, "localhost", 5002);
     connectFunctionsEmulator(functions, "localhost", 5001);
@@ -148,7 +141,6 @@ if (window.location.hostname === "localhost") {
     console.error("Error connecting to Firebase emulators:", error);
   }
 }
-
 export {
   app,
   analytics,

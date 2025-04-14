@@ -6,13 +6,11 @@
         Migrate your progress data from the old TarkovTracker site to this new
         instance.
       </p>
-
       <v-card variant="flat" class="mb-3 migration-card">
         <v-card-text>
           <p class="font-weight-bold mb-3">
             Follow these steps to migrate your data:
           </p>
-
           <div class="migration-steps mb-4">
             <div class="step-item">
               <span class="step-number">1</span>
@@ -49,7 +47,6 @@
               <span class="step-text">Copy the token and paste it below</span>
             </div>
           </div>
-
           <v-text-field
             v-model="apiToken"
             label="API Token from Old Site"
@@ -63,7 +60,6 @@
             :append-inner-icon="showToken ? 'mdi-eye-off' : 'mdi-eye'"
             @click:append-inner="showToken = !showToken"
           ></v-text-field>
-
           <v-text-field
             v-model="oldDomain"
             label="Old Site Domain (Optional)"
@@ -73,7 +69,6 @@
             hint="Only change this if the old site is not on tarkovtracker.io"
             class="mb-4"
           ></v-text-field>
-
           <div class="d-flex justify-space-between align-center">
             <div v-if="fetchingApi">
               <v-progress-circular
@@ -106,7 +101,6 @@
           </div>
         </v-card-text>
       </v-card>
-
       <v-dialog v-model="confirmDialog" max-width="700">
         <v-card>
           <v-card-title class="text-h5 px-4 py-3"
@@ -116,7 +110,6 @@
             <p class="mb-5">
               This will replace your current progress with the imported data:
             </p>
-
             <v-row>
               <v-col cols="12" md="6">
                 <v-card variant="outlined" class="mb-4 pa-1">
@@ -160,7 +153,6 @@
                   </v-list>
                 </v-card>
               </v-col>
-
               <v-col cols="12" md="6">
                 <v-card variant="outlined" class="mb-4 pa-1">
                   <v-card-title class="text-subtitle-1 px-4 py-2"
@@ -216,7 +208,6 @@
                 </v-card>
               </v-col>
             </v-row>
-
             <v-row>
               <v-col cols="12">
                 <v-card variant="outlined" class="pa-1">
@@ -246,7 +237,6 @@
                 </v-card>
               </v-col>
             </v-row>
-
             <p class="mt-5 text-red font-weight-bold">
               Warning: This action cannot be undone!
             </p>
@@ -273,7 +263,6 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
-
       <!-- Add task objectives explanation dialog -->
       <v-dialog v-model="showObjectivesDetails" max-width="500">
         <v-card>
@@ -306,7 +295,6 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
-
       <!-- Failed task details dialog with updated button -->
       <v-dialog v-model="showFailedTaskDetails" max-width="500">
         <v-card>
@@ -347,7 +335,6 @@
     </template>
   </fitted-card>
 </template>
-
 <script setup>
 import { ref, computed } from "vue";
 import { fireuser } from "@/plugins/firebase";
@@ -355,7 +342,6 @@ import { markDataMigrated } from "@/plugins/store-initializer";
 import DataMigrationService from "@/services/DataMigrationService";
 import { useTarkovStore } from "@/stores/tarkov";
 import FittedCard from "@/components/FittedCard.vue";
-
 // API migration variables
 const apiToken = ref("");
 const oldDomain = ref("tarkovtracker.io");
@@ -363,18 +349,14 @@ const apiError = ref("");
 const fetchingApi = ref(false);
 const apiFetchSuccess = ref(false);
 const showToken = ref(false);
-
 // Import confirmation variables
-const importJsonText = ref("");
 const importError = ref("");
 const importing = ref(false);
 const importSuccess = ref(false);
 const confirmDialog = ref(false);
 const importedData = ref(null);
-
 // Get the tarkov store
 const tarkovStore = useTarkovStore();
-
 // Compute the number of completed tasks
 const countCompletedTasks = computed(() => {
   if (!importedData.value || !importedData.value.taskCompletions) {
@@ -384,7 +366,6 @@ const countCompletedTasks = computed(() => {
     (t) => t.complete,
   ).length;
 });
-
 // Compute the number of failed tasks
 const countFailedTasks = computed(() => {
   if (!importedData.value || !importedData.value.taskCompletions) {
@@ -394,7 +375,6 @@ const countFailedTasks = computed(() => {
     (t) => t.failed,
   ).length;
 });
-
 // Compute the number of completed task objectives
 const countTaskObjectives = computed(() => {
   if (!importedData.value || !importedData.value.taskObjectives) {
@@ -402,7 +382,6 @@ const countTaskObjectives = computed(() => {
   }
   return Object.keys(importedData.value.taskObjectives).length;
 });
-
 // Compute the number of completed hideout modules
 const countHideoutModules = computed(() => {
   if (!importedData.value || !importedData.value.hideoutModules) {
@@ -412,7 +391,6 @@ const countHideoutModules = computed(() => {
     (m) => m.complete,
   ).length;
 });
-
 // Compute the number of tracked hideout parts
 const countHideoutParts = computed(() => {
   if (!importedData.value || !importedData.value.hideoutParts) {
@@ -420,11 +398,9 @@ const countHideoutParts = computed(() => {
   }
   return Object.keys(importedData.value.hideoutParts).length;
 });
-
 // Get edition name based on edition number
 const getEditionName = computed(() => {
   if (!importedData.value) return "N/A";
-
   const edition = importedData.value.gameEdition;
   switch (edition) {
     case 1:
@@ -439,19 +415,15 @@ const getEditionName = computed(() => {
       return `Edition ${edition}`;
   }
 });
-
 // Add state for the objectives info dialog
 const showObjectivesDetails = ref(false);
-
 // Add state for the failed tasks dialog
 const showFailedTaskDetails = ref(false);
-
 // Get a list of failed tasks
 const failedTasks = computed(() => {
   if (!importedData.value || !importedData.value.taskCompletions) {
     return [];
   }
-
   return Object.entries(importedData.value.taskCompletions)
     .filter(([_, task]) => task.failed === true)
     .map(([id, task]) => ({
@@ -459,13 +431,11 @@ const failedTasks = computed(() => {
       ...task,
     }));
 });
-
 // Fetch data using an API token
 const fetchWithApiToken = async () => {
   fetchingApi.value = true;
   apiError.value = "";
   apiFetchSuccess.value = false;
-
   try {
     // Validate token format (basic validation)
     if (!apiToken.value || apiToken.value.length < 10) {
@@ -473,24 +443,20 @@ const fetchWithApiToken = async () => {
       fetchingApi.value = false;
       return;
     }
-
     // Call the service to fetch data
     const data = await DataMigrationService.fetchDataWithApiToken(
       apiToken.value,
       oldDomain.value,
     );
-
     if (!data) {
       apiError.value =
         "Failed to fetch data. Please check your token and try again.";
       fetchingApi.value = false;
       return;
     }
-
     // Store the fetched data
     importedData.value = data;
     apiFetchSuccess.value = true;
-
     // Show confirmation dialog
     confirmDialog.value = true;
   } catch (error) {
@@ -500,24 +466,19 @@ const fetchWithApiToken = async () => {
     fetchingApi.value = false;
   }
 };
-
 // Confirm and execute the import
 const confirmImport = async () => {
   importing.value = true;
   importError.value = "";
-
   try {
     const result = await DataMigrationService.importDataToUser(
       fireuser.uid,
       importedData.value,
     );
-
     if (result) {
       importSuccess.value = true;
-
       // Mark as migrated to ensure data persistence
       markDataMigrated();
-
       // Rebind the store to load the imported data
       if (tarkovStore && typeof tarkovStore.firebindAll === "function") {
         tarkovStore.firebindAll();
@@ -539,40 +500,33 @@ const confirmImport = async () => {
   }
 };
 </script>
-
 <style scoped>
 code {
   font-family: monospace;
   white-space: pre-wrap;
 }
-
 .migration-card {
   border: 1px solid rgba(var(--v-theme-primary), 0.2);
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
-
 .info-link {
   color: rgba(var(--v-theme-link), 1);
   text-decoration: none;
 }
-
 .info-link:hover {
   text-decoration: underline;
 }
-
 .migration-steps {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .step-item {
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
-
 .step-number {
   display: flex;
   align-items: center;
@@ -585,7 +539,6 @@ code {
   font-size: 14px;
   font-weight: bold;
 }
-
 .step-text {
   padding-top: 2px;
 }

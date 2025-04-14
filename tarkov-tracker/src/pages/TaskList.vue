@@ -292,21 +292,17 @@ const activeSecondaryView = computed({
     userStore.setTaskSecondaryView(value);
   },
 });
-
 const expandMap = ref([0]);
-
 const hideGlobalTasks = computed({
   get: () => userStore.getHideGlobalTasks,
 });
 const hideNonKappaTasks = computed({
   get: () => userStore.getHideNonKappaTasks,
 });
-
 const activeUserView = computed({
   get: () => userStore.getTaskUserView,
   set: (value) => userStore.setTaskUserView(value),
 });
-
 const {
   tasks,
   maps,
@@ -314,7 +310,6 @@ const {
   loading: tasksLoading,
   disabledTasks,
 } = useTarkovData();
-
 const userViews = computed(() => {
   let views = [];
   views.push({ title: t("page.tasks.userviews.all"), view: "all" });
@@ -334,19 +329,15 @@ const userViews = computed(() => {
       });
     }
   }
-
   return views;
 });
-
 const traderAvatar = (id) => {
   return `/img/traders/${id}.jpg`;
 };
-
 const timeValue = ref("");
 setTimeout(() => {
   timeUpdate();
 }, 500);
-
 function timeUpdate() {
   var oneHour = 60 * 60 * 1000;
   var currentDate = new Date();
@@ -365,20 +356,15 @@ function timeUpdate() {
     tarkovSecondHour.toString().padStart(2, "0") +
     ":" +
     tarkovMinute.toString().padStart(2, "0");
-
   setTimeout(() => {
     timeUpdate();
   }, 3000);
 }
-
 const loadingTasks = computed(() => {
   return tasksLoading.value;
 });
-
 const reloadingTasks = ref(false);
-
 const visibleTasks = shallowRef([]);
-
 const visibleGPS = computed(() => {
   let visibleGPS = [];
 
@@ -389,7 +375,6 @@ const visibleGPS = computed(() => {
   if (activeSecondaryView.value != "available") {
     return [];
   }
-
   for (const task of visibleTasks.value) {
     let unlockedUsers = [];
     Object.entries(progressStore.unlockedTasks[task.id]).forEach(
@@ -429,7 +414,6 @@ const visibleGPS = computed(() => {
   }
   return visibleGPS;
 });
-
 function objectiveHasLocation(objective) {
   if (
     objective?.possibleLocations?.length > 0 ||
@@ -440,10 +424,8 @@ function objectiveHasLocation(objective) {
     return false;
   }
 }
-
 const mapTaskTotals = computed(() => {
   let mapTaskCounts = {};
-
   // Update the task count for each map
   for (const map of maps.value) {
     mapTaskCounts[map.id] = 0;
@@ -473,7 +455,6 @@ const mapTaskTotals = computed(() => {
               }
             }
           }
-
           if (anyObjectiveLeft) {
             mapTaskCounts[map.id]++;
           }
@@ -481,10 +462,8 @@ const mapTaskTotals = computed(() => {
       }
     }
   }
-
   return mapTaskCounts;
 });
-
 const updateVisibleTasks = async function () {
   // Guard clause: Wait until necessary data is loaded/available
   if (tasksLoading.value) {
@@ -493,7 +472,6 @@ const updateVisibleTasks = async function () {
     );
     return; // Exit if core task data isn't loaded
   }
-
   // Guard clause: Ensure userStore getter is available (should always return boolean due to || false)
   // Accessing the computed ref here might trigger dependencies prematurely, check the source directly if possible.
   // We already define `hideNonKappaTasks = computed(...)`, let's trust it exists but check its value source's readiness indirectly
@@ -504,7 +482,6 @@ const updateVisibleTasks = async function () {
     );
     return;
   }
-
   // Guard clause: Ensure disabledTasks ref exists AND its value is an array
   if (!disabledTasks || !Array.isArray(disabledTasks)) {
     console.warn(
@@ -512,7 +489,6 @@ const updateVisibleTasks = async function () {
     );
     return; // Exit if disabledTasks ref or its value isn't ready
   }
-
   // Guard clause: Check critical progressStore computed properties are ready
   // These depend on tasks.value and store state, which might have their own timings.
   if (
@@ -525,13 +501,9 @@ const updateVisibleTasks = async function () {
     );
     return; // Exit if progress store data isn't ready
   }
-
   reloadingTasks.value = true; // Indicate we are starting the actual processing
-
   let visibleTaskList = JSON.parse(JSON.stringify(tasks.value));
-
   console.log(`updateVisibleTasks: Start - ${visibleTaskList.length} tasks`); // LOG START
-
   // First, filter tasks by the primary view
   if (activePrimaryView.value == "maps") {
     visibleTaskList = visibleTaskList.filter((task) => {
@@ -539,7 +511,6 @@ const updateVisibleTasks = async function () {
       const objectiveMapMatch = task.objectives?.some(obj =>
         obj.maps?.some(map => map.id === activeMapView.value)
       );
-
       return primaryMapMatch || objectiveMapMatch;
     });
   } else if (activePrimaryView.value == "traders") {
@@ -547,11 +518,9 @@ const updateVisibleTasks = async function () {
       (task) => task.trader?.id == activeTraderView.value
     );
   }
-
   console.log(
     `updateVisibleTasks: After Primary Filter - ${visibleTaskList.length} tasks`
   ); // LOG AFTER PRIMARY
-
   if (activeUserView.value == "all") {
     // We want to show tasks by their availability to any team member
     if (activeSecondaryView.value == "available") {
@@ -591,7 +560,6 @@ const updateVisibleTasks = async function () {
         );
       });
     }
-
     // Filter out tasks not for the faction of the specified user
     visibleTaskList = visibleTaskList.filter((task) => {
       return (
@@ -603,7 +571,6 @@ const updateVisibleTasks = async function () {
   console.log(
     `updateVisibleTasks: After Secondary/User Filter - ${visibleTaskList.length} tasks`
   ); // LOG AFTER SECONDARY/USER
-
   // Remove any disabled tasks from the view
   visibleTaskList = visibleTaskList.filter(
     (task) =>
@@ -616,7 +583,6 @@ const updateVisibleTasks = async function () {
   console.log(
     `updateVisibleTasks: After Disabled Filter - ${visibleTaskList.length} tasks`
   ); // LOG AFTER DISABLED
-
   // Use optional chaining to safely access .value
   if (hideNonKappaTasks?.value) {
     visibleTaskList = visibleTaskList.filter(
@@ -626,19 +592,15 @@ const updateVisibleTasks = async function () {
   console.log(
     `updateVisibleTasks: After Kappa Filter - ${visibleTaskList.length} tasks`
   ); // LOG AFTER KAPPA
-
   // Finally, map the tasks to their IDs
   //visibleTaskList = visibleTaskList.map((task) => task.id)
-
   // Sort the tasks by their count of successors
   visibleTaskList.sort((a, b) => {
     return b.successors.length - a.successors.length;
   });
-
   reloadingTasks.value = false;
   visibleTasks.value = visibleTaskList;
 };
-
 // Watch for changes that affect visible tasks and update accordingly
 watchEffect(async () => {
   // Explicitly check core readiness *before* calling the main function
@@ -658,13 +620,11 @@ watchEffect(async () => {
     // No need to log here, as the effect will just silently wait.
     return;
   }
-
   // All checks passed, now it's safe to run the full update.
   reloadingTasks.value = true;
   await updateVisibleTasks();
   // reloadingTasks.value = false; // This is handled inside updateVisibleTasks
 });
-
 // Watch for changes to all of the views, and update the visible tasks
 watch(
   [
@@ -683,7 +643,6 @@ watch(
   },
   { immediate: true }
 );
-
 watch(
   () => progressStore.tasksCompletions,
   async () => {
