@@ -136,7 +136,6 @@ if (
       disableWarnings: true,
     });
     connectStorageEmulator(storage, "localhost", 9199);
-    console.log("Firebase emulators connected successfully");
   } catch (error) {
     console.error("Error connecting to Firebase emulators:", error);
   }

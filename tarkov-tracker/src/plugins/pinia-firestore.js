@@ -29,7 +29,6 @@ export function PiniaFireswap(context) {
             context.store.$state
           );
         }
-
         // Create a function to load the local storage version
         context.options.fireswap[fsIndex].loadLocal = function () {
           // Set a lock to prevent a subscribe mutation from firing while we load
@@ -100,7 +99,6 @@ export function PiniaFireswap(context) {
         };
         // Run the loadLocal function at startup
         context.options.fireswap[fsIndex].loadLocal();
-
         // Add the binding
         if (typeof context.store.firebind == "undefined") {
           context.store.firebind = {};
@@ -115,10 +113,8 @@ export function PiniaFireswap(context) {
             (snapshot) => {
               // Create a lock on the store to not trigger re-writes
               context.options.fireswap[fsIndex].lock = true;
-
               // Update the store with the snapshot
               const data = snapshot.data() || {};
-
               // Check if we have a path set, or if we default to the root
               if (fireswapSetting.path && fireswapSetting.path !== ".") {
                 // Set the store to the path
@@ -132,7 +128,6 @@ export function PiniaFireswap(context) {
                   context.store.$patch({ [key]: data[key] });
                 });
               }
-
               // Release the lock on the store
               context.options.fireswap[fsIndex].lock = false;
             },
@@ -152,7 +147,6 @@ export function PiniaFireswap(context) {
             context.store.firebind[key]();
           });
         };
-
         // Add the unbinding
         if (context.store.fireunbind === undefined) {
           context.store.fireunbind = {};
@@ -173,7 +167,6 @@ export function PiniaFireswap(context) {
             context.store.fireunbind[key]();
           });
         };
-
         // Debounced function to update the firestore document a maximum of once every 250ms
         const uploadDocument = debounce(function (state) {
           // Get rid of any undefined values via stringify+parse
@@ -182,7 +175,6 @@ export function PiniaFireswap(context) {
             console.error("Error updating document: ", e);
           });
         }, fireswapSetting.debouncems || 250);
-
         context.store.$subscribe(function (mutation, state) {
           // Update the related document when the state changes
           if (
@@ -241,7 +233,6 @@ export function PiniaFireswap(context) {
 //         } else {
 //           context.options.fireswap[fsIndex].defaultState = JSON.stringify(context.store.$state)
 //         }
-
 //         // Create a function to load the local storage version
 //         context.options.fireswap[fsIndex].loadLocal = function () {
 //           // Set a lock to prevent a subscribe mutation from firing while we load
@@ -289,7 +280,6 @@ export function PiniaFireswap(context) {
 //         }
 //         // Run the loadLocal function at startup
 //         context.options.fireswap[fsIndex].loadLocal()
-
 //         // Add the binding
 //         if (typeof context.store.firebind == 'undefined') {
 //           context.store.firebind = {}
@@ -304,10 +294,8 @@ export function PiniaFireswap(context) {
 //           //   (snapshot) => {
 //           //     // Create a lock on the store to not trigger re-writes
 //           //     context.options.fireswap[fsIndex].lock = true
-
 //           //     // Update the store with the snapshot
 //           //     const data = snapshot.data() || {}
-
 //           //     // Check if we have a path set, or if we default to the root
 //           //     if (fireswapSetting.path && fireswapSetting.path !== '.') {
 //           //       // Set the store to the path
@@ -321,7 +309,6 @@ export function PiniaFireswap(context) {
 //           //         context.store.$patch({ [key]: data[key] })
 //           //       })
 //           //     }
-
 //           //     // Release the lock on the store
 //           //     context.options.fireswap[fsIndex].lock = false
 //           //   }, (error) => {
@@ -335,7 +322,6 @@ export function PiniaFireswap(context) {
 //             context.store.firebind[key]()
 //           })
 //         }
-
 //         // Add the unbinding
 //         if (context.store.fireunbind === undefined) {
 //           context.store.fireunbind = {}
@@ -354,7 +340,6 @@ export function PiniaFireswap(context) {
 //             context.store.fireunbind[key]()
 //           })
 //         }
-
 //         // Debounced function to update the firestore document a maximum of once every 250ms
 //         const uploadDocument = debounce(function (state) {
 //           // Get rid of any undefined values via stringify+parse
@@ -367,7 +352,6 @@ export function PiniaFireswap(context) {
 //             }
 //           })
 //         }, fireswapSetting.debouncems || 250)
-
 //         context.store.$subscribe(function (mutation, state) {
 //           // Update the related document when the state changes
 //           if (typeof context.options.fireswap[fsIndex].unsubscribe != 'undefined' && !context.options.fireswap[fsIndex].lock) {
