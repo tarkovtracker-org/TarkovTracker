@@ -48,6 +48,4 @@ setTimeout(() => {
     .mount("#app");
   // Ensure the store system is marked as initialized
   markInitialized();
-  // Log that app initialization is complete
-  console.log("Vue app initialized successfully");
 }, 100);
