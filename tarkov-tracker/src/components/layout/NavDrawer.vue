@@ -4,7 +4,7 @@
     theme="dark"
     image="/img/sidebar-background.webp"
     :rail="appStore.drawerUseRail(mdAndDown)"
-    :width="appStore.drawerUseRail(mdAndDown) ? 56 : 180"
+    :width="appStore.drawerUseRail(mdAndDown) ? 56 : 200"
     class="compact-nav-drawer"
   >
     <tracker-logo />
@@ -25,20 +25,20 @@ import { useDisplay } from "vuetify";
 const { mdAndDown } = useDisplay();
 const appStore = useAppStore();
 // Set up component loading
-const TrackerLogo = defineAsyncComponent(() =>
-  import("@/components/drawer/TrackerLogo.vue")
+const TrackerLogo = defineAsyncComponent(
+  () => import("@/components/drawer/TrackerLogo.vue"),
 );
-const DrawerLinks = defineAsyncComponent(() =>
-  import("@/components/drawer/DrawerLinks.vue")
+const DrawerLinks = defineAsyncComponent(
+  () => import("@/components/drawer/DrawerLinks.vue"),
 );
-const DrawerAccount = defineAsyncComponent(() =>
-  import("@/components/drawer/DrawerAccount.vue")
+const DrawerAccount = defineAsyncComponent(
+  () => import("@/components/drawer/DrawerAccount.vue"),
 );
-const DrawerLevel = defineAsyncComponent(() =>
-  import("@/components/drawer/DrawerLevel.vue")
+const DrawerLevel = defineAsyncComponent(
+  () => import("@/components/drawer/DrawerLevel.vue"),
 );
-const DrawerExternalLinks = defineAsyncComponent(() =>
-  import("@/components/drawer/DrawerExternalLinks.vue")
+const DrawerExternalLinks = defineAsyncComponent(
+  () => import("@/components/drawer/DrawerExternalLinks.vue"),
 );
 </script>
 <style lang="scss" scoped>
@@ -50,5 +50,5 @@ const DrawerExternalLinks = defineAsyncComponent(() =>
   /* Remove width: auto, use fixed width for proper collapse */
   box-sizing: border-box !important;
 }
-
 </style>
+

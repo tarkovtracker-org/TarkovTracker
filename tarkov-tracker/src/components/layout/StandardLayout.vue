@@ -71,3 +71,4 @@ const AppBar = defineAsyncComponent(() =>
   flex: 1;
 }
 </style>
+

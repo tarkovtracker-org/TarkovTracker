@@ -1,5 +1,9 @@
 <template>
-  <v-footer class="px-0 py-1 d-flex" color="transparent" style="min-height: auto !important; height: auto !important;">
+  <v-footer
+    class="px-0 py-1 d-flex"
+    color="transparent"
+    style="min-height: auto !important; height: auto !important"
+  >
     <v-container class="text-center footer-background mx-0">
       <v-row justify="center" style="font-size: 12px">
         <v-col cols="12" md="4" align-self="center">
@@ -40,7 +44,10 @@
             </i18n-t>
           </div>
           <div class="mt-1">
-            <i18n-t keypath="footer.call_to_action.github_phrase">
+            <i18n-t
+              keypath="footer.call_to_action.github_phrase"
+              scope="global"
+            >
               <template #github>
                 <a
                   href="https://github.com/DysektAI/TarkovTracker"
@@ -79,7 +86,7 @@
 </template>
 <script setup>
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+const { t } = useI18n({ useScope: "global" });
 </script>
 <style lang="scss" scoped>
 .footer-background {

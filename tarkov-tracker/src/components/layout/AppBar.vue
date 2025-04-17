@@ -62,7 +62,7 @@ import { useRoute } from "vue-router";
 import { reactive } from "vue";
 import { useTarkovData } from "@/composables/tarkovdata.js";
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+const { t } = useI18n({ useScope: 'global' });
 const state = reactive({ menu: null });
 const appStore = useAppStore();
 const route = useRoute();
@@ -88,3 +88,4 @@ function changeNavigationDrawer() {
   }
 }
 </script>
+
