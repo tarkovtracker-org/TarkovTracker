@@ -6,7 +6,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useTarkovData } from "@/composables/tarkovdata";
 import { useRouter } from "vue-router";
-const { t } = useI18n();
+const { t } = useI18n({ useScope: 'global' });
 const { loading, hideoutLoading } = useTarkovData();
 const router = useRouter();
 const refreshEnabled = ref(false);
@@ -21,3 +21,4 @@ const refresh = () => {
 };
 </script>
 <style lang="scss" scoped></style>
+

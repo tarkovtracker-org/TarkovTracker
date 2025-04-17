@@ -24,3 +24,4 @@ const IconCard = defineAsyncComponent(() =>
 );
 </script>
 <style lang="scss" scoped></style>
+

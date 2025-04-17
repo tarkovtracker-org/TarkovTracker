@@ -3,7 +3,10 @@
     <v-row>
       <v-col cols="12">
         <template v-if="props.map?.svg?.floors?.length > 0">
-          <template v-for="floor in props.map.svg.floors" :key="floorIndex">
+          <template
+            v-for="(floor, floorIndex) in props.map.svg.floors"
+            :key="floorIndex"
+          >
             <v-btn
               variant="tonal"
               :color="floor == selectedFloor ? 'green' : ''"
@@ -136,3 +139,4 @@ onMounted(() => {
 });
 </script>
 <style lang="scss" scoped></style>
+

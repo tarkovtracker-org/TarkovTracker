@@ -177,7 +177,6 @@ const getTarkovStore = async () => {
 };
 // Force show migration dialog (for debugging)
 const forceShowMigrationDialog = () => {
-  console.warn("FORCING MIGRATION DIALOG TO SHOW");
   userId.value = fireuser.uid || "debug-user";
   showMigrationDialog.value = true;
   emit("migration-dialog-shown");
@@ -190,7 +189,6 @@ onMounted(async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     // Check for local data
     hasLocalData.value = DataMigrationService.hasLocalData();
-    console.log("Auth component mounted, hasLocalData:", hasLocalData.value);
     // If a user is already logged in and we need to show the migration dialog
     if (fireuser.uid) {
       userId.value = fireuser.uid;
@@ -221,9 +219,6 @@ const preventFirebaseBinding = async () => {
     }
     // Check if the store has a fireunbindAll method (from pinia-firestore)
     if (store?.fireunbindAll && typeof store.fireunbindAll === "function") {
-      console.log(
-        "Temporarily unbinding store from Firebase to preserve local data",
-      );
       store.fireunbindAll();
     } else {
       console.warn("tarkovStore.fireunbindAll is not available");
@@ -236,16 +231,12 @@ const checkUserDataAndShowMigration = async (uid) => {
   try {
     // Check if there's local data to migrate
     const hasLocalData = DataMigrationService.hasLocalData();
-    console.log("Has local data:", hasLocalData);
     if (hasLocalData) {
-      console.log("Local data:", DataMigrationService.getLocalData());
       // First, prevent automatic binding to Firebase to preserve local data
       await preventFirebaseBinding();
       // Check if user already has data in their account
       const hasUserData = await DataMigrationService.hasUserData(uid);
-      console.log("Has user data:", hasUserData);
       if (!hasUserData) {
-        console.log("Showing migration dialog for user:", uid);
         userId.value = uid;
         showMigrationDialog.value = true;
         emit("migration-dialog-shown");
@@ -266,22 +257,17 @@ const checkUserDataAndShowMigration = async (uid) => {
   }
 };
 const handleAuthSuccess = async (user) => {
-  console.log("Auth success handler called with user:", user.uid);
   userId.value = user.uid;
   try {
     // Check if there's local data to migrate
     const hasLocalData = DataMigrationService.hasLocalData();
-    console.log("Has local data:", hasLocalData);
     if (hasLocalData) {
-      console.log("Local data:", DataMigrationService.getLocalData());
       // First, prevent automatic binding to Firebase to preserve local data
       await preventFirebaseBinding();
       // Check if user already has data in their account
       const hasUserData = await DataMigrationService.hasUserData(user.uid);
-      console.log("Has user data:", hasUserData);
       if (!hasUserData) {
         // SHOW THE DIALOG INSTEAD OF AUTO-MIGRATING
-        console.log("Showing migration dialog for user:", user.uid);
         userId.value = user.uid;
         showMigrationDialog.value = true;
         emit("migration-dialog-shown");
@@ -330,7 +316,6 @@ const handleAuthSuccess = async (user) => {
               document
                 .getElementById("migrate-btn")
                 .addEventListener("click", async () => {
-                  console.log("Manual migration button clicked");
                   const result = await DataMigrationService.migrateDataToUser(
                     user.uid,
                   );
@@ -347,7 +332,6 @@ const handleAuthSuccess = async (user) => {
               document
                 .getElementById("fresh-btn")
                 .addEventListener("click", async () => {
-                  console.log("Start fresh button clicked");
                   const store = await getTarkovStore();
                   if (store && typeof store.firebindAll === "function") {
                     store.firebindAll();
@@ -362,7 +346,6 @@ const handleAuthSuccess = async (user) => {
       }
     }
     // Only redirect if we're not showing the dialog
-    console.log("No migration needed, redirecting to home");
     router.push("/");
   } catch (error) {
     console.error("Error in handleAuthSuccess:", error);
@@ -374,7 +357,6 @@ const handleAuthSuccess = async (user) => {
   }
 };
 const onMigrationDialogClose = () => {
-  console.log("Migration dialog closed");
   showMigrationDialog.value = false;
   emit("migration-dialog-closed");
   router.push("/");
@@ -457,3 +439,4 @@ const signInWithGithub = async () => {
   font-size: 12px;
 }
 </style>
+

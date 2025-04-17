@@ -175,3 +175,4 @@ const tooltipStyle = computed(() => {
   width: 100%;
 }
 </style>
+

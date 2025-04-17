@@ -28,7 +28,7 @@
 <script setup>
 import { useUserStore } from "@/stores/user.js";
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+const { t } = useI18n({ useScope: 'global' });
 const props = defineProps({
   icon: {
     type: String,
@@ -57,3 +57,4 @@ const hideTip = () => {
 };
 </script>
 <style lang="scss" scoped></style>
+
