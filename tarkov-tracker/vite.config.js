@@ -12,14 +12,18 @@ export default defineConfig({
     },
   },
   define: {
-    // Enable / disable compatibility flags
-    // -> https://v3-migration.vuejs.org/breaking-changes/runtime-compiler.html#compat-configuration
     __VUE_OPTIONS_API__: "true",
     __VUE_PROD_DEVTOOLS__: "false",
     __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: "false",
   },
   build: {
     sourcemap: true,
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
   },
   plugins: [
     vue(),
@@ -29,6 +33,6 @@ export default defineConfig({
     vuetify({ autoImport: true }),
   ],
   server: {
-    port: 5173, // Default Vite port
+    port: 3000,
   },
 });
