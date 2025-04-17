@@ -52,7 +52,7 @@ const props = defineProps({
   },
 });
 useTarkovData();
-const { t } = useI18n();
+const { t } = useI18n({ useScope: 'global' });
 // Check if there are two faction tasks for this task
 const isFactionTask = computed(() => {
   return props.task?.factionName != "Any";
@@ -85,3 +85,4 @@ a:any-link {
   white-space: nowrap;
 }
 </style>
+

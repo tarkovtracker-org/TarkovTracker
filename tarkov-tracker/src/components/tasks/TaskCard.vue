@@ -38,7 +38,7 @@
                   <v-icon icon="mdi-menu-right" />
                 </v-col>
                 <v-col>
-                  <i18n-t keypath="page.tasks.questcard.level">
+                  <i18n-t keypath="page.tasks.questcard.level" scope="global">
                     <template #count>
                       {{ props.task.minPlayerLevel }}
                     </template>
@@ -50,7 +50,10 @@
                   <v-icon icon="mdi-lock-open-outline" />
                 </v-col>
                 <v-col>
-                  <i18n-t keypath="page.tasks.questcard.lockedbefore">
+                  <i18n-t
+                    keypath="page.tasks.questcard.lockedbefore"
+                    scope="global"
+                  >
                     <template #count>
                       {{ lockedBefore }}
                     </template>
@@ -62,7 +65,10 @@
                   <v-icon icon="mdi-lock" />
                 </v-col>
                 <v-col>
-                  <i18n-t keypath="page.tasks.questcard.lockedbehind">
+                  <i18n-t
+                    keypath="page.tasks.questcard.lockedbehind"
+                    scope="global"
+                  >
                     <template #count>
                       {{ lockedBehind }}
                     </template>
@@ -128,6 +134,7 @@
                     <i18n-t
                       keypath="page.tasks.questcard.keysneeded"
                       :plural="keyMap.keys.length"
+                      scope="global"
                     >
                       <template #keys>
                         <span
@@ -163,24 +170,17 @@
                 <task-objective :objective="objective" />
               </v-col>
               <v-col
-                v-if="
-                  relevantViewObjectives.length != props.task.objectives.length
-                "
+                v-if="irrelevantObjectives.length > 0"
                 cols="12"
                 class="pa-1 hidden-objectives"
               >
                 <v-icon size="x-small" class="mr-1">mdi-eye-off</v-icon>
                 <i18n-t
                   keypath="page.tasks.questcard.objectiveshidden"
-                  :plural="
-                    props.task.objectives.length - relevantViewObjectives.length
-                  "
+                  :plural="irrelevantObjectives.length"
                 >
                   <template #count>
-                    {{
-                      props.task.objectives.length -
-                      relevantViewObjectives.length
-                    }}
+                    {{ irrelevantObjectives.length }}
                   </template>
                   <template #uncompleted>
                     {{ uncompletedIrrelevantObjectives.length }}
@@ -351,19 +351,19 @@ const props = defineProps({
     required: true,
   },
 });
-const { t } = useI18n();
+const { t } = useI18n({ useScope: "global" });
 const tarkovStore = useTarkovStore();
 const progressStore = useProgressStore();
 const userStore = useUserStore();
 const { tasks } = useTarkovData();
-const TaskLink = defineAsyncComponent(() =>
-  import("@/components/tasks/TaskLink.vue")
+const TaskLink = defineAsyncComponent(
+  () => import("@/components/tasks/TaskLink.vue"),
 );
-const TaskObjective = defineAsyncComponent(() =>
-  import("@/components/tasks/TaskObjective.vue")
+const TaskObjective = defineAsyncComponent(
+  () => import("@/components/tasks/TaskObjective.vue"),
 );
-const TarkovItem = defineAsyncComponent(() =>
-  import("@/components/TarkovItem.vue")
+const TarkovItem = defineAsyncComponent(
+  () => import("@/components/TarkovItem.vue"),
 );
 const { xs } = useDisplay();
 const isComplete = computed(() => {
@@ -393,19 +393,55 @@ const lockedBehind = computed(() => {
 const lockedBefore = computed(() => {
   // Calculate how many of the predecessors are uncompleted
   return props.task.predecessors.filter(
-    (s) => !tarkovStore.isTaskComplete(s.id)
+    (s) => !tarkovStore.isTaskComplete(s.id),
   ).length;
 });
 const nonKappa = computed(() => {
   return !props.task.kappaRequired;
 });
+const mapObjectiveTypes = [
+  "mark",
+  "zone",
+  "extract",
+  "visit",
+  "findItem",
+  "findQuestItem",
+  "plantItem",
+  "plantQuestItem",
+  "shoot",
+];
 const relevantViewObjectives = computed(() => {
   if (onMapView.value) {
-    return props.task.objectives.filter((o) =>
-      o?.maps.includes(userStore.getTaskMapView)
-    );
+    return props.task.objectives.filter((o) => {
+      // If the objective has a maps array, check if it includes the current map and is a map objective
+      if (Array.isArray(o.maps) && o.maps.length > 0) {
+        return (
+          o.maps.some((m) => m.id === userStore.getTaskMapView) &&
+          mapObjectiveTypes.includes(o.type)
+        );
+      }
+      // If the objective has no maps array or it's empty, treat as relevant (e.g. hand over, extract, etc.)
+      return true;
+    });
   } else {
     return props.task.objectives;
+  }
+});
+const irrelevantObjectives = computed(() => {
+  if (onMapView.value) {
+    return props.task.objectives.filter((o) => {
+      // If the objective has a maps array, and it does NOT include the current map and is a map objective, it's irrelevant
+      if (Array.isArray(o.maps) && o.maps.length > 0) {
+        return !(
+          o.maps.some((m) => m.id === userStore.getTaskMapView) &&
+          mapObjectiveTypes.includes(o.type)
+        );
+      }
+      // If the objective has no maps array or it's empty, treat as relevant (not irrelevant)
+      return false;
+    });
+  } else {
+    return [];
   }
 });
 const factionImage = computed(() => {
@@ -413,7 +449,11 @@ const factionImage = computed(() => {
 });
 const uncompletedIrrelevantObjectives = computed(() => {
   return props.task.objectives
-    .filter((o) => !o?.maps.includes(userStore.getTaskMapView))
+    .filter(
+      (o) =>
+        !o?.maps?.some((m) => m.id === userStore.getTaskMapView) ||
+        !mapObjectiveTypes.includes(o.type),
+    )
     .filter((o) => !tarkovStore.isTaskObjectiveComplete(o.id));
 });
 const onMapView = computed(() => {
