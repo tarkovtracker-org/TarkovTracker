@@ -56,10 +56,10 @@
       showing_all_sources: "Afficher toutes les sources",
       loading: "Chargement des quêtes",
       questcard: {
-        level: "Niveau {count}",
+        level: "Niveau requis : {count}",
         wiki: "Wiki",
-        lockedbefore: "{count} avant",
-        lockedbehind: "{count} derrière",
+        lockedbefore: "Quêtes avant : {count}",
+        lockedbehind: "Quêtes après : {count}",
         completebutton: "Terminer",
         availablebutton: "Disponible",
         uncompletebutton: "Annuler",
@@ -284,7 +284,7 @@
     },
     welcomett3: {
       title: "Bienvenue sur TarkovTracker 3!",
-      description: "Bienvenue dans TarkovTracker version 3 ! Il s'agit d'une réécriture complète du TarkovTracker original. De nouvelles fonctionnalités sont ajoutées à chaque wipe ! Veuillez signaler tout bug que vous trouvez sur Discord.",
+      description: "Bienvenue dans TarkovTracker version 3 ! Il s'agit d'une réécriture complète du TarkovTracker original. De nouvelles fonctionnalités sont ajoutées à chaque wipe ! Veuillez signaler tout bug que vous trouvez sur Discord.",
     },
     login: {
       title: "Login",
@@ -292,11 +292,11 @@
     },
     hideout: {
       title: "Planque",
-      description: "Vous pouvez marquer les progrès vers la construction et l’amélioration de votre cachette. La progression que vous marquez sera utilisée pour calculer les éléments nécessaires à votre cachette.",
+      description: "Vous pouvez marquer les progrès vers la construction et l'amélioration de votre cachette. La progression que vous marquez sera utilisée pour calculer les éléments nécessaires à votre cachette.",
     },
     neededitems: {
       title: "Objets requis",
-      description: "Ici, vous pouvez voir les éléments dont vous aurez besoin à l'avenir pour les tâches et les mises à niveau de votre cachette. Vous pouvez marquer les éléments au fur et à mesure que vous les récupérez pour savoir combien d’autres vous avez besoin.",
+      description: "Ici, vous pouvez voir les éléments dont vous aurez besoin à l'avenir pour les tâches et les mises à niveau de votre cachette. Vous pouvez marquer les éléments au fur et à mesure que vous les récupérez pour savoir combien d'autres vous avez besoin.",
     },
     teammembers: {
       title: "Membre de l'équipe",

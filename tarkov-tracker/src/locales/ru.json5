@@ -56,10 +56,10 @@
       showing_all_sources: "Показать все источники",
       loading: "Загружаем задания",
       questcard: {
-        level: "Уровнь {count}",
+        level: "Требуемый уровень: {count}",
         wiki: "Wiki страница",
-        lockedbefore: "{count} перед",
-        lockedbehind: "{count} после",
+        lockedbefore: "Заданий до: {count}",
+        lockedbehind: "Заданий после: {count}",
         completebutton: "Завершено",
         availablebutton: "Отметить Доступным",
         uncompletebutton: "Отметить Не Завершенным",

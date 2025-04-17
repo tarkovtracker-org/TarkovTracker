@@ -53,10 +53,10 @@
       showing_all_sources: "Mostrar todas las fuentes",
       loading: "Cargando misiones",
       questcard: {
-        level: "Nivel {count}",
+        level: "Nivel requerido: {count}",
         wiki: "Wiki",
-        lockedbefore: "{count} antes",
-        lockedbehind: "{count} después",
+        lockedbefore: "Misiones antes: {count}",
+        lockedbehind: "Misiones después: {count}",
         completebutton: "Completar",
         availablebutton: "Marcar como disponible",
         uncompletebutton: "Marcar como no completado",

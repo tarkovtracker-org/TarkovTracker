@@ -56,10 +56,10 @@
       showing_all_sources: "Showing all sources",
       loading: "Loading tasks",
       questcard: {
-        level: "Level {count}",
+        level: "Level Required: {count}",
         wiki: "Wiki page",
-        lockedbefore: "{count} before",
-        lockedbehind: "{count} behind",
+        lockedbefore: "Tasks Before: {count}",
+        lockedbehind: "Tasks Locked Behind: {count}",
         completebutton: "Complete",
         availablebutton: "Mark Available",
         uncompletebutton: "Mark Uncompleted",
