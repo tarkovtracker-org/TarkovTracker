@@ -1,5 +1,12 @@
 <template>
-  <v-container class="h-100 pb-0 mb-0" style="min-height: calc(100vh - 210px); margin-bottom: 0 !important; padding-bottom: 0 !important;">
+  <v-container
+    class="h-100 pb-0 mb-0"
+    style="
+      min-height: calc(100vh - 210px);
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    "
+  >
     <v-row justify="center">
       <v-col v-if="fireuser.loggedIn" cols="12" sm="12" md="12" lg="12" xl="12">
         <fitted-card icon="mdi-key-chain" icon-color="white">

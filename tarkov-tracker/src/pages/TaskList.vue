@@ -2,8 +2,7 @@
   <tracker-tip tip="tasks"></tracker-tip>
   <v-container>
     <v-row dense>
-      <v-col lg="4" md="12">
-        <!-- Primary views (all, maps, traders) -->
+      <v-col cols="12">
         <v-card>
           <v-tabs
             v-model="activePrimaryView"
@@ -23,22 +22,9 @@
           </v-tabs>
         </v-card>
       </v-col>
-      <v-col v-show="activePrimaryView == 'all'" lg="8" md="12">
-        <!-- The user has selected all quests, no need to filter by a sub-category -->
-        <v-card>
-          <v-tabs
-            bg-color="accent"
-            slider-color="secondary"
-            align-tabs="center"
-          >
-            <v-tab value="all">
-              {{ t("page.tasks.showing_all_sources") }}
-            </v-tab>
-          </v-tabs>
-        </v-card>
-      </v-col>
-      <v-col v-show="activePrimaryView == 'maps'" lg="8" md="12">
-        <!-- The user has selected quests by map -->
+    </v-row>
+    <v-row dense v-if="activePrimaryView == 'maps'">
+      <v-col cols="12">
         <v-card>
           <v-tabs
             v-model="activeMapView"
@@ -48,31 +34,37 @@
             show-arrows
           >
             <v-tab
-              v-for="(map, index) in maps"
+              v-for="(map, index) in mergedMaps"
               :key="index"
-              :value="map.id"
+              :value="map.mergedIds ? map.mergedIds[0] : map.id"
               prepend-icon="mdi-compass"
             >
-              <template v-if="mapTaskTotals[map.id] > 0">
-                <v-badge
-                  color="secondary"
-                  :content="mapTaskTotals[map.id]"
-                  :label="String(mapTaskTotals[map.id])"
-                  offset-y="-5"
-                  offset-x="-10"
-                >
-                  {{ map.name }}
-                </v-badge>
-              </template>
-              <template v-else>
+              <v-badge
+                :color="
+                  mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id] > 0
+                    ? 'secondary'
+                    : 'grey'
+                "
+                :content="
+                  mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id]
+                "
+                :label="
+                  String(
+                    mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id],
+                  )
+                "
+                offset-y="-5"
+                offset-x="-10"
+              >
                 {{ map.name }}
-              </template>
+              </v-badge>
             </v-tab>
           </v-tabs>
         </v-card>
       </v-col>
-      <v-col v-show="activePrimaryView == 'traders'" lg="8" md="12">
-        <!-- The user has selected quests by trader -->
+    </v-row>
+    <v-row dense v-else-if="activePrimaryView == 'traders'">
+      <v-col cols="12">
         <v-card>
           <v-tabs
             v-model="activeTraderView"
@@ -82,7 +74,7 @@
             show-arrows
           >
             <v-tab
-              v-for="(trader, index) in traders"
+              v-for="(trader, index) in orderedTraders"
               :key="index"
               :value="trader.id"
             >
@@ -162,11 +154,7 @@
       </v-col>
     </v-row>
     <v-row v-show="!loadingTasks && !reloadingTasks" justify="center">
-      <v-col
-        v-if="activePrimaryView == 'maps' && visibleGPS.length > 0"
-        cols="12"
-        class="my-1"
-      >
+      <v-col v-if="activePrimaryView == 'maps'" cols="12" class="my-1">
         <v-expansion-panels v-model="expandMap">
           <v-expansion-panel>
             <v-expansion-panel-title
@@ -176,10 +164,7 @@
               ></v-expansion-panel-title
             >
             <v-expansion-panel-text>
-              <tarkov-map
-                :map="maps.find((m) => m.id == activeMapView)"
-                :marks="visibleGPS"
-              />
+              <tarkov-map :map="selectedMergedMap" :marks="visibleGPS" />
             </v-expansion-panel-text>
           </v-expansion-panel>
         </v-expansion-panels>
@@ -214,17 +199,17 @@ import { useTarkovData } from "@/composables/tarkovdata";
 import { useProgressStore } from "@/stores/progress";
 import { useTarkovStore } from "@/stores/tarkov";
 
-const TrackerTip = defineAsyncComponent(() =>
-  import("@/components/TrackerTip.vue")
+const TrackerTip = defineAsyncComponent(
+  () => import("@/components/TrackerTip.vue"),
 );
-const TaskCard = defineAsyncComponent(() =>
-  import("@/components/tasks/TaskCard.vue")
+const TaskCard = defineAsyncComponent(
+  () => import("@/components/tasks/TaskCard.vue"),
 );
-const RefreshButton = defineAsyncComponent(() =>
-  import("@/components/RefreshButton.vue")
+const RefreshButton = defineAsyncComponent(
+  () => import("@/components/RefreshButton.vue"),
 );
-const TarkovMap = defineAsyncComponent(() =>
-  import("@/components/TarkovMap.vue")
+const TarkovMap = defineAsyncComponent(
+  () => import("@/components/TarkovMap.vue"),
 );
 const { t } = useI18n({ useScope: "global" });
 const userStore = useUserStore();
@@ -384,7 +369,7 @@ const visibleGPS = computed(() => {
         if (unlocked) {
           unlockedUsers.push(teamId);
         }
-      }
+      },
     );
     // For each objective
     for (const objective of task.objectives) {
@@ -395,7 +380,7 @@ const visibleGPS = computed(() => {
           // Find the users that have the task unlocked
           var users = unlockedUsers.filter(
             (user) =>
-              progressStore.objectiveCompletions[objective.id][user] == false
+              progressStore.objectiveCompletions[objective.id][user] == false,
           );
           if (users) {
             // Were a valid, unlocked, uncompleted objective, so add it to the list
@@ -426,39 +411,114 @@ function objectiveHasLocation(objective) {
     return false;
   }
 }
+
+// --- Merge Ground Zero and Ground Zero 21+ into a single map tab ---
+const groundZeroNames = ["Ground Zero", "Ground Zero 21+"];
+const factoryNames = ["Factory", "Night Factory"];
+const mergedMaps = computed(() => {
+  // Merge Ground Zero
+  const gzMaps = maps.value.filter((m) => groundZeroNames.includes(m.name));
+  let merged = [];
+  if (gzMaps.length === 2) {
+    const base = gzMaps.find((m) => m.name === "Ground Zero");
+    const plus = gzMaps.find((m) => m.name === "Ground Zero 21+");
+    merged.push({
+      ...base,
+      mergedIds: [base.id, plus.id],
+      name: base.name,
+      displayName: "Ground Zero (all levels)",
+    });
+  } else {
+    merged.push(...gzMaps);
+  }
+  // Merge Factory (only if both exist)
+  const factoryMaps = maps.value.filter((m) => factoryNames.includes(m.name));
+  if (factoryMaps.length === 2) {
+    const base = factoryMaps.find((m) => m.name === "Factory");
+    const night = factoryMaps.find((m) => m.name === "Night Factory");
+    merged.push({
+      ...base,
+      mergedIds: [base.id, night.id],
+      name: "Factory",
+      displayName: "Factory",
+    });
+  } else {
+    merged.push(...factoryMaps);
+  }
+  // Add all other maps that are not merged
+  const mergedNames = [...groundZeroNames, ...factoryNames];
+  merged.push(...maps.value.filter((m) => !mergedNames.includes(m.name)));
+  // Failsafe: Only show the merged Factory tab, never 'Night Factory' or duplicate 'Factory'
+  const filtered = merged.filter((m) => {
+    if (m.name === "Factory" && m.mergedIds) return true; // keep merged Factory
+    if (m.name === "Ground Zero" && m.mergedIds) return true; // keep merged Ground Zero
+    if (m.name === "Night Factory") return false; // always hide Night Factory
+    return true; // show unmerged Factory or Ground Zero if only one exists
+  });
+  // Sort alphabetically by name
+  return filtered.sort((a, b) => a.name.localeCompare(b.name));
+});
+
+// Helper to get the merged map object if selected
+const selectedMergedMap = computed(() => {
+  return mergedMaps.value.find((m) => {
+    if (m.mergedIds) return m.mergedIds.includes(activeMapView.value);
+    return m.id === activeMapView.value;
+  });
+});
+
 const mapTaskTotals = computed(() => {
   let mapTaskCounts = {};
-  // Update the task count for each map
-  for (const map of maps.value) {
-    mapTaskCounts[map.id] = 0;
+  for (const map of mergedMaps.value) {
+    // If merged, count for both IDs
+    const ids = map.mergedIds || [map.id];
+    mapTaskCounts[ids[0]] = 0;
     for (const task of tasks.value) {
-      if (disabledTasks.includes(task.id)) {
-        continue;
+      if (disabledTasks.includes(task.id)) continue;
+      if (hideGlobalTasks.value && !task.map) continue;
+      if (hideNonKappaTasks?.value && task.kappaRequired !== true) continue;
+      let taskLocations = Array.isArray(task.locations) ? task.locations : [];
+      if (taskLocations.length === 0 && Array.isArray(task.objectives)) {
+        for (const obj of task.objectives) {
+          if (Array.isArray(obj.maps)) {
+            for (const objMap of obj.maps) {
+              if (objMap && objMap.id && !taskLocations.includes(objMap.id)) {
+                taskLocations.push(objMap.id);
+              }
+            }
+          }
+        }
       }
-      if (hideGlobalTasks.value && task.map == null) {
-        continue;
-      }
-      if (Array.isArray(task.locations) && task.locations.includes(map.id)) {
-        if (
-          (activeUserView.value == "all" &&
-            Object.values(progressStore.unlockedTasks[task.id]).some(
-              (unlocked) => unlocked
-            )) ||
-          progressStore.unlockedTasks[task.id][activeUserView.value]
-        ) {
+      // If any of the merged IDs are present
+      if (ids.some((id) => taskLocations.includes(id))) {
+        // Check if task is available for the user
+        const unlocked =
+          activeUserView.value == "all"
+            ? Object.values(progressStore.unlockedTasks[task.id] || {}).some(
+                Boolean,
+              )
+            : progressStore.unlockedTasks[task.id]?.[activeUserView.value];
+        if (unlocked) {
           let anyObjectiveLeft = false;
-          for (const objective of task.objectives) {
-            if (objective.maps.includes(map.id)) {
-              if (
-                progressStore.objectiveCompletions[objective.id].self !== true
-              ) {
+          for (const objective of task.objectives || []) {
+            if (
+              Array.isArray(objective.maps) &&
+              objective.maps.some((m) => ids.includes(m.id))
+            ) {
+              const completions =
+                progressStore.objectiveCompletions[objective.id] || {};
+              const isComplete =
+                activeUserView.value == "all"
+                  ? Object.values(completions).every(Boolean)
+                  : completions[activeUserView.value] === true;
+              if (!isComplete) {
                 anyObjectiveLeft = true;
                 break;
               }
             }
           }
           if (anyObjectiveLeft) {
-            mapTaskCounts[map.id]++;
+            mapTaskCounts[ids[0]]++;
           }
         }
       }
@@ -466,11 +526,23 @@ const mapTaskTotals = computed(() => {
   }
   return mapTaskCounts;
 });
+
+const mapObjectiveTypes = [
+  "mark",
+  "zone",
+  "extract",
+  "visit",
+  "findItem",
+  "findQuestItem",
+  "plantItem",
+  "plantQuestItem",
+  "shoot",
+];
 const updateVisibleTasks = async function () {
   // Guard clause: Wait until necessary data is loaded/available
   if (tasksLoading.value) {
     console.warn(
-      "updateVisibleTasks: TarkovData (tasks) still loading, deferring update."
+      "updateVisibleTasks: TarkovData (tasks) still loading, deferring update.",
     );
     return; // Exit if core task data isn't loaded
   }
@@ -480,14 +552,14 @@ const updateVisibleTasks = async function () {
   // A simple check on tasks.value existing is a good proxy for data readiness post-loading
   if (!tasks.value) {
     console.warn(
-      "updateVisibleTasks: tasks.value is not ready, deferring update."
+      "updateVisibleTasks: tasks.value is not ready, deferring update.",
     );
     return;
   }
   // Guard clause: Ensure disabledTasks ref exists AND its value is an array
   if (!disabledTasks || !Array.isArray(disabledTasks)) {
     console.warn(
-      "updateVisibleTasks: disabledTasks ref or its value is not ready, deferring update."
+      "updateVisibleTasks: disabledTasks ref or its value is not ready, deferring update.",
     );
     return; // Exit if disabledTasks ref or its value isn't ready
   }
@@ -499,60 +571,80 @@ const updateVisibleTasks = async function () {
     !progressStore.playerFaction
   ) {
     console.warn(
-      "updateVisibleTasks: Progress store computed values not ready, deferring update."
+      "updateVisibleTasks: Progress store computed values not ready, deferring update.",
     );
     return; // Exit if progress store data isn't ready
   }
   reloadingTasks.value = true; // Indicate we are starting the actual processing
   let visibleTaskList = JSON.parse(JSON.stringify(tasks.value));
-  console.log(`updateVisibleTasks: Start - ${visibleTaskList.length} tasks`); // LOG START
-  // First, filter tasks by the primary view
   if (activePrimaryView.value == "maps") {
-    visibleTaskList = visibleTaskList.filter((task) => {
-      const primaryMapMatch = task.map?.id === activeMapView.value;
-      const objectiveMapMatch = task.objectives?.some(obj =>
-        obj.maps?.some(map => map.id === activeMapView.value)
-      );
-      return primaryMapMatch || objectiveMapMatch;
-    });
+    // If merged map selected, filter for both IDs
+    const mergedMap = mergedMaps.value.find(
+      (m) => m.mergedIds && m.mergedIds.includes(activeMapView.value),
+    );
+    if (mergedMap) {
+      const ids = mergedMap.mergedIds;
+      visibleTaskList = visibleTaskList.filter((task) => {
+        // Check locations field
+        let taskLocations = Array.isArray(task.locations) ? task.locations : [];
+        let hasMap = ids.some((id) => taskLocations.includes(id));
+        // Check objectives[].maps
+        if (!hasMap && Array.isArray(task.objectives)) {
+          hasMap = task.objectives.some(
+            (obj) =>
+              Array.isArray(obj.maps) &&
+              obj.maps.some((map) => ids.includes(map.id)) &&
+              mapObjectiveTypes.includes(obj.type),
+          );
+        }
+        return hasMap;
+      });
+    } else {
+      // Default: single map logic
+      visibleTaskList = visibleTaskList.filter((task) => {
+        return task.objectives?.some(
+          (obj) =>
+            obj.maps?.some((map) => map.id === activeMapView.value) &&
+            mapObjectiveTypes.includes(obj.type),
+        );
+      });
+    }
   } else if (activePrimaryView.value == "traders") {
     visibleTaskList = visibleTaskList.filter(
-      (task) => task.trader?.id == activeTraderView.value
+      (task) => task.trader?.id == activeTraderView.value,
     );
   }
-  console.log(
-    `updateVisibleTasks: After Primary Filter - ${visibleTaskList.length} tasks`
-  ); // LOG AFTER PRIMARY
   if (activeUserView.value == "all") {
     // We want to show tasks by their availability to any team member
     if (activeSecondaryView.value == "available") {
       visibleTaskList = visibleTaskList.filter((task) =>
         Object.values(progressStore.unlockedTasks?.[task.id]).some(
-          (v) => v === true
-        )
+          (v) => v === true,
+        ),
       );
     } else {
       // In theory, we should never be in this situation (we don't show locked or completed tasks for all users)
       // But just in case, we'll do nothing here
       // Consider clearing the list or logging a warning if this state is reached unexpectedly
       console.warn(
-        "updateVisibleTasks: 'all' user view combined with non-'available' secondary view - unexpected state."
+        "updateVisibleTasks: 'all' user view combined with non-'available' secondary view - unexpected state.",
       );
     }
   } else {
-    // We want to show tasks by their availablity to a specific team member
+    // We want to show tasks by their availability to a specific team member
     if (activeSecondaryView.value == "available") {
       visibleTaskList = visibleTaskList.filter(
         (task) =>
           progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] ===
-          true
+          true,
       );
     } else if (activeSecondaryView.value == "locked") {
       visibleTaskList = visibleTaskList.filter(
         (task) =>
           progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] !=
             true &&
-          progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] != true
+          progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] !=
+            true,
       );
     } else if (activeSecondaryView.value == "completed") {
       visibleTaskList = visibleTaskList.filter((task) => {
@@ -570,9 +662,6 @@ const updateVisibleTasks = async function () {
       );
     });
   }
-  console.log(
-    `updateVisibleTasks: After Secondary/User Filter - ${visibleTaskList.length} tasks`
-  ); // LOG AFTER SECONDARY/USER
   // Remove any disabled tasks from the view
   visibleTaskList = visibleTaskList.filter(
     (task) =>
@@ -580,20 +669,14 @@ const updateVisibleTasks = async function () {
       typeof task.id === "string" &&
       // Simplified check: since watchEffect guarantees disabledTasks.value is an array,
       // we only need to check if the task ID is *not* included.
-      !disabledTasks.includes(task.id)
+      !disabledTasks.includes(task.id),
   );
-  console.log(
-    `updateVisibleTasks: After Disabled Filter - ${visibleTaskList.length} tasks`
-  ); // LOG AFTER DISABLED
   // Use optional chaining to safely access .value
   if (hideNonKappaTasks?.value) {
     visibleTaskList = visibleTaskList.filter(
-      (task) => task.kappaRequired == true
+      (task) => task.kappaRequired == true,
     );
   }
-  console.log(
-    `updateVisibleTasks: After Kappa Filter - ${visibleTaskList.length} tasks`
-  ); // LOG AFTER KAPPA
   // Finally, map the tasks to their IDs
   //visibleTaskList = visibleTaskList.map((task) => task.id)
   // Sort the tasks by their count of successors
@@ -643,14 +726,36 @@ watch(
   async () => {
     await updateVisibleTasks();
   },
-  { immediate: true }
+  { immediate: true },
 );
 watch(
   () => progressStore.tasksCompletions,
   async () => {
     reloadingTasks.value = true;
     await updateVisibleTasks();
-  }
+  },
 );
+const traderOrder = [
+  "Prapor",
+  "Therapist",
+  "Fence",
+  "Skier",
+  "Peacekeeper",
+  "Mechanic",
+  "Ragman",
+  "Jaeger",
+  "Ref",
+  "Lightkeeper",
+  "BTR Driver",
+];
+
+const orderedTraders = computed(() => {
+  // If a trader is not in the list, put them at the end
+  return [...traders.value].sort((a, b) => {
+    const aIdx = traderOrder.indexOf(a.name);
+    const bIdx = traderOrder.indexOf(b.name);
+    return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+  });
+});
 </script>
 <style lang="scss" scoped></style>

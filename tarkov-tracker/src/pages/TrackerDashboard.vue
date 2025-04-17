@@ -86,7 +86,7 @@ import { useProgressStore } from "@/stores/progress";
 import { useTarkovStore } from "@/stores/tarkov.js";
 import { computed, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+const { t } = useI18n({ useScope: 'global' });
 const TrackerStat = defineAsyncComponent(
   () => import("@/components/TrackerStat.vue"),
 );
@@ -295,3 +295,4 @@ const totalTaskItems = computed(() => {
 });
 </script>
 <style lang="scss" scoped></style>
+

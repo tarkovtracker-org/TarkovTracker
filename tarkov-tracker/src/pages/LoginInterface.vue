@@ -40,25 +40,10 @@
   </div>
 </template>
 <script setup>
-import { defineAsyncComponent, ref, onMounted, watch } from "vue";
+import { defineAsyncComponent, ref } from "vue";
 import { fireuser } from "@/plugins/firebase.ts";
 // Track if the migration dialog is currently being shown
 const showingMigrationDialog = ref(false);
-// Debug logging for tracking state
-onMounted(() => {
-  console.log("LoginInterface mounted, user logged in:", !!fireuser.uid);
-});
-// Watch for changes to fireuser.uid to help debug
-watch(
-  () => fireuser.uid,
-  (newVal, oldVal) => {
-    console.log("User auth state changed:", oldVal, "→", newVal);
-  },
-);
-// Watch migration dialog state
-watch(showingMigrationDialog, (newVal) => {
-  console.log("Migration dialog state changed:", newVal);
-});
 const TrackerTip = defineAsyncComponent(
   () => import("@/components/TrackerTip.vue"),
 );
@@ -102,3 +87,4 @@ const AuthButtons = defineAsyncComponent(
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 </style>
+
