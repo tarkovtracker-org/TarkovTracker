@@ -5,7 +5,6 @@ import tarkovDataQuery from "@/utils/tarkovdataquery.js";
 import tarkovHideoutQuery from "@/utils/tarkovhideoutquery.js";
 import languageQuery from "@/utils/languagequery.js";
 import { useI18n } from "vue-i18n";
-// Import graphlib so that we can use it in the watch function
 import Graph from "graphology";
 provideApolloClient(apolloClient);
 // --- Singleton State ---
@@ -37,7 +36,7 @@ const mapNameMapping = {
   "night factory": "factory",
   "the lab": "lab",
   "ground zero 21+": "groundzero",
-  "the labyrinth": "streetsoftarkov", // Assuming 'The Labyrinth' maps to 'streetsoftarkov'
+  "the labyrinth": "labyrinth",
 };
 // Function to recursively get all of the predecessors for a task
 function getPredecessors(graph, nodeId, visited = []) {
@@ -344,10 +343,31 @@ const maps = computed(() => {
   return [...mergedMaps].sort((a, b) => a.name.localeCompare(b.name));
 });
 // --- End New Computed Property ---
+// --- Add New Computed Property for Traders ---
+const traders = computed(() => {
+  if (!queryResults.value?.traders) {
+    return [];
+  }
+  // Sort traders alphabetically by name for consistency
+  return [...queryResults.value.traders].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+});
+// --- End New Computed Property ---
+// --- Add New Computed Properties for Player Level Constraints ---
+const playerLevels = computed(() => queryResults.value?.playerLevels || []);
+const minPlayerLevel = computed(() => {
+  if (!playerLevels.value.length) return 1;
+  return Math.min(...playerLevels.value.map((l) => l.level));
+});
+const maxPlayerLevel = computed(() => {
+  if (!playerLevels.value.length) return 79;
+  return Math.max(...playerLevels.value.map((l) => l.level));
+});
 // --- Main Exported Composable ---
 export function useTarkovData() {
   // Obtain i18n context using the composable
-  const { locale } = useI18n();
+  const { locale } = useI18n({ useScope: "global" });
   // Define languageCode computed property here, using the locale from useI18n
   const languageCode = computed(() => extractLanguageCode(locale));
   // Fetch static map data when the composable is mounted
@@ -360,7 +380,6 @@ export function useTarkovData() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       staticMapData.value = await response.json();
-      console.log("Static map data loaded successfully:", staticMapData.value);
     } catch (error) {
       console.error("Failed to fetch static map data:", error);
       // Handle error appropriately, maybe set a default or show a message
@@ -484,7 +503,6 @@ export function useTarkovData() {
       const currentLang = languageCode.value; // Dependency
       if (availableLanguages.value && isInitialized.value) {
         // Ensure initialized and languages are loaded
-        console.log(`Language changed to ${currentLang}, refetching data...`);
         taskRefetch({ lang: currentLang });
         hideoutRefetch({ lang: currentLang });
       }
@@ -513,8 +531,12 @@ export function useTarkovData() {
     mapTasks,
     objectives,
     maps,
+    traders,
     neededItemTaskObjectives,
     neededItemHideoutModules,
     disabledTasks,
+    playerLevels,
+    minPlayerLevel,
+    maxPlayerLevel,
   };
 }
