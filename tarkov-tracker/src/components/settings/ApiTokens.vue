@@ -128,22 +128,16 @@ const createToken = async () => {
   }
   creatingToken.value = true;
   try {
-    console.log("Creating token with:", {
-      note: tokenName.value,
-      permissions: selectedPermissions.value,
-    });
     const createTokenFn = httpsCallable(functions, "createToken");
     tokenResult.value = await createTokenFn({
       note: tokenName.value,
       permissions: selectedPermissions.value,
     });
-    console.log("Token creation result:", tokenResult.value);
     newTokenForm.value.reset();
     selectedPermissions.value = [];
     tokenResult.value = t("page.settings.card.apitokens.create_token_success");
     newTokenSnackbar.value = true;
   } catch (error) {
-    console.error("Token creation error:", error);
     tokenResult.value = t("page.settings.card.apitokens.create_token_error");
     newTokenSnackbar.value = true;
   }
@@ -151,3 +145,4 @@ const createToken = async () => {
 };
 </script>
 <style lang="scss" scoped></style>
+
