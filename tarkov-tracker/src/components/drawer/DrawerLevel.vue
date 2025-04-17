@@ -15,19 +15,23 @@
         {{ t("navigation_drawer.level") }}
       </div>
       <div class="text-center">
-        <h1 v-if="!editingLevel" style="font-size: 2.5em; line-height: 0.8em; cursor: pointer;" @click="startEditingLevel">
+        <h1
+          v-if="!editingLevel"
+          style="font-size: 2.5em; line-height: 0.8em; cursor: pointer"
+          @click="startEditingLevel"
+        >
           {{ tarkovStore.playerLevel }}
         </h1>
         <input
           v-else
           ref="levelInput"
           type="number"
-          min="1"
-          max="79"
+          :min="minPlayerLevel"
+          :max="maxPlayerLevel"
           v-model.number="levelInputValue"
           @blur="saveLevel"
           @keyup.enter="saveLevel"
-          style="font-size: 2.5em; width: 2.5em; text-align: center;"
+          style="font-size: 2.5em; width: 2.5em; text-align: center"
         />
       </div>
     </span>
@@ -37,7 +41,8 @@
           icon
           size="small"
           variant="plain"
-          @click="tarkovStore.incrementLevel()"
+          @click="incrementLevel"
+          :disabled="tarkovStore.playerLevel >= maxPlayerLevel"
         >
           <v-icon class="ma-0" small> mdi-chevron-up </v-icon>
         </v-btn>
@@ -47,7 +52,8 @@
           icon
           size="small"
           variant="plain"
-          @click="tarkovStore.decrementLevel()"
+          @click="decrementLevel"
+          :disabled="tarkovStore.playerLevel <= minPlayerLevel"
         >
           <v-icon class="ma-0" small> mdi-chevron-down </v-icon>
         </v-btn>
@@ -67,10 +73,12 @@ import { useTarkovStore } from "@/stores/tarkov.js";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+import { useTarkovData } from "@/composables/tarkovdata.js";
+const { t } = useI18n({ useScope: "global" });
 const { mdAndDown } = useDisplay();
 const tarkovStore = useTarkovStore();
 const appStore = useAppStore();
+const { minPlayerLevel, maxPlayerLevel } = useTarkovData();
 const pmcFactionIcon = computed(() => {
   return `/img/factions/${tarkovStore.getPMCFaction}.webp`;
 });
@@ -93,10 +101,23 @@ function startEditingLevel() {
 
 function saveLevel() {
   let newLevel = parseInt(levelInputValue.value, 10);
-  if (isNaN(newLevel)) newLevel = 1;
-  newLevel = Math.max(1, Math.min(79, newLevel));
+  if (isNaN(newLevel)) newLevel = minPlayerLevel.value;
+  newLevel = Math.max(
+    minPlayerLevel.value,
+    Math.min(maxPlayerLevel.value, newLevel),
+  );
   tarkovStore.setLevel(newLevel);
   editingLevel.value = false;
+}
+function incrementLevel() {
+  if (tarkovStore.playerLevel < maxPlayerLevel.value) {
+    tarkovStore.setLevel(tarkovStore.playerLevel + 1);
+  }
+}
+function decrementLevel() {
+  if (tarkovStore.playerLevel > minPlayerLevel.value) {
+    tarkovStore.setLevel(tarkovStore.playerLevel - 1);
+  }
 }
 </script>
 <style lang="scss" scoped>
@@ -131,5 +152,17 @@ function saveLevel() {
 }
 .crossfade:hover .crossfade-level {
   opacity: 0;
+}
+</style>
+
+<style>
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield !important;
+  -moz-appearance: textfield !important;
 }
 </style>

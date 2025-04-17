@@ -32,7 +32,7 @@ import { computed } from "vue";
 import { useAppStore } from "@/stores/app.js";
 import { useDisplay } from "vuetify";
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+const { t } = useI18n({ useScope: 'global' });
 const { mdAndDown } = useDisplay();
 const props = defineProps({
   icon: {
@@ -96,7 +96,6 @@ const titleClass = computed(() => ({
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 110px;
   margin-inline-start: 8px !important;
 }
 
@@ -104,3 +103,4 @@ const titleClass = computed(() => ({
   width: 26px;
 }
 </style>
+
