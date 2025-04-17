@@ -45,3 +45,4 @@ const { useTeamStore } = useLiveData();
 const teamStore = useTeamStore();
 </script>
 <style lang="scss" scoped></style>
+
