@@ -49,3 +49,4 @@ const props = defineProps({
 const { tasks, rawMaps: maps, traders } = useTarkovData();
 </script>
 <style lang="scss" scoped></style>
+
