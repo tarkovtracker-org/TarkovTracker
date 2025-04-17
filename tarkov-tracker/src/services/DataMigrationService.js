@@ -252,21 +252,24 @@ export default class DataMigrationService {
     oldDomain = "https://tarkovtracker.io/api/v2/progress",
   ) {
     if (!apiToken) {
+      console.error("No API token provided");
       return null;
     }
     try {
       // Try to fetch data from the old domain's API
       const apiUrl = `${oldDomain}`;
+      const headers = {
+        Authorization: `Bearer ${apiToken}`,
+        Accept: "application/json",
+      };
       const response = await fetch(apiUrl, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          Accept: "application/json",
-        },
+        headers,
       });
       if (!response.ok) {
+        let errorText = await response.text();
         console.error(
-          `API fetch failed: ${response.status} ${response.statusText}`,
+          `[DataMigrationService] API fetch failed: ${response.status} ${response.statusText} - ${errorText}`,
         );
         return null;
       }
@@ -274,83 +277,76 @@ export default class DataMigrationService {
       // Extract the actual data from the response which has 'data' and 'meta' properties
       const data = responseData.data || responseData;
       // Convert array-based task progress to object format
-      // Our format: { taskId: { complete: true, timestamp: Date.now() } } for completed tasks
       const taskCompletions = {};
       if (Array.isArray(data.tasksProgress)) {
-        let completedCount = 0;
         data.tasksProgress.forEach((task) => {
           if (task.complete === true) {
-            // Create the proper task completion structure
             taskCompletions[task.id] = {
               complete: true,
               timestamp: Date.now(),
               failed: task.failed || false,
             };
-            completedCount++;
           }
         });
-      } else {
-        // Convert array-based hideout modules to object format
-        // Our format: { moduleId: { complete: true, timestamp: Date.now() } } for completed modules
-        const hideoutModules = {};
-        if (Array.isArray(data.hideoutModulesProgress)) {
-          data.hideoutModulesProgress.forEach((module) => {
-            if (module.complete === true) {
-              hideoutModules[module.id] = {
-                complete: true,
-                timestamp: Date.now(),
-              };
-            }
-          });
-        }
-        // Convert array-based hideout parts to object format
-        // Our format: { partId: { complete: true, count: X, timestamp: Date.now() } }
-        const hideoutParts = {};
-        if (Array.isArray(data.hideoutPartsProgress)) {
-          data.hideoutPartsProgress.forEach((part) => {
-            hideoutParts[part.id] = {
-              complete: part.complete || false,
-              count: part.count || 0,
-              timestamp: part.complete ? Date.now() : null,
+      }
+      // Convert array-based hideout modules to object format
+      const hideoutModules = {};
+      if (Array.isArray(data.hideoutModulesProgress)) {
+        data.hideoutModulesProgress.forEach((module) => {
+          if (module.complete === true) {
+            hideoutModules[module.id] = {
+              complete: true,
+              timestamp: Date.now(),
             };
-          });
-        }
-        // Convert array-based task objectives to object format
-        // Our format: { objectiveId: { complete: true, count: X, timestamp: Date.now() } }
-        const taskObjectives = {};
-        if (Array.isArray(data.taskObjectivesProgress)) {
-          data.taskObjectivesProgress.forEach((objective) => {
-            taskObjectives[objective.id] = {
-              complete: objective.complete || false,
-              count: objective.count || 0,
-              timestamp: objective.complete ? Date.now() : null,
-            };
-          });
-        }
-        // Calculate completed task count for logging
-        const completedTaskCount = Object.keys(taskCompletions).length;
-        // Create a properly formatted migration object
-        const migrationData = {
-          // Core fields
-          level: data.playerLevel || data.level || 1,
-          gameEdition: data.gameEdition || "standard",
-          pmcFaction: data.pmcFaction || "usec",
-          displayName: data.displayName || "",
-          // Progress fields - use our converted data
-          taskCompletions: taskCompletions,
-          taskObjectives: taskObjectives,
-          hideoutModules: hideoutModules,
-          hideoutParts: hideoutParts,
-          // Migration metadata
-          importedFromApi: true,
-          importDate: new Date().toISOString(),
-          sourceUserId: data.userId,
-          sourceDomain: oldDomain,
-        };
-        return migrationData;
-      } // close else block for tasksProgress
+          }
+        });
+      }
+      // Convert array-based hideout parts to object format
+      const hideoutParts = {};
+      if (Array.isArray(data.hideoutPartsProgress)) {
+        data.hideoutPartsProgress.forEach((part) => {
+          hideoutParts[part.id] = {
+            complete: part.complete || false,
+            count: part.count || 0,
+            timestamp: part.complete ? Date.now() : null,
+          };
+        });
+      }
+      // Convert array-based task objectives to object format
+      const taskObjectives = {};
+      if (Array.isArray(data.taskObjectivesProgress)) {
+        data.taskObjectivesProgress.forEach((objective) => {
+          taskObjectives[objective.id] = {
+            complete: objective.complete || false,
+            count: objective.count || 0,
+            timestamp: objective.complete ? Date.now() : null,
+          };
+        });
+      }
+      // Create a properly formatted migration object
+      const migrationData = {
+        // Core fields
+        level: data.playerLevel || data.level || 1,
+        gameEdition: data.gameEdition || "standard",
+        pmcFaction: data.pmcFaction || "usec",
+        displayName: data.displayName || "",
+        // Progress fields - use our converted data
+        taskCompletions: taskCompletions,
+        taskObjectives: taskObjectives,
+        hideoutModules: hideoutModules,
+        hideoutParts: hideoutParts,
+        // Migration metadata
+        importedFromApi: true,
+        importDate: new Date().toISOString(),
+        sourceUserId: data.userId,
+        sourceDomain: oldDomain,
+      };
+      return migrationData;
     } catch (error) {
-      console.error("Error fetching data with API token:", error);
+      console.error(
+        "[DataMigrationService] Error fetching data with API token:",
+        error,
+      );
       return null;
     }
   }

@@ -61,14 +61,21 @@
             @click:append-inner="showToken = !showToken"
           ></v-text-field>
           <v-text-field
-            v-model="oldDomain"
-            label="Old Site Domain (Optional)"
-            placeholder="e.g. tarkovtracker.io"
+            v-model="apiEndpoint"
+            label="Old Site API Endpoint"
+            placeholder="e.g. https://tarkovtracker.io/api/v2/progress"
             variant="outlined"
             :disabled="fetchingApi"
-            hint="Only change this if the old site is not on tarkovtracker.io"
-            class="mb-4"
+            :error-messages="apiEndpointError"
+            hint="Change this only if the old site uses a different API endpoint. Must include https:// and full path."
+            persistent-hint
+            class="mb-2"
           ></v-text-field>
+          <div class="mb-4" style="font-size: 0.95em; color: #888">
+            <span
+              >Endpoint being used: <code>{{ apiEndpoint }}</code></span
+            >
+          </div>
           <div class="d-flex justify-space-between align-center">
             <div v-if="fetchingApi">
               <v-progress-circular
@@ -344,8 +351,9 @@ import { useTarkovStore } from "@/stores/tarkov";
 import FittedCard from "@/components/FittedCard.vue";
 // API migration variables
 const apiToken = ref("");
-const oldDomain = ref("tarkovtracker.io");
+const apiEndpoint = ref("https://tarkovtracker.io/api/v2/progress");
 const apiError = ref("");
+const apiEndpointError = ref("");
 const fetchingApi = ref(false);
 const apiFetchSuccess = ref(false);
 const showToken = ref(false);
@@ -436,6 +444,7 @@ const fetchWithApiToken = async () => {
   fetchingApi.value = true;
   apiError.value = "";
   apiFetchSuccess.value = false;
+  apiEndpointError.value = "";
   try {
     // Validate token format (basic validation)
     if (!apiToken.value || apiToken.value.length < 10) {
@@ -443,14 +452,29 @@ const fetchWithApiToken = async () => {
       fetchingApi.value = false;
       return;
     }
+    // Validate endpoint
+    let endpoint = apiEndpoint.value.trim();
+    try {
+      new URL(endpoint);
+    } catch (e) {
+      apiEndpointError.value =
+        "Please enter a valid URL (must start with https://)";
+      fetchingApi.value = false;
+      return;
+    }
+    if (!endpoint.endsWith("/api/v2/progress")) {
+      apiEndpointError.value = "Endpoint must end with /api/v2/progress";
+      fetchingApi.value = false;
+      return;
+    }
     // Call the service to fetch data
     const data = await DataMigrationService.fetchDataWithApiToken(
       apiToken.value,
-      oldDomain.value,
+      endpoint,
     );
     if (!data) {
       apiError.value =
-        "Failed to fetch data. Please check your token and try again.";
+        "Failed to fetch data. Please check your token, endpoint, and try again.";
       fetchingApi.value = false;
       return;
     }
@@ -461,7 +485,11 @@ const fetchWithApiToken = async () => {
     confirmDialog.value = true;
   } catch (error) {
     console.error("Error fetching data with API token:", error);
-    apiError.value = `Error: ${error.message}`;
+    if (error && error.message) {
+      apiError.value = `Error: ${error.message}`;
+    } else {
+      apiError.value = "Unknown error occurred during fetch.";
+    }
   } finally {
     fetchingApi.value = false;
   }
@@ -543,4 +571,3 @@ code {
   padding-top: 2px;
 }
 </style>
-
