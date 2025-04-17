@@ -465,13 +465,7 @@
   </KeepAlive>
 </template>
 <script setup>
-import {
-  defineAsyncComponent,
-  computed,
-  inject,
-  ref,
-  defineProps,
-} from "vue";
+import { defineAsyncComponent, computed, inject, ref, defineProps } from "vue";
 import { useUserStore } from "@/stores/user";
 import { useProgressStore } from "@/stores/progress";
 import { useTarkovData } from "@/composables/tarkovdata";
