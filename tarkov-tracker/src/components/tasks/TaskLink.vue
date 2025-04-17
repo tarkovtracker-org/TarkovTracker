@@ -52,7 +52,7 @@ const props = defineProps({
   },
 });
 useTarkovData();
-const { t } = useI18n({ useScope: 'global' });
+const { t } = useI18n({ useScope: "global" });
 // Check if there are two faction tasks for this task
 const isFactionTask = computed(() => {
   return props.task?.factionName != "Any";
@@ -61,7 +61,7 @@ const factionImage = computed(() => {
   return `/img/factions/${props.task.factionName}.webp`;
 });
 const traderAvatar = computed(() => {
-  return `/img/traders/${props.task?.trader?.id}.jpg`;
+  return props.task?.trader?.imageLink;
 });
 const scrollToTask = () => {
   const taskCard = document.getElementById(`task-${props.task.id}`);
@@ -85,4 +85,3 @@ a:any-link {
   white-space: nowrap;
 }
 </style>
-

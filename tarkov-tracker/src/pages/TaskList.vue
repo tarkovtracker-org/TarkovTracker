@@ -319,7 +319,8 @@ const userViews = computed(() => {
   return views;
 });
 const traderAvatar = (id) => {
-  return `/img/traders/${id}.jpg`;
+  const trader = traders.value.find((t) => t.id === id);
+  return trader?.imageLink;
 };
 const timeValue = ref("");
 setTimeout(() => {

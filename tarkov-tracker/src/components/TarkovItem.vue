@@ -11,7 +11,12 @@
       :class="linkHover ? 'blur-item' : ''"
     >
       <v-col cols="auto" class="d-flex align-center justify-center">
-        <img width="32" :src="itemIconUrl" class="mr-2 rounded" />
+        <img
+          width="32"
+          :src="itemIconUrl"
+          class="mr-2 rounded"
+          @error="handleImgError"
+        />
       </v-col>
       <v-col v-if="props.count" cols="auto" class="mr-2">{{
         props.count.toLocaleString()
@@ -62,7 +67,7 @@
   </v-container>
 </template>
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watchEffect } from "vue";
 // Define the props for the component
 const props = defineProps({
   itemId: {
@@ -91,9 +96,19 @@ const props = defineProps({
   },
 });
 const linkHover = ref(false);
-const itemIconUrl = computed(() => {
-  return `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
+const itemIconUrl = ref(`https://assets.tarkov.dev/${props.itemId}-icon.jpg`);
+
+function handleImgError() {
+  // If .jpg fails, try .webp
+  if (itemIconUrl.value.endsWith(".jpg")) {
+    itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.webp`;
+  }
+}
+
+watchEffect(() => {
+  itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
 });
+
 const openTarkovDevLink = () => {
   window.open(props.devLink, "_blank");
 };
@@ -122,4 +137,3 @@ const openWikiLink = () => {
   z-index: 1;
 }
 </style>
-

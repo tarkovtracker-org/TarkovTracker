@@ -74,8 +74,8 @@ const props = defineProps({
     required: true,
   },
 });
-const TarkovItem = defineAsyncComponent(() =>
-  import("@/components/TarkovItem.vue")
+const TarkovItem = defineAsyncComponent(
+  () => import("@/components/TarkovItem.vue"),
 );
 const { objectives } = useTarkovData();
 const tarkovStore = useTarkovStore();
@@ -91,14 +91,19 @@ const relatedItem = computed(() => {
   if (!fullObjective.value) {
     return null;
   }
-  // Select case fullObjective.type
   switch (fullObjective.value.type) {
     case "giveItem":
       return fullObjective.value.item;
     case "mark":
       return fullObjective.value.markerItem;
-    case "buildWeapon":
-      return fullObjective.value.item;
+    case "buildWeapon": {
+      // Prefer the defaultPreset (full build) if available
+      const item = fullObjective.value.item;
+      if (item?.properties?.defaultPreset) {
+        return item.properties.defaultPreset;
+      }
+      return item;
+    }
     case "plantItem":
       return fullObjective.value.item;
     default:
@@ -111,7 +116,7 @@ const userNeeds = computed(() => {
     return needingUsers;
   }
   Object.entries(
-    progressStore.unlockedTasks[fullObjective.value.taskId]
+    progressStore.unlockedTasks[fullObjective.value.taskId],
   ).forEach(([teamId, unlocked]) => {
     if (
       unlocked &&
@@ -179,4 +184,3 @@ const toggleObjectiveCompletion = () => {
   cursor: pointer;
 }
 </style>
-

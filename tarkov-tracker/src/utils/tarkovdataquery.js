@@ -16,10 +16,10 @@ export default gql`
   }
 
   fragment CategoryData on ItemCategory {
-  id
-  name
-  normalizedName
-}
+    id
+    name
+    normalizedName
+  }
 
   fragment MapPositionData on MapPosition {
     x
@@ -59,6 +59,7 @@ export default gql`
       trader {
         id
         name
+        imageLink
       }
       map {
         id
@@ -113,9 +114,13 @@ export default gql`
             ...ItemData
           }
           containsCategory {
-          ...CategoryData
-          parent {...CategoryData}
-          children {...CategoryData}
+            ...CategoryData
+            parent {
+              ...CategoryData
+            }
+            children {
+              ...CategoryData
+            }
           }
           attributes {
             name
@@ -383,6 +388,7 @@ export default gql`
       id
       name
       resetTime
+      imageLink
       levels {
         id
         level
