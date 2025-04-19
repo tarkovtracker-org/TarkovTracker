@@ -35,7 +35,7 @@ This is a community maintained fork of the original [TarkovTracker](https://gith
 
 ### Prerequisites
 
-- Node.js 16.0 or higher
+- [Node.js](https://nodejs.org/en/download/) 18.0 or higher
 - Java JRE 11+ or higher (for [Firebase Emulator](https://firebase.google.com/docs/emulator-suite/install_and_configure))
 
 ### Installation
