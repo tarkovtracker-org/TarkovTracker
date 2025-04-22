@@ -1,15 +1,13 @@
 import { defineConfig } from "vitest/config";
-
 export default defineConfig({
   test: {
     globals: true,
-    environment: "node", // Using node environment
-    // Uncomment setupFiles to use global mocks
-    setupFiles: ["./test/setup.js"], // Global setup file
+    environment: "node",
+    setupFiles: ["./test/setup"],
     deps: {
       optimizer: {
         ssr: {
-          include: ["**/*.js"],
+          include: ["**/*.ts"],
         },
       },
       interopDefault: true, // Support for default exports in mixed ESM/CJS modules
@@ -22,7 +20,7 @@ export default defineConfig({
     coverage: {
       provider: "istanbul", // Use istanbul instead
       reporter: ["text", "json", "html"],
-      exclude: ["node_modules/**", "test/**", "coverage/**", "**/*.config.js"],
+      exclude: ["node_modules/**", "test/**", "coverage/**", "**/*.config"],
     },
     testTimeout: 15000, // Increase test timeout
     hookTimeout: 15000, // Increase hook timeout

@@ -1,7 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    // --- RELAXED RULES FOR LOCAL DEVELOPMENT ONLY ---
+    // Allow all authenticated users to read and write any document
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    // --- END RELAXED RULES ---
+    
+    // Original rules below (commented out for local dev)
+    /*
     function memberOfSameTeam(userId){
       let teamroom = get(/databases/$(database)/documents/system/$(request.auth.uid)).data.team;
       let targetTeamroom = get(/databases/$(database)/documents/system/$(userId)).data.team;
@@ -32,6 +40,6 @@ service cloud.firestore {
     match /team/{teamId} {
       allow read: if (memberOfTeam());
     }
-    
+    */
   }
 }
