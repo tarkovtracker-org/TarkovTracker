@@ -37,8 +37,9 @@
 </template>
 <script setup>
 import { computed } from "vue";
-import { useTarkovData } from "@/composables/tarkovdata";
 import { useI18n } from "vue-i18n";
+import { useTarkovData } from "@/composables/tarkovdata";
+
 // Define the props for the component
 const props = defineProps({
   task: {

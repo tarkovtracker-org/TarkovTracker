@@ -338,12 +338,13 @@
 </template>
 <script setup>
 import { defineAsyncComponent, computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useDisplay } from "vuetify";
 import { useTarkovStore } from "@/stores/tarkov";
 import { useProgressStore } from "@/stores/progress";
 import { useUserStore } from "@/stores/user";
 import { useTarkovData } from "@/composables/tarkovdata";
-import { useI18n } from "vue-i18n";
+
 // Define the props for the component
 const props = defineProps({
   task: {
