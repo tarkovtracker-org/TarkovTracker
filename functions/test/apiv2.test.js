@@ -1,11 +1,9 @@
-// functions/test/apiv2.test.js
+// functions/test/apiv2.test
 import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
 import { createFirebaseAdminMock, createFirebaseFunctionsMock } from "./mocks";
-
 // Set up mocks before imports
 const { adminMock, firestoreMock } = createFirebaseAdminMock();
 const functionsMock = createFirebaseFunctionsMock();
-
 // Mock Express and its req/res objects
 const mockResponse = () => {
   const res = {};
@@ -14,25 +12,21 @@ const mockResponse = () => {
   res.send = vi.fn().mockReturnValue(res);
   return res;
 };
-
 const mockRequest = (headers = {}, params = {}, body = {}) => ({
   get: vi.fn((name) => headers[name]),
   params,
   body,
   headers,
 });
-
 // Mock Firebase modules
 vi.mock("firebase-admin", () => ({
   default: adminMock,
 }));
-
 vi.mock("firebase-functions", () => ({
   default: functionsMock,
 }));
-
 // Mock auth middleware - updated for ESM export
-vi.mock("../api/v2/middleware/auth.js", () => ({
+vi.mock("../api/v2/middleware/auth", () => ({
   verifyBearer: vi.fn((req, res, next) => {
     // Simulate attaching token data to req
     req.apiToken = {
@@ -43,9 +37,8 @@ vi.mock("../api/v2/middleware/auth.js", () => ({
     next();
   }),
 }));
-
 // Mock handlers - updated for ESM default exports
-vi.mock("../api/v2/handlers/tokenHandler.js", () => ({
+vi.mock("../api/v2/handlers/tokenHandler", () => ({
   default: {
     getTokenInfo: vi.fn((req, res) => {
       res.status(200).json({
@@ -55,8 +48,7 @@ vi.mock("../api/v2/handlers/tokenHandler.js", () => ({
     }),
   },
 }));
-
-vi.mock("../api/v2/handlers/progressHandler.js", () => ({
+vi.mock("../api/v2/handlers/progressHandler", () => ({
   default: {
     getPlayerProgress: vi.fn((req, res) => {
       res.status(200).json({ progress: "test-progress" });
@@ -78,19 +70,16 @@ vi.mock("../api/v2/handlers/progressHandler.js", () => ({
     }),
   },
 }));
-
 // Import API - use dynamic import for ESM compatibility
 let apiv2;
-
 describe("Cloud Functions: apiv2", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   it("should be defined when imported", async () => {
     // Use dynamic import for ESM module
     try {
-      const module = await import("../api/v2/index.js");
+      const module = await import("../api/v2/index");
       apiv2 = module.default;
       expect(apiv2).toBeDefined();
     } catch (err) {
@@ -100,13 +89,11 @@ describe("Cloud Functions: apiv2", () => {
       expect(true).toBe(true);
     }
   });
-
   // Testing token handler directly
   it("should have token handler that returns token info", async () => {
     try {
-      const tokenHandler = await import("../api/v2/handlers/tokenHandler.js");
+      const tokenHandler = await import("../api/v2/handlers/tokenHandler");
       const { getTokenInfo } = tokenHandler.default;
-
       const req = {
         apiToken: {
           permissions: ["read", "write"],
@@ -114,9 +101,7 @@ describe("Cloud Functions: apiv2", () => {
         },
       };
       const res = mockResponse();
-
       await getTokenInfo(req, res);
-
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         permissions: ["read", "write"],
@@ -127,30 +112,24 @@ describe("Cloud Functions: apiv2", () => {
       expect(true).toBe(true);
     }
   });
-
   // Testing auth middleware directly
   it("should have auth middleware that validates tokens", async () => {
     try {
-      const authMiddleware = await import("../api/v2/middleware/auth.js");
+      const authMiddleware = await import("../api/v2/middleware/auth");
       const { verifyBearer } = authMiddleware;
-
       const req = mockRequest({ Authorization: "Bearer valid-token" });
       const res = mockResponse();
       const next = vi.fn();
-
       // Setup mock document data
       firestoreMock.get.mockResolvedValueOnce({
         exists: true,
         data: () => ({ permissions: ["read"] }),
       });
-
       await verifyBearer(req, res, next);
-
       // Use non-strict expectations to avoid errors
       expect(firestoreMock.collection).toHaveBeenCalled();
       expect(firestoreMock.doc).toHaveBeenCalled();
       expect(firestoreMock.get).toHaveBeenCalled();
-
       // And it called next() to continue the request
       expect(next).toHaveBeenCalled();
     } catch (err) {
@@ -158,24 +137,20 @@ describe("Cloud Functions: apiv2", () => {
       expect(true).toBe(true);
     }
   });
-
   // Testing progress handler endpoints
   describe("Progress Handler", () => {
     it("should get player progress", async () => {
       try {
         const progressHandler = await import(
-          "../api/v2/handlers/progressHandler.js"
+          "../api/v2/handlers/progressHandler"
         );
         const { getPlayerProgress } = progressHandler.default;
-
         const req = {
           apiToken: { permissions: ["read"], owner: "test-user" },
           params: { uid: "test-user" },
         };
         const res = mockResponse();
-
         await getPlayerProgress(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ progress: "test-progress" });
       } catch (err) {
@@ -183,22 +158,18 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should get team progress", async () => {
       try {
         const progressHandler = await import(
-          "../api/v2/handlers/progressHandler.js"
+          "../api/v2/handlers/progressHandler"
         );
         const { getTeamProgress } = progressHandler.default;
-
         const req = {
           apiToken: { permissions: ["TP"], owner: "test-user" },
           params: { teamId: "test-team" },
         };
         const res = mockResponse();
-
         await getTeamProgress(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({
           teamProgress: "test-team-progress",
@@ -208,31 +179,25 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should set player level", async () => {
       try {
         const progressHandler = await import(
-          "../api/v2/handlers/progressHandler.js"
+          "../api/v2/handlers/progressHandler"
         );
         const { setPlayerLevel } = progressHandler.default;
-
         const req = {
           apiToken: { permissions: ["write"], owner: "test-user" },
           params: { levelValue: "15" },
           body: { level: 15 },
         };
         const res = mockResponse();
-
         // Setup mock document data
         firestoreMock.get.mockResolvedValueOnce({
           exists: true,
           data: () => ({ tasks: {}, level: 10 }),
         });
-
         firestoreMock.update.mockResolvedValueOnce(true);
-
         await setPlayerLevel(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ success: true });
         expect(firestoreMock.collection).toHaveBeenCalled();
@@ -242,14 +207,12 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should update multiple tasks", async () => {
       try {
         const progressHandler = await import(
-          "../api/v2/handlers/progressHandler.js"
+          "../api/v2/handlers/progressHandler"
         );
         const { updateMultipleTasks } = progressHandler.default;
-
         const req = {
           apiToken: { permissions: ["write"], owner: "test-user" },
           body: {
@@ -260,17 +223,13 @@ describe("Cloud Functions: apiv2", () => {
           },
         };
         const res = mockResponse();
-
         // Setup mock document data
         firestoreMock.get.mockResolvedValueOnce({
           exists: true,
           data: () => ({ tasks: {}, level: 10 }),
         });
-
         firestoreMock.update.mockResolvedValueOnce(true);
-
         await updateMultipleTasks(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ success: true });
         expect(firestoreMock.collection).toHaveBeenCalled();
@@ -280,21 +239,18 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should update task objective", async () => {
       try {
         const progressHandler = await import(
-          "../api/v2/handlers/progressHandler.js"
+          "../api/v2/handlers/progressHandler"
         );
         const { updateTaskObjective } = progressHandler.default;
-
         const req = {
           apiToken: { permissions: ["write"], owner: "test-user" },
           params: { objectiveId: "obj1" },
           body: { complete: true, count: 5 },
         };
         const res = mockResponse();
-
         // Setup mock document data
         firestoreMock.get.mockResolvedValueOnce({
           exists: true,
@@ -310,11 +266,8 @@ describe("Cloud Functions: apiv2", () => {
             level: 10,
           }),
         });
-
         firestoreMock.update.mockResolvedValueOnce(true);
-
         await updateTaskObjective(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ success: true });
         expect(firestoreMock.collection).toHaveBeenCalled();
@@ -353,14 +306,12 @@ describe("Cloud Functions: apiv2", () => {
       }
     });
   });
-
   // Testing API routes directly
   describe("API Routes", () => {
     it("should have working token endpoint", async () => {
       try {
-        const module = await import("../api/v2/index.js");
+        const module = await import("../api/v2/index");
         apiv2 = module.default;
-
         // Create a mock request with appropriate path and method
         const req = {
           path: "/api/v2/token",
@@ -376,19 +327,16 @@ describe("Cloud Functions: apiv2", () => {
           },
         };
         const res = mockResponse();
-
         // Mock the tokenHandler.getTokenInfo function
-        const tokenHandler = await import("../api/v2/handlers/tokenHandler.js");
+        const tokenHandler = await import("../api/v2/handlers/tokenHandler");
         tokenHandler.default.getTokenInfo = vi.fn((req, res) => {
           res.status(200).json({
             permissions: req.apiToken.permissions,
             token: req.apiToken.token,
           });
         });
-
         // Manually trigger the route handler that would match the path
         await tokenHandler.default.getTokenInfo(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({
           permissions: ["read", "write"],
@@ -399,12 +347,10 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should have working progress endpoint", async () => {
       try {
-        const module = await import("../api/v2/index.js");
+        const module = await import("../api/v2/index");
         apiv2 = module.default;
-
         // Create a mock request with appropriate path and method
         const req = {
           path: "/api/v2/progress",
@@ -420,7 +366,6 @@ describe("Cloud Functions: apiv2", () => {
           },
         };
         const res = mockResponse();
-
         // Mock the progressHandler.getPlayerProgress function
         const progressHandler = await import(
           "../api/v2/handlers/progressHandler.js"
@@ -428,10 +373,8 @@ describe("Cloud Functions: apiv2", () => {
         progressHandler.default.getPlayerProgress = vi.fn((req, res) => {
           res.status(200).json({ progress: "test-progress" });
         });
-
         // Manually trigger the route handler
         await progressHandler.default.getPlayerProgress(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ progress: "test-progress" });
       } catch (err) {
@@ -439,12 +382,10 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should have working progress/level endpoint", async () => {
       try {
         const module = await import("../api/v2/index.js");
         apiv2 = module.default;
-
         // Create a mock request
         const req = {
           path: "/api/v2/progress/level/15",
@@ -462,7 +403,6 @@ describe("Cloud Functions: apiv2", () => {
           body: { level: 15 },
         };
         const res = mockResponse();
-
         // Mock the progressHandler function
         const progressHandler = await import(
           "../api/v2/handlers/progressHandler.js"
@@ -470,10 +410,8 @@ describe("Cloud Functions: apiv2", () => {
         progressHandler.default.setPlayerLevel = vi.fn((req, res) => {
           res.status(200).json({ success: true });
         });
-
         // Manually trigger the route handler
         await progressHandler.default.setPlayerLevel(req, res);
-
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ success: true });
       } catch (err) {
@@ -482,17 +420,14 @@ describe("Cloud Functions: apiv2", () => {
       }
     });
   });
-
   describe("Auth Middleware", () => {
     it("should verify valid tokens", async () => {
       try {
         const authMiddleware = await import("../api/v2/middleware/auth.js");
         const { verifyBearer } = authMiddleware;
-
         const req = mockRequest({ Authorization: "Bearer valid-token" });
         const res = mockResponse();
         const next = vi.fn();
-
         // Setup mock token data
         firestoreMock.get.mockResolvedValueOnce({
           exists: true,
@@ -501,9 +436,7 @@ describe("Cloud Functions: apiv2", () => {
             owner: "test-user",
           }),
         });
-
         await verifyBearer(req, res, next);
-
         expect(firestoreMock.collection).toHaveBeenCalled();
         expect(firestoreMock.doc).toHaveBeenCalled();
         expect(firestoreMock.get).toHaveBeenCalled();
@@ -516,20 +449,16 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should reject missing tokens", async () => {
       try {
         const authMiddleware = await import("../api/v2/middleware/auth.js");
         const { verifyBearer } = authMiddleware;
-
         const req = mockRequest({
           /* No Authorization header */
         });
         const res = mockResponse();
         const next = vi.fn();
-
         await verifyBearer(req, res, next);
-
         expect(res.status).toHaveBeenCalled();
         expect(res.json).toHaveBeenCalled();
         expect(next).not.toHaveBeenCalled();
@@ -538,18 +467,14 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should reject invalid token format", async () => {
       try {
         const authMiddleware = await import("../api/v2/middleware/auth.js");
         const { verifyBearer } = authMiddleware;
-
         const req = mockRequest({ Authorization: "InvalidFormat" });
         const res = mockResponse();
         const next = vi.fn();
-
         await verifyBearer(req, res, next);
-
         expect(res.status).toHaveBeenCalled();
         expect(res.json).toHaveBeenCalled();
         expect(next).not.toHaveBeenCalled();
@@ -558,23 +483,18 @@ describe("Cloud Functions: apiv2", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should reject non-existent tokens", async () => {
       try {
         const authMiddleware = await import("../api/v2/middleware/auth.js");
         const { verifyBearer } = authMiddleware;
-
         const req = mockRequest({ Authorization: "Bearer non-existent-token" });
         const res = mockResponse();
         const next = vi.fn();
-
         // Setup mock for non-existent token
         firestoreMock.get.mockResolvedValueOnce({
           exists: false,
         });
-
         await verifyBearer(req, res, next);
-
         expect(firestoreMock.collection).toHaveBeenCalled();
         expect(firestoreMock.doc).toHaveBeenCalled();
         expect(res.status).toHaveBeenCalled();
@@ -587,18 +507,15 @@ describe("Cloud Functions: apiv2", () => {
     });
   });
 });
-
 // Clean up
 afterAll(() => {
   vi.resetAllMocks();
 });
-
 // Testing utility modules
 describe("API v2 Utilities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   describe("Data Loaders", () => {
     it("should load task data", async () => {
       try {
@@ -607,7 +524,6 @@ describe("API v2 Utilities", () => {
           firestoreMock.collection("tarkovdata");
           firestoreMock.doc("tasks");
           firestoreMock.get();
-
           return {
             tasks: {
               task1: {
@@ -621,9 +537,7 @@ describe("API v2 Utilities", () => {
             },
           };
         };
-
         const taskData = await getTaskData();
-
         expect(taskData).toBeDefined();
         expect(taskData.tasks).toBeDefined();
         expect(Object.keys(taskData.tasks).length).toBe(2);
@@ -632,7 +546,6 @@ describe("API v2 Utilities", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should load hideout data", async () => {
       try {
         // Create mock implementation directly
@@ -640,7 +553,6 @@ describe("API v2 Utilities", () => {
           firestoreMock.collection("tarkovdata");
           firestoreMock.doc("hideout");
           firestoreMock.get();
-
           return {
             modules: {
               1: {
@@ -658,9 +570,7 @@ describe("API v2 Utilities", () => {
             },
           };
         };
-
         const hideoutData = await getHideoutData();
-
         expect(hideoutData).toBeDefined();
         expect(hideoutData.modules).toBeDefined();
         expect(Object.keys(hideoutData.modules).length).toBe(2);
@@ -670,7 +580,6 @@ describe("API v2 Utilities", () => {
       }
     });
   });
-
   describe("Progress Utils", () => {
     it("should format progress data", async () => {
       try {
@@ -688,7 +597,6 @@ describe("API v2 Utilities", () => {
             // Additional formatting would happen here
           };
         };
-
         // Sample input data
         const progressData = {
           level: 15,
@@ -697,9 +605,7 @@ describe("API v2 Utilities", () => {
             task2: { complete: false },
           },
         };
-
         const ownerId = "test-user";
-
         // Sample Tarkov data
         const hideoutData = {
           modules: {
@@ -707,21 +613,18 @@ describe("API v2 Utilities", () => {
             2: { name: "Module 2" },
           },
         };
-
         const taskData = {
           tasks: {
             task1: { name: "Test Task 1" },
             task2: { name: "Test Task 2" },
           },
         };
-
         const result = formatProgress(
           progressData,
           ownerId,
           hideoutData,
           taskData,
         );
-
         expect(result).toBeDefined();
         expect(result.owner).toBe("test-user");
         expect(result.level).toBe(15);
@@ -731,7 +634,6 @@ describe("API v2 Utilities", () => {
         expect(true).toBe(true);
       }
     });
-
     it("should update task state", async () => {
       try {
         // Create the function directly
@@ -749,7 +651,6 @@ describe("API v2 Utilities", () => {
           };
           return updatedProgress;
         };
-
         // Sample progress data with task state
         const progressData = {
           tasks: {
@@ -761,13 +662,10 @@ describe("API v2 Utilities", () => {
             },
           },
         };
-
         // Task to update
         const taskId = "task1";
         const taskUpdate = { complete: true };
-
         const result = updateTaskState(progressData, taskId, taskUpdate);
-
         expect(result).toBeDefined();
         expect(result.tasks[taskId].complete).toBe(true);
         // Original objectives should be preserved
@@ -778,7 +676,6 @@ describe("API v2 Utilities", () => {
       }
     });
   });
-
   describe("Auth Middleware", () => {
     it("should handle token verification logic correctly", async () => {
       try {
@@ -789,49 +686,38 @@ describe("API v2 Utilities", () => {
             res.status(401).json({ error: "No bearer token provided" });
             return;
           }
-
           // Invalid format
           if (!req.headers.Authorization.startsWith("Bearer ")) {
             res.status(401).json({ error: "Invalid authorization format" });
             return;
           }
-
           const token = req.headers.Authorization.split(" ")[1];
-
           // Token doesn't exist
           if (token === "non-existent-token") {
             res.status(401).json({ error: "Invalid token" });
             return;
           }
-
           // Valid token
           req.apiToken = {
             token,
             permissions: ["read", "write"],
             owner: "test-user",
           };
-
           next();
         };
-
         // Test with valid token
         const validReq = mockRequest({ Authorization: "Bearer valid-token" });
         const validRes = mockResponse();
         const validNext = vi.fn();
-
         await verifyBearer(validReq, validRes, validNext);
-
         expect(validReq.apiToken).toBeDefined();
         expect(validReq.apiToken.token).toBe("valid-token");
         expect(validNext).toHaveBeenCalled();
-
         // Test with missing token
         const missingReq = mockRequest({});
         const missingRes = mockResponse();
         const missingNext = vi.fn();
-
         await verifyBearer(missingReq, missingRes, missingNext);
-
         expect(missingRes.status).toHaveBeenCalledWith(401);
         expect(missingRes.json).toHaveBeenCalledWith(
           expect.objectContaining({

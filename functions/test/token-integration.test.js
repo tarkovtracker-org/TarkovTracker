@@ -1,16 +1,13 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { admin } from "firebase-admin"; // Use named import
-import { firestoreMock } from "./setup.js"; // Import top-level spies
-import { createToken } from "../api/token/create.js";
-import { revokeToken } from "../api/token/revoke.js";
-
+import { firestoreMock } from "./setup"; // Import top-level spies
+import { createToken } from "../api/token/create";
+import { revokeToken } from "../api/token/revoke";
 // --- Test Suite ---
 describe("Token API Integration", () => {
   let mockContext;
-
   beforeEach(() => {
-    // Reset mocks is handled globally in setup.js beforeEach
-
+    // Reset mocks is handled globally in setup
     // Setup mock context for callable functions
     mockContext = {
       auth: {
@@ -21,13 +18,11 @@ describe("Token API Integration", () => {
       // instanceIdToken: "test-instance-id-token",
     };
   });
-
   // --- Token Creation Tests ---
   describe("Token Creation", () => {
     it("should call the right Firestore methods when creating a token", async () => {
       const mockData = { note: "Test Token", permissions: ["read"] };
-
-      // --- Setup: Rely on default transaction mock from setup.js ---
+      // --- Setup: Rely on default transaction mock from setup ---
       // We only need to check if runTransaction itself was called.
       // Capture the result to check the returned token ID.
       let transactionResult = null;
@@ -51,24 +46,19 @@ describe("Token API Integration", () => {
         return transactionResult;
       });
       // --- End Setup ---
-
       const result = await createToken(mockData, mockContext);
-
       expect(firestoreMock.runTransaction).toHaveBeenCalled();
       expect(result).toBeDefined();
       // Check the structure returned by the transaction mock
       expect(result.token).toEqual(transactionResult.tokenId);
     });
-
     // Add tests for error cases if needed (e.g., user already has max tokens)
   });
-
   // --- Token Revocation Tests ---
   describe("Token Revocation", () => {
     it("should call the right Firestore methods when revoking a token", async () => {
       const mockData = { token: "token-to-revoke" };
       const ownerUid = mockContext.auth.uid;
-
       // --- Setup: Mock collection().doc().get/delete and runTransaction ---
       const mockDocMethods = {
         get: vi.fn().mockResolvedValue({
@@ -90,9 +80,7 @@ describe("Token API Integration", () => {
         .delete.mockResolvedValue(undefined);
       // The default transaction mock from setup handles the system doc update
       // --- End Setup ---
-
       const result = await revokeToken(mockData, mockContext);
-
       expect(firestoreMock.collection).toHaveBeenCalledWith("token");
       expect(firestoreMock.collection("token").doc).toHaveBeenCalledWith(
         mockData.token,
@@ -106,26 +94,21 @@ describe("Token API Integration", () => {
       expect(firestoreMock.runTransaction).toHaveBeenCalled(); // Check transaction was called for system update
       expect(result).toEqual({ success: true });
     });
-
     it("should throw 'not-found' if token does not exist", async () => {
       const mockData = { token: "non-existent-token" };
-
       // --- Setup: Mock specific get call to return exists: false ---
       const getSpy = vi.fn().mockResolvedValue({ exists: false });
       firestoreMock.collection("token").doc(mockData.token).get = getSpy; // Directly assign spy
       // --- End Setup ---
-
       await expect(revokeToken(mockData, mockContext)).rejects.toThrow(
         "Token not found",
       );
-
       expect(firestoreMock.collection).toHaveBeenCalledWith("token");
       expect(firestoreMock.collection("token").doc).toHaveBeenCalledWith(
         mockData.token,
       );
       expect(getSpy).toHaveBeenCalled(); // Assert the specific spy was called
     });
-
     // Add test for permission denied (token owner != context.auth.uid)
   });
 });

@@ -1,5 +1,31 @@
 import functions from "firebase-functions";
-import admin from "firebase-admin";
+import { Request, Response } from "express";
+import admin from "firebase-admin"; // Although not directly used, keep for consistency or potential future use
+
+// Define minimal interface for the token data attached by middleware
+// Duplicated from auth.ts/index.ts for simplicity, consider shared types
+interface ApiTokenData {
+  owner: string;
+  note: string;
+  permissions: string[];
+  calls?: number; // Optional calls field
+  createdAt?: admin.firestore.Timestamp;
+}
+
+interface ApiToken extends ApiTokenData {
+  token: string; // The actual token string
+}
+
+// Extend the Express Request interface
+interface AuthenticatedRequest extends Request {
+  apiToken?: ApiToken;
+}
+
+// Define the expected response structure
+interface TokenInfoResponse {
+  permissions: string[];
+  token: string;
+}
 
 /**
  * @openapi
@@ -31,12 +57,14 @@ import admin from "firebase-admin";
  *       500:
  *         description: "Internal server error."
  */
-const getTokenInfo = async (req, res) => {
+const getTokenInfo = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
   // req.apiToken is attached by verifyBearer middleware
   if (req.apiToken?.token) {
     // We already have the token data from the middleware, just format and return
-    // No need for another DB read unless we need data not stored in req.apiToken
-    let tokenResponse = {
+    const tokenResponse: TokenInfoResponse = {
       permissions: req.apiToken.permissions ?? [],
       token: req.apiToken.token, // Use the token string from middleware
     };
@@ -48,6 +76,7 @@ const getTokenInfo = async (req, res) => {
   }
 };
 
+// Export using default export as assumed by index.ts import
 export default {
   getTokenInfo,
 };

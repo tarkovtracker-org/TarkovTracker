@@ -2,10 +2,11 @@
  * @swagger
  * components:
  *   securitySchemes:
- *     bearer:
- *       bearerFormat: "Bearer <your-tarkovtracker-API-token>"
+ *     bearerAuth: // Changed name to match usage in swagger.ts
+ *       description: "API Token obtained from TarkovTracker website profile page"
  *       type: http
  *       scheme: bearer
+ *       bearerFormat: "Your TarkovTracker API Token"
  *   schemas:
  *     Token:
  *       title: "Token"
@@ -37,7 +38,8 @@
  *         gameEdition:
  *           type: "integer"
  *           description: "Player's game edition (1 = Standard Edition, 2 == Left to Die Edition, 3 == Prepare to Die Edition, 4 == Edge of Darkness Edition)"
- *         taskProgress:
+ *           enum: [1, 2, 3, 4]
+ *         tasksProgress: // Renamed from taskProgress for consistency
  *           type: "array"
  *           description: "Array of task progress data."
  *           items:
@@ -66,6 +68,7 @@
  *         pmcFaction:
  *          type: "string"
  *          description: "Player's PMC faction (USEC, BEAR)"
+ *          enum: ["USEC", "BEAR"]
  *     TaskProgress:
  *       title: "TaskProgress"
  *       description: "Player's progress of a given task. The key is the UUID correlating to the task ID available via the tarkov.dev API"
@@ -105,24 +108,31 @@
  *         count:
  *           type: "integer"
  *           description: "Number of items collected for a given objective (if applicable)"
+ *           nullable: true # Indicate count might be null/absent
  *         complete:
  *           type: "boolean"
  *           description: "True if a given objective has been completed"
  *         invalid:
  *          type: "boolean"
  *          description: "True if a given objective is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)"
+ *          nullable: true # Indicate invalid might be null/absent
+ *         failed:
+ *           type: "boolean"
+ *           description: "True if a given objective has been explicitly failed (less common)"
+ *           nullable: true # Indicate failed might be null/absent
  *     HideoutPartsProgress:
  *       title: "HideoutPartsProgress"
  *       description: "Player's progress on items needed for hideout module upgrades."
  *       type: "object"
  *       properties:
+ *         id:
+ *           type: "string"
+ *           description: "UUID correlating to individual hideout station level item requirements' ID available via the tarkov.dev API"
  *         complete:
  *           type: "boolean"
  *           description: "True if a given hideout part objective has been completed"
  *         count:
  *           type: "integer"
  *           description: "Number of items collected for a given hideout part objective"
- *         id:
- *           type: "string"
- *           description: "UUID correlating to individual hideout station level item requirements' ID available via the tarkov.dev API"
+ *           nullable: true # Indicate count might be null/absent
  */

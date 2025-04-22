@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { admin } from "firebase-admin";
-import { firestoreMock } from "./setup.js";
+import { firestoreMock } from "./setup";
 
 // Mock Express response object
 const mockResponse = () => {
@@ -18,21 +18,17 @@ const mockRequest = (headers = {}, params = {}, body = {}) => ({
   params,
   body,
 });
-
 // Main test suite
 describe("API v2 Integration Tests", () => {
-  // Reset mocks globally in setup.js
-
   describe("Auth Middleware", () => {
     it("should authenticate a valid token", async () => {
       let authMiddleware;
       try {
-        authMiddleware = await import("../api/v2/middleware/auth.js");
+        authMiddleware = await import("../api/v2/middleware/auth");
       } catch (e) {
         throw e;
       }
       const { verifyBearer } = authMiddleware;
-
       // --- Setup: Mock Firestore for this specific test ---
       const getSpy = vi.fn().mockResolvedValue({
         exists: true,
@@ -43,12 +39,10 @@ describe("API v2 Integration Tests", () => {
       firestoreMock.collection("token").doc("valid-token").get = getSpy;
       firestoreMock.collection("token").doc("valid-token").update = updateSpy;
       // --- End Setup ---
-
       const req = mockRequest({ Authorization: "Bearer valid-token" });
       const res = mockResponse();
       const next = vi.fn();
       await verifyBearer(req, res, next);
-
       // Assertions
       expect(firestoreMock.collection).toHaveBeenCalledWith("token");
       expect(firestoreMock.collection("token").doc).toHaveBeenCalledWith(
@@ -60,26 +54,22 @@ describe("API v2 Integration Tests", () => {
       expect(req.apiToken.permissions).toEqual(["read", "write"]);
       expect(next).toHaveBeenCalled();
     });
-
     it("should reject invalid tokens", async () => {
       let authMiddleware;
       try {
-        authMiddleware = await import("../api/v2/middleware/auth.js");
+        authMiddleware = await import("../api/v2/middleware/auth");
       } catch (e) {
         throw e;
       }
       const { verifyBearer } = authMiddleware;
-
       // --- Setup: Use default mocks (get returns exists: false) ---
       const getSpy = vi.fn().mockResolvedValue({ exists: false });
       firestoreMock.collection("token").doc("invalid-token").get = getSpy;
       // --- End Setup ---
-
       const req = mockRequest({ Authorization: "Bearer invalid-token" });
       const res = mockResponse();
       const next = vi.fn();
       await verifyBearer(req, res, next);
-
       // Assertions
       expect(firestoreMock.collection).toHaveBeenCalledWith("token");
       expect(firestoreMock.collection("token").doc).toHaveBeenCalledWith(
@@ -91,25 +81,22 @@ describe("API v2 Integration Tests", () => {
       expect(next).not.toHaveBeenCalled();
     });
   });
-
   describe("Progress Handler", () => {
     // Mock data loaders at the describe level
-    vi.doMock("../api/v2/utils/dataLoaders.js", () => ({
+    vi.doMock("../api/v2/utils/dataLoaders", () => ({
       // Use doMock for potentially better timing
       getTaskData: vi
         .fn()
         .mockResolvedValue({ tasks: [{ id: "task1", objectives: [] }] }),
       getHideoutData: vi.fn().mockResolvedValue({ hideoutStations: [] }),
     }));
-
     it("should handle player progress requests", async () => {
       let progressHandler;
       try {
-        progressHandler = await import("../api/v2/handlers/progressHandler.js");
+        progressHandler = await import("../api/v2/handlers/progressHandler");
       } catch (e) {
         throw e;
       }
-
       // --- Setup: Mock Firestore get for progress doc ---
       const mockDocMethods = {
         get: vi.fn().mockResolvedValue({
@@ -128,14 +115,12 @@ describe("API v2 Integration Tests", () => {
         };
       });
       // --- End Setup ---
-
       const req = {
         apiToken: { permissions: ["GP"], owner: "test-user" },
         params: {},
       };
       const res = mockResponse();
       await progressHandler.default.getPlayerProgress(req, res);
-
       // Assertions
       expect(firestoreMock.collection).toHaveBeenCalledWith("progress");
       expect(mockCollectionMethods.doc).toHaveBeenCalledWith("test-user");
@@ -143,17 +128,14 @@ describe("API v2 Integration Tests", () => {
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalled();
     });
-
     it("should update player task state", async () => {
       let progressHandler;
       // Use dynamic import *after* mocks are set up
-      progressHandler = (await import("../api/v2/handlers/progressHandler.js"))
+      progressHandler = (await import("../api/v2/handlers/progressHandler"))
         .default;
-
-      // --- Setup: Rely on default transaction mock from setup.js ---
-      // Default transaction mock handles get/update checks internally via setup.js
+      // --- Setup: Rely on default transaction mock from setup ---
+      // Default transaction mock handles get/update checks internally via setup
       // --- End Setup ---
-
       const req = {
         apiToken: { permissions: ["write"], owner: "test-user" },
         params: { taskId: "task1" },
@@ -161,7 +143,6 @@ describe("API v2 Integration Tests", () => {
       };
       const res = mockResponse();
       await progressHandler.updateSingleTask(req, res);
-
       // Assertions
       // Check that the transaction was called by the main function
       expect(firestoreMock.runTransaction).toHaveBeenCalled();
@@ -173,7 +154,6 @@ describe("API v2 Integration Tests", () => {
       // but we know the default mock in setup.js handles them.
     });
   });
-
   describe("API Router", () => {
     it("should define all required routes", async () => {
       let rawApiApp;
@@ -186,6 +166,4 @@ describe("API v2 Integration Tests", () => {
       expect(rawApiApp).toBeDefined();
     });
   });
-
-  // No afterEach needed if beforeEach clears mocks correctly
 });

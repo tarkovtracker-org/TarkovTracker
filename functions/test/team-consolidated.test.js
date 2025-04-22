@@ -45,7 +45,7 @@ describe("Team Management", () => {
   // Dynamic imports for the actual function logic
   it("should import team functions", async () => {
     try {
-      const module = await import("../index.js");
+      const module = await import("../index");
 
       // Extract the internal logic functions
       createTeamLogic = module._createTeamLogic;

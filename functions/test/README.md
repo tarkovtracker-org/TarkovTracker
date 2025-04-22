@@ -32,28 +32,26 @@ The test directory is organized by functionality:
 
 **Consolidated Files** (KEEP)
 
-- token-consolidated.test.js
-- team-consolidated.test.js
+- token-consolidated.test
+- team-consolidated.test
 - updateTarkovdata-consolidated.test.js
-- apiv2.test.js
-
+- apiv2.test
 **Files to Remove** (once consolidated tests are fixed)
-
-- token-unit.test.js
-- token-simple.test.js
-- fixed-token.test.js
-- working-token.test.js
-- token.mock.test.js
-- simple-token.test.js
-- token-fixed.test.js
-- token-improved.test.js
-- token.test.js
-- leaveTeam.test.js
-- team.test.js
-- updateTarkovdata.test.js
-- basic.test.js
-- minimal.test.js
-- mock.test.js
+- token-unit.test
+- token-simple.test
+- fixed-token.test
+- working-token.test
+- token.mock.test
+- simple-token.test
+- token-fixed.test
+- token-improved.test
+- token.test
+- leaveTeam.test
+- team.test
+- updateTarkovdata.test
+- basic.test
+- minimal.test
+- mock.test
 
 ## Current Issues
 
@@ -155,7 +153,7 @@ vi.mock('firebase-admin', () => {
 Run a specific test file:
 
 ```bash
-npx vitest run test/token-consolidated.test.js
+npx vitest run test/token-consolidated.test
 ```
 
 Run all tests:

@@ -1,8 +1,6 @@
 import { vi } from "vitest";
-
 // --- Mocks ---
 const adminMock = { initializeApp: vi.fn() }; // Simpler admin mock
-
 // Basic Firestore spies (tests will provide implementations)
 const firestoreMock = {
   collection: vi.fn(),
@@ -22,7 +20,6 @@ const firestoreMock = {
     fromDate: vi.fn((date) => ({ toDate: () => date })),
   },
 };
-
 const functionsMock = {
   // Basic structure
   config: vi.fn().mockReturnValue({}),
@@ -54,7 +51,6 @@ const functionsMock = {
     })),
   },
 };
-
 // --- Mock Factories ---
 vi.mock("firebase-admin", () => {
   const admin = {
@@ -71,7 +67,6 @@ vi.mock("firebase-admin", () => {
   admin.default = admin;
   return { default: admin, admin };
 });
-
 // Mock both v1 and default functions paths
 vi.mock("firebase-functions", () => ({
   ...functionsMock,
@@ -81,12 +76,10 @@ vi.mock("firebase-functions/v1", () => ({
   ...functionsMock,
   default: functionsMock,
 }));
-
 // --- Global Hooks ---
 beforeEach(() => {
   // Reset all mocks provided by vitest vi.fn()
   vi.clearAllMocks();
-
   // --- Reset specific mock implementations/return values ---
   // Reset top-level Firestore spies to basic chainable mocks
   // This ensures tests start with a consistent baseline
@@ -104,10 +97,8 @@ beforeEach(() => {
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
   };
-
   firestoreMock.collection.mockImplementation(() => mockCollectionMethods);
   firestoreMock.doc.mockImplementation(() => mockDocMethods);
-
   // Reset transaction mock to provide basic spied methods
   firestoreMock.runTransaction.mockImplementation(async (callback) => {
     const transaction = {
@@ -127,8 +118,6 @@ beforeEach(() => {
     return callback(transaction);
   });
 });
-
-console.log("functions/test/setup.js loaded (SIMPLIFIED mocks)");
-
+console.log("functions/test/setup loaded (SIMPLIFIED mocks)");
 // --- Explicit Exports ---
 export { adminMock, firestoreMock, functionsMock };
