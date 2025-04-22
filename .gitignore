@@ -26,3 +26,14 @@ yarn-error.log*
 *.sw*
 
 *-debug.log
+
+# Firebase Functions Files
+functions/node_modules/
+functions/coverage/
+functions/lib/
+
+# Tarkov Tracker Files
+tarkov-tracker/node_modules/
+tarkov-tracker/.env
+tarkov-tracker/.env.local
+tarkov-tracker/.env.*.local
