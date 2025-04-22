@@ -33,43 +33,60 @@
             ></v-list-item>
           </template>
         </template>
-        <drawer-item icon="mdi-lock" locale-key="logout" @click.stop="logout" />
+        <drawer-item
+          icon="mdi-lock"
+          locale-key="logout"
+          :is-collapsed="props.isCollapsed"
+          @click.stop="logout"
+        />
       </v-list-group>
     </template>
     <template v-else>
-      <drawer-item icon="mdi-fingerprint" locale-key="login" to="/login" />
+      <drawer-item
+        icon="mdi-fingerprint"
+        locale-key="login"
+        to="/login"
+        :is-collapsed="props.isCollapsed"
+      />
     </template>
   </v-list>
 </template>
 <script setup>
-import { fireuser, auth } from "@/plugins/firebase";
-import { defineAsyncComponent } from "vue";
-import { useAppStore } from "@/stores/app.js";
-import { useUserStore } from "@/stores/user.js";
-import { useDisplay } from "vuetify";
-import { signOut } from "firebase/auth";
-const { mdAndDown } = useDisplay();
-const appStore = useAppStore();
-const userStore = useUserStore();
-const DrawerItem = defineAsyncComponent(() =>
-  import("@/components/drawer/DrawerItem.vue")
-);
-function logout() {
-  signOut(auth);
-}
+  import { fireuser, auth } from '@/plugins/firebase';
+  import { defineAsyncComponent, defineProps } from 'vue';
+  import { useAppStore } from '@/stores/app';
+  import { useUserStore } from '@/stores/user';
+  import { useDisplay } from 'vuetify';
+  import { signOut } from 'firebase/auth';
+
+  const props = defineProps({
+    isCollapsed: {
+      type: Boolean,
+      required: true,
+    },
+  });
+
+  const { mdAndDown } = useDisplay();
+  const appStore = useAppStore();
+  const userStore = useUserStore();
+  const DrawerItem = defineAsyncComponent(
+    () => import('@/components/drawer/DrawerItem.vue')
+  );
+  function logout() {
+    signOut(auth);
+  }
 </script>
 <style lang="scss" scoped>
-:global(
+  :global(
     body
       > div.v-overlay-container
       > div.allow-overflow
       > div.v-overlay__content
       > div.v-sheet
   ) {
-  overflow-y: visible;
-}
-.fake-link {
-  cursor: pointer;
-}
+    overflow-y: visible;
+  }
+  .fake-link {
+    cursor: pointer;
+  }
 </style>
-

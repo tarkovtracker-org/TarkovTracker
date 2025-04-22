@@ -55,7 +55,6 @@ module.exports = {
         sourceType: "script",
       },
       env: {
-        // Ensure Node.js environment is enabled for these files
         node: true,
       },
       // Optionally, disable rules here that conflict with CommonJS if needed

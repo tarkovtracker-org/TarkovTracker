@@ -12,7 +12,7 @@
     "deps": "taze --interactive"
   },
   "dependencies": {
-    "@apollo/client": "^3.13.7",
+    "@apollo/client": "^3.13.8",
     "@mdi/font": "^7.4.47",
     "@vue/apollo-composable": "^4.2.2",
     "@vueuse/core": "^13.1.0",
@@ -33,15 +33,15 @@
     "vuetify": "^3.8.2"
   },
   "devDependencies": {
-    "@intlify/unplugin-vue-i18n": "^6.0.5",
+    "@intlify/unplugin-vue-i18n": "^6.0.6",
     "@vitejs/plugin-vue": "^5.2.3",
-    "eslint": "^9.24.0",
+    "eslint": "^9.25.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-vue": "^10.0.0",
     "prettier": "^3.5.3",
     "sass": "^1.86.3",
     "typescript": "^5.8.3",
-    "vite": "^6.3.1",
+    "vite": "^6.3.2",
     "vite-plugin-vuetify": "^2.1.1",
     "vue-eslint-parser": "^10.1.3"
   }

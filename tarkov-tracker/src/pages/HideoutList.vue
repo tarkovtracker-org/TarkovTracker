@@ -1,7 +1,10 @@
 <template>
-  <v-container class="d-flex flex-column" style="min-height: calc(100vh - 250px);">
-    <tracker-tip tip="hideout" style="flex: 0 0 auto;"></tracker-tip>
-    <div class="flex-grow-0" style="margin-bottom: 16px;">
+  <v-container
+    class="d-flex flex-column"
+    style="min-height: calc(100vh - 250px)"
+  >
+    <tracker-tip tip="hideout" style="flex: 0 0 auto"></tracker-tip>
+    <div class="flex-grow-0" style="margin-bottom: 16px">
       <v-row justify="center">
         <v-col lg="8" md="12">
           <v-card>
@@ -33,7 +36,7 @@
             color="secondary"
             class="mx-2"
           ></v-progress-circular>
-          {{ $t("page.hideout.loading") }} <refresh-button />
+          {{ $t('page.hideout.loading') }} <refresh-button />
         </v-col>
       </v-row>
       <v-row justify="center" class="mt-2">
@@ -52,7 +55,7 @@
       <v-row v-if="!hideoutLoading && visibleStations.length == 0">
         <v-col cols="12">
           <v-alert icon="mdi-clipboard-search">
-            {{ $t("page.hideout.nostationsfound") }}</v-alert
+            {{ $t('page.hideout.nostationsfound') }}</v-alert
           >
         </v-col>
       </v-row>
@@ -60,78 +63,83 @@
   </v-container>
 </template>
 <script setup>
-import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useTarkovData } from "@/composables/tarkovdata";
-import { useProgressStore } from "@/stores/progress";
-import { useUserStore } from "@/stores/user";
-import { defineAsyncComponent } from "vue";
-const TrackerTip = defineAsyncComponent(
-  () => import("@/components/TrackerTip.vue"),
-);
-const HideoutCard = defineAsyncComponent(
-  () => import("@/components/hideout/HideoutCard.vue"),
-);
-const RefreshButton = defineAsyncComponent(
-  () => import("@/components/RefreshButton.vue"),
-);
-const { t } = useI18n({ useScope: "global" });
-const { hideoutStations, hideoutLoading } = useTarkovData();
-const progressStore = useProgressStore();
-const userStore = useUserStore();
-const primaryViews = [
-  {
-    title: t("page.hideout.primaryviews.available"),
-    icon: "mdi-tag-arrow-up-outline",
-    view: "available",
-  },
-  {
-    title: t("page.hideout.primaryviews.maxed"),
-    icon: "mdi-arrow-collapse-up",
-    view: "maxed",
-  },
-  {
-    title: t("page.hideout.primaryviews.locked"),
-    icon: "mdi-lock",
-    view: "locked",
-  },
-  {
-    title: t("page.hideout.primaryviews.all"),
-    icon: "mdi-clipboard-check",
-    view: "all",
-  },
-];
-const activePrimaryView = computed({
-  get: () => userStore.getTaskPrimaryView,
-  set: (value) => userStore.setTaskPrimaryView(value),
-});
-const visibleStations = computed(() => {
-  let hideoutStationList = JSON.parse(JSON.stringify(hideoutStations.value));
-  let visibleStations = progressStore.visibleStations;
-  //Display all upgradeable stations
-  if (activePrimaryView.value === "available")
-    return Object.values(visibleStations).filter(
-      (station) =>
-        progressStore.stationLevels[station.id]["self"] !==
-        station.levels.length,
-    );
-  //Display all maxed stations
-  if (activePrimaryView.value === "maxed")
-    return hideoutStationList.filter(
-      (station) =>
-        progressStore.stationLevels[station.id]["self"] ===
-        station.levels.length,
-    );
-  //Display all locked stations
-  if (activePrimaryView.value === "locked")
-    return hideoutStationList.filter(
-      (station) =>
-        !Object.values(visibleStations).some((s) => s.id === station.id),
-    );
-  //Display all stations
-  if (activePrimaryView.value === "all") return hideoutStationList;
-  return visibleStations;
-});
+  import { computed, ref } from 'vue';
+  import { useI18n } from 'vue-i18n';
+  import { useTarkovData } from '@/composables/tarkovdata';
+  import { useProgressStore } from '@/stores/progress';
+  import { useUserStore } from '@/stores/user';
+  import { defineAsyncComponent } from 'vue';
+  const TrackerTip = defineAsyncComponent(
+    () => import('@/components/TrackerTip.vue')
+  );
+  const HideoutCard = defineAsyncComponent(
+    () => import('@/components/hideout/HideoutCard.vue')
+  );
+  const RefreshButton = defineAsyncComponent(
+    () => import('@/components/RefreshButton.vue')
+  );
+  const { t } = useI18n({ useScope: 'global' });
+  const { hideoutStations, hideoutLoading } = useTarkovData();
+  const progressStore = useProgressStore();
+  const userStore = useUserStore();
+  const primaryViews = [
+    {
+      title: t('page.hideout.primaryviews.available'),
+      icon: 'mdi-tag-arrow-up-outline',
+      view: 'available',
+    },
+    {
+      title: t('page.hideout.primaryviews.maxed'),
+      icon: 'mdi-arrow-collapse-up',
+      view: 'maxed',
+    },
+    {
+      title: t('page.hideout.primaryviews.locked'),
+      icon: 'mdi-lock',
+      view: 'locked',
+    },
+    {
+      title: t('page.hideout.primaryviews.all'),
+      icon: 'mdi-clipboard-check',
+      view: 'all',
+    },
+  ];
+  const activePrimaryView = computed({
+    get: () => userStore.getTaskPrimaryView,
+    set: (value) => userStore.setTaskPrimaryView(value),
+  });
+  const visibleStations = computed(() => {
+    let hideoutStationList = JSON.parse(JSON.stringify(hideoutStations.value));
+    //Display all upgradeable stations
+    if (activePrimaryView.value === 'available')
+      return hideoutStationList.filter(
+        (station) =>
+          progressStore.hideoutLevels[station.id] &&
+          progressStore.hideoutLevels[station.id]['self'] !== undefined &&
+          progressStore.hideoutLevels[station.id]['self'] !==
+            station.levels.length
+      );
+    //Display all maxed stations
+    if (activePrimaryView.value === 'maxed')
+      return hideoutStationList.filter(
+        (station) =>
+          progressStore.hideoutLevels[station.id] &&
+          progressStore.hideoutLevels[station.id]['self'] !== undefined &&
+          progressStore.hideoutLevels[station.id]['self'] ===
+            station.levels.length
+      );
+    //Display all locked stations
+    if (activePrimaryView.value === 'locked')
+      return hideoutStationList.filter(
+        (station) =>
+          !(
+            progressStore.hideoutLevels[station.id] &&
+            progressStore.hideoutLevels[station.id]['self'] !== undefined
+          )
+      );
+    //Display all stations
+    if (activePrimaryView.value === 'all') return hideoutStationList;
+    return hideoutStationList;
+  });
 </script>
 <style lang="scss" scoped></style>
-

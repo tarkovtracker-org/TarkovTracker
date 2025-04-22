@@ -247,10 +247,10 @@ const checkUserDataAndShowMigration = async (uid) => {
             showMigrationDialog.value,
           );
         }, 500);
-        return true; // Dialog was shown
+        return true;
       }
     }
-    return false; // No dialog needed
+    return false;
   } catch (error) {
     console.error("Error checking user data:", error);
     return false;
@@ -342,16 +342,14 @@ const handleAuthSuccess = async (user) => {
             }
           }
         }, 500);
-        return true; // Dialog was shown
+        return true;
       }
     }
-    // Only redirect if we're not showing the dialog
     router.push("/");
   } catch (error) {
     console.error("Error in handleAuthSuccess:", error);
     router.push("/");
   } finally {
-    // Reset loading state
     loading.value.google = false;
     loading.value.github = false;
   }
@@ -366,7 +364,6 @@ const signInWithGoogle = async () => {
     loading.value.google = true;
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    // Handle login result immediately
     await handleAuthSuccess(result.user);
   } catch (error) {
     console.error("Google sign in error:", error);
@@ -378,7 +375,6 @@ const signInWithGithub = async () => {
     loading.value.github = true;
     const provider = new GithubAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    // Handle login result immediately
     await handleAuthSuccess(result.user);
   } catch (error) {
     console.error("GitHub sign in error:", error);

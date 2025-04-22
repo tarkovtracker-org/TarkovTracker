@@ -339,7 +339,7 @@
 <script setup>
 import { defineAsyncComponent, computed, ref } from "vue";
 import { useDisplay } from "vuetify";
-import { useTarkovStore } from "@/stores/tarkov.js";
+import { useTarkovStore } from "@/stores/tarkov";
 import { useProgressStore } from "@/stores/progress";
 import { useUserStore } from "@/stores/user";
 import { useTarkovData } from "@/composables/tarkovdata";

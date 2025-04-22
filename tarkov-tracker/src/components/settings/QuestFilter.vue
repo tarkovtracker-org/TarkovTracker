@@ -37,7 +37,7 @@
 <script setup>
 import { useI18n } from "vue-i18n";
 import { defineAsyncComponent, computed } from "vue";
-import { useTarkovStore } from "@/stores/tarkov.js";
+import { useTarkovStore } from "@/stores/tarkov";
 import { useUserStore } from "@/stores/user";
 const FittedCard = defineAsyncComponent(() =>
   import("@/components/FittedCard.vue")

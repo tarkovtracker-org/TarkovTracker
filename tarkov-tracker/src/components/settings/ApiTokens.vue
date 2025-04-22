@@ -83,7 +83,7 @@ import { useI18n } from "vue-i18n";
 import { functions } from "@/plugins/firebase";
 import { httpsCallable } from "firebase/functions";
 import { useLiveData } from "@/composables/livedata";
-import availablePermissions from "@/utils/api_permissions.js";
+import availablePermissions from "@/utils/api_permissions";
 const TokenCard = defineAsyncComponent(() =>
   import("@/components/settings/TokenCard.vue")
 );
@@ -145,4 +145,3 @@ const createToken = async () => {
 };
 </script>
 <style lang="scss" scoped></style>
-

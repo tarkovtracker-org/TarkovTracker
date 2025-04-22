@@ -300,13 +300,18 @@ const {
 const userViews = computed(() => {
   let views = [];
   views.push({ title: t("page.tasks.userviews.all"), view: "all" });
-  if (tarkovStore.getDisplayName == null) {
+
+  // Call the getter function to get the actual display name
+  const displayName = tarkovStore.getDisplayName();
+
+  if (displayName == null) {
     // We don't have a display name set, so use the default language name for yourself
     views.push({ title: t("page.tasks.userviews.yourself"), view: "self" });
   } else {
     // We have a display name set, so use that
-    views.push({ title: tarkovStore.getDisplayName, view: "self" });
+    views.push({ title: displayName, view: "self" }); // Use the returned value
   }
+
   // For each progressStore visible team member (other than yourself), add a view
   for (const teamId of Object.keys(progressStore.visibleTeamStores)) {
     if (teamId != "self") {

@@ -36,8 +36,8 @@
 <script setup>
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useAppStore } from "@/stores/app.js";
-import { useUserStore } from "@/stores/user.js";
+import { useAppStore } from "@/stores/app";
+import { useUserStore } from "@/stores/user";
 const userStore = useUserStore();
 const unhideTips = () => {
   userStore.unhideTips();

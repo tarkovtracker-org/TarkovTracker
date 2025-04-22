@@ -14,7 +14,7 @@
       <v-icon :icon="props.icon" />
     </template>
     <v-list-item-title
-      v-if="!appStore.drawerUseRail(mdAndDown)"
+      v-if="!props.isCollapsed"
       :class="[titleClass, props.extLink ? 'drawer-external-link' : '']"
       style="display: inline-flex"
     >
@@ -28,79 +28,82 @@
   </v-list-item>
 </template>
 <script setup>
-import { computed } from "vue";
-import { useAppStore } from "@/stores/app.js";
-import { useDisplay } from "vuetify";
-import { useI18n } from "vue-i18n";
-const { t } = useI18n({ useScope: 'global' });
-const { mdAndDown } = useDisplay();
-const props = defineProps({
-  icon: {
-    type: String,
-    default: "mdi-menu-right",
-    required: false,
-  },
-  avatar: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  localeKey: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  text: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  to: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  href: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  extLink: {
-    type: Boolean,
-    required: false,
-    default: false,
-  },
-});
-const visitHref = () => {
-  if (props.href !== null) {
-    window.open(props.href, "_blank");
-  }
-};
-const appStore = useAppStore();
-const itemClass = computed(() => ({
-  "align-center": appStore.drawerUseRail(mdAndDown.value),
-  "justify-center": appStore.drawerUseRail(mdAndDown.value),
-}));
-const titleClass = computed(() => ({
-  "v-drawer-item-full": !appStore.drawerUseRail(mdAndDown.value),
-  "v-drawer-item-rail": appStore.drawerUseRail(mdAndDown.value),
-}));
+  import { computed } from 'vue';
+  import { useAppStore } from '@/stores/app';
+  import { useDisplay } from 'vuetify';
+  import { useI18n } from 'vue-i18n';
+  const { t } = useI18n({ useScope: 'global' });
+  const { mdAndDown } = useDisplay();
+  const props = defineProps({
+    icon: {
+      type: String,
+      default: 'mdi-menu-right',
+      required: false,
+    },
+    avatar: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    localeKey: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    text: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    to: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    href: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    extLink: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+    isCollapsed: {
+      type: Boolean,
+      required: true,
+    },
+  });
+  const visitHref = () => {
+    if (props.href !== null) {
+      window.open(props.href, '_blank');
+    }
+  };
+  const appStore = useAppStore();
+  const itemClass = computed(() => ({
+    'align-center': props.isCollapsed,
+    'justify-center': props.isCollapsed,
+  }));
+  const titleClass = computed(() => ({
+    'v-drawer-item-full': !props.isCollapsed,
+    'v-drawer-item-rail': props.isCollapsed,
+  }));
 </script>
 <style lang="scss" scoped>
-// Set up styles for rail and standard item
-.v-drawer-item-full {
-  margin-inline-start: 32px;
-}
-.drawer-external-link {
-  font-size: 0.97rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-inline-start: 8px !important;
-}
+  // Set up styles for rail and standard item
+  .v-drawer-item-full {
+    margin-inline-start: 32px;
+  }
+  .drawer-external-link {
+    font-size: 0.97rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-inline-start: 8px !important;
+  }
 
-.v-drawer-item-rail {
-  width: 26px;
-}
+  .v-drawer-item-rail {
+    width: 26px;
+  }
 </style>
-

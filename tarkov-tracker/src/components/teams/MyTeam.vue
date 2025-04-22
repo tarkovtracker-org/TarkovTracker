@@ -124,8 +124,8 @@ import { httpsCallable } from "firebase/functions";
 import { useLiveData } from "@/composables/livedata";
 import { useUserStore } from "@/stores/user";
 import { useTarkovStore } from "@/stores/tarkov";
-const FittedCard = defineAsyncComponent(() =>
-  import("@/components/FittedCard.vue")
+const FittedCard = defineAsyncComponent(
+  () => import("@/components/FittedCard.vue"),
 );
 
 const { t } = useI18n({ useScope: "global" });
@@ -184,9 +184,22 @@ const copyUrl = () => {
 };
 
 const teamUrl = computed(() => {
+  console.debug(
+    "[Invite Debug] teamOwner:",
+    teamStore.teamOwner,
+    "teamPassword:",
+    teamStore.teamPassword,
+  );
+  if (!teamStore.teamOwner || !teamStore.teamPassword) {
+    console.warn(
+      "[Invite Debug] Missing teamOwner or teamPassword when generating invite URL:",
+      teamStore.teamOwner,
+      teamStore.teamPassword,
+    );
+  }
   if (teamStore.teamOwner && teamStore.teamPassword) {
     return `${window.location.href.split("?")[0]}?team=${encodeURIComponent(
-      teamStore.teamOwner
+      teamStore.teamOwner,
     )}&code=${encodeURIComponent(teamStore.teamPassword)}`;
   } else {
     return "";
@@ -220,4 +233,3 @@ const clearDisplayName = () => {
 };
 </script>
 <style lang="scss" scoped></style>
-

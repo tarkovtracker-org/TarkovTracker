@@ -92,12 +92,23 @@ const acceptInvite = async () => {
 
   // Join the team
   try {
-    const joinResult = await fireapp.functions().httpsCallable("joinTeam")({
+    console.debug(
+      "[Invite Debug] route.query.team:",
+      route?.query?.team,
+      "route.query.code:",
+      route?.query?.code,
+    );
+    const joinPayload = {
       id: route?.query?.team,
       password: route?.query?.code,
-    });
-    if (joinResult.data.error) {
-      throw new Error(joinResult.data);
+    };
+    console.debug("[Invite Debug] joinTeam payload:", joinPayload);
+    const joinResultResp = await fireapp.functions().httpsCallable("joinTeam")(
+      joinPayload,
+    );
+    console.debug("[Invite Debug] joinTeam result:", joinResultResp);
+    if (joinResultResp.data && joinResultResp.data.error) {
+      throw new Error(joinResultResp.data);
     }
     joinResult.value = t("page.team.card.teaminvite.join_success");
     joinTeamSnackbar.value = true;
@@ -106,11 +117,14 @@ const acceptInvite = async () => {
     const router = useRouter();
     router.push({ name: "team" });
   } catch (error) {
-    console.debug("Error while joining team", JSON.stringify(error));
+    console.debug(
+      "[Invite Debug] Error while joining team",
+      error,
+      JSON.stringify(error),
+    );
     joinResult.value = t("page.team.card.teaminvite.join_error");
     joinTeamSnackbar.value = true;
   }
 };
 </script>
 <style lang="scss" scoped></style>
-

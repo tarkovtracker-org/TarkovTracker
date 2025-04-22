@@ -56,11 +56,11 @@
 <script setup>
 import { computed } from "vue";
 import { defineAsyncComponent } from "vue";
-import { useAppStore } from "@/stores/app.js";
+import { useAppStore } from "@/stores/app";
 import { useDisplay } from "vuetify";
 import { useRoute } from "vue-router";
 import { reactive } from "vue";
-import { useTarkovData } from "@/composables/tarkovdata.js";
+import { useTarkovData } from "@/composables/tarkovdata";
 import { useI18n } from "vue-i18n";
 const { t } = useI18n({ useScope: 'global' });
 const state = reactive({ menu: null });

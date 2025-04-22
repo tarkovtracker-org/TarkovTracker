@@ -18,7 +18,7 @@
 </template>
 <script setup>
 import { computed, defineAsyncComponent, ref } from "vue";
-import { useTarkovData } from "@/composables/tarkovdata.js";
+import { useTarkovData } from "@/composables/tarkovdata";
 const TaskObjective = defineAsyncComponent(() =>
   import("@/components/tasks/TaskObjective.vue")
 );

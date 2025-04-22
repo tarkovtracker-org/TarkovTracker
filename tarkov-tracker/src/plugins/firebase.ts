@@ -1,6 +1,6 @@
-import { reactive } from "vue";
-import { initializeApp, FirebaseOptions } from "firebase/app";
-import { getAnalytics, Analytics } from "firebase/analytics";
+import { reactive } from 'vue';
+import { initializeApp, FirebaseOptions, type FirebaseApp } from 'firebase/app';
+import { getAnalytics, Analytics } from 'firebase/analytics';
 import {
   getAuth,
   onAuthStateChanged,
@@ -10,23 +10,23 @@ import {
   TwitterAuthProvider,
   User,
   Auth,
-} from "firebase/auth";
+} from 'firebase/auth';
 import {
   getFirestore,
   connectFirestoreEmulator,
   Firestore,
-} from "firebase/firestore";
+} from 'firebase/firestore';
 import {
   getFunctions,
   connectFunctionsEmulator,
   Functions,
   httpsCallable,
-} from "firebase/functions";
+} from 'firebase/functions';
 import {
   getStorage,
   connectStorageEmulator,
   FirebaseStorage,
-} from "firebase/storage";
+} from 'firebase/storage';
 // Define a comprehensive type for our reactive user state
 type FireUser = {
   uid: string | null;
@@ -41,34 +41,37 @@ type FireUser = {
 };
 // Ensure all required environment variables are present
 const requiredEnvVars = [
-  "VITE_FIREBASE_API_KEY",
-  "VITE_FIREBASE_AUTH_DOMAIN",
-  "VITE_FIREBASE_PROJECT_ID",
-  "VITE_FIREBASE_STORAGE_BUCKET",
-  "VITE_FIREBASE_MESSAGING_SENDER_ID",
-  "VITE_FIREBASE_APP_ID",
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_DATABASE_URL',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
 ] as const;
 // Check for missing environment variables
 const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !import.meta.env[varName],
+  (varName) => !import.meta.env[varName]
 );
 if (missingEnvVars.length > 0) {
   throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(", ")}`,
+    `Missing required environment variables: ${missingEnvVars.join(', ')}`
   );
 }
+
 // Use environment variables for Firebase config with proper typing
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL, // Added for Realtime Database
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // Optional: for Google Analytics
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // Google Analytics
 };
 // Initialize Firebase with error handling
-let app;
+let app: FirebaseApp;
 let analytics: Analytics;
 let auth: Auth;
 let firestore: Firestore;
@@ -79,10 +82,10 @@ try {
   analytics = getAnalytics(app);
   auth = getAuth(app);
   firestore = getFirestore(app);
-  functions = getFunctions(app, "us-central1"); // Specify default region
+  functions = getFunctions(app, 'us-central1');
   storage = getStorage(app);
 } catch (error) {
-  console.error("Error initializing Firebase:", error);
+  console.error('Error initializing Firebase:', error);
   throw error;
 }
 // Set up a reactive object for our user state with comprehensive properties
@@ -126,18 +129,18 @@ onAuthStateChanged(auth, (user: User | null) => {
 });
 // Use emulators if we're on localhost or 127.0.0.1
 if (
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
 ) {
   try {
-    connectFirestoreEmulator(firestore, "localhost", 5002);
-    connectFunctionsEmulator(functions, "localhost", 5001);
-    connectAuthEmulator(auth, "http://localhost:9099", {
+    connectAuthEmulator(auth, 'http://localhost:9099', {
       disableWarnings: true,
     });
-    connectStorageEmulator(storage, "localhost", 9199);
+    connectFirestoreEmulator(firestore, 'localhost', 5002);
+    connectFunctionsEmulator(functions, 'localhost', 5001);
+    connectStorageEmulator(storage, 'localhost', 9199);
   } catch (error) {
-    console.error("Error connecting to Firebase emulators:", error);
+    console.error('Error connecting to Firebase emulators:', error);
   }
 }
 export {

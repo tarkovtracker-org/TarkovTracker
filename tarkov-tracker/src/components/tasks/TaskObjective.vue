@@ -61,8 +61,8 @@
 </template>
 <script setup>
 import { computed, ref, defineAsyncComponent } from "vue";
-import { useTarkovStore } from "@/stores/tarkov.js";
-import { useTarkovData } from "@/composables/tarkovdata.js";
+import { useTarkovStore } from "@/stores/tarkov";
+import { useTarkovData } from "@/composables/tarkovdata";
 import { useProgressStore } from "@/stores/progress";
 import { useLiveData } from "@/composables/livedata";
 const { useSystemStore } = useLiveData();

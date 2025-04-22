@@ -3,52 +3,55 @@
     v-model="appStore.drawerShow"
     theme="dark"
     image="/img/sidebar-background.webp"
-    :rail="appStore.drawerUseRail(mdAndDown)"
-    :width="appStore.drawerUseRail(mdAndDown) ? 56 : 200"
+    :rail="isRailActive"
+    :width="isRailActive ? 56 : 200"
     class="compact-nav-drawer"
   >
     <tracker-logo />
     <v-divider class="mx-3 my-1" />
-    <drawer-account />
+    <drawer-account :is-collapsed="isRailActive" />
     <v-divider class="mx-3 my-1" />
     <drawer-level />
     <v-divider class="mx-3 my-1" />
-    <drawer-links />
+    <drawer-links :is-collapsed="isRailActive" />
     <v-divider class="mx-3 my-1" />
-    <drawer-external-links />
+    <drawer-external-links :is-collapsed="isRailActive" />
   </v-navigation-drawer>
 </template>
 <script setup>
-import { defineAsyncComponent } from "vue";
-import { useAppStore } from "@/stores/app.js";
-import { useDisplay } from "vuetify";
-const { mdAndDown } = useDisplay();
-const appStore = useAppStore();
-// Set up component loading
-const TrackerLogo = defineAsyncComponent(
-  () => import("@/components/drawer/TrackerLogo.vue"),
-);
-const DrawerLinks = defineAsyncComponent(
-  () => import("@/components/drawer/DrawerLinks.vue"),
-);
-const DrawerAccount = defineAsyncComponent(
-  () => import("@/components/drawer/DrawerAccount.vue"),
-);
-const DrawerLevel = defineAsyncComponent(
-  () => import("@/components/drawer/DrawerLevel.vue"),
-);
-const DrawerExternalLinks = defineAsyncComponent(
-  () => import("@/components/drawer/DrawerExternalLinks.vue"),
-);
+  import { defineAsyncComponent, computed } from 'vue';
+  import { useAppStore } from '@/stores/app';
+  import { useDisplay } from 'vuetify';
+  const { mdAndDown } = useDisplay();
+  const appStore = useAppStore();
+
+  // Calculate the effective rail state
+  const isRailActive = computed(() => appStore.drawerRail && mdAndDown.value);
+
+  // Set up component loading
+  const TrackerLogo = defineAsyncComponent(
+    () => import('@/components/drawer/TrackerLogo.vue')
+  );
+  const DrawerLinks = defineAsyncComponent(
+    () => import('@/components/drawer/DrawerLinks.vue')
+  );
+  const DrawerAccount = defineAsyncComponent(
+    () => import('@/components/drawer/DrawerAccount.vue')
+  );
+  const DrawerLevel = defineAsyncComponent(
+    () => import('@/components/drawer/DrawerLevel.vue')
+  );
+  const DrawerExternalLinks = defineAsyncComponent(
+    () => import('@/components/drawer/DrawerExternalLinks.vue')
+  );
 </script>
 <style lang="scss" scoped>
-:deep(.v-list-group__items .v-list-item) {
-  padding-inline-start: 0 !important;
-  padding-left: 8px !important;
-}
-.compact-nav-drawer {
-  /* Remove width: auto, use fixed width for proper collapse */
-  box-sizing: border-box !important;
-}
+  :deep(.v-list-group__items .v-list-item) {
+    padding-inline-start: 0 !important;
+    padding-left: 8px !important;
+  }
+  .compact-nav-drawer {
+    /* Remove width: auto, use fixed width for proper collapse */
+    box-sizing: border-box !important;
+  }
 </style>
-
