@@ -37,3 +37,4 @@ tarkov-tracker/node_modules/
 tarkov-tracker/.env
 tarkov-tracker/.env.local
 tarkov-tracker/.env.*.local
+tarkov-tracker/dist/
