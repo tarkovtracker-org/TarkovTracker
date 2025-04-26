@@ -220,42 +220,74 @@ async function _createTeamLogic(
   try {
     let createdTeam = "";
     await db.runTransaction(async (transaction: Transaction) => {
-      const systemRef: DocumentReference<SystemDocData> = db
-        .collection("system")
-        .doc(userUid) as DocumentReference<SystemDocData>;
-      const systemDoc: DocumentSnapshot<SystemDocData> =
-        await transaction.get(systemRef);
-      const systemData = systemDoc?.data();
-      if (systemData?.team) {
-        throw new HttpsError(
-          "failed-precondition",
-          "User is already in a team.",
-        );
-      }
-      if (systemData?.lastLeftTeam) {
-        const now = admin.firestore.Timestamp.now();
-        const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(
-          now.toMillis() - 5 * 60 * 1000,
-        );
-        if (systemData.lastLeftTeam > fiveMinutesAgo) {
+      try {
+        logger.log("[createTeam] Transaction start", { userUid });
+        const systemRef: DocumentReference<SystemDocData> = db
+          .collection("system")
+          .doc(userUid) as DocumentReference<SystemDocData>;
+        logger.log("[createTeam] systemRef", { path: systemRef.path });
+        const systemDoc: DocumentSnapshot<SystemDocData> =
+          await transaction.get(systemRef);
+        const systemData = systemDoc?.data();
+        logger.log("[createTeam] systemData", { systemData });
+        if (systemData?.team) {
+          logger.log("[createTeam] User already in team", {
+            team: systemData.team,
+          });
           throw new HttpsError(
             "failed-precondition",
-            "You must wait 5 minutes after leaving a team to create a new one.",
+            "User is already in a team.",
           );
         }
+        if (systemData?.lastLeftTeam) {
+          const now = admin.firestore.Timestamp.now();
+          const fiveMinutesAgo = admin.firestore.Timestamp.fromMillis(
+            now.toMillis() - 5 * 60 * 1000,
+          );
+          logger.log("[createTeam] lastLeftTeam", {
+            lastLeftTeam: systemData.lastLeftTeam.toMillis(),
+            now: now.toMillis(),
+            fiveMinutesAgo: fiveMinutesAgo.toMillis(),
+          });
+          if (systemData.lastLeftTeam > fiveMinutesAgo) {
+            throw new HttpsError(
+              "failed-precondition",
+              "You must wait 5 minutes after leaving a team to create a new one.",
+            );
+          }
+        }
+        logger.log("[createTeam] Creating UIDGenerator");
+        const uidgen = new UIDGenerator(32); // Generate a 32-bit ID (valid multiple of 8)
+        const teamId = await uidgen.generate();
+        logger.log("[createTeam] Generated teamId", { teamId });
+        createdTeam = teamId; // Store the generated ID
+        const teamRef = db.collection("team").doc(teamId);
+        logger.log("[createTeam] teamRef", { path: teamRef.path });
+        transaction.set(teamRef, {
+          owner: userUid,
+          password: data.password || "", // Use provided password or default to empty string
+          maximumMembers: data.maximumMembers || 10, // Use provided max members or default to 10
+          members: [userUid],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        logger.log("[createTeam] Set team document");
+        transaction.set(systemRef, { team: teamId }, { merge: true });
+        logger.log("[createTeam] Set system document");
+      } catch (err) {
+        logger.error("[createTeam] Error inside transaction", {
+          error: err,
+          errorString: JSON.stringify(err),
+          errorMessage:
+            typeof err === "object" && err !== null && "message" in err
+              ? (err as any).message
+              : (err?.toString?.() ?? String(err)),
+          errorStack:
+            typeof err === "object" && err !== null && "stack" in err
+              ? (err as any).stack
+              : undefined,
+        });
+        throw err;
       }
-      const uidgen = new UIDGenerator(10); // Generate a 10-character ID
-      const teamId = await uidgen.generate();
-      createdTeam = teamId; // Store the generated ID
-      const teamRef = db.collection("team").doc(teamId);
-      transaction.set(teamRef, {
-        owner: userUid,
-        password: data.password || "", // Use provided password or default to empty string
-        maximumMembers: data.maximumMembers || 10, // Use provided max members or default to 10
-        members: [userUid],
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      transaction.set(systemRef, { team: teamId }, { merge: true });
     });
     logger.log("Created team", {
       owner: userUid,
@@ -267,11 +299,26 @@ async function _createTeamLogic(
     logger.error("Failed to create team", {
       owner: userUid,
       error: e,
+      errorString: JSON.stringify(e),
+      errorMessage:
+        typeof e === "object" && e !== null && "message" in e
+          ? (e as any).message
+          : (e?.toString?.() ?? String(e)),
+      errorStack:
+        typeof e === "object" && e !== null && "stack" in e
+          ? (e as any).stack
+          : undefined,
     });
     if (e instanceof HttpsError) {
       throw e;
     }
-    throw new HttpsError("internal", "Error during team creation", e.message);
+    throw new HttpsError(
+      "internal",
+      "Error during team creation",
+      typeof e === "object" && e !== null && "message" in e
+        ? (e as any).message
+        : (e?.toString?.() ?? String(e)),
+    );
   }
 }
 
