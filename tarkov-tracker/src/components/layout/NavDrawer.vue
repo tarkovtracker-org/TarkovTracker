@@ -2,16 +2,16 @@
   <v-navigation-drawer
     v-model="appStore.drawerShow"
     theme="dark"
-    image="/img/sidebar-background.webp"
+    image="/img/background/sidebar-background.webp"
     :rail="isRailActive"
     :width="isRailActive ? 56 : 200"
     class="compact-nav-drawer"
   >
-    <tracker-logo />
+    <tracker-logo :is-collapsed="isRailActive" />
     <v-divider class="mx-3 my-1" />
     <drawer-account :is-collapsed="isRailActive" />
     <v-divider class="mx-3 my-1" />
-    <drawer-level />
+    <drawer-level :is-collapsed="isRailActive" />
     <v-divider class="mx-3 my-1" />
     <drawer-links :is-collapsed="isRailActive" />
     <v-divider class="mx-3 my-1" />
@@ -26,7 +26,7 @@
   const appStore = useAppStore();
 
   // Calculate the effective rail state
-  const isRailActive = computed(() => appStore.drawerRail && mdAndDown.value);
+  const isRailActive = computed(() => !mdAndDown.value && appStore.drawerRail);
 
   // Set up component loading
   const TrackerLogo = defineAsyncComponent(

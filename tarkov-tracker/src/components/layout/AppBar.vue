@@ -14,7 +14,7 @@
       ></v-app-bar-nav-icon>
     </template>
     <v-toolbar-title>{{
-      t(`page.${route.name.replace("-", "_")}.title`)
+      t(`page.${route.name.replace('-', '_')}.title`)
     }}</v-toolbar-title>
     <span v-if="dataError">
       <!-- Show an icon and tooltip if we have a GraphQL error -->
@@ -54,38 +54,37 @@
   </v-app-bar>
 </template>
 <script setup>
-import { computed } from "vue";
-import { defineAsyncComponent } from "vue";
-import { useAppStore } from "@/stores/app";
-import { useDisplay } from "vuetify";
-import { useRoute } from "vue-router";
-import { reactive } from "vue";
-import { useTarkovData } from "@/composables/tarkovdata";
-import { useI18n } from "vue-i18n";
-const { t } = useI18n({ useScope: 'global' });
-const state = reactive({ menu: null });
-const appStore = useAppStore();
-const route = useRoute();
-const navBarIcon = computed(() => {
-  return appStore.drawerShow && appStore.drawerRail
-    ? "mdi-menu-open"
-    : "mdi-menu";
-});
-const OverflowMenu = defineAsyncComponent(() =>
-  import("/src/components/layout/OverflowMenu.vue")
-);
-const {
-  loading: dataLoading,
-  error: dataError,
-  hideoutLoading,
-} = useTarkovData();
-const { mdAndDown } = useDisplay();
-function changeNavigationDrawer() {
-  if (mdAndDown.value) {
-    appStore.drawerShow = !appStore.drawerShow;
-  } else {
-    appStore.drawerRail = !appStore.drawerRail;
+  import { computed } from 'vue';
+  import { defineAsyncComponent } from 'vue';
+  import { useAppStore } from '@/stores/app';
+  import { useDisplay } from 'vuetify';
+  import { useRoute } from 'vue-router';
+  import { reactive } from 'vue';
+  import { useTarkovData } from '@/composables/tarkovdata';
+  import { useI18n } from 'vue-i18n';
+  const { t } = useI18n({ useScope: 'global' });
+  const state = reactive({ menu: null });
+  const appStore = useAppStore();
+  const route = useRoute();
+  const navBarIcon = computed(() => {
+    return appStore.drawerShow && appStore.drawerRail
+      ? 'mdi-menu-open'
+      : 'mdi-menu';
+  });
+  const OverflowMenu = defineAsyncComponent(
+    () => import('/src/components/layout/OverflowMenu.vue')
+  );
+  const {
+    loading: dataLoading,
+    error: dataError,
+    hideoutLoading,
+  } = useTarkovData();
+  const { mdAndDown } = useDisplay();
+  function changeNavigationDrawer() {
+    if (mdAndDown.value) {
+      appStore.toggleDrawerShow();
+    } else {
+      appStore.toggleDrawerRail();
+    }
   }
-}
 </script>
-
