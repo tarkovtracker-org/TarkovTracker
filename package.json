@@ -14,7 +14,8 @@
     "emulators:local": "firebase emulators:start --import=./local_data --export-on-exit",
     "dev": "concurrently \"npm:frontend\" \"npm:emulators:local\"",
     "deps": "taze --interactive",
-    "deps:all": "npm run deps && npm run deps --workspaces --if-present"
+    "deps:all": "npm run deps && npm run deps --workspaces --if-present",
+    "swagger": "npm run swagger --workspace=functions"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
