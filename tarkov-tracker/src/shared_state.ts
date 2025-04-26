@@ -26,7 +26,7 @@ interface HideoutModule {
 
 export interface UserState {
   level: number;
-  gameEdition: number; // Assuming number represents edition ID
+  gameEdition: number;
   pmcFaction: 'USEC' | 'BEAR'; // Use union type for specific factions
   displayName: string | null;
   taskObjectives: { [objectiveId: string]: TaskObjective };
@@ -91,11 +91,11 @@ export interface UserActions {
   setTaskObjectiveUncomplete: Action<UserState, [string]>;
   toggleTaskObjectiveComplete: Action<UserState, [string]>;
   setHideoutPartComplete: Action<UserState, [string]>;
-  setHideoutPartUncomplete: Action<UserState, [string]>; // Added missing uncomplete action
-  toggleHideoutPartComplete: Action<UserState, [string]>; // Added missing toggle action
+  setHideoutPartUncomplete: Action<UserState, [string]>;
+  toggleHideoutPartComplete: Action<UserState, [string]>;
   setHideoutModuleComplete: Action<UserState, [string]>;
   setHideoutModuleUncomplete: Action<UserState, [string]>;
-  toggleHideoutModuleComplete: Action<UserState, [string]>; // Added missing toggle action
+  toggleHideoutModuleComplete: Action<UserState, [string]>;
 }
 
 // Getters are for reading store state in a uniform manner
