@@ -62,7 +62,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
   },
   // Path to the API docs files (TypeScript handlers and component definitions)
   apis: [
-    "lib/api/v2/index.js"
+    "lib/api/v2/index.js",
+    "lib/api/v2/components.js"
   ],
 };
 // Generate the OpenAPI specification
