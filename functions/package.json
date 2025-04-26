@@ -1,5 +1,5 @@
 {
-  "name": "tarkovtracker-cloud-functions",
+  "name": "functions",
   "description": "Cloud Functions for Firebase",
   "private": true,
   "version": "3.0.0",
@@ -7,13 +7,17 @@
     "node": "18"
   },
   "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
     "deploy": "npm run build && firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "vitest",
     "lint": "eslint .",
     "swagger": "node api/v2/swagger.ts",
-    "deps": "taze --interactive",
-    "build": "tsc"
+    "deps": "taze --interactive"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -41,6 +45,7 @@
     "eslint": "^9.25.1",
     "firebase-functions-test": "^3.4.1",
     "prettier": "^3.5.3",
+    "taze": "^19.0.4",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2"
   }
