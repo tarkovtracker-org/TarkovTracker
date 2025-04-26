@@ -44,7 +44,7 @@ This is a community maintained fork of the original [TarkovTracker](https://gith
 2. Install frontend dependencies:
 
    ```bash
-   cd tarkov-tracker
+   cd frontend
    npm install
    ```
 
@@ -58,7 +58,7 @@ This is a community maintained fork of the original [TarkovTracker](https://gith
 4. Start development server:
 
    ```bash
-   cd tarkov-tracker
+   cd frontend
    npm run dev
    ```
 
@@ -68,7 +68,7 @@ The project consists of two main components:
 
 1. **Frontend (SPA)**
 
-   - Located in `/tarkov-tracker`
+   - Located in `/frontend`
    - Built with Vue.js
    - Can function independently using local storage
 
@@ -85,3 +85,32 @@ This project retains the original GNU General Public License v3.0 from the origi
 
 - Original TarkovTracker team and [@Thaddeus](https://github.com/thaddeus)
 - All contributors and community members
+
+### Running the Frontend (Vite + Vue 3)
+
+1. Navigate to the frontend directory:
+
+    ```bash
+    cd frontend
+    ```
+
+2. Install dependencies:
+
+    To run the frontend development server:
+
+    ```bash
+    # From the root directory
+    npm run dev --workspace=frontend
+
+    # Or from the frontend directory
+    cd frontend
+    npm run dev
+    ```
+
+### Folder Structure
+
+- **`/functions`**: Contains the Firebase Cloud Functions (Node.js/TypeScript).
+- **`/frontend`**: Contains the frontend application (Vue 3/Vite).
+  - Located in `/frontend`
+  - Built using Vue 3, Vite, TypeScript, Vuetify, Pinia.
+- **`/docs`**: General project documentation.
