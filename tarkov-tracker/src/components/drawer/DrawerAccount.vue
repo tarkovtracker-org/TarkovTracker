@@ -3,18 +3,16 @@
     <template v-if="fireuser.loggedIn">
       <v-list-group>
         <template #activator="{ props }">
-          <template v-if="appStore.drawerUseRail(mdAndDown)">
+          <template v-if="isCollapsed">
             <v-avatar
               v-bind="props"
               class="mx-auto"
-              size="24"
-              :class="
-                appStore.drawerUseRail(mdAndDown) ? 'd-flex fake-link' : ''
-              "
+              size="32"
+              :class="'d-flex fake-link'"
             >
               <v-img
                 :src="
-                  userStore.getStreamerMode
+                  userStore.getStreamerMode || !fireuser.photoURL
                     ? '/img/default-avatar.svg'
                     : fireuser.photoURL
                 "
@@ -26,7 +24,7 @@
               v-bind="props"
               :title="userStore.getStreamerMode ? 'User' : fireuser.displayName"
               :prepend-avatar="
-                userStore.getStreamerMode
+                userStore.getStreamerMode || !fireuser.photoURL
                   ? '/img/default-avatar.svg'
                   : fireuser.photoURL
               "
@@ -36,7 +34,7 @@
         <drawer-item
           icon="mdi-lock"
           locale-key="logout"
-          :is-collapsed="props.isCollapsed"
+          :is-collapsed="isCollapsed"
           @click.stop="logout"
         />
       </v-list-group>
@@ -46,17 +44,15 @@
         icon="mdi-fingerprint"
         locale-key="login"
         to="/login"
-        :is-collapsed="props.isCollapsed"
+        :is-collapsed="isCollapsed"
       />
     </template>
   </v-list>
 </template>
 <script setup>
   import { fireuser, auth } from '@/plugins/firebase';
-  import { defineAsyncComponent, defineProps } from 'vue';
-  import { useAppStore } from '@/stores/app';
+  import { defineAsyncComponent } from 'vue';
   import { useUserStore } from '@/stores/user';
-  import { useDisplay } from 'vuetify';
   import { signOut } from 'firebase/auth';
 
   const props = defineProps({
@@ -65,9 +61,6 @@
       required: true,
     },
   });
-
-  const { mdAndDown } = useDisplay();
-  const appStore = useAppStore();
   const userStore = useUserStore();
   const DrawerItem = defineAsyncComponent(
     () => import('@/components/drawer/DrawerItem.vue')
