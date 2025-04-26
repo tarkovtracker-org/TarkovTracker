@@ -1,15 +1,15 @@
-export default {
+module.exports = {
   client: {
     service: {
-      name: "My-Graph-9wt0hn",
+      name: "tarkov-tracker",
       // URL to the GraphQL API
-      url: "https://api.tarkov.dev/graphql",
+      url: "http://localhost:5001/tarkovtracker-dev/us-central1/graphql",
     },
     // Files processed by the extension
     includes: [
-      "tarkov-tracker/src/**/*.vue",
-      "tarkov-tracker/src/**/*.js",
-      "tarkov-tracker/src/**/*.ts",
+      "frontend/src/**/*.vue",
+      "frontend/src/**/*.js",
+      "frontend/src/**/*.ts",
     ],
   },
 };
