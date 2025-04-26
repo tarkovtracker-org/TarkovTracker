@@ -156,20 +156,32 @@ function isTaskObjectiveNeeded(need) {
   }
 }
 function isHideoutModuleNeeded(need) {
+  // If hideoutModule or its id is missing, this need cannot be for a hideout module
+  if (!need.hideoutModule || !need.hideoutModule.id) {
+    return false;
+  }
+  const moduleCompletions = progressStore.moduleCompletions?.[need.hideoutModule?.id] || {};
+  const modulePartCompletions = progressStore.modulePartCompletions?.[need.id] || {};
+
+  // If there is no progress data at all, show the item by default
+  if (
+    Object.keys(moduleCompletions).length === 0 &&
+    Object.keys(modulePartCompletions).length === 0
+  ) {
+    return true;
+  }
+
   if (userStore.itemsTeamAllHidden || userStore.itemsTeamHideoutHidden) {
     // Only show if the objective is needed by ourself
     return (
-      !progressStore.moduleCompletions[need.hideoutModule.id]?.self &&
-      !progressStore.modulePartCompletions[need.id]?.self
+      moduleCompletions.self === undefined || moduleCompletions.self === false
+    ) && (
+      modulePartCompletions.self === undefined || modulePartCompletions.self === false
     );
   } else {
     return (
-      Object.values(
-        progressStore.moduleCompletions[need.hideoutModule.id],
-      ).some((userStatus) => userStatus === false) &&
-      Object.values(progressStore.modulePartCompletions[need.id]).some(
-        (userStatus) => userStatus === false,
-      )
+      Object.values(moduleCompletions).some((userStatus) => userStatus === false) &&
+      Object.values(modulePartCompletions).some((userStatus) => userStatus === false)
     );
   }
 }
@@ -288,15 +300,15 @@ const lockedBefore = computed(() => {
 const selfCompletedNeed = computed(() => {
   if (props.need.needType == "taskObjective") {
     return (
-      progressStore.tasksCompletions[props.need.taskId]["self"] ||
-      progressStore.objectiveCompletions[props.need.id]["self"] ||
+      progressStore.tasksCompletions?.[props.need.taskId]?.["self"] ||
+      progressStore.objectiveCompletions?.[props.need.id]?.["self"] ||
       (relatedTask.value.factionName != "Any" &&
         relatedTask.value.factionName != tarkovStore.getPMCFaction)
     );
   } else if (props.need.needType == "hideoutModule") {
     return (
-      progressStore.moduleCompletions[props.need.hideoutModule.id]["self"] ||
-      progressStore.modulePartCompletions[props.need.id]["self"]
+      progressStore.moduleCompletions?.[props.need.hideoutModule.id]?.["self"] ||
+      progressStore.modulePartCompletions?.[props.need.id]?.["self"]
     );
   } else {
     return false;

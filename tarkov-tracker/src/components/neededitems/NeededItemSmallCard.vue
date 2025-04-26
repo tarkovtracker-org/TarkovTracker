@@ -257,8 +257,8 @@ import {
   computed,
   inject,
   ref,
-  defineProps,
-  defineEmits,
+
+
 } from "vue";
 import { useUserStore } from "@/stores/user";
 import { useProgressStore } from "@/stores/progress";
