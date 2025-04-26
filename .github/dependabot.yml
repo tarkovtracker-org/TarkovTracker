@@ -6,7 +6,7 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/tarkov-tracker/"
+    directory: "/frontend/"
     schedule:
       interval: "weekly"
       day: "monday" # Start the week with fresh updates
@@ -15,24 +15,26 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "tarkov-tracker"
+      - "frontend"
     commit-message:
       prefix: "deps"
       prefix-development: "dev-deps"
       include: "scope"
     versioning-strategy: "auto"
     groups:
-      dev-dependencies:
+      frontend-deps:
         patterns:
-          - "*eslint*"
-          - "*prettier*"
+          - "*"
         update-types:
           - "minor"
           - "patch"
+      exclude-patterns:
+        - "vue"
+        - "vuetify"
     ignore:
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
-    
+
   - package-ecosystem: "npm"
     directory: "/functions/"
     schedule:
@@ -49,7 +51,7 @@ updates:
       prefix-development: "dev-deps"
       include: "scope"
     versioning-strategy: "auto"
-    
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
