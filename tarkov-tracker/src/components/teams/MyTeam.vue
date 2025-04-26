@@ -5,13 +5,13 @@
     highlight-color="secondary"
   >
     <template #title>
-      {{ $t("page.team.card.myteam.title") }}
+      {{ $t('page.team.card.myteam.title') }}
     </template>
     <template #content>
       <template v-if="systemStore.userTeam == null">
         <v-row align="center" no-gutters>
           <v-col cols="12">
-            {{ $t("page.team.card.myteam.no_team") }}
+            {{ $t('page.team.card.myteam.no_team') }}
           </v-col>
         </v-row>
       </template>
@@ -78,7 +78,7 @@
             prepend-icon="mdi-account-group"
             @click="createTeam"
           >
-            {{ $t("page.team.card.myteam.create_new_team") }}
+            {{ $t('page.team.card.myteam.create_new_team') }}
           </v-btn>
           <v-btn
             v-if="systemStore.userTeam != null"
@@ -91,8 +91,8 @@
           >
             {{
               systemStore.userTeamIsOwn
-                ? $t("page.team.card.myteam.disband_team")
-                : $t("page.team.card.myteam.leave_team")
+                ? $t('page.team.card.myteam.disband_team')
+                : $t('page.team.card.myteam.leave_team')
             }}
           </v-btn>
         </v-row>
@@ -117,119 +117,136 @@
   </v-snackbar>
 </template>
 <script setup>
-import { defineAsyncComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { fireuser, functions } from "@/plugins/firebase";
-import { httpsCallable } from "firebase/functions";
-import { useLiveData } from "@/composables/livedata";
-import { useUserStore } from "@/stores/user";
-import { useTarkovStore } from "@/stores/tarkov";
-const FittedCard = defineAsyncComponent(
-  () => import("@/components/FittedCard.vue"),
-);
-
-const { t } = useI18n({ useScope: "global" });
-const { useTeamStore, useSystemStore } = useLiveData();
-const teamStore = useTeamStore();
-const systemStore = useSystemStore();
-
-// Create new team
-const creatingTeam = ref(false);
-const createTeamResult = ref(null);
-const createTeamSnackbar = ref(false);
-const createTeam = async () => {
-  creatingTeam.value = true;
-  try {
-    const createTeamFunction = httpsCallable(functions, "createTeam");
-    createTeamResult.value = await createTeamFunction({});
-    createTeamResult.value = t("page.team.card.myteam.create_team_success");
-    createTeamSnackbar.value = true;
-  } catch (error) {
-    createTeamResult.value = t("page.team.card.myteam.create_team_error");
-    console.error(error);
-    createTeamSnackbar.value = true;
-  }
-  creatingTeam.value = false;
-};
-
-// Leave team
-const leavingTeam = ref(false);
-const leaveTeamResult = ref(null);
-const leaveTeamSnackbar = ref(false);
-const leaveTeam = async () => {
-  leavingTeam.value = true;
-  try {
-    const leaveTeamFunction = httpsCallable(functions, "leaveTeam");
-    leaveTeamResult.value = await leaveTeamFunction({});
-    if (systemStore.userTeamIsOwn) {
-      leaveTeamResult.value = t("page.team.card.myteam.disband_team_success");
-    } else {
-      leaveTeamResult.value = t("page.team.card.myteam.leave_team_success");
-    }
-    leaveTeamSnackbar.value = true;
-  } catch (error) {
-    leaveTeamResult.value = t("page.team.card.myteam.leave_team_error");
-    console.error(error);
-    leaveTeamSnackbar.value = true;
-  }
-  leavingTeam.value = false;
-};
-
-const copyUrl = () => {
-  if (teamUrl.value) {
-    navigator.clipboard.writeText(teamUrl.value);
-  } else {
-    console.error("No team URL to copy");
-  }
-};
-
-const teamUrl = computed(() => {
-  console.debug(
-    "[Invite Debug] teamOwner:",
-    teamStore.teamOwner,
-    "teamPassword:",
-    teamStore.teamPassword,
+  import { defineAsyncComponent, ref, computed, watch } from 'vue';
+  import { useI18n } from 'vue-i18n';
+  import { fireuser, functions } from '@/plugins/firebase';
+  import { httpsCallable } from 'firebase/functions';
+  import { useLiveData } from '@/composables/livedata';
+  import { useUserStore } from '@/stores/user';
+  import { useTarkovStore } from '@/stores/tarkov';
+  const FittedCard = defineAsyncComponent(
+    () => import('@/components/FittedCard.vue')
   );
-  if (!teamStore.teamOwner || !teamStore.teamPassword) {
-    console.warn(
-      "[Invite Debug] Missing teamOwner or teamPassword when generating invite URL:",
-      teamStore.teamOwner,
-      teamStore.teamPassword,
-    );
-  }
-  if (teamStore.teamOwner && teamStore.teamPassword) {
-    return `${window.location.href.split("?")[0]}?team=${encodeURIComponent(
-      teamStore.teamOwner,
-    )}&code=${encodeURIComponent(teamStore.teamPassword)}`;
-  } else {
-    return "";
-  }
-});
 
-const userStore = useUserStore();
+  const { t } = useI18n({ useScope: 'global' });
+  const { useTeamStore, useSystemStore } = useLiveData();
+  const teamStore = useTeamStore();
+  const systemStore = useSystemStore();
 
-const visibleUrl = computed(() => {
-  if (userStore.getStreamerMode) {
-    return t("page.team.card.myteam.url_hidden");
-  } else {
-    return teamUrl.value;
-  }
-});
-
-const tarkovStore = useTarkovStore();
-const displayName = computed({
-  get() {
-    return tarkovStore.getDisplayName || fireuser.uid.substring(0, 6);
-  },
-  set(newName) {
-    if (newName !== "") {
-      tarkovStore.setDisplayName(newName);
+  // Create new team
+  const creatingTeam = ref(false);
+  const createTeamResult = ref(null);
+  const createTeamSnackbar = ref(false);
+  const createTeam = async () => {
+    creatingTeam.value = true;
+    try {
+      const createTeamFunction = httpsCallable(functions, 'createTeam');
+      await createTeamFunction({});
+      // Wait for Firestore to update systemStore.userTeam
+      const waitForTeam = () =>
+        new Promise((resolve) => {
+          const stop = watch(
+            () => systemStore.userTeam,
+            (val) => {
+              if (val != null) {
+                stop();
+                resolve();
+              }
+            }
+          );
+        });
+      await waitForTeam();
+      createTeamResult.value = t('page.team.card.myteam.create_team_success');
+      createTeamSnackbar.value = true;
+    } catch (error) {
+      let backendMsg =
+        error?.message || error?.data?.message || error?.toString();
+      createTeamResult.value =
+        backendMsg || t('page.team.card.myteam.create_team_error');
+      console.error(error);
+      createTeamSnackbar.value = true;
     }
-  },
-});
+    creatingTeam.value = false;
+  };
 
-const clearDisplayName = () => {
-  tarkovStore.setDisplayName(null);
-};
+  // Leave team
+  const leavingTeam = ref(false);
+  const leaveTeamResult = ref(null);
+  const leaveTeamSnackbar = ref(false);
+  const leaveTeam = async () => {
+    leavingTeam.value = true;
+    try {
+      const leaveTeamFunction = httpsCallable(functions, 'leaveTeam');
+      leaveTeamResult.value = await leaveTeamFunction({});
+      if (systemStore.userTeamIsOwn) {
+        leaveTeamResult.value = t('page.team.card.myteam.disband_team_success');
+      } else {
+        leaveTeamResult.value = t('page.team.card.myteam.leave_team_success');
+      }
+      leaveTeamSnackbar.value = true;
+    } catch (error) {
+      leaveTeamResult.value = t('page.team.card.myteam.leave_team_error');
+      console.error(error);
+      leaveTeamSnackbar.value = true;
+    }
+    leavingTeam.value = false;
+  };
+
+  const copyUrl = () => {
+    if (teamUrl.value) {
+      navigator.clipboard.writeText(teamUrl.value);
+    } else {
+      console.error('No team URL to copy');
+    }
+  };
+
+  const teamUrl = computed(() => {
+    console.debug(
+      '[Invite Debug] teamOwner:',
+      teamStore.teamOwner,
+      'teamPassword:',
+      teamStore.teamPassword
+    );
+    if (!teamStore.teamOwner || !teamStore.teamPassword) {
+      console.warn(
+        '[Invite Debug] Missing teamOwner or teamPassword when generating invite URL:',
+        teamStore.teamOwner,
+        teamStore.teamPassword
+      );
+    }
+    if (teamStore.teamOwner && teamStore.teamPassword) {
+      return `${window.location.href.split('?')[0]}?team=${encodeURIComponent(
+        teamStore.teamOwner
+      )}&code=${encodeURIComponent(teamStore.teamPassword)}`;
+    } else {
+      return '';
+    }
+  });
+
+  const userStore = useUserStore();
+
+  const visibleUrl = computed(() => {
+    if (userStore.getStreamerMode) {
+      return t('page.team.card.myteam.url_hidden');
+    } else {
+      return teamUrl.value;
+    }
+  });
+
+  const tarkovStore = useTarkovStore();
+  const displayName = computed({
+    get() {
+      return tarkovStore.getDisplayName || fireuser.uid.substring(0, 6);
+    },
+    set(newName) {
+      if (newName !== '') {
+        tarkovStore.setDisplayName(newName);
+      }
+    },
+  });
+
+  const clearDisplayName = () => {
+    tarkovStore.setDisplayName(null);
+  };
 </script>
 <style lang="scss" scoped></style>

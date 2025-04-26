@@ -93,7 +93,7 @@
 <script setup>
 import { fireuser } from "@/plugins/firebase";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+
 import { useLiveData } from "@/composables/livedata";
 import { useUserStore } from "@/stores/user";
 import { useProgressStore } from "@/stores/progress";
@@ -119,7 +119,7 @@ const { useTeamStore } = useLiveData();
 const progressStore = useProgressStore();
 const teamStore = useTeamStore();
 const userStore = useUserStore();
-const { tasks } = useTarkovData();
+const { tasks, playerLevels } = useTarkovData();
 
 const completedTaskCount = computed(() => {
   return tasks.value.filter(
@@ -129,9 +129,9 @@ const completedTaskCount = computed(() => {
 });
 
 const groupIcon = computed(() => {
-  return `/img/levelgroups/${
-    Math.floor(progressStore.getLevel(props.teammember) / 5) + 1
-  }.png`;
+  const level = progressStore.getLevel(props.teammember);
+  const entry = playerLevels.value.find((pl) => pl.level === level);
+  return entry?.levelBadgeImageLink ?? '';
 });
 
 const factionIcon = computed(() => {
@@ -159,4 +159,3 @@ const factionIcon = computed(() => {
 // }
 </script>
 <style lang="scss" scoped></style>
-
