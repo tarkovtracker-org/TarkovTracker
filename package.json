@@ -1,18 +1,21 @@
 {
   "private": true,
+  "name": "tarkov-tracker-monorepo",
   "workspaces": [
     "functions",
-    "tarkov-tracker"
+    "frontend"
   ],
   "scripts": {
+    "dev": "npm run dev --workspace=frontend",
     "build": "npm run build --workspaces",
     "build:functions": "npm run build --workspace=functions",
-    "build:frontend": "npm run build --workspace=tarkov-tracker",
-    "emulators": "firebase emulators:start --only auth,functions,firestore,database,hosting"
+    "build:frontend": "npm run build --workspace=frontend",
+    "emulators": "firebase emulators:start --only auth,functions,firestore,database,hosting",
+    "serve:local": "firebase emulators:start --import=./local_data --export-on-exit"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
-    "@types/node": "^22.14.1",
+    "@types/node": "^22.15.2",
     "firebase-tools": "^11.0.0"
   }
 }
