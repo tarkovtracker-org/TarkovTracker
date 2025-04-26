@@ -28,7 +28,7 @@
     <div v-if="currentLevel" class="text-center text-caption mt-4 mb-2 mx-2">
       {{ currentLevel.description }}
     </div>
-    <div v-else class="text-center text-caption mt-4 mb-2 mx-2">
+    <div v-else-if="nextLevel" class="text-center text-caption mt-4 mb-2 mx-2">
       {{ nextLevel.description }}
     </div>
     <v-sheet
@@ -197,8 +197,8 @@
 <script setup>
   import { computed, defineAsyncComponent, ref } from 'vue';
   import { useProgressStore } from '@/stores/progress';
-  import { useI18n } from 'vue-i18n';
   import { useTarkovStore } from '@/stores/tarkov';
+  import { useI18n } from 'vue-i18n';
   const TarkovItem = defineAsyncComponent(
     () => import('@/components/TarkovItem.vue')
   );
@@ -225,15 +225,14 @@
     return nextLevel.value === null;
   });
   const downgradeDisabled = computed(() => {
-    if (props.station.id == '5d484fc0654e76006657e0ab') {
-      if (
-        progressStore.hideoutLevels[props.station.id]?.['self'] <=
-        progressStore.gameEditionData.find(
-          (edition) => edition.version == tarkovStore.getGameEdition
-        ).defaultStashLevel
-      ) {
-        return true;
-      }
+    if (props.station.id === '5d484fc0654e76006657e0ab') {
+      const currentStash = progressStore.hideoutLevels[props.station.id]?.['self'] ?? 0;
+      const editionId = tarkovStore.getGameEdition();
+      const editionData = progressStore.gameEditionData.find(
+        (e) => e.version === editionId
+      );
+      const defaultStash = editionData?.defaultStashLevel ?? 0;
+      return currentStash <= defaultStash;
     }
     return false;
   });
