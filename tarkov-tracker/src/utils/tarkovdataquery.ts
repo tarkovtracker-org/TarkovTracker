@@ -383,6 +383,7 @@ export default gql`
     playerLevels {
       level
       exp
+      levelBadgeImageLink
     }
     traders {
       id
