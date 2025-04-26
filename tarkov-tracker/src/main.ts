@@ -7,8 +7,8 @@ import vuetify from './plugins/vuetify';
 import pinia from './plugins/pinia';
 import apolloClient from './plugins/apollo';
 import { VueFire, VueFireAuth } from 'vuefire';
-import { app as fireapp } from './plugins/firebase'; // Assume firebase.ts exists or will be created
-import { markInitialized, forceInitialize } from './plugins/store-initializer'; // Assume this will be .ts
+import { app as fireapp } from './plugins/firebase';
+import { markInitialized, forceInitialize } from './plugins/store-initializer';
 // Base app component
 import App from './App.vue';
 // Import DataMigrationDialog for global registration
