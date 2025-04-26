@@ -72,14 +72,16 @@ const firebaseConfig: FirebaseOptions = {
 };
 // Initialize Firebase with error handling
 let app: FirebaseApp;
-let analytics: Analytics;
+let analytics: Analytics | undefined;
 let auth: Auth;
 let firestore: Firestore;
 let functions: Functions;
 let storage: FirebaseStorage;
 try {
   app = initializeApp(firebaseConfig);
-  analytics = getAnalytics(app);
+  if (import.meta.env.PROD) {
+    analytics = getAnalytics(app);
+  }
   auth = getAuth(app);
   firestore = getFirestore(app);
   functions = getFunctions(app, 'us-central1');

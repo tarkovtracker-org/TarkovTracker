@@ -3,16 +3,22 @@ import { createPinia, type Pinia } from 'pinia'; // Import Pinia type
 import { PiniaFireswap } from './pinia-firestore'; // Assume .ts conversion or types exist
 import { markInitialized } from './store-initializer'; // Assume .ts conversion or types exist
 
-// Explicitly type the pinia instance
-const pinia: Pinia = createPinia();
+// Singleton guard for Pinia instance
+let piniaInstance: Pinia | null = null;
 
-// Use plugins - TypeScript should infer types for use() if plugins are typed correctly
-pinia.use(PiniaFireswap);
+const getPinia = () => {
+  if (piniaInstance) {
+    console.warn('Pinia is being initialized more than once!');
+    return piniaInstance;
+  }
+  const pinia: Pinia = createPinia();
+  pinia.use(PiniaFireswap);
+  setTimeout(() => {
+    markInitialized();
+    console.debug('Pinia store system marked as initialized');
+  }, 100);
+  piniaInstance = pinia;
+  return pinia;
+};
 
-// Mark the store system as initialized after a short delay to ensure everything is ready
-setTimeout(() => {
-  markInitialized();
-  console.debug('Pinia store system marked as initialized');
-}, 100);
-
-export default pinia;
+export default getPinia();

@@ -118,13 +118,15 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
             let newStatePart: StateTree | undefined;
             if (localData) {
               console.debug(
-                `[PiniaFireswap ${store.$id}] Loading local version: ${fireswapSetting.localKey}`
+                `[PiniaFireswap ${store.$id}] Loading local version: ${fireswapSetting.localKey}`,
+                localData
               );
               newStatePart = JSON.parse(localData);
             } else {
               // No local data, use default state
               console.debug(
-                `[PiniaFireswap ${store.$id}] No local version found, using default state for ${fireswapSetting.localKey}`
+                `[PiniaFireswap ${store.$id}] No local version found, using default state for ${fireswapSetting.localKey}`,
+                fireswapSetting.defaultState
               );
               newStatePart = fireswapSetting.defaultState
                 ? JSON.parse(fireswapSetting.defaultState)
@@ -132,15 +134,25 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
             }
 
             if (path !== '.') {
-              // Use $patch from the correctly typed store
               store.$patch((state) => {
                 set(state, path, newStatePart);
+                if (fireswapSetting.localKey === 'progress') {
+                  console.debug(
+                    `[PiniaFireswap ${store.$id}] After patch (path: ${path}) level:`,
+                    state.level
+                  );
+                }
               });
             } else {
               // Patching root state
               store.$patch((state) => {
-                // Assign new properties, potentially overwriting existing ones
                 Object.assign(state, newStatePart);
+                if (fireswapSetting.localKey === 'progress') {
+                  console.debug(
+                    `[PiniaFireswap ${store.$id}] After patch (root) level:`,
+                    state.level
+                  );
+                }
               });
             }
           } catch (error) {
@@ -336,7 +348,8 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
               fireswapSetting.uploadDocument?.(relevantState);
             } else {
               console.debug(
-                `[PiniaFireswap ${store.$id}] $subscribe -> Saving to localStorage: ${fireswapSetting.localKey} (fsIndex ${fsIndex})`
+                `[PiniaFireswap ${store.$id}] $subscribe -> Saving to localStorage: ${fireswapSetting.localKey} (fsIndex ${fsIndex})`,
+                JSON.stringify(relevantState)
               );
               // If not bound, update local storage
               try {
@@ -344,6 +357,12 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
                   fireswapSetting.localKey,
                   JSON.stringify(relevantState)
                 );
+                if (fireswapSetting.localKey === 'progress') {
+                  console.debug(
+                    `[PiniaFireswap ${store.$id}] After localStorage set (level):`,
+                    relevantState.level
+                  );
+                }
               } catch (e) {
                 console.error(
                   `[PiniaFireswap ${store.$id}] Error saving to localStorage ${fireswapSetting.localKey}:`,
