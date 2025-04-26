@@ -32,9 +32,11 @@ functions/node_modules/
 functions/coverage/
 functions/lib/
 
-# Tarkov Tracker Files
-tarkov-tracker/node_modules/
-tarkov-tracker/.env
-tarkov-tracker/.env.local
-tarkov-tracker/.env.*.local
-tarkov-tracker/dist/
+# Frontend specific
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/dist/
+frontend/coverage/
+frontend/.DS_Store
