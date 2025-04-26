@@ -38,7 +38,7 @@
           class="external-link"
           @click="openWikiLink()"
         >
-          <v-img src="/img/wikilogo.png"></v-img>
+          <v-img src="/img/logos/wikilogo.png"></v-img>
         </v-avatar>
       </v-col>
       <v-col cols="auto" class="mx-1">
@@ -49,7 +49,7 @@
           class="external-link"
           @click="openTarkovDevLink()"
         >
-          <v-img src="/img/tarkovdevlogo.png"></v-img>
+          <v-img src="/img/logos/tarkovdevlogo.png"></v-img>
         </v-avatar>
       </v-col>
       <v-col cols="auto" class="mx-1">
