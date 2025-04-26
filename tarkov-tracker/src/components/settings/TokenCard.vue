@@ -65,9 +65,7 @@
 import { firestore, functions } from "@/plugins/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { computed, onMounted } from "vue";
-import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, onMounted, ref } from "vue";
 import QRCode from "qrcode";
 import { useUserStore } from "@/stores/user";
 // Get locale for use in calculating relative time
