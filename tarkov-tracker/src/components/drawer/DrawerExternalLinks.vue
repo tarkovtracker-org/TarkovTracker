@@ -1,28 +1,28 @@
 <template>
   <v-list nav bg-color="transparent" class="mx-auto">
     <drawer-item
-      avatar="/img/tarkovdevlogo.png"
+      avatar="/img/logos/tarkovdevlogo.png"
       locale-key="tarkovdev"
       href="https://tarkov.dev/"
       ext-link
       :is-collapsed="props.isCollapsed"
     />
     <drawer-item
-      avatar="/img/ratscannerlogo.png"
+      avatar="/img/logos/ratscannerlogo.png"
       locale-key="ratscanner"
       href="https://ratscanner.com/"
       ext-link
       :is-collapsed="props.isCollapsed"
     />
     <drawer-item
-      avatar="/img/tarkovgurulogo.png"
+      avatar="/img/logos/tarkovgurulogo.png"
       locale-key="tarkovguru"
       href="https://tarkov.guru/"
       ext-link
       :is-collapsed="props.isCollapsed"
     />
     <drawer-item
-      avatar="/img/tarkovchangeslogo.svg"
+      avatar="/img/logos/tarkovchangeslogo.svg"
       locale-key="tarkovchanges"
       href="https://tarkov-changes.com/"
       ext-link
@@ -31,7 +31,7 @@
   </v-list>
 </template>
 <script setup>
-  import { defineAsyncComponent, defineProps } from 'vue';
+  import { defineAsyncComponent } from 'vue';
 
   // Define the prop
   const props = defineProps({

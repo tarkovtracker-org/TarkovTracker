@@ -1,64 +1,78 @@
 <template>
   <div class="d-flex justify-center align-center mb-2">
-    <span v-if="!mdAndDown" style="line-height: 0px">
-      <div class="crossfade">
-        <img
-          :src="pmcFactionIcon"
-          style="max-width: 64px"
-          class="px-2 faction-icon crossfade-faction"
-        />
-        <img :src="groupIcon" style="max-width: 64px" class="crossfade-level" />
-      </div>
-    </span>
-    <span>
-      <div style="font-size: 0.7em" class="text-center mb-1">
-        {{ t('navigation_drawer.level') }}
-      </div>
+    <template v-if="isCollapsed">
       <div class="text-center">
-        <h1
-          v-if="!editingLevel"
-          style="font-size: 2.5em; line-height: 0.8em; cursor: pointer"
-          @click="startEditingLevel"
-        >
-          {{ tarkovStore.playerLevel() }}
-        </h1>
-        <input
-          v-else
-          ref="levelInput"
-          type="number"
-          :min="minPlayerLevel"
-          :max="maxPlayerLevel"
-          v-model.number="levelInputValue"
-          @blur="saveLevel"
-          @keyup.enter="saveLevel"
-          style="font-size: 2.5em; width: 2.5em; text-align: center"
-        />
+        <div style="font-size: 0.7em" class="mb-1">
+          {{ t('navigation_drawer.level') }}
+        </div>
+        <h1 class="rail-level-number">{{ tarkovStore.playerLevel() }}</h1>
       </div>
-    </span>
-    <span v-if="!mdAndDown">
-      <div>
-        <v-btn
-          icon
-          size="small"
-          variant="plain"
-          @click="incrementLevel"
-          :disabled="tarkovStore.playerLevel() >= maxPlayerLevel"
-        >
-          <v-icon class="ma-0" small> mdi-chevron-up </v-icon>
-        </v-btn>
-      </div>
-      <div>
-        <v-btn
-          icon
-          size="small"
-          variant="plain"
-          @click="decrementLevel"
-          :disabled="tarkovStore.playerLevel() <= minPlayerLevel"
-        >
-          <v-icon class="ma-0" small> mdi-chevron-down </v-icon>
-        </v-btn>
-      </div>
-    </span>
+    </template>
+    <template v-else>
+      <span v-if="!mdAndDown" style="line-height: 0px">
+        <div class="crossfade">
+          <img
+            :src="pmcFactionIcon"
+            style="max-width: 64px"
+            class="px-2 faction-icon crossfade-faction"
+          />
+          <img
+            :src="groupIcon"
+            style="max-width: 64px"
+            class="crossfade-level"
+          />
+        </div>
+      </span>
+      <span>
+        <div style="font-size: 0.7em" class="text-center mb-1">
+          {{ t('navigation_drawer.level') }}
+        </div>
+        <div class="text-center">
+          <h1
+            v-if="!editingLevel"
+            style="font-size: 2.5em; line-height: 0.8em; cursor: pointer"
+            @click="startEditingLevel"
+          >
+            {{ tarkovStore.playerLevel() }}
+          </h1>
+          <input
+            v-else
+            ref="levelInput"
+            type="number"
+            :min="minPlayerLevel"
+            :max="maxPlayerLevel"
+            v-model.number="levelInputValue"
+            @blur="saveLevel"
+            @keyup.enter="saveLevel"
+            style="font-size: 2.5em; width: 2.5em; text-align: center"
+          />
+        </div>
+      </span>
+      <span v-if="!mdAndDown">
+        <div>
+          <v-btn
+            icon
+            size="small"
+            variant="plain"
+            @click="incrementLevel"
+            :disabled="tarkovStore.playerLevel() >= maxPlayerLevel"
+          >
+            <v-icon class="ma-0" small> mdi-chevron-up </v-icon>
+          </v-btn>
+        </div>
+        <div>
+          <v-btn
+            icon
+            size="small"
+            variant="plain"
+            @click="decrementLevel"
+            :disabled="tarkovStore.playerLevel() <= minPlayerLevel"
+          >
+            <v-icon class="ma-0" small> mdi-chevron-down </v-icon>
+          </v-btn>
+        </div>
+      </span>
+    </template>
   </div>
   <!-- <template v-if="mdAndDown">
 
@@ -78,17 +92,20 @@
   const { mdAndDown } = useDisplay();
   const tarkovStore = useTarkovStore();
   const appStore = useAppStore();
-  const { minPlayerLevel, maxPlayerLevel } = useTarkovData();
+  const { minPlayerLevel, maxPlayerLevel, playerLevels } = useTarkovData();
+  const props = defineProps({
+    isCollapsed: {
+      type: Boolean,
+      required: true,
+    },
+  });
   const pmcFactionIcon = computed(() => {
     return `/img/factions/${tarkovStore.getPMCFaction()}.webp`;
   });
   const groupIcon = computed(() => {
     const level = tarkovStore.playerLevel();
-    const groupNum =
-      typeof level === 'number' && !isNaN(level)
-        ? Math.floor(level / 5) + 1
-        : 1;
-    return `/img/levelgroups/${groupNum}.png`;
+    const entry = playerLevels.value.find(pl => pl.level === level);
+    return entry?.levelBadgeImageLink ?? '';
   });
 
   // Manual level editing logic
@@ -157,6 +174,14 @@
   }
   .crossfade:hover .crossfade-level {
     opacity: 0;
+  }
+  .rail-level-number {
+    font-size: 2em;
+    font-weight: bold;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+    line-height: 1.2;
   }
 </style>
 

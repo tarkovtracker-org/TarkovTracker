@@ -6,12 +6,12 @@
     to="/"
   >
     <div
-      :class="mdAndDown ? 'v-logo-rail' : 'v-logo-full compact-logo'"
+      :class="isCollapsed ? 'v-logo-rail' : 'v-logo-full compact-logo'"
       style="height: auto; margin: 8px auto"
     >
       <v-img :src="logo" lazy-src="/favicon-32x32.png" />
     </div>
-    <div v-if="!mdAndDown">
+    <div v-if="!isCollapsed">
       <div
         class="text-subtitle1 text-center mt-1 font-weight-medium compact-site-name"
       >
@@ -28,10 +28,16 @@
   const { t } = useI18n({ useScope: 'global' });
   const { mdAndDown } = useDisplay();
   const appStore = useAppStore();
+  const props = defineProps({
+    isCollapsed: {
+      type: Boolean,
+      required: true,
+    },
+  });
   const logo = computed(() => {
-    return mdAndDown.value
-      ? '/img/tarkovtrackerlogo-mini.png'
-      : '/img/tarkovtrackerlogo-light.png';
+    return props.isCollapsed
+      ? '/img/logos/tarkovtrackerlogo-mini.png'
+      : '/img/logos/tarkovtrackerlogo-light.png';
   });
 </script>
 <style lang="scss" scoped>

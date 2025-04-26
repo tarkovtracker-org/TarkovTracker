@@ -46,7 +46,7 @@
   </v-list>
 </template>
 <script setup>
-  import { defineAsyncComponent, defineProps } from 'vue';
+  import { defineAsyncComponent } from 'vue';
   import { fireuser } from '@/plugins/firebase';
 
   const props = defineProps({
