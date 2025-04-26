@@ -23,13 +23,11 @@ onMounted(async () => {
   if (appStore.localeOverride) {
     locale.value = appStore.localeOverride;
   }
-
   // Check for migration flag in sessionStorage
   const wasMigrated = sessionStorage.getItem("tarkovDataMigrated") === "true";
   if (wasMigrated && fireuser.loggedIn) {
     // Re-set the migration flag
     markDataMigrated();
-
     // Make sure data is properly loaded from Firebase
     try {
       const store = useTarkovStore();
@@ -49,7 +47,6 @@ onMounted(async () => {
     font-family: "Share Tech Mono", sans-serif !important;
     font-display: swap;
   }
-
   font-family: "Share Tech Mono", sans-serif !important;
   font-display: swap;
 }
