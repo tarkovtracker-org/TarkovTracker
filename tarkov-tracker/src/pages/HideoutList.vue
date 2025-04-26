@@ -112,31 +112,29 @@
     let hideoutStationList = JSON.parse(JSON.stringify(hideoutStations.value));
     //Display all upgradeable stations
     if (activePrimaryView.value === 'available')
-      return hideoutStationList.filter(
-        (station) =>
-          progressStore.hideoutLevels[station.id] &&
-          progressStore.hideoutLevels[station.id]['self'] !== undefined &&
-          progressStore.hideoutLevels[station.id]['self'] !==
-            station.levels.length
-      );
+      return hideoutStationList.filter((station) => {
+        const lvl = progressStore.hideoutLevels[station.id]['self'] || 0;
+        const nextLevelData = station.levels.find((l) => l.level === lvl + 1);
+        if (!nextLevelData) return false;
+        return nextLevelData.stationLevelRequirements.every(
+          (req) => progressStore.hideoutLevels[req.station.id]['self'] >= req.level
+        );
+      });
     //Display all maxed stations
     if (activePrimaryView.value === 'maxed')
-      return hideoutStationList.filter(
-        (station) =>
-          progressStore.hideoutLevels[station.id] &&
-          progressStore.hideoutLevels[station.id]['self'] !== undefined &&
-          progressStore.hideoutLevels[station.id]['self'] ===
-            station.levels.length
+      return hideoutStationList.filter((station) =>
+        progressStore.hideoutLevels[station.id]['self'] === station.levels.length
       );
     //Display all locked stations
     if (activePrimaryView.value === 'locked')
-      return hideoutStationList.filter(
-        (station) =>
-          !(
-            progressStore.hideoutLevels[station.id] &&
-            progressStore.hideoutLevels[station.id]['self'] !== undefined
-          )
-      );
+      return hideoutStationList.filter((station) => {
+        const lvl = progressStore.hideoutLevels[station.id]['self'] || 0;
+        const nextLevelData = station.levels.find((l) => l.level === lvl + 1);
+        if (!nextLevelData) return false;
+        return !nextLevelData.stationLevelRequirements.every(
+          (req) => progressStore.hideoutLevels[req.station.id]['self'] >= req.level
+        );
+      });
     //Display all stations
     if (activePrimaryView.value === 'all') return hideoutStationList;
     return hideoutStationList;
