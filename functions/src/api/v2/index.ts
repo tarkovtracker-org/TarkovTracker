@@ -1,3 +1,12 @@
+/**
+ * @openapi
+ * /test:
+ *   get:
+ *     summary: Test endpoint
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 import functions from "firebase-functions";
 import express, { Express, Request, Response, NextFunction } from "express";
 import bodyParser from "body-parser";
@@ -62,29 +71,195 @@ type AuthenticatedHandler = (
 ) => void | Promise<void>;
 
 // Token Routes
+/**
+ * @openapi
+ * /api/v2/token:
+ *   get:
+ *     summary: Returns data associated with the Token given in the Authorization header of the request
+ *     tags:
+ *       - Token
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Token details retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 permissions:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: Permissions associated with the token.
+ *                 token:
+ *                   type: string
+ *                   description: The API token string.
+ *       401:
+ *         description: Unauthorized. Invalid or missing token.
+ *       500:
+ *         description: Internal server error.
+ */
 app.get("/api/v2/token", tokenHandler.getTokenInfo as AuthenticatedHandler);
 
 // Progress Routes
+/**
+ * @openapi
+ * /api/v2/progress:
+ *   get:
+ *     summary: Returns progress data of the player
+ *     tags:
+ *       - Progress
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Player progress retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   $ref: "#/components/schemas/Progress"
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     self:
+ *                       type: string
+ *                       description: The user ID of the requester.
+ *       401:
+ *         description: Unauthorized. Invalid token or missing 'GP' permission.
+ *       500:
+ *         description: Internal server error.
+ */
 app.get(
   "/api/v2/progress",
   progressHandler.getPlayerProgress as AuthenticatedHandler,
 );
+/**
+ * @openapi
+ * /api/v2/team/progress:
+ *   get:
+ *     summary: Returns progress data of all members of the team
+ *     tags:
+ *       - Progress
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Team progress retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TeamProgress'
+ *       401:
+ *         description: Unauthorized. Invalid token or missing 'TP' permission.
+ *       500:
+ *         description: Internal server error.
+ */
 app.get(
   "/api/v2/team/progress",
   progressHandler.getTeamProgress as AuthenticatedHandler,
 );
+/**
+ * @openapi
+ * /api/v2/progress/level/{levelValue}:
+ *   post:
+ *     summary: Set player level
+ *     tags:
+ *       - Progress
+ *     parameters:
+ *       - in: path
+ *         name: levelValue
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The new level value
+ *     responses:
+ *       200:
+ *         description: Player level set
+ */
 app.post(
   "/api/v2/progress/level/:levelValue",
   progressHandler.setPlayerLevel as AuthenticatedHandler,
 );
+/**
+ * @openapi
+ * /api/v2/progress/task/{taskId}:
+ *   post:
+ *     summary: Update a single task
+ *     tags:
+ *       - Progress
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Task ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Task updated
+ */
 app.post(
   "/api/v2/progress/task/:taskId",
   progressHandler.updateSingleTask as AuthenticatedHandler,
 );
+/**
+ * @openapi
+ * /api/v2/progress/tasks:
+ *   post:
+ *     summary: Update multiple tasks
+ *     tags:
+ *       - Progress
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: object
+ *     responses:
+ *       200:
+ *         description: Tasks updated
+ */
 app.post(
   "/api/v2/progress/tasks",
   progressHandler.updateMultipleTasks as AuthenticatedHandler,
 );
+/**
+ * @openapi
+ * /api/v2/progress/task/objective/{objectiveId}:
+ *   post:
+ *     summary: Update task objective
+ *     tags:
+ *       - Progress
+ *     parameters:
+ *       - in: path
+ *         name: objectiveId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Objective ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Task objective updated
+ */
 app.post(
   "/api/v2/progress/task/objective/:objectiveId",
   progressHandler.updateTaskObjective as AuthenticatedHandler,

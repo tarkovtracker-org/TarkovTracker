@@ -214,23 +214,7 @@ const getPlayerProgress = async (
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: "#/components/schemas/Progress"
- *                 meta:
- *                   type: object
- *                   properties:
- *                     self:
- *                       type: string
- *                       description: "The user ID of the requester."
- *                     hiddenTeammates:
- *                       type: array
- *                       items:
- *                         type: string
- *                       description: "List of teammate IDs hidden by the requester."
+ *               $ref: '#/components/schemas/TeamProgress' # Reference the schema
  *       401:
  *         description: "Unauthorized. Invalid token or missing 'TP' permission."
  *       500:
@@ -417,40 +401,42 @@ const setPlayerLevel = async (
 
 /**
  * @openapi
- * /progress/task/{taskId}:
+ * /api/v2/progress/task/{taskId}:
  *   post:
- *     summary: "Updates status for a single task"
+ *     summary: "Update task progress"
  *     tags:
  *       - "Progress"
+ *     description: "Update the progress state of a single task."
  *     security:
- *       - bearerAuth: []
+ *       - bearerAuth: [] # Requires authentication
  *     parameters:
- *       - name: "taskId"
- *         in: "path"
- *         description: "ID of the task to update"
+ *       - in: path
+ *         name: taskId
  *         required: true
+ *         description: "The ID (usually UUID from tarkov.dev) of the task to update."
  *         schema:
- *           type: "string"
+ *           type: string
  *     requestBody:
  *       required: true
+ *       description: "The new state for the task."
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             required:
- *               - status
+ *               - state
  *             properties:
- *               status:
- *                 type: integer
- *                 description: "New status for the task (0: Locked, 1: Unlocked, 2: Complete, 3: Failed)"
- *                 enum: [0, 1, 2, 3]
+ *               state:
+ *                 type: string
+ *                 description: "The new state of the task."
+ *                 enum: [uncompleted, completed, failed] # Matches the old spec and implementation logic
  *     responses:
  *       200:
- *         description: "Task status updated successfully"
+ *         description: "The task was updated successfully."
  *       400:
- *         description: "Invalid task ID or status provided."
+ *         description: "Invalid request parameters (e.g., bad taskId or state)."
  *       401:
- *         description: "Unauthorized. Invalid token or missing 'WP' permission."
+ *         description: "Unauthorized to update progress (missing 'WP' permission)."
  *       500:
  *         description: "Internal server error."
  */
@@ -615,39 +601,46 @@ const updateMultipleTasks = async (
 
 /**
  * @openapi
- * /progress/task/objective/{objectiveId}:
+ * /api/v2/progress/task/objective/{objectiveId}:
  *   post:
- *     summary: "Updates status for a single task objective"
+ *     summary: "Update objective progress for a task."
  *     tags:
  *       - "Progress"
+ *     description: "Update the progress (state or count) for a specific task objective."
  *     security:
- *       - bearerAuth: []
+ *       - bearerAuth: [] # Requires authentication
  *     parameters:
- *       - name: "objectiveId"
- *         in: "path"
- *         description: "ID of the objective to update (format: \"TASKID-INDEX\")"
+ *       - in: path
+ *         name: objectiveId
  *         required: true
+ *         description: "The ID (usually UUID from tarkov.dev) of the task objective to update."
  *         schema:
- *           type: "string"
+ *           type: string
  *     requestBody:
  *       required: true
+ *       description: "The objective properties to update. Provide at least one."
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - status
  *             properties:
- *               status:
- *                 type: [boolean, integer]
- *                 description: "New status for the objective (true/false for boolean objectives, number for count objectives)"
+ *               state:
+ *                 type: string
+ *                 description: "The new state of the task objective."
+ *                 enum: [completed, uncompleted]
+ *                 nullable: true
+ *               count:
+ *                 type: integer
+ *                 description: "The number of items or completions toward the objective's goal."
+ *                 minimum: 0
+ *                 nullable: true
  *     responses:
  *       200:
- *         description: "Task objective status updated successfully"
+ *         description: "The objective was updated successfully."
  *       400:
- *         description: "Invalid objective ID format, invalid status, or objective not found."
+ *         description: "Invalid request parameters (e.g., bad objectiveId, state, or count)."
  *       401:
- *         description: "Unauthorized. Invalid token or missing 'WP' permission."
+ *         description: "Unauthorized to update progress (missing 'WP' permission)."
  *       500:
  *         description: "Internal server error."
  */

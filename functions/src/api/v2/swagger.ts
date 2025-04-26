@@ -1,6 +1,11 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import fs from "fs";
-import path from "path"; // Use path for better file path handling
+import path, { dirname } from "path"; // Use path for better file path handling
+import { fileURLToPath } from "url";
+
+// ES Module equivalent for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Define the options for swagger-jsdoc
 const swaggerOptions: swaggerJsdoc.Options = {
@@ -57,14 +62,14 @@ const swaggerOptions: swaggerJsdoc.Options = {
   },
   // Path to the API docs files (TypeScript handlers and component definitions)
   apis: [
-    path.join(__dirname, "./handlers/*.ts"), // Path to handler files
-    path.join(__dirname, "./components.ts"), // Path to components file
+    "lib/api/v2/index.js"
   ],
 };
 // Generate the OpenAPI specification
 const openapiSpecification = swaggerJsdoc(swaggerOptions);
 // Define the output path relative to the current file
-const outputPath = path.join(__dirname, "../../../docs/openapi.json"); // Output JSON is generally more standard
+// Go up four levels from src/api/v2 to the root project dir, then into docs
+const outputPath = path.join(__dirname, "../../../../docs/openapi.json");
 const outputDir = path.dirname(outputPath);
 // Ensure the output directory exists
 if (!fs.existsSync(outputDir)) {
@@ -81,6 +86,20 @@ fs.writeFile(
     } else {
       console.log(
         `OpenAPI specification created successfully at ${outputPath}`,
+      );
+      const jsOutputPath = path.join(__dirname, "../../../../docs/openapi.js");
+      const jsContent = `window.openapi = ${JSON.stringify(openapiSpecification, null, 2)};`;
+      fs.writeFile(
+        jsOutputPath,
+        jsContent,
+        (err) => {
+          if (err) {
+            console.error("Error writing OpenAPI JS file:", err);
+            process.exit(1);
+          } else {
+            console.log(`OpenAPI JS file created successfully at ${jsOutputPath}`);
+          }
+        },
       );
     }
   },

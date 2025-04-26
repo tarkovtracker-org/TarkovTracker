@@ -16,7 +16,7 @@
     "logs": "firebase functions:log",
     "test": "vitest",
     "lint": "eslint .",
-    "swagger": "node api/v2/swagger.ts",
+    "swagger": "npm run build && node lib/api/v2/swagger.js",
     "deps": "taze --interactive"
   },
   "type": "module",
@@ -29,7 +29,6 @@
     "firebase-functions": "^6.3.2",
     "graphql-request": "^7.1.2",
     "graphql-tag": "^2.12.6",
-    "swagger-jsdoc": "^6.2.8",
     "uid-generator": "^2.0.0"
   },
   "devDependencies": {
@@ -45,6 +44,7 @@
     "eslint": "^9.25.1",
     "firebase-functions-test": "^3.4.1",
     "prettier": "^3.5.3",
+    "swagger-jsdoc": "^6.2.8",
     "taze": "^19.0.4",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2"
