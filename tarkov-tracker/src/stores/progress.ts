@@ -1,10 +1,10 @@
 import { useLiveData } from '@/composables/livedata';
 import { useTarkovData } from '@/composables/tarkovdata';
 import { fireuser } from '@/plugins/firebase';
-import { useTarkovStore } from '@/stores/tarkov';
 import { useUserStore } from '@/stores/user';
 import { defineStore, type Store } from 'pinia';
 import { computed, type Ref } from 'vue';
+import { useTarkovStore } from '@/stores/tarkov';
 // import type { Task, Trader, HideoutStation, Objective } from '@/types/tarkov'; // Removed
 // Import UserState for correct typing
 import { UserState } from '@/shared_state';
@@ -52,15 +52,15 @@ export const useProgressStore = defineStore('progress', () => {
     objectives: Ref<any[]>;
   };
 
-  const tarkovStoreSelf = useTarkovStore();
+  // Replace top-level const with a function
+  const getTarkovStoreSelf = () => useTarkovStore();
 
   const teamStores = computed((): TeamStoresMap => {
     const stores: TeamStoresMap = {};
-    // Cast self store to the correct type
-    stores['self'] = tarkovStoreSelf as Store<string, UserState>;
+    // Use the function to get the store instance
+    stores['self'] = getTarkovStoreSelf() as Store<string, UserState>;
     for (const teammateId of Object.keys(teammateStores.value)) {
       try {
-        // Assign the store instance directly
         stores[teammateId] = teammateStores.value[teammateId];
       } catch (error) {
         console.error(`Failed to get store for teammate ${teammateId}:`, error);
@@ -98,7 +98,6 @@ export const useProgressStore = defineStore('progress', () => {
   const traderRep = computed((): TraderRepMap => {
     const rep: TraderRepMap = {};
     if (!traders.value) return {};
-
     for (const teamId of Object.keys(visibleTeamStores.value)) {
       rep[teamId] = {};
       const store = visibleTeamStores.value[teamId] as any;
@@ -106,11 +105,9 @@ export const useProgressStore = defineStore('progress', () => {
       const bonus =
         gameEditions.find((e) => e.version === gameEditionVersion)?.value ??
         0.0;
-
       for (const trader of traders.value) {
         rep[teamId][trader.id] = bonus;
       }
-
       if (!tasks.value) continue;
       for (const task of tasks.value) {
         if (tasksCompletions.value[task.id]?.[teamId]) {
@@ -127,24 +124,19 @@ export const useProgressStore = defineStore('progress', () => {
     }
     return rep;
   });
-
   const gameEditionData = computed((): GameEdition[] => {
     return gameEditions;
   });
-
   const traderLevelsAchieved = computed((): TraderLevelsMap => {
     const levels: TraderLevelsMap = {};
     if (!traders.value) return {};
-
     for (const teamId of Object.keys(visibleTeamStores.value)) {
       levels[teamId] = {};
       const store = visibleTeamStores.value[teamId] as any;
       const playerLevel = store?.playerLevel ?? 0;
-
       for (const trader of traders.value) {
         levels[teamId][trader.id] = 1;
         const currentRep = traderRep.value[teamId]?.[trader.id] ?? -Infinity;
-
         // Add 'any' type
         trader.levels?.forEach((level: any) => {
           if (
@@ -159,7 +151,6 @@ export const useProgressStore = defineStore('progress', () => {
     }
     return levels;
   });
-
   const playerFaction = computed((): FactionMap => {
     const faction: FactionMap = {};
     for (const teamId of Object.keys(visibleTeamStores.value)) {
@@ -171,11 +162,9 @@ export const useProgressStore = defineStore('progress', () => {
     }
     return faction;
   });
-
   const unlockedTasks = computed((): TaskAvailabilityMap => {
     const available: TaskAvailabilityMap = {};
     if (!tasks.value) return {};
-
     for (const task of tasks.value) {
       available[task.id] = {};
       for (const teamId of Object.keys(visibleTeamStores.value)) {
@@ -184,12 +173,10 @@ export const useProgressStore = defineStore('progress', () => {
         const playerFaction = store?.getPMCFaction ?? 'Unknown';
         const isTaskComplete =
           tasksCompletions.value[task.id]?.[teamId] ?? false;
-
         if (isTaskComplete) {
           available[task.id][teamId] = false;
           continue;
         }
-
         let parentsComplete = true;
         if (task.parents) {
           for (const parentId of task.parents) {
@@ -203,7 +190,6 @@ export const useProgressStore = defineStore('progress', () => {
           available[task.id][teamId] = false;
           continue;
         }
-
         let failedReqsMet = true;
         // Add 'any' type
         task.taskRequirements?.forEach((req: any) => {
@@ -221,12 +207,10 @@ export const useProgressStore = defineStore('progress', () => {
           available[task.id][teamId] = false;
           continue;
         }
-
         if (task.minPlayerLevel && playerLevel < task.minPlayerLevel) {
           available[task.id][teamId] = false;
           continue;
         }
-
         let traderLevelsMet = true;
         if (task.traderLevelRequirements) {
           for (const req of task.traderLevelRequirements) {
@@ -243,7 +227,6 @@ export const useProgressStore = defineStore('progress', () => {
           available[task.id][teamId] = false;
           continue;
         }
-
         if (
           task.factionName &&
           task.factionName !== 'Any' &&
@@ -279,15 +262,23 @@ export const useProgressStore = defineStore('progress', () => {
   const hideoutLevels = computed((): HideoutLevelMap => {
     const levels: HideoutLevelMap = {};
     if (!hideoutStations.value) return {};
-
     for (const station of hideoutStations.value) {
       levels[station.id] = {};
       for (const teamId of Object.keys(visibleTeamStores.value)) {
         const store = visibleTeamStores.value[teamId] as any;
-        levels[station.id][teamId] =
-          typeof store?.getHideoutLevel === 'function'
-            ? store.getHideoutLevel(station.id)
-            : 0;
+        const modulesState = store.hideoutModules || {};
+        const baseCount = station.levels.filter(
+          (lvl: any) => modulesState[lvl.id]?.complete
+        ).length;
+        let levelCount = baseCount;
+        if (station.id === '5d484fc0654e76006657e0ab') {
+          const gameEditionVersion = store?.gameEdition ?? 0;
+          const edition = gameEditionData.value.find(
+            (e) => e.version === gameEditionVersion
+          );
+          levelCount = edition?.defaultStashLevel ?? baseCount;
+        }
+        levels[station.id][teamId] = levelCount;
       }
     }
     return levels;
@@ -336,3 +327,13 @@ export const useProgressStore = defineStore('progress', () => {
     getFaction,
   };
 });
+
+// Add fireswap config after definition for localStorage persistence
+useProgressStore.fireswap = [
+  {
+    path: '.',
+    document: 'progress/{uid}',
+    debouncems: 250,
+    localKey: 'progress',
+  },
+];

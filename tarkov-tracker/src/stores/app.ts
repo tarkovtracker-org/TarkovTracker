@@ -5,12 +5,9 @@ import type { Ref } from 'vue';
 // Define the state structure directly
 const state = () => ({
   drawerRail: useStorage<boolean>('app_drawerRail', false),
-  drawerShow: null as boolean | null, // Explicitly type null state
+  drawerShow: useStorage<boolean>('app_drawerShow', true), // Open by default
   localeOverride: useStorage<string | null>('app_localeOverride', null),
 });
-
-// Infer the state type from the state function
-// type AppState = ReturnType<typeof state>; // No longer needed for this approach
 
 // The 'app' Pinia Store. Used to keep global app state
 export const useAppStore = defineStore('app', {
@@ -25,6 +22,15 @@ export const useAppStore = defineStore('app', {
   actions: {
     setDrawerShow(show: boolean) {
       this.drawerShow = show;
+    },
+    toggleDrawerShow() {
+      this.drawerShow = !this.drawerShow;
+    },
+    setDrawerRail(val: boolean) {
+      this.drawerRail = val;
+    },
+    toggleDrawerRail() {
+      this.drawerRail = !this.drawerRail;
     },
     // Example action structure (if needed):
     // setLocaleOverride(locale: string | null) {

@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia';
 import { watch } from 'vue';
 import { fireuser } from '@/plugins/firebase';
-import { getters, actions, defaultState } from '@/shared_state'; // Needs conversion to .ts
-import { initializeStore, wasDataMigrated } from '@/plugins/store-initializer'; // Needs conversion to .ts
+import { getters, actions, defaultState } from '@/shared_state';
+import { initializeStore, wasDataMigrated } from '@/plugins/store-initializer';
 import type { Pinia } from 'pinia';
+
+console.log('swapTarkov store defined');
 
 // Define the Fireswap configuration type
 interface FireswapConfig {
@@ -71,17 +73,14 @@ watch(
         watchHandlerRunning = false;
         return;
       }
-
       // Runtime checks for fireswap methods remain necessary
       const canBind = typeof (tarkovStore as any).firebindAll === 'function';
       const canUnbind =
         typeof (tarkovStore as any).fireunbindAll === 'function';
-
       if (newValue) {
         const wasMigrated =
           wasDataMigrated() ||
           sessionStorage.getItem('tarkovDataMigrated') === 'true';
-
         if (wasMigrated) {
           if (canBind) {
             (tarkovStore as any).firebindAll();
@@ -119,12 +118,10 @@ setTimeout(async () => {
     if (!tarkovStore) {
       throw new Error('Failed to get tarkovStore in delayed initialization');
     }
-
     const canBind = typeof (tarkovStore as any).firebindAll === 'function';
     const wasMigrated =
       wasDataMigrated() ||
       sessionStorage.getItem('tarkovDataMigrated') === 'true';
-
     if (wasMigrated) {
       if (canBind) {
         (tarkovStore as any).firebindAll();
