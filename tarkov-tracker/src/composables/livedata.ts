@@ -26,7 +26,6 @@ import {
   UserGetters,
   UserActions,
 } from '@/shared_state';
-import { useTarkovStore } from '@/stores/tarkov';
 import { useUserStore } from '@/stores/user';
 
 const firedb: Firestore = firestore;
@@ -321,14 +320,16 @@ interface ProgressState extends StateTree {
   // Define state properties if needed, otherwise use 'any' or '{}'
 }
 
-const useProgressStore = defineStore('progress', () => {
-  const tarkovStore = useTarkovStore(); // Get the main store instance
+const getTarkovStore = () => {
+  return require('@/stores/tarkov').useTarkovStore();
+};
 
+const useProgressStore = defineStore('progress', () => {
+  // Use getTarkovStore instead of direct import
   const teamStores = computed(() => {
     let stores: { [key: string]: Store<string, UserState, any, any> } = {};
-    stores['self'] = tarkovStore as Store<string, UserState>; // Cast the main store to the correct type
+    stores['self'] = getTarkovStore() as Store<string, UserState>; // Use the function
     for (const teammate of Object.keys(teammateStores.value)) {
-      // Make sure the store instance exists before accessing it
       if (teammateStores.value[teammate]) {
         stores[teammate] = teammateStores.value[teammate];
       }

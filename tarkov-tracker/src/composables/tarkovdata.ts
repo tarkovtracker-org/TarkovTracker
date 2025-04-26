@@ -3,7 +3,6 @@ import {
   computed,
   ref,
   watch,
-  watchEffect,
   onMounted,
   Ref,
   ComputedRef,
@@ -139,7 +138,7 @@ interface Trader {
 interface PlayerLevel {
   level: number;
   exp: number;
-  skillPoint: number;
+  levelBadgeImageLink: string;
 }
 // Apollo Query Result Types (Simplified)
 interface LanguageQueryResult {
@@ -211,8 +210,23 @@ const neededItemHideoutModules = ref<NeededItemHideoutModule[]>([]);
 const loading = ref<boolean>(false);
 const hideoutLoading = ref<boolean>(false);
 const staticMapData = ref<StaticMapData | null>(null);
-// --- End Singleton State ---
-
+// Singleton loader for static maps (Pattern A): only fetch once
+const MAPS_URL = 'https://tarkovtracker.github.io/tarkovdata/maps.json';
+let mapPromise: Promise<StaticMapData> | null = null;
+function loadMaps(): Promise<StaticMapData> {
+  if (!mapPromise) {
+    mapPromise = fetch(MAPS_URL)
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.statusText}`);
+        return response.json() as Promise<StaticMapData>;
+      })
+      .catch(error => {
+        console.error('Failed to load maps:', error);
+        return {} as StaticMapData;
+      });
+  }
+  return mapPromise;
+}
 // Mapping from GraphQL map names (potentially different) to static data keys
 const mapNameMapping: { [key: string]: string } = {
   'night factory': 'factory',
@@ -559,22 +573,10 @@ const maxPlayerLevel = computed<number>(() => {
 export function useTarkovData() {
   const { locale } = useI18n({ useScope: 'global' });
   const languageCode = computed<string>(() => extractLanguageCode(locale));
-  onMounted(async () => {
-    if (!staticMapData.value) {
-      // Fetch only if not already loaded
-      try {
-        const response = await fetch(
-          'https://tarkovtracker.github.io/tarkovdata/maps.json'
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        staticMapData.value = (await response.json()) as StaticMapData;
-      } catch (error) {
-        console.error('Failed to fetch static map data:', error);
-        staticMapData.value = {}; // Set to empty object on error to prevent repeated fetches
-      }
-    }
+  onMounted(() => {
+    loadMaps().then(data => {
+      staticMapData.value = data;
+    });
   });
   // Initialize queries only once
   if (!isInitialized.value) {
@@ -682,12 +684,11 @@ export function useTarkovData() {
       },
       { immediate: true }
     );
-    // Refetch data when language changes
-    watchEffect(() => {
-      const currentLang = languageCode.value;
-      if (availableLanguages.value && isInitialized.value) {
-        taskRefetch({ lang: currentLang });
-        hideoutRefetch({ lang: currentLang });
+    // Refetch data when language changes (post-initial)
+    watch(languageCode, (newLang, oldLang) => {
+      if (oldLang !== newLang && availableLanguages.value && isInitialized.value) {
+        taskRefetch({ lang: newLang });
+        hideoutRefetch({ lang: newLang });
       }
     });
   } // End of initialization block
