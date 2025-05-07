@@ -2,13 +2,13 @@
   <v-sheet class="pa-2" color="primary" :rounded="true">
     <v-container no-gutters>
       <v-row dense align="center" justify="space-between">
-        <v-col cols="auto">
+        <v-col cols="auto" class="text-left">
           <div class="text-h4">
-            {{ progressStore.teammemberNames[teamStoreId] }}
+            {{ progressStore.getDisplayName(props.teammember) }}
           </div>
-          <div v-if="props.teammember == fireuser.uid">
+          <div v-if="props.teammember == fireuser.uid" class="text-left">
             <b>
-              {{ $t("page.team.card.manageteam.membercard.this_is_you") }}
+              {{ $t('page.team.card.manageteam.membercard.this_is_you') }}
             </b>
           </div>
         </v-col>
@@ -23,7 +23,7 @@
             </span>
             <span>
               <div style="font-size: 0.7em" class="text-center mb-1">
-                {{ $t("navigation_drawer.level") }}
+                {{ $t('navigation_drawer.level') }}
               </div>
               <div class="text-center">
                 <h1 style="font-size: 2.5em; line-height: 0.8em">
@@ -83,79 +83,97 @@
             class="mx-1"
             color="red"
             size="x-small"
+            :loading="kickingTeammate"
+            :disabled="kickingTeammate"
             @click="kickTeammate()"
           ></v-btn>
         </v-col>
       </v-row>
     </v-container>
   </v-sheet>
+  <v-snackbar v-model="kickTeammateSnackbar" :timeout="4000" color="accent">
+    {{ kickTeammateResult }}
+    <template #actions>
+      <v-btn color="white" variant="text" @click="kickTeammateSnackbar = false">
+        {{ $t('generic.close_button') }}
+      </v-btn>
+    </template>
+  </v-snackbar>
 </template>
 <script setup>
-import { fireuser } from "@/plugins/firebase";
-import { computed } from "vue";
+  import { fireuser, functions } from '@/plugins/firebase';
+  import { computed, ref } from 'vue';
+  import { httpsCallable } from 'firebase/functions';
+  import { useI18n } from 'vue-i18n';
 
-import { useLiveData } from "@/composables/livedata";
-import { useUserStore } from "@/stores/user";
-import { useProgressStore } from "@/stores/progress";
-import { useTarkovData } from "@/composables/tarkovdata";
+  import { useLiveData } from '@/composables/livedata';
+  import { useUserStore } from '@/stores/user';
+  import { useProgressStore } from '@/stores/progress';
+  import { useTarkovData } from '@/composables/tarkovdata';
 
-// Define the props for the component
-const props = defineProps({
-  teammember: {
-    type: String,
-    required: true,
-  },
-});
+  // Define the props for the component
+  const props = defineProps({
+    teammember: {
+      type: String,
+      required: true,
+    },
+  });
 
-const teamStoreId = computed(() => {
-  if (props.teammember == fireuser.uid) {
-    return "self";
-  } else {
-    return props.teammember;
-  }
-});
+  const teamStoreId = computed(() => {
+    if (props.teammember == fireuser.uid) {
+      return 'self';
+    } else {
+      return props.teammember;
+    }
+  });
 
-const { useTeamStore } = useLiveData();
-const progressStore = useProgressStore();
-const teamStore = useTeamStore();
-const userStore = useUserStore();
-const { tasks, playerLevels } = useTarkovData();
+  const { useTeamStore } = useLiveData();
+  const progressStore = useProgressStore();
+  const teamStore = useTeamStore();
+  const userStore = useUserStore();
+  const { tasks, playerLevels } = useTarkovData();
+  const { t } = useI18n({ useScope: 'global' });
 
-const completedTaskCount = computed(() => {
-  return tasks.value.filter(
-    (task) =>
-      progressStore.tasksCompletions?.[task.id]?.[teamStoreId.value] == true
-  ).length;
-});
+  const completedTaskCount = computed(() => {
+    return tasks.value.filter(
+      (task) =>
+        progressStore.tasksCompletions?.[task.id]?.[teamStoreId.value] == true
+    ).length;
+  });
 
-const groupIcon = computed(() => {
-  const level = progressStore.getLevel(props.teammember);
-  const entry = playerLevels.value.find((pl) => pl.level === level);
-  return entry?.levelBadgeImageLink ?? '';
-});
+  const groupIcon = computed(() => {
+    const level = progressStore.getLevel(props.teammember);
+    const entry = playerLevels.value.find((pl) => pl.level === level);
+    return entry?.levelBadgeImageLink ?? '';
+  });
 
-const factionIcon = computed(() => {
-  return `/img/factions/${progressStore.getFaction(props.teammember)}.webp`;
-});
+  const factionIcon = computed(() => {
+    return `/img/factions/${progressStore.getFaction(props.teammember)}.webp`;
+  });
 
-// const kickTeammate = () => {
-//   teamStore.kickTeammate(props.teammember)
-// }
-// const kickingTeammate = ref(false);
-// const kickTeammateResult = ref(null);
-// const kickTeammateSnackbar = ref(false);
-// const kickTeammate = async () => {
-//   creatingTeam.value = true;
-//   try {
-//     kickTeammateResult.value = await fireapp.functions().httpsCallable("kickTeammate")({});
-//     kickTeammateResult.value = t('page.team.card.myteam.create_team_success');
-//     kickTeammateSnackbar.value = true;
-//   } catch (error) {
-//     kickTeammateResult.value = t('page.team.card.myteam.create_team_error');
-//     console.error(error)
-//     kickTeammateSnackbar.value = true;
-//   }
-//   creatingTeam.value = false;
-// }
+  const kickingTeammate = ref(false);
+  const kickTeammateResult = ref(null);
+  const kickTeammateSnackbar = ref(false);
+
+  const kickTeammate = async () => {
+    if (!props.teammember) return;
+    kickingTeammate.value = true;
+    try {
+      const kickTeamMemberFunction = httpsCallable(functions, 'kickTeamMember');
+      await kickTeamMemberFunction({ kicked: props.teammember });
+      kickTeammateResult.value = t(
+        'page.team.card.manageteam.membercard.kick_success'
+      );
+      kickTeammateSnackbar.value = true;
+    } catch (error) {
+      let backendMsg =
+        error?.message || error?.data?.message || error?.toString();
+      kickTeammateResult.value =
+        backendMsg || t('page.team.card.manageteam.membercard.kick_error');
+      console.error('[TeammemberCard.vue] Error kicking teammate:', error);
+      kickTeammateSnackbar.value = true;
+    }
+    kickingTeammate.value = false;
+  };
 </script>
 <style lang="scss" scoped></style>
