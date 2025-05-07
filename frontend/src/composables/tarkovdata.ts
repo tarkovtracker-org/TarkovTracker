@@ -1,12 +1,5 @@
 import { useQuery, provideApolloClient } from '@vue/apollo-composable';
-import {
-  computed,
-  ref,
-  watch,
-  onMounted,
-  Ref,
-  ComputedRef,
-} from 'vue';
+import { computed, ref, watch, onMounted, Ref, ComputedRef } from 'vue';
 import { ApolloError } from '@apollo/client/core';
 import apolloClient from '@/plugins/apollo';
 import tarkovDataQuery from '@/utils/tarkovdataquery';
@@ -48,7 +41,12 @@ interface SkillRequirement {
 interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
-  value: number; // Assuming value is a number
+  value: number; // Reputation value for hideout/module
+}
+interface TaskTraderLevelRequirement {
+  id: string;
+  trader: { id: string; name: string };
+  level: number; // Loyalty level for tasks
 }
 interface Craft {
   id: string;
@@ -104,8 +102,9 @@ interface FinishReward {
   quest?: { id: string };
   // Add other reward types as needed
 }
-interface Task {
+export interface Task {
   id: string;
+  tarkovDataId?: number;
   name?: string;
   kappaRequired?: boolean;
   experience?: number;
@@ -113,13 +112,16 @@ interface Task {
   trader?: { id: string; name?: string; imageLink?: string };
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
+  minPlayerLevel?: number;
+  failedRequirements?: TaskRequirement[];
+  traderLevelRequirements?: TaskTraderLevelRequirement[];
+  factionName?: string;
   finishRewards?: FinishReward[];
-  traderIcon?: string; // Added in watcher
-  predecessors?: string[]; // Added in watcher
-  successors?: string[]; // Added in watcher
-  parents?: string[]; // Added in watcher
-  children?: string[]; // Added in watcher
-  // Add other Task properties from query
+  traderIcon?: string;
+  predecessors?: string[];
+  successors?: string[];
+  parents?: string[];
+  children?: string[];
 }
 interface TarkovMap {
   id: string;
@@ -196,19 +198,19 @@ const lastQueryTime = ref<number | null>(null);
 const queryHideoutErrors = ref<ApolloError | null>(null);
 const queryHideoutResults = ref<TarkovHideoutQueryResult | null>(null);
 const lastHideoutQueryTime = ref<number | null>(null);
-const hideoutStations = ref<HideoutStation[]>([]);
-const hideoutModules = ref<HideoutModule[]>([]);
-const hideoutGraph = ref<Graph>(new Graph()); // Explicitly type as Graph
-const tasks = ref<Task[]>([]);
-const taskGraph = ref<Graph>(new Graph()); // Explicitly type as Graph
-const objectiveMaps = ref<{ [taskId: string]: ObjectiveMapInfo[] }>({});
-const alternativeTasks = ref<{ [taskId: string]: string[] }>({});
-const objectiveGPS = ref<{ [taskId: string]: ObjectiveGPSInfo[] }>({});
-const mapTasks = ref<{ [mapId: string]: string[] }>({});
-const neededItemTaskObjectives = ref<NeededItemTaskObjective[]>([]);
-const neededItemHideoutModules = ref<NeededItemHideoutModule[]>([]);
-const loading = ref<boolean>(false);
-const hideoutLoading = ref<boolean>(false);
+export const hideoutStations = ref<HideoutStation[]>([]);
+export const hideoutModules = ref<HideoutModule[]>([]);
+export const hideoutGraph = ref<Graph>(new Graph()); // Explicitly type as Graph
+export const tasks = ref<Task[]>([]);
+export const taskGraph = ref<Graph>(new Graph()); // Explicitly type as Graph
+export const objectiveMaps = ref<{ [taskId: string]: ObjectiveMapInfo[] }>({});
+export const alternativeTasks = ref<{ [taskId: string]: string[] }>({});
+export const objectiveGPS = ref<{ [taskId: string]: ObjectiveGPSInfo[] }>({});
+export const mapTasks = ref<{ [mapId: string]: string[] }>({});
+export const neededItemTaskObjectives = ref<NeededItemTaskObjective[]>([]);
+export const neededItemHideoutModules = ref<NeededItemHideoutModule[]>([]);
+export const loading = ref<boolean>(false);
+export const hideoutLoading = ref<boolean>(false);
 const staticMapData = ref<StaticMapData | null>(null);
 // Singleton loader for static maps (Pattern A): only fetch once
 const MAPS_URL = 'https://tarkovtracker.github.io/tarkovdata/maps.json';
@@ -216,11 +218,12 @@ let mapPromise: Promise<StaticMapData> | null = null;
 function loadMaps(): Promise<StaticMapData> {
   if (!mapPromise) {
     mapPromise = fetch(MAPS_URL)
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.statusText}`);
+      .then((response) => {
+        if (!response.ok)
+          throw new Error(`HTTP error! status: ${response.statusText}`);
         return response.json() as Promise<StaticMapData>;
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('Failed to load maps:', error);
         return {} as StaticMapData;
       });
@@ -510,7 +513,7 @@ watch(queryResults, (newValue) => {
   }
 });
 // Define objectives computed property
-const objectives = computed<TaskObjective[]>(() => {
+export const objectives = computed<TaskObjective[]>(() => {
   if (!queryResults.value?.tasks) {
     return [];
   }
@@ -525,7 +528,7 @@ const objectives = computed<TaskObjective[]>(() => {
   return allObjectives;
 });
 // Computed Property for Maps
-const maps = computed<TarkovMap[]>(() => {
+export const maps = computed<TarkovMap[]>(() => {
   if (!queryResults.value?.maps || !staticMapData.value) {
     return [];
   }
@@ -549,7 +552,7 @@ const maps = computed<TarkovMap[]>(() => {
   return [...mergedMaps].sort((a, b) => a.name.localeCompare(b.name));
 });
 // Computed Property for Traders
-const traders = computed<Trader[]>(() => {
+export const traders = computed<Trader[]>(() => {
   if (!queryResults.value?.traders) {
     return [];
   }
@@ -558,7 +561,7 @@ const traders = computed<Trader[]>(() => {
   );
 });
 // Computed Properties for Player Level Constraints
-const playerLevels = computed<PlayerLevel[]>(
+export const playerLevels = computed<PlayerLevel[]>(
   () => queryResults.value?.playerLevels || []
 );
 const minPlayerLevel = computed<number>(() => {
@@ -574,7 +577,7 @@ export function useTarkovData() {
   const { locale } = useI18n({ useScope: 'global' });
   const languageCode = computed<string>(() => extractLanguageCode(locale));
   onMounted(() => {
-    loadMaps().then(data => {
+    loadMaps().then((data) => {
       staticMapData.value = data;
     });
   });
@@ -686,7 +689,11 @@ export function useTarkovData() {
     );
     // Refetch data when language changes (post-initial)
     watch(languageCode, (newLang, oldLang) => {
-      if (oldLang !== newLang && availableLanguages.value && isInitialized.value) {
+      if (
+        oldLang !== newLang &&
+        availableLanguages.value &&
+        isInitialized.value
+      ) {
         taskRefetch({ lang: newLang });
         hideoutRefetch({ lang: newLang });
       }
