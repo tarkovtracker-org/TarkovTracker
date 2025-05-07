@@ -6,22 +6,22 @@
     "frontend"
   ],
   "scripts": {
-    "frontend": "npm run dev --workspace=frontend",
+    "frontend": "cd frontend && npx vite",
     "build": "npm run build --workspaces",
     "build:functions": "npm run build --workspace=functions",
     "build:frontend": "npm run build --workspace=frontend",
     "emulators:start": "firebase emulators:start --only auth,functions,firestore,database,hosting",
-    "emulators:local": "firebase emulators:start --import=./local_data --export-on-exit",
-    "dev": "concurrently \"npm:frontend\" \"npm:emulators:local\"",
+    "emulators:local": "firebase emulators:start --import=./local_data --export-on-exit --only auth,functions,firestore,database,hosting,pubsub",
+    "dev": "concurrently \"cd frontend && npm run dev\" \"npm:emulators:local\"",
     "deps": "taze --interactive",
     "deps:all": "npm run deps && npm run deps --workspaces --if-present",
     "swagger": "npm run swagger --workspace=functions"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
-    "@types/node": "^22.15.3",
+    "@types/node": "^22.15.14",
     "concurrently": "^9.1.2",
     "firebase-tools": "^14.2.2",
-    "taze": "^19.0.4"
+    "taze": "^19.1.0"
   }
 }
