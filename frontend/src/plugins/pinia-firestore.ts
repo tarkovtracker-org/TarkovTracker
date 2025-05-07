@@ -112,26 +112,35 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
           console.debug(
             `[PiniaFireswap ${store.$id}] Set lock=true (loadLocal fsIndex ${fsIndex})`
           );
-          const localData = localStorage.getItem(fireswapSetting.localKey);
+          const localKey = fireswapSetting.localKey; // Use variable for clarity
+          const localData = localStorage.getItem(localKey);
+          console.debug(
+            `[PiniaFireswap ${store.$id}] loadLocal: Attempting to load from localStorage key '${localKey}'`
+          );
 
           try {
             let newStatePart: StateTree | undefined;
             if (localData) {
               console.debug(
-                `[PiniaFireswap ${store.$id}] Loading local version: ${fireswapSetting.localKey}`,
+                `[PiniaFireswap ${store.$id}] loadLocal: Found data in localStorage key '${localKey}':`,
                 localData
               );
               newStatePart = JSON.parse(localData);
             } else {
               // No local data, use default state
               console.debug(
-                `[PiniaFireswap ${store.$id}] No local version found, using default state for ${fireswapSetting.localKey}`,
+                `[PiniaFireswap ${store.$id}] loadLocal: No data in localStorage key '${localKey}'. Using default state:`,
                 fireswapSetting.defaultState
               );
               newStatePart = fireswapSetting.defaultState
                 ? JSON.parse(fireswapSetting.defaultState)
                 : {};
             }
+
+            console.debug(
+              `[PiniaFireswap ${store.$id}] loadLocal: Parsed state to apply for path '${path}':`,
+              JSON.stringify(newStatePart)
+            );
 
             if (path !== '.') {
               store.$patch((state) => {
@@ -146,7 +155,11 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
             } else {
               // Patching root state
               store.$patch((state) => {
+                const previousState = JSON.stringify(state);
                 Object.assign(state, newStatePart);
+                console.debug(
+                  `[PiniaFireswap ${store.$id}] loadLocal: Patched root state. Previous: ${previousState}, New: ${JSON.stringify(state)}`
+                );
                 if (fireswapSetting.localKey === 'progress') {
                   console.debug(
                     `[PiniaFireswap ${store.$id}] After patch (root) level:`,
@@ -185,6 +198,9 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
         };
 
         // Run loadLocal at startup
+        console.debug(
+          `[PiniaFireswap ${store.$id}] Initializing loadLocal for fsIndex ${fsIndex}, localKey '${fireswapSetting.localKey}'`
+        );
         fireswapSetting.loadLocal();
 
         // --- Firestore Binding ---
@@ -204,11 +220,11 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
               docRef,
               (snapshot) => {
                 console.debug(
-                  `[PiniaFireswap ${store.$id}] Snapshot received for ${fireswapSetting.document}`
+                  `[PiniaFireswap ${store.$id}] Firestore Snapshot received for ${fireswapSetting.document} (fsIndex ${fsIndex})`
                 );
                 if (fireswapSetting.lock) {
                   console.debug(
-                    `[PiniaFireswap ${store.$id}] Locked, ignoring snapshot (fsIndex ${fsIndex})`
+                    `[PiniaFireswap ${store.$id}] Locked, ignoring Firestore snapshot (fsIndex ${fsIndex})`
                   );
                   return; // Ignore snapshot if lock is active
                 }
@@ -219,24 +235,88 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
                 );
 
                 const data = snapshot.data() || {};
+                console.debug(
+                  `[PiniaFireswap ${store.$id}] Firestore Snapshot data (raw):`,
+                  JSON.stringify(data)
+                );
+
+                // ---- START: Revised logic for displayName initialization ----
+                // Initialize displayName from Firebase Auth only if it's undefined in Firestore doc
+                // This should happen *before* patching the store with 'data'
+                /* // ---- MODIFICATION: Commenting out auto-initialization from Firebase Auth displayName
+                if (
+                  store.$id === 'swapTarkov' &&
+                  typeof data.displayName === 'undefined' && // Check if field is missing
+                  fireuser.displayName &&
+                  fireuser.displayName.trim() !== ''
+                // Check if fireuser.displayName actually has a value
+                // AND data.displayName is not already set to null (which would be a deliberate user choice)
+                ) {
+                  console.debug(
+                    `[PiniaFireswap ${store.$id}] Firestore document for user ${fireuser.uid} has no displayName field. Initializing from Firebase Auth displayName ('${fireuser.displayName}'). This new displayName will be patched to the local store and subsequently saved back to Firestore.`
+                  );
+                  // Set it in the 'data' object that will be patched,
+                  // so it gets saved back by uploadDocument if it's the first time.
+                  data.displayName = fireuser.displayName;
+                }
+                */ // ---- END MODIFICATION ----
+                // ---- END: Revised logic for displayName initialization ----
 
                 try {
+                  const stateBeforePatch = JSON.stringify(
+                    path !== '.' ? get(store.$state, path) : store.$state
+                  );
+                  console.debug(
+                    `[PiniaFireswap ${store.$id}] State BEFORE Firestore patch (path: '${path}'):`,
+                    stateBeforePatch
+                  );
+
                   if (path !== '.') {
                     store.$patch((state) => {
                       set(state, path, data);
+                      if (fireswapSetting.localKey === 'progress') {
+                        console.debug(
+                          `[PiniaFireswap ${store.$id}] After Firestore patch (path: ${path}) level:`,
+                          (get(state, path) as any)?.level
+                        );
+                      }
                     });
                   } else {
-                    // Use function form for root patch, similar to loadLocal
+                    // Patching root state using function form for type safety
                     store.$patch((state) => {
-                      // Assign data properties onto the existing state object
-                      Object.assign(state, data);
+                      Object.assign(state, data as any); // data is DocumentData, state is StateTree
+                      if (fireswapSetting.localKey === 'progress') {
+                        console.debug(
+                          `[PiniaFireswap ${store.$id}] After Firestore patch (root) level:`,
+                          (state as any)?.level
+                        );
+                      }
                     });
                   }
-                  // Update local storage as well after Firestore sync
-                  localStorage.setItem(
-                    fireswapSetting.localKey,
-                    JSON.stringify(data)
+
+                  console.debug(
+                    `[PiniaFireswap ${store.$id}] State AFTER Firestore patch (reflecting changes from path '${path}'):`,
+                    JSON.stringify(
+                      path !== '.' ? get(store.$state, path) : store.$state
+                    )
                   );
+
+                  // Update local storage as well after Firestore sync
+                  try {
+                    const dataToStore =
+                      path !== '.' ? get(store.$state, path) : store.$state;
+                    const dataString = JSON.stringify(dataToStore);
+                    localStorage.setItem(fireswapSetting.localKey, dataString);
+                    console.debug(
+                      `[PiniaFireswap ${store.$id}] Updated localStorage key '${fireswapSetting.localKey}' after Firestore sync:`,
+                      dataString
+                    );
+                  } catch (lsError) {
+                    console.error(
+                      `[PiniaFireswap ${store.$id}] Error updating localStorage after Firestore sync for key '${fireswapSetting.localKey}':`,
+                      lsError
+                    );
+                  }
                 } catch (e) {
                   console.error(
                     `[PiniaFireswap ${store.$id}] Error patching state from snapshot:`,
@@ -283,24 +363,91 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
 
         // --- Debounced Firestore Upload ---
         fireswapSetting.uploadDocument = debounce(
-          (stateToUpload: StateTree) => {
+          (currentStateSnapshot: StateTree) => {
+            fireswapSetting.lock = true; // Lock before potential async operations
             console.debug(
-              `[PiniaFireswap ${store.$id}] Debounced upload triggered for ${fireswapSetting.document}`
+              `[PiniaFireswap ${store.$id}] Set lock=true (uploadDocument fsIndex ${fsIndex})`
             );
+            console.debug(
+              `[PiniaFireswap ${store.$id}] uploadDocument triggered for fsIndex ${fsIndex}, localKey '${fireswapSetting.localKey}', path '${path}'`
+            );
+
+            const stateToSave =
+              path !== '.'
+                ? get(currentStateSnapshot, path)
+                : currentStateSnapshot;
+
+            if (!stateToSave) {
+              console.warn(
+                `[PiniaFireswap ${store.$id}] No state found at path '${path}' to save.`
+              );
+              fireswapSetting.lock = false;
+              console.debug(
+                `[PiniaFireswap ${store.$id}] Set lock=false (uploadDocument - no state found fsIndex ${fsIndex})`
+              );
+              return;
+            }
+
+            const stateString = JSON.stringify(stateToSave);
+
+            // Save to local storage regardless of login state
             try {
-              const docRef = parseDoc(fireswapSetting.document);
-              // Create a clean copy, removing undefined values potentially introduced by patches
-              const stateCopy = JSON.parse(JSON.stringify(stateToUpload));
-              setDoc(docRef, stateCopy).catch((e) => {
-                console.error(
-                  `[PiniaFireswap ${store.$id}] Error in setDoc for ${fireswapSetting.document}:`,
-                  e
-                );
-              });
-            } catch (error) {
+              localStorage.setItem(fireswapSetting.localKey, stateString);
+              console.debug(
+                `[PiniaFireswap ${store.$id}] Saved state to localStorage key '${fireswapSetting.localKey}':`,
+                stateString
+              );
+            } catch (lsError) {
               console.error(
-                `[PiniaFireswap ${store.$id}] Error preparing/parsing doc for upload ${fireswapSetting.document}:`,
-                error
+                `[PiniaFireswap ${store.$id}] Error saving state to localStorage key '${fireswapSetting.localKey}':`,
+                lsError
+              );
+            }
+
+            if (fireuser.loggedIn && fireuser.uid) {
+              // User is logged in, save to Firestore
+              console.debug(
+                `[PiniaFireswap ${store.$id}] User logged in. Attempting to save state to Firestore doc '${fireswapSetting.document}':`,
+                stateString
+              );
+              try {
+                const docRef = parseDoc(fireswapSetting.document);
+                setDoc(docRef, stateToSave, { merge: true }) // Use merge: true to avoid overwriting fields not in stateToSave
+                  .then(() => {
+                    console.debug(
+                      `[PiniaFireswap ${store.$id}] Successfully saved state to Firestore doc '${fireswapSetting.document}'`
+                    );
+                  })
+                  .catch((error) => {
+                    console.error(
+                      `[PiniaFireswap ${store.$id}] Error saving state to Firestore doc '${fireswapSetting.document}':`,
+                      error
+                    );
+                  })
+                  .finally(() => {
+                    fireswapSetting.lock = false; // Unlock after Firestore operation completes
+                    console.debug(
+                      `[PiniaFireswap ${store.$id}] Set lock=false (uploadDocument - Firestore complete fsIndex ${fsIndex})`
+                    );
+                  });
+              } catch (error) {
+                console.error(
+                  `[PiniaFireswap ${store.$id}] Error parsing Firestore doc path '${fireswapSetting.document}' or calling setDoc:`,
+                  error
+                );
+                fireswapSetting.lock = false; // Unlock on error
+                console.debug(
+                  `[PiniaFireswap ${store.$id}] Set lock=false (uploadDocument - Firestore error fsIndex ${fsIndex})`
+                );
+              }
+            } else {
+              // User is logged out, only saved to local storage (already done above)
+              console.debug(
+                `[PiniaFireswap ${store.$id}] User logged out. State saved only to localStorage key '${fireswapSetting.localKey}'.`
+              );
+              fireswapSetting.lock = false; // Unlock since no Firestore operation
+              console.debug(
+                `[PiniaFireswap ${store.$id}] Set lock=false (uploadDocument - logged out fsIndex ${fsIndex})`
               );
             }
           },
@@ -313,64 +460,29 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
             mutation: SubscriptionCallbackMutation<StateTree>,
             state: StateTree
           ) => {
+            console.debug(
+              `[PiniaFireswap ${store.$id}] Store mutation detected:`,
+              {
+                storeId: mutation.storeId,
+                type: mutation.type,
+                // Avoid logging potentially large payloads unless needed
+                // payload: JSON.stringify(mutation.payload),
+              }
+            );
             if (fireswapSetting.lock) {
               console.debug(
-                `[PiniaFireswap ${store.$id}] Locked, ignoring $subscribe (fsIndex ${fsIndex})`
+                `[PiniaFireswap ${store.$id}] Locked, ignoring store subscription mutation (fsIndex ${fsIndex})`
               );
-              return; // Do nothing if locked
+              return; // Ignore if lock is active
             }
 
-            // Determine the relevant part of the state
-            let relevantState: StateTree | undefined;
-            try {
-              relevantState = path !== '.' ? get(state, path) : state;
-            } catch (e) {
-              console.error(
-                `[PiniaFireswap ${store.$id}] Error getting relevant state path '${path}' for subscription:`,
-                e
-              );
-              return;
-            }
-
-            if (relevantState === undefined) {
-              // This can happen if the path is invalid or leads to undefined
-              console.warn(
-                `[PiniaFireswap ${store.$id}] Relevant state for path '${path}' is undefined. Skipping sync.`
-              );
-              return;
-            }
-
-            if (fireswapSetting.unsubscribe) {
-              console.debug(
-                `[PiniaFireswap ${store.$id}] $subscribe -> Queuing Firestore upload for ${fireswapSetting.document} (fsIndex ${fsIndex})`
-              );
-              // If bound, queue Firestore upload
-              fireswapSetting.uploadDocument?.(relevantState);
-            } else {
-              console.debug(
-                `[PiniaFireswap ${store.$id}] $subscribe -> Saving to localStorage: ${fireswapSetting.localKey} (fsIndex ${fsIndex})`,
-                JSON.stringify(relevantState)
-              );
-              // If not bound, update local storage
-              try {
-                localStorage.setItem(
-                  fireswapSetting.localKey,
-                  JSON.stringify(relevantState)
-                );
-                if (fireswapSetting.localKey === 'progress') {
-                  console.debug(
-                    `[PiniaFireswap ${store.$id}] After localStorage set (level):`,
-                    relevantState.level
-                  );
-                }
-              } catch (e) {
-                console.error(
-                  `[PiniaFireswap ${store.$id}] Error saving to localStorage ${fireswapSetting.localKey}:`,
-                  e
-                );
-              }
-            }
-          }
+            console.debug(
+              `[PiniaFireswap ${store.$id}] Calling uploadDocument due to mutation (fsIndex ${fsIndex})`
+            );
+            // Pass a deep copy of the current state to the debounced function
+            fireswapSetting.uploadDocument?.(JSON.parse(JSON.stringify(state)));
+          },
+          { detached: true, deep: true } // Use deep copy and run detached
         );
       } else {
         console.error(
