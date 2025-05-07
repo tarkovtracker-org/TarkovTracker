@@ -293,14 +293,12 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
                       }
                     });
                   }
-
                   console.debug(
                     `[PiniaFireswap ${store.$id}] State AFTER Firestore patch (reflecting changes from path '${path}'):`,
                     JSON.stringify(
                       path !== '.' ? get(store.$state, path) : store.$state
                     )
                   );
-
                   // Update local storage as well after Firestore sync
                   try {
                     const dataToStore =
@@ -323,7 +321,6 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
                     e
                   );
                 }
-
                 console.debug(
                   `[PiniaFireswap ${store.$id}] Set lock=false (onSnapshot fsIndex ${fsIndex})`
                 );
@@ -345,10 +342,8 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
             );
           }
         };
-
         // --- Firestore Unbinding ---
         if (!storeExt.fireunbind) storeExt.fireunbind = {};
-
         storeExt.fireunbind[fsIndex] = () => {
           if (typeof fireswapSetting.unsubscribe === 'function') {
             console.debug(
