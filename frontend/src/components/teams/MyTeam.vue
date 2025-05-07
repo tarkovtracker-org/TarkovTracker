@@ -8,7 +8,7 @@
       {{ $t('page.team.card.myteam.title') }}
     </template>
     <template #content>
-      <template v-if="systemStore.userTeam == null">
+      <template v-if="localUserTeam == null">
         <v-row align="center" no-gutters>
           <v-col cols="12">
             {{ $t('page.team.card.myteam.no_team') }}
@@ -25,6 +25,8 @@
                 variant="outlined"
                 :label="$t('page.team.card.myteam.display_name_label')"
                 hide-details="auto"
+                maxlength="25"
+                counter
               ></v-text-field>
             </v-col>
             <v-col cols="auto">
@@ -70,7 +72,7 @@
         <v-row align="end" justify="start">
           <!-- Button to show the new token form -->
           <v-btn
-            v-if="systemStore.userTeam == null"
+            v-if="localUserTeam == null"
             :disabled="creatingTeam"
             :loading="creatingTeam"
             variant="outlined"
@@ -81,7 +83,7 @@
             {{ $t('page.team.card.myteam.create_new_team') }}
           </v-btn>
           <v-btn
-            v-if="systemStore.userTeam != null"
+            v-if="localUserTeam != null"
             :disabled="leavingTeam"
             :loading="leavingTeam"
             variant="outlined"
@@ -90,7 +92,7 @@
             @click="leaveTeam"
           >
             {{
-              systemStore.userTeamIsOwn
+              isTeamOwner
                 ? $t('page.team.card.myteam.disband_team')
                 : $t('page.team.card.myteam.leave_team')
             }}
@@ -117,7 +119,7 @@
   </v-snackbar>
 </template>
 <script setup>
-  import { defineAsyncComponent, ref, computed, watch } from 'vue';
+  import { defineAsyncComponent, ref, computed, watch, nextTick } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { fireuser, functions } from '@/plugins/firebase';
   import { httpsCallable } from 'firebase/functions';
@@ -133,40 +135,198 @@
   const teamStore = useTeamStore();
   const systemStore = useSystemStore();
 
+  const localUserTeam = computed(() => {
+    console.debug(
+      '[MyTeam.vue] localUserTeam computed. systemStore.$state.team:',
+      systemStore.$state.team,
+      'systemStore.userTeam (getter):',
+      systemStore.userTeam
+    );
+    return systemStore.$state.team || null; // Directly use the raw state
+  });
+
+  // This computed property might also need to ensure it uses up-to-date store data
+  const isTeamOwner = computed(() => {
+    // Directly access $state.owner for reactivity
+    console.debug(
+      '[MyTeam.vue] isTeamOwner computed. teamStore.$state.owner:',
+      teamStore.$state.owner,
+      'fireuser.uid:',
+      fireuser.uid,
+      'systemStore.$state.team:',
+      systemStore.$state.team
+    );
+    return (
+      teamStore.$state.owner === fireuser.uid && systemStore.$state.team != null
+    );
+  });
+
   // Create new team
   const creatingTeam = ref(false);
   const createTeamResult = ref(null);
   const createTeamSnackbar = ref(false);
   const createTeam = async () => {
     creatingTeam.value = true;
+    console.debug(
+      '[MyTeam.vue] createTeam called. localUserTeam before call:',
+      localUserTeam.value
+    );
     try {
       const createTeamFunction = httpsCallable(functions, 'createTeam');
       await createTeamFunction({});
-      // Wait for Firestore to update systemStore.userTeam
-      const waitForTeam = () =>
-        new Promise((resolve) => {
-          const stop = watch(
-            () => systemStore.userTeam,
-            (val) => {
-              if (val != null) {
-                stop();
-                resolve();
-              }
-            }
+      console.debug(
+        '[MyTeam.vue] createTeamFunction returned. localUserTeam after call (still pre-watch/nextTick):',
+        localUserTeam.value
+      );
+
+      // Wait for systemStore to confirm the user is in a team (i.e., systemStore.$state.team has the new teamId)
+      await new Promise((resolve, reject) => {
+        console.debug(
+          '[MyTeam.vue] Waiting for systemStore.$state.team to be populated. Current value:',
+          systemStore.$state.team
+        );
+        const timeout = setTimeout(() => {
+          console.warn(
+            '[MyTeam.vue] Timeout (15s) waiting for systemStore.$state.team to become non-null.'
           );
-        });
-      await waitForTeam();
-      createTeamResult.value = t('page.team.card.myteam.create_team_success');
-      createTeamSnackbar.value = true;
+          reject(
+            new Error(
+              'Timed out waiting for system record to update with new team ID.'
+            )
+          );
+        }, 15000);
+
+        let stopWatchingSystemTeam;
+        stopWatchingSystemTeam = watch(
+          () => systemStore.$state.team,
+          (newTeamId) => {
+            console.debug(
+              '[MyTeam.vue] Watch on systemStore.$state.team triggered. New teamId:',
+              newTeamId
+            );
+            if (newTeamId != null) {
+              clearTimeout(timeout);
+              if (stopWatchingSystemTeam) {
+                stopWatchingSystemTeam();
+              }
+              console.debug(
+                '[MyTeam.vue] systemStore.$state.team is now populated.'
+              );
+              resolve(newTeamId);
+            }
+          },
+          { immediate: true, deep: false }
+        );
+      });
+
+      // Now wait for teamStore to be populated with the owner information for the new team
+      await new Promise((resolve, reject) => {
+        console.debug(
+          '[MyTeam.vue] Waiting for teamStore.owner to match current user. Current teamStore.$state:',
+          JSON.parse(JSON.stringify(teamStore.$state || {})),
+          'fireuser.uid:',
+          fireuser.uid
+        );
+        const timeout = setTimeout(() => {
+          console.warn(
+            '[MyTeam.vue] Timeout (15s) waiting for teamStore.owner to match fireuser.uid. Current teamStore.$state.owner:',
+            teamStore.owner // Log current owner at timeout
+          );
+          resolve(null);
+        }, 15000);
+
+        let stopWatchingTeamOwner;
+        stopWatchingTeamOwner = watch(
+          () => teamStore.$state, // Watch the entire $state object
+          (newState) => {
+            const newOwner = newState?.owner;
+            console.debug(
+              '[MyTeam.vue] Watch on teamStore.$state triggered. New state owner:',
+              newOwner,
+              'fireuser.uid:',
+              fireuser.uid
+            );
+            if (newOwner && fireuser.uid && newOwner === fireuser.uid) {
+              clearTimeout(timeout);
+              if (stopWatchingTeamOwner) {
+                stopWatchingTeamOwner();
+              }
+              console.debug(
+                '[MyTeam.vue] teamStore.owner now matches fireuser.uid via $state watch.'
+              );
+              resolve(newOwner);
+            }
+          },
+          { immediate: true, deep: true } // Use deep: true for watching object properties
+        );
+        // Initial check (can be removed if immediate:true on $state with deep:true works reliably)
+        // if (
+        //   teamStore.owner &&
+        //   fireuser.uid &&
+        //   teamStore.owner === fireuser.uid
+        // ) {
+        //   clearTimeout(timeout);
+        //   if (stopWatchingTeamOwner) stopWatchingTeamOwner();
+        //   console.debug(
+        //     '[MyTeam.vue] Initial check: teamStore.owner already matches fireuser.uid.'
+        //   );
+        //   resolve(teamStore.owner);
+        // }
+      });
+
+      console.debug(
+        '[MyTeam.vue] All watches resolved. localUserTeam (before nextTick):',
+        localUserTeam.value,
+        'teamStore.owner:',
+        teamStore.owner,
+        'isTeamOwner computed:',
+        isTeamOwner.value
+      );
+      await nextTick();
+      console.debug(
+        '[MyTeam.vue] After nextTick. localUserTeam (getter):',
+        localUserTeam.value,
+        '$state.team:',
+        systemStore.$state.team,
+        'teamStore.owner:',
+        teamStore.owner,
+        'isTeamOwner computed:',
+        isTeamOwner.value
+      );
+
+      if (localUserTeam.value) {
+        createTeamResult.value = t('page.team.card.myteam.create_team_success');
+        createTeamSnackbar.value = true;
+        if (!isTeamOwner.value) {
+          console.warn(
+            "[MyTeam.vue] Team created and user is in team, but 'isTeamOwner' is still false. This might indicate an issue with owner state propagation or comparison."
+          );
+        }
+      } else {
+        console.error(
+          '[MyTeam.vue] Team creation failed: UI state (localUserTeam) did not update after nextTick. $state.team:',
+          systemStore.$state.team
+        );
+        createTeamResult.value = t(
+          'page.team.card.myteam.create_team_error_ui_update'
+        );
+        createTeamSnackbar.value = true;
+      }
     } catch (error) {
       let backendMsg =
         error?.message || error?.data?.message || error?.toString();
       createTeamResult.value =
         backendMsg || t('page.team.card.myteam.create_team_error');
-      console.error(error);
+      console.error('[MyTeam.vue] Error in createTeam:', error);
       createTeamSnackbar.value = true;
     }
     creatingTeam.value = false;
+    console.debug(
+      '[MyTeam.vue] createTeam finished. creatingTeam=false. localUserTeam for final UI render check:',
+      localUserTeam.value,
+      '$state.team:',
+      systemStore.$state.team
+    );
   };
 
   // Leave team
@@ -177,8 +337,9 @@
     leavingTeam.value = true;
     try {
       const leaveTeamFunction = httpsCallable(functions, 'leaveTeam');
-      leaveTeamResult.value = await leaveTeamFunction({});
-      if (systemStore.userTeamIsOwn) {
+      const result = await leaveTeamFunction({}); // Capture result if needed
+      if (isTeamOwner.value) {
+        // MODIFIED
         leaveTeamResult.value = t('page.team.card.myteam.disband_team_success');
       } else {
         leaveTeamResult.value = t('page.team.card.myteam.leave_team_success');
@@ -201,23 +362,25 @@
   };
 
   const teamUrl = computed(() => {
+    const teamIdForUrl = systemStore.$state.team; // Correct: Use the team ID from the system store
+    const passwordForUrl = teamStore.$state.password; // Correct: Use the password from the team store
     console.debug(
-      '[Invite Debug] teamOwner:',
-      teamStore.teamOwner,
-      'teamPassword:',
-      teamStore.teamPassword
+      '[Invite Debug - MyTeam.vue] Generating teamUrl. teamIdForUrl (from systemStore.$state.team):',
+      teamIdForUrl,
+      'passwordForUrl (from teamStore.$state.password):',
+      passwordForUrl
     );
-    if (!teamStore.teamOwner || !teamStore.teamPassword) {
+    if (!teamIdForUrl || !passwordForUrl) {
       console.warn(
-        '[Invite Debug] Missing teamOwner or teamPassword when generating invite URL:',
-        teamStore.teamOwner,
-        teamStore.teamPassword
+        '[Invite Debug - MyTeam.vue] Missing teamIdForUrl or passwordForUrl when generating invite URL:',
+        teamIdForUrl,
+        passwordForUrl
       );
     }
-    if (teamStore.teamOwner && teamStore.teamPassword) {
+    if (teamIdForUrl && passwordForUrl) {
       return `${window.location.href.split('?')[0]}?team=${encodeURIComponent(
-        teamStore.teamOwner
-      )}&code=${encodeURIComponent(teamStore.teamPassword)}`;
+        teamIdForUrl
+      )}&code=${encodeURIComponent(passwordForUrl)}`;
     } else {
       return '';
     }
@@ -236,7 +399,16 @@
   const tarkovStore = useTarkovStore();
   const displayName = computed({
     get() {
-      return tarkovStore.getDisplayName || fireuser.uid.substring(0, 6);
+      // Directly access the state property
+      const nameFromStore = tarkovStore.displayName;
+      console.debug(
+        '[MyTeam.vue] displayName GETTER value from store state:',
+        nameFromStore,
+        'UID substring:',
+        fireuser.uid?.substring(0, 6)
+      );
+      // Use fallback if nameFromStore is null, undefined, or empty string
+      return nameFromStore || fireuser.uid?.substring(0, 6) || 'ErrorName';
     },
     set(newName) {
       if (newName !== '') {
