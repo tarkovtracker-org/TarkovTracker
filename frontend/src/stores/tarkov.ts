@@ -5,8 +5,6 @@ import { getters, actions, defaultState } from '@/shared_state';
 import { initializeStore, wasDataMigrated } from '@/plugins/store-initializer';
 import type { Pinia } from 'pinia';
 
-console.log('swapTarkov store defined');
-
 // Define the Fireswap configuration type
 interface FireswapConfig {
   path: string;
@@ -21,21 +19,18 @@ export const useTarkovStore = defineStore('swapTarkov', {
   state: () => JSON.parse(JSON.stringify(defaultState)),
   getters: getters as any, // Cast to any - Requires shared_state.ts for proper typing
   actions: actions as any, // Cast to any - Requires shared_state.ts for proper typing
+  fireswap: [
+    {
+      path: '.',
+      document: 'progress/{uid}',
+      debouncems: 250,
+      localKey: 'progress',
+    },
+  ] as FireswapConfig[],
 });
 
 // Type the store instance based on Pinia's inferred type
 type TarkovStoreType = ReturnType<typeof useTarkovStore>;
-
-// Manually add the fireswap property to the store definition's prototype or instance
-// This is a workaround as Pinia doesn't natively support arbitrary properties in options store
-(useTarkovStore as any).fireswap = [
-  {
-    path: '.',
-    document: 'progress/{uid}',
-    debouncems: 250,
-    localKey: 'progress',
-  },
-] as FireswapConfig[];
 
 // Type the store instance potentially returned by initializeStore
 type StoreInstance = TarkovStoreType | null;
