@@ -260,13 +260,66 @@ async function _createTeamLogic(
         const uidgen = new UIDGenerator(32); // Generate a 32-bit ID (valid multiple of 8)
         const teamId = await uidgen.generate();
         logger.log("[createTeam] Generated teamId", { teamId });
-        createdTeam = teamId; // Store the generated ID
+
+        let teamPassword = data.password;
+        logger.log(
+          "[createTeam] DEBUG PASVVOORD: Initial teamPassword from data (data.password):",
+        );
+        logger.log(data.password === undefined ? "undefined" : data.password);
+
+        if (!teamPassword) {
+          logger.log(
+            "[createTeam] DEBUG PASVVOORD: No client password, generating one...",
+          );
+          try {
+            const passGen = new UIDGenerator(48, UIDGenerator.BASE62); // Generate from 48 bits of randomness, encoded in Base62 (approx 8 chars)
+            const generatedPass = await passGen.generate();
+            logger.log("[createTeam] DEBUG PASVVOORD: Raw generatedPass:");
+            logger.log(
+              generatedPass === undefined ? "undefined" : generatedPass,
+            );
+
+            if (generatedPass && generatedPass.length >= 4) {
+              teamPassword = generatedPass;
+              logger.log(
+                "[createTeam] DEBUG PASVVOORD: Using generated password (masked): ****",
+              );
+            } else {
+              logger.warn(
+                "[createTeam] DEBUG PASVVOORD: Generated password was short or falsy. Raw:",
+                generatedPass,
+                "Using fallback: DEBUG_PASS_123",
+              );
+              teamPassword = "DEBUG_PASS_123";
+            }
+          } catch (genError) {
+            logger.error(
+              "[createTeam] DEBUG PASVVOORD: Error during password generation:",
+              genError,
+            );
+            teamPassword = "ERROR_PASS_456"; // Fallback on error
+          }
+        } else {
+          logger.log(
+            "[createTeam] DEBUG PASVVOORD: Using client-provided password (masked): ****",
+          );
+        }
+
+        logger.log(
+          "[createTeam] DEBUG PASVVOORD: Final teamPassword before set (masked):",
+          teamPassword ? "****" : "(IT IS FALSY)",
+          "Actual value for Firestore:",
+          teamPassword,
+        );
+
+        createdTeam = teamId;
         const teamRef = db.collection("team").doc(teamId);
         logger.log("[createTeam] teamRef", { path: teamRef.path });
+
         transaction.set(teamRef, {
           owner: userUid,
-          password: data.password || "", // Use provided password or default to empty string
-          maximumMembers: data.maximumMembers || 10, // Use provided max members or default to 10
+          password: teamPassword,
+          maximumMembers: data.maximumMembers || 10,
           members: [userUid],
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
