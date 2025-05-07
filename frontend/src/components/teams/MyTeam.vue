@@ -135,6 +135,17 @@
   const teamStore = useTeamStore();
   const systemStore = useSystemStore();
 
+  const generateRandomName = (length = 6) => {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  };
+
   const localUserTeam = computed(() => {
     console.debug(
       '[MyTeam.vue] localUserTeam computed. systemStore.$state.team:',
@@ -297,7 +308,14 @@
       if (localUserTeam.value) {
         createTeamResult.value = t('page.team.card.myteam.create_team_success');
         createTeamSnackbar.value = true;
-        if (!isTeamOwner.value) {
+        if (isTeamOwner.value) {
+          const randomTeamName = generateRandomName();
+          tarkovStore.setDisplayName(randomTeamName);
+          console.log(
+            '[MyTeam.vue] New team created by owner, set random display name:',
+            randomTeamName
+          );
+        } else {
           console.warn(
             "[MyTeam.vue] Team created and user is in team, but 'isTeamOwner' is still false. This might indicate an issue with owner state propagation or comparison."
           );
