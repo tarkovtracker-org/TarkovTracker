@@ -15,10 +15,12 @@
             <i18n-t
               keypath="page.hideout.stationcard.level"
               scope="global"
-              :plural="progressStore.hideoutLevels[props.station.id]['self']"
+              :plural="
+                progressStore.hideoutLevels?.[props.station.id]?.self || 0
+              "
             >
               <template #level>
-                {{ progressStore.hideoutLevels[props.station.id]['self'] }}
+                {{ progressStore.hideoutLevels?.[props.station.id]?.self || 0 }}
               </template>
             </i18n-t>
           </span>
@@ -158,11 +160,14 @@
               keypath="page.hideout.stationcard.downgradebutton"
               scope="global"
               :plural="
-                progressStore.hideoutLevels[props.station.id]['self'] - 1
+                (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1
               "
             >
               <template #level>
-                {{ progressStore.hideoutLevels[props.station.id]['self'] - 1 }}
+                {{
+                  (progressStore.hideoutLevels?.[props.station.id]?.self || 0) -
+                  1
+                }}
               </template>
             </i18n-t>
           </v-btn>
@@ -214,7 +219,7 @@
 
   const highlightClasses = computed(() => {
     let classes = {};
-    if (progressStore.hideoutLevels[props.station.id]?.['self'] > 0) {
+    if (progressStore.hideoutLevels?.[props.station.id]?.self > 0) {
       classes['highlight-secondary'] = true;
     } else {
       classes['highlight-green'] = true;
@@ -226,7 +231,8 @@
   });
   const downgradeDisabled = computed(() => {
     if (props.station.id === '5d484fc0654e76006657e0ab') {
-      const currentStash = progressStore.hideoutLevels[props.station.id]?.['self'] ?? 0;
+      const currentStash =
+        progressStore.hideoutLevels?.[props.station.id]?.self ?? 0;
       const editionId = tarkovStore.getGameEdition();
       const editionData = progressStore.gameEditionData.find(
         (e) => e.version === editionId
@@ -271,7 +277,7 @@
       props.station.levels.find(
         (level) =>
           level.level ===
-          (progressStore.hideoutLevels[props.station.id]?.['self'] || 0) + 1
+          (progressStore.hideoutLevels?.[props.station.id]?.self || 0) + 1
       ) || null
     );
   });
@@ -279,8 +285,7 @@
     return (
       props.station.levels.find(
         (level) =>
-          level.level ===
-          progressStore.hideoutLevels[props.station.id]?.['self']
+          level.level === progressStore.hideoutLevels?.[props.station.id]?.self
       ) || null
     );
   });
