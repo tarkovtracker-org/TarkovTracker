@@ -30,21 +30,17 @@ import {
   UserActions,
 } from '@/shared_state';
 import { useUserStore } from '@/stores/user';
-
 const firedb: Firestore = firestore;
-
 interface SystemState extends StateTree {
   tokens?: string[];
   team?: string | null;
 }
-
 interface SystemGetters extends _GettersTree<SystemState> {
   userTokens: (state: SystemState) => string[];
   userTokenCount: (state: SystemState) => number;
   userTeam: (state: SystemState) => string | null;
   userTeamIsOwn: (state: SystemState) => boolean;
 }
-
 const useSystemStore = defineStore<string, SystemState, SystemGetters>(
   'system',
   {
@@ -57,11 +53,6 @@ const useSystemStore = defineStore<string, SystemState, SystemGetters>(
         return state?.tokens?.length || 0;
       },
       userTeam(state) {
-        // console.debug(
-        //   `[livedata.ts] systemStore.userTeam GETTER CALLED. state.team is:`,
-        //   state.team,
-        //   `(returning: ${state?.team || null})`
-        // );
         return state?.team || null;
       },
       userTeamIsOwn(state) {
@@ -70,10 +61,8 @@ const useSystemStore = defineStore<string, SystemState, SystemGetters>(
     },
   }
 );
-
 const systemStore = useSystemStore();
 const userStore = useUserStore();
-
 const systemRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(
   () => {
     if (fireuser.loggedIn) {
@@ -83,9 +72,7 @@ const systemRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(
     }
   }
 );
-
 const systemUnsubscribe: Ref<Unsubscribe | null> = ref(null);
-
 function clearState(store: Store, newState?: DocumentData | {}): void {
   try {
     const currentState = store.$state;
@@ -111,7 +98,6 @@ function clearState(store: Store, newState?: DocumentData | {}): void {
     console.error(error);
   }
 }
-
 function startStoreWatcher(
   store: Store,
   refToWatch: ComputedRef<DocumentReference<DocumentData> | null>,
@@ -122,18 +108,12 @@ function startStoreWatcher(
     async (newRef) => {
       if (newRef) {
         if (unsubscribe?.value) {
-          // console.debug('Unsubscribing from', store.$id);
           unsubscribe.value();
           clearState(store, {});
         }
-        // console.debug(`Ref changed to ${newRef.path} for ${store.$id}`);
         unsubscribe.value = onSnapshot(
           newRef,
           (snapshot) => {
-            // console.debug(
-            //   `[livedata.ts] ${store.$id} data changed. Raw snapshot data:`,
-            //   JSON.parse(JSON.stringify(snapshot.data() || {}))
-            // );
             const snapshotData = snapshot.data();
             if (snapshotData) {
               if (store.$id === 'team') {
@@ -141,9 +121,6 @@ function startStoreWatcher(
                   '[livedata][startStoreWatcher/teamStore] Snapshot received. snapshotData.members:',
                   JSON.parse(JSON.stringify(snapshotData.members || null))
                 );
-                // It's tricky to get $state reliably before patch for a specific sub-property
-                // if the store.$state itself might be initially undefined or different structure.
-                // Let's log the whole state.
                 console.log(
                   '[livedata][startStoreWatcher/teamStore] teamStore.$state BEFORE patch:',
                   JSON.parse(JSON.stringify(store.$state))
@@ -165,20 +142,12 @@ function startStoreWatcher(
               }
               clearState(store, snapshotData);
             } else {
-              // console.debug(
-              //   `[livedata.ts] ${store.$id} received empty snapshot data.`
-              // );
               clearState(store, {});
             }
           },
           (error: any) => {
             // Consider using a more specific error type if available
             if (error.code == 'permission-denied' && unsubscribe.value) {
-              // console.debug(
-              //   'Unsubscribing from',
-              //   store.$id,
-              //   'due to permission denied'
-              // );
               unsubscribe.value();
               clearState(store, {});
             }
@@ -186,56 +155,35 @@ function startStoreWatcher(
         );
       } else {
         if (unsubscribe?.value) {
-          // console.debug('Unsubscribing from', store.$id);
           unsubscribe.value();
         }
-        // console.debug(`Ref changed to null for ${store.$id}`);
         clearState(store, {});
       }
     },
     { immediate: true }
   );
 }
-
 startStoreWatcher(systemStore, systemRef, systemUnsubscribe);
-
 const teamRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(
   () => {
-    const currentSystemStateTeam = systemStore.$state.team; // Read raw state
-    // console.debug(
-    //   '[livedata.ts] teamRef computed. fireuser.loggedIn:',
-    //   fireuser.loggedIn,
-    //   'systemStore.$state.team:',
-    //   currentSystemStateTeam
-    // );
+    const currentSystemStateTeam = systemStore.$state.team;
     if (fireuser.loggedIn) {
       if (currentSystemStateTeam && typeof currentSystemStateTeam == 'string') {
-        // Use raw state
-        // console.debug(
-        //   '[livedata.ts] Team ref now points to team:' + currentSystemStateTeam
-        // );
         return doc(collection(firedb, 'team'), currentSystemStateTeam);
       } else {
-        // console.debug(
-        //   '[livedata.ts] Team ref now null (no currentSystemStateTeam or not a string).'
-        // );
         return null;
       }
     } else {
-      // console.debug('[livedata.ts] Team ref now null (user not logged in).');
       return null;
     }
   }
 );
-
 const teamUnsubscribe: Ref<Unsubscribe | null> = ref(null);
-
 interface TeamState extends StateTree {
   owner?: string | null;
   password?: string | null;
   members?: string[];
 }
-
 interface TeamGetters extends _GettersTree<TeamState> {
   teamOwner: (state: TeamState) => string | null;
   isOwner: (state: TeamState) => boolean;
@@ -243,7 +191,6 @@ interface TeamGetters extends _GettersTree<TeamState> {
   teamMembers: (state: TeamState) => string[];
   teammates: (state: TeamState) => string[];
 }
-
 const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
   state: (): TeamState => {
     return {};
@@ -253,7 +200,11 @@ const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
       return state?.owner || null;
     },
     isOwner(state) {
-      return state?.owner == fireuser?.uid || false;
+      const owner = state.owner;
+      console.log(
+        `[livedata.ts] teamStore.isOwner GETTER internal. owner: ${owner}, fireuser.uid: ${fireuser.uid}, comparison result: ${owner === fireuser.uid}`
+      );
+      return owner === fireuser.uid;
     },
     teamPassword(state) {
       return state?.password || null;
@@ -271,7 +222,6 @@ const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
         'fireuser.uid:',
         currentFireUID
       );
-
       let result: string[];
       if (currentMembers) {
         result = currentMembers.filter((member) => member !== currentFireUID);
@@ -286,27 +236,19 @@ const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
     },
   },
 });
-
 const teamStore = useTeamStore();
 startStoreWatcher(teamStore, teamRef, teamUnsubscribe);
-
 const teammateUnsubscribes: Ref<{ [key: string]: Unsubscribe }> = ref({});
-// teammateStores is now declared and exported at the top of the file for global use
-
 const { teammates } = storeToRefs(teamStore);
-
 watch(
-  () => teamStore.$state, // Watch the entire $state object
+  () => teamStore.$state,
   async (newState, oldState) => {
-    // Parameters change to reflect watching $state
-    // We need to manually get the newTeammates from newState.members
     const newFireUID = fireuser?.uid;
     const newTeammatesArray =
       newState.members?.filter((member: string) => member !== newFireUID) || [];
     const oldTeammatesArray =
       oldState?.members?.filter((member: string) => member !== newFireUID) ||
       [];
-
     console.log(
       '[livedata] teammates watcher (watching $state) triggered. New state members:',
       JSON.parse(JSON.stringify(newState.members || [])),
@@ -317,26 +259,21 @@ watch(
       'Current teammateStores keys:',
       JSON.parse(JSON.stringify(Object.keys(teammateStores.value)))
     );
-
-    // Remove any teammates that are no longer in the team
     for (const teammate of Object.keys(teammateStores.value)) {
       if (!newTeammatesArray.includes(teammate)) {
         console.debug('Removing teammate', teammate);
         if (teammateUnsubscribes.value[teammate]) {
           teammateUnsubscribes.value[teammate]();
-          delete teammateUnsubscribes.value[teammate]; // Clean up unsubscribe ref
+          delete teammateUnsubscribes.value[teammate];
         }
         delete teammateStores.value[teammate];
       }
     }
-    // Add any new teammates
     try {
       if (Array.isArray(newTeammatesArray)) {
         for (const teammate of newTeammatesArray) {
-          // Check if teammate store already exists before creating
           if (!teammateStores.value[teammate]) {
             console.debug('Adding teammate', teammate);
-            // Use imported types for defineStore
             const storeDefinition = defineStore<
               `teammate-${string}`,
               UserState,
@@ -344,30 +281,25 @@ watch(
               UserActions
             >(`teammate-${teammate}`, {
               state: (): UserState => JSON.parse(JSON.stringify(defaultState)),
-              getters: getters, // Use imported getters directly
-              actions: actions, // Use imported actions directly
+              getters: getters,
+              actions: actions,
             });
             // Instantiate the store and add it to the ref
             teammateStores.value[teammate] = storeDefinition();
-
             teammateUnsubscribes.value[teammate] = onSnapshot(
               doc(firedb, 'progress', teammate),
               (memberDocSnapshot) => {
                 const storeId = teammateStores.value[teammate]?.$id; // e.g., teammate-UID
                 const teammateStoreInstance = teammateStores.value[teammate];
-
                 if (!teammateStoreInstance) {
                   console.warn(
                     `[livedata][teammateStore:${teammate}] Store instance not found during snapshot for progress/${teammate}. This should not happen if store was just created.`
                   );
                   return;
                 }
-
                 const firestoreDocData = memberDocSnapshot.data();
                 const docExists = memberDocSnapshot.exists();
-
                 console.log(
-                  // Using console.log for higher visibility
                   `[livedata][${storeId}] SNAPSHOT for progress/${teammate}. Exists: ${docExists}. Raw Firestore Data:`,
                   JSON.parse(JSON.stringify(firestoreDocData || {}))
                 );
@@ -375,12 +307,9 @@ watch(
                   `[livedata][${storeId}] Store state BEFORE patch:`,
                   JSON.parse(JSON.stringify(teammateStoreInstance.$state))
                 );
-
                 if (docExists && firestoreDocData) {
-                  // Document exists and has data
                   teammateStoreInstance.$patch(firestoreDocData);
                 } else if (docExists && !firestoreDocData) {
-                  // Document exists but data() returned undefined/null (edge case, Firestore usually returns {} for empty doc if it exists)
                   console.warn(
                     `[livedata][${storeId}] Document progress/${teammate} exists but data is empty. Patching defaultState.`
                   );
@@ -388,7 +317,6 @@ watch(
                     JSON.parse(JSON.stringify(defaultState))
                   );
                 } else {
-                  // Document does not exist
                   console.log(
                     `[livedata][${storeId}] Document progress/${teammate} does not exist. Patching defaultState.`
                   );
@@ -396,14 +324,12 @@ watch(
                     JSON.parse(JSON.stringify(defaultState))
                   );
                 }
-
                 console.log(
                   `[livedata][${storeId}] Store state AFTER patch:`,
                   JSON.parse(JSON.stringify(teammateStoreInstance.$state))
                 );
               },
               (error: any) => {
-                // Consider using a more specific error type
                 if (
                   error.code == 'permission-denied' &&
                   teammateUnsubscribes.value[teammate]
@@ -414,9 +340,7 @@ watch(
                     'due to permission denied'
                   );
                   teammateUnsubscribes.value[teammate]();
-                  delete teammateUnsubscribes.value[teammate]; // Clean up unsubscribe ref
-                  // Optionally remove the store as well if unsubscribed due to permissions
-                  // delete teammateStores.value[teammate];
+                  delete teammateUnsubscribes.value[teammate];
                 }
               }
             );
@@ -432,27 +356,19 @@ watch(
     deep: true,
   }
 );
-
 interface ProgressGetters extends _GettersTree<any> {
-  // Define more specific state if possible
   getDisplayName: (state: any) => (teamId: string) => string;
   getLevel: (state: any) => (teamId: string) => number;
   getTeamIndex: (state: any) => (teamId: string) => string;
 }
-
-interface ProgressState extends StateTree {
-  // Define state properties if needed, otherwise use 'any' or '{}'
-}
-
+interface ProgressState extends StateTree {}
 const getTarkovStore = () => {
   return require('@/stores/tarkov').useTarkovStore();
 };
-
 const useProgressStore = defineStore('progress', () => {
-  // Use getTarkovStore instead of direct import
   const teamStores = computed(() => {
     let stores: { [key: string]: Store<string, UserState> } = {};
-    stores['self'] = getTarkovStore() as Store<string, UserState>; // Use the function
+    stores['self'] = getTarkovStore() as Store<string, UserState>;
     for (const teammate of Object.keys(teammateStores.value)) {
       if (teammateStores.value[teammate]) {
         stores[teammate] = teammateStores.value[teammate];
@@ -460,18 +376,15 @@ const useProgressStore = defineStore('progress', () => {
     }
     return stores;
   });
-
   const visibleTeamStores = computed(() => {
     let visibleStores: { [key: string]: Store<string, UserState> } = {};
     Object.entries(teamStores.value).forEach(([teamId, store]) => {
-      // Assuming userStore has a method teamIsHidden
       if (!userStore.teamIsHidden(teamId)) {
         visibleStores[teamId] = store;
       }
     });
     return visibleStores;
   });
-
   const getTeamIndex = (teamId: string): string => {
     if (teamId == fireuser?.uid) {
       return 'self';
@@ -479,34 +392,22 @@ const useProgressStore = defineStore('progress', () => {
       return teamId;
     }
   };
-
   const getDisplayName = (teamId: string): string => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
-    // Use optional chaining and nullish coalescing safely
-    // Accessing $state.displayName is now type-safe due to UserState
     return store?.$state?.displayName ?? teamId.substring(0, 6);
   };
-
   const getLevel = (teamId: string): number => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
-    // Use optional chaining and nullish coalescing safely
-    // Accessing $state.level is now type-safe due to UserState (assuming level is the correct property)
-    return store?.$state?.level ?? 1; // Changed from playerLevel to level based on UserState
+    return store?.$state?.level ?? 1;
   };
-
-  // Return the state, getters, and actions
-  // Note: Pinia setup stores typically return an object with state properties,
-  // computed refs, and methods directly.
   return {
-    // Expose computed properties and methods
     teamStores,
     visibleTeamStores,
     getDisplayName,
     getTeamIndex,
     getLevel,
-    // No explicit state properties defined here, relies on computed/methods
   };
 });
 
@@ -515,6 +416,6 @@ export function useLiveData() {
     useTeamStore,
     useSystemStore,
     useProgressStore,
-    teammateStores, // Exposing the Ref directly
+    teammateStores,
   };
 }
