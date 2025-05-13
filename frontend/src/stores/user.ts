@@ -293,21 +293,15 @@ watch(
 
       if (newValue) {
         if (canBind) {
-          console.debug('Binding remoteUser store');
           (userStore as any).firebindAll();
         } else {
-          console.debug('No remoteUser store to bind');
         }
       } else {
         if (canUnbind) {
-          console.debug('Unbinding remoteUser store');
           (userStore as any).fireunbindAll();
-        } else {
-          console.debug('No remoteUser store to unbind');
         }
       }
     } catch (error) {
-      console.error('Error in user store watch handler:', error);
       // Handle cases where pinia or userStore might not be ready
     }
   },
