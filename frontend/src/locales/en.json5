@@ -72,6 +72,7 @@
         alternatives: 'Alternative quests',
         alternativefailed: 'Alternative quests will also be reset',
         differentfaction: 'This quest is not available to your faction',
+        neededby: 'Needed by: {names}',
       },
     },
     hideout: {
