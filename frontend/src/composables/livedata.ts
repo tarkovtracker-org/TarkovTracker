@@ -15,13 +15,7 @@ import {
   DocumentData,
   Firestore,
 } from 'firebase/firestore';
-import {
-  defineStore,
-  storeToRefs,
-  _GettersTree,
-  DefineStoreOptions,
-  _ActionsTree,
-} from 'pinia';
+import { defineStore, storeToRefs, _GettersTree, _ActionsTree } from 'pinia';
 import {
   getters,
   actions,
@@ -142,11 +136,13 @@ function startStoreWatcher(
               }
               clearState(store, snapshotData);
             } else {
+              console.log(
+                '[livedata][systemStore Watcher] Snapshot data is null/undefined. Clearing state.'
+              );
               clearState(store, {});
             }
           },
           (error: any) => {
-            // Consider using a more specific error type if available
             if (error.code == 'permission-denied' && unsubscribe.value) {
               unsubscribe.value();
               clearState(store, {});
@@ -395,7 +391,22 @@ const useProgressStore = defineStore('progress', () => {
   const getDisplayName = (teamId: string): string => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
-    return store?.$state?.displayName ?? teamId.substring(0, 6);
+    const displayNameFromStore = store?.$state?.displayName;
+
+    console.log(
+      `[livedata][getDisplayName] For teamId: ${teamId} (storeKey: ${storeKey})`,
+      `Store found: ${!!store}`,
+      `Store $state: ${JSON.stringify(store?.$state)}`,
+      `DisplayName from store: ${displayNameFromStore}`
+    );
+
+    if (!displayNameFromStore) {
+      console.warn(
+        `[livedata][getDisplayName] DisplayName for ${teamId} (storeKey: ${storeKey}) is FALSY ('${displayNameFromStore}'). Falling back to UID substring. Store $state was: ${JSON.stringify(store?.$state)}`
+      );
+      return teamId.substring(0, 6);
+    }
+    return displayNameFromStore;
   };
   const getLevel = (teamId: string): number => {
     const storeKey = getTeamIndex(teamId);
