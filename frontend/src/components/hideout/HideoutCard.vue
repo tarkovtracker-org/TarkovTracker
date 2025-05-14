@@ -178,10 +178,42 @@
         no-gutters
         class="align-center justify-center"
       >
-        <v-col cols="auto" class="mx-1 my-1">
-          <span class="mx-3">
-            {{ t('page.hideout.stationcard.upgradeunavailable') }}</span
+        <v-col
+          v-if="currentLevel && !downgradeDisabled"
+          cols="auto"
+          class="mx-1 my-1"
+        >
+          <v-btn
+            color="red"
+            variant="tonal"
+            density="comfortable"
+            class="my-1"
+            @click="downgradeStation()"
           >
+            <i18n-t
+              keypath="page.hideout.stationcard.downgradebutton"
+              scope="global"
+              :plural="
+                (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1
+              "
+            >
+              <template #level>
+                {{
+                  (progressStore.hideoutLevels?.[props.station.id]?.self || 0) -
+                  1
+                }}
+              </template>
+            </i18n-t>
+          </v-btn>
+        </v-col>
+        <v-col
+          v-if="nextLevel && (!currentLevel || downgradeDisabled)"
+          cols="auto"
+          class="mx-1 my-1"
+        >
+          <span class="mx-3">
+            {{ t('page.hideout.stationcard.upgradeunavailable') }}
+          </span>
         </v-col>
       </v-row>
     </div>
