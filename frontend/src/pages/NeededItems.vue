@@ -123,7 +123,7 @@
                           color="primary"
                           block
                           @click="settingsDialog = false"
-                          >{{ $t("page.neededitems.options.close") }}</v-btn
+                          >{{ $t('page.neededitems.options.close') }}</v-btn
                         >
                       </v-col>
                     </v-row>
@@ -142,7 +142,7 @@
           color="secondary"
           class="mx-2"
         ></v-progress-circular>
-        {{ $t("page.neededitems.loading") }} <refresh-button />
+        {{ $t('page.neededitems.loading') }} <refresh-button />
       </v-col>
     </v-row>
     <v-row
@@ -170,215 +170,254 @@
   </v-container>
 </template>
 <script setup>
-import { computed, provide, ref, watch } from "vue";
-import { useTarkovData } from "@/composables/tarkovdata";
-import { useProgressStore } from "@/stores/progress";
-import { defineAsyncComponent } from "vue";
-import { debounce } from "lodash-es";
-import { useI18n } from "vue-i18n";
-import { useUserStore } from "@/stores/user";
-const TrackerTip = defineAsyncComponent(() =>
-  import("@/components/TrackerTip.vue")
-);
-const RefreshButton = defineAsyncComponent(() =>
-  import("@/components/RefreshButton.vue")
-);
-const NeededItem = defineAsyncComponent(() =>
-  import("@/components/neededitems/NeededItem.vue")
-);
-const { t } = useI18n({ useScope: "global" });
-const {
-  tasks,
-  hideoutModules,
-  hideoutLoading,
-  loading,
-  neededItemTaskObjectives,
-  neededItemHideoutModules,
-} = useTarkovData();
-const progressStore = useProgressStore();
-const userStore = useUserStore();
-const itemFilterNameText = ref("");
-function clearItemFilterNameText() {
-  if (itemFilterNameText.value) itemFilterNameText.value = "";
-}
-const itemFilterName = ref("");
-provide("itemFilterName", itemFilterName);
-watch(
-  itemFilterNameText,
-  debounce((newVal) => {
-    itemFilterName.value = newVal;
-  }, 500)
-);
-const neededItemsStyle = computed({
-  get: () => userStore.getNeededItemsStyle,
-  set: (value) => userStore.setNeededItemsStyle(value),
-});
-const settingsDialog = ref(false);
-const neededViews = [
-  {
-    title: t("page.neededitems.neededviews.all"),
-    icon: "mdi-all-inclusive",
-    view: "all",
-  },
-  {
-    title: t("page.neededitems.neededviews.tasks"),
-    icon: "mdi-clipboard-text",
-    view: "tasks",
-  },
-  {
-    title: t("page.neededitems.neededviews.hideout"),
-    icon: "mdi-home",
-    view: "hideout",
-  },
-];
-const activeNeededView = computed({
-  get: () => userStore.getNeededTypeView,
-  set: (value) => userStore.setNeededTypeView(value),
-});
-const neededTaskItems = computed(() => {
-  // Capture dependencies' values at the start using optional chaining on .value access
-  const objectives = neededItemTaskObjectives?.value;
-  const taskList = tasks?.value;
-  // Check if captured values are valid arrays
-  if (!Array.isArray(objectives) || !Array.isArray(taskList)) {
-    return [];
+  import { computed, provide, ref, watch } from 'vue';
+  import { useTarkovData } from '@/composables/tarkovdata';
+  import { useProgressStore } from '@/stores/progress';
+  import { defineAsyncComponent } from 'vue';
+  import { debounce } from 'lodash-es';
+  import { useI18n } from 'vue-i18n';
+  import { useUserStore } from '@/stores/user';
+  const TrackerTip = defineAsyncComponent(
+    () => import('@/components/TrackerTip.vue')
+  );
+  const RefreshButton = defineAsyncComponent(
+    () => import('@/components/RefreshButton.vue')
+  );
+  const NeededItem = defineAsyncComponent(
+    () => import('@/components/neededitems/NeededItem.vue')
+  );
+  const { t } = useI18n({ useScope: 'global' });
+  const {
+    tasks,
+    hideoutModules,
+    hideoutLoading,
+    loading,
+    neededItemTaskObjectives,
+    neededItemHideoutModules,
+  } = useTarkovData();
+  const progressStore = useProgressStore();
+  const userStore = useUserStore();
+  const itemFilterNameText = ref('');
+  function clearItemFilterNameText() {
+    if (itemFilterNameText.value) itemFilterNameText.value = '';
   }
-  try {
-    // Use the captured, validated arrays
-    return JSON.parse(JSON.stringify(objectives)).sort(
-      // Use objectives
-      (a, b) => {
-        let aCount = 0;
-        // Use taskList, still needs optional chaining for find
-        const taskA = taskList?.find((task) => task.id == a.taskId);
-        taskA?.predecessors.forEach((predecessor) => {
-          if (
-            progressStore.tasksCompletions?.[predecessor]?.["self"] === false
-          ) {
-            aCount++;
+  const itemFilterName = ref('');
+  provide('itemFilterName', itemFilterName);
+  watch(
+    itemFilterNameText,
+    debounce((newVal) => {
+      itemFilterName.value = newVal;
+    }, 500)
+  );
+  const neededItemsStyle = computed({
+    get: () => userStore.getNeededItemsStyle,
+    set: (value) => userStore.setNeededItemsStyle(value),
+  });
+  const settingsDialog = ref(false);
+  const neededViews = [
+    {
+      title: t('page.neededitems.neededviews.all'),
+      icon: 'mdi-all-inclusive',
+      view: 'all',
+    },
+    {
+      title: t('page.neededitems.neededviews.tasks'),
+      icon: 'mdi-clipboard-text',
+      view: 'tasks',
+    },
+    {
+      title: t('page.neededitems.neededviews.hideout'),
+      icon: 'mdi-home',
+      view: 'hideout',
+    },
+  ];
+  const activeNeededView = computed({
+    get: () => userStore.getNeededTypeView,
+    set: (value) => userStore.setNeededTypeView(value),
+  });
+  const neededTaskItems = computed(() => {
+    // Capture dependencies' values at the start using optional chaining on .value access
+    const objectives = neededItemTaskObjectives?.value;
+    const taskList = tasks?.value;
+    // Check if captured values are valid arrays
+    if (!Array.isArray(objectives) || !Array.isArray(taskList)) {
+      return [];
+    }
+    try {
+      // Use the captured, validated arrays
+      return JSON.parse(JSON.stringify(objectives)).sort(
+        // Use objectives
+        (a, b) => {
+          let aCount = 0;
+          // Use taskList, still needs optional chaining for find
+          const taskA = taskList?.find((task) => task.id == a.taskId);
+          taskA?.predecessors.forEach((predecessor) => {
+            if (
+              progressStore.tasksCompletions?.[predecessor]?.['self'] === false
+            ) {
+              aCount++;
+            }
+          });
+          let bCount = 0;
+          // Use taskList, still needs optional chaining for find
+          const taskB = taskList?.find((task) => task.id == b.taskId);
+          taskB?.predecessors.forEach((predecessor) => {
+            if (
+              progressStore.tasksCompletions?.[predecessor]?.['self'] === false
+            ) {
+              bCount++;
+            }
+          });
+          if (aCount > bCount) {
+            return 1;
+          } else if (aCount < bCount) {
+            return -1;
           }
-        });
-        let bCount = 0;
-        // Use taskList, still needs optional chaining for find
-        const taskB = taskList?.find((task) => task.id == b.taskId);
-        taskB?.predecessors.forEach((predecessor) => {
+          return 0;
+        }
+      );
+    } catch (error) {
+      console.error('Error processing neededTaskItems:', error);
+      return [];
+    }
+  });
+  const neededHideoutItems = computed(() => {
+    // Capture dependencies' values at the start using optional chaining on .value access
+    const modulesNeeded = neededItemHideoutModules?.value;
+    const moduleList = hideoutModules?.value;
+    // Check if captured values are valid arrays
+    if (!Array.isArray(modulesNeeded) || !Array.isArray(moduleList)) {
+      return [];
+    }
+    try {
+      const STASH_STATION_ID = '5d484fc0654e76006657e0ab'; // Tarkov Wiki ID for Stash
+
+      // Use the captured, validated arrays
+      let hideoutNeeds = JSON.parse(JSON.stringify(modulesNeeded))
+        .filter((need) => {
+          const moduleInstanceId = need.hideoutModule?.id;
+          const moduleStationId = need.hideoutModule?.stationId;
+          const moduleTargetLevel = need.hideoutModule?.level;
+
+          // Basic check for data integrity
           if (
-            progressStore.tasksCompletions?.[predecessor]?.["self"] === false
+            !moduleInstanceId ||
+            !moduleStationId ||
+            typeof moduleTargetLevel !== 'number'
           ) {
-            bCount++;
+            // If essential data is missing, cautiously keep the item, though this state is unexpected.
+            // Consider logging this case if it occurs.
+            return true;
           }
+
+          if (moduleStationId === STASH_STATION_ID) {
+            // Special handling for Stash items
+            const currentEffectiveStashLevel =
+              progressStore.hideoutLevels?.[STASH_STATION_ID]?.['self'];
+            if (typeof currentEffectiveStashLevel === 'number') {
+              // Item is needed if current Stash level is less than the level this item is for
+              return currentEffectiveStashLevel < moduleTargetLevel;
+            }
+            // Fallback if effective stash level is somehow unknown: check individual completion (less likely for Stash)
+            return (
+              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[
+                moduleInstanceId
+              ]?.complete !== true
+            );
+          } else {
+            // Standard handling for all other hideout modules
+            return (
+              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[
+                moduleInstanceId
+              ]?.complete !== true
+            );
+          }
+        })
+        .sort((a, b) => {
+          let aCount = 0;
+          // Use moduleList, still needs optional chaining for find and hideoutModule access
+          const moduleA = moduleList?.find(
+            (hModule) => hModule.id == a.hideoutModule?.id
+          );
+          moduleA?.predecessors.forEach((predecessor) => {
+            if (
+              progressStore.moduleCompletions?.[predecessor]?.['self'] === false
+            ) {
+              aCount++;
+            }
+          });
+          let bCount = 0;
+          // Use moduleList, still needs optional chaining for find and hideoutModule access
+          const moduleB = moduleList?.find(
+            (hModule) => hModule.id == b.hideoutModule?.id
+          );
+          moduleB?.predecessors.forEach((predecessor) => {
+            if (
+              progressStore.moduleCompletions?.[predecessor]?.['self'] === false
+            ) {
+              bCount++;
+            }
+          });
+          if (aCount > bCount) {
+            return 1;
+          } else if (aCount < bCount) {
+            return -1;
+          }
+          return 0;
         });
-        if (aCount > bCount) {
-          return 1;
-        } else if (aCount < bCount) {
-          return -1;
-        }
-        return 0;
-      }
-    );
-  } catch (error) {
-    console.error("Error processing neededTaskItems:", error);
-    return [];
-  }
-});
-const neededHideoutItems = computed(() => {
-  // Capture dependencies' values at the start using optional chaining on .value access
-  const modulesNeeded = neededItemHideoutModules?.value;
-  const moduleList = hideoutModules?.value;
-  // Check if captured values are valid arrays
-  if (!Array.isArray(modulesNeeded) || !Array.isArray(moduleList)) {
-    return [];
-  }
-  try {
-    // Use the captured, validated arrays
-    let hideoutNeeds = JSON.parse(
-      JSON.stringify(modulesNeeded) // Use modulesNeeded
-    ).sort((a, b) => {
-      let aCount = 0;
-      // Use moduleList, still needs optional chaining for find and hideoutModule access
-      const moduleA = moduleList?.find(
-        (hModule) => hModule.id == a.hideoutModule?.id
-      );
-      moduleA?.predecessors.forEach((predecessor) => {
-        if (
-          progressStore.moduleCompletions?.[predecessor]?.["self"] === false
-        ) {
-          aCount++;
-        }
-      });
-      let bCount = 0;
-      // Use moduleList, still needs optional chaining for find and hideoutModule access
-      const moduleB = moduleList?.find(
-        (hModule) => hModule.id == b.hideoutModule?.id
-      );
-      moduleB?.predecessors.forEach((predecessor) => {
-        if (
-          progressStore.moduleCompletions?.[predecessor]?.["self"] === false
-        ) {
-          bCount++;
-        }
-      });
-      if (aCount > bCount) {
-        return 1;
-      } else if (aCount < bCount) {
-        return -1;
-      }
-      return 0;
-    });
-    return hideoutNeeds;
-  } catch (error) {
-    console.error("Error processing neededHideoutItems:", error);
-    return [];
-  }
-});
-const hideFIR = computed({
-  get: () => userStore.itemsNeededHideNonFIR,
-  set: (value) => userStore.setItemsNeededHideNonFIR(value),
-});
-const hideFIRLabel = computed(() =>
-  userStore.itemsNeededHideNonFIR
-    ? "page.neededitems.options.items_hide_non_fir"
-    : "page.neededitems.options.items_show_non_fir"
-);
-const hideFIRColor = computed(() =>
-  userStore.itemsNeededHideNonFIR ? "error" : "success"
-);
-const itemsHideAll = computed({
-  get: () => userStore.itemsTeamAllHidden,
-  set: (value) => userStore.setItemsTeamHideAll(value),
-});
-const itemsHideAllLabel = computed(() =>
-  userStore.itemsTeamAllHidden
-    ? "page.team.card.teamoptions.items_hide_all"
-    : "page.team.card.teamoptions.items_show_all"
-);
-const itemsHideAllColor = computed(() =>
-  userStore.itemsTeamAllHidden ? "error" : "success"
-);
-const itemsHideNonFIR = computed({
-  get: () => userStore.itemsTeamNonFIRHidden,
-  set: (value) => userStore.setItemsTeamHideNonFIR(value),
-});
-const itemsHideNonFIRLabel = computed(() =>
-  userStore.itemsTeamNonFIRHidden
-    ? "page.team.card.teamoptions.items_hide_non_fir"
-    : "page.team.card.teamoptions.items_show_non_fir"
-);
-const itemsHideNonFIRColor = computed(() =>
-  userStore.itemsTeamNonFIRHidden ? "error" : "success"
-);
-const itemsHideHideout = computed({
-  get: () => userStore.itemsTeamHideoutHidden,
-  set: (value) => userStore.setItemsTeamHideHideout(value),
-});
-const itemsHideHideoutLabel = computed(() =>
-  userStore.itemsTeamHideoutHidden
-    ? "page.team.card.teamoptions.items_hide_hideout"
-    : "page.team.card.teamoptions.items_show_hideout"
-);
-const itemsHideHideoutColor = computed(() =>
-  userStore.itemsTeamHideoutHidden ? "error" : "success"
-);
+      return hideoutNeeds;
+    } catch (error) {
+      console.error('Error processing neededHideoutItems:', error);
+      return [];
+    }
+  });
+  const hideFIR = computed({
+    get: () => userStore.itemsNeededHideNonFIR,
+    set: (value) => userStore.setItemsNeededHideNonFIR(value),
+  });
+  const hideFIRLabel = computed(() =>
+    userStore.itemsNeededHideNonFIR
+      ? 'page.neededitems.options.items_hide_non_fir'
+      : 'page.neededitems.options.items_show_non_fir'
+  );
+  const hideFIRColor = computed(() =>
+    userStore.itemsNeededHideNonFIR ? 'error' : 'success'
+  );
+  const itemsHideAll = computed({
+    get: () => userStore.itemsTeamAllHidden,
+    set: (value) => userStore.setItemsTeamHideAll(value),
+  });
+  const itemsHideAllLabel = computed(() =>
+    userStore.itemsTeamAllHidden
+      ? 'page.team.card.teamoptions.items_hide_all'
+      : 'page.team.card.teamoptions.items_show_all'
+  );
+  const itemsHideAllColor = computed(() =>
+    userStore.itemsTeamAllHidden ? 'error' : 'success'
+  );
+  const itemsHideNonFIR = computed({
+    get: () => userStore.itemsTeamNonFIRHidden,
+    set: (value) => userStore.setItemsTeamHideNonFIR(value),
+  });
+  const itemsHideNonFIRLabel = computed(() =>
+    userStore.itemsTeamNonFIRHidden
+      ? 'page.team.card.teamoptions.items_hide_non_fir'
+      : 'page.team.card.teamoptions.items_show_non_fir'
+  );
+  const itemsHideNonFIRColor = computed(() =>
+    userStore.itemsTeamNonFIRHidden ? 'error' : 'success'
+  );
+  const itemsHideHideout = computed({
+    get: () => userStore.itemsTeamHideoutHidden,
+    set: (value) => userStore.setItemsTeamHideHideout(value),
+  });
+  const itemsHideHideoutLabel = computed(() =>
+    userStore.itemsTeamHideoutHidden
+      ? 'page.team.card.teamoptions.items_hide_hideout'
+      : 'page.team.card.teamoptions.items_show_hideout'
+  );
+  const itemsHideHideoutColor = computed(() =>
+    userStore.itemsTeamHideoutHidden ? 'error' : 'success'
+  );
 </script>
 <style lang="scss" scoped></style>
-
