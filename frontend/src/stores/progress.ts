@@ -220,24 +220,52 @@ export const useProgressStore = defineStore('progress', {
     },
     hideoutLevels(state: ProgressState): HideoutLevelMap {
       const levels: HideoutLevelMap = {};
-      if (!hideoutStations.value) return {}; // <-- Use imported ref
+      if (!hideoutStations.value) return {}; // Ensure data is available
+
       for (const station of hideoutStations.value) {
+        if (!station || !station.id) continue; // Skip if station or station.id is invalid
+
         levels[station.id] = {};
         for (const teamId of Object.keys(this.visibleTeamStores)) {
           const store = this.visibleTeamStores[teamId];
           const modulesState = store?.$state.hideoutModules ?? {};
-          const baseCount = station.levels.filter(
-            (lvl: any) => modulesState[lvl.id]?.complete
-          ).length;
-          let levelCount = baseCount;
+
+          let maxManuallyCompletedLevel = 0;
+          // Check if station.levels is valid and an array before iterating
+          if (station.levels && Array.isArray(station.levels)) {
+            for (const lvl of station.levels) {
+              // Ensure lvl, lvl.id, and lvl.level are valid before accessing
+              if (
+                lvl &&
+                lvl.id &&
+                modulesState[lvl.id]?.complete &&
+                typeof lvl.level === 'number'
+              ) {
+                maxManuallyCompletedLevel = Math.max(
+                  maxManuallyCompletedLevel,
+                  lvl.level
+                );
+              }
+            }
+          }
+
+          let currentStationDisplayLevel;
           if (station.id === '5d484fc0654e76006657e0ab') {
+            // Stash ID
             const gameEditionVersion = store?.$state.gameEdition ?? 0;
             const edition = this.gameEditionData.find(
               (e: any) => e.version === gameEditionVersion
             );
-            levelCount = edition?.defaultStashLevel ?? baseCount;
+            const defaultStashFromEdition = edition?.defaultStashLevel ?? 0;
+            currentStationDisplayLevel = Math.max(
+              defaultStashFromEdition,
+              maxManuallyCompletedLevel
+            );
+          } else {
+            // For all other stations
+            currentStationDisplayLevel = maxManuallyCompletedLevel;
           }
-          levels[station.id][teamId] = levelCount;
+          levels[station.id][teamId] = currentStationDisplayLevel;
         }
       }
       return levels;
