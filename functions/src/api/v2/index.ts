@@ -51,7 +51,7 @@ type AuthenticatedHandler = (
 // Token Routes
 /**
  * @openapi
- * /api/v2/token:
+ * /token:
  *   get:
  *     summary: Returns data associated with the Token given in the Authorization header of the request
  *     tags:
@@ -84,7 +84,7 @@ app.get("/api/v2/token", tokenHandler.getTokenInfo as AuthenticatedHandler);
 // Progress Routes
 /**
  * @openapi
- * /api/v2/progress:
+ * /progress:
  *   get:
  *     summary: Returns progress data of the player
  *     tags:
@@ -118,7 +118,7 @@ app.get(
 );
 /**
  * @openapi
- * /api/v2/team/progress:
+ * /team/progress:
  *   get:
  *     summary: Returns progress data of all members of the team
  *     tags:
@@ -143,7 +143,7 @@ app.get(
 );
 /**
  * @openapi
- * /api/v2/progress/level/{levelValue}:
+ * /progress/level/{levelValue}:
  *   post:
  *     summary: Set player level
  *     tags:
@@ -165,7 +165,7 @@ app.post(
 );
 /**
  * @openapi
- * /api/v2/progress/task/{taskId}:
+ * /progress/task/{taskId}:
  *   post:
  *     summary: Update a single task
  *     tags:
@@ -193,7 +193,7 @@ app.post(
 );
 /**
  * @openapi
- * /api/v2/progress/tasks:
+ * /progress/tasks:
  *   post:
  *     summary: Update multiple tasks
  *     tags:
@@ -216,9 +216,10 @@ app.post(
 );
 /**
  * @openapi
- * /api/v2/progress/task/objective/{objectiveId}:
+ * /progress/task/objective/{objectiveId}:
  *   post:
  *     summary: Update task objective
+ *     description: Update the progress objectives of tasks.
  *     tags:
  *       - Progress
  *     parameters:
@@ -227,16 +228,38 @@ app.post(
  *         required: true
  *         schema:
  *           type: string
- *         description: Objective ID to update
+ *         description: The ID of the objective to update progress for.
  *     requestBody:
  *       required: true
+ *       description: Objective properties to update.
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               state:
+ *                 type: string
+ *                 description: The new state of the objective (e.g., "completed").
+ *                 example: "completed"
+ *               count:
+ *                 type: integer
+ *                 description: The new count for the objective.
+ *                 example: 0
+ *             required: # Optional: specify if these fields are strictly required by the backend
+ *               - state
+ *               - count
+ *           example:
+ *             state: "completed"
+ *             count: 0
  *     responses:
- *       200:
- *         description: Task objective updated
+ *       '200': # Note: response codes should often be quoted if they are numbers
+ *         description: The objective was updated successfully.
+ *       '400':
+ *         description: Invalid request parameters.
+ *       '401':
+ *         description: Unauthorized to update progress.
+ *       '500':
+ *         description: Internal server error.
  */
 app.post(
   "/api/v2/progress/task/objective/:objectiveId",
@@ -277,4 +300,4 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 // Export the express app as a single Cloud Function using ESM export
 const apiFunction = functions.https.onRequest(app);
-export { apiFunction as default, app as rawApp }; // Export both wrapped function and raw app
+export { apiFunction as apiv2Default, app as rawApp }; // Export both wrapped function and raw app

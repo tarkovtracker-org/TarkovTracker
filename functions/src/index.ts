@@ -2,9 +2,9 @@ import admin from "firebase-admin";
 import { logger } from "firebase-functions/v2";
 import { onSchedule, ScheduledEvent } from "firebase-functions/v2/scheduler";
 import {
-  onCall,
   HttpsError,
   CallableRequest,
+  FunctionsErrorCode,
 } from "firebase-functions/v2/https";
 import { request, gql } from "graphql-request";
 import UIDGenerator from "uid-generator";
@@ -15,36 +15,28 @@ import {
   Transaction,
   Firestore,
 } from "firebase-admin/firestore";
-// Import API and token functions using ESM - add .js extensions
-// TypeScript requires .js extension here for NodeNext module resolution
-import apiv2 from "./api/v2/index.js";
+import { apiv2Default as _apiv2Default } from "./api/v2/index.js";
 import { createToken } from "./api/token/create.js";
 import { revokeToken } from "./api/token/revoke.js";
-// console.log("Firebase Functions Environment:", process.env.NODE_ENV);
-// console.log('Firebase Admin SDK Version:', admin.SDK_VERSION); // Use admin.SDK_VERSION if available/needed
-// console.log('Firebase Functions Version:', functions.SDK_VERSION); // Use functions.SDK_VERSION if available/needed
+import cors from "cors";
+import * as functions from "firebase-functions";
 admin.initializeApp();
-// Export the v2 API using ESM
-export default apiv2;
-// Export the token management functions using ESM
+export const apiv2Default = _apiv2Default;
 export { createToken, revokeToken };
-// --- Team Management Logic Functions (for testing) ---
-// Define a type for System documents
+
 interface SystemDocData {
   team?: string | null;
   teamMax?: number;
   lastLeftTeam?: admin.firestore.Timestamp;
-  // Add other fields from system documents if known
 }
-// Define a type for Team documents
 interface TeamDocData {
   owner?: string;
   password?: string;
   maximumMembers?: number;
   members?: string[];
   createdAt?: admin.firestore.Timestamp;
-  // Add other fields from team documents if known
 }
+
 async function _leaveTeamLogic(
   request: CallableRequest<any>,
 ): Promise<{ left: boolean }> {
@@ -54,7 +46,7 @@ async function _leaveTeamLogic(
   }
   const userUid: string = request.auth.uid;
   try {
-    let originalTeam: string | null = null; // Define outside transaction scope
+    let originalTeam: string | null = null;
     await db.runTransaction(async (transaction: Transaction) => {
       const systemRef: DocumentReference<SystemDocData> = db
         .collection("system")
@@ -62,7 +54,7 @@ async function _leaveTeamLogic(
       const systemDoc: DocumentSnapshot<SystemDocData> =
         await transaction.get(systemRef);
       const systemData = systemDoc?.data();
-      originalTeam = systemData?.team ?? null; // Assign inside transaction
+      originalTeam = systemData?.team ?? null;
       if (systemData?.team) {
         const teamRef: DocumentReference<TeamDocData> = db
           .collection("team")
@@ -71,7 +63,6 @@ async function _leaveTeamLogic(
           await transaction.get(teamRef);
         const teamData = teamDoc?.data();
         if (teamData?.owner === userUid) {
-          // Disband team if owner leaves
           if (teamData?.members) {
             teamData.members.forEach((member: string) => {
               logger.log("Removing team from member", {
@@ -90,7 +81,6 @@ async function _leaveTeamLogic(
           }
           transaction.delete(teamRef);
         } else {
-          // Leave team if member
           transaction.set(
             teamRef,
             { members: admin.firestore.FieldValue.arrayRemove(userUid) },
@@ -126,7 +116,7 @@ async function _leaveTeamLogic(
     throw new HttpsError("internal", "Error during team leave", e.message);
   }
 }
-// Define an interface for the expected data structure
+
 interface JoinTeamData {
   id: string;
   password: string;
@@ -202,15 +192,13 @@ async function _joinTeamLogic(
   }
 }
 
-// Define interface for CreateTeamData
 interface CreateTeamData {
-  password?: string; // Optional password
-  maximumMembers?: number; // Optional max members
+  password?: string;
+  maximumMembers?: number;
 }
-
 async function _createTeamLogic(
   request: CallableRequest<CreateTeamData>,
-): Promise<{ team: string }> {
+): Promise<{ team: string; password?: string }> {
   const db: Firestore = admin.firestore();
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Authentication required.");
@@ -219,6 +207,7 @@ async function _createTeamLogic(
   const data = request.data;
   try {
     let createdTeam = "";
+    let finalTeamPassword = ""; // Variable to store the password
     await db.runTransaction(async (transaction: Transaction) => {
       try {
         logger.log("[createTeam] Transaction start", { userUid });
@@ -257,28 +246,25 @@ async function _createTeamLogic(
           }
         }
         logger.log("[createTeam] Creating UIDGenerator");
-        const uidgen = new UIDGenerator(32); // Generate a 32-bit ID (valid multiple of 8)
+        const uidgen = new UIDGenerator(32);
         const teamId = await uidgen.generate();
         logger.log("[createTeam] Generated teamId", { teamId });
-
         let teamPassword = data.password;
         logger.log(
           "[createTeam] DEBUG PASVVOORD: Initial teamPassword from data (data.password):",
         );
         logger.log(data.password === undefined ? "undefined" : data.password);
-
         if (!teamPassword) {
           logger.log(
             "[createTeam] DEBUG PASVVOORD: No client password, generating one...",
           );
           try {
-            const passGen = new UIDGenerator(48, UIDGenerator.BASE62); // Generate from 48 bits of randomness, encoded in Base62 (approx 8 chars)
+            const passGen = new UIDGenerator(48, UIDGenerator.BASE62);
             const generatedPass = await passGen.generate();
             logger.log("[createTeam] DEBUG PASVVOORD: Raw generatedPass:");
             logger.log(
               generatedPass === undefined ? "undefined" : generatedPass,
             );
-
             if (generatedPass && generatedPass.length >= 4) {
               teamPassword = generatedPass;
               logger.log(
@@ -297,25 +283,23 @@ async function _createTeamLogic(
               "[createTeam] DEBUG PASVVOORD: Error during password generation:",
               genError,
             );
-            teamPassword = "ERROR_PASS_456"; // Fallback on error
+            teamPassword = "ERROR_PASS_456";
           }
         } else {
           logger.log(
             "[createTeam] DEBUG PASVVOORD: Using client-provided password (masked): ****",
           );
         }
-
+        finalTeamPassword = teamPassword; // Store the password
         logger.log(
           "[createTeam] DEBUG PASVVOORD: Final teamPassword before set (masked):",
           teamPassword ? "****" : "(IT IS FALSY)",
           "Actual value for Firestore:",
           teamPassword,
         );
-
         createdTeam = teamId;
         const teamRef = db.collection("team").doc(teamId);
         logger.log("[createTeam] teamRef", { path: teamRef.path });
-
         transaction.set(teamRef, {
           owner: userUid,
           password: teamPassword,
@@ -347,7 +331,7 @@ async function _createTeamLogic(
       team: createdTeam,
       maximumMembers: data.maximumMembers || 10,
     });
-    return { team: createdTeam };
+    return { team: createdTeam, password: finalTeamPassword }; // Return both teamId and password
   } catch (e: any) {
     logger.error("Failed to create team", {
       owner: userUid,
@@ -375,11 +359,9 @@ async function _createTeamLogic(
   }
 }
 
-// Define interface for KickTeamMemberData
 interface KickTeamMemberData {
   kicked: string;
 }
-
 async function _kickTeamMemberLogic(
   request: CallableRequest<KickTeamMemberData>,
 ): Promise<{ kicked: boolean }> {
@@ -422,13 +404,11 @@ async function _kickTeamMemberLogic(
       if (!teamData?.members?.includes(data.kicked)) {
         throw new HttpsError("not-found", "User not found in team.");
       }
-      // Kick the member
       transaction.set(
         teamRef,
         { members: admin.firestore.FieldValue.arrayRemove(data.kicked) },
         { merge: true },
       );
-      // Update the kicked member's system document
       const kickedUserSystemRef: DocumentReference<SystemDocData> = db
         .collection("system")
         .doc(data.kicked) as DocumentReference<SystemDocData>;
@@ -458,31 +438,345 @@ async function _kickTeamMemberLogic(
     throw new HttpsError("internal", "Error kicking member", e.message);
   }
 }
-// Wrap the logic functions in onCall handlers
-export const createTeam = onCall<CreateTeamData>(
-  async (request: CallableRequest<CreateTeamData>) => {
-    console.log(
-      "Firebase Functions Environment (inside handler):",
-      process.env.NODE_ENV,
-    );
-    return _createTeamLogic(request);
-  },
-);
-export const joinTeam = onCall(_joinTeamLogic);
-export const leaveTeam = onCall(_leaveTeamLogic);
-export const kickTeamMember = onCall(_kickTeamMemberLogic);
-// -- GraphQL Data Retrieval (Example for Tarkov data) --
-// Interface for Tarkov items from GraphQL
+
+const corsHandler = cors({ origin: "https://tarkov-tracker-dev.web.app" });
+
+// Helper function to map HttpsError codes to HTTP status codes
+function getStatusFromHttpsErrorCode(code: FunctionsErrorCode): number {
+  switch (code) {
+    case "ok":
+      return 200;
+    case "cancelled":
+      return 499; // Typically 499 Client Closed Request
+    case "unknown":
+      return 500;
+    case "invalid-argument":
+      return 400;
+    case "deadline-exceeded":
+      return 504;
+    case "not-found":
+      return 404;
+    case "already-exists":
+      return 409;
+    case "permission-denied":
+      return 403;
+    case "resource-exhausted":
+      return 429;
+    case "failed-precondition":
+      return 400;
+    case "aborted":
+      return 409;
+    case "out-of-range":
+      return 400;
+    case "unauthenticated":
+      return 401;
+    case "internal":
+      return 500;
+    case "unavailable":
+      return 503;
+    case "data-loss":
+      return 500;
+    default:
+      logger.warn("Unknown HttpsError code received:", code);
+      return 500;
+  }
+}
+
+export const createTeam = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      const match = authHeader.match(/^Bearer (.+)$/);
+      if (!match) {
+        res
+          .status(401)
+          .json({ error: "Missing or invalid Authorization header" });
+        return;
+      }
+      const idToken = match[1];
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (err: any) {
+        logger.warn("Token verification failed for createTeam", {
+          error: err,
+          tokenUsed: idToken ? idToken.substring(0, 10) + "..." : "null",
+        });
+        res
+          .status(401)
+          .json({ error: err.message || "Invalid or expired token" });
+        return;
+      }
+      const userUid = decodedToken.uid;
+      const data = req.body;
+      // Mimic CallableRequest structure
+      const request = {
+        auth: { uid: userUid, token: decodedToken },
+        data,
+        rawRequest: req,
+        acceptsStreaming: false,
+      };
+      try {
+        const result = await _createTeamLogic(request);
+        res.status(200).json({ data: result });
+      } catch (e: any) {
+        let messageToSend = "Error processing team creation.";
+        let httpStatus = 500; // Default to 500
+
+        if (e instanceof HttpsError) {
+          httpStatus = getStatusFromHttpsErrorCode(
+            e.code as FunctionsErrorCode,
+          );
+          if (
+            e.code === "internal" &&
+            e.message === "Error during team creation" &&
+            e.details
+          ) {
+            messageToSend =
+              typeof e.details === "string"
+                ? e.details.substring(0, 500)
+                : String(e.details).substring(0, 500);
+          } else {
+            messageToSend = e.message || messageToSend;
+          }
+        } else if (e && e.message) {
+          messageToSend = String(e.message).substring(0, 500);
+        } else if (typeof e === "string") {
+          messageToSend = e.substring(0, 500);
+        }
+        logger.error("Error from _createTeamLogic in createTeam handler", {
+          uid: userUid,
+          originalError: e,
+          errorCode: e?.code,
+          errorMessage: e?.message,
+          errorDetails: e?.details,
+          messageSent: messageToSend,
+          httpStatusSet: httpStatus,
+        });
+        res.status(httpStatus).json({ error: messageToSend });
+      }
+    } catch (e: any) {
+      // Outer catch for auth errors or other setup issues
+      let messageToSend = "Server error during team creation request."; // Default message
+      if (e && e.message) {
+        // If the caught error is the one from token verification (already sent with 401), avoid double logging/responding
+        if (res.headersSent) return;
+        messageToSend = String(e.message).substring(0, 500);
+      } else if (typeof e === "string") {
+        messageToSend = e.substring(0, 500);
+      }
+      logger.error("Outer error in createTeam request handler", {
+        originalError: e, // Log the full error object
+        errorMessage: e?.message,
+        messageSent: messageToSend,
+      });
+      // Ensure a response is sent if not already
+      if (!res.headersSent) {
+        res.status(500).json({ error: messageToSend });
+      }
+    }
+  });
+});
+
+export const joinTeam = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method Not Allowed" });
+      return;
+    }
+    try {
+      const authHeader = req.headers.authorization || "";
+      const match = authHeader.match(/^Bearer (.+)$/);
+      if (!match) {
+        res
+          .status(401)
+          .json({ error: "Missing or invalid Authorization header" });
+        return;
+      }
+      const idToken = match[1];
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (err) {
+        res.status(401).json({ error: "Invalid or expired token" });
+        return;
+      }
+      const userUid = decodedToken.uid;
+      const data = req.body;
+      // Mimic CallableRequest structure
+      const request = {
+        auth: { uid: userUid, token: decodedToken },
+        data,
+        rawRequest: req,
+        acceptsStreaming: false,
+      };
+      try {
+        const result = await _joinTeamLogic(request);
+        res.status(200).json(result);
+      } catch (e: any) {
+        let messageToSend = "Error processing join team request.";
+        let httpStatus = 500;
+
+        if (e instanceof HttpsError) {
+          httpStatus = getStatusFromHttpsErrorCode(
+            e.code as FunctionsErrorCode,
+          );
+          messageToSend = e.message || messageToSend;
+        } else if (e && e.message) {
+          messageToSend = String(e.message).substring(0, 500);
+        } else if (typeof e === "string") {
+          messageToSend = e.substring(0, 500);
+        }
+        logger.error("Error from _joinTeamLogic in joinTeam handler", {
+          uid: userUid, // Ensure userUid is defined in this scope or remove if not needed for this log
+          originalError: e,
+          messageSent: messageToSend,
+          httpStatusSet: httpStatus,
+        });
+        res.status(httpStatus).json({ error: messageToSend });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+});
+
+export const leaveTeam = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method Not Allowed" });
+      return;
+    }
+    try {
+      const authHeader = req.headers.authorization || "";
+      const match = authHeader.match(/^Bearer (.+)$/);
+      if (!match) {
+        res
+          .status(401)
+          .json({ error: "Missing or invalid Authorization header" });
+        return;
+      }
+      const idToken = match[1];
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (err) {
+        res.status(401).json({ error: "Invalid or expired token" });
+        return;
+      }
+      const userUid = decodedToken.uid;
+      const data = req.body;
+      // Mimic CallableRequest structure
+      const request = {
+        auth: { uid: userUid, token: decodedToken },
+        data,
+        rawRequest: req,
+        acceptsStreaming: false,
+      };
+      try {
+        await _leaveTeamLogic(request);
+        res.status(200).json({ data: { left: true } });
+      } catch (e: any) {
+        let messageToSend = "Error processing leave team request.";
+        let httpStatus = 500;
+
+        if (e instanceof HttpsError) {
+          httpStatus = getStatusFromHttpsErrorCode(
+            e.code as FunctionsErrorCode,
+          );
+          messageToSend = e.message || messageToSend;
+        } else if (e && e.message) {
+          messageToSend = String(e.message).substring(0, 500);
+        } else if (typeof e === "string") {
+          messageToSend = e.substring(0, 500);
+        }
+        logger.error("Error from _leaveTeamLogic in leaveTeam handler", {
+          uid: userUid, // Ensure userUid is defined
+          originalError: e,
+          messageSent: messageToSend,
+          httpStatusSet: httpStatus,
+        });
+        res.status(httpStatus).json({ error: messageToSend });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+});
+
+export const kickTeamMember = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method Not Allowed" });
+      return;
+    }
+    try {
+      const authHeader = req.headers.authorization || "";
+      const match = authHeader.match(/^Bearer (.+)$/);
+      if (!match) {
+        res
+          .status(401)
+          .json({ error: "Missing or invalid Authorization header" });
+        return;
+      }
+      const idToken = match[1];
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (err) {
+        res.status(401).json({ error: "Invalid or expired token" });
+        return;
+      }
+      const userUid = decodedToken.uid;
+      const data = req.body;
+      // Mimic CallableRequest structure
+      const request = {
+        auth: { uid: userUid, token: decodedToken },
+        data,
+        rawRequest: req,
+        acceptsStreaming: false,
+      };
+      try {
+        const result = await _kickTeamMemberLogic(request);
+        res.status(200).json(result);
+      } catch (e: any) {
+        let messageToSend = "Error processing kick member request.";
+        let httpStatus = 500;
+
+        if (e instanceof HttpsError) {
+          httpStatus = getStatusFromHttpsErrorCode(
+            e.code as FunctionsErrorCode,
+          );
+          messageToSend = e.message || messageToSend;
+        } else if (e && e.message) {
+          messageToSend = String(e.message).substring(0, 500);
+        } else if (typeof e === "string") {
+          messageToSend = e.substring(0, 500);
+        }
+        logger.error(
+          "Error from _kickTeamMemberLogic in kickTeamMember handler",
+          {
+            uid: userUid, // Ensure userUid is defined
+            originalError: e,
+            messageSent: messageToSend,
+            httpStatusSet: httpStatus,
+          },
+        );
+        res.status(httpStatus).json({ error: messageToSend });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+});
+
 interface TarkovItem {
   id: string;
-  // Add other known properties from the GraphQL query
-  [key: string]: any; // Allow other properties
+  [key: string]: any;
 }
-// Interface for the expected GraphQL response structure
 interface TarkovDataResponse {
   items: TarkovItem[];
 }
-// Function to retrieve data from Tarkov API
 async function retrieveTarkovdata(): Promise<TarkovDataResponse | undefined> {
   const query = gql`
     {
@@ -534,9 +828,10 @@ async function retrieveTarkovdata(): Promise<TarkovDataResponse | undefined> {
     return data;
   } catch (e: any) {
     logger.error("Failed to retrieve data from Tarkov API:", e.message);
-    return undefined; // Return undefined or handle error as needed
+    return undefined;
   }
 }
+
 // Function to save data to Firestore
 async function saveTarkovData(data: TarkovDataResponse | undefined) {
   if (!data || !data.items) {
@@ -559,6 +854,7 @@ async function saveTarkovData(data: TarkovDataResponse | undefined) {
     logger.error("Failed to save Tarkov data to Firestore:", e.message);
   }
 }
+
 // Scheduled function to fetch and save data daily
 export const scheduledTarkovDataFetch = onSchedule(
   "every day 00:00",
@@ -568,8 +864,3 @@ export const scheduledTarkovDataFetch = onSchedule(
     await saveTarkovData(data);
   },
 );
-// Example HTTP function (adjust if needed)
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", { structuredData: true });
-//   response.send("Hello from Firebase!");
-// });

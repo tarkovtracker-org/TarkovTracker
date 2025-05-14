@@ -12,9 +12,9 @@ const swaggerOptions: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "TarkovTracker API",
+      title: "TarkovTracker API (Fork)",
       description:
-        "Official TarkovTracker API - player's progress, objectives, level, reputation and much more in one place. If you are missing something here, let the developers know on TarkovTracker Discord server or create a new issue on GitHub.",
+        "Unofficial TarkovTracker API a fork of the original TarkovTracker API - player's progress, objectives, level, reputation and much more in one place. If you are missing something here, let the developers know on the DysektAI/TarkovTracker Discord server or create a new issue on GitHub.",
       version: "2.0", // Consider dynamically getting version from package.json
       contact: {
         name: "TarkovTracker GitHub",
@@ -61,10 +61,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
     ],
   },
   // Path to the API docs files (TypeScript handlers and component definitions)
-  apis: [
-    "lib/api/v2/index.js",
-    "lib/api/v2/components.js"
-  ],
+  apis: ["lib/api/v2/index.js", "lib/api/v2/components.js"],
 };
 // Generate the OpenAPI specification
 const openapiSpecification = swaggerJsdoc(swaggerOptions);
@@ -90,18 +87,16 @@ fs.writeFile(
       );
       const jsOutputPath = path.join(__dirname, "../../../../docs/openapi.js");
       const jsContent = `window.openapi = ${JSON.stringify(openapiSpecification, null, 2)};`;
-      fs.writeFile(
-        jsOutputPath,
-        jsContent,
-        (err) => {
-          if (err) {
-            console.error("Error writing OpenAPI JS file:", err);
-            process.exit(1);
-          } else {
-            console.log(`OpenAPI JS file created successfully at ${jsOutputPath}`);
-          }
-        },
-      );
+      fs.writeFile(jsOutputPath, jsContent, (err) => {
+        if (err) {
+          console.error("Error writing OpenAPI JS file:", err);
+          process.exit(1);
+        } else {
+          console.log(
+            `OpenAPI JS file created successfully at ${jsOutputPath}`,
+          );
+        }
+      });
     }
   },
 );

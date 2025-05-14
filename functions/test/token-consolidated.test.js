@@ -173,10 +173,7 @@ describe("Token Management", () => {
       }
       expect(createTokenLogic).toBeDefined();
       expect(revokeTokenLogic).toBeDefined();
-    } catch (err) {
-      console.error("Error importing token modules:", err.message);
-      // Using the mock implementations already set in beforeEach
-    }
+    } catch (err) {}
   });
   // Integration tests for token creation
   describe("Token Creation", () => {
