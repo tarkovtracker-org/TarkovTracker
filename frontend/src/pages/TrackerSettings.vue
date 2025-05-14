@@ -20,7 +20,7 @@
             >
               <template #openAPI_documentation>
                 <a
-                  href="https://tarkovtracker.github.io/TarkovTracker/"
+                  href="https://tarkovtracker-org.github.io/TarkovTracker/"
                   target="_blank"
                   class="info-link"
                 >
@@ -47,7 +47,7 @@
             >
               <template #openAPI_documentation>
                 <a
-                  href="https://tarkovtracker.github.io/TarkovTracker/"
+                  href="https://tarkovtracker-org.github.io/TarkovTracker/"
                   target="_blank"
                   class="info-link"
                 >
