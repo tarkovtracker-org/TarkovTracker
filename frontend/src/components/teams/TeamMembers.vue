@@ -23,7 +23,10 @@
               lg="4"
               xl="4"
             >
-              <teammember-card :teammember="teammate"></teammember-card>
+              <teammember-card
+                :teammember="teammate"
+                :is-team-owner-view="isCurrentUserTeamOwner"
+              ></teammember-card>
             </v-col>
           </v-row>
         </v-container>
@@ -38,14 +41,15 @@
         </v-container>
       </template>
       <template v-else>
-        <!-- You could put a v-progress-circular here or just leave it blank -->
       </template>
     </template>
   </icon-card>
 </template>
 <script setup>
-  import { defineAsyncComponent, watch } from 'vue';
+  import { defineAsyncComponent, watch, computed } from 'vue';
   import { useLiveData } from '@/composables/livedata';
+  import { fireuser } from '@/plugins/firebase';
+
   const IconCard = defineAsyncComponent(
     () => import('@/components/IconCard.vue')
   );
@@ -58,21 +62,13 @@
   const { useTeamStore } = useLiveData();
   const teamStore = useTeamStore();
 
-  // You can remove these watches now if the template change works, or keep them for one more test run.
-  /*
-  watch(() => teamStore.teamMembers, (newMembers, oldMembers) => {
-    console.log('[TeamMembers.vue] watch teamStore.teamMembers RAW:', newMembers);
-    if (newMembers) {
-      console.log('[TeamMembers.vue] watch teamStore.teamMembers length:', newMembers.length);
-    }
-  }, { deep: true, immediate: true });
-
-  watch(() => teamStore.$state.members, (newMembers, oldMembers) => {
-    console.log('[TeamMembers.vue] watch teamStore.$state.members RAW:', newMembers);
-    if (newMembers) {
-      console.log('[TeamMembers.vue] watch teamStore.$state.members length:', newMembers.length);
-    }
-  }, { deep: true, immediate: true });
-  */
+  const isCurrentUserTeamOwner = computed(() => {
+    const currentTeamOwner = teamStore.$state.owner;
+    const currentFireUID = fireuser.uid;
+    console.log(
+      `[TeamMembers.vue] isCurrentUserTeamOwner computed. teamStore.$state.owner: ${currentTeamOwner}, fireuser.uid: ${currentFireUID}, result: ${currentTeamOwner === currentFireUID}`
+    );
+    return currentTeamOwner === currentFireUID;
+  });
 </script>
 <style lang="scss" scoped></style>

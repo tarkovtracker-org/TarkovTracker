@@ -45,7 +45,12 @@
   import { computed, ref } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import { useI18n } from 'vue-i18n';
-  import { functions, httpsCallable } from '@/plugins/firebase.ts';
+  import {
+    auth,
+    fireuser,
+    functions,
+    httpsCallable,
+  } from '@/plugins/firebase.ts';
   import { useLiveData } from '@/composables/livedata';
 
   const router = useRouter();
@@ -80,54 +85,127 @@
     // Mark the process as started
     accepting.value = true;
 
-    // If the user is already in a team, leave it first
-    if (systemStore.userTeam != null) {
-      try {
-        const leaveTeamFunction = httpsCallable(functions, 'leaveTeam');
-        const leaveResult = await leaveTeamFunction();
-        if (leaveResult.data.error) {
-          throw new Error(leaveResult.data);
-        }
-      } catch (error) {
-        console.debug('Error while leaving team', JSON.stringify(error));
-        joinResult.value = t('page.team.card.teaminvite.leave_error');
+    try {
+      // Use auth.currentUser to get the ID token
+      if (!auth.currentUser) {
+        console.error(
+          '[TeamInvite.vue] User not authenticated. Cannot accept invite.'
+        );
+        joinResult.value = t('page.team.card.teaminvite.auth_error');
         joinTeamSnackbar.value = true;
+        accepting.value = false;
         return;
       }
-    }
+      const idToken = await auth.currentUser.getIdToken();
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
 
-    // Join the team
-    try {
-      console.debug(
-        '[Invite Debug] route.query.team:',
-        route?.query?.team,
-        'route.query.code:',
-        route?.query?.code
-      );
-      const joinPayload = {
-        id: route?.query?.team,
-        password: route?.query?.code,
-      };
-      console.debug('[Invite Debug] joinTeam payload:', joinPayload);
-      const joinTeamFunction = httpsCallable(functions, 'joinTeam');
-      const joinResultResp = await joinTeamFunction(joinPayload);
-      console.debug('[Invite Debug] joinTeam result:', joinResultResp);
-      if (joinResultResp.data && joinResultResp.data.error) {
-        throw new Error(joinResultResp.data);
+      // If the user is already in a team, leave it first
+      if (systemStore.userTeam != null) {
+        try {
+          const leaveResponse = await fetch(
+            `https://us-central1-${projectId}.cloudfunctions.net/leaveTeam`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${idToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({}),
+            }
+          );
+          const leaveResult = await leaveResponse.json();
+          if (!leaveResponse.ok) {
+            joinResult.value =
+              leaveResult.error || t('page.team.card.teaminvite.leave_error');
+            joinTeamSnackbar.value = true;
+            accepting.value = false;
+            return;
+          }
+          if (
+            (!leaveResult.data || !leaveResult.data.left) &&
+            systemStore.userTeam
+          ) {
+            joinResult.value = t('page.team.card.teaminvite.leave_error');
+            joinTeamSnackbar.value = true;
+            accepting.value = false;
+            return;
+          }
+        } catch (error) {
+          joinResult.value = t('page.team.card.teaminvite.leave_error');
+          joinTeamSnackbar.value = true;
+          accepting.value = false;
+          return;
+        }
       }
-      joinResult.value = t('page.team.card.teaminvite.join_success');
-      joinTeamSnackbar.value = true;
-      accepting.value = false;
-      // Get rid of the invite code from the URL by navigating to the team page with no query/params
-      router.push({ name: 'team' });
+
+      // Join the team
+      try {
+        console.debug(
+          '[Invite Debug] route.query.team:',
+          route?.query?.team,
+          'route.query.code:',
+          route?.query?.code
+        );
+        const joinPayload = {
+          id: route?.query?.team,
+          password: route?.query?.code,
+        };
+        console.debug('[Invite Debug] joinTeam payload:', joinPayload);
+        const joinResponse = await fetch(
+          `https://us-central1-${projectId}.cloudfunctions.net/joinTeam`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(joinPayload),
+          }
+        );
+        const joinResultResp = await joinResponse.json();
+        console.debug('[Invite Debug] joinTeam result:', joinResultResp);
+        if (!joinResponse.ok) {
+          console.error(
+            '[Invite Debug] joinTeam non-OK response:',
+            joinResultResp
+          );
+          joinResult.value =
+            joinResultResp.error || t('page.team.card.teaminvite.join_error');
+          joinTeamSnackbar.value = true;
+          accepting.value = false;
+          return;
+        } else {
+          console.debug('[Invite Debug] joinTeam OK response:', joinResultResp);
+        }
+        if (!joinResultResp.joined) {
+          console.error(
+            '[Invite Debug] joinTeam OK response but not joined:',
+            joinResultResp
+          );
+          joinResult.value = t('page.team.card.teaminvite.join_error');
+          joinTeamSnackbar.value = true;
+          accepting.value = false;
+          return;
+        }
+        joinResult.value = t('page.team.card.teaminvite.join_success');
+        joinTeamSnackbar.value = true;
+        accepting.value = false;
+        // Get rid of the invite code from the URL by navigating to the team page with no query/params
+        router.push({ name: 'team' });
+      } catch (error) {
+        console.error(
+          '[Invite Debug] Error during fetch or JSON parsing for joinTeam:',
+          error,
+          JSON.stringify(error, Object.getOwnPropertyNames(error))
+        );
+        joinResult.value = t('page.team.card.teaminvite.join_error');
+        joinTeamSnackbar.value = true;
+        accepting.value = false;
+      }
     } catch (error) {
-      console.debug(
-        '[Invite Debug] Error while joining team',
-        error,
-        JSON.stringify(error)
-      );
       joinResult.value = t('page.team.card.teaminvite.join_error');
       joinTeamSnackbar.value = true;
+      accepting.value = false;
     }
   };
 </script>

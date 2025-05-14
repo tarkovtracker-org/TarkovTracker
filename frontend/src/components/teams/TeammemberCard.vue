@@ -77,7 +77,7 @@
           ></v-btn>
           <!-- Button to delete the token -->
           <v-btn
-            v-if="props.teammember != fireuser.uid && teamStore.isOwner"
+            v-if="props.teammember != fireuser.uid && isTeamOwnerView"
             variant="outlined"
             icon="mdi-account-minus"
             class="mx-1"
@@ -105,20 +105,21 @@
   import { computed, ref } from 'vue';
   import { httpsCallable } from 'firebase/functions';
   import { useI18n } from 'vue-i18n';
-
   import { useLiveData } from '@/composables/livedata';
   import { useUserStore } from '@/stores/user';
   import { useProgressStore } from '@/stores/progress';
   import { useTarkovData } from '@/composables/tarkovdata';
-
   // Define the props for the component
   const props = defineProps({
     teammember: {
       type: String,
       required: true,
     },
+    isTeamOwnerView: {
+      type: Boolean,
+      required: true,
+    },
   });
-
   const teamStoreId = computed(() => {
     if (props.teammember == fireuser.uid) {
       return 'self';
@@ -126,41 +127,61 @@
       return props.teammember;
     }
   });
-
   const { useTeamStore } = useLiveData();
   const progressStore = useProgressStore();
   const teamStore = useTeamStore();
   const userStore = useUserStore();
   const { tasks, playerLevels } = useTarkovData();
   const { t } = useI18n({ useScope: 'global' });
-
   const completedTaskCount = computed(() => {
     return tasks.value.filter(
       (task) =>
         progressStore.tasksCompletions?.[task.id]?.[teamStoreId.value] == true
     ).length;
   });
-
   const groupIcon = computed(() => {
     const level = progressStore.getLevel(props.teammember);
     const entry = playerLevels.value.find((pl) => pl.level === level);
     return entry?.levelBadgeImageLink ?? '';
   });
-
   const factionIcon = computed(() => {
     return `/img/factions/${progressStore.getFaction(props.teammember)}.webp`;
   });
-
   const kickingTeammate = ref(false);
   const kickTeammateResult = ref(null);
   const kickTeammateSnackbar = ref(false);
-
   const kickTeammate = async () => {
     if (!props.teammember) return;
     kickingTeammate.value = true;
     try {
-      const kickTeamMemberFunction = httpsCallable(functions, 'kickTeamMember');
-      await kickTeamMemberFunction({ kicked: props.teammember });
+      const idToken = await fireuser.value.getIdToken();
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+      const response = await fetch(
+        `https://us-central1-${projectId}.cloudfunctions.net/kickTeamMember`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ kicked: props.teammember }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        let backendMsg =
+          result.error || t('page.team.card.manageteam.membercard.kick_error');
+        kickTeammateResult.value = backendMsg;
+        kickTeammateSnackbar.value = true;
+        throw new Error(backendMsg);
+      }
+      if (!result.kicked) {
+        kickTeammateResult.value = t(
+          'page.team.card.manageteam.membercard.kick_error'
+        );
+        kickTeammateSnackbar.value = true;
+        return;
+      }
       kickTeammateResult.value = t(
         'page.team.card.manageteam.membercard.kick_success'
       );

@@ -119,22 +119,18 @@
   </v-snackbar>
 </template>
 <script setup>
-  import { defineAsyncComponent, ref, computed, watch, nextTick } from 'vue';
+  import { ref, computed, watch, nextTick } from 'vue';
   import { useI18n } from 'vue-i18n';
-  import { fireuser, functions } from '@/plugins/firebase';
-  import { httpsCallable } from 'firebase/functions';
+  import { fireuser, functions, auth } from '@/plugins/firebase';
   import { useLiveData } from '@/composables/livedata';
   import { useUserStore } from '@/stores/user';
   import { useTarkovStore } from '@/stores/tarkov';
-  const FittedCard = defineAsyncComponent(
-    () => import('@/components/FittedCard.vue')
-  );
+  import FittedCard from '@/components/FittedCard.vue';
 
   const { t } = useI18n({ useScope: 'global' });
   const { useTeamStore, useSystemStore } = useLiveData();
   const teamStore = useTeamStore();
   const systemStore = useSystemStore();
-
   const generateRandomName = (length = 6) => {
     const characters =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -145,7 +141,6 @@
     }
     return result;
   };
-
   const localUserTeam = computed(() => {
     console.debug(
       '[MyTeam.vue] localUserTeam computed. systemStore.$state.team:',
@@ -155,7 +150,6 @@
     );
     return systemStore.$state.team || null; // Directly use the raw state
   });
-
   // This computed property might also need to ensure it uses up-to-date store data
   const isTeamOwner = computed(() => {
     // Directly access $state.owner for reactivity
@@ -171,7 +165,6 @@
       teamStore.$state.owner === fireuser.uid && systemStore.$state.team != null
     );
   });
-
   // Create new team
   const creatingTeam = ref(false);
   const createTeamResult = ref(null);
@@ -180,16 +173,93 @@
     creatingTeam.value = true;
     console.debug(
       '[MyTeam.vue] createTeam called. localUserTeam before call:',
-      localUserTeam.value
+      localUserTeam.value,
+      'fireuser.loggedIn:',
+      fireuser.loggedIn,
+      'fireuser.uid:',
+      fireuser.uid
     );
+    // Check if our reactive state indicates a logged-in user
+    if (!fireuser.loggedIn || !fireuser.uid) {
+      console.error(
+        '[MyTeam.vue] createTeam - User not authenticated (reactive state).'
+      );
+      createTeamResult.value = t(
+        'page.team.card.myteam.user_not_authenticated'
+      );
+      createTeamSnackbar.value = true;
+      creatingTeam.value = false;
+      return;
+    }
+    // Get the current Firebase user object directly from auth
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error(
+        '[MyTeam.vue] createTeam - Firebase auth.currentUser is null, despite reactive state indicating login.'
+      );
+      createTeamResult.value = t('page.team.card.myteam.auth_inconsistency'); // Add a new translation key for this
+      createTeamSnackbar.value = true;
+      creatingTeam.value = false;
+      return;
+    }
     try {
-      const createTeamFunction = httpsCallable(functions, 'createTeam');
-      await createTeamFunction({});
+      const idToken = await currentUser.getIdToken();
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+      const response = await fetch(
+        `https://us-central1-${projectId}.cloudfunctions.net/createTeam`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            // Add password, maximumMembers, etc. here if needed
+          }),
+        }
+      );
+      if (!response.ok) {
+        let specificErrorMessage = t('page.team.card.myteam.create_team_error'); // Default message
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorResult = await response.json(); // Attempt to parse JSON from error response
+            if (errorResult && errorResult.error) {
+              specificErrorMessage = errorResult.error; // Use backend's error message
+            } else if (response.statusText) {
+              specificErrorMessage = response.statusText;
+            }
+          } else if (response.statusText) {
+            specificErrorMessage = response.statusText;
+          }
+        } catch (e) {
+          // Failed to parse JSON or other issue reading error response body
+          console.warn(
+            '[MyTeam.vue] Could not parse JSON from error response body:',
+            e
+          );
+          if (response.statusText) {
+            specificErrorMessage = response.statusText; // Fallback to status text
+          }
+        }
+        createTeamResult.value = specificErrorMessage;
+        createTeamSnackbar.value = true;
+        throw new Error(specificErrorMessage); // Throw an error with the specific message
+      }
+      // response.ok is true, proceed with parsing success response
+      const result = await response.json();
+      // Check for the team field under result.data.team
+      if (!result.data || !result.data.team) {
+        createTeamResult.value = t(
+          'page.team.card.myteam.create_team_error_ui_update'
+        );
+        createTeamSnackbar.value = true;
+        return;
+      }
       console.debug(
-        '[MyTeam.vue] createTeamFunction returned. localUserTeam after call (still pre-watch/nextTick):',
+        '[MyTeam.vue] createTeam returned. localUserTeam after call (still pre-watch/nextTick):',
         localUserTeam.value
       );
-
       // Wait for systemStore to confirm the user is in a team (i.e., systemStore.$state.team has the new teamId)
       await new Promise((resolve, reject) => {
         console.debug(
@@ -206,7 +276,6 @@
             )
           );
         }, 15000);
-
         let stopWatchingSystemTeam;
         stopWatchingSystemTeam = watch(
           () => systemStore.$state.team,
@@ -229,62 +298,57 @@
           { immediate: true, deep: false }
         );
       });
-
       // Now wait for teamStore to be populated with the owner information for the new team
       await new Promise((resolve, reject) => {
         console.debug(
-          '[MyTeam.vue] Waiting for teamStore.owner to match current user. Current teamStore.$state:',
+          '[MyTeam.vue] Waiting for teamStore.owner to match current user and password to be populated. Current teamStore.$state:',
           JSON.parse(JSON.stringify(teamStore.$state || {})),
           'fireuser.uid:',
           fireuser.uid
         );
         const timeout = setTimeout(() => {
           console.warn(
-            '[MyTeam.vue] Timeout (15s) waiting for teamStore.owner to match fireuser.uid. Current teamStore.$state.owner:',
-            teamStore.owner // Log current owner at timeout
+            '[MyTeam.vue] Timeout (15s) waiting for teamStore.owner to match fireuser.uid and password to be populated. Current teamStore.$state.owner:',
+            teamStore.owner, // Log current owner at timeout
+            'Current teamStore.$state.password:',
+            teamStore.$state.password // Log current password at timeout
           );
-          resolve(null);
+          resolve(null); // Resolve with null on timeout as before, or consider rejecting
         }, 15000);
-
-        let stopWatchingTeamOwner;
-        stopWatchingTeamOwner = watch(
+        let stopWatchingTeamOwnerAndPassword;
+        stopWatchingTeamOwnerAndPassword = watch(
           () => teamStore.$state, // Watch the entire $state object
           (newState) => {
             const newOwner = newState?.owner;
+            const newPassword = newState?.password; // Check for password
             console.debug(
               '[MyTeam.vue] Watch on teamStore.$state triggered. New state owner:',
               newOwner,
+              'New state password:', // Log the password
+              newPassword,
               'fireuser.uid:',
               fireuser.uid
             );
-            if (newOwner && fireuser.uid && newOwner === fireuser.uid) {
+            // We need both owner to match and password to be populated
+            if (
+              newOwner &&
+              fireuser.uid &&
+              newOwner === fireuser.uid &&
+              newPassword
+            ) {
               clearTimeout(timeout);
-              if (stopWatchingTeamOwner) {
-                stopWatchingTeamOwner();
+              if (stopWatchingTeamOwnerAndPassword) {
+                stopWatchingTeamOwnerAndPassword();
               }
               console.debug(
-                '[MyTeam.vue] teamStore.owner now matches fireuser.uid via $state watch.'
+                '[MyTeam.vue] teamStore.owner now matches fireuser.uid and teamStore.password is populated via $state watch.'
               );
-              resolve(newOwner);
+              resolve(newState); // Resolve with the new state containing owner and password
             }
           },
           { immediate: true, deep: true } // Use deep: true for watching object properties
         );
-        // Initial check (can be removed if immediate:true on $state with deep:true works reliably)
-        // if (
-        //   teamStore.owner &&
-        //   fireuser.uid &&
-        //   teamStore.owner === fireuser.uid
-        // ) {
-        //   clearTimeout(timeout);
-        //   if (stopWatchingTeamOwner) stopWatchingTeamOwner();
-        //   console.debug(
-        //     '[MyTeam.vue] Initial check: teamStore.owner already matches fireuser.uid.'
-        //   );
-        //   resolve(teamStore.owner);
-        // }
       });
-
       console.debug(
         '[MyTeam.vue] All watches resolved. localUserTeam (before nextTick):',
         localUserTeam.value,
@@ -304,7 +368,6 @@
         'isTeamOwner computed:',
         isTeamOwner.value
       );
-
       if (localUserTeam.value) {
         createTeamResult.value = t('page.team.card.myteam.create_team_success');
         createTeamSnackbar.value = true;
@@ -331,11 +394,55 @@
         createTeamSnackbar.value = true;
       }
     } catch (error) {
-      let backendMsg =
-        error?.message || error?.data?.message || error?.toString();
-      createTeamResult.value =
-        backendMsg || t('page.team.card.myteam.create_team_error');
-      console.error('[MyTeam.vue] Error in createTeam:', error);
+      // Log the full error object for inspection
+      console.error(
+        '[MyTeam.vue] Error in createTeam function. Full error object below:'
+      );
+      console.dir(error);
+      console.error(
+        '[MyTeam.vue] ERROR OBJECT (stringified, in case dir is not showing full details):'
+      );
+      try {
+        console.log(
+          JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+        );
+      } catch (e) {
+        console.error('[MyTeam.vue] Could not stringify the error object:', e);
+      }
+      let messageForSnackbar = null;
+      if (error && typeof error === 'object') {
+        if (error.details) {
+          if (typeof error.details.error === 'string') {
+            messageForSnackbar = error.details.error;
+          } else if (typeof error.details === 'string') {
+            // Attempt to parse if details is a string (might be stringified JSON)
+            try {
+              const parsedDetails = JSON.parse(error.details);
+              if (parsedDetails && typeof parsedDetails.error === 'string') {
+                messageForSnackbar = parsedDetails.error;
+              } else {
+                messageForSnackbar = error.details; // Use the string itself if not the expected JSON structure
+              }
+            } catch (e) {
+              // Parsing failed, use error.details as is if it's a string
+              messageForSnackbar = error.details;
+            }
+          }
+        }
+        // If no message from .details, fallback to error.message
+        if (
+          !messageForSnackbar &&
+          typeof error.message === 'string' &&
+          error.message.length > 0
+        ) {
+          messageForSnackbar = error.message;
+        }
+      }
+      // Ultimate fallback if no message could be extracted
+      if (!messageForSnackbar) {
+        messageForSnackbar = t('page.team.card.myteam.create_team_error');
+      }
+      createTeamResult.value = messageForSnackbar;
       createTeamSnackbar.value = true;
     }
     creatingTeam.value = false;
@@ -346,31 +453,73 @@
       systemStore.$state.team
     );
   };
-
   // Leave team
   const leavingTeam = ref(false);
   const leaveTeamResult = ref(null);
   const leaveTeamSnackbar = ref(false);
   const leaveTeam = async () => {
     leavingTeam.value = true;
+    // Check if our reactive state indicates a logged-in user
+    if (!fireuser.loggedIn || !fireuser.uid) {
+      console.error(
+        '[MyTeam.vue] leaveTeam - User not authenticated (reactive state).'
+      );
+      leaveTeamResult.value = t('page.team.card.myteam.user_not_authenticated'); // Use existing or new translation key
+      leaveTeamSnackbar.value = true;
+      leavingTeam.value = false;
+      return;
+    }
+    // Get the current Firebase user object directly from auth
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error(
+        '[MyTeam.vue] leaveTeam - Firebase auth.currentUser is null, despite reactive state indicating login.'
+      );
+      leaveTeamResult.value = t('page.team.card.myteam.auth_inconsistency'); // Use existing or new translation key
+      leaveTeamSnackbar.value = true;
+      leavingTeam.value = false;
+      return;
+    }
     try {
-      const leaveTeamFunction = httpsCallable(functions, 'leaveTeam');
-      const result = await leaveTeamFunction({}); // Capture result if needed
-      if (isTeamOwner.value) {
-        // MODIFIED
-        leaveTeamResult.value = t('page.team.card.myteam.disband_team_success');
-      } else {
-        leaveTeamResult.value = t('page.team.card.myteam.leave_team_success');
+      const idToken = await currentUser.getIdToken();
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+      const response = await fetch(
+        `https://us-central1-${projectId}.cloudfunctions.net/leaveTeam`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        leaveTeamResult.value =
+          result.error || t('page.team.card.myteam.leave_team_error');
+        leaveTeamSnackbar.value = true;
+        throw new Error(result.error || 'Failed to leave team');
       }
+      // Ensure result.data exists before trying to access result.data.left
+      if (!result.data || (!result.data.left && systemStore.$state.team)) {
+        leaveTeamResult.value = t('page.team.card.myteam.leave_team_error');
+        leaveTeamSnackbar.value = true;
+        return;
+      }
+      leaveTeamResult.value = isTeamOwner.value
+        ? t('page.team.card.myteam.disband_team_success')
+        : t('page.team.card.myteam.leave_team_success');
       leaveTeamSnackbar.value = true;
     } catch (error) {
-      leaveTeamResult.value = t('page.team.card.myteam.leave_team_error');
+      if (!leaveTeamResult.value) {
+        leaveTeamResult.value = t('page.team.card.myteam.leave_team_error');
+        leaveTeamSnackbar.value = true;
+      }
       console.error(error);
-      leaveTeamSnackbar.value = true;
     }
     leavingTeam.value = false;
   };
-
   const copyUrl = () => {
     if (teamUrl.value) {
       navigator.clipboard.writeText(teamUrl.value);
@@ -378,7 +527,6 @@
       console.error('No team URL to copy');
     }
   };
-
   const teamUrl = computed(() => {
     const teamIdForUrl = systemStore.$state.team; // Correct: Use the team ID from the system store
     const passwordForUrl = teamStore.$state.password; // Correct: Use the password from the team store
@@ -403,9 +551,7 @@
       return '';
     }
   });
-
   const userStore = useUserStore();
-
   const visibleUrl = computed(() => {
     if (userStore.getStreamerMode) {
       return t('page.team.card.myteam.url_hidden');
@@ -413,7 +559,6 @@
       return teamUrl.value;
     }
   });
-
   const tarkovStore = useTarkovStore();
   const displayName = computed({
     get() {
@@ -434,7 +579,6 @@
       }
     },
   });
-
   const clearDisplayName = () => {
     tarkovStore.setDisplayName(null);
   };
