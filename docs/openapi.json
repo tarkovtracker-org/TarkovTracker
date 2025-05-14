@@ -353,34 +353,65 @@
     },
     "/progress/task/{taskId}": {
       "post": {
-        "summary": "Update a single task",
+        "summary": "Update a single task's progress",
         "tags": [
           "Progress"
+        ],
+        "description": "Update the progress state of a single task.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ],
         "parameters": [
           {
             "in": "path",
             "name": "taskId",
             "required": true,
+            "description": "The ID (usually UUID from tarkov.dev) of the task to update.",
             "schema": {
               "type": "string"
-            },
-            "description": "Task ID to update"
+            }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "The new state for the task.",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "type": "object",
+                "required": [
+                  "state"
+                ],
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "description": "The new state of the task. Accepts 'completed', 'failed', 'uncompleted', or numeric values (0-3) where 0=Locked, 1=Uncompleted/Active, 2=Completed, 3=Failed.",
+                    "enum": [
+                      "uncompleted",
+                      "completed",
+                      "failed"
+                    ],
+                    "example": "completed"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Task updated"
+            "description": "The task was updated successfully."
+          },
+          "400": {
+            "description": "Invalid request parameters (e.g., bad taskId or state)."
+          },
+          "401": {
+            "description": "Unauthorized to update progress (missing 'WP' permission)."
+          },
+          "500": {
+            "description": "Internal server error."
           }
         }
       }
