@@ -1,8 +1,8 @@
 window.openapi = {
   "openapi": "3.0.0",
   "info": {
-    "title": "TarkovTracker API",
-    "description": "Official TarkovTracker API - player's progress, objectives, level, reputation and much more in one place. If you are missing something here, let the developers know on TarkovTracker Discord server or create a new issue on GitHub.",
+    "title": "TarkovTracker API (Fork)",
+    "description": "Unofficial TarkovTracker API a fork of the original TarkovTracker API - player's progress, objectives, level, reputation and much more in one place. If you are missing something here, let the developers know on the DysektAI/TarkovTracker Discord server or create a new issue on GitHub.",
     "version": "2.0",
     "contact": {
       "name": "TarkovTracker GitHub",
@@ -207,7 +207,7 @@ window.openapi = {
     }
   ],
   "paths": {
-    "/api/v2/token": {
+    "/token": {
       "get": {
         "summary": "Returns data associated with the Token given in the Authorization header of the request",
         "tags": [
@@ -251,7 +251,7 @@ window.openapi = {
         }
       }
     },
-    "/api/v2/progress": {
+    "/progress": {
       "get": {
         "summary": "Returns progress data of the player",
         "tags": [
@@ -296,7 +296,7 @@ window.openapi = {
         }
       }
     },
-    "/api/v2/team/progress": {
+    "/team/progress": {
       "get": {
         "summary": "Returns progress data of all members of the team",
         "tags": [
@@ -327,7 +327,7 @@ window.openapi = {
         }
       }
     },
-    "/api/v2/progress/level/{levelValue}": {
+    "/progress/level/{levelValue}": {
       "post": {
         "summary": "Set player level",
         "tags": [
@@ -351,7 +351,7 @@ window.openapi = {
         }
       }
     },
-    "/api/v2/progress/task/{taskId}": {
+    "/progress/task/{taskId}": {
       "post": {
         "summary": "Update a single task",
         "tags": [
@@ -385,7 +385,7 @@ window.openapi = {
         }
       }
     },
-    "/api/v2/progress/tasks": {
+    "/progress/tasks": {
       "post": {
         "summary": "Update multiple tasks",
         "tags": [
@@ -411,9 +411,10 @@ window.openapi = {
         }
       }
     },
-    "/api/v2/progress/task/objective/{objectiveId}": {
+    "/progress/task/objective/{objectiveId}": {
       "post": {
         "summary": "Update task objective",
+        "description": "Update the progress objectives of tasks.",
         "tags": [
           "Progress"
         ],
@@ -425,22 +426,52 @@ window.openapi = {
             "schema": {
               "type": "string"
             },
-            "description": "Objective ID to update"
+            "description": "The ID of the objective to update progress for."
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Objective properties to update.",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "description": "The new state of the objective (e.g., \"completed\").",
+                    "example": "completed"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The new count for the objective.",
+                    "example": 0
+                  }
+                },
+                "required": [
+                  "state",
+                  "count"
+                ]
+              },
+              "example": {
+                "state": "completed",
+                "count": 0
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Task objective updated"
+            "description": "The objective was updated successfully."
+          },
+          "400": {
+            "description": "Invalid request parameters."
+          },
+          "401": {
+            "description": "Unauthorized to update progress."
+          },
+          "500": {
+            "description": "Internal server error."
           }
         }
       }
