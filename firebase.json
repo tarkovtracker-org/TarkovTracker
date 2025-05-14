@@ -15,13 +15,11 @@
       "firebase-debug.log",
       "firebase-debug.*.log",
       "src/"
-    ]
+    ],
+    "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
   },
   "hosting": {
-    "predeploy": [
-      "cd functions && npm install && npm run build",
-      "cd frontend && npm install && npm run build"
-    ],
+    "predeploy": ["cd frontend && npm install && npm run build:dev"],
     "public": "frontend/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "redirects": [
@@ -39,7 +37,7 @@
     "rewrites": [
       {
         "source": "/api/v2/**",
-        "function": "apiv2-default"
+        "function": "apiv2Default"
       },
       {
         "source": "**",
