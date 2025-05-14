@@ -90,6 +90,27 @@
                   </v-chip>
                 </v-col>
               </v-row>
+              <v-row
+                v-if="
+                  props.activeUserView === 'all' && props.neededBy.length > 0
+                "
+                no-gutters
+                class="mb-1"
+              >
+                <v-col cols="auto" class="mr-1">
+                  <v-icon icon="mdi-account-multiple-outline" />
+                </v-col>
+                <v-col>
+                  <i18n-t
+                    keypath="page.tasks.questcard.neededby"
+                    scope="global"
+                  >
+                    <template #names>
+                      {{ props.neededBy.join(', ') }}
+                    </template>
+                  </i18n-t>
+                </v-col>
+              </v-row>
               <v-row no-gutters class="mb-1">
                 <a
                   :href="props.task.wikiLink"
@@ -350,6 +371,14 @@
     task: {
       type: Object,
       required: true,
+    },
+    activeUserView: {
+      type: String,
+      required: true,
+    },
+    neededBy: {
+      type: Array,
+      default: () => [],
     },
   });
   const { t } = useI18n({ useScope: 'global' });
