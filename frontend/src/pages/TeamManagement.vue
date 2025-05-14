@@ -39,8 +39,9 @@
   const TeamInvite = defineAsyncComponent(
     () => import('@/components/teams/TeamInvite.vue')
   );
-  const { useSystemStore } = useLiveData();
+  const { useSystemStore, useTeamStore } = useLiveData();
   const systemStore = useSystemStore();
+  const teamStore = useTeamStore();
   const route = useRoute();
 </script>
 <style lang="scss" scoped></style>

@@ -213,7 +213,7 @@
   </v-container>
 </template>
 <script setup>
-  import { ref, defineAsyncComponent, computed } from 'vue';
+  import { ref, computed } from 'vue';
   import { useUserStore } from '@/stores/user';
   import { useTarkovStore } from '@/stores/tarkov';
   import { fireuser } from '@/plugins/firebase';
@@ -221,9 +221,8 @@
   import FactionSelect from '@/components/settings/FactionSelect.vue';
   import ApiTokens from '@/components/settings/ApiTokens.vue';
   import DataMigrationCard from '@/components/settings/DataMigrationCard.vue';
-  const FittedCard = defineAsyncComponent(
-    () => import('@/components/FittedCard.vue')
-  );
+  import FittedCard from '@/components/FittedCard.vue';
+
   const tarkovStore = useTarkovStore();
   const userStore = useUserStore();
   const resetDialog = ref(false);

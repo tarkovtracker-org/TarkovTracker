@@ -178,7 +178,12 @@
           }"
           min-height="100"
         >
-          <task-card :task="task" class="my-1" />
+          <task-card
+            :task="task"
+            :activeUserView="activeUserView"
+            :neededBy="task.neededBy || []"
+            class="my-1"
+          />
         </v-lazy>
       </v-col>
     </v-row>
@@ -299,24 +304,26 @@
   } = useTarkovData();
   const userViews = computed(() => {
     let views = [];
-    views.push({ title: t('page.tasks.userviews.all'), view: 'all' });
+    const teamStoreKeys = Object.keys(progressStore.visibleTeamStores);
 
-    // Call the getter function to get the actual display name
-    const displayName = tarkovStore.getDisplayName();
-
-    if (displayName == null) {
-      // We don't have a display name set, so use the default language name for yourself
-      views.push({ title: t('page.tasks.userviews.yourself'), view: 'self' });
-    } else {
-      // We have a display name set, so use that
-      views.push({ title: displayName, view: 'self' }); // Use the returned value
+    // Only add the "All" view if there's more than just 'self' (i.e., user is in a team with others)
+    if (teamStoreKeys.length > 1) {
+      views.push({ title: t('page.tasks.userviews.all'), view: 'all' });
     }
 
-    // For each progressStore visible team member (other than yourself), add a view
-    for (const teamId of Object.keys(progressStore.visibleTeamStores)) {
-      if (teamId != 'self') {
+    // Add 'self' view
+    const displayName = tarkovStore.getDisplayName();
+    if (displayName == null) {
+      views.push({ title: t('page.tasks.userviews.yourself'), view: 'self' });
+    } else {
+      views.push({ title: displayName, view: 'self' });
+    }
+
+    // Add other team members
+    for (const teamId of teamStoreKeys) {
+      if (teamId !== 'self') {
         views.push({
-          title: progressStore.teammemberNames[teamId],
+          title: progressStore.getDisplayName(teamId),
           view: teamId,
         });
       }
@@ -370,33 +377,39 @@
     }
     for (const task of visibleTasks.value) {
       let unlockedUsers = [];
-      Object.entries(progressStore.unlockedTasks[task.id]).forEach(
-        ([teamId, unlocked]) => {
-          if (unlocked) {
-            unlockedUsers.push(teamId);
+      if (progressStore.unlockedTasks && progressStore.unlockedTasks[task.id]) {
+        Object.entries(progressStore.unlockedTasks[task.id]).forEach(
+          ([teamId, unlocked]) => {
+            if (unlocked) {
+              unlockedUsers.push(teamId);
+            }
           }
-        }
-      );
+        );
+      }
       // For each objective
       for (const objective of task.objectives) {
         // If the objective has a GPS location, and its not complete yet, add it to the list
-        if (objectiveHasLocation(objective)) {
+        if (objective && objective.id && objectiveHasLocation(objective)) {
           // Only show the GPS location if the objective is not complete by the selected user view
           if (activeUserView.value == 'all') {
             // Find the users that have the task unlocked
-            var users = unlockedUsers.filter(
-              (user) =>
-                progressStore.objectiveCompletions[objective.id][user] == false
-            );
-            if (users) {
+            var users = unlockedUsers.filter((user) => {
+              const objCompletionForId = progressStore.objectiveCompletions
+                ? progressStore.objectiveCompletions[objective.id]
+                : undefined;
+              return objCompletionForId && objCompletionForId[user] === false;
+            });
+            if (users.length > 0) {
               // Were a valid, unlocked, uncompleted objective, so add it to the list
               visibleGPS.push({ ...objective, users: users });
             }
           } else {
+            const objCompletionForId = progressStore.objectiveCompletions
+              ? progressStore.objectiveCompletions[objective.id]
+              : undefined;
             if (
-              progressStore.objectiveCompletions[objective.id][
-                activeUserView.value
-              ] == false
+              objCompletionForId &&
+              objCompletionForId[activeUserView.value] === false
             ) {
               // Were a valid, unlocked, uncompleted objective, so add it to the list
               visibleGPS.push({ ...objective, users: activeUserView.value });
@@ -625,11 +638,34 @@
     if (activeUserView.value == 'all') {
       // We want to show tasks by their availability to any team member
       if (activeSecondaryView.value == 'available') {
-        visibleTaskList = visibleTaskList.filter((task) =>
-          Object.values(progressStore.unlockedTasks?.[task.id] || {}).some(
-            (v) => v === true
-          )
-        );
+        let tempVisibleTasks = [];
+        for (const task of visibleTaskList) {
+          let usersWhoNeedTask = [];
+          let taskIsNeededBySomeone = false;
+
+          for (const teamId of Object.keys(progressStore.visibleTeamStores)) {
+            const isUnlockedForUser =
+              progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
+            const isCompletedByUser =
+              progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
+
+            // Check faction requirements for this specific user
+            const userFaction = progressStore.playerFaction[teamId];
+            const taskFaction = task.factionName;
+            const factionMatch =
+              taskFaction == 'Any' || taskFaction == userFaction;
+
+            if (isUnlockedForUser && !isCompletedByUser && factionMatch) {
+              taskIsNeededBySomeone = true;
+              usersWhoNeedTask.push(progressStore.getDisplayName(teamId));
+            }
+          }
+
+          if (taskIsNeededBySomeone) {
+            tempVisibleTasks.push({ ...task, neededBy: usersWhoNeedTask });
+          }
+        }
+        visibleTaskList = tempVisibleTasks;
       } else {
         // In theory, we should never be in this situation (we don't show locked or completed tasks for all users)
         // But just in case, we'll do nothing here
