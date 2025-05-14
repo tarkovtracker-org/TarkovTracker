@@ -451,13 +451,41 @@ const updateSingleTask = async (
       .collection("progress")
       .doc(ownerId) as DocumentReference<ProgressDocData>;
     const taskId: string = req.params.taskId;
-    const status = req.body.status;
+    const rawBodyState = req.body.state; // Read req.body.state instead of req.body.status
+    let numericState: number | undefined;
+
+    if (typeof rawBodyState === "string") {
+      switch (rawBodyState.toLowerCase()) {
+        case "completed":
+          numericState = 2;
+          break;
+        case "failed":
+          numericState = 3;
+          break;
+        case "uncompleted": // This corresponds to 'started' or 'active'
+          numericState = 1;
+          break;
+        default:
+          // If the string is not recognized, numericState remains undefined
+          // and will fail the isValidTaskStatus check later.
+          break;
+      }
+    } else if (typeof rawBodyState === "number") {
+      numericState = rawBodyState;
+    }
+
     if (!taskId) {
       res.status(400).send({ error: "Task ID is required." });
       return;
     }
-    if (!isValidTaskStatus(status)) {
-      res.status(400).send({ error: "Invalid status provided." });
+    // Validate the converted numericState
+    if (!isValidTaskStatus(numericState)) {
+      res
+        .status(400)
+        .send({
+          error:
+            "Invalid state provided should be 'completed', 'failed', or 'uncompleted'.",
+        });
       return;
     }
     try {
@@ -468,18 +496,19 @@ const updateSingleTask = async (
       // Use dot notation for specific field update
       updateData[`tasks.${taskId}`] = {
         ...existingTaskData, // Preserve existing fields (like objectives)
-        st: status,
+        st: numericState, // Use the converted numeric state
       };
       await progressRef.update(updateData);
-      // TODO: Consider triggering task dependency updates (using updateTaskState) if needed
-      // await updateTaskState(ownerId, taskId, status);
+      // TODO: Consider triggering task dependency updates (using updateTaskState)
+      // For example: await updateTaskState(ownerId, taskId, numericState, taskData);
+      // Ensure taskData is loaded if updateTaskState requires it.
       res.status(200).send({ message: "Task updated successfully." });
     } catch (error: any) {
       functions.logger.error("Error updating single task:", {
         error: error.message,
         userId: ownerId,
         taskId: taskId,
-        status: status,
+        status: numericState, // Log the numeric state
       });
       res.status(500).send({ error: "Failed to update task." });
     }
