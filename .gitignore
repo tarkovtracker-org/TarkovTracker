@@ -42,3 +42,7 @@ frontend/coverage/
 frontend/.DS_Store
 frontend/.env.development
 frontend/.env.production
+local_data/firebase-export-metadata.json
+local_data/auth_export/accounts.json
+local_data/auth_export/config.json
+local_data/firestore_export/firestore_export.overall_export_metadata
