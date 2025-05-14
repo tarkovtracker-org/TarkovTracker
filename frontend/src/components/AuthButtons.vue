@@ -132,6 +132,7 @@ import {
 import { app as fireapp, fireuser } from "@/plugins/firebase.ts";
 import DataMigrationService from "@/services/DataMigrationService";
 import { markDataMigrated } from "@/plugins/store-initializer";
+import { useTarkovStore } from "@/stores/tarkov";
 // Defer store import to avoid initialization issues
 let tarkovStore = null;
 // Enable debug mode in development
@@ -155,8 +156,6 @@ const emit = defineEmits(["migration-dialog-shown", "migration-dialog-closed"]);
 const getTarkovStore = async () => {
   if (tarkovStore) return tarkovStore;
   try {
-    // Dynamically import to avoid initialization issues
-    const { useTarkovStore } = await import("@/stores/tarkov");
     // Wait for next tick and a small delay to ensure Pinia is ready
     await nextTick();
     await new Promise((resolve) => setTimeout(resolve, 100));
