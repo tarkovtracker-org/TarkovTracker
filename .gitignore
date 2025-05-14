@@ -40,3 +40,5 @@ frontend/.env.*.local
 frontend/dist/
 frontend/coverage/
 frontend/.DS_Store
+frontend/.env.development
+frontend/.env.production

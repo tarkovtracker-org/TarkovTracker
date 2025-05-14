@@ -10,18 +10,21 @@
     "build": "npm run build --workspaces",
     "build:functions": "npm run build --workspace=functions",
     "build:frontend": "npm run build --workspace=frontend",
+    "build:frontend:dev": "npm run build:dev --workspace=frontend",
     "emulators:start": "firebase emulators:start --only auth,functions,firestore,database,hosting",
     "emulators:local": "firebase emulators:start --import=./local_data --export-on-exit --only auth,functions,firestore,database,hosting,pubsub",
     "dev": "concurrently \"cd frontend && npm run dev\" \"npm:emulators:local\"",
     "deps": "taze --interactive",
     "deps:all": "npm run deps && npm run deps --workspaces --if-present",
-    "swagger": "npm run swagger --workspace=functions"
+    "swagger": "npm run swagger --workspace=functions",
+    "deploy:dev": "firebase use dev && npm run build:functions && npm run build:frontend:dev && firebase deploy",
+    "deploy:prod": "firebase use prod && npm run build:functions && npm run build:frontend && firebase deploy"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
-    "@types/node": "^22.15.14",
+    "@types/node": "^22.15.17",
     "concurrently": "^9.1.2",
-    "firebase-tools": "^14.2.2",
+    "firebase-tools": "^14.3.1",
     "taze": "^19.1.0"
   }
 }
