@@ -265,7 +265,7 @@ export const useProgressStore = defineStore('progress', {
           }
         }
         // For other teammates
-        const store = this.visibleTeamStores[teamId];
+        const store = this.teamStores[teamId];
         // If displayName is null/undefined in their store, fallback to shortened UID, then full UID
         return store?.$state.displayName ?? teamId.substring(0, 6) ?? teamId;
       };
