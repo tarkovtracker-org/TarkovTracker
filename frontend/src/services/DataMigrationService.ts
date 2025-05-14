@@ -38,7 +38,6 @@ interface ProgressData {
   // Allow any other properties, as the structure seems flexible
   [key: string]: any;
 }
-
 // Interface for the exported data object
 interface ExportObject {
   type: 'tarkovtracker-migration';
@@ -46,7 +45,6 @@ interface ExportObject {
   version: number;
   data: ProgressData;
 }
-
 /**
  * Service to handle migration of local data to a user's Firebase account
  */
@@ -70,11 +68,9 @@ export default class DataMigrationService {
         Object.keys(parsedData.hideoutModules || {}).length > 0;
       return hasKeys && hasProgress;
     } catch (error) {
-      console.error('Error checking local data:', error);
       return false;
     }
   }
-
   /**
    * Get the local progress data
    * @returns {ProgressData | null} The local progress data or null if none exists
@@ -83,7 +79,6 @@ export default class DataMigrationService {
     try {
       const progressData = localStorage.getItem('progress');
       if (!progressData) {
-        console.warn('No progress data in localStorage');
         return null;
       }
       const parsedData: ProgressData = JSON.parse(progressData);
@@ -92,11 +87,9 @@ export default class DataMigrationService {
       }
       return null;
     } catch (error) {
-      console.error('Error getting local data:', error);
       return null;
     }
   }
-
   /**
    * Check if a user already has data in their account
    * @param {string} uid The user's UID
@@ -116,11 +109,9 @@ export default class DataMigrationService {
         Object.keys(data.hideoutModules || {}).length > 0;
       return exists && hasData && hasProgress;
     } catch (error) {
-      console.error('Error checking user data:', error);
       return false;
     }
   }
-
   /**
    * Migrate local data to a user's account
    * @param {string} uid The user's UID
@@ -128,16 +119,13 @@ export default class DataMigrationService {
    */
   static async migrateDataToUser(uid: string): Promise<boolean> {
     if (!uid) {
-      console.error('Migration failed: No user ID provided');
       return false;
     }
     try {
       const localData = this.getLocalData();
       if (!localData) {
-        console.error('Migration failed: No local data to migrate');
         return false;
       }
-
       try {
         const progressRef = doc(firestore, 'progress', uid);
         const existingDoc = await getDoc(progressRef);
@@ -149,17 +137,12 @@ export default class DataMigrationService {
               Object.keys(existingData.taskCompletions || {}).length > 0 ||
               Object.keys(existingData.taskObjectives || {}).length > 0)
           ) {
-            console.warn(
-              'User already has meaningful progress, aborting migration'
-            );
             return false;
           }
         }
       } catch (checkError) {
-        console.error('Error checking existing data:', checkError);
         // Continue
       }
-
       localData.lastUpdated = new Date().toISOString();
       localData.migratedFromLocalStorage = true;
       localData.migrationDate = new Date().toISOString();
@@ -167,7 +150,6 @@ export default class DataMigrationService {
       if (!localData.displayName) {
         localData.imported = true;
       }
-
       try {
         const progressRef = doc(firestore, 'progress', uid);
         await setDoc(progressRef, localData as DocumentData); // Cast to DocumentData
@@ -175,19 +157,17 @@ export default class DataMigrationService {
         try {
           localStorage.setItem(backupKey, JSON.stringify(localData));
         } catch (backupError) {
-          console.warn('Failed to create backup:', backupError);
+          // Continue
         }
         return true;
       } catch (firestoreError) {
-        console.error('Error writing to Firestore:', firestoreError);
-        return false;
+        // Continue
       }
     } catch (error) {
-      console.error('Error in migration process:', error);
       return false;
     }
+    return false;
   }
-
   /**
    * Export data in a format suitable for cross-domain migration
    * @returns {ExportObject | null} The formatted data for export or null if no data
@@ -204,11 +184,9 @@ export default class DataMigrationService {
       };
       return exportObject;
     } catch (error) {
-      console.error('Error exporting data for migration:', error);
       return null;
     }
   }
-
   /**
    * Import data from a JSON string provided by a user
    * @param {string} jsonString The JSON string to import
@@ -218,7 +196,6 @@ export default class DataMigrationService {
     try {
       const importedObject: any = JSON.parse(jsonString); // Parse as any first
       if (importedObject.type !== 'tarkovtracker-migration') {
-        console.error('Not a valid TarkovTracker migration object');
         return null;
       }
       const data: ProgressData = importedObject.data;
@@ -230,31 +207,24 @@ export default class DataMigrationService {
       for (const field of requiredFields) {
         // Check existence and handle potential undefined/null
         if (data[field] === undefined || data[field] === null) {
-          console.error(`Missing or invalid required field: ${field}`);
           return null;
         }
       }
       // Basic type checks (can be expanded)
       if (typeof data.level !== 'number') {
-        console.error(`Invalid type for field: level (expected number)`);
         return null;
       }
       if (typeof data.gameEdition !== 'string') {
-        console.error(`Invalid type for field: gameEdition (expected string)`);
         return null;
       }
       if (typeof data.pmcFaction !== 'string') {
-        console.error(`Invalid type for field: pmcFaction (expected string)`);
         return null;
       }
-
       return data;
     } catch (error) {
-      console.error('Error parsing import data:', error);
       return null;
     }
   }
-
   /**
    * Import data from another domain to a user's account
    * @param {string} uid The user's UID
@@ -266,32 +236,27 @@ export default class DataMigrationService {
     importedData: ProgressData
   ): Promise<boolean> {
     if (!uid) {
-      console.error('Import failed: No user ID provided');
       return false;
     }
     if (!importedData) {
-      console.error('Import failed: No data to import');
       return false;
     }
     try {
       importedData.lastUpdated = new Date().toISOString();
       importedData.importedFromExternalSource = true;
       importedData.importDate = new Date().toISOString();
-
       try {
         const progressRef = doc(firestore, 'progress', uid);
         await setDoc(progressRef, importedData as DocumentData); // Cast to DocumentData
         return true;
       } catch (firestoreError) {
-        console.error('Error writing to Firestore:', firestoreError);
-        return false;
+        // Continue
       }
     } catch (error) {
-      console.error('Error in import process:', error);
       return false;
     }
+    return false;
   }
-
   /**
    * Fetch user data from old TarkovTracker domain using API token
    * @param {string} apiToken The user's API token from the old site
@@ -303,7 +268,6 @@ export default class DataMigrationService {
     oldDomain: string = 'https://tarkovtracker.io/api/v2/progress'
   ): Promise<ProgressData | null> {
     if (!apiToken) {
-      console.error('No API token provided');
       return null;
     }
     try {
@@ -316,15 +280,10 @@ export default class DataMigrationService {
         method: 'GET',
         headers,
       });
-
       if (!response.ok) {
         let errorText = await response.text();
-        console.error(
-          `[DataMigrationService] API fetch failed: ${response.status} ${response.statusText} - ${errorText}`
-        );
         return null;
       }
-
       const responseData: any = await response.json(); // Fetch as any first
       const data = responseData.data || responseData; // Adapt based on actual API response
 
@@ -348,7 +307,6 @@ export default class DataMigrationService {
         complete?: boolean;
         count?: number;
       }
-
       const taskCompletions: ProgressData['taskCompletions'] = {};
       if (Array.isArray(data.tasksProgress)) {
         data.tasksProgress.forEach((task: OldTaskProgress) => {
