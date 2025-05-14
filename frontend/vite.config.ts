@@ -28,6 +28,28 @@ export default defineConfig({
         drop_debugger: true,
       },
     },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Group specific large vendors into their own chunks
+            if (id.includes('vuetify')) {
+              return 'vuetify';
+            }
+            if (id.includes('@apollo') || id.includes('graphql')) {
+              return 'apollo-graphql';
+            }
+            if (id.includes('firebase')) {
+              return 'firebase';
+            }
+            if (id.includes('d3')) {
+              return 'd3';
+            }
+            // Let Vite handle other node_modules with its default chunking strategy
+          }
+        },
+      },
+    },
   },
   plugins: [
     vue(),
