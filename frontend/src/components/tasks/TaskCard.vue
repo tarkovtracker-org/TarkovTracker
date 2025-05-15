@@ -412,7 +412,7 @@
     // Check if the task is faction 'Any' or the user's faction
     return (
       props.task.factionName == 'Any' ||
-      props.task.factionName == tarkovStore.getPMCFaction
+      props.task.factionName == tarkovStore.getPMCFaction()
     );
   });
   const lockedBehind = computed(() => {
