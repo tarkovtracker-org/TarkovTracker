@@ -14,7 +14,6 @@ import {
   CollectionReference,
 } from "firebase-admin/firestore";
 
-// Define interfaces for data structures
 interface CreateTokenData {
   note: string;
   permissions: string[];
@@ -72,7 +71,8 @@ async function _createTokenLogic(
       const systemDoc: DocumentSnapshot<SystemDocData> =
         await transaction.get(systemRef);
       const systemData = systemDoc.data();
-      if (systemDoc.exists && (systemData?.tokens?.length ?? 0) >= 5) {
+      // Check if the user already has the maximum number of tokens
+      if (systemData?.tokens && systemData.tokens.length >= 5) {
         throw new HttpsError(
           "resource-exhausted",
           "You have the maximum number of tokens (5).",
@@ -111,6 +111,7 @@ async function _createTokenLogic(
           tokens: admin.firestore.FieldValue.arrayUnion(generatedToken),
         });
       } else {
+        // If the system document doesn't exist, create it with the new token
         const newSystemData: SystemDocData = {
           tokens: [generatedToken],
         };
