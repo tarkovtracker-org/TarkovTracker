@@ -439,7 +439,9 @@ async function _kickTeamMemberLogic(
   }
 }
 
-const corsHandler = cors({ origin: "https://tarkov-tracker-dev.web.app" });
+const corsHandler = cors({
+  origin: ["https://tarkov-tracker-dev.web.app", "https://tarkovtracker.org"],
+});
 
 // Helper function to map HttpsError codes to HTTP status codes
 function getStatusFromHttpsErrorCode(code: FunctionsErrorCode): number {
@@ -679,7 +681,6 @@ export const leaveTeam = functions.https.onRequest((req, res) => {
       } catch (e: any) {
         let messageToSend = "Error processing leave team request.";
         let httpStatus = 500;
-
         if (e instanceof HttpsError) {
           httpStatus = getStatusFromHttpsErrorCode(
             e.code as FunctionsErrorCode,
@@ -742,7 +743,6 @@ export const kickTeamMember = functions.https.onRequest((req, res) => {
       } catch (e: any) {
         let messageToSend = "Error processing kick member request.";
         let httpStatus = 500;
-
         if (e instanceof HttpsError) {
           httpStatus = getStatusFromHttpsErrorCode(
             e.code as FunctionsErrorCode,
@@ -858,7 +858,7 @@ async function saveTarkovData(data: TarkovDataResponse | undefined) {
 // Scheduled function to fetch and save data daily
 export const scheduledTarkovDataFetch = onSchedule(
   "every day 00:00",
-  async (event: ScheduledEvent) => {
+  async (_event: ScheduledEvent) => {
     logger.log("Running scheduled Tarkov data fetch...");
     const data = await retrieveTarkovdata();
     await saveTarkovData(data);
