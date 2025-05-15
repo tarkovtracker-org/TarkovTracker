@@ -12,6 +12,8 @@ import {
   hideoutStations,
 } from '@/composables/tarkovdata';
 
+const STASH_STATION_ID = '5d484fc0654e76006657e0ab';
+
 interface GameEdition {
   version: number;
   value: number;
@@ -91,7 +93,7 @@ export const useProgressStore = defineStore('progress', {
     },
     tasksCompletions(state: ProgressState): CompletionsMap {
       const completions: CompletionsMap = {};
-      if (!tasks.value) return {}; // <-- Use imported ref
+      if (!tasks.value) return {};
       for (const task of tasks.value as Task[]) {
         completions[task.id] = {};
         for (const teamId of Object.keys(this.visibleTeamStores)) {
@@ -105,14 +107,14 @@ export const useProgressStore = defineStore('progress', {
     gameEditionData: () => gameEditions,
     traderLevelsAchieved(state: ProgressState): TraderLevelsMap {
       const levels: TraderLevelsMap = {};
-      if (!traders.value) return {}; // <-- Use imported ref
+      if (!traders.value) return {};
       for (const teamId of Object.keys(this.visibleTeamStores)) {
         levels[teamId] = {};
         const store = this.visibleTeamStores[teamId];
         for (const trader of traders.value) {
           // TODO: Verify how trader level should be determined.
           // Using player level as a placeholder proxy for now as getTraderLevel is missing.
-          levels[teamId][trader.id] = store?.$state.level ?? 0; // Reverted temporary fix
+          levels[teamId][trader.id] = store?.$state.level ?? 0;
         }
       }
       return levels;
@@ -130,7 +132,7 @@ export const useProgressStore = defineStore('progress', {
       state: ProgressState
     ): TaskAvailabilityMap {
       const available: TaskAvailabilityMap = {};
-      if (!tasks.value) return {}; // <-- Use imported ref
+      if (!tasks.value) return {};
       for (const task of tasks.value as Task[]) {
         available[task.id] = {};
         for (const teamId of Object.keys(this.visibleTeamStores)) {
@@ -207,7 +209,7 @@ export const useProgressStore = defineStore('progress', {
     },
     objectiveCompletions(state: ProgressState): ObjectiveCompletionsMap {
       const completions: ObjectiveCompletionsMap = {};
-      if (!objectives.value) return {}; // <-- Use imported ref
+      if (!objectives.value) return {};
       for (const objective of objectives.value) {
         completions[objective.id] = {};
         for (const teamId of Object.keys(this.visibleTeamStores)) {
@@ -220,21 +222,16 @@ export const useProgressStore = defineStore('progress', {
     },
     hideoutLevels(state: ProgressState): HideoutLevelMap {
       const levels: HideoutLevelMap = {};
-      if (!hideoutStations.value) return {}; // Ensure data is available
-
+      if (!hideoutStations.value) return {};
       for (const station of hideoutStations.value) {
-        if (!station || !station.id) continue; // Skip if station or station.id is invalid
-
+        if (!station || !station.id) continue;
         levels[station.id] = {};
         for (const teamId of Object.keys(this.visibleTeamStores)) {
           const store = this.visibleTeamStores[teamId];
           const modulesState = store?.$state.hideoutModules ?? {};
-
           let maxManuallyCompletedLevel = 0;
-          // Check if station.levels is valid and an array before iterating
           if (station.levels && Array.isArray(station.levels)) {
             for (const lvl of station.levels) {
-              // Ensure lvl, lvl.id, and lvl.level are valid before accessing
               if (
                 lvl &&
                 lvl.id &&
@@ -248,10 +245,8 @@ export const useProgressStore = defineStore('progress', {
               }
             }
           }
-
           let currentStationDisplayLevel;
-          if (station.id === '5d484fc0654e76006657e0ab') {
-            // Stash ID
+          if (station.id === STASH_STATION_ID) {
             const gameEditionVersion = store?.$state.gameEdition ?? 0;
             const edition = this.gameEditionData.find(
               (e: any) => e.version === gameEditionVersion
@@ -262,7 +257,6 @@ export const useProgressStore = defineStore('progress', {
               maxManuallyCompletedLevel
             );
           } else {
-            // For all other stations
             currentStationDisplayLevel = maxManuallyCompletedLevel;
           }
           levels[station.id][teamId] = currentStationDisplayLevel;
@@ -283,7 +277,6 @@ export const useProgressStore = defineStore('progress', {
           const selfStore = this.teamStores['self'];
           const storedDisplayName = selfStore?.$state.displayName;
           if (storedDisplayName) {
-            // If a display name is explicitly set in the store, use it.
             return storedDisplayName;
           } else {
             // If the stored display name is null (e.g., after being cleared),
