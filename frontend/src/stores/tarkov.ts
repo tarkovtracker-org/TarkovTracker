@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { watch } from 'vue';
-import { fireuser } from '@/plugins/firebase';
-import { getters, actions, defaultState } from '@/shared_state';
+import { fireuser, firestore } from '@/plugins/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { getters, actions, defaultState, type UserState } from '@/shared_state';
 import { initializeStore, wasDataMigrated } from '@/plugins/store-initializer';
 import type { Pinia } from 'pinia';
 
@@ -16,9 +17,35 @@ interface FireswapConfig {
 // Define the store, letting Pinia infer the type
 // Cast getters/actions to any for now due to JS import
 export const useTarkovStore = defineStore('swapTarkov', {
-  state: () => JSON.parse(JSON.stringify(defaultState)),
+  state: () => JSON.parse(JSON.stringify(defaultState)) as UserState,
   getters: getters as any, // Cast to any - Requires shared_state.ts for proper typing
-  actions: actions as any, // Cast to any - Requires shared_state.ts for proper typing
+  actions: {
+    ...(actions as any), // Spread existing actions
+
+    async resetOnlineProfile() {
+      if (!fireuser.uid) {
+        console.error('User not logged in. Cannot reset online profile.');
+        return;
+      }
+      const userProgressRef = doc(firestore, 'progress', fireuser.uid);
+
+      try {
+        // Set the Firestore document to a fresh defaultState
+        const freshDefaultState = JSON.parse(JSON.stringify(defaultState));
+        await setDoc(userProgressRef, freshDefaultState);
+
+        // Reset the local Pinia store state to default using $patch
+        // This ensures the in-memory state reflects the reset immediately.
+        this.$patch(JSON.parse(JSON.stringify(defaultState)));
+
+        console.log(
+          'Online profile reset in Firestore. Local Pinia state reset. localStorage will be updated by fireswap if configured.'
+        );
+      } catch (error) {
+        console.error('Error resetting online profile:', error);
+      }
+    },
+  },
   fireswap: [
     {
       path: '.',
@@ -35,9 +62,7 @@ type TarkovStoreType = ReturnType<typeof useTarkovStore>;
 // Type the store instance potentially returned by initializeStore
 type StoreInstance = TarkovStoreType | null;
 
-const getSafeStoreInstance = async (
-  piniaInstance?: Pinia
-): Promise<StoreInstance> => {
+const getSafeStoreInstance = async (piniaInstance?: Pinia): Promise<StoreInstance> => {
   try {
     const store = await initializeStore('tarkov', useTarkovStore);
     if (store && typeof store.$id === 'string') {
@@ -50,8 +75,6 @@ const getSafeStoreInstance = async (
     return null;
   }
 };
-
-// Watch logic remains the same, using runtime checks for firebindAll/fireunbindAll
 let watchHandlerRunning = false;
 watch(
   () => fireuser.loggedIn,
@@ -68,14 +91,11 @@ watch(
         watchHandlerRunning = false;
         return;
       }
-      // Runtime checks for fireswap methods remain necessary
       const canBind = typeof (tarkovStore as any).firebindAll === 'function';
-      const canUnbind =
-        typeof (tarkovStore as any).fireunbindAll === 'function';
+      const canUnbind = typeof (tarkovStore as any).fireunbindAll === 'function';
       if (newValue) {
         const wasMigrated =
-          wasDataMigrated() ||
-          sessionStorage.getItem('tarkovDataMigrated') === 'true';
+          wasDataMigrated() || sessionStorage.getItem('tarkovDataMigrated') === 'true';
         if (wasMigrated) {
           if (canBind) {
             (tarkovStore as any).firebindAll();
@@ -104,8 +124,6 @@ watch(
   },
   { immediate: false }
 );
-
-// setTimeout logic remains the same
 setTimeout(async () => {
   try {
     console.debug('Starting delayed initialization of tarkovStore');
@@ -115,8 +133,7 @@ setTimeout(async () => {
     }
     const canBind = typeof (tarkovStore as any).firebindAll === 'function';
     const wasMigrated =
-      wasDataMigrated() ||
-      sessionStorage.getItem('tarkovDataMigrated') === 'true';
+      wasDataMigrated() || sessionStorage.getItem('tarkovDataMigrated') === 'true';
     if (wasMigrated) {
       if (canBind) {
         (tarkovStore as any).firebindAll();
