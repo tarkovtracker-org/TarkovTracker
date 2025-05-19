@@ -94,11 +94,9 @@
   </v-snackbar>
 </template>
 <script setup>
-  import { fireuser, functions } from '@/plugins/firebase';
+  import { fireuser } from '@/plugins/firebase';
   import { computed, ref } from 'vue';
-  import { httpsCallable } from 'firebase/functions';
   import { useI18n } from 'vue-i18n';
-  import { useLiveData } from '@/composables/livedata';
   import { useUserStore } from '@/stores/user';
   import { useProgressStore } from '@/stores/progress';
   import { useTarkovData } from '@/composables/tarkovdata';
@@ -120,25 +118,19 @@
       return props.teammember;
     }
   });
-  const { useTeamStore } = useLiveData();
   const progressStore = useProgressStore();
-  const teamStore = useTeamStore();
   const userStore = useUserStore();
   const { tasks, playerLevels } = useTarkovData();
   const { t } = useI18n({ useScope: 'global' });
   const completedTaskCount = computed(() => {
     return tasks.value.filter(
-      (task) =>
-        progressStore.tasksCompletions?.[task.id]?.[teamStoreId.value] == true
+      (task) => progressStore.tasksCompletions?.[task.id]?.[teamStoreId.value] == true
     ).length;
   });
   const groupIcon = computed(() => {
     const level = progressStore.getLevel(props.teammember);
     const entry = playerLevels.value.find((pl) => pl.level === level);
     return entry?.levelBadgeImageLink ?? '';
-  });
-  const factionIcon = computed(() => {
-    return `/img/factions/${progressStore.getFaction(props.teammember)}.webp`;
   });
   const kickingTeammate = ref(false);
   const kickTeammateResult = ref(null);
