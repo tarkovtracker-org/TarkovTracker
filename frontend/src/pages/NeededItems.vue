@@ -37,21 +37,13 @@
       <v-col cols="3" sm="2" md="1" lg="1">
         <v-dialog v-model="settingsDialog" scrim="#9A8866">
           <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              variant="tonal"
-              style="width: 100%; height: 48px"
-              class="px-0"
-            >
+            <v-btn v-bind="props" variant="tonal" style="width: 100%; height: 48px" class="px-0">
               <v-icon>mdi-cog</v-icon>
             </v-btn>
           </template>
           <v-row class="justify-center">
             <v-col cols="auto">
-              <v-card
-                :title="$t('page.neededitems.options.title')"
-                style="width: fit-content"
-              >
+              <v-card :title="$t('page.neededitems.options.title')" style="width: fit-content">
                 <v-card-text>
                   <v-container class="ma-0 pa-0">
                     <v-row dense>
@@ -63,12 +55,9 @@
                           group
                           variant="outlined"
                         >
-                          <v-btn value="mediumCard" icon="mdi-view-grid">
-                          </v-btn>
-                          <v-btn value="smallCard" icon="mdi-view-comfy">
-                          </v-btn>
-                          <v-btn value="row" icon="mdi-view-sequential">
-                          </v-btn>
+                          <v-btn value="mediumCard" icon="mdi-view-grid"> </v-btn>
+                          <v-btn value="smallCard" icon="mdi-view-comfy"> </v-btn>
+                          <v-btn value="row" icon="mdi-view-sequential"> </v-btn>
                         </v-btn-toggle>
                       </v-col>
                       <!-- Hide Task Items that aren't needed found in raid option-->
@@ -119,12 +108,9 @@
                     </v-row>
                     <v-row justify="end">
                       <v-col cols="12" md="6">
-                        <v-btn
-                          color="primary"
-                          block
-                          @click="settingsDialog = false"
-                          >{{ $t('page.neededitems.options.close') }}</v-btn
-                        >
+                        <v-btn color="primary" block @click="settingsDialog = false">{{
+                          $t('page.neededitems.options.close')
+                        }}</v-btn>
                       </v-col>
                     </v-row>
                   </v-container>
@@ -137,11 +123,7 @@
     </v-row>
     <v-row v-if="loading || hideoutLoading" justify="center">
       <v-col cols="12" align="center">
-        <v-progress-circular
-          indeterminate
-          color="secondary"
-          class="mx-2"
-        ></v-progress-circular>
+        <v-progress-circular indeterminate color="secondary" class="mx-2"></v-progress-circular>
         {{ $t('page.neededitems.loading') }} <refresh-button />
       </v-col>
     </v-row>
@@ -172,20 +154,14 @@
 <script setup>
   import { computed, provide, ref, watch } from 'vue';
   import { useTarkovData } from '@/composables/tarkovdata';
-  import { useProgressStore } from '@/stores/progress';
+  import { useProgressStore, STASH_STATION_ID } from '@/stores/progress';
   import { defineAsyncComponent } from 'vue';
   import { debounce } from 'lodash-es';
   import { useI18n } from 'vue-i18n';
   import { useUserStore } from '@/stores/user';
-  const TrackerTip = defineAsyncComponent(
-    () => import('@/components/TrackerTip.vue')
-  );
-  const RefreshButton = defineAsyncComponent(
-    () => import('@/components/RefreshButton.vue')
-  );
-  const NeededItem = defineAsyncComponent(
-    () => import('@/components/neededitems/NeededItem.vue')
-  );
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
+  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton.vue'));
+  const NeededItem = defineAsyncComponent(() => import('@/components/neededitems/NeededItem.vue'));
   const { t } = useI18n({ useScope: 'global' });
   const {
     tasks,
@@ -236,10 +212,8 @@
     set: (value) => userStore.setNeededTypeView(value),
   });
   const neededTaskItems = computed(() => {
-    // Capture dependencies' values at the start using optional chaining on .value access
     const objectives = neededItemTaskObjectives?.value;
     const taskList = tasks?.value;
-    // Check if captured values are valid arrays
     if (!Array.isArray(objectives) || !Array.isArray(taskList)) {
       return [];
     }
@@ -252,9 +226,7 @@
           // Use taskList, still needs optional chaining for find
           const taskA = taskList?.find((task) => task.id == a.taskId);
           taskA?.predecessors.forEach((predecessor) => {
-            if (
-              progressStore.tasksCompletions?.[predecessor]?.['self'] === false
-            ) {
+            if (progressStore.tasksCompletions?.[predecessor]?.['self'] === false) {
               aCount++;
             }
           });
@@ -262,9 +234,7 @@
           // Use taskList, still needs optional chaining for find
           const taskB = taskList?.find((task) => task.id == b.taskId);
           taskB?.predecessors.forEach((predecessor) => {
-            if (
-              progressStore.tasksCompletions?.[predecessor]?.['self'] === false
-            ) {
+            if (progressStore.tasksCompletions?.[predecessor]?.['self'] === false) {
               bCount++;
             }
           });
@@ -290,71 +260,46 @@
       return [];
     }
     try {
-      const STASH_STATION_ID = '5d484fc0654e76006657e0ab'; // Tarkov Wiki ID for Stash
-
       // Use the captured, validated arrays
       let hideoutNeeds = JSON.parse(JSON.stringify(modulesNeeded))
         .filter((need) => {
           const moduleInstanceId = need.hideoutModule?.id;
           const moduleStationId = need.hideoutModule?.stationId;
           const moduleTargetLevel = need.hideoutModule?.level;
-
-          // Basic check for data integrity
-          if (
-            !moduleInstanceId ||
-            !moduleStationId ||
-            typeof moduleTargetLevel !== 'number'
-          ) {
+          if (!moduleInstanceId || !moduleStationId || typeof moduleTargetLevel !== 'number') {
             // If essential data is missing, cautiously keep the item, though this state is unexpected.
             // Consider logging this case if it occurs.
             return true;
           }
-
           if (moduleStationId === STASH_STATION_ID) {
-            // Special handling for Stash items
             const currentEffectiveStashLevel =
               progressStore.hideoutLevels?.[STASH_STATION_ID]?.['self'];
             if (typeof currentEffectiveStashLevel === 'number') {
-              // Item is needed if current Stash level is less than the level this item is for
               return currentEffectiveStashLevel < moduleTargetLevel;
             }
-            // Fallback if effective stash level is somehow unknown: check individual completion (less likely for Stash)
             return (
-              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[
-                moduleInstanceId
-              ]?.complete !== true
+              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[moduleInstanceId]
+                ?.complete !== true
             );
           } else {
-            // Standard handling for all other hideout modules
             return (
-              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[
-                moduleInstanceId
-              ]?.complete !== true
+              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[moduleInstanceId]
+                ?.complete !== true
             );
           }
         })
         .sort((a, b) => {
           let aCount = 0;
-          // Use moduleList, still needs optional chaining for find and hideoutModule access
-          const moduleA = moduleList?.find(
-            (hModule) => hModule.id == a.hideoutModule?.id
-          );
+          const moduleA = moduleList?.find((hModule) => hModule.id == a.hideoutModule?.id);
           moduleA?.predecessors.forEach((predecessor) => {
-            if (
-              progressStore.moduleCompletions?.[predecessor]?.['self'] === false
-            ) {
+            if (progressStore.moduleCompletions?.[predecessor]?.['self'] === false) {
               aCount++;
             }
           });
           let bCount = 0;
-          // Use moduleList, still needs optional chaining for find and hideoutModule access
-          const moduleB = moduleList?.find(
-            (hModule) => hModule.id == b.hideoutModule?.id
-          );
+          const moduleB = moduleList?.find((hModule) => hModule.id == b.hideoutModule?.id);
           moduleB?.predecessors.forEach((predecessor) => {
-            if (
-              progressStore.moduleCompletions?.[predecessor]?.['self'] === false
-            ) {
+            if (progressStore.moduleCompletions?.[predecessor]?.['self'] === false) {
               bCount++;
             }
           });
@@ -380,9 +325,7 @@
       ? 'page.neededitems.options.items_hide_non_fir'
       : 'page.neededitems.options.items_show_non_fir'
   );
-  const hideFIRColor = computed(() =>
-    userStore.itemsNeededHideNonFIR ? 'error' : 'success'
-  );
+  const hideFIRColor = computed(() => (userStore.itemsNeededHideNonFIR ? 'error' : 'success'));
   const itemsHideAll = computed({
     get: () => userStore.itemsTeamAllHidden,
     set: (value) => userStore.setItemsTeamHideAll(value),
@@ -392,9 +335,7 @@
       ? 'page.team.card.teamoptions.items_hide_all'
       : 'page.team.card.teamoptions.items_show_all'
   );
-  const itemsHideAllColor = computed(() =>
-    userStore.itemsTeamAllHidden ? 'error' : 'success'
-  );
+  const itemsHideAllColor = computed(() => (userStore.itemsTeamAllHidden ? 'error' : 'success'));
   const itemsHideNonFIR = computed({
     get: () => userStore.itemsTeamNonFIRHidden,
     set: (value) => userStore.setItemsTeamHideNonFIR(value),

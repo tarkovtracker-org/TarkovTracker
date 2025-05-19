@@ -14,9 +14,6 @@
         </v-col>
         <v-col align="center" justify="center"> </v-col>
         <v-col cols="auto">
-          <!-- <div class="d-flex justify-center align-center">
-            <img :src="factionIcon" contain style="max-width: 64px; filter: invert(1)" />
-          </div> -->
           <div class="d-flex justify-center align-center">
             <span style="line-height: 0px">
               <img :src="groupIcon" contain style="max-width: 64px" />
@@ -55,20 +52,16 @@
         </v-col>
         <v-col cols="auto">
           <v-btn
-            :disabled="
-              props.teammember == fireuser.uid || userStore.taskTeamAllHidden
-            "
+            :disabled="props.teammember == fireuser.uid || userStore.taskTeamAllHidden"
             variant="outlined"
             :icon="
-              props.teammember != fireuser.uid &&
-              userStore.teamIsHidden(props.teammember)
+              props.teammember != fireuser.uid && userStore.teamIsHidden(props.teammember)
                 ? 'mdi-eye-off'
                 : 'mdi-eye'
             "
             class="mx-1"
             :color="
-              props.teammember != fireuser.uid &&
-              userStore.teamIsHidden(props.teammember)
+              props.teammember != fireuser.uid && userStore.teamIsHidden(props.teammember)
                 ? 'red'
                 : 'green'
             "
@@ -169,28 +162,21 @@
       );
       const result = await response.json();
       if (!response.ok) {
-        let backendMsg =
-          result.error || t('page.team.card.manageteam.membercard.kick_error');
+        let backendMsg = result.error || t('page.team.card.manageteam.membercard.kick_error');
         kickTeammateResult.value = backendMsg;
         kickTeammateSnackbar.value = true;
         throw new Error(backendMsg);
       }
       if (!result.kicked) {
-        kickTeammateResult.value = t(
-          'page.team.card.manageteam.membercard.kick_error'
-        );
+        kickTeammateResult.value = t('page.team.card.manageteam.membercard.kick_error');
         kickTeammateSnackbar.value = true;
         return;
       }
-      kickTeammateResult.value = t(
-        'page.team.card.manageteam.membercard.kick_success'
-      );
+      kickTeammateResult.value = t('page.team.card.manageteam.membercard.kick_success');
       kickTeammateSnackbar.value = true;
     } catch (error) {
-      let backendMsg =
-        error?.message || error?.data?.message || error?.toString();
-      kickTeammateResult.value =
-        backendMsg || t('page.team.card.manageteam.membercard.kick_error');
+      let backendMsg = error?.message || error?.data?.message || error?.toString();
+      kickTeammateResult.value = backendMsg || t('page.team.card.manageteam.membercard.kick_error');
       console.error('[TeammemberCard.vue] Error kicking teammate:', error);
       kickTeammateSnackbar.value = true;
     }
