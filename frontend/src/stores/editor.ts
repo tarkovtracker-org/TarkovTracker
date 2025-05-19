@@ -23,23 +23,16 @@ interface ObjectiveGpsData {
 
 export const useEditorStore = defineStore('editor', () => {
   // --- State --- Use refs directly
-  const objectiveMaps: RemovableRef<ObjectiveMapData> = useStorage(
-    'editor_objectiveMaps',
-    {}
-  );
+  const objectiveMaps: RemovableRef<ObjectiveMapData> = useStorage('editor_objectiveMaps', {});
   const alternativeTasks: RemovableRef<AlternativeTaskData> = useStorage(
     'editor_alternativeTasks',
     {}
   );
-  const objectiveGPS: RemovableRef<ObjectiveGpsData> = useStorage(
-    'editor_objectiveGPS',
-    {}
-  );
+  const objectiveGPS: RemovableRef<ObjectiveGpsData> = useStorage('editor_objectiveGPS', {});
 
   // --- Getters --- Use computed properties
   const getObjectiveMaps = computed(() => {
-    return (objectiveId: string): string[] =>
-      objectiveMaps.value[objectiveId] ?? [];
+    return (objectiveId: string): string[] => objectiveMaps.value[objectiveId] ?? [];
   });
 
   const getObjectiveMapsFull = computed((): ObjectiveMapData => {
@@ -47,8 +40,7 @@ export const useEditorStore = defineStore('editor', () => {
   });
 
   const getAlternativeTasks = computed(() => {
-    return (taskId: string): Record<string, unknown> =>
-      alternativeTasks.value[taskId] ?? {};
+    return (taskId: string): Record<string, unknown> => alternativeTasks.value[taskId] ?? {};
   });
 
   const getAlternativeTasksFull = computed((): AlternativeTaskData => {
@@ -56,8 +48,7 @@ export const useEditorStore = defineStore('editor', () => {
   });
 
   const getObjectiveGPS = computed(() => {
-    return (objectiveId: string): GpsData | null =>
-      objectiveGPS.value[objectiveId] ?? null;
+    return (objectiveId: string): GpsData | null => objectiveGPS.value[objectiveId] ?? null;
   });
 
   const getObjectiveGPSFull = computed((): ObjectiveGpsData => {

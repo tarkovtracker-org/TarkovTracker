@@ -2,11 +2,9 @@ interface Permission {
   title: string;
   description: string;
 }
-
 interface Permissions {
   [key: string]: Permission;
 }
-
 const availablePermissions: Permissions = {
   GP: {
     title: 'Get Progression',
@@ -20,9 +18,7 @@ const availablePermissions: Permissions = {
   },
   WP: {
     title: 'Write Progression',
-    description:
-      'Allows access to update your TarkovTracker progress data on your behalf',
+    description: 'Allows access to update your TarkovTracker progress data on your behalf',
   },
 };
-
 export default availablePermissions;

@@ -5,7 +5,7 @@ import type { Ref } from 'vue';
 // Define the state structure directly
 const state = () => ({
   drawerRail: useStorage<boolean>('app_drawerRail', false),
-  drawerShow: useStorage<boolean>('app_drawerShow', true), // Open by default
+  drawerShow: useStorage<boolean>('app_drawerShow', true),
   localeOverride: useStorage<string | null>('app_localeOverride', null),
 });
 
@@ -32,10 +32,5 @@ export const useAppStore = defineStore('app', {
     toggleDrawerRail() {
       this.drawerRail = !this.drawerRail;
     },
-    // Example action structure (if needed):
-    // setLocaleOverride(locale: string | null) {
-    //   // Access ref value directly when using useStorage ref in actions
-    //   this.localeOverride.value = locale;
-    // }
   },
 });

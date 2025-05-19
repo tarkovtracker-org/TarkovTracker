@@ -11,22 +11,14 @@ import {
   User,
   Auth,
 } from 'firebase/auth';
-import {
-  getFirestore,
-  connectFirestoreEmulator,
-  Firestore,
-} from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
 import {
   getFunctions,
   connectFunctionsEmulator,
   Functions,
   httpsCallable,
 } from 'firebase/functions';
-import {
-  getStorage,
-  connectStorageEmulator,
-  FirebaseStorage,
-} from 'firebase/storage';
+import { getStorage, connectStorageEmulator, FirebaseStorage } from 'firebase/storage';
 // Define a comprehensive type for our reactive user state
 type FireUser = {
   uid: string | null;
@@ -50,15 +42,10 @@ const requiredEnvVars = [
   'VITE_FIREBASE_APP_ID',
 ] as const;
 // Check for missing environment variables
-const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !import.meta.env[varName]
-);
+const missingEnvVars = requiredEnvVars.filter((varName) => !import.meta.env[varName]);
 if (missingEnvVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(', ')}`
-  );
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
 }
-
 // Use environment variables for Firebase config with proper typing
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -130,10 +117,7 @@ onAuthStateChanged(auth, (user: User | null) => {
   }
 });
 // Use emulators if we're on localhost or 127.0.0.1
-if (
-  window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1'
-) {
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
   try {
     connectAuthEmulator(auth, 'http://localhost:9099', {
       disableWarnings: true,
