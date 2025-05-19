@@ -6,7 +6,7 @@
     "version": "2.0",
     "contact": {
       "name": "TarkovTracker GitHub",
-      "url": "https://github.com/DysektAI/TarkovTracker"
+      "url": "https://github.com/tarkovtracker-org/TarkovTracker"
     },
     "license": {
       "name": "GNU General Public License v3.0",
@@ -210,9 +210,7 @@
     "/token": {
       "get": {
         "summary": "Returns data associated with the Token given in the Authorization header of the request",
-        "tags": [
-          "Token"
-        ],
+        "tags": ["Token"],
         "security": [
           {
             "bearerAuth": []
@@ -254,9 +252,7 @@
     "/progress": {
       "get": {
         "summary": "Returns progress data of the player",
-        "tags": [
-          "Progress"
-        ],
+        "tags": ["Progress"],
         "security": [
           {
             "bearerAuth": []
@@ -299,9 +295,7 @@
     "/team/progress": {
       "get": {
         "summary": "Returns progress data of all members of the team",
-        "tags": [
-          "Progress"
-        ],
+        "tags": ["Progress"],
         "security": [
           {
             "bearerAuth": []
@@ -330,9 +324,7 @@
     "/progress/level/{levelValue}": {
       "post": {
         "summary": "Set player level",
-        "tags": [
-          "Progress"
-        ],
+        "tags": ["Progress"],
         "parameters": [
           {
             "in": "path",
@@ -354,9 +346,7 @@
     "/progress/task/{taskId}": {
       "post": {
         "summary": "Update a single task's progress",
-        "tags": [
-          "Progress"
-        ],
+        "tags": ["Progress"],
         "description": "Update the progress state of a single task.",
         "security": [
           {
@@ -381,18 +371,12 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "state"
-                ],
+                "required": ["state"],
                 "properties": {
                   "state": {
                     "type": "string",
                     "description": "The new state of the task. Accepts 'completed', 'failed', 'uncompleted', or numeric values (0-3) where 0=Locked, 1=Uncompleted/Active, 2=Completed, 3=Failed.",
-                    "enum": [
-                      "uncompleted",
-                      "completed",
-                      "failed"
-                    ],
+                    "enum": ["uncompleted", "completed", "failed"],
                     "example": "completed"
                   }
                 }
@@ -419,9 +403,7 @@
     "/progress/tasks": {
       "post": {
         "summary": "Update multiple tasks",
-        "tags": [
-          "Progress"
-        ],
+        "tags": ["Progress"],
         "requestBody": {
           "required": true,
           "content": {
@@ -446,9 +428,7 @@
       "post": {
         "summary": "Update task objective",
         "description": "Update the progress objectives of tasks.",
-        "tags": [
-          "Progress"
-        ],
+        "tags": ["Progress"],
         "parameters": [
           {
             "in": "path",
@@ -479,10 +459,7 @@
                     "example": 0
                   }
                 },
-                "required": [
-                  "state",
-                  "count"
-                ]
+                "required": ["state", "count"]
               },
               "example": {
                 "state": "completed",

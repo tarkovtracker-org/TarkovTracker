@@ -1,511 +1,512 @@
 window.openapi = {
-  "openapi": "3.0.0",
-  "info": {
-    "title": "TarkovTracker API (Fork)",
-    "description": "Unofficial TarkovTracker API a fork of the original TarkovTracker API - player's progress, objectives, level, reputation and much more in one place. If you are missing something here, let the developers know on the DysektAI/TarkovTracker Discord server or create a new issue on GitHub.",
-    "version": "2.0",
-    "contact": {
-      "name": "TarkovTracker GitHub",
-      "url": "https://github.com/DysektAI/TarkovTracker"
+  openapi: "3.0.0",
+  info: {
+    title: "TarkovTracker API (Fork)",
+    description:
+      "Unofficial TarkovTracker API a fork of the original TarkovTracker API - player's progress, objectives, level, reputation and much more in one place. If you are missing something here, let the developers know on the DysektAI/TarkovTracker Discord server or create a new issue on GitHub.",
+    version: "2.0",
+    contact: {
+      name: "TarkovTracker GitHub",
+      url: "https://github.com/tarkovtracker-org/TarkovTracker",
     },
-    "license": {
-      "name": "GNU General Public License v3.0",
-      "url": "https://www.gnu.org/licenses/gpl-3.0.en.html"
-    }
+    license: {
+      name: "GNU General Public License v3.0",
+      url: "https://www.gnu.org/licenses/gpl-3.0.en.html",
+    },
   },
-  "servers": [
+  servers: [
     {
-      "url": "https://tarkovtracker.org/api/v2",
-      "description": "TarkovTracker API v2 endpoint"
-    }
+      url: "https://tarkovtracker.org/api/v2",
+      description: "TarkovTracker API v2 endpoint",
+    },
   ],
-  "tags": [
+  tags: [
     {
-      "name": "Token",
-      "description": "Operations related to API tokens"
+      name: "Token",
+      description: "Operations related to API tokens",
     },
     {
-      "name": "Progress",
-      "description": "Operations related to player and team progress"
-    }
-  ],
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      }
+      name: "Progress",
+      description: "Operations related to player and team progress",
     },
-    "schemas": {
-      "Token": {
-        "title": "Token",
-        "description": "User's token data.",
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "description": "Shows token used to make this call"
-          },
-          "permissions": {
-            "type": "array",
-            "description": "List of permissions this token has (GP == Read Personal Progression, TP == Read Team Progression, WP == Write Personal Progression)",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
       },
-      "TeamProgress": {
-        "title": "TeamProgress",
-        "description": "Array of team member's progress data.",
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/Progress"
-        }
+    },
+    schemas: {
+      Token: {
+        title: "Token",
+        description: "User's token data.",
+        type: "object",
+        properties: {
+          token: {
+            type: "string",
+            description: "Shows token used to make this call",
+          },
+          permissions: {
+            type: "array",
+            description:
+              "List of permissions this token has (GP == Read Personal Progression, TP == Read Team Progression, WP == Write Personal Progression)",
+            items: {
+              type: "string",
+            },
+          },
+        },
       },
-      "Progress": {
-        "title": "Progress",
-        "description": "User's progress data.",
-        "type": "object",
-        "properties": {
-          "playerLevel": {
-            "type": "integer",
-            "description": "Player's current level"
-          },
-          "gameEdition": {
-            "type": "integer",
-            "description": "Player's game edition (1 = Standard Edition, 2 == Left to Die Edition, 3 == Prepare to Die Edition, 4 == Edge of Darkness Edition)"
-          },
-          "taskProgress": {
-            "type": "array",
-            "description": "Array of task progress data.",
-            "items": {
-              "$ref": "#/components/schemas/TaskProgress"
-            }
-          },
-          "taskObjectivesProgress": {
-            "type": "array",
-            "description": "Array of task objective progress data.",
-            "items": {
-              "$ref": "#/components/schemas/TaskObjectiveProgress"
-            }
-          },
-          "hideoutModulesProgress": {
-            "type": "array",
-            "description": "Array of hideout module progress data.",
-            "items": {
-              "$ref": "#/components/schemas/HideoutModulesProgress"
-            }
-          },
-          "hideoutPartsProgress": {
-            "type": "array",
-            "description": "Array of hideout part progress data.",
-            "items": {
-              "$ref": "#/components/schemas/HideoutPartsProgress"
-            }
-          },
-          "userId": {
-            "type": "string",
-            "description": "Player's TarkovTracker UUID"
-          },
-          "displayName": {
-            "type": "string",
-            "description": "Player's TarkovTracker display name within their team"
-          },
-          "pmcFaction": {
-            "type": "string",
-            "description": "Player's PMC faction (USEC, BEAR)"
-          }
-        }
+      TeamProgress: {
+        title: "TeamProgress",
+        description: "Array of team member's progress data.",
+        type: "array",
+        items: {
+          $ref: "#/components/schemas/Progress",
+        },
       },
-      "TaskProgress": {
-        "title": "TaskProgress",
-        "description": "Player's progress of a given task. The key is the UUID correlating to the task ID available via the tarkov.dev API",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "UUID correlating to the task ID available via the tarkov.dev API"
+      Progress: {
+        title: "Progress",
+        description: "User's progress data.",
+        type: "object",
+        properties: {
+          playerLevel: {
+            type: "integer",
+            description: "Player's current level",
           },
-          "complete": {
-            "type": "boolean",
-            "description": "True if a given quest has been completed."
+          gameEdition: {
+            type: "integer",
+            description:
+              "Player's game edition (1 = Standard Edition, 2 == Left to Die Edition, 3 == Prepare to Die Edition, 4 == Edge of Darkness Edition)",
           },
-          "failed": {
-            "type": "boolean",
-            "description": "True if a given quest has been failed in some permanent way (eg. one of three quest options was chosen and the other two are now unavailable)"
+          taskProgress: {
+            type: "array",
+            description: "Array of task progress data.",
+            items: {
+              $ref: "#/components/schemas/TaskProgress",
+            },
           },
-          "invalid": {
-            "type": "boolean",
-            "description": "True if a given quest is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)"
-          }
-        }
+          taskObjectivesProgress: {
+            type: "array",
+            description: "Array of task objective progress data.",
+            items: {
+              $ref: "#/components/schemas/TaskObjectiveProgress",
+            },
+          },
+          hideoutModulesProgress: {
+            type: "array",
+            description: "Array of hideout module progress data.",
+            items: {
+              $ref: "#/components/schemas/HideoutModulesProgress",
+            },
+          },
+          hideoutPartsProgress: {
+            type: "array",
+            description: "Array of hideout part progress data.",
+            items: {
+              $ref: "#/components/schemas/HideoutPartsProgress",
+            },
+          },
+          userId: {
+            type: "string",
+            description: "Player's TarkovTracker UUID",
+          },
+          displayName: {
+            type: "string",
+            description:
+              "Player's TarkovTracker display name within their team",
+          },
+          pmcFaction: {
+            type: "string",
+            description: "Player's PMC faction (USEC, BEAR)",
+          },
+        },
       },
-      "HideoutModulesProgress": {
-        "title": "HideoutModulesProgress",
-        "description": "Player's progress on a given hideout module.",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "UUID correlating to the hideout station level ID available via the tarkov.dev API"
+      TaskProgress: {
+        title: "TaskProgress",
+        description:
+          "Player's progress of a given task. The key is the UUID correlating to the task ID available via the tarkov.dev API",
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description:
+              "UUID correlating to the task ID available via the tarkov.dev API",
           },
-          "complete": {
-            "type": "boolean",
-            "description": "True if a given hideout module has been installed"
-          }
-        }
+          complete: {
+            type: "boolean",
+            description: "True if a given quest has been completed.",
+          },
+          failed: {
+            type: "boolean",
+            description:
+              "True if a given quest has been failed in some permanent way (eg. one of three quest options was chosen and the other two are now unavailable)",
+          },
+          invalid: {
+            type: "boolean",
+            description:
+              "True if a given quest is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)",
+          },
+        },
       },
-      "TaskObjectiveProgress": {
-        "title": "TaskObjectiveProgress",
-        "description": "Player's progress on a given task objective.",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "UUID correlating to the task objective ID available via the tarkov.dev API"
+      HideoutModulesProgress: {
+        title: "HideoutModulesProgress",
+        description: "Player's progress on a given hideout module.",
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description:
+              "UUID correlating to the hideout station level ID available via the tarkov.dev API",
           },
-          "count": {
-            "type": "integer",
-            "description": "Number of items collected for a given objective (if applicable)"
+          complete: {
+            type: "boolean",
+            description: "True if a given hideout module has been installed",
           },
-          "complete": {
-            "type": "boolean",
-            "description": "True if a given objective has been completed"
-          },
-          "invalid": {
-            "type": "boolean",
-            "description": "True if a given objective is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)"
-          }
-        }
+        },
       },
-      "HideoutPartsProgress": {
-        "title": "HideoutPartsProgress",
-        "description": "Player's progress on items needed for hideout module upgrades.",
-        "type": "object",
-        "properties": {
-          "complete": {
-            "type": "boolean",
-            "description": "True if a given hideout part objective has been completed"
+      TaskObjectiveProgress: {
+        title: "TaskObjectiveProgress",
+        description: "Player's progress on a given task objective.",
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description:
+              "UUID correlating to the task objective ID available via the tarkov.dev API",
           },
-          "count": {
-            "type": "integer",
-            "description": "Number of items collected for a given hideout part objective"
+          count: {
+            type: "integer",
+            description:
+              "Number of items collected for a given objective (if applicable)",
           },
-          "id": {
-            "type": "string",
-            "description": "UUID correlating to invidiual hideout station level item requirements' ID available via the tarkov.dev API"
-          }
-        }
-      }
-    }
+          complete: {
+            type: "boolean",
+            description: "True if a given objective has been completed",
+          },
+          invalid: {
+            type: "boolean",
+            description:
+              "True if a given objective is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)",
+          },
+        },
+      },
+      HideoutPartsProgress: {
+        title: "HideoutPartsProgress",
+        description:
+          "Player's progress on items needed for hideout module upgrades.",
+        type: "object",
+        properties: {
+          complete: {
+            type: "boolean",
+            description:
+              "True if a given hideout part objective has been completed",
+          },
+          count: {
+            type: "integer",
+            description:
+              "Number of items collected for a given hideout part objective",
+          },
+          id: {
+            type: "string",
+            description:
+              "UUID correlating to invidiual hideout station level item requirements' ID available via the tarkov.dev API",
+          },
+        },
+      },
+    },
   },
-  "security": [
+  security: [
     {
-      "bearerAuth": []
-    }
+      bearerAuth: [],
+    },
   ],
-  "paths": {
+  paths: {
     "/token": {
-      "get": {
-        "summary": "Returns data associated with the Token given in the Authorization header of the request",
-        "tags": [
-          "Token"
-        ],
-        "security": [
+      get: {
+        summary:
+          "Returns data associated with the Token given in the Authorization header of the request",
+        tags: ["Token"],
+        security: [
           {
-            "bearerAuth": []
-          }
+            bearerAuth: [],
+          },
         ],
-        "responses": {
-          "200": {
-            "description": "Token details retrieved successfully.",
-            "content": {
+        responses: {
+          200: {
+            description: "Token details retrieved successfully.",
+            content: {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "permissions": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
+                schema: {
+                  type: "object",
+                  properties: {
+                    permissions: {
+                      type: "array",
+                      items: {
+                        type: "string",
                       },
-                      "description": "Permissions associated with the token."
+                      description: "Permissions associated with the token.",
                     },
-                    "token": {
-                      "type": "string",
-                      "description": "The API token string."
-                    }
-                  }
-                }
-              }
-            }
+                    token: {
+                      type: "string",
+                      description: "The API token string.",
+                    },
+                  },
+                },
+              },
+            },
           },
-          "401": {
-            "description": "Unauthorized. Invalid or missing token."
+          401: {
+            description: "Unauthorized. Invalid or missing token.",
           },
-          "500": {
-            "description": "Internal server error."
-          }
-        }
-      }
+          500: {
+            description: "Internal server error.",
+          },
+        },
+      },
     },
     "/progress": {
-      "get": {
-        "summary": "Returns progress data of the player",
-        "tags": [
-          "Progress"
-        ],
-        "security": [
+      get: {
+        summary: "Returns progress data of the player",
+        tags: ["Progress"],
+        security: [
           {
-            "bearerAuth": []
-          }
+            bearerAuth: [],
+          },
         ],
-        "responses": {
-          "200": {
-            "description": "Player progress retrieved successfully.",
-            "content": {
+        responses: {
+          200: {
+            description: "Player progress retrieved successfully.",
+            content: {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/Progress"
+                schema: {
+                  type: "object",
+                  properties: {
+                    data: {
+                      $ref: "#/components/schemas/Progress",
                     },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "self": {
-                          "type": "string",
-                          "description": "The user ID of the requester."
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+                    meta: {
+                      type: "object",
+                      properties: {
+                        self: {
+                          type: "string",
+                          description: "The user ID of the requester.",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
-          "401": {
-            "description": "Unauthorized. Invalid token or missing 'GP' permission."
+          401: {
+            description:
+              "Unauthorized. Invalid token or missing 'GP' permission.",
           },
-          "500": {
-            "description": "Internal server error."
-          }
-        }
-      }
+          500: {
+            description: "Internal server error.",
+          },
+        },
+      },
     },
     "/team/progress": {
-      "get": {
-        "summary": "Returns progress data of all members of the team",
-        "tags": [
-          "Progress"
-        ],
-        "security": [
+      get: {
+        summary: "Returns progress data of all members of the team",
+        tags: ["Progress"],
+        security: [
           {
-            "bearerAuth": []
-          }
+            bearerAuth: [],
+          },
         ],
-        "responses": {
-          "200": {
-            "description": "Team progress retrieved successfully.",
-            "content": {
+        responses: {
+          200: {
+            description: "Team progress retrieved successfully.",
+            content: {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamProgress"
-                }
-              }
-            }
+                schema: {
+                  $ref: "#/components/schemas/TeamProgress",
+                },
+              },
+            },
           },
-          "401": {
-            "description": "Unauthorized. Invalid token or missing 'TP' permission."
+          401: {
+            description:
+              "Unauthorized. Invalid token or missing 'TP' permission.",
           },
-          "500": {
-            "description": "Internal server error."
-          }
-        }
-      }
+          500: {
+            description: "Internal server error.",
+          },
+        },
+      },
     },
     "/progress/level/{levelValue}": {
-      "post": {
-        "summary": "Set player level",
-        "tags": [
-          "Progress"
-        ],
-        "parameters": [
+      post: {
+        summary: "Set player level",
+        tags: ["Progress"],
+        parameters: [
           {
-            "in": "path",
-            "name": "levelValue",
-            "required": true,
-            "schema": {
-              "type": "integer"
+            in: "path",
+            name: "levelValue",
+            required: true,
+            schema: {
+              type: "integer",
             },
-            "description": "The new level value"
-          }
+            description: "The new level value",
+          },
         ],
-        "responses": {
-          "200": {
-            "description": "Player level set"
-          }
-        }
-      }
+        responses: {
+          200: {
+            description: "Player level set",
+          },
+        },
+      },
     },
     "/progress/task/{taskId}": {
-      "post": {
-        "summary": "Update a single task's progress",
-        "tags": [
-          "Progress"
-        ],
-        "description": "Update the progress state of a single task.",
-        "security": [
+      post: {
+        summary: "Update a single task's progress",
+        tags: ["Progress"],
+        description: "Update the progress state of a single task.",
+        security: [
           {
-            "bearerAuth": []
-          }
+            bearerAuth: [],
+          },
         ],
-        "parameters": [
+        parameters: [
           {
-            "in": "path",
-            "name": "taskId",
-            "required": true,
-            "description": "The ID (usually UUID from tarkov.dev) of the task to update.",
-            "schema": {
-              "type": "string"
-            }
-          }
+            in: "path",
+            name: "taskId",
+            required: true,
+            description:
+              "The ID (usually UUID from tarkov.dev) of the task to update.",
+            schema: {
+              type: "string",
+            },
+          },
         ],
-        "requestBody": {
-          "required": true,
-          "description": "The new state for the task.",
-          "content": {
+        requestBody: {
+          required: true,
+          description: "The new state for the task.",
+          content: {
             "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "state"
-                ],
-                "properties": {
-                  "state": {
-                    "type": "string",
-                    "description": "The new state of the task. Accepts 'completed', 'failed', 'uncompleted', or numeric values (0-3) where 0=Locked, 1=Uncompleted/Active, 2=Completed, 3=Failed.",
-                    "enum": [
-                      "uncompleted",
-                      "completed",
-                      "failed"
-                    ],
-                    "example": "completed"
-                  }
-                }
-              }
-            }
-          }
+              schema: {
+                type: "object",
+                required: ["state"],
+                properties: {
+                  state: {
+                    type: "string",
+                    description:
+                      "The new state of the task. Accepts 'completed', 'failed', 'uncompleted', or numeric values (0-3) where 0=Locked, 1=Uncompleted/Active, 2=Completed, 3=Failed.",
+                    enum: ["uncompleted", "completed", "failed"],
+                    example: "completed",
+                  },
+                },
+              },
+            },
+          },
         },
-        "responses": {
-          "200": {
-            "description": "The task was updated successfully."
+        responses: {
+          200: {
+            description: "The task was updated successfully.",
           },
-          "400": {
-            "description": "Invalid request parameters (e.g., bad taskId or state)."
+          400: {
+            description:
+              "Invalid request parameters (e.g., bad taskId or state).",
           },
-          "401": {
-            "description": "Unauthorized to update progress (missing 'WP' permission)."
+          401: {
+            description:
+              "Unauthorized to update progress (missing 'WP' permission).",
           },
-          "500": {
-            "description": "Internal server error."
-          }
-        }
-      }
+          500: {
+            description: "Internal server error.",
+          },
+        },
+      },
     },
     "/progress/tasks": {
-      "post": {
-        "summary": "Update multiple tasks",
-        "tags": [
-          "Progress"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
+      post: {
+        summary: "Update multiple tasks",
+        tags: ["Progress"],
+        requestBody: {
+          required: true,
+          content: {
             "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "type": "object"
-                }
-              }
-            }
-          }
+              schema: {
+                type: "array",
+                items: {
+                  type: "object",
+                },
+              },
+            },
+          },
         },
-        "responses": {
-          "200": {
-            "description": "Tasks updated"
-          }
-        }
-      }
+        responses: {
+          200: {
+            description: "Tasks updated",
+          },
+        },
+      },
     },
     "/progress/task/objective/{objectiveId}": {
-      "post": {
-        "summary": "Update task objective",
-        "description": "Update the progress objectives of tasks.",
-        "tags": [
-          "Progress"
-        ],
-        "parameters": [
+      post: {
+        summary: "Update task objective",
+        description: "Update the progress objectives of tasks.",
+        tags: ["Progress"],
+        parameters: [
           {
-            "in": "path",
-            "name": "objectiveId",
-            "required": true,
-            "schema": {
-              "type": "string"
+            in: "path",
+            name: "objectiveId",
+            required: true,
+            schema: {
+              type: "string",
             },
-            "description": "The ID of the objective to update progress for."
-          }
+            description: "The ID of the objective to update progress for.",
+          },
         ],
-        "requestBody": {
-          "required": true,
-          "description": "Objective properties to update.",
-          "content": {
+        requestBody: {
+          required: true,
+          description: "Objective properties to update.",
+          content: {
             "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "state": {
-                    "type": "string",
-                    "description": "The new state of the objective (e.g., \"completed\").",
-                    "example": "completed"
+              schema: {
+                type: "object",
+                properties: {
+                  state: {
+                    type: "string",
+                    description:
+                      'The new state of the objective (e.g., "completed").',
+                    example: "completed",
                   },
-                  "count": {
-                    "type": "integer",
-                    "description": "The new count for the objective.",
-                    "example": 0
-                  }
+                  count: {
+                    type: "integer",
+                    description: "The new count for the objective.",
+                    example: 0,
+                  },
                 },
-                "required": [
-                  "state",
-                  "count"
-                ]
+                required: ["state", "count"],
               },
-              "example": {
-                "state": "completed",
-                "count": 0
-              }
-            }
-          }
+              example: {
+                state: "completed",
+                count: 0,
+              },
+            },
+          },
         },
-        "responses": {
-          "200": {
-            "description": "The objective was updated successfully."
+        responses: {
+          200: {
+            description: "The objective was updated successfully.",
           },
-          "400": {
-            "description": "Invalid request parameters."
+          400: {
+            description: "Invalid request parameters.",
           },
-          "401": {
-            "description": "Unauthorized to update progress."
+          401: {
+            description: "Unauthorized to update progress.",
           },
-          "500": {
-            "description": "Internal server error."
-          }
-        }
-      }
-    }
-  }
+          500: {
+            description: "Internal server error.",
+          },
+        },
+      },
+    },
+  },
 };
