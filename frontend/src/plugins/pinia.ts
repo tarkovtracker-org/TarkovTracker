@@ -1,11 +1,8 @@
-// Pinia store
-import { createPinia, type Pinia } from 'pinia'; // Import Pinia type
-import { PiniaFireswap } from './pinia-firestore'; // Assume .ts conversion or types exist
-import { markInitialized } from './store-initializer'; // Assume .ts conversion or types exist
-
+import { createPinia, type Pinia } from 'pinia';
+import { PiniaFireswap } from './pinia-firestore';
+import { markInitialized } from './store-initializer';
 // Singleton guard for Pinia instance
 let piniaInstance: Pinia | null = null;
-
 const getPinia = () => {
   if (piniaInstance) {
     console.warn('Pinia is being initialized more than once!');
@@ -20,5 +17,4 @@ const getPinia = () => {
   piniaInstance = pinia;
   return pinia;
 };
-
 export default getPinia();
