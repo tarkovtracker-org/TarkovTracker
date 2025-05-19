@@ -1,9 +1,7 @@
 <template>
   <v-app-bar color="transparent" prominent elevation="0">
     <template #image>
-      <v-img
-        gradient="to top right, rgba(45,45,35,.95), rgba(6,13,12,.95)"
-      ></v-img>
+      <v-img gradient="to top right, rgba(45,45,35,.95), rgba(6,13,12,.95)"></v-img>
     </template>
     <template #prepend>
       <v-app-bar-nav-icon
@@ -13,9 +11,7 @@
         @click.stop="changeNavigationDrawer"
       ></v-app-bar-nav-icon>
     </template>
-    <v-toolbar-title>{{
-      t(`page.${route.name.replace('-', '_')}.title`)
-    }}</v-toolbar-title>
+    <v-toolbar-title>{{ t(`page.${route.name.replace('-', '_')}.title`) }}</v-toolbar-title>
     <span v-if="dataError">
       <!-- Show an icon and tooltip if we have a GraphQL error -->
       <v-tooltip activator="parent" location="left">
@@ -40,11 +36,7 @@
       </v-tooltip>
     </span>
     <template #append>
-      <v-menu
-        v-model="state.menu"
-        :close-on-content-click="false"
-        location="start"
-      >
+      <v-menu v-model="state.menu" :close-on-content-click="false" location="start">
         <template #activator="{ props }">
           <v-btn icon="mdi-dots-vertical" v-bind="props"></v-btn>
         </template>
@@ -67,18 +59,12 @@
   const appStore = useAppStore();
   const route = useRoute();
   const navBarIcon = computed(() => {
-    return appStore.drawerShow && appStore.drawerRail
-      ? 'mdi-menu-open'
-      : 'mdi-menu';
+    return appStore.drawerShow && appStore.drawerRail ? 'mdi-menu-open' : 'mdi-menu';
   });
   const OverflowMenu = defineAsyncComponent(
     () => import('/src/components/layout/OverflowMenu.vue')
   );
-  const {
-    loading: dataLoading,
-    error: dataError,
-    hideoutLoading,
-  } = useTarkovData();
+  const { loading: dataLoading, error: dataError, hideoutLoading } = useTarkovData();
   const { mdAndDown } = useDisplay();
   function changeNavigationDrawer() {
     if (mdAndDown.value) {

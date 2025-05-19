@@ -1,10 +1,5 @@
 <template>
-  <v-list-item
-    id="app-logo-item"
-    class="flex flex-column mt-1"
-    :ripple="false"
-    to="/"
-  >
+  <v-list-item id="app-logo-item" class="flex flex-column mt-1" :ripple="false" to="/">
     <div
       :class="isCollapsed ? 'v-logo-rail' : 'v-logo-full compact-logo'"
       style="height: auto; margin: 8px auto"
@@ -12,9 +7,7 @@
       <v-img :src="logo" lazy-src="/favicon-32x32.png" />
     </div>
     <div v-if="!isCollapsed">
-      <div
-        class="text-subtitle1 text-center mt-1 font-weight-medium compact-site-name"
-      >
+      <div class="text-subtitle1 text-center mt-1 font-weight-medium compact-site-name">
         {{ t('site_name') }}
       </div>
     </div>

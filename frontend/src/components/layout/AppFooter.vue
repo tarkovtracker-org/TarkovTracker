@@ -10,11 +10,7 @@
           <div>
             <i18n-t keypath="footer.call_to_action.discord_phrase">
               <template #discord>
-                <a
-                  href="https://discord.gg/zeAP4Ng"
-                  target="_blank"
-                  class="info-link"
-                >
+                <a href="https://discord.gg/zeAP4Ng" target="_blank" class="info-link">
                   <div
                     class="d-inline-flex align-center"
                     style="
@@ -38,24 +34,21 @@
                       />
                     </svg>
                   </div>
-                  {{ t("footer.call_to_action.discord") }}
+                  {{ t('footer.call_to_action.discord') }}
                 </a>
               </template>
             </i18n-t>
           </div>
           <div class="mt-1">
-            <i18n-t
-              keypath="footer.call_to_action.github_phrase"
-              scope="global"
-            >
+            <i18n-t keypath="footer.call_to_action.github_phrase" scope="global">
               <template #github>
                 <a
-                  href="https://github.com/DysektAI/TarkovTracker"
+                  href="https://github.com/tarkovtracker-org/TarkovTracker"
                   target="_blank"
                   class="info-link"
                 >
                   <v-icon class="mr-1 icon-link">mdi-github</v-icon
-                  >{{ t("footer.call_to_action.github") }}
+                  >{{ t('footer.call_to_action.github') }}
                 </a>
               </template>
             </i18n-t>
@@ -65,50 +58,44 @@
       <!-- Notice of Battlestate Games copy/trade notices -->
       <v-container class="text-center mb-0 pb-0" style="font-size: 12px">
         <div>
-          Game content and materials are trademarks and copyrights of
-          Battlestate Games and its licensors. All rights reserved.
+          Game content and materials are trademarks and copyrights of Battlestate Games and its
+          licensors. All rights reserved.
         </div>
-        <div class="mt-2">
-          TarkovTracker &copy; 2020 - {{ new Date().getFullYear() }}
-        </div>
+        <div class="mt-2">TarkovTracker &copy; 2020 - {{ new Date().getFullYear() }}</div>
         <div class="mt-0">
-          <router-link to="/terms" target="_blank" class="info-link"
-            >Terms</router-link
-          >
+          <router-link to="/terms" target="_blank" class="info-link">Terms</router-link>
           |
-          <router-link to="/privacy" target="_blank" class="info-link"
-            >Privacy</router-link
-          >
+          <router-link to="/privacy" target="_blank" class="info-link">Privacy</router-link>
         </div>
       </v-container>
     </v-container>
   </v-footer>
 </template>
 <script setup>
-import { useI18n } from "vue-i18n";
-const { t } = useI18n({ useScope: "global" });
+  import { useI18n } from 'vue-i18n';
+  const { t } = useI18n({ useScope: 'global' });
 </script>
 <style lang="scss" scoped>
-.footer-background {
-  background-color: rgba(0, 0, 0, 0.3);
-  max-width: 100% !important;
-}
-a:link,
-a:active,
-a:visited {
-  color: rgba(var(--v-theme-link), 1);
-}
-.info-link {
-  text-decoration: none;
-}
-.icon-link {
-  color: #7289da !important; /* Discord brand color */
-}
-/* Target the specific Discord icon class */
-:deep(.mdi-discord) {
-  color: #7289da !important;
-}
-.custom-svg {
-  height: 4em;
-}
+  .footer-background {
+    background-color: rgba(0, 0, 0, 0.3);
+    max-width: 100% !important;
+  }
+  a:link,
+  a:active,
+  a:visited {
+    color: rgba(var(--v-theme-link), 1);
+  }
+  .info-link {
+    text-decoration: none;
+  }
+  .icon-link {
+    color: #7289da !important; /* Discord brand color */
+  }
+  /* Target the specific Discord icon class */
+  :deep(.mdi-discord) {
+    color: #7289da !important;
+  }
+  .custom-svg {
+    height: 4em;
+  }
 </style>

@@ -16,11 +16,7 @@
             style="max-width: 64px"
             class="px-2 faction-icon crossfade-faction"
           />
-          <img
-            :src="groupIcon"
-            style="max-width: 64px"
-            class="crossfade-level"
-          />
+          <img :src="groupIcon" style="max-width: 64px" class="crossfade-level" />
         </div>
       </span>
       <span>
@@ -104,7 +100,7 @@
   });
   const groupIcon = computed(() => {
     const level = tarkovStore.playerLevel();
-    const entry = playerLevels.value.find(pl => pl.level === level);
+    const entry = playerLevels.value.find((pl) => pl.level === level);
     return entry?.levelBadgeImageLink ?? '';
   });
 
@@ -124,10 +120,7 @@
   function saveLevel() {
     let newLevel = parseInt(levelInputValue.value, 10);
     if (isNaN(newLevel)) newLevel = minPlayerLevel.value;
-    newLevel = Math.max(
-      minPlayerLevel.value,
-      Math.min(maxPlayerLevel.value, newLevel)
-    );
+    newLevel = Math.max(minPlayerLevel.value, Math.min(maxPlayerLevel.value, newLevel));
     tarkovStore.setLevel(newLevel);
     editingLevel.value = false;
   }

@@ -1,5 +1,4 @@
 import gql from 'graphql-tag';
-
 export default gql`
   fragment ItemData on Item {
     id
@@ -14,19 +13,16 @@ export default gql`
     image8xLink
     backgroundColor
   }
-
   fragment CategoryData on ItemCategory {
     id
     name
     normalizedName
   }
-
   fragment MapPositionData on MapPosition {
     x
     y
     z
   }
-
   fragment MapWithPositionsData on MapWithPosition {
     map {
       id
@@ -35,7 +31,6 @@ export default gql`
       ...MapPositionData
     }
   }
-
   fragment TaskZoneData on TaskZone {
     id
     map {
@@ -50,7 +45,6 @@ export default gql`
     top
     bottom
   }
-
   query TarkovData($lang: LanguageCode) {
     tasks(lang: $lang) {
       id

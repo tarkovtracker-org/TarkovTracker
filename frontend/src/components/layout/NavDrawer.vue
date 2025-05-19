@@ -29,18 +29,10 @@
   const isRailActive = computed(() => !mdAndDown.value && appStore.drawerRail);
 
   // Set up component loading
-  const TrackerLogo = defineAsyncComponent(
-    () => import('@/components/drawer/TrackerLogo.vue')
-  );
-  const DrawerLinks = defineAsyncComponent(
-    () => import('@/components/drawer/DrawerLinks.vue')
-  );
-  const DrawerAccount = defineAsyncComponent(
-    () => import('@/components/drawer/DrawerAccount.vue')
-  );
-  const DrawerLevel = defineAsyncComponent(
-    () => import('@/components/drawer/DrawerLevel.vue')
-  );
+  const TrackerLogo = defineAsyncComponent(() => import('@/components/drawer/TrackerLogo.vue'));
+  const DrawerLinks = defineAsyncComponent(() => import('@/components/drawer/DrawerLinks.vue'));
+  const DrawerAccount = defineAsyncComponent(() => import('@/components/drawer/DrawerAccount.vue'));
+  const DrawerLevel = defineAsyncComponent(() => import('@/components/drawer/DrawerLevel.vue'));
   const DrawerExternalLinks = defineAsyncComponent(
     () => import('@/components/drawer/DrawerExternalLinks.vue')
   );
