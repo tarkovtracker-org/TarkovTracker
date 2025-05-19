@@ -9,20 +9,11 @@
   "functions": {
     "runtime": "nodejs20",
     "source": "functions",
-    "ignore": [
-      "node_modules",
-      ".git",
-      "firebase-debug.log",
-      "firebase-debug.*.log",
-      "src/"
-    ],
+    "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log", "src/"],
     "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
   },
   "hosting": {
-    "predeploy": [
-      "npm install --prefix ./frontend",
-      "npm run build:prod --prefix ./frontend"
-    ],
+    "predeploy": ["npm install --prefix ./frontend", "npm run build:prod --prefix ./frontend"],
     "public": "frontend/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "redirects": [

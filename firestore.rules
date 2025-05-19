@@ -7,7 +7,6 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     // --- END RELAXED RULES ---
-    
     // Original rules below (commented out for local dev)
     /*
     function memberOfSameTeam(userId){
@@ -15,28 +14,22 @@ service cloud.firestore {
       let targetTeamroom = get(/databases/$(database)/documents/system/$(userId)).data.team;
       return teamroom == targetTeamroom
     }
-
     function memberOfTeam(){
       return request.auth.uid in resource.data.members || request.auth.uid == resource.data.owner;
     }
-    
     match /system/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
     }
-    
     match /progress/{userId} {
       allow update, delete, create: if request.auth != null && request.auth.uid == userId;
       allow read: if (request.auth != null && request.auth.uid == userId) || (memberOfSameTeam(userId));
     }
-
     match /user/{userId} {
       allow read, update, delete, create: if request.auth != null && request.auth.uid == userId;
     }
-
     match /token/{tokenId} {
       allow read: if (request.auth != null && request.auth.uid == resource.data.owner);
     }
-
     match /team/{teamId} {
       allow read: if (memberOfTeam());
     }

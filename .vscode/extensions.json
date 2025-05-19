@@ -1,7 +1,11 @@
 {
   "recommendations": [
     "apollographql.vscode-apollo",
-    "vue.volar",
-    "antfu.vite"
-  ]
+    "Vue.volar",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "DavidAnson.vscode-markdownlint",
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "unwantedRecommendations": []
 }
