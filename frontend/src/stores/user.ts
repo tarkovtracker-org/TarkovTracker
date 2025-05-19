@@ -1,20 +1,20 @@
-import { fireuser } from '@/plugins/firebase'; // Assuming fireuser has appropriate types or use any
+import { fireuser } from '@/plugins/firebase';
 import { defineStore, type StoreDefinition } from 'pinia';
 import { watch } from 'vue';
-import pinia from '@/plugins/pinia'; // Assuming pinia export is typed correctly
+import pinia from '@/plugins/pinia';
 
 // Define the state structure
 interface UserState {
   allTipsHidden: boolean;
-  hideTips: Record<string, boolean>; // Map of tipKey to hidden status
+  hideTips: Record<string, boolean>;
   streamerMode: boolean;
-  teamHide: Record<string, boolean>; // Map of teamId to hidden status
+  teamHide: Record<string, boolean>;
   taskTeamHideAll: boolean;
   itemsTeamHideAll: boolean;
   itemsTeamHideNonFIR: boolean;
   itemsTeamHideHideout: boolean;
   mapTeamHideAll: boolean;
-  taskPrimaryView: string | null; // Assuming view types are strings, adjust if needed
+  taskPrimaryView: string | null;
   taskMapView: string | null;
   taskTraderView: string | null;
   taskSecondaryView: string | null;
@@ -23,8 +23,14 @@ interface UserState {
   itemsHideNonFIR: boolean;
   hideGlobalTasks: boolean;
   hideNonKappaTasks: boolean;
-  neededitemsStyle: string | null; // Assuming style is a string, adjust if needed
-  hideoutPrimaryView?: string | null; // Added optional hideoutPrimaryView based on getter/setter
+  neededitemsStyle: string | null;
+  hideoutPrimaryView?: string | null;
+  saving: {
+    streamerMode: boolean;
+    hideGlobalTasks: boolean;
+    hideNonKappaTasks: boolean;
+    itemsNeededHideNonFIR: boolean;
+  };
 }
 
 // Export the default state with type annotation
@@ -48,10 +54,24 @@ export const defaultState: UserState = {
   hideGlobalTasks: false,
   hideNonKappaTasks: false,
   neededitemsStyle: null,
-  hideoutPrimaryView: null, // Initialize the optional property
+  hideoutPrimaryView: null,
+  saving: {
+    streamerMode: false,
+    hideGlobalTasks: false,
+    hideNonKappaTasks: false,
+    itemsNeededHideNonFIR: false,
+  },
 };
 
-// Define getter types (adjust return types as needed)
+// Per-toggle saving state (not persisted)
+const initialSavingState = {
+  streamerMode: false,
+  hideGlobalTasks: false,
+  hideNonKappaTasks: false,
+  itemsNeededHideNonFIR: false,
+};
+
+// Define getter types
 type UserGetters = {
   showTip: (state: UserState) => (tipKey: string) => boolean;
   hiddenTipCount: (state: UserState) => number;
@@ -115,24 +135,28 @@ interface UserStoreDefinition
     'swapUser',
     UserState,
     UserGetters,
-    UserActions & { fireswap?: FireswapConfig[] } // Add fireswap here
+    UserActions & { fireswap?: FireswapConfig[] }
   > {
   fireswap?: FireswapConfig[];
 }
 
 export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
-  state: (): UserState => JSON.parse(JSON.stringify(defaultState)),
+  state: (): UserState => {
+    const state = JSON.parse(JSON.stringify(defaultState));
+    // Always reset saving state on store creation
+    state.saving = { ...initialSavingState };
+    return state;
+  },
   getters: {
     showTip: (state) => {
-      return (tipKey: string): boolean =>
-        !state.allTipsHidden && !state.hideTips?.[tipKey];
+      return (tipKey: string): boolean => !state.allTipsHidden && !state.hideTips?.[tipKey];
     },
     hiddenTipCount: (state) => {
       // Ensure hideTips exists before getting keys
       return state.hideTips ? Object.keys(state.hideTips).length : 0;
     },
     hideAllTips: (state) => {
-      return state.allTipsHidden ?? false; // Use nullish coalescing
+      return state.allTipsHidden ?? false;
     },
     getStreamerMode(state) {
       return state.streamerMode ?? false;
@@ -188,14 +212,11 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
       return state.neededitemsStyle ?? 'mediumCard';
     },
     getHideoutPrimaryView: (state) => {
-      // Use optional chaining and nullish coalescing for safety
       return state.hideoutPrimaryView ?? 'available';
     },
   },
   actions: {
-    // Implement actions matching UserActions type
     hideTip(tipKey: string) {
-      // Ensure hideTips object exists
       if (!this.hideTips) {
         this.hideTips = {};
       }
@@ -210,12 +231,13 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
     },
     setStreamerMode(mode: boolean) {
       this.streamerMode = mode;
+      persistUserState(this.$state);
+      this.saving.streamerMode = true;
     },
     toggleHidden(teamId: string) {
       if (!this.teamHide) {
         this.teamHide = {};
       }
-      // Toggle the boolean value
       this.teamHide[teamId] = !this.teamHide[teamId];
     },
     setQuestTeamHideAll(hide: boolean) {
@@ -253,12 +275,18 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
     },
     setItemsNeededHideNonFIR(hide: boolean) {
       this.itemsHideNonFIR = hide;
+      persistUserState(this.$state);
+      this.saving.itemsNeededHideNonFIR = true;
     },
     setHideGlobalTasks(hide: boolean) {
       this.hideGlobalTasks = hide;
+      persistUserState(this.$state);
+      this.saving.hideGlobalTasks = true;
     },
     setHideNonKappaTasks(hide: boolean) {
       this.hideNonKappaTasks = hide;
+      persistUserState(this.$state);
+      this.saving.hideNonKappaTasks = true;
     },
     setNeededItemsStyle(style: string) {
       this.neededitemsStyle = style;
@@ -267,17 +295,15 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
       this.hideoutPrimaryView = view;
     },
   },
+  fireswap: [
+    {
+      path: '.',
+      document: 'user/{uid}',
+      debouncems: 10,
+      localKey: 'user',
+    },
+  ],
 }) as UserStoreDefinition;
-
-// Add fireswap config after definition
-useUserStore.fireswap = [
-  {
-    path: '.',
-    document: 'user/{uid}',
-    debouncems: 250,
-    localKey: 'user',
-  },
-];
 
 // Watch for fireuser state changing and bind/unbind
 watch(
@@ -307,3 +333,9 @@ watch(
   },
   { immediate: true }
 );
+
+// Helper to persist state without 'saving'
+function persistUserState(state: UserState) {
+  const { saving, ...persistedState } = state;
+  localStorage.setItem('user', JSON.stringify(persistedState));
+}
