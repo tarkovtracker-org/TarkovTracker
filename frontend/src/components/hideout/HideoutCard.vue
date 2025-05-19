@@ -1,9 +1,5 @@
 <template>
-  <v-sheet
-    rounded
-    class="elevation-2 pt-2 corner-highlight-parent"
-    color="rgba(33,33,33,1)"
-  >
+  <v-sheet rounded class="elevation-2 pt-2 corner-highlight-parent" color="rgba(33,33,33,1)">
     <div class="mt-n10">
       <span class="elevation-3 corner-highlight" :class="highlightClasses">
         <img class="pt-0" :src="stationAvatar" height="50" />
@@ -15,9 +11,7 @@
             <i18n-t
               keypath="page.hideout.stationcard.level"
               scope="global"
-              :plural="
-                progressStore.hideoutLevels?.[props.station.id]?.self || 0
-              "
+              :plural="progressStore.hideoutLevels?.[props.station.id]?.self || 0"
             >
               <template #level>
                 {{ progressStore.hideoutLevels?.[props.station.id]?.self || 0 }}
@@ -33,11 +27,7 @@
     <div v-else-if="nextLevel" class="text-center text-caption mt-4 mb-2 mx-2">
       {{ nextLevel.description }}
     </div>
-    <v-sheet
-      v-if="props.station.id == '5d484fc0654e76006657e0ab'"
-      class="text-center pa-2"
-      color="secondary"
-    >
+    <v-sheet v-if="props.station.id == STASH_STATION_ID" class="text-center pa-2" color="secondary">
       <div>
         {{ $t('page.hideout.stationcard.gameeditiondescription') }}
       </div>
@@ -51,10 +41,7 @@
           <v-icon class="mr-2">mdi-package-variant-closed-check</v-icon
           >{{ $t('page.hideout.stationcard.nextlevel') }}
         </div>
-        <div
-          v-for="(requirement, rIndex) in nextLevel.itemRequirements"
-          :key="rIndex"
-        >
+        <div v-for="(requirement, rIndex) in nextLevel.itemRequirements" :key="rIndex">
           <span class="d-flex align-center justify-center">
             <tarkov-item
               :item-id="requirement.item.id"
@@ -66,14 +53,8 @@
             />
           </span>
         </div>
-        <div
-          v-for="(requirement, rIndex) in nextLevel.stationLevelRequirements"
-          :key="rIndex"
-        >
-          <i18n-t
-            keypath="page.hideout.stationcard.requirements.station"
-            scope="global"
-          >
+        <div v-for="(requirement, rIndex) in nextLevel.stationLevelRequirements" :key="rIndex">
+          <i18n-t keypath="page.hideout.stationcard.requirements.station" scope="global">
             <template #level>
               {{ requirement.level }}
             </template>
@@ -82,14 +63,8 @@
             </template>
           </i18n-t>
         </div>
-        <div
-          v-for="(requirement, rIndex) in nextLevel.skillRequirements"
-          :key="rIndex"
-        >
-          <i18n-t
-            keypath="page.hideout.stationcard.requirements.skill"
-            scope="global"
-          >
+        <div v-for="(requirement, rIndex) in nextLevel.skillRequirements" :key="rIndex">
+          <i18n-t keypath="page.hideout.stationcard.requirements.skill" scope="global">
             <template #level>
               {{ requirement.level }}
             </template>
@@ -98,14 +73,8 @@
             </template>
           </i18n-t>
         </div>
-        <div
-          v-for="(requirement, rIndex) in nextLevel.traderRequirements"
-          :key="rIndex"
-        >
-          <i18n-t
-            keypath="page.hideout.stationcard.requirements.trader"
-            scope="global"
-          >
+        <div v-for="(requirement, rIndex) in nextLevel.traderRequirements" :key="rIndex">
+          <i18n-t keypath="page.hideout.stationcard.requirements.trader" scope="global">
             <template #loyaltylevel>
               {{ requirement.value }}
             </template>
@@ -118,16 +87,11 @@
     </v-sheet>
     <v-sheet v-if="!nextLevel" rounded color="accent" class="pa-2">
       <div class="text-center text-subtitle-1">
-        <v-icon class="mr-2">mdi-star-check</v-icon
-        >{{ $t('page.hideout.stationcard.maxlevel') }}
+        <v-icon class="mr-2">mdi-star-check</v-icon>{{ $t('page.hideout.stationcard.maxlevel') }}
       </div>
     </v-sheet>
     <div class="mb-2">
-      <v-row
-        v-if="!upgradeDisabled"
-        no-gutters
-        class="align-center justify-center"
-      >
+      <v-row v-if="!upgradeDisabled" no-gutters class="align-center justify-center">
         <v-col v-if="nextLevel?.level" cols="auto" class="mx-1 my-1">
           <v-btn
             color="green"
@@ -159,30 +123,17 @@
             <i18n-t
               keypath="page.hideout.stationcard.downgradebutton"
               scope="global"
-              :plural="
-                (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1
-              "
+              :plural="(progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1"
             >
               <template #level>
-                {{
-                  (progressStore.hideoutLevels?.[props.station.id]?.self || 0) -
-                  1
-                }}
+                {{ (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1 }}
               </template>
             </i18n-t>
           </v-btn>
         </v-col>
       </v-row>
-      <v-row
-        v-if="upgradeDisabled"
-        no-gutters
-        class="align-center justify-center"
-      >
-        <v-col
-          v-if="currentLevel && !downgradeDisabled"
-          cols="auto"
-          class="mx-1 my-1"
-        >
+      <v-row v-if="upgradeDisabled" no-gutters class="align-center justify-center">
+        <v-col v-if="currentLevel && !downgradeDisabled" cols="auto" class="mx-1 my-1">
           <v-btn
             color="red"
             variant="tonal"
@@ -193,15 +144,10 @@
             <i18n-t
               keypath="page.hideout.stationcard.downgradebutton"
               scope="global"
-              :plural="
-                (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1
-              "
+              :plural="(progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1"
             >
               <template #level>
-                {{
-                  (progressStore.hideoutLevels?.[props.station.id]?.self || 0) -
-                  1
-                }}
+                {{ (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1 }}
               </template>
             </i18n-t>
           </v-btn>
@@ -220,25 +166,17 @@
     <v-snackbar v-model="moduleStatusUpdated" :timeout="4000" color="secondary">
       {{ moduleStatus }}
       <template #actions>
-        <v-btn
-          color="white"
-          variant="text"
-          @click="moduleStatusUpdated = false"
-        >
-          Close
-        </v-btn>
+        <v-btn color="white" variant="text" @click="moduleStatusUpdated = false"> Close </v-btn>
       </template>
     </v-snackbar>
   </v-sheet>
 </template>
 <script setup>
   import { computed, defineAsyncComponent, ref } from 'vue';
-  import { useProgressStore } from '@/stores/progress';
+  import { useProgressStore, STASH_STATION_ID } from '@/stores/progress';
   import { useTarkovStore } from '@/stores/tarkov';
   import { useI18n } from 'vue-i18n';
-  const TarkovItem = defineAsyncComponent(
-    () => import('@/components/TarkovItem.vue')
-  );
+  const TarkovItem = defineAsyncComponent(() => import('@/components/TarkovItem.vue'));
   const props = defineProps({
     station: {
       type: Object,
@@ -262,13 +200,10 @@
     return nextLevel.value === null;
   });
   const downgradeDisabled = computed(() => {
-    if (props.station.id === '5d484fc0654e76006657e0ab') {
-      const currentStash =
-        progressStore.hideoutLevels?.[props.station.id]?.self ?? 0;
+    if (props.station.id === STASH_STATION_ID) {
+      const currentStash = progressStore.hideoutLevels?.[props.station.id]?.self ?? 0;
       const editionId = tarkovStore.getGameEdition();
-      const editionData = progressStore.gameEditionData.find(
-        (e) => e.version === editionId
-      );
+      const editionData = progressStore.gameEditionData.find((e) => e.version === editionId);
       const defaultStash = editionData?.defaultStashLevel ?? 0;
       return currentStash <= defaultStash;
     }
@@ -307,17 +242,14 @@
   const nextLevel = computed(() => {
     return (
       props.station.levels.find(
-        (level) =>
-          level.level ===
-          (progressStore.hideoutLevels?.[props.station.id]?.self || 0) + 1
+        (level) => level.level === (progressStore.hideoutLevels?.[props.station.id]?.self || 0) + 1
       ) || null
     );
   });
   const currentLevel = computed(() => {
     return (
       props.station.levels.find(
-        (level) =>
-          level.level === progressStore.hideoutLevels?.[props.station.id]?.self
+        (level) => level.level === progressStore.hideoutLevels?.[props.station.id]?.self
       ) || null
     );
   });
