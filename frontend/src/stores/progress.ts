@@ -5,21 +5,13 @@ import { defineStore, type Store } from 'pinia';
 import { useTarkovStore } from '@/stores/tarkov';
 import { UserState } from '@/shared_state';
 import type { Task } from '@/composables/tarkovdata';
-import {
-  tasks,
-  traders,
-  objectives,
-  hideoutStations,
-} from '@/composables/tarkovdata';
-
-const STASH_STATION_ID = '5d484fc0654e76006657e0ab';
-
+import { tasks, traders, objectives, hideoutStations } from '@/composables/tarkovdata';
+export const STASH_STATION_ID = '5d484fc0654e76006657e0ab';
 interface GameEdition {
   version: number;
   value: number;
   defaultStashLevel: number;
 }
-
 const gameEditions: GameEdition[] = [
   { version: 1, value: 0.0, defaultStashLevel: 1 },
   { version: 2, value: 0.0, defaultStashLevel: 2 },
@@ -27,7 +19,6 @@ const gameEditions: GameEdition[] = [
   { version: 4, value: 0.2, defaultStashLevel: 4 },
   { version: 5, value: 0.2, defaultStashLevel: 5 },
 ];
-
 type TeamStoresMap = Record<string, Store<string, UserState, any, any>>;
 type CompletionsMap = Record<string, Record<string, boolean>>;
 type TraderLevelsMap = Record<string, Record<string, any>>;
@@ -35,9 +26,7 @@ type FactionMap = Record<string, string>;
 type TaskAvailabilityMap = Record<string, Record<string, boolean>>;
 type ObjectiveCompletionsMap = Record<string, Record<string, boolean>>;
 type HideoutLevelMap = Record<string, Record<string, number>>;
-
 type ProgressState = {};
-
 type ProgressGetters = {
   teamStores: TeamStoresMap;
   visibleTeamStores: TeamStoresMap;
@@ -53,7 +42,6 @@ type ProgressGetters = {
   getLevel: (teamId: string) => number;
   getFaction: (teamId: string) => string;
 };
-
 // Define the Fireswap configuration type expected by the plugin
 interface FireswapConfig {
   path: string;
@@ -61,7 +49,6 @@ interface FireswapConfig {
   debouncems: number;
   localKey: string;
 }
-
 export const useProgressStore = defineStore('progress', {
   state: (): ProgressState => ({}),
   getters: {
@@ -73,10 +60,7 @@ export const useProgressStore = defineStore('progress', {
         try {
           stores[teammateId] = teammateStores.value[teammateId];
         } catch (error) {
-          console.error(
-            `Failed to get store for teammate ${teammateId}:`,
-            error
-          );
+          console.error(`Failed to get store for teammate ${teammateId}:`, error);
         }
       }
       return stores;
@@ -139,8 +123,7 @@ export const useProgressStore = defineStore('progress', {
           const store = this.visibleTeamStores[teamId];
           const playerLevel = store?.$state.level ?? 0;
           const playerFaction = this.playerFaction[teamId];
-          const isTaskComplete =
-            this.tasksCompletions[task.id]?.[teamId] ?? false;
+          const isTaskComplete = this.tasksCompletions[task.id]?.[teamId] ?? false;
           if (isTaskComplete) {
             available[task.id][teamId] = false;
             continue;
@@ -148,8 +131,7 @@ export const useProgressStore = defineStore('progress', {
           let failedReqsMet = true;
           if (task.failedRequirements) {
             for (const req of task.failedRequirements) {
-              const failed =
-                store?.$state.taskCompletions?.[req.task.id]?.failed ?? false;
+              const failed = store?.$state.taskCompletions?.[req.task.id]?.failed ?? false;
               if (failed) {
                 failedReqsMet = false;
                 break;
@@ -167,8 +149,7 @@ export const useProgressStore = defineStore('progress', {
           let traderLevelsMet = true;
           if (task.traderLevelRequirements) {
             for (const req of task.traderLevelRequirements) {
-              const currentTraderLevel =
-                this.traderLevelsAchieved[teamId]?.[req.trader.id] ?? 0;
+              const currentTraderLevel = this.traderLevelsAchieved[teamId]?.[req.trader.id] ?? 0;
               if (currentTraderLevel < req.level) {
                 traderLevelsMet = false;
                 break;
@@ -182,8 +163,7 @@ export const useProgressStore = defineStore('progress', {
           let prereqsMet = true;
           if (task.taskRequirements) {
             for (const req of task.taskRequirements) {
-              const isPrereqComplete =
-                this.tasksCompletions[req.task.id]?.[teamId] ?? false;
+              const isPrereqComplete = this.tasksCompletions[req.task.id]?.[teamId] ?? false;
               if (!isPrereqComplete) {
                 prereqsMet = false;
                 break;
@@ -238,19 +218,14 @@ export const useProgressStore = defineStore('progress', {
                 modulesState[lvl.id]?.complete &&
                 typeof lvl.level === 'number'
               ) {
-                maxManuallyCompletedLevel = Math.max(
-                  maxManuallyCompletedLevel,
-                  lvl.level
-                );
+                maxManuallyCompletedLevel = Math.max(maxManuallyCompletedLevel, lvl.level);
               }
             }
           }
           let currentStationDisplayLevel;
           if (station.id === STASH_STATION_ID) {
             const gameEditionVersion = store?.$state.gameEdition ?? 0;
-            const edition = this.gameEditionData.find(
-              (e: any) => e.version === gameEditionVersion
-            );
+            const edition = this.gameEditionData.find((e: any) => e.version === gameEditionVersion);
             const defaultStashFromEdition = edition?.defaultStashLevel ?? 0;
             currentStationDisplayLevel = Math.max(
               defaultStashFromEdition,
