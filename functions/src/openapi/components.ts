@@ -12,7 +12,7 @@
  *           description: Shows token used to make this call
  *         permissions:
  *           type: array
- *           description: List of permissions this token has (GP == Read Personal Progression, TP == Read Team Progression, WP == Write Personal Progression)
+ *           description: GP == Get Progression, TP == Team Progression, WP == Write Progression
  *           items:
  *             type: string
  *     TeamProgress:
@@ -31,7 +31,8 @@
  *           description: Player's current level
  *         gameEdition:
  *           type: integer
- *           description: Player's game edition (1 = Standard Edition, 2 == Left to Die Edition, 3 == Prepare to Die Edition, 4 == Edge of Darkness Edition)
+ *           description: 1 = Standard Edition, 2 = Left Behind Edition, 3 = Prepare for Escape Edition,
+ *             4 = Edge of Darkness (Limited Edition), 5 = The Unheard Edition
  *         taskProgress:
  *           type: array
  *           description: Array of task progress data.
@@ -63,7 +64,8 @@
  *           description: Player's PMC faction (USEC, BEAR)
  *     TaskProgress:
  *       title: TaskProgress
- *       description: Player's progress of a given task. The key is the UUID correlating to the task ID available via the tarkov.dev API
+ *       description: Player's progress of a given task. The key is the UUID correlating to the task ID
+ *         available via the tarkov.dev API
  *       type: object
  *       properties:
  *         id:
@@ -74,10 +76,12 @@
  *           description: True if a given quest has been completed.
  *         failed:
  *           type: boolean
- *           description: True if a given quest has been failed in some permanent way (eg. one of three quest options was chosen and the other two are now unavailable)
+ *           description: True if a given quest has been failed in some permanent way
+ *             (eg. one of three quest options was chosen and the other two are now unavailable)
  *         invalid:
  *           type: boolean
- *           description: True if a given quest is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)
+ *           description: True if a given quest is no longer accessible, but not necessarily failed
+ *             (eg. wrong faction, part of a quest chain that was not chosen by previous completions)
  *     HideoutModulesProgress:
  *       title: HideoutModulesProgress
  *       description: Player's progress on a given hideout module.
@@ -105,7 +109,8 @@
  *           description: True if a given objective has been completed
  *         invalid:
  *           type: boolean
- *           description: True if a given objective is no longer accessible, but not necessarily failed (eg. wrong faction, part of a quest chain that was not chosen by previous completions)
+ *           description: True if a given objective is no longer accessible, but not necessarily failed
+ *             (eg. wrong faction, part of a quest chain that was not chosen by previous completions)
  *     HideoutPartsProgress:
  *       title: HideoutPartsProgress
  *       description: Player's progress on items needed for hideout module upgrades.
@@ -119,7 +124,8 @@
  *           description: Number of items collected for a given hideout part objective
  *         id:
  *           type: string
- *           description: UUID correlating to invidiual hideout station level item requirements' ID available via the tarkov.dev API
+ *           description: UUID correlating to individual hideout station level item requirements' ID
+ *             available via the tarkov.dev API
  */
 
 // This file primarily serves to hold the OpenAPI component definitions.

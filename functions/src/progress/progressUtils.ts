@@ -1,13 +1,8 @@
-import functions from "firebase-functions";
-import admin from "firebase-admin";
-import {
-  Firestore,
-  DocumentReference,
-  FieldValue,
-} from "firebase-admin/firestore";
-
+import functions from 'firebase-functions';
+import admin from 'firebase-admin';
+import { Firestore, DocumentReference, FieldValue } from 'firebase-admin/firestore';
+const STASH_STATION_ID = '5d484fc0654e76006657e0ab'; // Stash ID
 // --- Interfaces for Data Structures ---
-
 // Basic Objective/Progress Item Structure
 interface ObjectiveItem {
   id: string;
@@ -16,7 +11,6 @@ interface ObjectiveItem {
   invalid?: boolean;
   failed?: boolean;
 }
-
 // Raw Progress Data (from Firestore or initial processing)
 interface RawObjectiveData {
   [key: string]: {
@@ -26,57 +20,39 @@ interface RawObjectiveData {
     failed?: boolean;
   };
 }
-
-// Task Data Structures (based on usage)
 interface TaskRequirement {
   task?: { id: string };
   status?: string[];
 }
-
 interface TaskObjective {
   id: string;
-  // other objective properties if needed
 }
-
 interface Task {
   id: string;
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
   factionName?: string;
   alternatives?: string[];
-  // other task properties
 }
-
 interface TaskData {
   tasks?: Task[];
-  // other task data properties
 }
-
-// Hideout Data Structures (based on usage)
 interface HideoutItemRequirement {
   id: string;
   count: number;
-  // other item properties
 }
-
 interface HideoutLevel {
   id: string;
   level: number;
   itemRequirements?: HideoutItemRequirement[];
-  // other level properties
 }
-
 interface HideoutStation {
   id: string;
   levels?: HideoutLevel[];
-  // other station properties
 }
-
 interface HideoutData {
   hideoutStations?: HideoutStation[];
-  // other hideout data properties
 }
-
 // User Progress Data (from Firestore)
 interface UserProgressData {
   taskCompletions?: RawObjectiveData;
@@ -88,7 +64,6 @@ interface UserProgressData {
   gameEdition?: number;
   pmcFaction?: string;
 }
-
 // Formatted Progress Structure (returned by formatProgress)
 interface FormattedProgress {
   tasksProgress: ObjectiveItem[];
@@ -101,29 +76,18 @@ interface FormattedProgress {
   gameEdition: number;
   pmcFaction: string;
 }
-
 // Task State Update Structure
 interface ProgressUpdate {
-  [key: string]: any; // For storing updates using dot notation
+  [key: string]: boolean | number | FieldValue; // For storing updates using dot notation
 }
-
 // --- Utility Functions ---
-
-/**
- * Formats objective data into a standardized format.
- * @param {RawObjectiveData | undefined | null} objectiveData - An object mapping objective IDs to their respective data
- * @param {boolean} [showCount=false] - Whether to include the count of the objective
- * @param {boolean} [showInvalid=false] - Whether to include whether the objective is invalid
- * @returns {ObjectiveItem[]} An array of formatted objectives
- */
 const formatObjective = (
   objectiveData: RawObjectiveData | undefined | null,
-  showCount = false,
-  showInvalid = false,
+  showCount: boolean = false,
+  showInvalid: boolean = false
 ): ObjectiveItem[] => {
   const processedObjectives: ObjectiveItem[] = [];
-  if (!objectiveData) return processedObjectives; // Handle null/undefined input
-
+  if (!objectiveData) return processedObjectives;
   for (const [objectiveKey, objective] of Object.entries(objectiveData)) {
     const newObjective: ObjectiveItem = {
       id: objectiveKey,
@@ -142,23 +106,12 @@ const formatObjective = (
   }
   return processedObjectives;
 };
-
-/**
- * Finds the task in the taskData, marks it as invalid in the tasksProgress, and marks all of its objectives as invalid in the objectiveProgress
- * Finally, calls this function on all of the tasks that have this task as a requirement
- * @param {string} taskId the id of the task to invalidate
- * @param {TaskData | null | undefined} taskData the task data
- * @param {ObjectiveItem[]} tasksProgress the tasks progress data (will be mutated)
- * @param {ObjectiveItem[]} objectiveProgress the objective progress data (will be mutated)
- * @param {boolean} [childOnly=false] whether to only mark the successors of the task as invalid, rather than the task itself
- * @returns {{ tasksProgress: ObjectiveItem[]; objectiveProgress: ObjectiveItem[] }} an object with the updated tasksProgress and objectiveProgress (references the mutated arrays)
- */
 const invalidateTaskRecursive = (
   taskId: string,
   taskData: TaskData | null | undefined,
   tasksProgress: ObjectiveItem[],
   objectiveProgress: ObjectiveItem[],
-  childOnly = false,
+  childOnly: boolean = false
 ): { tasksProgress: ObjectiveItem[]; objectiveProgress: ObjectiveItem[] } => {
   // Find the task in the taskData
   const task = taskData?.tasks?.find((task) => task.id === taskId);
@@ -176,9 +129,7 @@ const invalidateTaskRecursive = (
       }
       // For each objective of the task, mark it as invalid
       task.objectives?.forEach((objective) => {
-        let objectiveIndex = objectiveProgress.findIndex(
-          (o) => o.id === objective.id,
-        );
+        let objectiveIndex = objectiveProgress.findIndex((o) => o.id === objective.id);
         if (objectiveIndex !== -1) {
           objectiveProgress[objectiveIndex].invalid = true;
           objectiveProgress[objectiveIndex].complete = false; // Ensure invalid objectives are not complete
@@ -197,39 +148,23 @@ const invalidateTaskRecursive = (
       reqTask.taskRequirements?.some(
         (requirement) =>
           requirement.task?.id === taskId &&
-          requirement.status?.some(
-            (status) => status === "complete" || status === "active",
-          ),
-      ),
+          requirement.status?.some((status) => status === 'complete' || status === 'active')
+      )
     );
     requiredTasks?.forEach((requiredTask) => {
       // Recursively call this function on the task that requires this task
       // Note: This mutates the original arrays passed in, so no need to reassign
-      invalidateTaskRecursive(
-        requiredTask.id,
-        taskData,
-        tasksProgress,
-        objectiveProgress,
-      );
+      invalidateTaskRecursive(requiredTask.id, taskData, tasksProgress, objectiveProgress);
     });
   }
   // Return references to the (potentially mutated) arrays
   return { tasksProgress, objectiveProgress };
 };
-
-/**
- * Formats the progress data for a given user
- * @param {UserProgressData | undefined | null} progressData - The progress data for the user
- * @param {string} userId - The ID of the user
- * @param {HideoutData | null | undefined} hideoutData - The hideout data to check for stash modules
- * @param {TaskData | null | undefined} taskData - The task data to check for invalid tasks
- * @returns {FormattedProgress} The formatted progress data
- */
 const formatProgress = (
   progressData: UserProgressData | undefined | null,
   userId: string,
   hideoutData: HideoutData | null | undefined,
-  taskData: TaskData | null | undefined,
+  taskData: TaskData | null | undefined
 ): FormattedProgress => {
   const taskCompletions = progressData?.taskCompletions ?? {};
   const objectiveCompletions = progressData?.taskObjectives ?? {};
@@ -238,8 +173,7 @@ const formatProgress = (
   const displayName = progressData?.displayName ?? userId.substring(0, 6);
   const playerLevel = progressData?.level ?? 1;
   const gameEdition = progressData?.gameEdition ?? 1;
-  const pmcFaction = progressData?.pmcFaction ?? "USEC";
-
+  const pmcFaction = progressData?.pmcFaction ?? 'USEC';
   const progress: FormattedProgress = {
     tasksProgress: formatObjective(taskCompletions, false, true),
     taskObjectivesProgress: formatObjective(objectiveCompletions, true, true),
@@ -251,18 +185,17 @@ const formatProgress = (
     gameEdition: gameEdition,
     pmcFaction: pmcFaction,
   };
-
   // --- Hideout Post-processing ---
   try {
     if (hideoutData?.hideoutStations) {
       const stashStation = hideoutData.hideoutStations.find(
-        (station) => station.id === "5d484fc0654e76006657e0ab", // Stash ID
+        (station) => station.id === STASH_STATION_ID
       );
       stashStation?.levels?.forEach((level) => {
         if (level.level <= gameEdition) {
           // Mark module complete
           let moduleIndex = progress.hideoutModulesProgress.findIndex(
-            (mLevel) => mLevel.id === level.id,
+            (mLevel) => mLevel.id === level.id
           );
           if (moduleIndex === -1) {
             progress.hideoutModulesProgress.push({
@@ -274,9 +207,7 @@ const formatProgress = (
           }
           // Mark parts complete
           level.itemRequirements?.forEach((item) => {
-            let partIndex = progress.hideoutPartsProgress.findIndex(
-              (part) => part.id === item.id,
-            );
+            let partIndex = progress.hideoutPartsProgress.findIndex((part) => part.id === item.id);
             if (partIndex === -1) {
               progress.hideoutPartsProgress.push({
                 id: item.id,
@@ -291,62 +222,58 @@ const formatProgress = (
         }
       });
     }
-  } catch (error: any) {
-    functions.logger.error("Error processing hideout data", {
-      error: error.message,
+  } catch (error: unknown) {
+    functions.logger.error('Error processing hideout data', {
+      error: error instanceof Error ? error.message : String(error),
       userId,
     });
   }
-
   // --- Task Post-processing ---
   try {
     if (taskData?.tasks) {
       // Invalidate faction-specific tasks
       const invalidFactionTasks = taskData.tasks.filter(
-        (task) => task.factionName !== "Any" && task.factionName !== pmcFaction,
+        (task) => task.factionName !== 'Any' && task.factionName !== pmcFaction
       );
       invalidFactionTasks.forEach((task) => {
         invalidateTaskRecursive(
           task.id,
           taskData,
           progress.tasksProgress,
-          progress.taskObjectivesProgress,
+          progress.taskObjectivesProgress
         );
       });
-
       // Invalidate tasks with failed requirements if the requirement isn't actually failed
       const failedRequirementTasks = taskData.tasks.filter((task) =>
-        task.taskRequirements?.some((req) => req.status?.includes("failed")),
+        task.taskRequirements?.some((req) => req.status?.includes('failed'))
       );
       failedRequirementTasks.forEach((failTask) => {
         const shouldInvalidate = failTask.taskRequirements?.some(
           (req) =>
             req?.status?.length === 1 &&
-            req.status[0] === "failed" &&
-            req.task?.id && // Check if task ID exists
-            !progress.tasksProgress.find((t) => t.id === req.task!.id)
-              ?.failed && // Requirement task is NOT marked failed
-            progress.tasksProgress.find((t) => t.id === req.task!.id)?.complete, // Requirement task IS marked complete
+            req.status[0] === 'failed' &&
+            req.task?.id &&
+            !progress.tasksProgress.find((t) => t.id === req.task!.id)?.failed &&
+            progress.tasksProgress.find((t) => t.id === req.task!.id)?.complete
         );
         if (shouldInvalidate) {
           invalidateTaskRecursive(
             failTask.id,
             taskData,
             progress.tasksProgress,
-            progress.taskObjectivesProgress,
+            progress.taskObjectivesProgress
           );
         }
       });
-
       // Invalidate tasks if an alternative task is completed
       const alternativeTasks = taskData.tasks.filter(
-        (task) => task.alternatives && task.alternatives.length > 0,
+        (task) => task.alternatives && task.alternatives.length > 0
       );
       alternativeTasks.forEach((altTask) => {
         const alternativeCompleted = altTask.alternatives?.some(
           (altId) =>
             !progress.tasksProgress.find((t) => t.id === altId)?.failed && // Alternative is NOT failed
-            progress.tasksProgress.find((t) => t.id === altId)?.complete, // Alternative IS complete
+            progress.tasksProgress.find((t) => t.id === altId)?.complete // Alternative IS complete
         );
         if (alternativeCompleted) {
           // Invalidate the original task and its successors (childOnly = true)
@@ -355,132 +282,153 @@ const formatProgress = (
             taskData,
             progress.tasksProgress,
             progress.taskObjectivesProgress,
-            true,
+            true
           );
         }
       });
     }
-  } catch (error: any) {
-    functions.logger.error("Error processing task data", {
-      error: error.message,
+  } catch (error: unknown) {
+    functions.logger.error('Error processing task data', {
+      error: error instanceof Error ? error.message : String(error),
       userId,
     });
   }
-
   return progress;
 };
-
-/**
- * Updates the state of related tasks based on a change in one task's status.
- * @param {string} taskId - The ID of the task that changed.
- * @param {number} newState - The new state (0: Locked, 1: Unlocked, 2: Complete, 3: Failed).
- * @param {string} userId - The ID of the user whose progress is being updated.
- * @param {TaskData | null | undefined} taskData - The global task data.
- */
 const updateTaskState = async (
   taskId: string,
   newState: number,
   userId: string,
-  taskData: TaskData | null | undefined,
+  taskData: TaskData | null | undefined
 ): Promise<void> => {
   if (!taskData?.tasks) return;
-
   const db: Firestore = admin.firestore();
-  const progressRef: DocumentReference = db.collection("progress").doc(userId);
+  const progressRef: DocumentReference = db.collection('progress').doc(userId);
   const updateTime = FieldValue.serverTimestamp();
   const progressUpdate: ProgressUpdate = {};
-
   const changedTask = taskData.tasks.find((t) => t.id === taskId);
   if (!changedTask) return;
-
   // --- Update tasks that REQUIRE the changed task ---
-  taskData.tasks.forEach((dependentTask) => {
-    dependentTask.taskRequirements?.forEach((req) => {
+  for (const dependentTask of taskData.tasks) {
+    // Using for...of instead of forEach to support async/await
+    for (const req of dependentTask.taskRequirements || []) {
       if (req.task?.id === taskId) {
         let shouldUnlock = false;
         let shouldLock = false;
-
         // Check if ALL requirements are now met for unlocking
-        if (newState === 2) {
-          // If changed task is completed
-          // Check if other requirements are also met
-          // This logic needs refinement based on how requirements are structured (AND/OR)
-          // Assuming AND for now:
-          const allReqsMet = dependentTask.taskRequirements?.every(
-            (innerReq) => {
-              const reqTaskId = innerReq.task?.id;
-              if (!reqTaskId) return true; // Skip if requirement has no task id?
-
-              const reqStatus = innerReq.status ?? [];
-              // Simple check: if req needs 'complete', check if it IS complete
-              if (reqStatus.includes("complete")) {
-                // Need to check actual progress data here - HOW?
-                // Requires fetching progress data, which makes this complex
-                // For now, assume we cannot reliably check other task status here
-                // Mark as potentially unlockable, needs full check elsewhere
-                // TODO: Implement full requirement checking if needed here
-              }
-              return false; // Placeholder: Cannot determine if all reqs met
-            },
-          );
-          // if (allReqsMet) shouldUnlock = true; // Simplified - cannot check other tasks
+        if (newState === 2 && req.status?.includes('complete')) {
+          // This requirement is now satisfied, but we need to check if ALL requirements are met
+          shouldUnlock = await checkAllRequirementsMet(dependentTask, taskId, newState, userId, db);
         }
-
         // Check if ANY requirement is now unmet for locking
-        // e.g., if changed task failed or went back to locked/unlocked
-        if (newState !== 2 && req.status?.includes("complete")) {
+        if (newState !== 2 && req.status?.includes('complete')) {
           // If requirement needs completion, but changed task is no longer complete
-          // shouldLock = true; // Needs logic to determine current state
+          shouldLock = true;
         }
-
-        // Apply updates (simplified due to lack of full progress context)
+        // Apply updates based on conditions
         if (shouldUnlock) {
-          // Only unlock if currently locked (state 0)
-          // Requires current state - cannot do reliably here
+          // Mark the task as potentially unlockable
+          // In a real implementation, we would check actual status first
+          progressUpdate[`tasks.${dependentTask.id}.st`] = 1; // Set to unlocked/active
+          progressUpdate[`tasks.${dependentTask.id}.cAt`] = updateTime; // Record when changed
         }
         if (shouldLock) {
-          // Only lock if currently unlocked (state 1)
-          // Requires current state - cannot do reliably here
+          // Task should be locked because requirement is no longer met
+          progressUpdate[`tasks.${dependentTask.id}.st`] = 0; // Set to locked
+          progressUpdate[`tasks.${dependentTask.id}.cAt`] = updateTime; // Record when changed
         }
       }
-    });
-  });
-
-  // --- Update tasks that are ALTERNATIVES to the changed task ---
-  // If task completed, potentially fail alternatives?
-  // If task failed, potentially unlock alternatives?
-  // This requires specific game logic.
-
+    }
+  }
   // --- Update ALTERNATIVE tasks OF the changed task ---
   changedTask.alternatives?.forEach((altTaskId) => {
     if (newState === 2) {
-      // If changed task completed
-      // Mark alternative as failed (state 3)?
-      // progressUpdate[`tasks.${altTaskId}.st`] = 3;
-      // progressUpdate[`tasks.${altTaskId}.failed`] = true; // If using a failed flag
-      // progressUpdate[`tasks.${altTaskId}.cAt`] = updateTime;
+      // If changed task completed, mark alternative as failed (state 3)
+      progressUpdate[`tasks.${altTaskId}.st`] = 3;
+      progressUpdate[`tasks.${altTaskId}.failed`] = true; // If using a failed flag
+      progressUpdate[`tasks.${altTaskId}.cAt`] = updateTime; // Record when this change happened
     }
     // Add logic if changed task failed
   });
-
   // Commit any collected updates
   if (Object.keys(progressUpdate).length > 0) {
     try {
       await progressRef.update(progressUpdate);
-      functions.logger.log("Updated dependent task states", {
+      functions.logger.log('Updated dependent task states', {
         userId,
         changedTaskId: taskId,
         newState,
         updates: progressUpdate,
       });
-    } catch (error: any) {
-      functions.logger.error("Error updating dependent task states", {
+    } catch (error: unknown) {
+      functions.logger.error('Error updating dependent task states', {
         userId,
         changedTaskId: taskId,
         newState,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+};
+
+/**
+ * Checks if all requirements for a task are met, considering current progress
+ */
+const checkAllRequirementsMet = async (
+  dependentTask: Task,
+  changedTaskId: string,
+  newState: number,
+  userId: string,
+  db: Firestore
+): Promise<boolean> => {
+  try {
+    const progressRef: DocumentReference = db.collection('progress').doc(userId);
+    const progressDoc = await progressRef.get();
+    const progressData = progressDoc.data() || {};
+    const taskCompletions = progressData.tasks || {};
+    // Check if ALL requirements for this dependent task are satisfied
+    const allReqsMet = dependentTask.taskRequirements?.every((innerReq) => {
+      if (!innerReq.task?.id) return true; // Skip if requirement has no task id
+      const reqTaskId = innerReq.task.id;
+      const reqStatus = innerReq.status || [];
+      // If this is the task that just changed status
+      if (reqTaskId === changedTaskId) {
+        // Check if the new state satisfies the requirement
+        if (reqStatus.includes('complete') && newState === 2) return true;
+        if (reqStatus.includes('failed') && newState === 3) return true;
+        if (reqStatus.includes('active') && (newState === 1 || newState === 2)) return true;
+        return false;
+      }
+      // For other task requirements, check if they're satisfied based on current progress
+      const otherTaskState = taskCompletions[reqTaskId]?.st;
+      if (reqStatus.includes('complete') && otherTaskState === 2) {
+        return true; // Requirement needs completion and task is complete
+      }
+      if (reqStatus.includes('active') && (otherTaskState === 1 || otherTaskState === 2)) {
+        return true; // Requirement needs activation and task is active or complete
+      }
+      if (reqStatus.includes('failed') && otherTaskState === 3) {
+        return true; // Requirement needs failure and task is failed
+      }
+      return false; // Requirement not met
+    });
+    if (allReqsMet) {
+      functions.logger.log('All requirements met for task unlocking', {
+        userId,
+        taskId: dependentTask.id,
+        changedTaskId,
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    functions.logger.error('Error checking task requirements:', {
+      error: error instanceof Error ? error.message : String(error),
+      userId,
+      taskId: dependentTask.id,
+    });
+    // Default to the simplified behavior if checking fails
+    return true;
   }
 };
 

@@ -1,28 +1,25 @@
-import functions from "firebase-functions";
-import admin from "firebase-admin";
-import { Request, Response } from "express";
+import functions from 'firebase-functions';
+import admin from 'firebase-admin';
+import { Request, Response } from 'express';
 import {
   Firestore,
   DocumentReference,
   DocumentSnapshot,
   WriteBatch,
-} from "firebase-admin/firestore";
+} from 'firebase-admin/firestore';
 
-// TODO: Convert utils/dataLoaders.js to TypeScript and remove .js extension
-// Update: dataLoaders is now TS, keep .js extension for import
-import { getTaskData, getHideoutData } from "../utils/dataLoaders.js";
-// TODO: Convert utils/progressUtils.js to TypeScript and remove .js extension
-// Update: progressUtils is now TS, keep .js extension for import
-import { formatProgress, updateTaskState } from "../utils/progressUtils.js";
+// Update: dataLoaders and progressUtils is now TS, keep .js extension for import
+import { getTaskData, getHideoutData } from '../utils/dataLoaders.js';
+import { formatProgress, updateTaskState } from './progressUtils.js';
 
 // --- Interfaces for Data Structures ---
 
 // Assume structure returned by utils (replace with actual types when utils are converted)
 interface TaskData {
-  [key: string]: any;
+  [key: string]: unknown;
 } // Keep utils return types generic for now
 interface HideoutData {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Define FormattedProgress strictly based on formatProgress function output
@@ -67,17 +64,14 @@ interface HideoutProgressData {
 
 interface SystemDocData {
   team?: string | null;
-  // Add other fields if needed
 }
 
 interface UserDocData {
   teamHide?: { [teammateId: string]: boolean };
-  // Add other fields if needed
 }
 
 interface TeamDocData {
   members?: string[];
-  // Add other fields if needed
 }
 
 // Custom Request Interface (matching auth.ts/index.ts)
@@ -98,8 +92,8 @@ interface AuthenticatedRequest extends Request {
 }
 
 // --- Helper Type Check Functions ---
-function isValidTaskStatus(status: any): status is number {
-  return typeof status === "number" && [0, 1, 2, 3].includes(status);
+function isValidTaskStatus(status: unknown): status is number {
+  return typeof status === 'number' && [0, 1, 2, 3].includes(status);
 }
 
 // --- Handler Functions ---
@@ -134,15 +128,12 @@ function isValidTaskStatus(status: any): status is number {
  *       500:
  *         description: "Internal server error."
  */
-const getPlayerProgress = async (
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> => {
+const getPlayerProgress = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const ownerId = req.apiToken?.owner;
-  if (ownerId && req.apiToken?.permissions?.includes("GP")) {
+  if (ownerId && req.apiToken?.permissions?.includes('GP')) {
     const db: Firestore = admin.firestore();
     const progressRef: DocumentReference<ProgressDocData> = db
-      .collection("progress")
+      .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>; // Type assertion
     try {
       let progressDoc: DocumentSnapshot<ProgressDocData> | null = null;
@@ -160,21 +151,16 @@ const getPlayerProgress = async (
       ]);
       // Handle potential null data before formatting
       if (hideoutData === null || taskData === null) {
-        functions.logger.error(
-          "Failed to load essential Tarkov data (tasks or hideout)",
-          {
-            userId: ownerId,
-            hideoutLoaded: hideoutData !== null,
-            tasksLoaded: taskData !== null,
-          },
-        );
-        res.status(500).send({ error: "Failed to load essential game data." });
+        functions.logger.error('Failed to load essential Tarkov data (tasks or hideout)', {
+          userId: ownerId,
+          hideoutLoaded: hideoutData !== null,
+          tasksLoaded: taskData !== null,
+        });
+        res.status(500).send({ error: 'Failed to load essential game data.' });
         return;
       }
       if (!progressDoc.exists) {
-        functions.logger.warn(
-          `Progress document not found for user ${ownerId}`,
-        );
+        functions.logger.warn(`Progress document not found for user ${ownerId}`);
         // Send empty progress structure? Or 404? Let's send formatted empty for now.
       }
       // Assuming formatProgress handles potentially undefined data
@@ -182,20 +168,18 @@ const getPlayerProgress = async (
         progressDoc.data(), // Pass potentially undefined data
         ownerId,
         hideoutData,
-        taskData,
+        taskData
       );
       res.status(200).json({ data: progressData, meta: { self: ownerId } });
-    } catch (error: any) {
-      functions.logger.error("Error fetching player progress:", {
-        error: error.message,
+    } catch (error: unknown) {
+      functions.logger.error('Error fetching player progress:', {
+        error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
       });
-      res.status(500).send({ error: "Failed to retrieve player progress." });
+      res.status(500).send({ error: 'Failed to retrieve player progress.' });
     }
   } else {
-    res
-      .status(401)
-      .send({ error: "Unauthorized or insufficient permissions." });
+    res.status(401).send({ error: 'Unauthorized or insufficient permissions.' });
   }
 };
 
@@ -220,20 +204,17 @@ const getPlayerProgress = async (
  *       500:
  *         description: "Internal server error."
  */
-const getTeamProgress = async (
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> => {
+const getTeamProgress = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const ownerId = req.apiToken?.owner;
-  if (ownerId && req.apiToken?.permissions?.includes("TP")) {
+  if (ownerId && req.apiToken?.permissions?.includes('TP')) {
     const db: Firestore = admin.firestore();
     try {
       // Get the requesters meta documents, hideout data, and task data concurrently
       const systemRef: DocumentReference<SystemDocData> = db
-        .collection("system")
+        .collection('system')
         .doc(ownerId) as DocumentReference<SystemDocData>;
       const userRef: DocumentReference<UserDocData> = db
-        .collection("user")
+        .collection('user')
         .doc(ownerId) as DocumentReference<UserDocData>;
       let systemDoc: DocumentSnapshot<SystemDocData> | null = null;
       let userDoc: DocumentSnapshot<UserDocData> | null = null;
@@ -253,28 +234,25 @@ const getTeamProgress = async (
       // Handle potential null data before proceeding
       if (hideoutData === null || taskData === null) {
         functions.logger.error(
-          "Failed to load essential Tarkov data (tasks or hideout) for team progress",
+          'Failed to load essential Tarkov data (tasks or hideout) for team progress',
           {
             userId: ownerId,
             hideoutLoaded: hideoutData !== null,
             tasksLoaded: taskData !== null,
-          },
+          }
         );
-        res
-          .status(500)
-          .send({ error: "Failed to load essential game data for team." });
+        res.status(500).send({ error: 'Failed to load essential game data for team.' });
         return;
       }
       const systemData = systemDoc.data();
       const userData = userDoc.data();
       const teamId: string | null | undefined = systemData?.team;
-      const hiddenTeammatesMap: { [key: string]: boolean } =
-        userData?.teamHide ?? {};
+      const hiddenTeammatesMap: { [key: string]: boolean } = userData?.teamHide ?? {};
       let memberIds: string[] = [ownerId]; // Start with the requester
       let teamDoc: DocumentSnapshot<TeamDocData> | null = null;
       if (teamId) {
         const teamRef: DocumentReference<TeamDocData> = db
-          .collection("team")
+          .collection('team')
           .doc(teamId) as DocumentReference<TeamDocData>;
         teamDoc = await teamRef.get();
         const teamData = teamDoc.data();
@@ -282,30 +260,25 @@ const getTeamProgress = async (
           // Use Set to ensure uniqueness and include owner
           memberIds = [...new Set([...(teamData?.members ?? []), ownerId])];
         } else {
-          functions.logger.warn(
-            `Team document ${teamId} not found for user ${ownerId}`,
-          );
+          functions.logger.warn(`Team document ${teamId} not found for user ${ownerId}`);
           // Proceed with only the owner's progress
         }
       }
       // Prepare progress fetch promises
       const progressPromises = memberIds.map(
         (memberId) =>
-          db.collection("progress").doc(memberId).get() as Promise<
+          db.collection('progress').doc(memberId).get() as Promise<
             DocumentSnapshot<ProgressDocData>
-          >,
+          >
       );
       // Fetch all progress docs
-      const progressDocs: DocumentSnapshot<ProgressDocData>[] =
-        await Promise.all(progressPromises);
+      const progressDocs: DocumentSnapshot<ProgressDocData>[] = await Promise.all(progressPromises);
       // Format progress for each member
       const teamResponse: FormattedProgress[] = progressDocs
         .map((memberDoc): FormattedProgress | null => {
           const memberId = memberDoc.ref.id;
           if (!memberDoc.exists) {
-            functions.logger.warn(
-              `Progress document not found for member ${memberId}`,
-            );
+            functions.logger.warn(`Progress document not found for member ${memberId}`);
             return null;
           }
           // Pass non-null hideoutData and taskData
@@ -313,29 +286,25 @@ const getTeamProgress = async (
             memberDoc.data(),
             memberId,
             hideoutData, // Known non-null here
-            taskData, // Known non-null here
+            taskData // Known non-null here
           );
         })
         .filter((p): p is FormattedProgress => p !== null); // Type predicate should now work
       // Determine hidden teammates based on the fetched member list
-      const hiddenTeammates = memberIds.filter(
-        (id) => id !== ownerId && hiddenTeammatesMap?.[id],
-      );
+      const hiddenTeammates = memberIds.filter((id) => id !== ownerId && hiddenTeammatesMap?.[id]);
       res.status(200).json({
         data: teamResponse,
         meta: { self: ownerId, hiddenTeammates: hiddenTeammates },
       });
-    } catch (error: any) {
-      functions.logger.error("Error fetching team progress:", {
-        error: error.message,
+    } catch (error: unknown) {
+      functions.logger.error('Error fetching team progress:', {
+        error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
       });
-      res.status(500).send({ error: "Failed to retrieve team progress." });
+      res.status(500).send({ error: 'Failed to retrieve team progress.' });
     }
   } else {
-    res
-      .status(401)
-      .send({ error: "Unauthorized or insufficient permissions." });
+    res.status(401).send({ error: 'Unauthorized or insufficient permissions.' });
   }
 };
 
@@ -366,36 +335,31 @@ const getTeamProgress = async (
  *       500:
  *         description: "Internal server error."
  */
-const setPlayerLevel = async (
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> => {
+const setPlayerLevel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const ownerId = req.apiToken?.owner;
-  if (ownerId && req.apiToken?.permissions?.includes("WP")) {
+  if (ownerId && req.apiToken?.permissions?.includes('WP')) {
     const db: Firestore = admin.firestore();
     const progressRef: DocumentReference<ProgressDocData> = db
-      .collection("progress")
+      .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>;
     const levelValue = parseInt(req.params.levelValue, 10);
     if (isNaN(levelValue) || levelValue < 1) {
-      res.status(400).send({ error: "Invalid level value provided." });
+      res.status(400).send({ error: 'Invalid level value provided.' });
       return;
     }
     try {
       await progressRef.set({ level: levelValue }, { merge: true });
-      res.status(200).send({ message: "Level updated successfully." });
-    } catch (error: any) {
-      functions.logger.error("Error setting player level:", {
-        error: error.message,
+      res.status(200).send({ message: 'Level updated successfully.' });
+    } catch (error: unknown) {
+      functions.logger.error('Error setting player level:', {
+        error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
         level: levelValue,
       });
-      res.status(500).send({ error: "Failed to update player level." });
+      res.status(500).send({ error: 'Failed to update player level.' });
     }
   } else {
-    res
-      .status(401)
-      .send({ error: "Unauthorized or insufficient permissions." });
+    res.status(401).send({ error: 'Unauthorized or insufficient permissions.' });
   }
 };
 
@@ -440,29 +404,26 @@ const setPlayerLevel = async (
  *       500:
  *         description: "Internal server error."
  */
-const updateSingleTask = async (
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> => {
+const updateSingleTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const ownerId = req.apiToken?.owner;
-  if (ownerId && req.apiToken?.permissions?.includes("WP")) {
+  if (ownerId && req.apiToken?.permissions?.includes('WP')) {
     const db: Firestore = admin.firestore();
     const progressRef: DocumentReference<ProgressDocData> = db
-      .collection("progress")
+      .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>;
     const taskId: string = req.params.taskId;
     const rawBodyState = req.body.state; // Read req.body.state instead of req.body.status
     let numericState: number | undefined;
 
-    if (typeof rawBodyState === "string") {
+    if (typeof rawBodyState === 'string') {
       switch (rawBodyState.toLowerCase()) {
-        case "completed":
+        case 'completed':
           numericState = 2;
           break;
-        case "failed":
+        case 'failed':
           numericState = 3;
           break;
-        case "uncompleted": // This corresponds to 'started' or 'active'
+        case 'uncompleted': // This corresponds to 'started' or 'active'
           numericState = 1;
           break;
         default:
@@ -470,52 +431,59 @@ const updateSingleTask = async (
           // and will fail the isValidTaskStatus check later.
           break;
       }
-    } else if (typeof rawBodyState === "number") {
+    } else if (typeof rawBodyState === 'number') {
       numericState = rawBodyState;
     }
 
     if (!taskId) {
-      res.status(400).send({ error: "Task ID is required." });
+      res.status(400).send({ error: 'Task ID is required.' });
       return;
     }
     // Validate the converted numericState
     if (!isValidTaskStatus(numericState)) {
-      res
-        .status(400)
-        .send({
-          error:
-            "Invalid state provided should be 'completed', 'failed', or 'uncompleted'.",
-        });
+      res.status(400).send({
+        error: "Invalid state provided should be 'completed', 'failed', or 'uncompleted'.",
+      });
       return;
     }
     try {
       // Fetch existing task data to preserve objectives if needed
       const progressDoc = await progressRef.get();
       const existingTaskData = progressDoc.data()?.tasks?.[taskId] ?? {}; // Get existing or empty object
-      const updateData: { [key: string]: any } = {};
+      const updateData: { [key: `tasks.${string}`]: TaskProgressData } = {};
       // Use dot notation for specific field update
       updateData[`tasks.${taskId}`] = {
         ...existingTaskData, // Preserve existing fields (like objectives)
         st: numericState, // Use the converted numeric state
       };
       await progressRef.update(updateData);
-      // TODO: Consider triggering task dependency updates (using updateTaskState)
-      // For example: await updateTaskState(ownerId, taskId, numericState, taskData);
-      // Ensure taskData is loaded if updateTaskState requires it.
-      res.status(200).send({ message: "Task updated successfully." });
-    } catch (error: any) {
-      functions.logger.error("Error updating single task:", {
-        error: error.message,
+      // Implement task dependency updates using updateTaskState
+      try {
+        const { getTaskData } = await import('../utils/dataLoaders.js');
+        const taskData = await getTaskData();
+        // Use the top-level imported updateTaskState instead of dynamic import
+        await updateTaskState(taskId, numericState, ownerId, taskData);
+      } catch (error) {
+        // Log error but don't fail the request if dependency updates fail
+        functions.logger.error('Error updating task dependencies:', {
+          error: error instanceof Error ? error.message : String(error),
+          userId: ownerId,
+          taskId,
+          numericState,
+        });
+      }
+      res.status(200).send({ message: 'Task updated successfully.' });
+    } catch (error: unknown) {
+      functions.logger.error('Error updating single task:', {
+        error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
         taskId: taskId,
         status: numericState, // Log the numeric state
       });
-      res.status(500).send({ error: "Failed to update task." });
+      res.status(500).send({ error: 'Failed to update task.' });
     }
   } else {
-    res
-      .status(401)
-      .send({ error: "Unauthorized or insufficient permissions." });
+    res.status(401).send({ error: 'Unauthorized or insufficient permissions.' });
   }
 };
 
@@ -550,23 +518,20 @@ const updateSingleTask = async (
  *       500:
  *         description: "Internal server error during batch update."
  */
-const updateMultipleTasks = async (
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> => {
+const updateMultipleTasks = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const ownerId = req.apiToken?.owner;
-  if (ownerId && req.apiToken?.permissions?.includes("WP")) {
+  if (ownerId && req.apiToken?.permissions?.includes('WP')) {
     const db: Firestore = admin.firestore();
     const progressRef: DocumentReference<ProgressDocData> = db
-      .collection("progress")
+      .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>;
     const taskUpdates: { [taskId: string]: number } = req.body;
     if (
-      typeof taskUpdates !== "object" ||
+      typeof taskUpdates !== 'object' ||
       taskUpdates === null ||
       Object.keys(taskUpdates).length === 0
     ) {
-      res.status(400).send({ error: "Invalid request body format." });
+      res.status(400).send({ error: 'Invalid request body format.' });
       return;
     }
     const batch: WriteBatch = db.batch();
@@ -581,7 +546,7 @@ const updateMultipleTasks = async (
           const status = taskUpdates[taskId];
           if (!isValidTaskStatus(status)) {
             invalidStatusFound = true;
-            functions.logger.warn("Invalid status found in batch update", {
+            functions.logger.warn('Invalid status found in batch update', {
               userId: ownerId,
               taskId: taskId,
               status: status,
@@ -592,39 +557,52 @@ const updateMultipleTasks = async (
           }
           const existingTaskData = existingTasksData[taskId] ?? {};
           // Prepare update data for this specific task using dot notation
-          const updateData: { [key: string]: any } = {};
+          const updateData: { [key: `tasks.${string}`]: TaskProgressData } = {};
           updateData[`tasks.${taskId}`] = {
             ...existingTaskData, // Preserve existing fields
             st: status,
           };
           // Add update operation to the batch
           batch.update(progressRef, updateData);
-          // TODO: Collect task updates for potential dependency checks
-          // updatePromises.push(updateTaskState(ownerId, taskId, status));
+          // Collect task updates for dependency checks
+          updatePromises.push(
+            (async () => {
+              try {
+                const { getTaskData } = await import('../utils/dataLoaders.js');
+                const taskData = await getTaskData();
+                // Use the top-level imported updateTaskState instead of dynamic import
+                await updateTaskState(taskId, status, ownerId, taskData);
+              } catch (error) {
+                // Log error but continue with other updates
+                functions.logger.error('Error updating task dependencies in batch:', {
+                  error: error instanceof Error ? error.message : String(error),
+                  userId: ownerId,
+                  taskId,
+                  status,
+                });
+              }
+            })()
+          );
         }
       }
       if (invalidStatusFound) {
-        res
-          .status(400)
-          .send({ error: "Invalid status value found in batch update." });
+        res.status(400).send({ error: 'Invalid status value found in batch update.' });
         return;
       }
       // Commit the batch write
       await batch.commit();
-      // TODO: Await dependency updates if implemented
-      // await Promise.all(updatePromises);
-      res.status(200).send({ message: "Tasks updated successfully." });
-    } catch (error: any) {
-      functions.logger.error("Error updating multiple tasks:", {
-        error: error.message,
+      // Process task dependency updates
+      await Promise.all(updatePromises);
+      res.status(200).send({ message: 'Tasks updated successfully.' });
+    } catch (error: unknown) {
+      functions.logger.error('Error updating multiple tasks:', {
+        error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
       });
-      res.status(500).send({ error: "Failed to update tasks." });
+      res.status(500).send({ error: 'Failed to update tasks.' });
     }
   } else {
-    res
-      .status(401)
-      .send({ error: "Unauthorized or insufficient permissions." });
+    res.status(401).send({ error: 'Unauthorized or insufficient permissions.' });
   }
 };
 
@@ -673,29 +651,26 @@ const updateMultipleTasks = async (
  *       500:
  *         description: "Internal server error."
  */
-const updateTaskObjective = async (
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> => {
+const updateTaskObjective = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const ownerId = req.apiToken?.owner;
-  if (ownerId && req.apiToken?.permissions?.includes("WP")) {
+  if (ownerId && req.apiToken?.permissions?.includes('WP')) {
     const db: Firestore = admin.firestore();
     const progressRef: DocumentReference<ProgressDocData> = db
-      .collection("progress")
+      .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>;
     const objectiveId: string = req.params.objectiveId;
     const status = req.body.status; // Can be boolean or number
-    if (!objectiveId || !objectiveId.includes("-")) {
-      res.status(400).send({ error: "Invalid objective ID format." });
+    if (!objectiveId || !objectiveId.includes('-')) {
+      res.status(400).send({ error: 'Invalid objective ID format.' });
       return;
     }
-    if (typeof status !== "boolean" && typeof status !== "number") {
-      res.status(400).send({ error: "Invalid status value." });
+    if (typeof status !== 'boolean' && typeof status !== 'number') {
+      res.status(400).send({ error: 'Invalid status value.' });
       return;
     }
-    const [taskId, objIndex] = objectiveId.split("-");
+    const [taskId, objIndex] = objectiveId.split('-');
     if (!taskId || !objIndex) {
-      res.status(400).send({ error: "Malformed objective ID." });
+      res.status(400).send({ error: 'Malformed objective ID.' });
       return;
     }
     try {
@@ -705,26 +680,23 @@ const updateTaskObjective = async (
       // Use update for nested field
       await progressRef.update(updateData);
       // TODO: Optionally re-evaluate task status based on objective completion
-      res.status(200).send({ message: "Task objective updated successfully." });
-    } catch (error: any) {
-      functions.logger.error("Error updating task objective:", {
-        error: error.message,
+      res.status(200).send({ message: 'Task objective updated successfully.' });
+    } catch (error: unknown) {
+      functions.logger.error('Error updating task objective:', {
+        error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
         objectiveId: objectiveId,
         status: status,
       });
       // Firestore update might fail if the path doesn't exist (e.g., task doesn't exist)
       // Consider checking if task exists first or handle specific errors
-      res.status(500).send({ error: "Failed to update task objective." });
+      res.status(500).send({ error: 'Failed to update task objective.' });
     }
   } else {
-    res
-      .status(401)
-      .send({ error: "Unauthorized or insufficient permissions." });
+    res.status(401).send({ error: 'Unauthorized or insufficient permissions.' });
   }
 };
 
-// Export using default export as assumed by index.ts import
 export default {
   getPlayerProgress,
   getTeamProgress,
