@@ -1,16 +1,10 @@
 <template>
-  <icon-card
-    icon="mdi-account-group"
-    icon-background="secondary"
-    icon-color="white"
-  >
+  <icon-card icon="mdi-account-group" icon-background="secondary" icon-color="white">
     <template #stat>
       {{ $t('page.team.card.manageteam.title') }}
     </template>
     <template #content>
-      <template
-        v-if="teamStore.$state.members && teamStore.$state.members.length > 0"
-      >
+      <template v-if="teamStore.$state.members && teamStore.$state.members.length > 0">
         <tracker-tip tip="teammembers" class="text-left"></tracker-tip>
         <v-container>
           <v-row>
@@ -40,8 +34,7 @@
           </v-row>
         </v-container>
       </template>
-      <template v-else>
-      </template>
+      <template v-else> </template>
     </template>
   </icon-card>
 </template>
@@ -49,19 +42,13 @@
   import { defineAsyncComponent, watch, computed } from 'vue';
   import { useLiveData } from '@/composables/livedata';
   import { fireuser } from '@/plugins/firebase';
-
-  const IconCard = defineAsyncComponent(
-    () => import('@/components/IconCard.vue')
-  );
+  const IconCard = defineAsyncComponent(() => import('@/components/IconCard.vue'));
   const TeammemberCard = defineAsyncComponent(
     () => import('@/components/teams/TeammemberCard.vue')
   );
-  const TrackerTip = defineAsyncComponent(
-    () => import('@/components/TrackerTip.vue')
-  );
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
   const { useTeamStore } = useLiveData();
   const teamStore = useTeamStore();
-
   const isCurrentUserTeamOwner = computed(() => {
     const currentTeamOwner = teamStore.$state.owner;
     const currentFireUID = fireuser.uid;

@@ -71,9 +71,7 @@
   <v-snackbar v-model="newTokenSnackbar" :timeout="4000" color="accent">
     {{ tokenResult }}
     <template #actions>
-      <v-btn color="white" variant="text" @click="newTokenSnackbar = false">
-        Close
-      </v-btn>
+      <v-btn color="white" variant="text" @click="newTokenSnackbar = false"> Close </v-btn>
     </template>
   </v-snackbar>
 </template>
@@ -84,9 +82,7 @@
   import { httpsCallable } from 'firebase/functions';
   import { useLiveData } from '@/composables/livedata';
   import availablePermissions from '@/utils/api_permissions';
-  const TokenCard = defineAsyncComponent(
-    () => import('@/components/settings/TokenCard.vue')
-  );
+  const TokenCard = defineAsyncComponent(() => import('@/components/settings/TokenCard.vue'));
   const { t } = useI18n({ useScope: 'global' });
   const { useSystemStore } = useLiveData();
   const systemStore = useSystemStore();
@@ -101,13 +97,10 @@
   const validNewToken = ref(false);
   const tokenName = ref('');
   const selectedPermissions = ref([]);
-  const selectedPermissionsCount = computed(
-    () => selectedPermissions.value.length
-  );
+  const selectedPermissionsCount = computed(() => selectedPermissions.value.length);
   const tokenNameRules = ref([
     (v) => !!v || 'You must enter a token description',
-    (v) =>
-      v.length <= 20 || 'Token description must be less than 20 characters',
+    (v) => v.length <= 20 || 'Token description must be less than 20 characters',
   ]);
   const creatingToken = ref(false);
   const tokenResult = ref(null);
@@ -141,10 +134,7 @@
       });
       // Add the new token to the systemStore
       if (tokenResult.value.data && tokenResult.value.data.token) {
-        systemStore.userTokens = [
-          ...systemStore.userTokens,
-          tokenResult.value.data.token,
-        ];
+        systemStore.userTokens = [...systemStore.userTokens, tokenResult.value.data.token];
         console.log(
           'Updated systemStore.userTokens in ApiTokens.vue (reassigned):',
           JSON.parse(JSON.stringify(systemStore.userTokens))
@@ -152,9 +142,7 @@
       }
       newTokenForm.value.reset();
       selectedPermissions.value = [];
-      tokenResult.value = t(
-        'page.settings.card.apitokens.create_token_success'
-      );
+      tokenResult.value = t('page.settings.card.apitokens.create_token_success');
       newTokenSnackbar.value = true;
     } catch (error) {
       tokenResult.value = t('page.settings.card.apitokens.create_token_error');

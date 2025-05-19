@@ -1,9 +1,5 @@
 <template>
-  <fitted-card
-    icon="mdi-account-wrench"
-    icon-color="white"
-    highlight-color="secondary"
-  >
+  <fitted-card icon="mdi-account-wrench" icon-color="white" highlight-color="secondary">
     <template #title>
       {{ $t('page.team.card.teamoptions.title') }}
     </template>
@@ -73,9 +69,7 @@
   import { computed } from 'vue';
   import { useUserStore } from '@/stores/user';
   import FittedCard from '@/components/FittedCard.vue';
-
   const userStore = useUserStore();
-
   const taskHideAll = computed({
     get: () => userStore.taskTeamAllHidden,
     set: (value) => userStore.setQuestTeamHideAll(value),
@@ -85,10 +79,7 @@
       ? 'page.team.card.teamoptions.task_hide_all'
       : 'page.team.card.teamoptions.task_show_all'
   );
-  const taskHideAllColor = computed(() =>
-    userStore.taskTeamAllHidden ? 'error' : 'success'
-  );
-
+  const taskHideAllColor = computed(() => (userStore.taskTeamAllHidden ? 'error' : 'success'));
   const itemsHideAll = computed({
     get: () => userStore.itemsTeamAllHidden,
     set: (value) => userStore.setItemsTeamHideAll(value),
@@ -98,10 +89,7 @@
       ? 'page.team.card.teamoptions.items_hide_all'
       : 'page.team.card.teamoptions.items_show_all'
   );
-  const itemsHideAllColor = computed(() =>
-    userStore.itemsTeamAllHidden ? 'error' : 'success'
-  );
-
+  const itemsHideAllColor = computed(() => (userStore.itemsTeamAllHidden ? 'error' : 'success'));
   const itemsHideNonFIR = computed({
     get: () => userStore.itemsTeamNonFIRHidden,
     set: (value) => userStore.setItemsTeamHideNonFIR(value),
@@ -114,7 +102,6 @@
   const itemsHideNonFIRColor = computed(() =>
     userStore.itemsTeamNonFIRHidden ? 'error' : 'success'
   );
-
   const itemsHideHideout = computed({
     get: () => userStore.itemsTeamHideoutHidden,
     set: (value) => userStore.setItemsTeamHideHideout(value),
@@ -127,7 +114,6 @@
   const itemsHideHideoutColor = computed(() =>
     userStore.itemsTeamHideoutHidden ? 'error' : 'success'
   );
-
   const mapHideAll = computed({
     get: () => userStore.mapTeamAllHidden,
     set: (value) => userStore.setMapTeamHideAll(value),
@@ -137,8 +123,6 @@
       ? 'page.team.card.teamoptions.map_hide_all'
       : 'page.team.card.teamoptions.map_show_all'
   );
-  const mapHideAllColor = computed(() =>
-    userStore.mapTeamAllHidden ? 'error' : 'success'
-  );
+  const mapHideAllColor = computed(() => (userStore.mapTeamAllHidden ? 'error' : 'success'));
 </script>
 <style lang="scss" scoped></style>

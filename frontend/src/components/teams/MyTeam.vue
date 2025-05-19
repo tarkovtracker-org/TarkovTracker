@@ -1,9 +1,5 @@
 <template>
-  <fitted-card
-    icon="mdi-account-supervisor"
-    icon-color="white"
-    highlight-color="secondary"
-  >
+  <fitted-card icon="mdi-account-supervisor" icon-color="white" highlight-color="secondary">
     <template #title>
       {{ $t('page.team.card.myteam.title') }}
     </template>
@@ -31,12 +27,7 @@
             </v-col>
             <v-col cols="auto">
               <!-- Button to copy the invite URL to clipboard -->
-              <v-btn
-                variant="outlined"
-                class="mx-1"
-                style="height: 100%"
-                @click="clearDisplayName"
-              >
+              <v-btn variant="outlined" class="mx-1" style="height: 100%" @click="clearDisplayName">
                 <v-icon>mdi-backspace</v-icon>
               </v-btn>
             </v-col>
@@ -54,12 +45,7 @@
             </v-col>
             <v-col cols="auto">
               <!-- Button to copy the invite URL to clipboard -->
-              <v-btn
-                variant="outlined"
-                class="mx-1"
-                style="height: 100%"
-                @click="copyUrl"
-              >
+              <v-btn variant="outlined" class="mx-1" style="height: 100%" @click="copyUrl">
                 <v-icon>mdi-content-copy</v-icon>
               </v-btn>
             </v-col>
@@ -104,17 +90,13 @@
   <v-snackbar v-model="createTeamSnackbar" :timeout="4000" color="accent">
     {{ createTeamResult }}
     <template #actions>
-      <v-btn color="white" variant="text" @click="createTeamSnackbar = false">
-        Close
-      </v-btn>
+      <v-btn color="white" variant="text" @click="createTeamSnackbar = false"> Close </v-btn>
     </template>
   </v-snackbar>
   <v-snackbar v-model="leaveTeamSnackbar" :timeout="4000" color="accent">
     {{ leaveTeamResult }}
     <template #actions>
-      <v-btn color="white" variant="text" @click="leaveTeamSnackbar = false">
-        Close
-      </v-btn>
+      <v-btn color="white" variant="text" @click="leaveTeamSnackbar = false"> Close </v-btn>
     </template>
   </v-snackbar>
 </template>
@@ -126,14 +108,12 @@
   import { useUserStore } from '@/stores/user';
   import { useTarkovStore } from '@/stores/tarkov';
   import FittedCard from '@/components/FittedCard.vue';
-
   const { t } = useI18n({ useScope: 'global' });
   const { useTeamStore, useSystemStore } = useLiveData();
   const teamStore = useTeamStore();
   const systemStore = useSystemStore();
   const generateRandomName = (length = 6) => {
-    const characters =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
     const charactersLength = characters.length;
     for (let i = 0; i < length; i++) {
@@ -161,9 +141,7 @@
       'systemStore.$state.team:',
       systemStore.$state.team
     );
-    return (
-      teamStore.$state.owner === fireuser.uid && systemStore.$state.team != null
-    );
+    return teamStore.$state.owner === fireuser.uid && systemStore.$state.team != null;
   });
   // Create new team
   const creatingTeam = ref(false);
@@ -181,12 +159,8 @@
     );
     // Check if our reactive state indicates a logged-in user
     if (!fireuser.loggedIn || !fireuser.uid) {
-      console.error(
-        '[MyTeam.vue] createTeam - User not authenticated (reactive state).'
-      );
-      createTeamResult.value = t(
-        'page.team.card.myteam.user_not_authenticated'
-      );
+      console.error('[MyTeam.vue] createTeam - User not authenticated (reactive state).');
+      createTeamResult.value = t('page.team.card.myteam.user_not_authenticated');
       createTeamSnackbar.value = true;
       creatingTeam.value = false;
       return;
@@ -234,10 +208,7 @@
           }
         } catch (e) {
           // Failed to parse JSON or other issue reading error response body
-          console.warn(
-            '[MyTeam.vue] Could not parse JSON from error response body:',
-            e
-          );
+          console.warn('[MyTeam.vue] Could not parse JSON from error response body:', e);
           if (response.statusText) {
             specificErrorMessage = response.statusText; // Fallback to status text
           }
@@ -250,9 +221,7 @@
       const result = await response.json();
       // Check for the team field under result.data.team
       if (!result.data || !result.data.team) {
-        createTeamResult.value = t(
-          'page.team.card.myteam.create_team_error_ui_update'
-        );
+        createTeamResult.value = t('page.team.card.myteam.create_team_error_ui_update');
         createTeamSnackbar.value = true;
         return;
       }
@@ -270,11 +239,7 @@
           console.warn(
             '[MyTeam.vue] Timeout (15s) waiting for systemStore.$state.team to become non-null.'
           );
-          reject(
-            new Error(
-              'Timed out waiting for system record to update with new team ID.'
-            )
-          );
+          reject(new Error('Timed out waiting for system record to update with new team ID.'));
         }, 15000);
         let stopWatchingSystemTeam;
         stopWatchingSystemTeam = watch(
@@ -289,9 +254,7 @@
               if (stopWatchingSystemTeam) {
                 stopWatchingSystemTeam();
               }
-              console.debug(
-                '[MyTeam.vue] systemStore.$state.team is now populated.'
-              );
+              console.debug('[MyTeam.vue] systemStore.$state.team is now populated.');
               resolve(newTeamId);
             }
           },
@@ -330,12 +293,7 @@
               fireuser.uid
             );
             // We need both owner to match and password to be populated
-            if (
-              newOwner &&
-              fireuser.uid &&
-              newOwner === fireuser.uid &&
-              newPassword
-            ) {
+            if (newOwner && fireuser.uid && newOwner === fireuser.uid && newPassword) {
               clearTimeout(timeout);
               if (stopWatchingTeamOwnerAndPassword) {
                 stopWatchingTeamOwnerAndPassword();
@@ -388,24 +346,18 @@
           '[MyTeam.vue] Team creation failed: UI state (localUserTeam) did not update after nextTick. $state.team:',
           systemStore.$state.team
         );
-        createTeamResult.value = t(
-          'page.team.card.myteam.create_team_error_ui_update'
-        );
+        createTeamResult.value = t('page.team.card.myteam.create_team_error_ui_update');
         createTeamSnackbar.value = true;
       }
     } catch (error) {
       // Log the full error object for inspection
-      console.error(
-        '[MyTeam.vue] Error in createTeam function. Full error object below:'
-      );
+      console.error('[MyTeam.vue] Error in createTeam function. Full error object below:');
       console.dir(error);
       console.error(
         '[MyTeam.vue] ERROR OBJECT (stringified, in case dir is not showing full details):'
       );
       try {
-        console.log(
-          JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-        );
+        console.log(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
         console.error('[MyTeam.vue] Could not stringify the error object:', e);
       }
@@ -430,11 +382,7 @@
           }
         }
         // If no message from .details, fallback to error.message
-        if (
-          !messageForSnackbar &&
-          typeof error.message === 'string' &&
-          error.message.length > 0
-        ) {
+        if (!messageForSnackbar && typeof error.message === 'string' && error.message.length > 0) {
           messageForSnackbar = error.message;
         }
       }
@@ -461,9 +409,7 @@
     leavingTeam.value = true;
     // Check if our reactive state indicates a logged-in user
     if (!fireuser.loggedIn || !fireuser.uid) {
-      console.error(
-        '[MyTeam.vue] leaveTeam - User not authenticated (reactive state).'
-      );
+      console.error('[MyTeam.vue] leaveTeam - User not authenticated (reactive state).');
       leaveTeamResult.value = t('page.team.card.myteam.user_not_authenticated'); // Use existing or new translation key
       leaveTeamSnackbar.value = true;
       leavingTeam.value = false;
@@ -496,8 +442,7 @@
       );
       const result = await response.json();
       if (!response.ok) {
-        leaveTeamResult.value =
-          result.error || t('page.team.card.myteam.leave_team_error');
+        leaveTeamResult.value = result.error || t('page.team.card.myteam.leave_team_error');
         leaveTeamSnackbar.value = true;
         throw new Error(result.error || 'Failed to leave team');
       }

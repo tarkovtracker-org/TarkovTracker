@@ -11,6 +11,7 @@
             <v-switch
               v-model="hideGlobalTasks"
               :label="$t(hideGlobalTasksLabel)"
+              :disabled="Boolean(userStore.saving && userStore.saving.hideGlobalTasks)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
@@ -21,6 +22,7 @@
             <v-switch
               v-model="hideNonKappaTasks"
               :label="$t(hideNonKappaTasksLabel)"
+              :disabled="Boolean(userStore.saving && userStore.saving.hideNonKappaTasks)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
@@ -28,6 +30,16 @@
               hide-details
               density="compact"
             ></v-switch>
+            <v-progress-circular
+              v-if="
+                userStore.saving &&
+                (userStore.saving.hideGlobalTasks || userStore.saving.hideNonKappaTasks)
+              "
+              indeterminate
+              color="primary"
+              size="20"
+              class="ml-2 align-middle"
+            />
           </v-col>
         </v-row>
       </v-container>
@@ -62,12 +74,8 @@
       ? 'page.settings.card.questfilter.hide_non_kappa_tasks'
       : 'page.settings.card.questfilter.show_non_kappa_tasks'
   );
-  const hideGlobalTasksColor = computed(() =>
-    hideGlobalTasks.value ? 'error' : 'success'
-  );
-  const hideNonKappaTasksColor = computed(() =>
-    hideNonKappaTasks.value ? 'error' : 'success'
-  );
+  const hideGlobalTasksColor = computed(() => (hideGlobalTasks.value ? 'error' : 'success'));
+  const hideNonKappaTasksColor = computed(() => (hideNonKappaTasks.value ? 'error' : 'success'));
 </script>
 <style lang="scss" scoped>
   a:link,
