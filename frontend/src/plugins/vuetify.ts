@@ -1,19 +1,12 @@
-// Styles
 import '@mdi/font/css/materialdesignicons.css';
 import 'vuetify/styles';
-import colors from 'vuetify/lib/util/colors'; // Assuming this path provides typed colors
+import colors from 'vuetify/lib/util/colors';
 import { useI18n } from 'vue-i18n';
 import { createVueI18nAdapter } from 'vuetify/locale/adapters/vue-i18n';
 import { mdi } from 'vuetify/iconsets/mdi';
-// Import from the new TypeScript i18n file
 import i18n from './i18n';
-
-// Vuetify
-import { createVuetify, type VuetifyOptions } from 'vuetify'; // Import type for options
-// Import ThemeDefinition if needed for explicit typing
+import { createVuetify, type VuetifyOptions } from 'vuetify';
 import type { ThemeDefinition } from 'vuetify';
-
-// Define type for color theme keys
 type ColorThemeKeys =
   | 'primary'
   | 'secondary'
@@ -28,7 +21,6 @@ type ColorThemeKeys =
   | 'error'
   | 'failure'
   | 'tasklink';
-
 // Type the colorTheme object
 const colorTheme: Record<ColorThemeKeys, string> = {
   primary: '#0A0A09',
@@ -45,8 +37,6 @@ const colorTheme: Record<ColorThemeKeys, string> = {
   failure: '#391111', // Note: Same as warning
   tasklink: '#00acc1',
 };
-
-// Define the custom theme with types
 const trackerTheme: ThemeDefinition = {
   dark: true,
   colors: {
@@ -64,14 +54,12 @@ const trackerTheme: ThemeDefinition = {
     contentbackground: '#1E1E1E',
   },
 };
-
 // Explicitly type the options passed to createVuetify
 const vuetifyOptions: VuetifyOptions = {
   locale: {
     // The adapter type should be inferred correctly here
     adapter: createVueI18nAdapter({ i18n, useI18n }),
   },
-  // Global settings moved under defaults
   defaults: {
     global: {
       ripple: false,
@@ -86,9 +74,8 @@ const vuetifyOptions: VuetifyOptions = {
   theme: {
     defaultTheme: 'trackerTheme',
     themes: {
-      trackerTheme, // Use the defined theme object
+      trackerTheme,
     },
   },
 };
-
 export default createVuetify(vuetifyOptions);

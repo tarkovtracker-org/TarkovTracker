@@ -45,14 +45,8 @@
                     ? 'secondary'
                     : 'grey'
                 "
-                :content="
-                  mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id]
-                "
-                :label="
-                  String(
-                    mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id]
-                  )
-                "
+                :content="mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id]"
+                :label="String(mapTaskTotals[map.mergedIds ? map.mergedIds[0] : map.id])"
                 offset-y="-5"
                 offset-x="-10"
               >
@@ -73,11 +67,7 @@
             align-tabs="center"
             show-arrows
           >
-            <v-tab
-              v-for="(trader, index) in orderedTraders"
-              :key="index"
-              :value="trader.id"
-            >
+            <v-tab v-for="(trader, index) in orderedTraders" :key="index" :value="trader.id">
               <v-avatar color="primary" size="2em" class="mr-2">
                 <v-img :src="traderAvatar(trader.id)" />
               </v-avatar>
@@ -124,9 +114,7 @@
               v-for="view in userViews"
               :key="view.view"
               :value="view.view"
-              :disabled="
-                view.view == 'all' && activeSecondaryView != 'available'
-              "
+              :disabled="view.view == 'all' && activeSecondaryView != 'available'"
             >
               {{ view.title }}
             </v-tab>
@@ -137,20 +125,14 @@
     <v-row justify="center">
       <v-col v-if="loadingTasks || reloadingTasks" cols="12" align="center">
         <!-- If we're still waiting on tasks from tarkov.dev API -->
-        <v-progress-circular
-          indeterminate
-          color="secondary"
-          class="mx-2"
-        ></v-progress-circular>
+        <v-progress-circular indeterminate color="secondary" class="mx-2"></v-progress-circular>
         {{ t('page.tasks.loading') }}
         <refresh-button />
       </v-col>
     </v-row>
     <v-row v-if="!loadingTasks && !reloadingTasks && visibleTasks.length == 0">
       <v-col cols="12">
-        <v-alert icon="mdi-clipboard-search">
-          {{ t('page.tasks.notasksfound') }}</v-alert
-        >
+        <v-alert icon="mdi-clipboard-search"> {{ t('page.tasks.notasksfound') }}</v-alert>
       </v-col>
     </v-row>
     <v-row v-show="!loadingTasks && !reloadingTasks" justify="center">
@@ -158,8 +140,7 @@
         <v-expansion-panels v-model="expandMap">
           <v-expansion-panel>
             <v-expansion-panel-title
-              >Objective Locations<span
-                v-show="activeMapView != '55f2d3fd4bdc2d5f408b4567'"
+              >Objective Locations<span v-show="activeMapView != '55f2d3fd4bdc2d5f408b4567'"
                 >&nbsp;-&nbsp;{{ timeValue }}</span
               ></v-expansion-panel-title
             >
@@ -190,32 +171,17 @@
   </v-container>
 </template>
 <script setup>
-  import {
-    defineAsyncComponent,
-    computed,
-    watch,
-    ref,
-    shallowRef,
-    watchEffect,
-  } from 'vue';
+  import { defineAsyncComponent, computed, watch, ref, shallowRef, watchEffect } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { useUserStore } from '@/stores/user';
   import { useTarkovData } from '@/composables/tarkovdata';
   import { useProgressStore } from '@/stores/progress';
   import { useTarkovStore } from '@/stores/tarkov';
 
-  const TrackerTip = defineAsyncComponent(
-    () => import('@/components/TrackerTip.vue')
-  );
-  const TaskCard = defineAsyncComponent(
-    () => import('@/components/tasks/TaskCard.vue')
-  );
-  const RefreshButton = defineAsyncComponent(
-    () => import('@/components/RefreshButton.vue')
-  );
-  const TarkovMap = defineAsyncComponent(
-    () => import('@/components/TarkovMap.vue')
-  );
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
+  const TaskCard = defineAsyncComponent(() => import('@/components/tasks/TaskCard.vue'));
+  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton.vue'));
+  const TarkovMap = defineAsyncComponent(() => import('@/components/TarkovMap.vue'));
   const { t } = useI18n({ useScope: 'global' });
   const userStore = useUserStore();
   const progressStore = useProgressStore();
@@ -295,13 +261,7 @@
     get: () => userStore.getTaskUserView,
     set: (value) => userStore.setTaskUserView(value),
   });
-  const {
-    tasks,
-    maps,
-    traders,
-    loading: tasksLoading,
-    disabledTasks,
-  } = useTarkovData();
+  const { tasks, maps, traders, loading: tasksLoading, disabledTasks } = useTarkovData();
   const userViews = computed(() => {
     let views = [];
     const teamStoreKeys = Object.keys(progressStore.visibleTeamStores);
@@ -378,13 +338,11 @@
     for (const task of visibleTasks.value) {
       let unlockedUsers = [];
       if (progressStore.unlockedTasks && progressStore.unlockedTasks[task.id]) {
-        Object.entries(progressStore.unlockedTasks[task.id]).forEach(
-          ([teamId, unlocked]) => {
-            if (unlocked) {
-              unlockedUsers.push(teamId);
-            }
+        Object.entries(progressStore.unlockedTasks[task.id]).forEach(([teamId, unlocked]) => {
+          if (unlocked) {
+            unlockedUsers.push(teamId);
           }
-        );
+        });
       }
       // For each objective
       for (const objective of task.objectives) {
@@ -407,10 +365,7 @@
             const objCompletionForId = progressStore.objectiveCompletions
               ? progressStore.objectiveCompletions[objective.id]
               : undefined;
-            if (
-              objCompletionForId &&
-              objCompletionForId[activeUserView.value] === false
-            ) {
+            if (objCompletionForId && objCompletionForId[activeUserView.value] === false) {
               // Were a valid, unlocked, uncompleted objective, so add it to the list
               visibleGPS.push({ ...objective, users: activeUserView.value });
             }
@@ -421,10 +376,7 @@
     return visibleGPS;
   });
   function objectiveHasLocation(objective) {
-    if (
-      objective?.possibleLocations?.length > 0 ||
-      objective?.zones?.length > 0
-    ) {
+    if (objective?.possibleLocations?.length > 0 || objective?.zones?.length > 0) {
       return true;
     } else {
       return false;
@@ -513,19 +465,13 @@
           // Check if task is available for the user
           const unlocked =
             activeUserView.value == 'all'
-              ? Object.values(progressStore.unlockedTasks[task.id] || {}).some(
-                  Boolean
-                )
+              ? Object.values(progressStore.unlockedTasks[task.id] || {}).some(Boolean)
               : progressStore.unlockedTasks[task.id]?.[activeUserView.value];
           if (unlocked) {
             let anyObjectiveLeft = false;
             for (const objective of task.objectives || []) {
-              if (
-                Array.isArray(objective.maps) &&
-                objective.maps.some((m) => ids.includes(m.id))
-              ) {
-                const completions =
-                  progressStore.objectiveCompletions[objective.id] || {};
+              if (Array.isArray(objective.maps) && objective.maps.some((m) => ids.includes(m.id))) {
+                const completions = progressStore.objectiveCompletions[objective.id] || {};
                 const isComplete =
                   activeUserView.value == 'all'
                     ? Object.values(completions).every(Boolean)
@@ -560,9 +506,7 @@
   const updateVisibleTasks = async function () {
     // Guard clause: Wait until necessary data is loaded/available
     if (tasksLoading.value) {
-      console.warn(
-        'updateVisibleTasks: TarkovData (tasks) still loading, deferring update.'
-      );
+      console.warn('updateVisibleTasks: TarkovData (tasks) still loading, deferring update.');
       return; // Exit if core task data isn't loaded
     }
     // Guard clause: Ensure userStore getter is available (should always return boolean due to || false)
@@ -570,9 +514,7 @@
     // We already define `hideNonKappaTasks = computed(...)`, let's trust it exists but check its value source's readiness indirectly
     // A simple check on tasks.value existing is a good proxy for data readiness post-loading
     if (!tasks.value) {
-      console.warn(
-        'updateVisibleTasks: tasks.value is not ready, deferring update.'
-      );
+      console.warn('updateVisibleTasks: tasks.value is not ready, deferring update.');
       return;
     }
     // Guard clause: Ensure disabledTasks ref exists AND its value is an array
@@ -605,9 +547,7 @@
         const ids = mergedMap.mergedIds;
         visibleTaskList = visibleTaskList.filter((task) => {
           // Check locations field
-          let taskLocations = Array.isArray(task.locations)
-            ? task.locations
-            : [];
+          let taskLocations = Array.isArray(task.locations) ? task.locations : [];
           let hasMap = ids.some((id) => taskLocations.includes(id));
           // Check objectives[].maps
           if (!hasMap && Array.isArray(task.objectives)) {
@@ -631,9 +571,7 @@
         });
       }
     } else if (activePrimaryView.value == 'traders') {
-      visibleTaskList = visibleTaskList.filter(
-        (task) => task.trader?.id == activeTraderView.value
-      );
+      visibleTaskList = visibleTaskList.filter((task) => task.trader?.id == activeTraderView.value);
     }
     if (activeUserView.value == 'all') {
       // We want to show tasks by their availability to any team member
@@ -644,16 +582,13 @@
           let taskIsNeededBySomeone = false;
 
           for (const teamId of Object.keys(progressStore.visibleTeamStores)) {
-            const isUnlockedForUser =
-              progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
-            const isCompletedByUser =
-              progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
+            const isUnlockedForUser = progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
+            const isCompletedByUser = progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
 
             // Check faction requirements for this specific user
             const userFaction = progressStore.playerFaction[teamId];
             const taskFaction = task.factionName;
-            const factionMatch =
-              taskFaction == 'Any' || taskFaction == userFaction;
+            const factionMatch = taskFaction == 'Any' || taskFaction == userFaction;
 
             if (isUnlockedForUser && !isCompletedByUser && factionMatch) {
               taskIsNeededBySomeone = true;
@@ -678,24 +613,17 @@
       // We want to show tasks by their availability to a specific team member
       if (activeSecondaryView.value == 'available') {
         visibleTaskList = visibleTaskList.filter(
-          (task) =>
-            progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] ===
-            true
+          (task) => progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] === true
         );
       } else if (activeSecondaryView.value == 'locked') {
         visibleTaskList = visibleTaskList.filter(
           (task) =>
-            progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] !=
-              true &&
-            progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] !=
-              true
+            progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] != true &&
+            progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] != true
         );
       } else if (activeSecondaryView.value == 'completed') {
         visibleTaskList = visibleTaskList.filter((task) => {
-          return (
-            progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] ==
-            true
-          );
+          return progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] == true;
         });
       }
       // Filter out tasks not for the faction of the specified user
@@ -717,9 +645,7 @@
     );
     // Use optional chaining to safely access .value
     if (hideNonKappaTasks?.value) {
-      visibleTaskList = visibleTaskList.filter(
-        (task) => task.kappaRequired == true
-      );
+      visibleTaskList = visibleTaskList.filter((task) => task.kappaRequired == true);
     }
     // Finally, map the tasks to their IDs
     //visibleTaskList = visibleTaskList.map((task) => task.id)

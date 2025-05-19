@@ -27,7 +27,7 @@ interface HideoutModule {
 export interface UserState {
   level: number;
   gameEdition: number;
-  pmcFaction: 'USEC' | 'BEAR'; // Use union type for specific factions
+  pmcFaction: 'USEC' | 'BEAR';
   displayName: string | null;
   taskObjectives: { [objectiveId: string]: TaskObjective };
   taskCompletions: { [taskId: string]: TaskCompletion };
@@ -49,9 +49,7 @@ export const defaultState: UserState = {
 
 // Type definition for Getter functions (State as first arg, returns specific type)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Getter<S, R = any, Args extends any[] = any[]> = (
-  state: S
-) => (...args: Args) => R;
+type Getter<S, R = any, Args extends any[] = any[]> = (state: S) => (...args: Args) => R;
 // Type definition for Action functions (this context is State, accepts args, returns void)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Action<S, Args extends any[] = any[]> = (this: S, ...args: Args) => void;
@@ -104,51 +102,34 @@ export const getters: UserGetters = {
   playerLevel(state) {
     return () => state.level ?? 1;
   },
-
   getGameEdition(state) {
     return () => state.gameEdition ?? 1;
   },
-
   getPMCFaction(state) {
     return () => state.pmcFaction ?? 'USEC';
   },
-
   getDisplayName(state) {
     // If an empty string, return null
-    return () =>
-      state.displayName === '' ? null : (state.displayName ?? null);
+    return () => (state.displayName === '' ? null : (state.displayName ?? null));
   },
-
   getObjectiveCount(state) {
     return (objectiveId) => state?.taskObjectives?.[objectiveId]?.count ?? 0;
   },
-
   getHideoutPartCount(state) {
     return (objectiveId) => state?.hideoutParts?.[objectiveId]?.count ?? 0;
   },
-
-  // Check if a specific task is completed
   isTaskComplete(state) {
     return (taskId) => state?.taskCompletions?.[taskId]?.complete ?? false;
   },
-
   isTaskFailed(state) {
     return (taskId) => state?.taskCompletions?.[taskId]?.failed ?? false;
   },
-
-  // Check if a specific task objective is completed
   isTaskObjectiveComplete(state) {
-    return (objectiveId) =>
-      state?.taskObjectives?.[objectiveId]?.complete ?? false;
+    return (objectiveId) => state?.taskObjectives?.[objectiveId]?.complete ?? false;
   },
-
-  // Check if a specific hideout part is completed
   isHideoutPartComplete(state) {
-    return (objectiveId) =>
-      state?.hideoutParts?.[objectiveId]?.complete ?? false;
+    return (objectiveId) => state?.hideoutParts?.[objectiveId]?.complete ?? false;
   },
-
-  // Check if a specific hideout objective is completed
   isHideoutModuleComplete(state) {
     return (hideoutId) => state?.hideoutModules?.[hideoutId]?.complete ?? false;
   },
@@ -163,28 +144,22 @@ export const actions: UserActions = {
       this.level = 2;
     }
   },
-
   decrementLevel() {
     if (this.level && this.level > 1) {
-      // Ensure level doesn't go below 1
       this.level--;
     } else {
       this.level = 1;
     }
   },
-
   setLevel(level) {
-    this.level = level > 0 ? level : 1; // Ensure level is positive
+    this.level = level > 0 ? level : 1;
   },
-
   setGameEdition(edition) {
     this.gameEdition = edition;
   },
-
   setPMCFaction(faction) {
     this.pmcFaction = faction;
   },
-
   setDisplayName(name) {
     if (typeof name === 'string') {
       this.displayName = name;
@@ -192,52 +167,46 @@ export const actions: UserActions = {
       this.displayName = null;
     }
   },
-
   setObjectiveCount(objectiveId, count) {
     if (!this.taskObjectives) {
       this.taskObjectives = {};
     }
     this.taskObjectives[objectiveId] = {
-      ...(this.taskObjectives[objectiveId] || {}), // Preserve existing properties if any
-      count: count >= 0 ? count : 0, // Ensure count is non-negative
+      ...(this.taskObjectives[objectiveId] || {}),
+      count: count >= 0 ? count : 0,
     };
   },
-
   setHideoutPartCount(objectiveId, count) {
     if (!this.hideoutParts) {
       this.hideoutParts = {};
     }
     this.hideoutParts[objectiveId] = {
-      ...(this.hideoutParts[objectiveId] || {}), // Preserve existing properties
-      count: count >= 0 ? count : 0, // Ensure count is non-negative
+      ...(this.hideoutParts[objectiveId] || {}),
+      count: count >= 0 ? count : 0,
     };
   },
-
-  // Set a task as complete
   setTaskComplete(taskId) {
     if (!this.taskCompletions) {
       this.taskCompletions = {};
     }
     this.taskCompletions[taskId] = {
-      ...(this.taskCompletions[taskId] || {}), // Preserve existing properties
+      ...(this.taskCompletions[taskId] || {}),
       complete: true,
-      failed: false, // Ensure failed is false when completing
+      failed: false,
       timestamp: Date.now(),
     };
   },
-
   setTaskFailed(taskId) {
     if (!this.taskCompletions) {
       this.taskCompletions = {};
     }
     this.taskCompletions[taskId] = {
-      ...(this.taskCompletions[taskId] || {}), // Preserve existing properties
+      ...(this.taskCompletions[taskId] || {}),
       complete: true, // Typically failed tasks are also considered 'complete' in terms of progression
       failed: true,
       timestamp: Date.now(),
     };
   },
-
   setTaskUncompleted(taskId) {
     if (!this.taskCompletions) {
       this.taskCompletions = {};
@@ -249,8 +218,6 @@ export const actions: UserActions = {
       // Consider whether to keep or remove timestamp
     };
   },
-
-  // Set a task objective as complete
   setTaskObjectiveComplete(objectiveId) {
     if (!this.taskObjectives) {
       this.taskObjectives = {};
@@ -261,7 +228,6 @@ export const actions: UserActions = {
       timestamp: Date.now(),
     };
   },
-
   setTaskObjectiveUncomplete(objectiveId) {
     if (!this.taskObjectives) {
       this.taskObjectives = {};
@@ -271,19 +237,15 @@ export const actions: UserActions = {
       complete: false,
     };
   },
-
   toggleTaskObjectiveComplete(objectiveId) {
     // Need to use the getter function correctly - getters return functions
     const objectiveCompleteGetter = getters.isTaskObjectiveComplete(this);
     if (objectiveCompleteGetter(objectiveId)) {
-      // Call action explicitly, passing the correct 'this' context
       actions.setTaskObjectiveUncomplete.call(this, objectiveId);
     } else {
       actions.setTaskObjectiveComplete.call(this, objectiveId);
     }
   },
-
-  // Set a hideout part as complete
   setHideoutPartComplete(objectiveId) {
     if (!this.hideoutParts) {
       this.hideoutParts = {};
@@ -294,8 +256,6 @@ export const actions: UserActions = {
       timestamp: Date.now(),
     };
   },
-
-  // Added missing action
   setHideoutPartUncomplete(objectiveId) {
     if (!this.hideoutParts) {
       this.hideoutParts = {};
@@ -305,19 +265,14 @@ export const actions: UserActions = {
       complete: false,
     };
   },
-
-  // Added missing action
   toggleHideoutPartComplete(objectiveId) {
     const partCompleteGetter = getters.isHideoutPartComplete(this);
     if (partCompleteGetter(objectiveId)) {
-      // Call action explicitly, passing the correct 'this' context
       actions.setHideoutPartUncomplete.call(this, objectiveId);
     } else {
       actions.setHideoutPartComplete.call(this, objectiveId);
     }
   },
-
-  // Set a hideout module as complete
   setHideoutModuleComplete(hideoutId) {
     if (!this.hideoutModules) {
       this.hideoutModules = {};
@@ -328,7 +283,6 @@ export const actions: UserActions = {
       timestamp: Date.now(),
     };
   },
-
   setHideoutModuleUncomplete(hideoutId) {
     if (!this.hideoutModules) {
       this.hideoutModules = {};
@@ -338,12 +292,9 @@ export const actions: UserActions = {
       complete: false,
     };
   },
-
-  // Added missing action
   toggleHideoutModuleComplete(hideoutId) {
     const moduleCompleteGetter = getters.isHideoutModuleComplete(this);
     if (moduleCompleteGetter(hideoutId)) {
-      // Call action explicitly, passing the correct 'this' context
       actions.setHideoutModuleUncomplete.call(this, hideoutId);
     } else {
       actions.setHideoutModuleComplete.call(this, hideoutId);

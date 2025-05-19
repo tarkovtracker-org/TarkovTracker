@@ -14,7 +14,9 @@
       project. Updated data will be automatically pulled from
       <a href="http://tarkov.dev/" target="_blank">tarkov.dev</a> as changes are
       discovered and confirmed. Contributions and bug reports are welcome on the
-      <a href="https://github.com/DysektAI/TarkovTracker" target="_blank"
+      <a
+        href="https://github.com/tarkovtracker-org/TarkovTracker"
+        target="_blank"
         >GitHub repo fork</a
       >
       to help keep the project up to date.

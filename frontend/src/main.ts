@@ -11,8 +11,6 @@ import { app as fireapp } from './plugins/firebase';
 import { markInitialized, forceInitialize } from './plugins/store-initializer';
 // Base app component
 import App from './App.vue';
-// Import DataMigrationDialog for global registration
-import DataMigrationDialog from './components/DataMigrationDialog.vue';
 
 // Define custom window property
 declare global {
@@ -27,17 +25,12 @@ window.__TARKOV_DATA_MIGRATED = false;
 // Create app instance
 const app = createApp(App);
 // Global error handler for debugging
-app.config.errorHandler = (
-  err: unknown,
-  vm: ComponentPublicInstance | null,
-  info: string
-) => {
+app.config.errorHandler = (err: unknown, vm: ComponentPublicInstance | null, info: string) => {
   console.error('Vue Error:', err);
   console.error('Component:', vm);
   console.error('Info:', info);
 };
-// Register DataMigrationDialog as a global component for easier access
-app.component('DataMigrationDialog', DataMigrationDialog);
+
 // Configure app with plugins in the correct order
 app.use(i18n);
 // Initialize Pinia first
