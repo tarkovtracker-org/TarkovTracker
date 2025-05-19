@@ -3,8 +3,7 @@ import type { Store, StateTree } from 'pinia';
 import type { UserState } from '@/shared_state';
 
 // Typed teammateStores for Pinia best practices
-export const teammateStores: Ref<Record<string, Store<string, UserState>>> =
-  ref({});
+export const teammateStores: Ref<Record<string, Store<string, UserState>>> = ref({});
 import { fireuser, firestore } from '@/plugins/firebase';
 import {
   doc,
@@ -16,13 +15,7 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { defineStore, storeToRefs, _GettersTree, _ActionsTree } from 'pinia';
-import {
-  getters,
-  actions,
-  defaultState,
-  UserGetters,
-  UserActions,
-} from '@/shared_state';
+import { getters, actions, defaultState, UserGetters, UserActions } from '@/shared_state';
 import { useUserStore } from '@/stores/user';
 const firedb: Firestore = firestore;
 interface SystemState extends StateTree {
@@ -35,37 +28,32 @@ interface SystemGetters extends _GettersTree<SystemState> {
   userTeam: (state: SystemState) => string | null;
   userTeamIsOwn: (state: SystemState) => boolean;
 }
-const useSystemStore = defineStore<string, SystemState, SystemGetters>(
-  'system',
-  {
-    state: (): SystemState => ({}),
-    getters: {
-      userTokens(state) {
-        return state?.tokens || [];
-      },
-      userTokenCount(state) {
-        return state?.tokens?.length || 0;
-      },
-      userTeam(state) {
-        return state?.team || null;
-      },
-      userTeamIsOwn(state) {
-        return state?.team == fireuser?.uid || false;
-      },
+const useSystemStore = defineStore<string, SystemState, SystemGetters>('system', {
+  state: (): SystemState => ({}),
+  getters: {
+    userTokens(state) {
+      return state?.tokens || [];
     },
-  }
-);
+    userTokenCount(state) {
+      return state?.tokens?.length || 0;
+    },
+    userTeam(state) {
+      return state?.team || null;
+    },
+    userTeamIsOwn(state) {
+      return state?.team == fireuser?.uid || false;
+    },
+  },
+});
 const systemStore = useSystemStore();
 const userStore = useUserStore();
-const systemRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(
-  () => {
-    if (fireuser.loggedIn) {
-      return doc(collection(firedb, 'system'), fireuser.uid as string);
-    } else {
-      return null;
-    }
+const systemRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(() => {
+  if (fireuser.loggedIn) {
+    return doc(collection(firedb, 'system'), fireuser.uid as string);
+  } else {
+    return null;
   }
-);
+});
 const systemUnsubscribe: Ref<Unsubscribe | null> = ref(null);
 function clearState(store: Store, newState?: DocumentData | {}): void {
   try {
@@ -125,9 +113,7 @@ function startStoreWatcher(
                 const teamStateAfterPatch = store.$state as TeamState;
                 console.log(
                   '[livedata][startStoreWatcher/teamStore] teamStore.$state.members AFTER patch:',
-                  JSON.parse(
-                    JSON.stringify(teamStateAfterPatch.members || null)
-                  )
+                  JSON.parse(JSON.stringify(teamStateAfterPatch.members || null))
                 );
                 console.log(
                   '[livedata][startStoreWatcher/teamStore] teamStore.$state AFTER patch (full):',
@@ -160,20 +146,18 @@ function startStoreWatcher(
   );
 }
 startStoreWatcher(systemStore, systemRef, systemUnsubscribe);
-const teamRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(
-  () => {
-    const currentSystemStateTeam = systemStore.$state.team;
-    if (fireuser.loggedIn) {
-      if (currentSystemStateTeam && typeof currentSystemStateTeam == 'string') {
-        return doc(collection(firedb, 'team'), currentSystemStateTeam);
-      } else {
-        return null;
-      }
+const teamRef: ComputedRef<DocumentReference<DocumentData> | null> = computed(() => {
+  const currentSystemStateTeam = systemStore.$state.team;
+  if (fireuser.loggedIn) {
+    if (currentSystemStateTeam && typeof currentSystemStateTeam == 'string') {
+      return doc(collection(firedb, 'team'), currentSystemStateTeam);
     } else {
       return null;
     }
+  } else {
+    return null;
   }
-);
+});
 const teamUnsubscribe: Ref<Unsubscribe | null> = ref(null);
 interface TeamState extends StateTree {
   owner?: string | null;
@@ -224,10 +208,7 @@ const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
       } else {
         result = [];
       }
-      console.log(
-        '[livedata][teammates getter] Returning:',
-        JSON.parse(JSON.stringify(result))
-      );
+      console.log('[livedata][teammates getter] Returning:', JSON.parse(JSON.stringify(result)));
       return result;
     },
   },
@@ -243,8 +224,7 @@ watch(
     const newTeammatesArray =
       newState.members?.filter((member: string) => member !== newFireUID) || [];
     const oldTeammatesArray =
-      oldState?.members?.filter((member: string) => member !== newFireUID) ||
-      [];
+      oldState?.members?.filter((member: string) => member !== newFireUID) || [];
     console.log(
       '[livedata] teammates watcher (watching $state) triggered. New state members:',
       JSON.parse(JSON.stringify(newState.members || [])),
@@ -309,16 +289,12 @@ watch(
                   console.warn(
                     `[livedata][${storeId}] Document progress/${teammate} exists but data is empty. Patching defaultState.`
                   );
-                  teammateStoreInstance.$patch(
-                    JSON.parse(JSON.stringify(defaultState))
-                  );
+                  teammateStoreInstance.$patch(JSON.parse(JSON.stringify(defaultState)));
                 } else {
                   console.log(
                     `[livedata][${storeId}] Document progress/${teammate} does not exist. Patching defaultState.`
                   );
-                  teammateStoreInstance.$patch(
-                    JSON.parse(JSON.stringify(defaultState))
-                  );
+                  teammateStoreInstance.$patch(JSON.parse(JSON.stringify(defaultState)));
                 }
                 console.log(
                   `[livedata][${storeId}] Store state AFTER patch:`,
@@ -326,10 +302,7 @@ watch(
                 );
               },
               (error: any) => {
-                if (
-                  error.code == 'permission-denied' &&
-                  teammateUnsubscribes.value[teammate]
-                ) {
+                if (error.code == 'permission-denied' && teammateUnsubscribes.value[teammate]) {
                   console.debug(
                     'Unsubscribing from',
                     teammateStores.value[teammate]?.$id,
