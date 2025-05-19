@@ -68,12 +68,8 @@
     } else {
       return (
         item.value &&
-        (item.value.shortName
-          .toLowerCase()
-          .includes(filterString.value.toLowerCase()) ||
-          item.value.name
-            .toLowerCase()
-            .includes(filterString.value.toLowerCase())) &&
+        (item.value.shortName.toLowerCase().includes(filterString.value.toLowerCase()) ||
+          item.value.name.toLowerCase().includes(filterString.value.toLowerCase())) &&
         showItem.value
       );
     }
@@ -95,11 +91,7 @@
   });
   function isTaskObjectiveNeeded(need) {
     if (userStore.itemsNeededHideNonFIR) {
-      if (
-        need.type == 'mark' ||
-        need.type == 'buildWeapon' ||
-        need.type == 'plantItem'
-      ) {
+      if (need.type == 'mark' || need.type == 'buildWeapon' || need.type == 'plantItem') {
         return false;
       } else if (need.type == 'giveItem') {
         if (need.foundInRaid == false) {
@@ -160,10 +152,8 @@
     if (!need.hideoutModule || !need.hideoutModule.id) {
       return false;
     }
-    const moduleCompletions =
-      progressStore.moduleCompletions?.[need.hideoutModule?.id] || {};
-    const modulePartCompletions =
-      progressStore.modulePartCompletions?.[need.id] || {};
+    const moduleCompletions = progressStore.moduleCompletions?.[need.hideoutModule?.id] || {};
+    const modulePartCompletions = progressStore.modulePartCompletions?.[need.id] || {};
 
     // If there is no progress data at all, show the item by default
     if (
@@ -176,19 +166,13 @@
     if (userStore.itemsTeamAllHidden || userStore.itemsTeamHideoutHidden) {
       // Only show if the objective is needed by ourself
       return (
-        (moduleCompletions.self === undefined ||
-          moduleCompletions.self === false) &&
-        (modulePartCompletions.self === undefined ||
-          modulePartCompletions.self === false)
+        (moduleCompletions.self === undefined || moduleCompletions.self === false) &&
+        (modulePartCompletions.self === undefined || modulePartCompletions.self === false)
       );
     } else {
       return (
-        Object.values(moduleCompletions).some(
-          (userStatus) => userStatus === false
-        ) &&
-        Object.values(modulePartCompletions).some(
-          (userStatus) => userStatus === false
-        )
+        Object.values(moduleCompletions).some((userStatus) => userStatus === false) &&
+        Object.values(modulePartCompletions).some((userStatus) => userStatus === false)
       );
     }
   }
@@ -293,9 +277,7 @@
   });
   const lockedBefore = computed(() => {
     if (props.need.needType == 'taskObjective') {
-      return relatedTask.value.predecessors.filter(
-        (s) => !tarkovStore.isTaskComplete(s)
-      ).length;
+      return relatedTask.value.predecessors.filter((s) => !tarkovStore.isTaskComplete(s)).length;
     } else if (props.need.needType == 'hideoutModule') {
       return props.need.hideoutModule.predecessors.filter(
         (s) => !tarkovStore.isHideoutModuleComplete(s)
@@ -314,9 +296,8 @@
       );
     } else if (props.need.needType == 'hideoutModule') {
       return (
-        progressStore.moduleCompletions?.[props.need.hideoutModule.id]?.[
-          'self'
-        ] || progressStore.modulePartCompletions?.[props.need.id]?.['self']
+        progressStore.moduleCompletions?.[props.need.hideoutModule.id]?.['self'] ||
+        progressStore.modulePartCompletions?.[props.need.id]?.['self']
       );
     } else {
       return false;
@@ -346,33 +327,26 @@
       // Find all of the users that need this objective
       Object.entries(progressStore.objectiveCompletions[props.need.id]).forEach(
         ([user, completed]) => {
-          if (
-            !completed &&
-            !progressStore.tasksCompletions[props.need.taskId][user]
-          ) {
+          if (!completed && !progressStore.tasksCompletions[props.need.taskId][user]) {
             needingUsers.push({
               user: user,
-              count: progressStore.teamStores[user].getObjectiveCount(
-                props.need.id
-              ),
+              count: progressStore.teamStores[user].getObjectiveCount(props.need.id),
             });
           }
         }
       );
     } else if (props.need.needType == 'hideoutModule') {
       // Find all of the users that need this module
-      Object.entries(
-        progressStore.modulePartCompletions[props.need.id]
-      ).forEach(([user, completed]) => {
-        if (!completed) {
-          needingUsers.push({
-            user: user,
-            count: progressStore.teamStores[user].getHideoutPartCount(
-              props.need.id
-            ),
-          });
+      Object.entries(progressStore.modulePartCompletions[props.need.id]).forEach(
+        ([user, completed]) => {
+          if (!completed) {
+            needingUsers.push({
+              user: user,
+              count: progressStore.teamStores[user].getHideoutPartCount(props.need.id),
+            });
+          }
         }
-      });
+      );
     }
     return needingUsers;
   });
