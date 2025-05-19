@@ -1,14 +1,8 @@
 <template>
   <v-container v-if="userStore.showTip(props.tip)" class="mb-0 pb-0">
     <v-row justify="center">
-      <v-col cols="12">
-        <v-alert
-          :color="props.color"
-          theme="dark"
-          :icon="props.icon"
-          border
-          prominent
-        >
+      <v-col cols="12" md="10" lg="8" xl="6">
+        <v-alert :color="props.color" theme="dark" :icon="props.icon" border prominent>
           {{ t('tips.' + props.tip + '.description') }}
           <v-container class="align-right pa-0 pt-2" fluid>
             <v-btn

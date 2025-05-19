@@ -16,23 +16,23 @@
   </v-sheet>
 </template>
 <script setup>
-// eslint-disable-next-line no-unused-vars
-const props = defineProps({
-  icon: {
-    type: String,
-    default: "mdi-check-all",
-    required: false,
-  },
-  iconBackground: {
-    type: String,
-    default: "accent",
-    required: false,
-  },
-  iconColor: {
-    type: String,
-    default: "secondary",
-    required: false,
-  },
-});
+  // eslint-disable-next-line no-unused-vars
+  const props = defineProps({
+    icon: {
+      type: String,
+      default: 'mdi-check-all',
+      required: false,
+    },
+    iconBackground: {
+      type: String,
+      default: 'accent',
+      required: false,
+    },
+    iconColor: {
+      type: String,
+      default: 'secondary',
+      required: false,
+    },
+  });
 </script>
 <style lang="scss" scoped></style>
