@@ -1,16 +1,14 @@
 <template>
   <div>
     <v-container>
-      <v-row justify="center" class="mt-4">
+      <v-row justify="center">
         <v-col cols="12" sm="10" md="8" lg="6" xl="4">
           <v-card class="auth-card elevation-8" color="rgb(18, 25, 30)">
             <div class="auth-header">
               <v-avatar size="72" class="mt-8 mb-3">
                 <v-icon size="48" color="grey">mdi-shield-account</v-icon>
               </v-avatar>
-              <h2 class="text-h5 font-weight-bold mb-2">
-                Sign in to access your account
-              </h2>
+              <h2 class="text-h5 font-weight-bold mb-2">Sign in to access your account</h2>
               <p class="text-body-2 text-medium-emphasis mb-6">
                 Track your progress, share with friends, and coordinate raids
               </p>
@@ -97,341 +95,145 @@
         </v-col>
       </v-row>
     </v-container>
-    <!-- Data Migration Dialog -->
-    <div v-if="showMigrationDialog" class="migration-dialog-container">
-      <data-migration-dialog
-        :userId="userId"
-        :show="showMigrationDialog"
-        @close="onMigrationDialogClose"
-      />
-    </div>
-    <!-- Debug display for migration state -->
-    <div v-if="DEBUG_MODE" class="debug-panel">
-      <p>Migration Debug Panel:</p>
-      <ul>
-        <li>User ID: {{ userId }}</li>
-        <li>Show Dialog: {{ showMigrationDialog }}</li>
-        <li>Local Data: {{ hasLocalData ? "Yes" : "No" }}</li>
-        <li>Loading: {{ loading.google || loading.github ? "Yes" : "No" }}</li>
-      </ul>
-      <v-btn color="warning" @click="forceShowMigrationDialog">
-        Force Show Dialog
-      </v-btn>
-    </div>
   </div>
 </template>
 <script setup>
-import { ref, defineAsyncComponent, onMounted, nextTick } from "vue";
-import { useRouter } from "vue-router";
-import {
-  GoogleAuthProvider,
-  GithubAuthProvider,
-  signInWithPopup,
-  getAuth,
-} from "firebase/auth";
-import { app as fireapp, fireuser } from "@/plugins/firebase.ts";
-import DataMigrationService from "@/services/DataMigrationService";
-import { markDataMigrated } from "@/plugins/store-initializer";
-import { useTarkovStore } from "@/stores/tarkov";
-// Defer store import to avoid initialization issues
-let tarkovStore = null;
-// Enable debug mode in development
-const DEBUG_MODE = import.meta.env.DEV;
-const hasLocalData = ref(false);
-// Async import the dialog component to avoid circular dependencies
-const DataMigrationDialog = defineAsyncComponent(
-  () => import("@/components/DataMigrationDialog.vue"),
-);
-const router = useRouter();
-const auth = getAuth(fireapp);
-const loading = ref({
-  google: false,
-  github: false,
-});
-const showMigrationDialog = ref(false);
-const userId = ref(null);
-// Define emits
-const emit = defineEmits(["migration-dialog-shown", "migration-dialog-closed"]);
-// Helper function to safely access the store
-const getTarkovStore = async () => {
-  if (tarkovStore) return tarkovStore;
-  try {
-    // Wait for next tick and a small delay to ensure Pinia is ready
-    await nextTick();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  import { ref, defineAsyncComponent, onMounted, nextTick } from 'vue';
+  import { useRouter } from 'vue-router';
+  import { GoogleAuthProvider, GithubAuthProvider, signInWithPopup, getAuth } from 'firebase/auth';
+  import { app as fireapp, fireuser } from '@/plugins/firebase.ts';
+  import DataMigrationService from '@/services/DataMigrationService';
+  import { useTarkovStore } from '@/stores/tarkov';
+  // Defer store import to avoid initialization issues
+  let tarkovStore = null;
+  // Enable debug mode in development
+  const DEBUG_MODE = import.meta.env.DEV;
+  const hasLocalData = ref(false);
+
+  const router = useRouter();
+  const auth = getAuth(fireapp);
+  const loading = ref({
+    google: false,
+    github: false,
+  });
+  const userId = ref(null);
+  // Define emits - remove migration related emits if no longer used elsewhere
+  const emit = defineEmits([]); // Adjusted if no emits are needed
+
+  // Helper function to safely access the store
+  const getTarkovStore = async () => {
+    if (tarkovStore) return tarkovStore;
     try {
-      tarkovStore = useTarkovStore();
-      return tarkovStore;
-    } catch (error) {
-      console.error("Initial store access failed, retrying:", error);
-      // Try one more time after a delay
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      tarkovStore = useTarkovStore();
-      return tarkovStore;
-    }
-  } catch (error) {
-    console.error("Error accessing tarkovStore:", error);
-    return null;
-  }
-};
-// Force show migration dialog (for debugging)
-const forceShowMigrationDialog = () => {
-  userId.value = fireuser.uid || "debug-user";
-  showMigrationDialog.value = true;
-  emit("migration-dialog-shown");
-};
-// Prevent automatic navigation after login - we'll handle it manually
-onMounted(async () => {
-  try {
-    // Wait for Vue to finish initial rendering and give Pinia time to initialize
-    await nextTick();
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    // Check for local data
-    hasLocalData.value = DataMigrationService.hasLocalData();
-    // If a user is already logged in and we need to show the migration dialog
-    if (fireuser.uid) {
-      userId.value = fireuser.uid;
-      await checkUserDataAndShowMigration(fireuser.uid);
-    }
-  } catch (error) {
-    console.error("Error in onMounted:", error);
-  }
-});
-// This is key - it prevents the store from automatically binding to Firebase
-// until the user has made a decision about data migration
-const preventFirebaseBinding = async () => {
-  try {
-    // Try multiple times with increasing delays to get the store safely
-    let store = null;
-    const maxAttempts = 3;
-    for (let i = 0; i < maxAttempts; i++) {
+      // Wait for next tick and a small delay to ensure Pinia is ready
+      await nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 100));
       try {
-        // Get store reference safely
-        store = await getTarkovStore();
-        if (store) break;
-        // Wait longer between attempts
-        await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
+        tarkovStore = useTarkovStore();
+        return tarkovStore;
       } catch (error) {
-        console.warn(`Store access attempt ${i + 1} failed:`, error);
-        if (i === maxAttempts - 1) throw error;
+        console.error('Initial store access failed, retrying:', error);
+        // Try one more time after a delay
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        tarkovStore = useTarkovStore();
+        return tarkovStore;
       }
+    } catch (error) {
+      console.error('Error accessing tarkovStore:', error);
+      return null;
     }
-    // Check if the store has a fireunbindAll method (from pinia-firestore)
-    if (store?.fireunbindAll && typeof store.fireunbindAll === "function") {
-      store.fireunbindAll();
-    } else {
-      console.warn("tarkovStore.fireunbindAll is not available");
-    }
-  } catch (error) {
-    console.error("Error in preventFirebaseBinding:", error);
-  }
-};
-const checkUserDataAndShowMigration = async (uid) => {
-  try {
-    // Check if there's local data to migrate
-    const hasLocalData = DataMigrationService.hasLocalData();
-    if (hasLocalData) {
-      // First, prevent automatic binding to Firebase to preserve local data
-      await preventFirebaseBinding();
-      // Check if user already has data in their account
-      const hasUserData = await DataMigrationService.hasUserData(uid);
-      if (!hasUserData) {
-        userId.value = uid;
-        showMigrationDialog.value = true;
-        emit("migration-dialog-shown");
-        // Simple visibility check - the actual dialog creation is handled in handleAuthSuccess
-        setTimeout(() => {
-          console.warn(
-            "CHECKING MIGRATION DIALOG VISIBILITY:",
-            showMigrationDialog.value,
-          );
-        }, 500);
-        return true;
+  };
+  // Prevent automatic navigation after login - we'll handle it manually
+  onMounted(async () => {
+    try {
+      // Wait for Vue to finish initial rendering and give Pinia time to initialize
+      await nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Check for local data
+      hasLocalData.value = DataMigrationService.hasLocalData();
+      // If a user is already logged in, set userId
+      if (fireuser.uid) {
+        userId.value = fireuser.uid;
+        // If there was a checkUserDataAndShowMigration, it would be removed or simplified
       }
+    } catch (error) {
+      console.error('Error in onMounted:', error);
     }
-    return false;
-  } catch (error) {
-    console.error("Error checking user data:", error);
-    return false;
-  }
-};
-const handleAuthSuccess = async (user) => {
-  userId.value = user.uid;
-  try {
-    // Check if there's local data to migrate
-    const hasLocalData = DataMigrationService.hasLocalData();
-    if (hasLocalData) {
-      // First, prevent automatic binding to Firebase to preserve local data
-      await preventFirebaseBinding();
-      // Check if user already has data in their account
-      const hasUserData = await DataMigrationService.hasUserData(user.uid);
-      if (!hasUserData) {
-        // SHOW THE DIALOG INSTEAD OF AUTO-MIGRATING
-        userId.value = user.uid;
-        showMigrationDialog.value = true;
-        emit("migration-dialog-shown");
-        // Force dialog visibility with a delay to ensure it's rendered
-        setTimeout(() => {
-          console.warn(
-            "CHECKING MIGRATION DIALOG VISIBILITY:",
-            showMigrationDialog.value,
-          );
-          // Add dialog directly to the body if it's not visible
-          if (showMigrationDialog.value) {
-            console.warn("ENHANCING MIGRATION DIALOG VISIBILITY");
-            // Create a modal container if it doesn't exist
-            const existingModal = document.getElementById(
-              "migration-dialog-container",
-            );
-            if (!existingModal) {
-              const modalContainer = document.createElement("div");
-              modalContainer.id = "migration-dialog-container";
-              modalContainer.style.cssText = `
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                background: rgba(0, 0, 0, 0.9) !important;
-                z-index: 999999 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-              `;
-              // Add buttons for migration choices directly into the container
-              modalContainer.innerHTML = `
-                <div style="background-color: rgb(18, 25, 30); padding: 30px; border-radius: 8px; max-width: 500px; text-align: center; box-shadow: 0 0 30px rgba(255, 193, 7, 0.3); font-family: 'Share Tech Mono', monospace;">
-                  <h2 style="color: white; margin-bottom: 20px; font-family: 'Share Tech Mono', monospace;">Data Migration Options</h2>
-                  <p style="color: white; margin-bottom: 30px; font-family: 'Share Tech Mono', monospace;">You have existing progress (Level ${DataMigrationService.getLocalData()?.level || "unknown"}) saved in your browser.</p>
-                  <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <button id="migrate-btn" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-size: 16px; font-family: 'Share Tech Mono', monospace; text-transform: uppercase; letter-spacing: 1px;">Migrate Existing Data</button>
-                    <button id="fresh-btn" style="background: #607D8B; color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-size: 16px; font-family: 'Share Tech Mono', monospace; text-transform: uppercase; letter-spacing: 1px;">Start Fresh Account</button>
-                  </div>
-                  <p style="color: #AAA; margin-top: 20px; font-size: 12px;">User ID: ${user.uid}</p>
-                </div>
-              `;
-              document.body.appendChild(modalContainer);
-              // Add event listeners for the buttons
-              document
-                .getElementById("migrate-btn")
-                .addEventListener("click", async () => {
-                  const result = await DataMigrationService.migrateDataToUser(
-                    user.uid,
-                  );
-                  if (result) {
-                    markDataMigrated();
-                    const store = await getTarkovStore();
-                    if (store && typeof store.firebindAll === "function") {
-                      store.firebindAll();
-                    }
-                    modalContainer.remove();
-                    router.push("/");
-                  }
-                });
-              document
-                .getElementById("fresh-btn")
-                .addEventListener("click", async () => {
-                  const store = await getTarkovStore();
-                  if (store && typeof store.firebindAll === "function") {
-                    store.firebindAll();
-                  }
-                  modalContainer.remove();
-                  router.push("/");
-                });
-            }
-          }
-        }, 500);
-        return true;
-      }
+  });
+  const handleAuthSuccess = async (user) => {
+    userId.value = user.uid;
+    try {
+      // If pinia-fireswap handles auto-migration, no explicit check or dialog trigger is needed here.
+      // The store should sync automatically when the user is authenticated and store binds.
+      console.log(
+        'User authenticated:',
+        user.uid,
+        'Local data exists:',
+        DataMigrationService.hasLocalData()
+      );
+      // Navigate to dashboard after successful login
+      router.push('/');
+    } catch (error) {
+      console.error('Error in handleAuthSuccess:', error);
+      // Handle error (e.g., show a notification to the user)
     }
-    router.push("/");
-  } catch (error) {
-    console.error("Error in handleAuthSuccess:", error);
-    router.push("/");
-  } finally {
-    loading.value.google = false;
-    loading.value.github = false;
-  }
-};
-const onMigrationDialogClose = () => {
-  showMigrationDialog.value = false;
-  emit("migration-dialog-closed");
-  router.push("/");
-};
-const signInWithGoogle = async () => {
-  try {
-    loading.value.google = true;
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    await handleAuthSuccess(result.user);
-  } catch (error) {
-    console.error("Google sign in error:", error);
-    loading.value.google = false;
-  }
-};
-const signInWithGithub = async () => {
-  try {
-    loading.value.github = true;
-    const provider = new GithubAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    await handleAuthSuccess(result.user);
-  } catch (error) {
-    console.error("GitHub sign in error:", error);
-    loading.value.github = false;
-  }
-};
+  };
+  const signInWithGoogle = async () => {
+    try {
+      loading.value.google = true;
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      await handleAuthSuccess(result.user);
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      loading.value.google = false;
+    }
+  };
+  const signInWithGithub = async () => {
+    try {
+      loading.value.github = true;
+      const provider = new GithubAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      await handleAuthSuccess(result.user);
+    } catch (error) {
+      console.error('GitHub sign in error:', error);
+      loading.value.github = false;
+    }
+  };
 </script>
 <style scoped>
-.auth-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background-color: rgb(18, 25, 30);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-}
-.auth-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 0 24px;
-}
-.auth-btn {
-  letter-spacing: 0.5px;
-  text-transform: none;
-  font-weight: 500;
-  border-radius: 4px;
-}
-.github-btn {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.github-btn:hover {
-  background-color: #2c3136 !important;
-}
-.google-btn {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-.google-btn:hover {
-  background-color: #f5f5f5 !important;
-}
-.auth-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background-color: rgba(0, 0, 0, 0.2);
-}
-.migration-dialog-container {
-  position: relative;
-  z-index: 10000;
-}
-.debug-panel {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 10px;
-  border-radius: 8px;
-  z-index: 9998;
-  color: white;
-  font-size: 12px;
-}
+  .auth-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgb(18, 25, 30);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+  .auth-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0 24px;
+  }
+  .auth-btn {
+    letter-spacing: 0.5px;
+    text-transform: none;
+    font-weight: 500;
+    border-radius: 4px;
+  }
+  .github-btn {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .github-btn:hover {
+    background-color: #2c3136 !important;
+  }
+  .google-btn {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  .google-btn:hover {
+    background-color: #f5f5f5 !important;
+  }
+  .auth-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background-color: rgba(0, 0, 0, 0.2);
+  }
 </style>
-
