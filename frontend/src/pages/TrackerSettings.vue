@@ -14,10 +14,7 @@
             {{ $t('page.settings.card.apitokens.title') }}
           </template>
           <template #content>
-            <i18n-t
-              keypath="page.settings.card.apitokens.description"
-              scope="global"
-            >
+            <i18n-t keypath="page.settings.card.apitokens.description" scope="global">
               <template #openAPI_documentation>
                 <a
                   href="https://tarkovtracker-org.github.io/TarkovTracker/"
@@ -25,9 +22,7 @@
                   class="info-link"
                 >
                   <v-icon class="mr-1" size="16">mdi-file-document</v-icon
-                  >{{
-                    $t('page.settings.card.apitokens.openAPI_documentation')
-                  }}
+                  >{{ $t('page.settings.card.apitokens.openAPI_documentation') }}
                 </a>
               </template>
             </i18n-t>
@@ -41,10 +36,7 @@
             {{ $t('page.settings.card.apitokens.title') }}
           </template>
           <template #content>
-            <i18n-t
-              keypath="page.settings.card.apitokens.description"
-              scope="global"
-            >
+            <i18n-t keypath="page.settings.card.apitokens.description" scope="global">
               <template #openAPI_documentation>
                 <a
                   href="https://tarkovtracker-org.github.io/TarkovTracker/"
@@ -52,9 +44,7 @@
                   class="info-link"
                 >
                   <v-icon class="mr-1" size="16">mdi-file-document</v-icon
-                  >{{
-                    $t('page.settings.card.apitokens.openAPI_documentation')
-                  }}
+                  >{{ $t('page.settings.card.apitokens.openAPI_documentation') }}
                 </a>
               </template>
             </i18n-t>
@@ -80,6 +70,7 @@
                 <v-col cols="12">
                   <v-switch
                     v-model="streamerMode"
+                    :disabled="Boolean(userStore.saving && userStore.saving.streamerMode)"
                     hide-details
                     density="compact"
                     :label="
@@ -89,6 +80,13 @@
                     "
                   >
                   </v-switch>
+                  <v-progress-circular
+                    v-if="userStore.saving && userStore.saving.streamerMode"
+                    indeterminate
+                    color="primary"
+                    size="20"
+                    class="ml-2 align-middle"
+                  />
                 </v-col>
               </v-row>
             </v-container>
@@ -132,11 +130,7 @@
     <!-- Reset section in a separate row at the bottom -->
     <v-row justify="center" class="mt-4">
       <v-col cols="12" sm="8" md="6" lg="4" xl="4">
-        <fitted-card
-          icon="mdi-restart-alert"
-          icon-color="white"
-          class="reset-card"
-        >
+        <fitted-card icon="mdi-restart-alert" icon-color="white" class="reset-card">
           <template #title>
             {{ $t('page.settings.card.reset.title') }}
           </template>
@@ -147,11 +141,7 @@
               </p>
               <v-dialog v-model="resetDialog">
                 <template #activator="{ props }">
-                  <v-btn
-                    color="warning"
-                    prepend-icon="mdi-alert"
-                    v-bind="props"
-                  >
+                  <v-btn color="warning" prepend-icon="mdi-alert" v-bind="props">
                     {{ $t('page.settings.card.reset.button') }}
                   </v-btn>
                 </template>
@@ -175,28 +165,17 @@
                                 block
                                 prepend-icon="mdi-alert"
                                 @click="
-                                  tarkovStore.$reset();
+                                  tarkovStore.resetOnlineProfile();
                                   resetDialog = false;
                                 "
                               >
-                                {{
-                                  $t(
-                                    'page.settings.card.reset.confirmresetbutton'
-                                  )
-                                }}
+                                {{ $t('page.settings.card.reset.confirmresetbutton') }}
                               </v-btn>
                             </v-col>
                             <v-col cols="12" md="6">
-                              <v-btn
-                                color="primary"
-                                block
-                                @click="resetDialog = false"
-                                >{{
-                                  $t(
-                                    'page.settings.card.reset.confirmcancelbutton'
-                                  )
-                                }}</v-btn
-                              >
+                              <v-btn color="primary" block @click="resetDialog = false">{{
+                                $t('page.settings.card.reset.confirmcancelbutton')
+                              }}</v-btn>
                             </v-col>
                           </v-row>
                         </v-container>
@@ -230,7 +209,8 @@
     { title: 'Standard Edition', value: 1 },
     { title: 'Left Behind Edition', value: 2 },
     { title: 'Prepare for Escape Edition', value: 3 },
-    { title: 'Edge of Darkness Limited Edition', value: 4 },
+    { title: 'Edge of Darkness (Limited Edition)', value: 4 },
+    { title: 'Unheard Edition', value: 5 },
   ];
   const currentGameEdition = computed({
     get() {

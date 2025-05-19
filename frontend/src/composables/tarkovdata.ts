@@ -219,8 +219,7 @@ function loadMaps(): Promise<StaticMapData> {
   if (!mapPromise) {
     mapPromise = fetch(MAPS_URL)
       .then((response) => {
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.statusText}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.statusText}`);
         return response.json() as Promise<StaticMapData>;
       })
       .catch((error) => {
@@ -238,11 +237,7 @@ const mapNameMapping: { [key: string]: string } = {
   'the labyrinth': 'labyrinth',
 };
 // Helper function types
-function getPredecessors(
-  graph: Graph,
-  nodeId: string,
-  visited: string[] = []
-): string[] {
+function getPredecessors(graph: Graph, nodeId: string, visited: string[] = []): string[] {
   let predecessors: string[] = [];
   try {
     predecessors = graph.inNeighbors(nodeId);
@@ -263,11 +258,7 @@ function getPredecessors(
   }
   return [...new Set(predecessors)]; // Ensure uniqueness
 }
-function getSuccessors(
-  graph: Graph,
-  nodeId: string,
-  visited: string[] = []
-): string[] {
+function getSuccessors(graph: Graph, nodeId: string, visited: string[] = []): string[] {
   let successors: string[] = [];
   try {
     successors = graph.outNeighbors(nodeId);
@@ -281,12 +272,10 @@ function getSuccessors(
       if (visited.includes(successor)) {
         continue;
       }
-      successors = successors.concat(
-        getSuccessors(graph, successor, [...visited])
-      ); // Pass copy
+      successors = successors.concat(getSuccessors(graph, successor, [...visited]));
     }
   }
-  return [...new Set(successors)]; // Ensure uniqueness
+  return [...new Set(successors)];
 }
 function extractLanguageCode(localeRef: Ref<string>): string {
   const localeValue = localeRef.value;
@@ -400,8 +389,7 @@ watch(queryResults, (newValue) => {
     activeRequirements.forEach(({ task, requirement }) => {
       const requiredTaskNodeId = requirement.task.id;
       if (newTaskGraph.hasNode(requiredTaskNodeId)) {
-        const requiredTaskPredecessors =
-          newTaskGraph.inNeighbors(requiredTaskNodeId);
+        const requiredTaskPredecessors = newTaskGraph.inNeighbors(requiredTaskNodeId);
         requiredTaskPredecessors.forEach((predecessorId) => {
           if (newTaskGraph.hasNode(task.id)) {
             // Ensure target task node exists
@@ -419,9 +407,7 @@ watch(queryResults, (newValue) => {
     const newTasks: Task[] = [];
     newValue.tasks.forEach((task) => {
       if (!newTaskGraph.hasNode(task.id)) {
-        console.warn(
-          `Task ${task.id} not found in graph, skipping processing.`
-        );
+        console.warn(`Task ${task.id} not found in graph, skipping processing.`);
         return; // Skip if node somehow doesn't exist
       }
       const predecessors = getPredecessors(newTaskGraph, task.id);
@@ -534,8 +520,7 @@ export const maps = computed<TarkovMap[]>(() => {
   }
   const mergedMaps = queryResults.value.maps.map((map) => {
     const lowerCaseName = map.name.toLowerCase();
-    let mapKey =
-      mapNameMapping[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
+    let mapKey = mapNameMapping[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
     const staticData = staticMapData.value?.[mapKey];
     if (staticData?.svg) {
       return {
@@ -543,9 +528,7 @@ export const maps = computed<TarkovMap[]>(() => {
         svg: staticData.svg,
       };
     } else {
-      console.warn(
-        `Static SVG data not found for map: ${map.name} (lookup key: ${mapKey})`
-      );
+      console.warn(`Static SVG data not found for map: ${map.name} (lookup key: ${mapKey})`);
       return map; // Return original map data without SVG
     }
   });
@@ -556,14 +539,10 @@ export const traders = computed<Trader[]>(() => {
   if (!queryResults.value?.traders) {
     return [];
   }
-  return [...queryResults.value.traders].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  return [...queryResults.value.traders].sort((a, b) => a.name.localeCompare(b.name));
 });
 // Computed Properties for Player Level Constraints
-export const playerLevels = computed<PlayerLevel[]>(
-  () => queryResults.value?.playerLevels || []
-);
+export const playerLevels = computed<PlayerLevel[]>(() => queryResults.value?.playerLevels || []);
 const minPlayerLevel = computed<number>(() => {
   if (!playerLevels.value.length) return 1;
   return Math.min(...playerLevels.value.map((l) => l.level));
@@ -585,12 +564,15 @@ export function useTarkovData() {
   if (!isInitialized.value) {
     isInitialized.value = true;
     // === Language Query ===
-    const { onResult: languageOnResult, onError: languageOnError } =
-      useQuery<LanguageQueryResult>(languageQuery, null, {
+    const { onResult: languageOnResult, onError: languageOnError } = useQuery<LanguageQueryResult>(
+      languageQuery,
+      null,
+      {
         fetchPolicy: 'cache-first',
         notifyOnNetworkStatusChange: true,
         errorPolicy: 'all',
-      });
+      }
+    );
     languageOnResult((result) => {
       availableLanguages.value = result.data?.__type?.enumValues.map(
         (enumValue) => enumValue.name
@@ -689,11 +671,7 @@ export function useTarkovData() {
     );
     // Refetch data when language changes (post-initial)
     watch(languageCode, (newLang, oldLang) => {
-      if (
-        oldLang !== newLang &&
-        availableLanguages.value &&
-        isInitialized.value
-      ) {
+      if (oldLang !== newLang && availableLanguages.value && isInitialized.value) {
         taskRefetch({ lang: newLang });
         hideoutRefetch({ lang: newLang });
       }
@@ -709,8 +687,7 @@ export function useTarkovData() {
     loading: loading as Ref<boolean>,
     hideoutLoading: hideoutLoading as Ref<boolean>,
     queryHideoutErrors: queryHideoutErrors as Ref<ApolloError | null>,
-    queryHideoutResults:
-      queryHideoutResults as Ref<TarkovHideoutQueryResult | null>,
+    queryHideoutResults: queryHideoutResults as Ref<TarkovHideoutQueryResult | null>,
     lastHideoutQueryTime: lastHideoutQueryTime as Ref<number | null>,
     hideoutStations: hideoutStations as Ref<HideoutStation[]>,
     hideoutModules: hideoutModules as Ref<HideoutModule[]>,
@@ -726,12 +703,8 @@ export function useTarkovData() {
     objectives: objectives as ComputedRef<TaskObjective[]>,
     maps: maps as ComputedRef<TarkovMap[]>,
     traders: traders as ComputedRef<Trader[]>,
-    neededItemTaskObjectives: neededItemTaskObjectives as Ref<
-      NeededItemTaskObjective[]
-    >,
-    neededItemHideoutModules: neededItemHideoutModules as Ref<
-      NeededItemHideoutModule[]
-    >,
+    neededItemTaskObjectives: neededItemTaskObjectives as Ref<NeededItemTaskObjective[]>,
+    neededItemHideoutModules: neededItemHideoutModules as Ref<NeededItemHideoutModule[]>,
     disabledTasks,
     playerLevels: playerLevels as ComputedRef<PlayerLevel[]>,
     minPlayerLevel: minPlayerLevel as ComputedRef<number>,
