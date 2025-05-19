@@ -135,6 +135,7 @@
           title: 'Game Edition',
           description: 'Select the game edition you are playing. Additional data may be computed from this information (e.g. trader reputation, stash level).',
           select: 'Select game edition',
+          unheard: 'Unheard Edition',
         },
         pmcfaction: {
           title: 'PMC Faction',
@@ -272,6 +273,7 @@
     ratscanner: 'Rat Scanner',
     tarkovguru: 'Tarkov Guru',
     tarkovchanges: 'Tarkov Changes',
+    tarkovmonitor: 'Tarkov Monitor',
   },
   tips: {
     hide_tip: 'Hide this tip',

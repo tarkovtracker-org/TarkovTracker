@@ -8,6 +8,13 @@
       :is-collapsed="props.isCollapsed"
     />
     <drawer-item
+      avatar="/img/logos/tarkovmonitorlogo.avif"
+      locale-key="tarkovmonitor"
+      href="https://github.com/the-hideout/TarkovMonitor"
+      ext-link
+      :is-collapsed="props.isCollapsed"
+    />
+    <drawer-item
       avatar="/img/logos/ratscannerlogo.png"
       locale-key="ratscanner"
       href="https://ratscanner.com/"
@@ -41,8 +48,6 @@
     },
   });
 
-  const DrawerItem = defineAsyncComponent(
-    () => import('@/components/drawer/DrawerItem.vue')
-  );
+  const DrawerItem = defineAsyncComponent(() => import('@/components/drawer/DrawerItem.vue'));
 </script>
 <style lang="scss" scoped></style>
