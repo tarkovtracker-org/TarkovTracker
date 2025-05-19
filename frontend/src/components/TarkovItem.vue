@@ -5,31 +5,16 @@
     @mouseenter="linkHover = true"
     @mouseleave="linkHover = false"
   >
-    <v-row
-      no-gutters
-      class="align-center justify-center"
-      :class="linkHover ? 'blur-item' : ''"
-    >
+    <v-row no-gutters class="align-center justify-center" :class="linkHover ? 'blur-item' : ''">
       <v-col cols="auto" class="d-flex align-center justify-center">
-        <img
-          width="32"
-          :src="itemIconUrl"
-          class="mr-2 rounded"
-          @error="handleImgError"
-        />
+        <img width="32" :src="itemIconUrl" class="mr-2 rounded" @error="handleImgError" />
       </v-col>
-      <v-col v-if="props.count" cols="auto" class="mr-2">{{
-        props.count.toLocaleString()
-      }}</v-col>
+      <v-col v-if="props.count" cols="auto" class="mr-2">{{ props.count.toLocaleString() }}</v-col>
       <v-col cols="auto" class="align-center justify-center tarkov-item-name">
         <b>{{ props.itemName }}</b>
       </v-col>
     </v-row>
-    <v-row
-      v-show="linkHover"
-      no-gutters
-      class="float-link align-center justify-center"
-    >
+    <v-row v-show="linkHover" no-gutters class="float-link align-center justify-center">
       <v-col cols="auto" class="mx-1">
         <v-avatar
           color="primary"
@@ -67,73 +52,73 @@
   </v-container>
 </template>
 <script setup>
-import { computed, ref, watchEffect } from "vue";
-// Define the props for the component
-const props = defineProps({
-  itemId: {
-    type: String,
-    required: true,
-  },
-  itemName: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  devLink: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  wikiLink: {
-    type: String,
-    required: false,
-    default: null,
-  },
-  count: {
-    type: Number,
-    required: false,
-    default: null,
-  },
-});
-const linkHover = ref(false);
-const itemIconUrl = ref(`https://assets.tarkov.dev/${props.itemId}-icon.jpg`);
+  import { computed, ref, watchEffect } from 'vue';
+  // Define the props for the component
+  const props = defineProps({
+    itemId: {
+      type: String,
+      required: true,
+    },
+    itemName: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    devLink: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    wikiLink: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    count: {
+      type: Number,
+      required: false,
+      default: null,
+    },
+  });
+  const linkHover = ref(false);
+  const itemIconUrl = ref(`https://assets.tarkov.dev/${props.itemId}-icon.jpg`);
 
-function handleImgError() {
-  // If .jpg fails, try .webp
-  if (itemIconUrl.value.endsWith(".jpg")) {
-    itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.webp`;
+  function handleImgError() {
+    // If .jpg fails, try .webp
+    if (itemIconUrl.value.endsWith('.jpg')) {
+      itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.webp`;
+    }
   }
-}
 
-watchEffect(() => {
-  itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
-});
+  watchEffect(() => {
+    itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
+  });
 
-const openTarkovDevLink = () => {
-  window.open(props.devLink, "_blank");
-};
-const openWikiLink = () => {
-  window.open(props.wikiLink, "_blank");
-};
+  const openTarkovDevLink = () => {
+    window.open(props.devLink, '_blank');
+  };
+  const openWikiLink = () => {
+    window.open(props.wikiLink, '_blank');
+  };
 </script>
 <style lang="scss" scoped>
-.blur-item {
-  filter: blur(1px);
-}
-.external-link {
-  cursor: pointer;
-}
-.float-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-.float-link {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
+  .blur-item {
+    filter: blur(1px);
+  }
+  .external-link {
+    cursor: pointer;
+  }
+  .float-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .float-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
 </style>
