@@ -1,9 +1,6 @@
 <template>
-  <v-container
-    class="d-flex flex-column"
-    style="min-height: calc(100vh - 250px)"
-  >
-    <tracker-tip tip="hideout" style="flex: 0 0 auto"></tracker-tip>
+  <v-container class="d-flex flex-column" style="min-height: calc(100vh - 250px)">
+    <tracker-tip tip="hideout" style="flex: 0 0 auto" class="mb-4"></tracker-tip>
     <div class="flex-grow-0" style="margin-bottom: 16px">
       <v-row justify="center">
         <v-col lg="8" md="12">
@@ -31,11 +28,7 @@
     <div class="flex-grow-1">
       <v-row v-if="hideoutLoading" justify="center">
         <v-col cols="12" align="center">
-          <v-progress-circular
-            indeterminate
-            color="secondary"
-            class="mx-2"
-          ></v-progress-circular>
+          <v-progress-circular indeterminate color="secondary" class="mx-2"></v-progress-circular>
           {{ $t('page.hideout.loading') }} <refresh-button />
         </v-col>
       </v-row>
@@ -54,9 +47,7 @@
       </v-row>
       <v-row v-if="!hideoutLoading && visibleStations.length == 0">
         <v-col cols="12">
-          <v-alert icon="mdi-clipboard-search">
-            {{ $t('page.hideout.nostationsfound') }}</v-alert
-          >
+          <v-alert icon="mdi-clipboard-search"> {{ $t('page.hideout.nostationsfound') }}</v-alert>
         </v-col>
       </v-row>
     </div>
@@ -69,15 +60,9 @@
   import { useProgressStore } from '@/stores/progress';
   import { useUserStore } from '@/stores/user';
   import { defineAsyncComponent } from 'vue';
-  const TrackerTip = defineAsyncComponent(
-    () => import('@/components/TrackerTip.vue')
-  );
-  const HideoutCard = defineAsyncComponent(
-    () => import('@/components/hideout/HideoutCard.vue')
-  );
-  const RefreshButton = defineAsyncComponent(
-    () => import('@/components/RefreshButton.vue')
-  );
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
+  const HideoutCard = defineAsyncComponent(() => import('@/components/hideout/HideoutCard.vue'));
+  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton.vue'));
   const { t } = useI18n({ useScope: 'global' });
   const { hideoutStations, hideoutLoading } = useTarkovData();
   const progressStore = useProgressStore();
@@ -117,17 +102,14 @@
         const nextLevelData = station.levels.find((l) => l.level === lvl + 1);
         if (!nextLevelData) return false;
         return nextLevelData.stationLevelRequirements.every(
-          (req) =>
-            (progressStore.hideoutLevels?.[req.station.id]?.self || 0) >=
-            req.level
+          (req) => (progressStore.hideoutLevels?.[req.station.id]?.self || 0) >= req.level
         );
       });
     //Display all maxed stations
     if (activePrimaryView.value === 'maxed')
       return hideoutStationList.filter(
         (station) =>
-          (progressStore.hideoutLevels?.[station.id]?.self || 0) ===
-          station.levels.length
+          (progressStore.hideoutLevels?.[station.id]?.self || 0) === station.levels.length
       );
     //Display all locked stations
     if (activePrimaryView.value === 'locked')
@@ -136,9 +118,7 @@
         const nextLevelData = station.levels.find((l) => l.level === lvl + 1);
         if (!nextLevelData) return false;
         return !nextLevelData.stationLevelRequirements.every(
-          (req) =>
-            (progressStore.hideoutLevels?.[req.station.id]?.self || 0) >=
-            req.level
+          (req) => (progressStore.hideoutLevels?.[req.station.id]?.self || 0) >= req.level
         );
       });
     //Display all stations
