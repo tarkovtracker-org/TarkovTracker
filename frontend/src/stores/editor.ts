@@ -22,7 +22,7 @@ interface ObjectiveGpsData {
 }
 
 export const useEditorStore = defineStore('editor', () => {
-  // --- State --- Use refs directly
+  // State Use refs directly
   const objectiveMaps: RemovableRef<ObjectiveMapData> = useStorage('editor_objectiveMaps', {});
   const alternativeTasks: RemovableRef<AlternativeTaskData> = useStorage(
     'editor_alternativeTasks',
@@ -30,7 +30,7 @@ export const useEditorStore = defineStore('editor', () => {
   );
   const objectiveGPS: RemovableRef<ObjectiveGpsData> = useStorage('editor_objectiveGPS', {});
 
-  // --- Getters --- Use computed properties
+  // Getters Use computed properties
   const getObjectiveMaps = computed(() => {
     return (objectiveId: string): string[] => objectiveMaps.value[objectiveId] ?? [];
   });
@@ -55,7 +55,7 @@ export const useEditorStore = defineStore('editor', () => {
     return objectiveGPS.value ?? {};
   });
 
-  // --- Actions --- Regular functions
+  // Actions Regular functions
   function setObjectiveMaps(objectiveId: string, maps: string[]) {
     objectiveMaps.value[objectiveId] = maps;
   }
@@ -86,7 +86,7 @@ export const useEditorStore = defineStore('editor', () => {
     resetObjectiveGPS();
   }
 
-  // --- Return state, getters, and actions ---
+  // Return state, getters, and actions
   return {
     // State (Refs are automatically reactive)
     objectiveMaps,

@@ -2,7 +2,7 @@ import { fireuser } from '@/plugins/firebase';
 import { defineStore, type StoreDefinition } from 'pinia';
 import { watch } from 'vue';
 import pinia from '@/plugins/pinia';
-
+import type { StoreWithFireswapExt } from '@/plugins/pinia-firestore';
 // Define the state structure
 interface UserState {
   allTipsHidden: boolean;
@@ -25,14 +25,13 @@ interface UserState {
   hideNonKappaTasks: boolean;
   neededitemsStyle: string | null;
   hideoutPrimaryView?: string | null;
-  saving: {
+  saving?: {
     streamerMode: boolean;
     hideGlobalTasks: boolean;
     hideNonKappaTasks: boolean;
     itemsNeededHideNonFIR: boolean;
   };
 }
-
 // Export the default state with type annotation
 export const defaultState: UserState = {
   allTipsHidden: false,
@@ -62,7 +61,6 @@ export const defaultState: UserState = {
     itemsNeededHideNonFIR: false,
   },
 };
-
 // Per-toggle saving state (not persisted)
 const initialSavingState = {
   streamerMode: false,
@@ -70,7 +68,6 @@ const initialSavingState = {
   hideNonKappaTasks: false,
   itemsNeededHideNonFIR: false,
 };
-
 // Define getter types
 type UserGetters = {
   showTip: (state: UserState) => (tipKey: string) => boolean;
@@ -95,7 +92,6 @@ type UserGetters = {
   getNeededItemsStyle: (state: UserState) => string;
   getHideoutPrimaryView: (state: UserState) => string;
 };
-
 // Define action types
 type UserActions = {
   hideTip(tipKey: string): void;
@@ -120,25 +116,9 @@ type UserActions = {
   setNeededItemsStyle(style: string): void;
   setHideoutPrimaryView(view: string): void;
 };
-
-// Define the Fireswap configuration type
-interface FireswapConfig {
-  path: string;
-  document: string;
-  debouncems: number;
-  localKey: string;
-}
-
 // Define the store type including the fireswap property
-interface UserStoreDefinition
-  extends StoreDefinition<
-    'swapUser',
-    UserState,
-    UserGetters,
-    UserActions & { fireswap?: FireswapConfig[] }
-  > {
-  fireswap?: FireswapConfig[];
-}
+// Changed interface to type alias to resolve no-empty-object-type error
+type UserStoreDefinition = StoreDefinition<'swapUser', UserState, UserGetters, UserActions>;
 
 export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
   state: (): UserState => {
@@ -232,6 +212,7 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
     setStreamerMode(mode: boolean) {
       this.streamerMode = mode;
       persistUserState(this.$state);
+      this.saving = this.saving ?? { ...initialSavingState };
       this.saving.streamerMode = true;
     },
     toggleHidden(teamId: string) {
@@ -276,16 +257,19 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
     setItemsNeededHideNonFIR(hide: boolean) {
       this.itemsHideNonFIR = hide;
       persistUserState(this.$state);
+      this.saving = this.saving ?? { ...initialSavingState };
       this.saving.itemsNeededHideNonFIR = true;
     },
     setHideGlobalTasks(hide: boolean) {
       this.hideGlobalTasks = hide;
       persistUserState(this.$state);
+      this.saving = this.saving ?? { ...initialSavingState };
       this.saving.hideGlobalTasks = true;
     },
     setHideNonKappaTasks(hide: boolean) {
       this.hideNonKappaTasks = hide;
       persistUserState(this.$state);
+      this.saving = this.saving ?? { ...initialSavingState };
       this.saving.hideNonKappaTasks = true;
     },
     setNeededItemsStyle(style: string) {
@@ -304,7 +288,6 @@ export const useUserStore: UserStoreDefinition = defineStore('swapUser', {
     },
   ],
 }) as UserStoreDefinition;
-
 // Watch for fireuser state changing and bind/unbind
 watch(
   () => fireuser.loggedIn,
@@ -312,30 +295,29 @@ watch(
     try {
       // Ensure pinia instance is available and correctly typed
       const userStore = useUserStore(pinia);
-
+      const extendedStore = userStore as StoreWithFireswapExt<typeof userStore>;
       // Check if firebindAll/fireunbindAll exist before calling
-      const canBind = typeof (userStore as any).firebindAll === 'function';
-      const canUnbind = typeof (userStore as any).fireunbindAll === 'function';
-
+      const canBind = typeof extendedStore.firebindAll === 'function';
+      const canUnbind = typeof extendedStore.fireunbindAll === 'function';
       if (newValue) {
         if (canBind) {
-          (userStore as any).firebindAll();
-        } else {
+          extendedStore.firebindAll!();
         }
       } else {
         if (canUnbind) {
-          (userStore as any).fireunbindAll();
+          extendedStore.fireunbindAll!();
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Handle cases where pinia or userStore might not be ready
+      console.error('Error in userStore watch for fireuser.loggedIn:', _error);
     }
   },
   { immediate: true }
 );
-
 // Helper to persist state without 'saving'
 function persistUserState(state: UserState) {
-  const { saving, ...persistedState } = state;
+  const persistedState = { ...state };
+  delete persistedState.saving;
   localStorage.setItem('user', JSON.stringify(persistedState));
 }

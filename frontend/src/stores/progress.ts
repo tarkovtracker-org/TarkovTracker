@@ -1,12 +1,13 @@
 import { useLiveData } from '@/composables/livedata';
 import { fireuser } from '@/plugins/firebase';
 import { useUserStore } from '@/stores/user';
-import { defineStore, type Store } from 'pinia';
+import { defineStore } from 'pinia';
 import { useTarkovStore } from '@/stores/tarkov';
-import { UserState } from '@/shared_state';
 import type { Task } from '@/composables/tarkovdata';
 import { tasks, traders, objectives, hideoutStations } from '@/composables/tarkovdata';
+import { StoreGeneric } from 'pinia';
 export const STASH_STATION_ID = '5d484fc0654e76006657e0ab';
+export const CULTIST_CIRCLE_STATION_ID = '667298e75ea6b4493c08f266';
 interface GameEdition {
   version: number;
   value: number;
@@ -19,14 +20,14 @@ const gameEditions: GameEdition[] = [
   { version: 4, value: 0.2, defaultStashLevel: 4 },
   { version: 5, value: 0.2, defaultStashLevel: 5 },
 ];
-type TeamStoresMap = Record<string, Store<string, UserState, any, any>>;
+type TeamStoresMap = Record<string, StoreGeneric>;
 type CompletionsMap = Record<string, Record<string, boolean>>;
-type TraderLevelsMap = Record<string, Record<string, any>>;
+type TraderLevelsMap = Record<string, Record<string, number>>;
 type FactionMap = Record<string, string>;
 type TaskAvailabilityMap = Record<string, Record<string, boolean>>;
 type ObjectiveCompletionsMap = Record<string, Record<string, boolean>>;
 type HideoutLevelMap = Record<string, Record<string, number>>;
-type ProgressState = {};
+type ProgressState = object;
 type ProgressGetters = {
   teamStores: TeamStoresMap;
   visibleTeamStores: TeamStoresMap;
@@ -52,7 +53,7 @@ interface FireswapConfig {
 export const useProgressStore = defineStore('progress', {
   state: (): ProgressState => ({}),
   getters: {
-    teamStores(state: ProgressState): TeamStoresMap {
+    teamStores(_state: ProgressState): TeamStoresMap {
       const { teammateStores } = useLiveData();
       const stores: TeamStoresMap = {};
       stores['self'] = useTarkovStore();
@@ -65,7 +66,7 @@ export const useProgressStore = defineStore('progress', {
       }
       return stores;
     },
-    visibleTeamStores(state: ProgressState): TeamStoresMap {
+    visibleTeamStores(_state: ProgressState): TeamStoresMap {
       const userStore = useUserStore();
       const visibleStores: TeamStoresMap = {};
       Object.entries(this.teamStores).forEach(([teamId, store]) => {
@@ -75,7 +76,7 @@ export const useProgressStore = defineStore('progress', {
       });
       return visibleStores;
     },
-    tasksCompletions(state: ProgressState): CompletionsMap {
+    tasksCompletions(_state: ProgressState): CompletionsMap {
       const completions: CompletionsMap = {};
       if (!tasks.value) return {};
       for (const task of tasks.value as Task[]) {
@@ -89,7 +90,7 @@ export const useProgressStore = defineStore('progress', {
       return completions;
     },
     gameEditionData: () => gameEditions,
-    traderLevelsAchieved(state: ProgressState): TraderLevelsMap {
+    traderLevelsAchieved(_state: ProgressState): TraderLevelsMap {
       const levels: TraderLevelsMap = {};
       if (!traders.value) return {};
       for (const teamId of Object.keys(this.visibleTeamStores)) {
@@ -113,7 +114,7 @@ export const useProgressStore = defineStore('progress', {
     },
     unlockedTasks(
       this: ProgressState & ProgressGetters,
-      state: ProgressState
+      _state: ProgressState
     ): TaskAvailabilityMap {
       const available: TaskAvailabilityMap = {};
       if (!tasks.value) return {};
@@ -187,7 +188,7 @@ export const useProgressStore = defineStore('progress', {
       }
       return available;
     },
-    objectiveCompletions(state: ProgressState): ObjectiveCompletionsMap {
+    objectiveCompletions(_state: ProgressState): ObjectiveCompletionsMap {
       const completions: ObjectiveCompletionsMap = {};
       if (!objectives.value) return {};
       for (const objective of objectives.value) {
@@ -200,7 +201,7 @@ export const useProgressStore = defineStore('progress', {
       }
       return completions;
     },
-    hideoutLevels(state: ProgressState): HideoutLevelMap {
+    hideoutLevels(_state: ProgressState): HideoutLevelMap {
       const levels: HideoutLevelMap = {};
       if (!hideoutStations.value) return {};
       for (const station of hideoutStations.value) {
@@ -225,12 +226,26 @@ export const useProgressStore = defineStore('progress', {
           let currentStationDisplayLevel;
           if (station.id === STASH_STATION_ID) {
             const gameEditionVersion = store?.$state.gameEdition ?? 0;
-            const edition = this.gameEditionData.find((e: any) => e.version === gameEditionVersion);
-            const defaultStashFromEdition = edition?.defaultStashLevel ?? 0;
-            currentStationDisplayLevel = Math.max(
-              defaultStashFromEdition,
-              maxManuallyCompletedLevel
+            const edition = this.gameEditionData.find(
+              (e: GameEdition) => e.version === gameEditionVersion
             );
+            const defaultStashFromEdition = edition?.defaultStashLevel ?? 0;
+            const maxLevel = station.levels?.length || 0;
+            // Set to min(defaultStashFromEdition, maxLevel)
+            const effectiveStashLevel = Math.min(defaultStashFromEdition, maxLevel);
+            if (effectiveStashLevel === maxLevel) {
+              currentStationDisplayLevel = maxLevel;
+            } else {
+              currentStationDisplayLevel = Math.max(effectiveStashLevel, maxManuallyCompletedLevel);
+            }
+          } else if (station.id === CULTIST_CIRCLE_STATION_ID) {
+            const gameEditionVersion = store?.$state.gameEdition ?? 0;
+            // If Unheard Edition (5), always max this station
+            if (gameEditionVersion === 5 && station.levels && station.levels.length > 0) {
+              currentStationDisplayLevel = station.levels.length;
+            } else {
+              currentStationDisplayLevel = maxManuallyCompletedLevel;
+            }
           } else {
             currentStationDisplayLevel = maxManuallyCompletedLevel;
           }
@@ -247,7 +262,6 @@ export const useProgressStore = defineStore('progress', {
     },
     getDisplayName(_state: ProgressState) {
       return (teamId: string): string => {
-        // If teamId is the current user's UID, or the literal 'self', use the main user's store
         if (teamId === fireuser.uid || teamId === 'self') {
           const selfStore = this.teamStores['self'];
           const storedDisplayName = selfStore?.$state.displayName;
@@ -260,21 +274,17 @@ export const useProgressStore = defineStore('progress', {
             return fireuser.uid?.substring(0, 6) ?? teamId;
           }
         }
-        // For other teammates
         const store = this.teamStores[teamId];
-        // If displayName is null/undefined in their store, fallback to shortened UID, then full UID
         return store?.$state.displayName ?? teamId.substring(0, 6) ?? teamId;
       };
     },
     getLevel(_state: ProgressState) {
       return (teamId: string): number => {
-        // If teamId is the current user's UID, or the literal 'self', use the main user's store
         if (teamId === fireuser.uid || teamId === 'self') {
-          const selfStore = this.teamStores['self']; // this.teamStores contains the user's own store under 'self'
+          const selfStore = this.teamStores['self'];
           return selfStore?.$state.level ?? 1;
         }
-        // For other teammates
-        const store = this.visibleTeamStores[teamId]; // This accesses the dynamically created store for the teammate
+        const store = this.visibleTeamStores[teamId];
         return store?.$state.level ?? 1;
       };
     },
@@ -288,10 +298,10 @@ export const useProgressStore = defineStore('progress', {
   actions: {},
   fireswap: [
     {
-      path: '.', // Sync the entire store state
-      document: 'userProgress/{uid}', // Use a separate Firestore path for this store
-      debouncems: 500, // Use a slightly different debounce?
-      localKey: 'userProgress', // Use a separate local key for this store
+      path: '.',
+      document: 'userProgress/{uid}',
+      debouncems: 500,
+      localKey: 'userProgress',
     },
   ] as FireswapConfig[],
 });

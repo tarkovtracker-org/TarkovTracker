@@ -2,9 +2,10 @@ import { defineStore } from 'pinia';
 import { watch } from 'vue';
 import { fireuser, firestore } from '@/plugins/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { getters, actions, defaultState, type UserState } from '@/shared_state';
+import { getters, actions, defaultState, type UserState, type UserActions } from '@/shared_state';
 import { initializeStore, wasDataMigrated } from '@/plugins/store-initializer';
 import type { Pinia } from 'pinia';
+import type { StoreWithFireswapExt } from '@/plugins/pinia-firestore';
 
 // Define the Fireswap configuration type
 interface FireswapConfig {
@@ -13,33 +14,28 @@ interface FireswapConfig {
   debouncems: number;
   localKey: string;
 }
-
 // Define the store, letting Pinia infer the type
 // Cast getters/actions to any for now due to JS import
 export const useTarkovStore = defineStore('swapTarkov', {
   state: () => JSON.parse(JSON.stringify(defaultState)) as UserState,
-  getters: getters as any, // Cast to any - Requires shared_state.ts for proper typing
+  getters: getters,
   actions: {
-    ...(actions as any), // Spread existing actions
-
+    ...(actions as UserActions),
     async resetOnlineProfile() {
       if (!fireuser.uid) {
         console.error('User not logged in. Cannot reset online profile.');
         return;
       }
       const userProgressRef = doc(firestore, 'progress', fireuser.uid);
-
       try {
         // Set the Firestore document to a fresh defaultState
         const freshDefaultState = JSON.parse(JSON.stringify(defaultState));
         await setDoc(userProgressRef, freshDefaultState);
-
         // Reset the local Pinia store state to default using $patch
         // This ensures the in-memory state reflects the reset immediately.
         this.$patch(JSON.parse(JSON.stringify(defaultState)));
-
         console.log(
-          'Online profile reset in Firestore. Local Pinia state reset. localStorage will be updated by fireswap if configured.'
+          'Online profile and local Pinia state reset. localStorage may update via fireswap.'
         );
       } catch (error) {
         console.error('Error resetting online profile:', error);
@@ -55,14 +51,11 @@ export const useTarkovStore = defineStore('swapTarkov', {
     },
   ] as FireswapConfig[],
 });
-
 // Type the store instance based on Pinia's inferred type
 type TarkovStoreType = ReturnType<typeof useTarkovStore>;
-
 // Type the store instance potentially returned by initializeStore
 type StoreInstance = TarkovStoreType | null;
-
-const getSafeStoreInstance = async (piniaInstance?: Pinia): Promise<StoreInstance> => {
+const getSafeStoreInstance = async (_piniaInstance?: Pinia): Promise<StoreInstance> => {
   try {
     const store = await initializeStore('tarkov', useTarkovStore);
     if (store && typeof store.$id === 'string') {
@@ -91,27 +84,26 @@ watch(
         watchHandlerRunning = false;
         return;
       }
-      const canBind = typeof (tarkovStore as any).firebindAll === 'function';
-      const canUnbind = typeof (tarkovStore as any).fireunbindAll === 'function';
+      const extendedStore = tarkovStore as StoreWithFireswapExt<TarkovStoreType>;
       if (newValue) {
         const wasMigrated =
           wasDataMigrated() || sessionStorage.getItem('tarkovDataMigrated') === 'true';
         if (wasMigrated) {
-          if (canBind) {
-            (tarkovStore as any).firebindAll();
+          if (typeof extendedStore.firebindAll === 'function') {
+            extendedStore.firebindAll();
           }
         } else {
-          if (canBind) {
+          if (typeof extendedStore.firebindAll === 'function') {
             console.debug('Binding remoteTarkov store');
-            (tarkovStore as any).firebindAll();
+            extendedStore.firebindAll();
           } else {
             console.debug('No remoteTarkov store to bind');
           }
         }
       } else {
-        if (canUnbind) {
+        if (typeof extendedStore.fireunbindAll === 'function') {
           console.debug('Unbinding remoteTarkov store');
-          (tarkovStore as any).fireunbindAll();
+          extendedStore.fireunbindAll();
         } else {
           console.debug('No remoteTarkov store to unbind');
         }
@@ -131,15 +123,15 @@ setTimeout(async () => {
     if (!tarkovStore) {
       throw new Error('Failed to get tarkovStore in delayed initialization');
     }
-    const canBind = typeof (tarkovStore as any).firebindAll === 'function';
+    const extendedStore = tarkovStore as StoreWithFireswapExt<TarkovStoreType>;
     const wasMigrated =
       wasDataMigrated() || sessionStorage.getItem('tarkovDataMigrated') === 'true';
     if (wasMigrated) {
-      if (canBind) {
-        (tarkovStore as any).firebindAll();
+      if (typeof extendedStore.firebindAll === 'function') {
+        extendedStore.firebindAll();
       }
-    } else if (fireuser.loggedIn && canBind) {
-      (tarkovStore as any).firebindAll();
+    } else if (fireuser.loggedIn && typeof extendedStore.firebindAll === 'function') {
+      extendedStore.firebindAll();
     }
   } catch (error) {
     console.error('Error in delayed store initialization:', error);
