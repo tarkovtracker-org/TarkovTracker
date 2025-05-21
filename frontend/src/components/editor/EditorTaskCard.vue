@@ -25,14 +25,13 @@
   </v-card>
 </template>
 <script setup>
-  import { inject, computed } from 'vue';
-  import { useTarkovData } from '@/composables/tarkovdata';
-  import { defineAsyncComponent } from 'vue';
+  import { defineAsyncComponent, defineProps } from 'vue';
+
   const EditorObjectiveSection = defineAsyncComponent(
-    () => import('@/components/editor/EditorObjectiveSection.vue')
+    () => import('@/components/editor/EditorObjectiveSection')
   );
   const EditorAlternativeSection = defineAsyncComponent(
-    () => import('@/components/editor/EditorAlternativeSection.vue')
+    () => import('@/components/editor/EditorAlternativeSection')
   );
   const props = defineProps({
     task: {
@@ -40,6 +39,5 @@
       required: true,
     },
   });
-  const { tasks, rawMaps: maps, traders } = useTarkovData();
 </script>
 <style lang="scss" scoped></style>

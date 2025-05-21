@@ -48,14 +48,38 @@
         </v-col>
       </v-row>
     </v-col>
+    <v-col cols="12">
+      <v-row align="center" no-gutters>
+        <v-col cols="auto">
+          <v-btn
+            v-if="!objective.optional && objective.type !== 'giveQuestItem'"
+            icon="mdi-map-marker-plus"
+            variant="text"
+            size="small"
+            :title="t('editor.add_map_marker_to_objective')"
+            @click="addMapMarker(objective.id, objective.location?.id ?? null)"
+          ></v-btn>
+        </v-col>
+        <v-col cols="auto">
+          <v-btn
+            v-if="objective.optional && objective.type !== 'giveQuestItem'"
+            icon="mdi-map-marker-off"
+            variant="text"
+            size="small"
+            :title="t('editor.remove_map_marker_from_objective')"
+            @click="removeMapMarker(objective.id)"
+          ></v-btn>
+        </v-col>
+      </v-row>
+    </v-col>
   </v-row>
 </template>
 <script setup>
   import { computed, ref } from 'vue';
   import { useTarkovData } from '@/composables/tarkovdata';
   import { defineAsyncComponent } from 'vue';
-  import { useEditorStore } from '@/stores/editor';
-  const TarkovMap = defineAsyncComponent(() => import('@/components/TarkovMap.vue'));
+  import { useEditorStore } from '@/stores/editor'; // Updated import path
+  const TarkovMap = defineAsyncComponent(() => import('@/components/TarkovMap'));
   const props = defineProps({
     objective: {
       type: Object,
@@ -111,8 +135,32 @@
     return Object.values(finalMaps);
   });
   const validGPS = computed(() => {
-    if (properMaps.value.length == 1) {
-      return true;
+    if (objectiveMaps.value.length == 1) {
+      if (objectiveMaps.value[0] == '59fc81d786f774390775787e') {
+        // Were night factory, so use factory instead
+        return processedMaps.value.find((map) => (map.id = '55f2d3fd4bdc2d5f408b4567'));
+      } else {
+        return processedMaps.value.find((map) => map.id == objectiveMaps.value[0].id);
+      }
+    } else if (objectiveMaps.value.length == 2) {
+      // If there are two maps, and they are factory and night factory, use factory
+      try {
+        if (
+          objectiveMaps.value.includes('55f2d3fd4bdc2d5f408b4567') &&
+          objectiveMaps.value.includes('59fc81d786f774390775787e')
+        ) {
+          return processedMaps.value.find((map) => (map.id = '55f2d3fd4bdc2d5f408b4567'));
+        } else if (
+          objectiveMaps.value.map((m) => m.id).includes('55f2d3fd4bdc2d5f408b4567') &&
+          objectiveMaps.value.map((m) => m.id).includes('59fc81d786f774390775787e')
+        ) {
+          return processedMaps.value.find((map) => (map.id = '55f2d3fd4bdc2d5f408b4567'));
+        } else {
+          return false;
+        }
+      } catch {
+        return false;
+      }
     } else {
       return false;
     }
@@ -128,36 +176,16 @@
       return {};
     }
   });
-  // const validGPS = computed(() => {
-  //   if (objectiveMaps.value.length == 1) {
-  //     if (objectiveMaps.value[0] == '59fc81d786f774390775787e') {
-  //       // Were night factory, so use factory instead
-  //       return processedMaps.value.find(map => map.id = '55f2d3fd4bdc2d5f408b4567')
-  //     } else {
-  //       return processedMaps.value.find(map => map.id == objectiveMaps.value[0].id)
-  //     }
-  //   } else if (objectiveMaps.value.length == 2) {
-  //     // If there are two maps, and they are factory and night factory, use factory
-  //     try {
-  //       if (objectiveMaps.value.includes('55f2d3fd4bdc2d5f408b4567') && objectiveMaps.value.includes('59fc81d786f774390775787e')) {
-  //         return processedMaps.value.find(map => map.id = '55f2d3fd4bdc2d5f408b4567')
-  //       } else if (objectiveMaps.value.map(m => m.id).includes('55f2d3fd4bdc2d5f408b4567') && objectiveMaps.value.map(m => m.id).includes('59fc81d786f774390775787e')) {
-  //         return processedMaps.value.find(map => map.id = '55f2d3fd4bdc2d5f408b4567')
-  //       } else {
-  //         return false
-  //       }
-  //     } catch {
-  //       return false
-  //     }
-  //   } else {
-  //     return false
-  //   }
-  // })
   const objectiveMapString = computed(() => {
     return objectiveMaps.value
-      .map((m) =>
-        typeof m == 'string' ? processedMaps.value.find((map) => m == map.id).name : m.name
-      )
+      .map((m) => {
+        if (typeof m == 'string') {
+          const foundMap = processedMaps.value.find((map) => m == map.id);
+          return foundMap ? foundMap.name : '';
+        } else {
+          return m.name;
+        }
+      })
       .join(', ');
   });
 </script>

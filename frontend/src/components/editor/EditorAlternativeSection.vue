@@ -29,7 +29,7 @@
 <script setup>
   import { computed, ref } from 'vue';
   import { useTarkovData } from '@/composables/tarkovdata';
-  import { useEditorStore } from '@/stores/editor';
+  import { useEditorStore } from '@/stores/editor'; // Updated import path
   const props = defineProps({
     task: {
       type: Object,
