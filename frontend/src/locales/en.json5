@@ -252,6 +252,9 @@
       discord: 'Discord',
       github: 'GitHub',
     },
+    support: 'Support',
+    contributors: 'Contributors',
+    changelog: 'Changelog',
   },
   module: {
     team_settings: {
@@ -316,4 +319,6 @@
     loading: 'Loading...',
     error: 'Error',
   },
+  'task.kappa_req': 'Required for Kappa quest',
+  'task.level_req': 'Level required: {level}',
 }
