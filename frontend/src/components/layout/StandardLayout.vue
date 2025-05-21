@@ -42,9 +42,9 @@
   //     return ''
   //   }
   // })
-  const NavDrawer = defineAsyncComponent(() => import('@/components/layout/NavDrawer.vue'));
-  const AppFooter = defineAsyncComponent(() => import('@/components/layout/AppFooter.vue'));
-  const AppBar = defineAsyncComponent(() => import('@/components/layout/AppBar.vue'));
+  const NavDrawer = defineAsyncComponent(() => import('@/components/layout/NavDrawer'));
+  const AppFooter = defineAsyncComponent(() => import('@/components/layout/AppFooter'));
+  const AppBar = defineAsyncComponent(() => import('@/components/layout/AppBar'));
 </script>
 <style lang="scss" scoped>
   #tracker-page-background {

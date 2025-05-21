@@ -61,9 +61,7 @@
   const navBarIcon = computed(() => {
     return appStore.drawerShow && appStore.drawerRail ? 'mdi-menu-open' : 'mdi-menu';
   });
-  const OverflowMenu = defineAsyncComponent(
-    () => import('/src/components/layout/OverflowMenu.vue')
-  );
+  const OverflowMenu = defineAsyncComponent(() => import('@/components/layout/OverflowMenu'));
   const { loading: dataLoading, error: dataError, hideoutLoading } = useTarkovData();
   const { mdAndDown } = useDisplay();
   function changeNavigationDrawer() {
