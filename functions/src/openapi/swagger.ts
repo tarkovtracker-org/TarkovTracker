@@ -36,8 +36,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: process.env.API_BASE_URL || 'https://tarkovtracker.org/api',
-        description: 'TarkovTracker API endpoint',
+        url: process.env.API_BASE_URL || 'https://tarkovtracker.org/api/v2',
+        description: process.env.API_ENV_DESCRIPTION || 'TarkovTracker API v2 endpoint',
       },
     ],
     tags: [
@@ -65,7 +65,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
     ],
   },
-  apis: ['lib/index.js', 'lib/openapi/components.js'],
+  apis: ['lib/**/*.js'],
 };
 // Find the project root
 const projectRoot = findProjectRoot(__dirname, 'LICENSE.md');

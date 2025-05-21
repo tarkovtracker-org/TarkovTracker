@@ -9,12 +9,14 @@ const availablePermissions: Permissions = {
   GP: {
     title: 'Get Progression',
     description:
-      'Allows access to read your general progression information, including your TarkovTracker display name, quest progress, hideout progress',
+      'Allows access to read your general progression information, ' +
+      'including your TarkovTracker display name, quest progress, hideout progress',
   },
   TP: {
     title: 'Get Team Progression',
     description:
-      "Allows access to read a virtual copy of your team's progress, including display names, quest, and hideout progress",
+      "Allows access to read a virtual copy of your team's progress, " +
+      'including display names, quest, and hideout progress',
   },
   WP: {
     title: 'Write Progression',
