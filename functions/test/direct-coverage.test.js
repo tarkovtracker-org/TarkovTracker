@@ -1,12 +1,4 @@
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  afterAll,
-} from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 
 // Set up admin mock
 const adminMock = {
@@ -18,11 +10,11 @@ const adminMock = {
           Promise.resolve({
             exists: true,
             data: () => ({
-              permissions: ["read", "write"],
-              owner: "test-user",
+              permissions: ['read', 'write'],
+              owner: 'test-user',
             }),
-            ref: { id: "test-doc" },
-          }),
+            ref: { id: 'test-doc' },
+          })
         ),
         update: vi.fn(() => Promise.resolve()),
         delete: vi.fn(() => Promise.resolve()),
@@ -32,8 +24,8 @@ const adminMock = {
             get: vi.fn(() =>
               Promise.resolve({
                 exists: true,
-                data: () => ({ data: "test-data" }),
-              }),
+                data: () => ({ data: 'test-data' }),
+              })
             ),
           })),
         })),
@@ -45,7 +37,7 @@ const adminMock = {
           Promise.resolve({
             exists: true,
             data: () => ({ tokens: 0 }),
-          }),
+          })
         ),
         update: vi.fn(),
         set: vi.fn(),
@@ -57,10 +49,10 @@ const adminMock = {
 
 // Add FieldValue to the admin.firestore
 adminMock.firestore.FieldValue = {
-  serverTimestamp: vi.fn().mockReturnValue("serverTimestamp"),
+  serverTimestamp: vi.fn().mockReturnValue('serverTimestamp'),
   arrayUnion: vi.fn((item) => `arrayUnion(${item})`),
   arrayRemove: vi.fn((item) => `arrayRemove(${item})`),
-  delete: vi.fn().mockReturnValue("delete()"),
+  delete: vi.fn().mockReturnValue('delete()'),
 };
 
 // Set up functions mock
@@ -86,11 +78,11 @@ const functionsMock = {
 };
 
 // Mock our imports
-vi.mock("firebase-admin", () => ({
+vi.mock('firebase-admin', () => ({
   default: adminMock,
 }));
 
-vi.mock("firebase-functions", () => ({
+vi.mock('firebase-functions', () => ({
   default: functionsMock,
 }));
 
@@ -105,7 +97,7 @@ const mockExpressApp = () => {
 };
 
 // Mock express
-vi.mock("express", () => ({
+vi.mock('express', () => ({
   default: vi.fn(() => mockExpressApp()),
 }));
 
@@ -113,21 +105,19 @@ vi.mock("express", () => ({
 let auth, tokenHandler, progressHandler, apiv2;
 
 // Tests that directly call the module functions
-describe("Direct API Tests", () => {
+describe('Direct API Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-  describe("Auth Middleware", () => {
-    it("should import and test verifyBearer", async () => {
-      const authModule = await import("../api/v2/middleware/auth.js");
+  describe('Auth Middleware', () => {
+    it('should import and test verifyBearer', async () => {
+      const authModule = await import('../api/v2/middleware/auth.js');
       auth = authModule;
       expect(auth.verifyBearer).toBeDefined();
       // Mock request and response
       const req = {
-        get: vi.fn((header) =>
-          header === "Authorization" ? "Bearer valid-token" : null,
-        ),
-        headers: { Authorization: "Bearer valid-token" },
+        get: vi.fn((header) => (header === 'Authorization' ? 'Bearer valid-token' : null)),
+        headers: { Authorization: 'Bearer valid-token' },
       };
       const res = {
         status: vi.fn().mockReturnThis(),
@@ -146,8 +136,8 @@ describe("Direct API Tests", () => {
         expect(res.json).toHaveBeenCalled();
       }
     });
-    it("should handle missing Authorization header", async () => {
-      const authModule = await import("../api/v2/middleware/auth.js");
+    it('should handle missing Authorization header', async () => {
+      const authModule = await import('../api/v2/middleware/auth.js');
       auth = authModule;
       // Mock request with no Authorization header
       const req = {
@@ -168,18 +158,16 @@ describe("Direct API Tests", () => {
       expect(next).not.toHaveBeenCalled();
     });
   });
-  describe("Token Handler", () => {
-    it("should import and test getTokenInfo", async () => {
-      const tokenHandlerModule = await import(
-        "../api/v2/handlers/tokenHandler.js"
-      );
+  describe('Token Handler', () => {
+    it('should import and test getTokenInfo', async () => {
+      const tokenHandlerModule = await import('../api/v2/handlers/tokenHandler.js');
       tokenHandler = tokenHandlerModule.default;
       expect(tokenHandler.getTokenInfo).toBeDefined();
       // Mock request with token data
       const req = {
         apiToken: {
-          permissions: ["read", "write"],
-          token: "test-token",
+          permissions: ['read', 'write'],
+          token: 'test-token',
         },
       };
       const res = {
@@ -193,26 +181,24 @@ describe("Direct API Tests", () => {
       expect(res.json).toHaveBeenCalled();
     });
   });
-  describe("API Router", () => {
-    it("should import and verify API routes", async () => {
-      const apiModule = await import("../api/v2/index.js");
+  describe('API Router', () => {
+    it('should import and verify API routes', async () => {
+      const apiModule = await import('../api/v2/index.js');
       apiv2 = apiModule.default;
       // Just verify it was initialized
       expect(apiv2).toBeDefined();
     });
   });
-  describe("Progress Handler", () => {
-    it("should import and test getPlayerProgress", async () => {
-      const progressHandlerModule = await import(
-        "../api/v2/handlers/progressHandler.js"
-      );
+  describe('Progress Handler', () => {
+    it('should import and test getPlayerProgress', async () => {
+      const progressHandlerModule = await import('../api/v2/handlers/progressHandler.js');
       progressHandler = progressHandlerModule.default;
       expect(progressHandler.getPlayerProgress).toBeDefined();
       // Mock request with player token
       const req = {
         apiToken: {
-          permissions: ["GP"],
-          owner: "test-user",
+          permissions: ['GP'],
+          owner: 'test-user',
         },
       };
       const res = {
@@ -226,16 +212,14 @@ describe("Direct API Tests", () => {
       expect(res.status).toHaveBeenCalled();
       expect(res.json).toHaveBeenCalled();
     });
-    it("should handle unauthorized getPlayerProgress request", async () => {
-      const progressHandlerModule = await import(
-        "../api/v2/handlers/progressHandler.js"
-      );
+    it('should handle unauthorized getPlayerProgress request', async () => {
+      const progressHandlerModule = await import('../api/v2/handlers/progressHandler.js');
       progressHandler = progressHandlerModule.default;
       // Mock request WITHOUT player permission
       const req = {
         apiToken: {
-          permissions: ["read"], // Missing GP permission
-          owner: "test-user",
+          permissions: ['read'], // Missing GP permission
+          owner: 'test-user',
         },
       };
       const res = {
@@ -249,39 +233,35 @@ describe("Direct API Tests", () => {
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.send).toHaveBeenCalled();
     });
-    it("should handle updateSingleTask", async () => {
-      const progressHandlerModule = await import(
-        "../api/v2/handlers/progressHandler.js"
-      );
+    it('should handle updateSingleTask', async () => {
+      const progressHandlerModule = await import('../api/v2/handlers/progressHandler.js');
       progressHandler = progressHandlerModule.default;
       // Import progressUtils so we can spy on it
-      const progressUtils = await import("../api/v2/utils/progressUtils.js");
+      const progressUtils = await import('../api/v2/utils/progressUtils.js');
       // Spy on updateTaskState
-      const updateTaskStateSpy = vi.spyOn(progressUtils, "updateTaskState");
+      const updateTaskStateSpy = vi.spyOn(progressUtils, 'updateTaskState');
       // Setup mock to return a mock task
-      adminMock
-        .firestore()
-        .runTransaction.mockImplementation(async (callback) => {
-          const transaction = {
-            get: vi.fn(() =>
-              Promise.resolve({
-                exists: true,
-                data: () => ({ level: 5, tasks: {} }),
-              }),
-            ),
-            update: vi.fn(),
-          };
-          return callback(transaction);
-        });
+      adminMock.firestore().runTransaction.mockImplementation(async (callback) => {
+        const transaction = {
+          get: vi.fn(() =>
+            Promise.resolve({
+              exists: true,
+              data: () => ({ level: 5, tasks: {} }),
+            })
+          ),
+          update: vi.fn(),
+        };
+        return callback(transaction);
+      });
       expect(progressHandler.updateSingleTask).toBeDefined();
       // Mock request with task data
       const req = {
         apiToken: {
-          permissions: ["WP"],
-          owner: "test-user",
+          permissions: ['WP'],
+          owner: 'test-user',
         },
-        params: { taskId: "test-task" },
-        body: { state: "completed" },
+        params: { taskId: 'test-task' },
+        body: { state: 'completed' },
       };
       const res = {
         status: vi.fn().mockReturnThis(),
@@ -289,9 +269,9 @@ describe("Direct API Tests", () => {
         send: vi.fn().mockReturnThis(),
       };
       // Mock getTaskData to return a valid task
-      const getTaskDataModule = await import("../api/v2/utils/dataLoaders.js");
-      vi.spyOn(getTaskDataModule, "getTaskData").mockResolvedValue({
-        tasks: [{ id: "test-task", objectives: [], minPlayerLevel: 1 }],
+      const getTaskDataModule = await import('../api/v2/utils/dataLoaders.js');
+      vi.spyOn(getTaskDataModule, 'getTaskData').mockResolvedValue({
+        tasks: [{ id: 'test-task', objectives: [], minPlayerLevel: 1 }],
       });
       // Call the function
       await progressHandler.updateSingleTask(req, res);
@@ -303,18 +283,16 @@ describe("Direct API Tests", () => {
       expect(res.status).toHaveBeenCalled();
       expect(res.send).toHaveBeenCalled();
     });
-    it("should handle unauthorized updateSingleTask", async () => {
-      const progressHandlerModule = await import(
-        "../api/v2/handlers/progressHandler.js"
-      );
+    it('should handle unauthorized updateSingleTask', async () => {
+      const progressHandlerModule = await import('../api/v2/handlers/progressHandler.js');
       progressHandler = progressHandlerModule.default;
       // Mock request WITHOUT write permission
       const req = {
         apiToken: {
-          permissions: ["read"], // Missing write permission
-          owner: "test-user",
+          permissions: ['read'], // Missing write permission
+          owner: 'test-user',
         },
-        params: { taskId: "test-task" },
+        params: { taskId: 'test-task' },
         body: { complete: true },
       };
       const res = {
@@ -329,25 +307,25 @@ describe("Direct API Tests", () => {
       expect(res.send).toHaveBeenCalled();
     });
   });
-  describe("Utility Functions", () => {
-    it("should import and test dataLoaders", async () => {
-      const dataLoaders = await import("../api/v2/utils/dataLoaders.js");
+  describe('Utility Functions', () => {
+    it('should import and test dataLoaders', async () => {
+      const dataLoaders = await import('../api/v2/utils/dataLoaders.js');
       expect(dataLoaders.getTaskData).toBeDefined();
       expect(dataLoaders.getHideoutData).toBeDefined();
       // Call functions - they might not complete due to mocks, but will increase coverage
       try {
         await dataLoaders.getTaskData();
       } catch (error) {
-        console.log("Expected error in getTaskData:", error.message);
+        console.log('Expected error in getTaskData:', error.message);
       }
       try {
         await dataLoaders.getHideoutData();
       } catch (error) {
-        console.log("Expected error in getHideoutData:", error.message);
+        console.log('Expected error in getHideoutData:', error.message);
       }
     });
-    it("should import and test progressUtils", async () => {
-      const progressUtils = await import("../api/v2/utils/progressUtils.js");
+    it('should import and test progressUtils', async () => {
+      const progressUtils = await import('../api/v2/utils/progressUtils.js');
       expect(progressUtils.formatProgress).toBeDefined();
       expect(progressUtils.updateTaskState).toBeDefined();
       // Test formatProgress with minimal data
@@ -359,16 +337,16 @@ describe("Direct API Tests", () => {
             task2: { complete: false },
           },
         },
-        "test-user",
+        'test-user',
         { modules: {} },
-        { tasks: {} },
+        { tasks: {} }
       );
       expect(formattedProgress).toBeDefined();
-      expect(formattedProgress.userId).toBe("test-user");
+      expect(formattedProgress.userId).toBe('test-user');
       expect(formattedProgress.playerLevel).toBe(10);
       // Test updateTaskState with correct parameters
-      const task = { id: "task1", objectives: [{ id: "obj1" }] };
-      const state = "completed";
+      const task = { id: 'task1', objectives: [{ id: 'obj1' }] };
+      const state = 'completed';
       const progressData = { level: 5 };
       const taskData = { tasks: [task] };
       const progressUpdate = {};
@@ -380,7 +358,7 @@ describe("Direct API Tests", () => {
         progressData,
         taskData,
         progressUpdate,
-        updateTime,
+        updateTime
       );
       expect(result).toBeDefined();
       expect(result).toBe(progressUpdate); // Should return the same object that was passed in

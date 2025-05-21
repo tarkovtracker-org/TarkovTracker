@@ -1,5 +1,5 @@
 // Common mocks for tests
-import { vi } from "vitest";
+import { vi } from 'vitest';
 
 // Create transaction mock that properly resolves promises
 export const createTransactionMock = () => ({
@@ -20,12 +20,10 @@ export const createFirestoreMock = () => {
   const createDocumentSnapshotMock = (data = {}, exists = true) => ({
     exists,
     data: () => data,
-    id: "mock-doc-id",
+    id: 'mock-doc-id',
     ref: {
-      id: "mock-doc-id",
-      collection: vi
-        .fn()
-        .mockImplementation((name) => createCollectionRefMock(name)),
+      id: 'mock-doc-id',
+      collection: vi.fn().mockImplementation((name) => createCollectionRefMock(name)),
       update: vi.fn().mockResolvedValue({}),
       delete: vi.fn().mockResolvedValue({}),
     },
@@ -40,14 +38,14 @@ export const createFirestoreMock = () => {
     limit: vi.fn(),
     get: vi.fn().mockResolvedValue(createDocumentSnapshotMock()),
     set: vi.fn().mockResolvedValue({}),
-    add: vi.fn().mockResolvedValue({ id: "mock-doc-id" }),
+    add: vi.fn().mockResolvedValue({ id: 'mock-doc-id' }),
     update: vi.fn().mockResolvedValue({}),
     delete: vi.fn().mockResolvedValue({}),
     runTransaction: vi.fn(),
   };
 
   // Create a document reference mock that tracks its own calls
-  const createDocRefMock = (path) => {
+  const createDocRefMock = (_path) => {
     const docRef = {
       get: vi.fn().mockImplementation(() => {
         firestoreMock.get();
@@ -124,15 +122,15 @@ export const createFirebaseAdminMock = () => {
 
   // Add static properties
   firestoreFunction.FieldValue = {
-    serverTimestamp: vi.fn().mockReturnValue("serverTimestamp"),
+    serverTimestamp: vi.fn().mockReturnValue('serverTimestamp'),
     arrayUnion: vi.fn((item) => `arrayUnion(${item})`),
     arrayRemove: vi.fn((item) => `arrayRemove(${item})`),
-    delete: vi.fn().mockReturnValue("delete()"),
+    delete: vi.fn().mockReturnValue('delete()'),
     increment: vi.fn((value) => `increment(${value})`),
   };
 
   firestoreFunction.Timestamp = {
-    now: vi.fn().mockReturnValue("now"),
+    now: vi.fn().mockReturnValue('now'),
     fromDate: vi.fn((date) => ({ toDate: () => date })),
   };
 
@@ -141,8 +139,8 @@ export const createFirebaseAdminMock = () => {
     initializeApp: vi.fn(),
     firestore: firestoreFunction,
     auth: vi.fn().mockReturnValue({
-      verifyIdToken: vi.fn().mockResolvedValue({ uid: "test-user" }),
-      createCustomToken: vi.fn().mockResolvedValue("test-custom-token"),
+      verifyIdToken: vi.fn().mockResolvedValue({ uid: 'test-user' }),
+      createCustomToken: vi.fn().mockResolvedValue('test-custom-token'),
     }),
   };
 
@@ -156,7 +154,7 @@ export const createFirebaseFunctionsMock = () => {
     https: {
       HttpsError: class HttpsError extends Error {
         constructor(code, message) {
-          super(message || "Error during test");
+          super(message || 'Error during test');
           this.code = code;
         }
       },

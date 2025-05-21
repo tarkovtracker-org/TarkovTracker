@@ -1,5 +1,5 @@
 // Firebase mocks for testing
-import { vi } from "vitest";
+import { vi } from 'vitest';
 
 // Create a transaction mock
 export const createTransactionMock = () => ({
@@ -58,21 +58,21 @@ export const createFirebaseAdminMock = () => {
 
   // Add FieldValue and Timestamp as properties to the function
   firestoreFunction.FieldValue = {
-    serverTimestamp: vi.fn().mockReturnValue("server-timestamp"),
+    serverTimestamp: vi.fn().mockReturnValue('server-timestamp'),
     arrayUnion: vi.fn((item) => `array-union-${item}`),
     arrayRemove: vi.fn((item) => `array-remove-${item}`),
   };
 
   firestoreFunction.Timestamp = {
-    now: vi.fn().mockReturnValue("timestamp-now"),
+    now: vi.fn().mockReturnValue('timestamp-now'),
   };
 
   const adminMock = {
     initializeApp: vi.fn(),
     firestore: firestoreFunction,
     auth: vi.fn().mockReturnValue({
-      verifyIdToken: vi.fn().mockResolvedValue({ uid: "test-user" }),
-      createCustomToken: vi.fn().mockResolvedValue("custom-token"),
+      verifyIdToken: vi.fn().mockResolvedValue({ uid: 'test-user' }),
+      createCustomToken: vi.fn().mockResolvedValue('custom-token'),
     }),
   };
 

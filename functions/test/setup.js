@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi, beforeEach } from 'vitest';
 // --- Mocks ---
 const adminMock = { initializeApp: vi.fn() }; // Simpler admin mock
 // Basic Firestore spies (tests will provide implementations)
@@ -8,15 +8,15 @@ const firestoreMock = {
   runTransaction: vi.fn(),
   FieldValue: {
     // Keep FieldValue for convenience
-    serverTimestamp: vi.fn().mockReturnValue("serverTimestamp"),
+    serverTimestamp: vi.fn().mockReturnValue('serverTimestamp'),
     arrayUnion: vi.fn((item) => `arrayUnion(${item})`),
     arrayRemove: vi.fn((item) => `arrayRemove(${item})`),
     increment: vi.fn((value) => `increment(${value})`),
-    delete: vi.fn().mockReturnValue("delete()"),
+    delete: vi.fn().mockReturnValue('delete()'),
   },
   Timestamp: {
     // Keep Timestamp
-    now: vi.fn().mockReturnValue("now"),
+    now: vi.fn().mockReturnValue('now'),
     fromDate: vi.fn((date) => ({ toDate: () => date })),
   },
 };
@@ -52,15 +52,15 @@ const functionsMock = {
   },
 };
 // --- Mock Factories ---
-vi.mock("firebase-admin", () => {
+vi.mock('firebase-admin', () => {
   const admin = {
     ...adminMock,
     // firestore() returns the basic object with spies
     firestore: vi.fn(() => firestoreMock),
     // Basic auth mock (tests might need to enhance this)
     auth: vi.fn(() => ({
-      verifyIdToken: vi.fn().mockResolvedValue({ uid: "test-user" }),
-      createCustomToken: vi.fn().mockResolvedValue("test-custom-token"),
+      verifyIdToken: vi.fn().mockResolvedValue({ uid: 'test-user' }),
+      createCustomToken: vi.fn().mockResolvedValue('test-custom-token'),
     })),
     credential: { cert: vi.fn() },
   };
@@ -68,11 +68,11 @@ vi.mock("firebase-admin", () => {
   return { default: admin, admin };
 });
 // Mock both v1 and default functions paths
-vi.mock("firebase-functions", () => ({
+vi.mock('firebase-functions', () => ({
   ...functionsMock,
   default: functionsMock,
 }));
-vi.mock("firebase-functions/v1", () => ({
+vi.mock('firebase-functions/v1', () => ({
   ...functionsMock,
   default: functionsMock,
 }));
@@ -103,7 +103,7 @@ beforeEach(() => {
   firestoreMock.runTransaction.mockImplementation(async (callback) => {
     const transaction = {
       get: vi.fn().mockImplementation((docRef) => {
-        if (docRef?.path?.startsWith("system/")) {
+        if (docRef?.path?.startsWith('system/')) {
           return Promise.resolve({
             exists: true,
             data: () => ({ tokens: [] }),
@@ -118,6 +118,6 @@ beforeEach(() => {
     return callback(transaction);
   });
 });
-console.log("functions/test/setup loaded (SIMPLIFIED mocks)");
+console.log('functions/test/setup loaded (SIMPLIFIED mocks)');
 // --- Explicit Exports ---
 export { adminMock, firestoreMock, functionsMock };

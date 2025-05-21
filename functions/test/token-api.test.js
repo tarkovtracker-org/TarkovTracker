@@ -1,32 +1,32 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
-import { createFirebaseAdminMock, createFirebaseFunctionsMock } from "./mocks";
+import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { createFirebaseAdminMock, createFirebaseFunctionsMock } from './mocks';
 
 // Set up mocks before imports
-const { adminMock, firestoreMock } = createFirebaseAdminMock();
+const { adminMock } = createFirebaseAdminMock(); // We only need adminMock for vi.mock
 const functionsMock = createFirebaseFunctionsMock();
 
-// Mock Express and its req/res objects
-const mockResponse = () => {
-  const res = {};
-  res.status = vi.fn().mockReturnValue(res);
-  res.json = vi.fn().mockReturnValue(res);
-  res.send = vi.fn().mockReturnValue(res);
-  return res;
-};
+// We don't use these in our tests, so they're commented out
+// const mockResponse = () => {
+//   const res = {};
+//   res.status = vi.fn().mockReturnValue(res);
+//   res.json = vi.fn().mockReturnValue(res);
+//   res.send = vi.fn().mockReturnValue(res);
+//   return res;
+// };
 
-const mockRequest = (headers = {}, params = {}, body = {}) => ({
-  get: vi.fn((name) => headers[name]),
-  params,
-  body,
-  headers,
-});
+// const mockRequest = (headers = {}, params = {}, body = {}) => ({
+//   get: vi.fn((name) => headers[name]),
+//   params,
+//   body,
+//   headers,
+// });
 
 // Mock Firebase modules
-vi.mock("firebase-admin", () => ({
+vi.mock('firebase-admin', () => ({
   default: adminMock,
 }));
 
-vi.mock("firebase-functions", () => ({
+vi.mock('firebase-functions', () => ({
   default: functionsMock,
 }));
 
@@ -34,96 +34,83 @@ vi.mock("firebase-functions", () => ({
 const mockCreateTokenLogic = async (data, context) => {
   // Validate input
   if (!context?.auth) {
-    throw new functionsMock.https.HttpsError(
-      "unauthenticated",
-      "Authentication required.",
-    );
+    throw new functionsMock.https.HttpsError('unauthenticated', 'Authentication required.');
   }
   if (!data.note) {
     throw new functionsMock.https.HttpsError(
-      "invalid-argument",
-      "A note describing the token purpose is required.",
+      'invalid-argument',
+      'A note describing the token purpose is required.'
     );
   }
-  if (
-    !data.permissions ||
-    !Array.isArray(data.permissions) ||
-    data.permissions.length === 0
-  ) {
+  if (!data.permissions || !Array.isArray(data.permissions) || data.permissions.length === 0) {
     throw new functionsMock.https.HttpsError(
-      "invalid-argument",
-      "At least one permission must be specified.",
+      'invalid-argument',
+      'At least one permission must be specified.'
     );
   }
 
   // Return mock result
   return {
-    token: "mock-token-123",
+    token: 'mock-token-123',
     permissions: data.permissions,
     note: data.note,
-    createdAt: "mock-timestamp",
+    createdAt: 'mock-timestamp',
   };
 };
 
 const mockRevokeTokenLogic = async (data, context) => {
   // Validate input
   if (!context?.auth) {
-    throw new functionsMock.https.HttpsError(
-      "unauthenticated",
-      "Authentication required.",
-    );
+    throw new functionsMock.https.HttpsError('unauthenticated', 'Authentication required.');
   }
   if (!data.token) {
-    throw new functionsMock.https.HttpsError(
-      "invalid-argument",
-      "Token ID must be provided.",
-    );
+    throw new functionsMock.https.HttpsError('invalid-argument', 'Token ID must be provided.');
   }
 
   // Check if token exists
-  if (data.token === "non-existent-token") {
-    throw new functionsMock.https.HttpsError("not-found", "Token not found");
+  if (data.token === 'non-existent-token') {
+    throw new functionsMock.https.HttpsError('not-found', 'Token not found');
   }
 
   // Return mock result
   return { success: true };
 };
 
-describe("Token API", () => {
+describe('Token API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("Token Creation", () => {
-    it("should create a token with valid inputs", async () => {
+  describe('Token Creation', () => {
+    it('should create a token with valid inputs', async () => {
       try {
         // Use the mock implementation directly
         const data = {
-          note: "Test API Token",
-          permissions: ["read", "write"],
+          note: 'Test API Token',
+          permissions: ['read', 'write'],
         };
 
         const context = {
-          auth: { uid: "test-user" },
+          auth: { uid: 'test-user' },
         };
 
         const result = await mockCreateTokenLogic(data, context);
 
         expect(result).toBeDefined();
         expect(result.token).toBeDefined();
-        expect(result.permissions).toEqual(["read", "write"]);
-        expect(result.note).toBe("Test API Token");
+        expect(result.permissions).toEqual(['read', 'write']);
+        expect(result.note).toBe('Test API Token');
       } catch (err) {
-        console.error("Could not test token creation:", err.message);
+        console.error('Could not test token creation:', err.message);
         expect(true).toBe(true);
       }
     });
 
-    it("should reject token creation without auth", async () => {
+    it('should reject token creation without auth', async () => {
       try {
         const data = {
-          note: "Test API Token",
-          permissions: ["read", "write"],
+          note: 'Test API Token',
+          permissions: ['read', 'write'],
         };
 
         const context = {
@@ -131,43 +118,43 @@ describe("Token API", () => {
         };
 
         await expect(mockCreateTokenLogic(data, context)).rejects.toThrow(
-          /Authentication required/,
+          /Authentication required/
         );
       } catch (err) {
-        console.error("Could not test token creation rejection:", err.message);
+        console.error('Could not test token creation rejection:', err.message);
         expect(true).toBe(true);
       }
     });
 
-    it("should reject token creation without note", async () => {
+    it('should reject token creation without note', async () => {
       try {
         const data = {
-          permissions: ["read", "write"],
+          permissions: ['read', 'write'],
         };
 
         const context = {
-          auth: { uid: "test-user" },
+          auth: { uid: 'test-user' },
         };
 
         await expect(mockCreateTokenLogic(data, context)).rejects.toThrow(
-          /note describing the token purpose/,
+          /note describing the token purpose/
         );
       } catch (err) {
-        console.error("Could not test token creation rejection:", err.message);
+        console.error('Could not test token creation rejection:', err.message);
         expect(true).toBe(true);
       }
     });
   });
 
-  describe("Token Revocation", () => {
-    it("should revoke a token with valid inputs", async () => {
+  describe('Token Revocation', () => {
+    it('should revoke a token with valid inputs', async () => {
       try {
         const data = {
-          token: "valid-token",
+          token: 'valid-token',
         };
 
         const context = {
-          auth: { uid: "test-user" },
+          auth: { uid: 'test-user' },
         };
 
         const result = await mockRevokeTokenLogic(data, context);
@@ -175,15 +162,15 @@ describe("Token API", () => {
         expect(result).toBeDefined();
         expect(result.success).toBe(true);
       } catch (err) {
-        console.error("Could not test token revocation:", err.message);
+        console.error('Could not test token revocation:', err.message);
         expect(true).toBe(true);
       }
     });
 
-    it("should reject token revocation without auth", async () => {
+    it('should reject token revocation without auth', async () => {
       try {
         const data = {
-          token: "valid-token",
+          token: 'valid-token',
         };
 
         const context = {
@@ -191,35 +178,27 @@ describe("Token API", () => {
         };
 
         await expect(mockRevokeTokenLogic(data, context)).rejects.toThrow(
-          /Authentication required/,
+          /Authentication required/
         );
       } catch (err) {
-        console.error(
-          "Could not test token revocation rejection:",
-          err.message,
-        );
+        console.error('Could not test token revocation rejection:', err.message);
         expect(true).toBe(true);
       }
     });
 
-    it("should reject token revocation for non-existent tokens", async () => {
+    it('should reject token revocation for non-existent tokens', async () => {
       try {
         const data = {
-          token: "non-existent-token",
+          token: 'non-existent-token',
         };
 
         const context = {
-          auth: { uid: "test-user" },
+          auth: { uid: 'test-user' },
         };
 
-        await expect(mockRevokeTokenLogic(data, context)).rejects.toThrow(
-          /Token not found/,
-        );
+        await expect(mockRevokeTokenLogic(data, context)).rejects.toThrow(/Token not found/);
       } catch (err) {
-        console.error(
-          "Could not test token revocation rejection:",
-          err.message,
-        );
+        console.error('Could not test token revocation rejection:', err.message);
         expect(true).toBe(true);
       }
     });
