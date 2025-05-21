@@ -1,4 +1,7 @@
-// These functions are used in both the Pinia store and API to access the store, and ensure that both systems update the store in the same way.
+// These functions are used in both the Pinia store and API to access the store,
+// and ensure that both systems update the store in the same way.
+
+import type { _GettersTree } from 'pinia';
 
 // Define interfaces for the state structure
 interface TaskObjective {
@@ -48,18 +51,16 @@ export const defaultState: UserState = {
 };
 
 // Type definition for Getter functions (State as first arg, returns specific type)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Getter<S, R = any, Args extends any[] = any[]> = (state: S) => (...args: Args) => R;
+
+type Getter<S, R = unknown, Args extends unknown[] = unknown[]> = (
+  state: S
+) => (...args: Args) => R;
 // Type definition for Action functions (this context is State, accepts args, returns void)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Action<S, Args extends any[] = any[]> = (this: S, ...args: Args) => void;
+
+type Action<S, Args extends unknown[] = unknown[]> = (this: S, ...args: Args) => void;
 
 // Define types for the specific getters and actions based on UserState
 export interface UserGetters {
-  // Add index signature to satisfy _GettersTree
-  [key: string]: Getter<UserState, any, any>;
-
-  // Existing specific getters
   playerLevel: Getter<UserState, number>;
   getGameEdition: Getter<UserState, number>;
   getPMCFaction: Getter<UserState, 'USEC' | 'BEAR'>;
@@ -97,7 +98,7 @@ export interface UserActions {
 }
 
 // Getters are for reading store state in a uniform manner
-export const getters: UserGetters = {
+export const getters: UserGetters & _GettersTree<UserState> = {
   // State getters
   playerLevel(state) {
     return () => state.level ?? 1;
@@ -202,7 +203,8 @@ export const actions: UserActions = {
     }
     this.taskCompletions[taskId] = {
       ...(this.taskCompletions[taskId] || {}),
-      complete: true, // Typically failed tasks are also considered 'complete' in terms of progression
+      // Typically failed tasks are also considered 'complete' in terms of progression
+      complete: true,
       failed: true,
       timestamp: Date.now(),
     };
