@@ -128,7 +128,7 @@ interface TarkovMap {
   name: string;
   normalizedName?: string;
   // Add other Map properties from query
-  svg?: any; // From static data
+  svg?: string; // Changed from any to string
 }
 interface Trader {
   id: string;
@@ -158,7 +158,7 @@ interface TarkovHideoutQueryResult {
 }
 // Type for static map data fetch
 interface StaticMapData {
-  [key: string]: { svg?: any }; // Basic structure
+  [key: string]: { svg?: string }; // Changed from any to string
 }
 // Types for needed items
 interface NeededItemBase {
@@ -247,7 +247,7 @@ function getPredecessors(graph: Graph, nodeId: string, visited: string[] = []): 
     return [];
   }
   if (predecessors.length > 0) {
-    for (let predecessor of predecessors) {
+    for (const predecessor of predecessors) {
       if (visited.includes(predecessor)) {
         continue;
       }
@@ -268,7 +268,7 @@ function getSuccessors(graph: Graph, nodeId: string, visited: string[] = []): st
     return [];
   }
   if (successors.length > 0) {
-    for (let successor of successors) {
+    for (const successor of successors) {
       if (visited.includes(successor)) {
         continue;
       }
@@ -279,7 +279,7 @@ function getSuccessors(graph: Graph, nodeId: string, visited: string[] = []): st
 }
 function extractLanguageCode(localeRef: Ref<string>): string {
   const localeValue = localeRef.value;
-  let browserLocale = localeValue.split(/[-_]/)[0];
+  const browserLocale = localeValue.split(/[-_]/)[0];
 
   if (availableLanguages.value?.includes(browserLocale)) {
     return browserLocale;
@@ -297,7 +297,7 @@ const disabledTasks: string[] = [
 // --- Watchers defined outside useTarkovData to modify singleton state ---
 watch(queryHideoutResults, (newValue) => {
   if (newValue?.hideoutStations) {
-    let newHideoutGraph = new Graph();
+    const newHideoutGraph = new Graph();
     newValue.hideoutStations.forEach((station) => {
       station.levels.forEach((level) => {
         newHideoutGraph.mergeNode(level.id);
@@ -315,15 +315,16 @@ watch(queryHideoutResults, (newValue) => {
               newHideoutGraph.mergeEdge(requiredLevel.id, level.id);
             } else {
               console.warn(
-                `Could not find required level ID for station ${requirement.station.id} level ${requirement.level} needed by ${level.id}`
+                `Could not find required level ID for station ${requirement.station.id} ` +
+                  `level ${requirement.level} needed by ${level.id}`
               );
             }
           }
         });
       });
     });
-    let newModules: HideoutModule[] = [];
-    let tempNeededModules: NeededItemHideoutModule[] = [];
+    const newModules: HideoutModule[] = [];
+    const tempNeededModules: NeededItemHideoutModule[] = [];
     newValue.hideoutStations.forEach((station) => {
       station.levels.forEach((level) => {
         const predecessors = getPredecessors(newHideoutGraph, level.id);
@@ -366,8 +367,8 @@ watch(queryHideoutResults, (newValue) => {
 });
 watch(queryResults, (newValue) => {
   if (newValue?.tasks) {
-    let newTaskGraph = new Graph();
-    let activeRequirements: { task: Task; requirement: TaskRequirement }[] = [];
+    const newTaskGraph = new Graph();
+    const activeRequirements: { task: Task; requirement: TaskRequirement }[] = [];
     // Build initial graph based on non-active requirements
     newValue.tasks.forEach((task) => {
       newTaskGraph.mergeNode(task.id);
@@ -443,9 +444,10 @@ watch(queryResults, (newValue) => {
           if (!tempObjectiveMaps[task.id]) {
             tempObjectiveMaps[task.id] = [];
           }
+          // Ensure objectiveID is a string, and mapID is a string
           tempObjectiveMaps[task.id].push({
-            objectiveID: objective.id,
-            mapID: mapId,
+            objectiveID: String(objective.id),
+            mapID: String(mapId),
           });
           if (!tempObjectiveGPS[task.id]) {
             tempObjectiveGPS[task.id] = [];
@@ -520,7 +522,7 @@ export const maps = computed<TarkovMap[]>(() => {
   }
   const mergedMaps = queryResults.value.maps.map((map) => {
     const lowerCaseName = map.name.toLowerCase();
-    let mapKey = mapNameMapping[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
+    const mapKey = mapNameMapping[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
     const staticData = staticMapData.value?.[mapKey];
     if (staticData?.svg) {
       return {
