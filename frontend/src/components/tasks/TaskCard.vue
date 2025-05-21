@@ -16,14 +16,7 @@
     </div>
     <v-container>
       <v-row>
-        <v-col
-          cols="12"
-          xs="12"
-          sm="4"
-          md="3"
-          lg="3"
-          :align="xs ? 'center' : 'left'"
-        >
+        <v-col cols="12" xs="12" sm="4" md="3" lg="3" :align="xs ? 'center' : 'left'">
           <!-- Quest general info, links, and tags -->
           <template v-if="!xs">
             <!-- Not xs, so display full details -->
@@ -50,10 +43,7 @@
                   <v-icon icon="mdi-lock-open-outline" />
                 </v-col>
                 <v-col>
-                  <i18n-t
-                    keypath="page.tasks.questcard.lockedbefore"
-                    scope="global"
-                  >
+                  <i18n-t keypath="page.tasks.questcard.lockedbefore" scope="global">
                     <template #count>
                       {{ lockedBefore }}
                     </template>
@@ -65,10 +55,7 @@
                   <v-icon icon="mdi-lock" />
                 </v-col>
                 <v-col>
-                  <i18n-t
-                    keypath="page.tasks.questcard.lockedbehind"
-                    scope="global"
-                  >
+                  <i18n-t keypath="page.tasks.questcard.lockedbehind" scope="global">
                     <template #count>
                       {{ lockedBehind }}
                     </template>
@@ -91,9 +78,7 @@
                 </v-col>
               </v-row>
               <v-row
-                v-if="
-                  props.activeUserView === 'all' && props.neededBy.length > 0
-                "
+                v-if="props.activeUserView === 'all' && props.neededBy.length > 0"
                 no-gutters
                 class="mb-1"
               >
@@ -101,10 +86,7 @@
                   <v-icon icon="mdi-account-multiple-outline" />
                 </v-col>
                 <v-col>
-                  <i18n-t
-                    keypath="page.tasks.questcard.neededby"
-                    scope="global"
-                  >
+                  <i18n-t keypath="page.tasks.questcard.neededby" scope="global">
                     <template #names>
                       {{ props.neededBy.join(', ') }}
                     </template>
@@ -112,11 +94,7 @@
                 </v-col>
               </v-row>
               <v-row no-gutters class="mb-1">
-                <a
-                  :href="props.task.wikiLink"
-                  target="_blank"
-                  class="wiki-link"
-                >
+                <a :href="props.task.wikiLink" target="_blank" class="wiki-link">
                   <v-row no-gutters>
                     <v-col cols="auto" class="mr-1">
                       <v-icon icon="mdi-information-outline" />
@@ -134,14 +112,7 @@
             <task-link :task="props.task" class="d-flex justify-center" />
           </template>
         </v-col>
-        <v-col
-          cols="12"
-          xs="12"
-          sm="8"
-          md="7"
-          lg="7"
-          class="d-flex align-center"
-        >
+        <v-col cols="12" xs="12" sm="8" md="7" lg="7" class="d-flex align-center">
           <v-container>
             <!-- Quest keys -->
             <v-row v-if="props.task?.neededKeys?.length > 0" no-gutters>
@@ -168,6 +139,7 @@
                             :item-name="key.shortName"
                             :dev-link="key.link"
                             :wiki-link="key.wikiLink"
+                            :count="1"
                             class="mr-2"
                           />
                         </span>
@@ -211,24 +183,13 @@
             </v-row>
           </v-container>
         </v-col>
-        <v-col
-          cols="12"
-          xs="12"
-          sm="12"
-          md="2"
-          lg="2"
-          class="d-flex align-center justify-center"
-        >
+        <v-col cols="12" xs="12" sm="12" md="2" lg="2" class="d-flex align-center justify-center">
           <div class="d-block">
             <!-- Quest actions -->
             <template v-if="!isComplete && !isLocked">
               <!-- We are an available quest, so the primary button is the complete one -->
               <template v-if="!xs">
-                <v-btn
-                  size="x-large"
-                  color="accent"
-                  class="mx-1 my-1"
-                  @click="markTaskComplete()"
+                <v-btn size="x-large" color="accent" class="mx-1 my-1" @click="markTaskComplete()"
                   ><v-icon class="mr-2">mdi-check-all</v-icon
                   >{{ t('page.tasks.questcard.completebutton') }}</v-btn
                 >
@@ -250,10 +211,7 @@
               </template>
               <template v-else>
                 <div class="d-flex justify-center">
-                  <v-btn
-                    color="accent"
-                    class="mx-1 my-1"
-                    @click="markTaskComplete()"
+                  <v-btn color="accent" class="mx-1 my-1" @click="markTaskComplete()"
                     ><v-icon class="mr-2">mdi-check-all</v-icon
                     >{{ t('page.tasks.questcard.completebutton') }}</v-btn
                   >
@@ -263,11 +221,7 @@
             <template v-else-if="isComplete">
               <!-- We are a completed quest, so the primary button is the reset one -->
               <template v-if="!xs">
-                <v-btn
-                  size="x-large"
-                  color="accent"
-                  class="mx-1 my-1"
-                  @click="markTaskUncomplete()"
+                <v-btn size="x-large" color="accent" class="mx-1 my-1" @click="markTaskUncomplete()"
                   ><v-icon class="mr-2">mdi-undo</v-icon
                   >{{ t('page.tasks.questcard.uncompletebutton') }}</v-btn
                 >
@@ -289,10 +243,7 @@
               </template>
               <template v-else>
                 <div class="d-flex justify-center">
-                  <v-btn
-                    color="accent"
-                    class="mx-1 my-1"
-                    @click="markTaskUncomplete()"
+                  <v-btn color="accent" class="mx-1 my-1" @click="markTaskUncomplete()"
                     ><v-icon class="mr-2">mdi-undo</v-icon
                     >{{ t('page.tasks.questcard.uncompletebutton') }}</v-btn
                   >
@@ -305,38 +256,22 @@
             <template v-else-if="isLocked">
               <!-- We are a locked quest, so the primary button is the unlock one -->
               <template v-if="!xs">
-                <v-btn
-                  size="x-large"
-                  color="accent"
-                  class="mx-1 my-1"
-                  @click="markTaskAvailable()"
+                <v-btn size="x-large" color="accent" class="mx-1 my-1" @click="markTaskAvailable()"
                   ><v-icon class="mr-2">mdi-fast-forward</v-icon
                   >{{ t('page.tasks.questcard.availablebutton') }}</v-btn
                 >
-                <v-btn
-                  size="x-large"
-                  color="accent"
-                  class="mx-1 my-1"
-                  @click="markTaskComplete()"
+                <v-btn size="x-large" color="accent" class="mx-1 my-1" @click="markTaskComplete()"
                   ><v-icon class="mr-2">mdi-check-all</v-icon
                   >{{ t('page.tasks.questcard.completebutton') }}</v-btn
                 >
               </template>
               <template v-else>
                 <div class="d-flex justify-center">
-                  <v-btn
-                    size="small"
-                    color="accent"
-                    class="mx-1 my-1"
-                    @click="markTaskAvailable()"
+                  <v-btn size="small" color="accent" class="mx-1 my-1" @click="markTaskAvailable()"
                     ><v-icon class="mr-2">mdi-fast-forward</v-icon
                     >{{ t('page.tasks.questcard.availablebutton') }}</v-btn
                   >
-                  <v-btn
-                    size="small"
-                    color="accent"
-                    class="mx-1 my-1"
-                    @click="markTaskComplete()"
+                  <v-btn size="small" color="accent" class="mx-1 my-1" @click="markTaskComplete()"
                     ><v-icon class="mr-2">mdi-check-all</v-icon
                     >{{ t('page.tasks.questcard.completebutton') }}</v-btn
                   >
@@ -350,9 +285,7 @@
     <v-snackbar v-model="taskStatusUpdated" :timeout="4000" color="secondary">
       {{ taskStatus }}
       <template #actions>
-        <v-btn color="white" variant="text" @click="taskStatusUpdated = false">
-          Close
-        </v-btn>
+        <v-btn color="white" variant="text" @click="taskStatusUpdated = false"> Close </v-btn>
       </template>
     </v-snackbar>
   </v-sheet>
@@ -386,15 +319,9 @@
   const progressStore = useProgressStore();
   const userStore = useUserStore();
   const { tasks } = useTarkovData();
-  const TaskLink = defineAsyncComponent(
-    () => import('@/components/tasks/TaskLink.vue')
-  );
-  const TaskObjective = defineAsyncComponent(
-    () => import('@/components/tasks/TaskObjective.vue')
-  );
-  const TarkovItem = defineAsyncComponent(
-    () => import('@/components/TarkovItem.vue')
-  );
+  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink'));
+  const TaskObjective = defineAsyncComponent(() => import('@/components/tasks/TaskObjective'));
+  const TarkovItem = defineAsyncComponent(() => import('@/components/TarkovItem'));
   const { xs } = useDisplay();
   const isComplete = computed(() => {
     return tarkovStore.isTaskComplete(props.task.id);
@@ -403,29 +330,19 @@
     return tarkovStore.isTaskFailed(props.task.id);
   });
   const isLocked = computed(() => {
-    return (
-      progressStore.unlockedTasks[props.task.id]?.self !== true &&
-      !isComplete.value
-    );
+    return progressStore.unlockedTasks[props.task.id]?.self !== true && !isComplete.value;
   });
   const isOurFaction = computed(() => {
     // Check if the task is faction 'Any' or the user's faction
-    return (
-      props.task.factionName == 'Any' ||
-      props.task.factionName == tarkovStore.getPMCFaction()
-    );
+    const taskFaction = props.task.factionName;
+    return taskFaction == 'Any' || taskFaction == tarkovStore.getPMCFaction();
   });
   const lockedBehind = computed(() => {
-    // Calculate how many of the successors are uncompleted (should be all, but someone might have marked off one)
-    return props.task.successors.filter(
-      (s) => !tarkovStore.isTaskComplete(s.id)
-    ).length;
+    return props.task.successors.filter((s) => !tarkovStore.isTaskComplete(s.id)).length;
   });
   const lockedBefore = computed(() => {
     // Calculate how many of the predecessors are uncompleted
-    return props.task.predecessors.filter(
-      (s) => !tarkovStore.isTaskComplete(s.id)
-    ).length;
+    return props.task.predecessors.filter((s) => !tarkovStore.isTaskComplete(s.id)).length;
   });
   const nonKappa = computed(() => {
     return !props.task.kappaRequired;
@@ -444,14 +361,14 @@
   const relevantViewObjectives = computed(() => {
     if (onMapView.value) {
       return props.task.objectives.filter((o) => {
-        // If the objective has a maps array, check if it includes the current map and is a map objective
         if (Array.isArray(o.maps) && o.maps.length > 0) {
-          return (
+          const isRelevant =
             o.maps.some((m) => m.id === userStore.getTaskMapView) &&
-            mapObjectiveTypes.includes(o.type)
-          );
+            mapObjectiveTypes.includes(o.type);
+          return isRelevant;
         }
-        // If the objective has no maps array or it's empty, treat as relevant (e.g. hand over, extract, etc.)
+        // If the objective has no maps array or it's empty,
+        // treat as relevant (e.g. hand over, extract, etc.)
         return true;
       });
     } else {
@@ -461,14 +378,11 @@
   const irrelevantObjectives = computed(() => {
     if (onMapView.value) {
       return props.task.objectives.filter((o) => {
-        // If the objective has a maps array, and it does NOT include the current map and is a map objective, it's irrelevant
         if (Array.isArray(o.maps) && o.maps.length > 0) {
-          return !(
-            o.maps.some((m) => m.id === userStore.getTaskMapView) &&
-            mapObjectiveTypes.includes(o.type)
-          );
+          const onSelectedMap = o.maps.some((m) => m.id === userStore.getTaskMapView);
+          const isMapType = mapObjectiveTypes.includes(o.type);
+          return !(onSelectedMap && isMapType);
         }
-        // If the objective has no maps array or it's empty, treat as relevant (not irrelevant)
         return false;
       });
     } else {
@@ -480,11 +394,11 @@
   });
   const uncompletedIrrelevantObjectives = computed(() => {
     return props.task.objectives
-      .filter(
-        (o) =>
-          !o?.maps?.some((m) => m.id === userStore.getTaskMapView) ||
-          !mapObjectiveTypes.includes(o.type)
-      )
+      .filter((o) => {
+        const onCorrectMap = o?.maps?.some((m) => m.id === userStore.getTaskMapView);
+        const isMapObjectiveType = mapObjectiveTypes.includes(o.type);
+        return !onCorrectMap || !isMapObjectiveType;
+      })
       .filter((o) => !tarkovStore.isTaskObjectiveComplete(o.id));
   });
   const onMapView = computed(() => {
