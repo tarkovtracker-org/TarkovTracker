@@ -27,12 +27,12 @@
   import { computed, ref } from 'vue';
   import { useTarkovData } from '@/composables/tarkovdata';
   import { defineAsyncComponent } from 'vue';
-  import { useEditorStore } from '@/stores/editor';
+  import { useEditorStore } from '@/stores/editor'; // Updated import path
   const EditorTaskCard = defineAsyncComponent(
-    () => import('@/components/editor/EditorTaskCard.vue')
+    () => import('@/components/editor/EditorTaskCard.vue') // Fixed import path
   );
   const editorStore = useEditorStore();
-  const { tasks, maps, traders } = useTarkovData();
+  const { tasks } = useTarkovData();
   const updatedTasks = ref({});
   const allTasks = computed({
     get() {

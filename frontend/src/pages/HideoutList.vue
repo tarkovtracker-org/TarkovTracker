@@ -1,6 +1,6 @@
 <template>
   <v-container class="d-flex flex-column" style="min-height: calc(100vh - 250px)">
-    <tracker-tip tip="hideout" style="flex: 0 0 auto" class="mb-4"></tracker-tip>
+    <tracker-tip :tip="{ id: 'hideout' }" style="flex: 0 0 auto" class="mb-4"></tracker-tip>
     <div class="flex-grow-0" style="margin-bottom: 16px">
       <v-row justify="center">
         <v-col lg="8" md="12">
@@ -54,15 +54,15 @@
   </v-container>
 </template>
 <script setup>
-  import { computed, ref } from 'vue';
+  import { computed } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { useTarkovData } from '@/composables/tarkovdata';
   import { useProgressStore } from '@/stores/progress';
   import { useUserStore } from '@/stores/user';
   import { defineAsyncComponent } from 'vue';
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
-  const HideoutCard = defineAsyncComponent(() => import('@/components/hideout/HideoutCard.vue'));
-  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton.vue'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
+  const HideoutCard = defineAsyncComponent(() => import('@/components/hideout/HideoutCard'));
+  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton'));
   const { t } = useI18n({ useScope: 'global' });
   const { hideoutStations, hideoutLoading } = useTarkovData();
   const progressStore = useProgressStore();

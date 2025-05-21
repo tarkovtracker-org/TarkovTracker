@@ -1,5 +1,5 @@
 <template>
-  <tracker-tip tip="tasks"></tracker-tip>
+  <tracker-tip :tip="{ id: 'tasks' }"></tracker-tip>
   <v-container>
     <v-row dense>
       <v-col cols="12">
@@ -23,7 +23,7 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-row dense v-if="activePrimaryView == 'maps'">
+    <v-row v-if="activePrimaryView == 'maps'" dense>
       <v-col cols="12">
         <v-card>
           <v-tabs
@@ -57,7 +57,7 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-row dense v-else-if="activePrimaryView == 'traders'">
+    <v-row v-else-if="activePrimaryView == 'traders'" dense>
       <v-col cols="12">
         <v-card>
           <v-tabs
@@ -145,7 +145,8 @@
               ></v-expansion-panel-title
             >
             <v-expansion-panel-text>
-              <tarkov-map :map="selectedMergedMap" :marks="visibleGPS" />
+              <tarkov-map v-if="selectedMergedMap" :map="selectedMergedMap" :marks="visibleGPS" />
+              <v-alert v-else type="error">No map data available for this selection.</v-alert>
             </v-expansion-panel-text>
           </v-expansion-panel>
         </v-expansion-panels>
@@ -161,8 +162,8 @@
         >
           <task-card
             :task="task"
-            :activeUserView="activeUserView"
-            :neededBy="task.neededBy || []"
+            :active-user-view="activeUserView"
+            :needed-by="task.neededBy || []"
             class="my-1"
           />
         </v-lazy>
@@ -178,10 +179,10 @@
   import { useProgressStore } from '@/stores/progress';
   import { useTarkovStore } from '@/stores/tarkov';
 
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
-  const TaskCard = defineAsyncComponent(() => import('@/components/tasks/TaskCard.vue'));
-  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton.vue'));
-  const TarkovMap = defineAsyncComponent(() => import('@/components/TarkovMap.vue'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
+  const TaskCard = defineAsyncComponent(() => import('@/components/tasks/TaskCard'));
+  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton'));
+  const TarkovMap = defineAsyncComponent(() => import('@/components/TarkovMap'));
   const { t } = useI18n({ useScope: 'global' });
   const userStore = useUserStore();
   const progressStore = useProgressStore();
@@ -242,7 +243,8 @@
     get: () => userStore.getTaskSecondaryView,
     set: (value) => {
       if (value != 'available') {
-        // If we're viewing locked or completed tasks, we need to make sure we're viewing an individual user
+        // If we're viewing locked or completed tasks,
+        // we need to make sure we're viewing an individual user
         if (activeUserView.value == 'all') {
           activeUserView.value = 'self';
         }
@@ -266,7 +268,7 @@
     let views = [];
     const teamStoreKeys = Object.keys(progressStore.visibleTeamStores);
 
-    // Only add the "All" view if there's more than just 'self' (i.e., user is in a team with others)
+    // Only add the "All" view if there's more than just 'self' (i.e. user is in a team with others)
     if (teamStoreKeys.length > 1) {
       views.push({ title: t('page.tasks.userviews.all'), view: 'all' });
     }
@@ -274,7 +276,10 @@
     // Add 'self' view
     const displayName = tarkovStore.getDisplayName();
     if (displayName == null) {
-      views.push({ title: t('page.tasks.userviews.yourself'), view: 'self' });
+      views.push({
+        title: t('page.tasks.userviews.yourself'),
+        view: 'self',
+      });
     } else {
       views.push({ title: displayName, view: 'self' });
     }
@@ -509,10 +514,12 @@
       console.warn('updateVisibleTasks: TarkovData (tasks) still loading, deferring update.');
       return; // Exit if core task data isn't loaded
     }
-    // Guard clause: Ensure userStore getter is available (should always return boolean due to || false)
-    // Accessing the computed ref here might trigger dependencies prematurely, check the source directly if possible.
-    // We already define `hideNonKappaTasks = computed(...)`, let's trust it exists but check its value source's readiness indirectly
-    // A simple check on tasks.value existing is a good proxy for data readiness post-loading
+    // Guard clause: Ensure userStore getter is available
+    // (should always return boolean due to || false)
+    // Accessing the computed ref here might trigger dependencies prematurely,
+    // check the source directly if possible.
+    // We already define `hideNonKappaTasks = computed(...)`,
+    // let's trust it exists but check its value source's readiness indirectly
     if (!tasks.value) {
       console.warn('updateVisibleTasks: tasks.value is not ready, deferring update.');
       return;
@@ -580,47 +587,45 @@
         for (const task of visibleTaskList) {
           let usersWhoNeedTask = [];
           let taskIsNeededBySomeone = false;
-
           for (const teamId of Object.keys(progressStore.visibleTeamStores)) {
             const isUnlockedForUser = progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
             const isCompletedByUser = progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
-
             // Check faction requirements for this specific user
             const userFaction = progressStore.playerFaction[teamId];
             const taskFaction = task.factionName;
             const factionMatch = taskFaction == 'Any' || taskFaction == userFaction;
-
             if (isUnlockedForUser && !isCompletedByUser && factionMatch) {
               taskIsNeededBySomeone = true;
               usersWhoNeedTask.push(progressStore.getDisplayName(teamId));
             }
           }
-
           if (taskIsNeededBySomeone) {
             tempVisibleTasks.push({ ...task, neededBy: usersWhoNeedTask });
           }
         }
         visibleTaskList = tempVisibleTasks;
       } else {
-        // In theory, we should never be in this situation (we don't show locked or completed tasks for all users)
-        // But just in case, we'll do nothing here
-        // Consider clearing the list or logging a warning if this state is reached unexpectedly
         console.warn(
-          "updateVisibleTasks: 'all' user view combined with non-'available' secondary view - unexpected state."
+          "updateVisibleTasks: 'all' user view combined with non-'available' " +
+            'secondary view - unexpected state.'
         );
       }
     } else {
       // We want to show tasks by their availability to a specific team member
       if (activeSecondaryView.value == 'available') {
-        visibleTaskList = visibleTaskList.filter(
-          (task) => progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] === true
-        );
+        visibleTaskList = visibleTaskList.filter((task) => {
+          const unlockedTasks = progressStore.unlockedTasks?.[task.id];
+          return unlockedTasks?.[activeUserView.value] === true;
+        });
       } else if (activeSecondaryView.value == 'locked') {
-        visibleTaskList = visibleTaskList.filter(
-          (task) =>
-            progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] != true &&
-            progressStore.unlockedTasks?.[task.id]?.[activeUserView.value] != true
-        );
+        visibleTaskList = visibleTaskList.filter((task) => {
+          const taskCompletions = progressStore.tasksCompletions?.[task.id];
+          const unlockedTasks = progressStore.unlockedTasks?.[task.id];
+          return (
+            taskCompletions?.[activeUserView.value] != true &&
+            unlockedTasks?.[activeUserView.value] != true
+          );
+        });
       } else if (activeSecondaryView.value == 'completed') {
         visibleTaskList = visibleTaskList.filter((task) => {
           return progressStore.tasksCompletions?.[task.id]?.[activeUserView.value] == true;

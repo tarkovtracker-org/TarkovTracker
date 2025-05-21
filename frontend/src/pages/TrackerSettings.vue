@@ -14,18 +14,20 @@
             {{ $t('page.settings.card.apitokens.title') }}
           </template>
           <template #content>
-            <i18n-t keypath="page.settings.card.apitokens.description" scope="global">
-              <template #openAPI_documentation>
-                <a
-                  href="https://tarkovtracker-org.github.io/TarkovTracker/"
-                  target="_blank"
-                  class="info-link"
-                >
-                  <v-icon class="mr-1" size="16">mdi-file-document</v-icon
-                  >{{ $t('page.settings.card.apitokens.openAPI_documentation') }}
-                </a>
-              </template>
-            </i18n-t>
+            <div style="text-align: left" class="pt-2 px-4">
+              <i18n-t keypath="page.settings.card.apitokens.description" scope="global">
+                <template #openAPI_documentation>
+                  <a
+                    href="https://tarkovtracker-org.github.io/TarkovTracker/"
+                    target="_blank"
+                    class="info-link"
+                  >
+                    <v-icon class="mr-1" size="16">mdi-file-document</v-icon
+                    >{{ $t('page.settings.card.apitokens.openAPI_documentation') }}
+                  </a>
+                </template>
+              </i18n-t>
+            </div>
             <api-tokens />
           </template>
         </fitted-card>
@@ -36,18 +38,20 @@
             {{ $t('page.settings.card.apitokens.title') }}
           </template>
           <template #content>
-            <i18n-t keypath="page.settings.card.apitokens.description" scope="global">
-              <template #openAPI_documentation>
-                <a
-                  href="https://tarkovtracker-org.github.io/TarkovTracker/"
-                  target="_blank"
-                  class="info-link"
-                >
-                  <v-icon class="mr-1" size="16">mdi-file-document</v-icon
-                  >{{ $t('page.settings.card.apitokens.openAPI_documentation') }}
-                </a>
-              </template>
-            </i18n-t>
+            <div style="text-align: left" class="pt-2 px-4">
+              <i18n-t keypath="page.settings.card.apitokens.description" scope="global">
+                <template #openAPI_documentation>
+                  <a
+                    href="https://tarkovtracker-org.github.io/TarkovTracker/"
+                    target="_blank"
+                    class="info-link"
+                  >
+                    <v-icon class="mr-1" size="16">mdi-file-document</v-icon
+                    >{{ $t('page.settings.card.apitokens.openAPI_documentation') }}
+                  </a>
+                </template>
+              </i18n-t>
+            </div>
             <v-row justify="center">
               <v-col cols="12">
                 <v-alert dense outlined type="error" :value="true" class="ma-2">
@@ -64,7 +68,9 @@
             {{ $t('page.settings.card.streamermode.title') }}
           </template>
           <template #content>
-            {{ $t('page.settings.card.streamermode.description') }}
+            <div style="text-align: left" class="pt-2 px-4">
+              {{ $t('page.settings.card.streamermode.description') }}
+            </div>
             <v-container>
               <v-row justify="center">
                 <v-col cols="12">
@@ -73,6 +79,8 @@
                     :disabled="Boolean(userStore.saving && userStore.saving.streamerMode)"
                     hide-details
                     density="compact"
+                    color="green"
+                    base-color="error"
                     :label="
                       streamerMode
                         ? $t('page.settings.card.streamermode.modeOn')
@@ -196,11 +204,11 @@
   import { useUserStore } from '@/stores/user';
   import { useTarkovStore } from '@/stores/tarkov';
   import { fireuser } from '@/plugins/firebase';
-  import QuestFilter from '@/components/settings/QuestFilter.vue';
-  import FactionSelect from '@/components/settings/FactionSelect.vue';
-  import ApiTokens from '@/components/settings/ApiTokens.vue';
-  import DataMigrationCard from '@/components/settings/DataMigrationCard.vue';
-  import FittedCard from '@/components/FittedCard.vue';
+  import QuestFilter from '@/components/settings/QuestFilter';
+  import FactionSelect from '@/components/settings/FactionSelect';
+  import ApiTokens from '@/components/settings/ApiTokens';
+  import DataMigrationCard from '@/components/settings/DataMigrationCard';
+  import FittedCard from '@/components/FittedCard';
 
   const tarkovStore = useTarkovStore();
   const userStore = useUserStore();

@@ -1,5 +1,5 @@
 <template>
-  <tracker-tip tip="team"></tracker-tip>
+  <tracker-tip :tip="{ id: 'team' }"></tracker-tip>
   <v-container v-if="fireuser.loggedIn">
     <v-row v-if="route?.query?.team && route?.query?.code" justify="center">
       <v-col cols="12">
@@ -24,14 +24,13 @@
   import { useLiveData } from '@/composables/livedata';
   import { useRoute } from 'vue-router';
   import { defineAsyncComponent } from 'vue';
-  const TeamMembers = defineAsyncComponent(() => import('@/components/teams/TeamMembers.vue'));
-  const TeamOptions = defineAsyncComponent(() => import('@/components/teams/TeamOptions.vue'));
-  const MyTeam = defineAsyncComponent(() => import('@/components/teams/MyTeam.vue'));
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
-  const TeamInvite = defineAsyncComponent(() => import('@/components/teams/TeamInvite.vue'));
-  const { useSystemStore, useTeamStore } = useLiveData();
+  const TeamMembers = defineAsyncComponent(() => import('@/components/teams/TeamMembers'));
+  const TeamOptions = defineAsyncComponent(() => import('@/components/teams/TeamOptions'));
+  const MyTeam = defineAsyncComponent(() => import('@/components/teams/MyTeam'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
+  const TeamInvite = defineAsyncComponent(() => import('@/components/teams/TeamInvite'));
+  const { useSystemStore } = useLiveData();
   const systemStore = useSystemStore();
-  const teamStore = useTeamStore();
   const route = useRoute();
 </script>
 <style lang="scss" scoped></style>

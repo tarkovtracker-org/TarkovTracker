@@ -1,5 +1,5 @@
 <template>
-  <tracker-tip tip="neededitems"></tracker-tip>
+  <tracker-tip :tip="{ id: 'neededitems' }"></tracker-tip>
   <v-container>
     <v-row align="center" dense>
       <v-col cols="9" sm="8" md="9" lg="8">
@@ -159,9 +159,9 @@
   import { debounce } from 'lodash-es';
   import { useI18n } from 'vue-i18n';
   import { useUserStore } from '@/stores/user';
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
-  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton.vue'));
-  const NeededItem = defineAsyncComponent(() => import('@/components/neededitems/NeededItem.vue'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
+  const RefreshButton = defineAsyncComponent(() => import('@/components/RefreshButton'));
+  const NeededItem = defineAsyncComponent(() => import('@/components/neededitems/NeededItem'));
   const { t } = useI18n({ useScope: 'global' });
   const {
     tasks,
@@ -183,7 +183,7 @@
     itemFilterNameText,
     debounce((newVal) => {
       itemFilterName.value = newVal;
-    }, 500)
+    }, 50)
   );
   const neededItemsStyle = computed({
     get: () => userStore.getNeededItemsStyle,
@@ -267,7 +267,8 @@
           const moduleStationId = need.hideoutModule?.stationId;
           const moduleTargetLevel = need.hideoutModule?.level;
           if (!moduleInstanceId || !moduleStationId || typeof moduleTargetLevel !== 'number') {
-            // If essential data is missing, cautiously keep the item, though this state is unexpected.
+            // If essential data is missing, cautiously keep the item,
+            // though this state is unexpected.
             // Consider logging this case if it occurs.
             return true;
           }
@@ -282,10 +283,10 @@
                 ?.complete !== true
             );
           } else {
-            return (
-              progressStore.teamStores?.['self']?.$state?.hideoutModules?.[moduleInstanceId]
-                ?.complete !== true
-            );
+            const selfTeamStore = progressStore.teamStores?.['self'];
+            const hideoutModules = selfTeamStore?.$state?.hideoutModules;
+            const module = hideoutModules?.[moduleInstanceId];
+            return module?.complete !== true;
           }
         })
         .sort((a, b) => {

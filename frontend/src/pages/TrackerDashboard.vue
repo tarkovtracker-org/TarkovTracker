@@ -1,8 +1,5 @@
 <template>
-  <v-container
-    class="mt-2 d-flex flex-column"
-    style="min-height: calc(100vh - 250px)"
-  >
+  <v-container class="mt-2 d-flex flex-column" style="min-height: calc(100vh - 250px)">
     <v-alert
       density="compact"
       color="green-darken-4"
@@ -10,13 +7,11 @@
       class="mb-6"
       style="flex: 0 0 auto"
     >
-      This is a community-maintained fork of the original TarkovTracker.io
-      project. Updated data will be automatically pulled from
-      <a href="http://tarkov.dev/" target="_blank">tarkov.dev</a> as changes are
-      discovered and confirmed. Contributions and bug reports are welcome on the
-      <a
-        href="https://github.com/tarkovtracker-org/TarkovTracker"
-        target="_blank"
+      This is a community-maintained fork of the original TarkovTracker.io project. Updated data
+      will be automatically pulled from
+      <a href="http://tarkov.dev/" target="_blank">tarkov.dev</a> as changes are discovered and
+      confirmed. Contributions and bug reports are welcome on the
+      <a href="https://github.com/tarkovtracker-org/TarkovTracker" target="_blank"
         >GitHub repo fork</a
       >
       to help keep the project up to date.
@@ -29,11 +24,7 @@
           </template>
           <template #value> {{ completedTasks }}/{{ totalTasks }} </template>
           <template #percentage>
-            {{
-              totalTasks > 0
-                ? ((completedTasks / totalTasks) * 100).toFixed(1)
-                : '0.0'
-            }}%
+            {{ totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : '0.0' }}%
           </template>
           <template #details>
             {{ t('page.dashboard.stats.allTasks.details') }}
@@ -45,9 +36,7 @@
           <template #stat>
             {{ t('page.dashboard.stats.allObjectives.stat') }}
           </template>
-          <template #value>
-            {{ completedObjectives }}/{{ totalObjectives }}
-          </template>
+          <template #value> {{ completedObjectives }}/{{ totalObjectives }} </template>
           <template #percentage>
             {{
               totalObjectives > 0
@@ -65,14 +54,10 @@
           <template #stat>
             {{ t('page.dashboard.stats.taskItems.stat') }}
           </template>
-          <template #value>
-            {{ completedTaskItems }}/{{ totalTaskItems }}
-          </template>
+          <template #value> {{ completedTaskItems }}/{{ totalTaskItems }} </template>
           <template #percentage>
             {{
-              totalTaskItems > 0
-                ? ((completedTaskItems / totalTaskItems) * 100).toFixed(1)
-                : '0.0'
+              totalTaskItems > 0 ? ((completedTaskItems / totalTaskItems) * 100).toFixed(1) : '0.0'
             }}%
           </template>
           <template #details>
@@ -90,9 +75,7 @@
   import { computed, defineAsyncComponent } from 'vue';
   import { useI18n } from 'vue-i18n';
   const { t } = useI18n({ useScope: 'global' });
-  const TrackerStat = defineAsyncComponent(
-    () => import('@/components/TrackerStat.vue')
-  );
+  const TrackerStat = defineAsyncComponent(() => import('@/components/TrackerStat'));
   const { tasks, objectives } = useTarkovData();
   const progressStore = useProgressStore();
   const tarkovStore = useTarkovStore();
@@ -110,9 +93,7 @@
       'plantItem',
       'buildWeapon',
     ];
-    return objectives.value.filter(
-      (obj) => obj && itemObjectiveTypes.includes(obj.type)
-    );
+    return objectives.value.filter((obj) => obj && itemObjectiveTypes.includes(obj.type));
   });
   const totalTasks = computed(() => {
     if (!tasks.value) {
@@ -121,9 +102,7 @@
     let relevantTasks = tasks.value.filter(
       (task) =>
         // Ensure task exists and has factionName before filtering
-        task &&
-        (task.factionName == 'Any' ||
-          task.factionName == tarkovStore.getPMCFaction)
+        task && (task.factionName == 'Any' || task.factionName == tarkovStore.getPMCFaction)
     ).length;
     // Find all tasks with alternatives and subtract n-1 from the total
     // Ensure tasks.value exists before filtering
@@ -162,9 +141,7 @@
       .filter(
         (task) =>
           // Ensure task exists before filtering
-          task &&
-          (task.factionName == 'Any' ||
-            task.factionName == tarkovStore.getPMCFaction)
+          task && (task.factionName == 'Any' || task.factionName == tarkovStore.getPMCFaction)
       )
       .forEach((task) => {
         // Check if task and task.objectives exist before accessing length
@@ -181,9 +158,7 @@
     return objectives.value.filter(
       (objective) =>
         // Ensure objective and its id exist before checking completion
-        objective &&
-        objective.id &&
-        tarkovStore.isTaskObjectiveComplete(objective.id)
+        objective && objective.id && tarkovStore.isTaskObjectiveComplete(objective.id)
     ).length;
   });
   const completedTasks = computed(() => {
@@ -230,15 +205,13 @@
         !relatedTask ||
         !relatedTask.factionName ||
         currentPMCFaction === undefined ||
-        (relatedTask.factionName != 'Any' &&
-          relatedTask.factionName != currentPMCFaction)
+        (relatedTask.factionName != 'Any' && relatedTask.factionName != currentPMCFaction)
       ) {
         return;
       }
       if (!objective.id || !objective.taskId) return;
       const taskCompletion = progressStore.tasksCompletions[objective.taskId];
-      const objectiveCompletion =
-        progressStore.objectiveCompletions[objective.id];
+      const objectiveCompletion = progressStore.objectiveCompletions[objective.id];
       if (
         (taskCompletion && taskCompletion['self']) ||
         (objectiveCompletion && objectiveCompletion['self']) ||
@@ -283,8 +256,7 @@
         !relatedTask ||
         !relatedTask.factionName ||
         currentPMCFaction === undefined ||
-        (relatedTask.factionName != 'Any' &&
-          relatedTask.factionName != currentPMCFaction)
+        (relatedTask.factionName != 'Any' && relatedTask.factionName != currentPMCFaction)
       ) {
         return;
       }

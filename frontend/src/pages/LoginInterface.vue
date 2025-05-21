@@ -1,6 +1,6 @@
 <template>
   <div class="login-page">
-    <tracker-tip tip="login"></tracker-tip>
+    <tracker-tip :tip="{ id: 'login' }"></tracker-tip>
     <v-container
       class="d-flex align-start justify-center pt-16 mb-0 pb-0"
       style="margin-bottom: 0 !important; padding-bottom: 0 !important"
@@ -38,8 +38,8 @@
   import { fireuser } from '@/plugins/firebase.ts';
   // Track if the migration dialog is currently being shown
   const showingMigrationDialog = ref(false);
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
-  const AuthButtons = defineAsyncComponent(() => import('@/components/AuthButtons.vue'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
+  const AuthButtons = defineAsyncComponent(() => import('@/components/AuthButtons'));
 </script>
 <style scoped>
   .login-page {

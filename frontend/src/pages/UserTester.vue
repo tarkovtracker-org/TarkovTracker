@@ -1,5 +1,5 @@
 <template>
-  <TrackerTip tip="login" />
+  <TrackerTip :tip="{ id: 'login' }" />
   <v-container>
     <v-row>
       <v-col cols="12">
@@ -17,7 +17,7 @@
   import { app as fireapp, fireuser } from '@/plugins/firebase.ts';
   import { getAuth, signInWithCustomToken } from 'firebase/auth';
 
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
   const customToken = ref('');
   const auth = getAuth(fireapp);
   const signIn = async () => {
