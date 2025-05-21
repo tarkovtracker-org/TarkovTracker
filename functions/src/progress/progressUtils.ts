@@ -2,6 +2,7 @@ import functions from 'firebase-functions';
 import admin from 'firebase-admin';
 import { Firestore, DocumentReference, FieldValue } from 'firebase-admin/firestore';
 const STASH_STATION_ID = '5d484fc0654e76006657e0ab'; // Stash ID
+const CULTIST_CIRCLE_STATION_ID = '667298e75ea6b4493c08f266'; // Cultist Circle ID
 // --- Interfaces for Data Structures ---
 // Basic Objective/Progress Item Structure
 interface ObjectiveItem {
@@ -221,6 +222,41 @@ const formatProgress = (
           });
         }
       });
+
+      // Special case: If Unheard Edition (5), mark Cultist Circle as maxed
+      if (gameEdition === 5) {
+        const cultistCircleStation = hideoutData.hideoutStations.find(
+          (station) => station.id === CULTIST_CIRCLE_STATION_ID
+        );
+        cultistCircleStation?.levels?.forEach((level) => {
+          // Mark module complete
+          let moduleIndex = progress.hideoutModulesProgress.findIndex(
+            (mLevel) => mLevel.id === level.id
+          );
+          if (moduleIndex === -1) {
+            progress.hideoutModulesProgress.push({
+              id: level.id,
+              complete: true,
+            });
+          } else {
+            progress.hideoutModulesProgress[moduleIndex].complete = true;
+          }
+          // Mark parts complete
+          level.itemRequirements?.forEach((item) => {
+            let partIndex = progress.hideoutPartsProgress.findIndex((part) => part.id === item.id);
+            if (partIndex === -1) {
+              progress.hideoutPartsProgress.push({
+                id: item.id,
+                complete: true,
+                count: item.count,
+              });
+            } else {
+              progress.hideoutPartsProgress[partIndex].complete = true;
+              // Note: Should we update count here too if it differs?
+            }
+          });
+        });
+      }
     }
   } catch (error: unknown) {
     functions.logger.error('Error processing hideout data', {
