@@ -2,7 +2,6 @@ import globals from 'globals';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import pluginVue from 'eslint-plugin-vue';
-import vueEslintParser from 'vue-eslint-parser';
 import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
@@ -11,7 +10,7 @@ export default [
     ignores: [
       '**/dist/**',
       '**/lib/**',
-      'frontend/public/**', // Static assets, images, etc.
+      'frontend/public/**',
       'frontend/.output/**',
       'docs/openapi.json',
       'docs/openapi.js',
@@ -19,9 +18,29 @@ export default [
       'node_modules/**',
     ],
   },
+  // Configuration for JS test files in functions/test (must come before the main functions config)
+  {
+    files: ['functions/test/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.es2022,
+      },
+    },
+    // No TypeScript plugin or rules for plain JS test files
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-console': 'off',
+      'max-len': ['warn', { code: 120 }],
+    },
+  },
   // Configuration for the 'functions' directory
   {
     files: ['functions/**/*.ts', 'functions/**/*.js'],
+    ignores: ['functions/test/**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -52,8 +71,7 @@ export default [
       'max-len': ['warn', { code: 120 }],
     },
   },
-  // --- Configuration for the 'frontend' directory ---
-
+  // Configuration for the 'frontend' directory
   // Base JS configuration (applies to .js, .ts, .vue unless overridden)
   {
     files: ['frontend/**/*.{js,ts,vue}'],
@@ -69,71 +87,96 @@ export default [
       },
     },
   },
-
   // TypeScript configuration for .ts and .js files in frontend
   // This uses tseslint.parser for these files.
   {
-    files: ['frontend/**/*.{ts,js}'], // Explicitly target .ts and .js, NOT .vue here
+    files: ['frontend/src/**/*.{ts,js}'],
     plugins: {
       '@typescript-eslint': tseslint.plugin,
     },
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        project: './frontend/tsconfig.json',
+        project: './frontend/tsconfig.eslint.json',
         tsconfigRootDir: '.',
         sourceType: 'module',
       },
     },
     rules: {
-      // Spread all rule objects from tseslint.configs.recommended
-      // tseslint.configs.recommended is an array of config objects
       ...tseslint.configs.recommended.reduce((acc, config) => ({ ...acc, ...config.rules }), {}),
     },
   },
-
+  // Configuration for frontend root TypeScript files (e.g., vite.config.ts)
+  {
+    files: ['frontend/*.ts'], // Specifically targets files like vite.config.ts in frontend root
+    plugins: {
+      '@typescript-eslint': tseslint.plugin,
+    },
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        // Vite config runs in Node.js environment
+        ...globals.node,
+        ...globals.es2022,
+      },
+      parser: tseslint.parser,
+      parserOptions: {
+        project: './frontend/tsconfig.json', // Assumes vite.config.ts is covered by this tsconfig
+        tsconfigRootDir: '.', // Consistent with how other tsconfigs are referenced
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      // Start with recommended TypeScript rules
+      ...tseslint.configs.recommended.reduce((acc, config) => ({ ...acc, ...config.rules }), {}),
+      // Common overrides for config files
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // You might need to add other specific rules, for example, to allow devDependencies:
+      // 'import/no-extraneous-dependencies': ['error', { 'devDependencies': true, 'optionalDependencies': false }],
+    },
+  },
   // Vue configuration using eslint-plugin-vue's flat config
   // This sets up vue-eslint-parser for .vue files and integrates with TypeScript for <script> blocks.
-  // pluginVue.configs['flat/vue3-recommended'] is an array, so spread it.
-  ...pluginVue.configs['flat/vue3-recommended'].map((config) => ({
+  // pluginVue.configs['flat/recommended'] is an array, so spread it.
+  ...(pluginVue.configs['flat/recommended'] || []).map((config) => ({
     ...config,
     files: ['frontend/**/*.vue'], // Ensure it's scoped to frontend .vue files
     // Ensure parser options for TypeScript within <script lang="ts"> are set
-    // The flat/vue3-recommended should handle most of this, but explicit options can be merged if needed.
+    // The flat/recommended should handle most of this, but explicit options can be merged if needed.
     languageOptions: {
-      ...config.languageOptions, // Preserve existing languageOptions from flat/vue3-recommended
+      ...config.languageOptions,
       parserOptions: {
         ...(config.languageOptions?.parserOptions || {}),
-        parser: tseslint.parser, // This is for <script lang="ts"> blocks, vue-eslint-parser delegates
-        project: './frontend/tsconfig.json',
+        parser: tseslint.parser,
+        project: './frontend/tsconfig.eslint.json',
         tsconfigRootDir: '.',
-        extraFileExtensions: ['.vue'], // Important for TS to understand .vue files
+        extraFileExtensions: ['.vue'],
         sourceType: 'module',
       },
     },
     plugins: {
-      // Ensure vue and typescript plugins are correctly referenced
       ...config.plugins,
-      '@typescript-eslint': tseslint.plugin, // Ensure TS plugin is available for Vue SFCs
+      '@typescript-eslint': tseslint.plugin,
     },
   })),
-
   // Prettier config - should be last to override styling rules
   {
     files: ['frontend/**/*.{ts,js,vue}'], // Apply to all relevant frontend files
     ...eslintConfigPrettier,
   },
-
   // Custom rule overrides for frontend (applied after all presets)
   {
     files: ['frontend/**/*.{ts,js,vue}'],
+    plugins: {
+      '@typescript-eslint': tseslint.plugin,
+    },
     rules: {
       'no-debugger': 'off',
-      'no-unused-vars': 'off', // Disable base rule, prefer @typescript-eslint/no-unused-vars
+      'no-unused-vars': 'off', // Disable base ESLint rule
+      'vue/no-unused-vars': 'off', // Disable Vue's version to rely on TypeScript's for script blocks
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'max-len': ['warn', { code: 100 }],
-      // Vue specific overrides can go here too
-      // e.g. 'vue/no-v-html': 'off'
     },
   },
 
@@ -145,9 +188,8 @@ export default [
       // Assuming CommonJS for .js/.cjs unless .mjs implies ESM
       // sourceType: 'script', // Or 'module' for .mjs
       globals: {
-        ...globals.node, // These are typically Node-based config files
+        ...globals.node,
       },
     },
-    // No TS/Vue specific plugins here unless these root files actually use them.
   },
 ];
