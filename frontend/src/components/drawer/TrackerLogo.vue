@@ -15,12 +15,8 @@
 </template>
 <script setup>
   import { computed } from 'vue';
-  import { useAppStore } from '@/stores/app';
-  import { useDisplay } from 'vuetify';
   import { useI18n } from 'vue-i18n';
   const { t } = useI18n({ useScope: 'global' });
-  const { mdAndDown } = useDisplay();
-  const appStore = useAppStore();
   const props = defineProps({
     isCollapsed: {
       type: Boolean,

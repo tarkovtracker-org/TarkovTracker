@@ -34,13 +34,13 @@
           <input
             v-else
             ref="levelInput"
+            v-model.number="levelInputValue"
             type="number"
             :min="minPlayerLevel"
             :max="maxPlayerLevel"
-            v-model.number="levelInputValue"
+            style="font-size: 2.5em; width: 2.5em; text-align: center"
             @blur="saveLevel"
             @keyup.enter="saveLevel"
-            style="font-size: 2.5em; width: 2.5em; text-align: center"
           />
         </div>
       </span>
@@ -50,8 +50,8 @@
             icon
             size="small"
             variant="plain"
-            @click="incrementLevel"
             :disabled="tarkovStore.playerLevel() >= maxPlayerLevel"
+            @click="incrementLevel"
           >
             <v-icon class="ma-0" small> mdi-chevron-up </v-icon>
           </v-btn>
@@ -61,8 +61,8 @@
             icon
             size="small"
             variant="plain"
-            @click="decrementLevel"
             :disabled="tarkovStore.playerLevel() <= minPlayerLevel"
+            @click="decrementLevel"
           >
             <v-icon class="ma-0" small> mdi-chevron-down </v-icon>
           </v-btn>
@@ -80,21 +80,19 @@
 <script setup>
   import { computed, ref, nextTick } from 'vue';
   import { useTarkovStore } from '@/stores/tarkov';
-  import { useAppStore } from '@/stores/app';
   import { useDisplay } from 'vuetify';
   import { useI18n } from 'vue-i18n';
   import { useTarkovData } from '@/composables/tarkovdata';
   const { t } = useI18n({ useScope: 'global' });
   const { mdAndDown } = useDisplay();
-  const tarkovStore = useTarkovStore();
-  const appStore = useAppStore();
-  const { minPlayerLevel, maxPlayerLevel, playerLevels } = useTarkovData();
-  const props = defineProps({
+  defineProps({
     isCollapsed: {
       type: Boolean,
       required: true,
     },
   });
+  const tarkovStore = useTarkovStore();
+  const { minPlayerLevel, maxPlayerLevel, playerLevels } = useTarkovData();
   const pmcFactionIcon = computed(() => {
     return `/img/factions/${tarkovStore.getPMCFaction()}.webp`;
   });

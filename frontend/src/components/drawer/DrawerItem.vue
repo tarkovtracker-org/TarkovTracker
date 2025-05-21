@@ -29,11 +29,8 @@
 </template>
 <script setup>
   import { computed } from 'vue';
-  import { useAppStore } from '@/stores/app';
-  import { useDisplay } from 'vuetify';
   import { useI18n } from 'vue-i18n';
   const { t } = useI18n({ useScope: 'global' });
-  const { mdAndDown } = useDisplay();
   const props = defineProps({
     icon: {
       type: String,
@@ -80,7 +77,6 @@
       window.open(props.href, '_blank');
     }
   };
-  const appStore = useAppStore();
   const itemClass = computed(() => ({
     'align-center': props.isCollapsed,
     'justify-center': props.isCollapsed,

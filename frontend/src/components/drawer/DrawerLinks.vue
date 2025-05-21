@@ -56,6 +56,6 @@
     },
   });
 
-  const DrawerItem = defineAsyncComponent(() => import('@/components/drawer/DrawerItem.vue'));
+  const DrawerItem = defineAsyncComponent(() => import('@/components/drawer/DrawerItem'));
 </script>
 <style lang="scss" scoped></style>
