@@ -15,7 +15,8 @@
             <slot name="title"></slot>
           </span>
         </v-col>
-        <v-col cols="12" class="mt-2 text-center">
+        <v-divider class="mx-4 my-2"></v-divider>
+        <v-col cols="12" class="mt-2">
           <slot name="content"></slot>
         </v-col>
         <v-col align-self="end" cols="12" class="pb-1">
