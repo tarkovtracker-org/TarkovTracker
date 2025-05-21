@@ -4,7 +4,9 @@
       {{ $t('page.settings.card.pmcfaction.title') }}
     </template>
     <template #content>
-      {{ $t('page.settings.card.pmcfaction.description') }}
+      <div style="text-align: left" class="pt-2 px-4">
+        {{ $t('page.settings.card.pmcfaction.description') }}
+      </div>
       <v-container>
         <v-row justify="center">
           <v-col cols="12">
@@ -46,7 +48,7 @@
   import { useI18n } from 'vue-i18n';
   import { defineAsyncComponent, computed, ref } from 'vue';
   import { useTarkovStore } from '@/stores/tarkov';
-  const FittedCard = defineAsyncComponent(() => import('@/components/FittedCard.vue'));
+  const FittedCard = defineAsyncComponent(() => import('@/components/FittedCard'));
   const { t } = useI18n({ useScope: 'global' });
   const tarkovStore = useTarkovStore();
   const PMCFactions = [
@@ -54,10 +56,6 @@
     { title: t('page.settings.card.pmcfaction.factions.BEAR'), value: 'BEAR' },
   ];
   const factionMenuActive = ref(true);
-  const setFaction = (faction) => {
-    currentPMCFaction.value = faction;
-    factionMenuActive.value = false;
-  };
   const factionImage = (faction) => {
     return `img/factions/${faction}.webp`;
   };

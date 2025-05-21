@@ -1,8 +1,10 @@
 <template>
   <v-container>
-    <template v-if="userTokenCount == 0">{{
-      $t('page.settings.card.apitokens.no_tokens')
-    }}</template>
+    <template v-if="userTokenCount == 0">
+      <div style="text-align: left" class="pt-2 px-4">
+        {{ $t('page.settings.card.apitokens.no_tokens') }}
+      </div>
+    </template>
     <v-row no-gutters>
       <v-col
         v-for="(token, index) in userTokens"
@@ -76,13 +78,13 @@
   </v-snackbar>
 </template>
 <script setup>
-  import { ref, defineAsyncComponent, computed, watch } from 'vue';
+  import { ref, defineAsyncComponent, computed } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { functions } from '@/plugins/firebase';
   import { httpsCallable } from 'firebase/functions';
   import { useLiveData } from '@/composables/livedata';
   import availablePermissions from '@/utils/api_permissions';
-  const TokenCard = defineAsyncComponent(() => import('@/components/settings/TokenCard.vue'));
+  const TokenCard = defineAsyncComponent(() => import('@/components/settings/TokenCard'));
   const { t } = useI18n({ useScope: 'global' });
   const { useSystemStore } = useLiveData();
   const systemStore = useSystemStore();
@@ -106,9 +108,7 @@
   const tokenResult = ref(null);
   const newTokenSnackbar = ref(false);
   const showNewTokenForm = ref(false);
-  // Create a function which calls the createToken function with the current token name and selected permissions
   const createToken = async () => {
-    // The error rules for vuetify3 checkboxes weren't working properly when this was implemented, so this is fairly ugly.
     let { valid } = await newTokenForm.value.validate();
     if (!valid) {
       if (selectedPermissionsCount.value == 0) {
@@ -145,6 +145,7 @@
       tokenResult.value = t('page.settings.card.apitokens.create_token_success');
       newTokenSnackbar.value = true;
     } catch (error) {
+      console.error('Error creating token:', error);
       tokenResult.value = t('page.settings.card.apitokens.create_token_error');
       newTokenSnackbar.value = true;
     }

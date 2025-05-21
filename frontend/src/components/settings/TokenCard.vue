@@ -9,18 +9,14 @@
       {{ tokenHidden }}
     </div>
     <div>
-      <!-- Display the permission titles the token has -->
       <b>{{ $t('page.settings.card.apitokens.permissions_column') }}: </b>
       <span v-for="(permission, index) in tokenPermissions" :key="index">
         {{ $t('page.settings.card.apitokens.permission.' + permission)
         }}<span v-if="index < tokenPermissions.length - 1">, </span>
       </span>
     </div>
-    <div>
-      {{ $t('page.settings.card.apitokens.created_column') }} {{ relativeDays }}
-    </div>
+    <div>{{ $t('page.settings.card.apitokens.created_column') }} {{ relativeDays }}</div>
     <div v-show="showQR">
-      <!-- Create a canvas with an ID of the token -->
       <template v-if="userStore.getStreamerMode">
         {{ $t('page.settings.card.apitokens.streamer_mode_qr') }}
       </template>
@@ -29,7 +25,6 @@
       </template>
     </div>
     <div class="mt-1">
-      <!-- Button to copy the token into clipboard -->
       <v-btn
         variant="outlined"
         icon="mdi-content-copy"
@@ -38,7 +33,6 @@
         size="x-small"
         @click="copyToken"
       ></v-btn>
-      <!-- Button to toggle a QR code for the token -->
       <v-btn
         variant="outlined"
         icon="mdi-qrcode"
@@ -47,7 +41,6 @@
         size="x-small"
         @click="showQR = !showQR"
       ></v-btn>
-      <!-- Button to delete the token -->
       <v-btn
         variant="outlined"
         icon="mdi-delete"
@@ -101,10 +94,7 @@
       }
     })
     .catch((error) => {
-      console.error(
-        `TokenCard (${props.token}): Error getting document:`,
-        error
-      );
+      console.error(`TokenCard (${props.token}): Error getting document:`, error);
     });
   // Computed property to retrieve the timestamp of the token creation
   const tokenCreated = computed(() => {
@@ -128,9 +118,7 @@
   // Calculate the relative days since the token was created using Intl.RelativeTimeFormat
   const relativeDays = computed(() => {
     if (!tokenDataRef.value?.created) {
-      console.log(
-        `TokenCard (${props.token}): relativeDays computed - no creation data yet.`
-      );
+      console.log(`TokenCard (${props.token}): relativeDays computed - no creation data yet.`);
       return 'N/A';
     }
     const relativeTimeFormat = new Intl.RelativeTimeFormat(locale.value, {
@@ -138,12 +126,9 @@
     });
     const days = Math.floor((Date.now() - tokenCreated.value) / 86400000);
     const formattedDays = relativeTimeFormat.format(days, 'day');
-    console.log(
-      `TokenCard (${props.token}): relativeDays computed: ${formattedDays}`
-    );
+    console.log(`TokenCard (${props.token}): relativeDays computed: ${formattedDays}`);
     return formattedDays;
   });
-  // Get a string representation of the token where all but the last 4 characters are replaced with *
   const tokenHidden = computed(() => {
     if (userStore.getStreamerMode) {
       return props.token.replace(/.(?=.{0})/g, '*');
@@ -151,53 +136,39 @@
       return props.token.replace(/.(?=.{5})/g, '*');
     }
   });
-  // Copy token to clipboard function
   const copyToken = () => {
     navigator.clipboard.writeText(props.token);
   };
-  // Ref to store whether the token is being deleted
   const deleting = ref(false);
-  // Delete token function
   const deleteToken = async () => {
-    // Use the firebase callable function to delete the token
     const revokeTokenFn = httpsCallable(functions, 'revokeToken');
-    // Set deleting to true to disable the button
     deleting.value = true;
     try {
-      // Call the function and then read the result
       const result = await revokeTokenFn({ token: props.token });
-      // Read result of the Cloud Function.
       if (result.data.error) {
-        // If there was an error, log it
         console.error(result.data.error);
       }
     } catch (error) {
       console.error('Error revoking token:', error);
     } finally {
-      // Set deleting to false to re-enable the button
       deleting.value = false;
     }
   };
-  // Ref to store whether the QR code is being shown
   const showQR = ref(false);
   onMounted(() => {
     console.log(`TokenCard (${props.token}): Component mounted.`);
-    // Create the QR code for the token
     if (document.getElementById(props.token + '-tc')) {
       QRCode.toCanvas(
         document.getElementById(props.token + '-tc'),
         props.token,
         {},
         function (error) {
-          if (error)
-            console.error(`TokenCard (${props.token}): QR Code error:`, error);
+          if (error) console.error(`TokenCard (${props.token}): QR Code error:`, error);
           else console.log(`TokenCard (${props.token}): QR Code generated.`);
         }
       );
     } else {
-      console.warn(
-        `TokenCard (${props.token}): Canvas element for QR code not found on mount.`
-      );
+      console.warn(`TokenCard (${props.token}): Canvas element for QR code not found on mount.`);
     }
   });
 </script>

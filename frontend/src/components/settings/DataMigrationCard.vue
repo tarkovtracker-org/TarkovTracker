@@ -7,7 +7,6 @@
       </p>
       <v-card variant="flat" class="mb-3 migration-card">
         <v-card-text>
-          <p class="font-weight-bold mb-3">Follow these steps to migrate your data:</p>
           <div class="migration-steps mb-4">
             <div class="step-item">
               <span class="step-number">1</span>
@@ -37,65 +36,69 @@
               <span class="step-text">Copy the token and paste it below</span>
             </div>
           </div>
-          <v-text-field
-            v-model="apiToken"
-            label="API Token from Old Site"
-            placeholder="Paste your API token here..."
-            variant="outlined"
-            :disabled="fetchingApi"
-            :error-messages="apiError"
-            hide-details="auto"
-            class="mb-4"
-            :type="showToken ? 'text' : 'password'"
-            :append-inner-icon="showToken ? 'mdi-eye-off' : 'mdi-eye'"
-            @click:append-inner="showToken = !showToken"
-          ></v-text-field>
-          <v-text-field
-            v-model="apiEndpoint"
-            label="Old Site API Endpoint"
-            placeholder="e.g. https://tarkovtracker.io/api/v2/progress"
-            variant="outlined"
-            :disabled="fetchingApi"
-            :error-messages="apiEndpointError"
-            hint="Change this only if the old site uses a different API endpoint. Must include https:// and full path."
-            persistent-hint
-            class="mb-2"
-          ></v-text-field>
-          <div class="mb-4" style="font-size: 0.95em; color: #888">
-            <span
-              >Endpoint being used: <code>{{ apiEndpoint }}</code></span
-            >
-          </div>
-          <div class="d-flex justify-space-between align-center">
-            <div v-if="fetchingApi">
-              <v-progress-circular
-                indeterminate
-                color="primary"
-                size="24"
-                class="mr-2"
-              ></v-progress-circular>
-              <span>Fetching data...</span>
+          <form @submit.prevent="fetchWithApiToken">
+            <v-text-field
+              v-model="apiToken"
+              label="API Token from Old Site"
+              placeholder="Paste your API token here..."
+              variant="outlined"
+              :disabled="fetchingApi"
+              :error-messages="apiError"
+              hide-details="auto"
+              class="mb-4"
+              :type="showToken ? 'text' : 'password'"
+              :append-inner-icon="showToken ? 'mdi-eye-off' : 'mdi-eye'"
+              autocomplete="off"
+              @click:append-inner="showToken = !showToken"
+            ></v-text-field>
+            <v-text-field
+              v-model="apiEndpoint"
+              label="Old Site API Endpoint"
+              placeholder="e.g. https://tarkovtracker.io/api/v2/progress"
+              variant="outlined"
+              :disabled="fetchingApi"
+              :error-messages="apiEndpointError"
+              hint="Change this only if the old site uses a different API endpoint. 
+                Must include https:// and full path."
+              persistent-hint
+              class="mb-2"
+            ></v-text-field>
+            <div class="mb-4" style="font-size: 0.95em; color: #888; text-align: left">
+              <span
+                >Endpoint being used: <code>{{ apiEndpoint }}</code></span
+              >
             </div>
-            <v-alert
-              v-else-if="apiFetchSuccess"
-              type="success"
-              variant="tonal"
-              density="compact"
-              class="mb-0 mt-0 flex-grow-1 mr-4"
-            >
-              Data fetched successfully! Confirm below to import.
-            </v-alert>
-            <v-spacer v-else></v-spacer>
-            <v-btn
-              color="primary"
-              @click="fetchWithApiToken"
-              :loading="fetchingApi"
-              :disabled="!apiToken || fetchingApi"
-              class="px-4"
-            >
-              Fetch Data
-            </v-btn>
-          </div>
+            <div class="d-flex justify-space-between align-center">
+              <div v-if="fetchingApi">
+                <v-progress-circular
+                  indeterminate
+                  color="primary"
+                  size="24"
+                  class="mr-2"
+                ></v-progress-circular>
+                <span>Fetching data...</span>
+              </div>
+              <v-alert
+                v-else-if="apiFetchSuccess"
+                type="success"
+                variant="tonal"
+                density="compact"
+                class="mb-0 mt-0 flex-grow-1 mr-4"
+              >
+                Data fetched successfully! Confirm below to import.
+              </v-alert>
+              <v-spacer v-else></v-spacer>
+              <v-btn
+                color="primary"
+                :loading="fetchingApi"
+                :disabled="!apiToken || fetchingApi"
+                class="px-4"
+                @click="fetchWithApiToken"
+              >
+                Fetch Data
+              </v-btn>
+            </div>
+          </form>
         </v-card-text>
       </v-card>
       <v-dialog v-model="confirmDialog" max-width="700">
@@ -109,7 +112,7 @@
                   <v-card-title class="text-subtitle-1 px-4 py-2">PMC Information</v-card-title>
                   <v-list density="compact" class="px-2">
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-account" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title
@@ -117,7 +120,7 @@
                       >
                     </v-list-item>
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-shield" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title
@@ -125,7 +128,7 @@
                       >
                     </v-list-item>
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-package-variant" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title style="white-space: normal; overflow: visible">
@@ -140,7 +143,7 @@
                   <v-card-title class="text-subtitle-1 px-4 py-2">Task Progress</v-card-title>
                   <v-list density="compact" class="px-2">
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-check-circle" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title class="d-flex align-center">
@@ -148,7 +151,7 @@
                       </v-list-item-title>
                     </v-list-item>
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-format-list-checks" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title class="d-flex align-center">
@@ -165,7 +168,7 @@
                       </v-list-item-title>
                     </v-list-item>
                     <v-list-item v-if="countFailedTasks > 0">
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-close-circle" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title class="d-flex align-center">
@@ -191,7 +194,7 @@
                   <v-card-title class="text-subtitle-1 px-4 py-2">Hideout Progress</v-card-title>
                   <v-list density="compact" class="px-2">
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-home" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title
@@ -199,7 +202,7 @@
                       >
                     </v-list-item>
                     <v-list-item>
-                      <template v-slot:prepend>
+                      <template #prepend>
                         <v-icon icon="mdi-tools" class="mr-3"></v-icon>
                       </template>
                       <v-list-item-title
@@ -214,15 +217,15 @@
           </v-card-text>
           <v-card-actions class="px-4 pb-4">
             <v-spacer></v-spacer>
-            <v-btn color="grey" variant="flat" @click="confirmDialog = false" class="px-4">
+            <v-btn color="grey" variant="flat" class="px-4" @click="confirmDialog = false">
               Cancel
             </v-btn>
             <v-btn
               color="error"
               variant="flat"
-              @click="confirmImport"
               :loading="importing"
               class="ml-3 px-4"
+              @click="confirmImport"
             >
               Confirm Import
             </v-btn>
@@ -294,9 +297,9 @@
   import { ref, computed } from 'vue';
   import { fireuser } from '@/plugins/firebase';
   import { markDataMigrated } from '@/plugins/store-initializer';
-  import DataMigrationService from '@/services/DataMigrationService';
+  import DataMigrationService from '@/utils/DataMigrationService';
   import { useTarkovStore } from '@/stores/tarkov';
-  import FittedCard from '@/components/FittedCard.vue';
+  import FittedCard from '@/components/FittedCard';
   // API migration variables
   const apiToken = ref('');
   const apiEndpoint = ref('https://tarkovtracker.io/api/v2/progress');
@@ -400,7 +403,7 @@
       let endpoint = apiEndpoint.value.trim();
       try {
         new URL(endpoint);
-      } catch (e) {
+      } catch {
         apiEndpointError.value = 'Please enter a valid URL (must start with https://)';
         fetchingApi.value = false;
         return;
@@ -422,10 +425,10 @@
       apiFetchSuccess.value = true;
       // Show confirmation dialog
       confirmDialog.value = true;
-    } catch (error) {
-      console.error('Error fetching data with API token:', error);
-      if (error && error.message) {
-        apiError.value = `Error: ${error.message}`;
+    } catch (_error) {
+      console.error('Error fetching data with API token:', _error);
+      if (_error && _error.message) {
+        apiError.value = `Error: ${_error.message}`;
       } else {
         apiError.value = 'Unknown error occurred during fetch.';
       }
@@ -505,5 +508,6 @@
   }
   .step-text {
     padding-top: 2px;
+    text-align: left;
   }
 </style>
