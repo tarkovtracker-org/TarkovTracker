@@ -13,7 +13,7 @@
     "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
   },
   "hosting": {
-    "predeploy": ["npm install --prefix ./frontend", "npm run build:prod --prefix ./frontend"],
+    "predeploy": ["npm install --prefix ./frontend", "npm run build:dev --prefix ./frontend"],
     "public": "frontend/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "redirects": [
@@ -31,7 +31,7 @@
     "rewrites": [
       {
         "source": "/api/v2/**",
-        "function": "apiv2Default"
+        "function": "api"
       },
       {
         "source": "**",
