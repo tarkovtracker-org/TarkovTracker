@@ -37,13 +37,13 @@
   import { useTarkovData } from '@/composables/tarkovdata';
   import { useTarkovStore } from '@/stores/tarkov';
   const NeededItemMediumCard = defineAsyncComponent(
-    () => import('@/components/neededitems/NeededItemMediumCard.vue')
+    () => import('@/components/neededitems/NeededItemMediumCard')
   );
   const NeededItemSmallCard = defineAsyncComponent(
-    () => import('@/components/neededitems/NeededItemSmallCard.vue')
+    () => import('@/components/neededitems/NeededItemSmallCard')
   );
   const NeededItemRow = defineAsyncComponent(
-    () => import('@/components/neededitems/NeededItemRow.vue')
+    () => import('@/components/neededitems/NeededItemRow')
   );
   const props = defineProps({
     need: {
@@ -113,36 +113,44 @@
       );
     } else if (userStore.itemsTeamNonFIRHidden) {
       // Only show if a someone needs the objective
-      return (
-        need.foundInRaid &&
-        // Check if any user has not completed the task (and that its a relevant faction task for them)
-        Object.entries(progressStore.tasksCompletions[need.taskId] || {}).some(
-          ([userTeamId, userStatus]) =>
-            ['Any', progressStore.playerFaction[userTeamId]].some(
-              (faction) => faction == relatedTask.value.factionName
-            ) && userStatus === false
-        ) &&
-        // Check if any user has not completed the objective (and that its a relevant faction task for them)
-        Object.entries(progressStore.objectiveCompletions[need.id] || {}).some(
-          ([userTeamId, userStatus]) =>
-            ['Any', progressStore.playerFaction[userTeamId]].some(
-              (faction) => faction == relatedTask.value.factionName
-            ) && userStatus === false
-        )
+      const taskNeeded = Object.entries(progressStore.tasksCompletions[need.taskId] || {}).some(
+        ([userTeamId, userStatus]) => {
+          const relevantFactions = ['Any', progressStore.playerFaction[userTeamId]];
+          return (
+            relevantFactions.some((faction) => faction == relatedTask.value.factionName) &&
+            userStatus === false
+          );
+        }
       );
+      const objectiveNeeded = Object.entries(
+        progressStore.objectiveCompletions[need.id] || {}
+      ).some(([userTeamId, userStatus]) => {
+        const relevantFactions = ['Any', progressStore.playerFaction[userTeamId]];
+        return (
+          relevantFactions.some((faction) => faction == relatedTask.value.factionName) &&
+          userStatus === false
+        );
+      });
+      return need.foundInRaid && taskNeeded && objectiveNeeded;
     } else {
       return (
         Object.entries(progressStore.tasksCompletions[need.taskId] || {}).some(
-          ([userTeamId, userStatus]) =>
-            ['Any', progressStore.playerFaction[userTeamId]].some(
-              (faction) => faction == relatedTask.value.factionName
-            ) && userStatus === false
+          ([userTeamId, userStatus]) => {
+            const relevantFactions = ['Any', progressStore.playerFaction[userTeamId]];
+            return (
+              relevantFactions.some((faction) => faction == relatedTask.value.factionName) &&
+              userStatus === false
+            );
+          }
         ) &&
         Object.entries(progressStore.objectiveCompletions[need.id] || {}).some(
-          ([userTeamId, userStatus]) =>
-            ['Any', progressStore.playerFaction[userTeamId]].some(
-              (faction) => faction == relatedTask.value.factionName
-            ) && userStatus === false
+          ([userTeamId, userStatus]) => {
+            const relevantFactions = ['Any', progressStore.playerFaction[userTeamId]];
+            return (
+              relevantFactions.some((faction) => faction == relatedTask.value.factionName) &&
+              userStatus === false
+            );
+          }
         )
       );
     }

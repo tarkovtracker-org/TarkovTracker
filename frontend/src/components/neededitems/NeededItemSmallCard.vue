@@ -183,13 +183,12 @@
 </template>
 <script setup>
   import { defineAsyncComponent, computed, inject, ref } from 'vue';
-  import { useUserStore } from '@/stores/user';
-  import { useProgressStore } from '@/stores/progress';
   import { useTarkovData } from '@/composables/tarkovdata';
   import { useTarkovStore } from '@/stores/tarkov';
   import { useDisplay } from 'vuetify';
-  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink.vue'));
-  const StationLink = defineAsyncComponent(() => import('@/components/hideout/StationLink.vue'));
+  import { useProgressStore } from '@/stores/progress';
+  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink'));
+  const StationLink = defineAsyncComponent(() => import('@/components/hideout/StationLink'));
   const props = defineProps({
     need: {
       type: Object,
@@ -246,7 +245,7 @@
       'item-count-complete': selfCompletedNeed.value || currentCount.value >= neededCount.value,
     };
   });
-  const emit = defineEmits(['decreaseCount', 'increaseCount', 'toggleCount']);
+  defineEmits(['decreaseCount', 'increaseCount', 'toggleCount']);
 </script>
 <style lang="scss">
   .item-complete {

@@ -139,12 +139,10 @@
 </template>
 <script setup>
   import { defineAsyncComponent, computed, inject } from 'vue';
-  import { useUserStore } from '@/stores/user';
   import { useProgressStore } from '@/stores/progress';
-  import { useTarkovData } from '@/composables/tarkovdata';
   import { useTarkovStore } from '@/stores/tarkov';
-  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink.vue'));
-  const StationLink = defineAsyncComponent(() => import('@/components/hideout/StationLink.vue'));
+  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink'));
+  const StationLink = defineAsyncComponent(() => import('@/components/hideout/StationLink'));
   const props = defineProps({
     need: {
       type: Object,
@@ -154,7 +152,6 @@
   defineEmits(['increaseCount', 'decreaseCount', 'toggleCount']);
   const progressStore = useProgressStore();
   const tarkovStore = useTarkovStore();
-  useTarkovData();
   const {
     selfCompletedNeed,
     relatedTask,

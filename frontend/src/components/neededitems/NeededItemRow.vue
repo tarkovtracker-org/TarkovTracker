@@ -194,10 +194,7 @@
                             >
                           </div>
                         </div>
-                        <div
-                          v-else
-                          class="d-flex fill-height align-self-stretch justify-center mt-2 mb-2 mx-2"
-                        >
+                        <div v-else class="neededitem-row-flex">
                           <div class="align-self-end text-center">
                             <i18n-t keypath="page.neededitems.neededby" scope="global">
                               <template #users>
@@ -208,7 +205,8 @@
                                 >
                                   <v-icon size="x-small" class="mr-1"
                                     >mdi-account-child-circle</v-icon
-                                  >{{ progressStore.getDisplayName(userNeed.user) }}
+                                  >
+                                  {{ progressStore.getDisplayName(userNeed.user) }}
                                   {{ userNeed.count.toLocaleString() }}/{{
                                     neededCount.toLocaleString()
                                   }}
@@ -325,8 +323,8 @@
                           :key="userIndex"
                           style="white-space: pre-line"
                         >
-                          <v-icon size="x-small" class="mr-1">mdi-account-child-circle</v-icon
-                          >{{ progressStore.getDisplayName(userNeed.user) }}
+                          <v-icon size="x-small" class="mr-1">mdi-account-child-circle</v-icon>
+                          {{ progressStore.getDisplayName(userNeed.user) }}
                           {{ userNeed.count.toLocaleString() }}/{{ neededCount.toLocaleString() }}
                         </div>
                       </template>
@@ -343,13 +341,12 @@
 </template>
 <script setup>
   import { defineAsyncComponent, computed, inject, ref } from 'vue';
-  import { useUserStore } from '@/stores/user';
   import { useProgressStore } from '@/stores/progress';
   import { useTarkovData } from '@/composables/tarkovdata';
   import { useTarkovStore } from '@/stores/tarkov';
   import { useDisplay } from 'vuetify';
-  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink.vue'));
-  const StationLink = defineAsyncComponent(() => import('@/components/hideout/StationLink.vue'));
+  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink'));
+  const StationLink = defineAsyncComponent(() => import('@/components/hideout/StationLink'));
   const props = defineProps({
     need: {
       type: Object,
@@ -393,7 +390,7 @@
       'item-complete-row': selfCompletedNeed.value || currentCount.value >= neededCount.value,
     };
   });
-  const emit = defineEmits(['decreaseCount', 'increaseCount', 'toggleCount']);
+  defineEmits(['decreaseCount', 'increaseCount', 'toggleCount']);
 </script>
 <style lang="scss">
   .item-complete-row {
@@ -438,5 +435,15 @@
   }
   .item-bg-blue {
     background-color: #202d32;
+  }
+  .neededitem-row-flex {
+    display: flex;
+    height: 100%;
+    align-self: stretch;
+    justify-content: center;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
   }
 </style>
