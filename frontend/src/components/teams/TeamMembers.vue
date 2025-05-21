@@ -39,21 +39,26 @@
   </icon-card>
 </template>
 <script setup>
-  import { defineAsyncComponent, watch, computed } from 'vue';
+  import {
+    computed,
+    defineAsyncComponent,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    defineProps,
+  } from 'vue';
   import { useLiveData } from '@/composables/livedata';
   import { fireuser } from '@/plugins/firebase';
-  const IconCard = defineAsyncComponent(() => import('@/components/IconCard.vue'));
-  const TeammemberCard = defineAsyncComponent(
-    () => import('@/components/teams/TeammemberCard.vue')
-  );
-  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip.vue'));
+  const IconCard = defineAsyncComponent(() => import('@/components/IconCard'));
+  const TeammemberCard = defineAsyncComponent(() => import('@/components/teams/TeammemberCard'));
+  const TrackerTip = defineAsyncComponent(() => import('@/components/TrackerTip'));
   const { useTeamStore } = useLiveData();
   const teamStore = useTeamStore();
   const isCurrentUserTeamOwner = computed(() => {
     const currentTeamOwner = teamStore.$state.owner;
     const currentFireUID = fireuser.uid;
     console.log(
-      `[TeamMembers.vue] isCurrentUserTeamOwner computed. teamStore.$state.owner: ${currentTeamOwner}, fireuser.uid: ${currentFireUID}, result: ${currentTeamOwner === currentFireUID}`
+      `[TeamMembers.vue] isCurrentUserTeamOwner computed. ` +
+        `teamStore.$state.owner: ${currentTeamOwner}, ` +
+        `fireuser.uid: ${currentFireUID}, result: ${currentTeamOwner === currentFireUID}`
     );
     return currentTeamOwner === currentFireUID;
   });

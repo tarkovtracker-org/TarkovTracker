@@ -9,56 +9,76 @@
           <v-col cols="12">
             <v-switch
               v-model="taskHideAll"
-              :label="$t(taskHideAllLabel)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
-              :color="taskHideAllColor"
+              color="error"
+              base-color="green"
               hide-details
               density="compact"
-            ></v-switch>
+            >
+              <template #label>
+                <div style="text-align: left">{{ $t(taskHideAllLabel) }}</div>
+              </template>
+            </v-switch>
             <v-switch
               v-model="itemsHideAll"
-              :label="$t(itemsHideAllLabel)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
-              :color="itemsHideAllColor"
+              color="error"
+              base-color="green"
               hide-details
               density="compact"
-            ></v-switch>
+            >
+              <template #label>
+                <div style="text-align: left">{{ $t(itemsHideAllLabel) }}</div>
+              </template>
+            </v-switch>
             <v-switch
               v-model="itemsHideNonFIR"
               :disabled="itemsHideAll"
-              :label="$t(itemsHideNonFIRLabel)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
-              :color="itemsHideNonFIRColor"
+              color="error"
+              base-color="green"
               hide-details
               density="compact"
-            ></v-switch>
+            >
+              <template #label>
+                <div style="text-align: left">{{ $t(itemsHideNonFIRLabel) }}</div>
+              </template>
+            </v-switch>
             <v-switch
               v-model="itemsHideHideout"
               :disabled="itemsHideAll"
-              :label="$t(itemsHideHideoutLabel)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
-              :color="itemsHideHideoutColor"
+              color="error"
+              base-color="green"
               hide-details
               density="compact"
-            ></v-switch>
+            >
+              <template #label>
+                <div style="text-align: left">{{ $t(itemsHideHideoutLabel) }}</div>
+              </template>
+            </v-switch>
             <v-switch
               v-model="mapHideAll"
-              :label="$t(mapHideAllLabel)"
               inset
               true-icon="mdi-eye-off"
               false-icon="mdi-eye"
-              :color="mapHideAllColor"
+              color="error"
+              base-color="green"
               hide-details
               density="compact"
-            ></v-switch>
+            >
+              <template #label>
+                <div style="text-align: left">{{ $t(mapHideAllLabel) }}</div>
+              </template>
+            </v-switch>
           </v-col>
         </v-row>
       </v-container>
@@ -68,7 +88,7 @@
 <script setup>
   import { computed } from 'vue';
   import { useUserStore } from '@/stores/user';
-  import FittedCard from '@/components/FittedCard.vue';
+  import FittedCard from '@/components/FittedCard';
   const userStore = useUserStore();
   const taskHideAll = computed({
     get: () => userStore.taskTeamAllHidden,
@@ -79,7 +99,6 @@
       ? 'page.team.card.teamoptions.task_hide_all'
       : 'page.team.card.teamoptions.task_show_all'
   );
-  const taskHideAllColor = computed(() => (userStore.taskTeamAllHidden ? 'error' : 'success'));
   const itemsHideAll = computed({
     get: () => userStore.itemsTeamAllHidden,
     set: (value) => userStore.setItemsTeamHideAll(value),
@@ -89,7 +108,6 @@
       ? 'page.team.card.teamoptions.items_hide_all'
       : 'page.team.card.teamoptions.items_show_all'
   );
-  const itemsHideAllColor = computed(() => (userStore.itemsTeamAllHidden ? 'error' : 'success'));
   const itemsHideNonFIR = computed({
     get: () => userStore.itemsTeamNonFIRHidden,
     set: (value) => userStore.setItemsTeamHideNonFIR(value),
@@ -98,9 +116,6 @@
     userStore.itemsTeamNonFIRHidden
       ? 'page.team.card.teamoptions.items_hide_non_fir'
       : 'page.team.card.teamoptions.items_show_non_fir'
-  );
-  const itemsHideNonFIRColor = computed(() =>
-    userStore.itemsTeamNonFIRHidden ? 'error' : 'success'
   );
   const itemsHideHideout = computed({
     get: () => userStore.itemsTeamHideoutHidden,
@@ -111,9 +126,6 @@
       ? 'page.team.card.teamoptions.items_hide_hideout'
       : 'page.team.card.teamoptions.items_show_hideout'
   );
-  const itemsHideHideoutColor = computed(() =>
-    userStore.itemsTeamHideoutHidden ? 'error' : 'success'
-  );
   const mapHideAll = computed({
     get: () => userStore.mapTeamAllHidden,
     set: (value) => userStore.setMapTeamHideAll(value),
@@ -123,6 +135,5 @@
       ? 'page.team.card.teamoptions.map_hide_all'
       : 'page.team.card.teamoptions.map_show_all'
   );
-  const mapHideAllColor = computed(() => (userStore.mapTeamAllHidden ? 'error' : 'success'));
 </script>
 <style lang="scss" scoped></style>

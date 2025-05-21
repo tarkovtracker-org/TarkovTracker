@@ -103,11 +103,11 @@
 <script setup>
   import { ref, computed, watch, nextTick } from 'vue';
   import { useI18n } from 'vue-i18n';
-  import { fireuser, functions, auth } from '@/plugins/firebase';
+  import { fireuser, auth } from '@/plugins/firebase';
   import { useLiveData } from '@/composables/livedata';
   import { useUserStore } from '@/stores/user';
   import { useTarkovStore } from '@/stores/tarkov';
-  import FittedCard from '@/components/FittedCard.vue';
+  import FittedCard from '@/components/FittedCard';
   const { t } = useI18n({ useScope: 'global' });
   const { useTeamStore, useSystemStore } = useLiveData();
   const teamStore = useTeamStore();
@@ -169,9 +169,11 @@
     const currentUser = auth.currentUser;
     if (!currentUser) {
       console.error(
-        '[MyTeam.vue] createTeam - Firebase auth.currentUser is null, despite reactive state indicating login.'
+        '[MyTeam.vue] createTeam - Firebase auth.currentUser is null, ' +
+          'despite reactive state indicating login.'
       );
-      createTeamResult.value = t('page.team.card.myteam.auth_inconsistency'); // Add a new translation key for this
+      createTeamResult.value = t('page.team.card.myteam.auth_inconsistency');
+      // Add a new translation key for this
       createTeamSnackbar.value = true;
       creatingTeam.value = false;
       return;
@@ -206,9 +208,8 @@
           } else if (response.statusText) {
             specificErrorMessage = response.statusText;
           }
-        } catch (e) {
-          // Failed to parse JSON or other issue reading error response body
-          console.warn('[MyTeam.vue] Could not parse JSON from error response body:', e);
+        } catch {
+          console.error('[MyTeam.vue] Could not parse JSON from error response body');
           if (response.statusText) {
             specificErrorMessage = response.statusText; // Fallback to status text
           }
@@ -229,17 +230,16 @@
         '[MyTeam.vue] createTeam returned. localUserTeam after call (still pre-watch/nextTick):',
         localUserTeam.value
       );
-      // Wait for systemStore to confirm the user is in a team (i.e., systemStore.$state.team has the new teamId)
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve, _reject) => {
         console.debug(
           '[MyTeam.vue] Waiting for systemStore.$state.team to be populated. Current value:',
           systemStore.$state.team
         );
         const timeout = setTimeout(() => {
           console.warn(
-            '[MyTeam.vue] Timeout (15s) waiting for systemStore.$state.team to become non-null.'
+            '[MyTeam] Timeout (15s) waiting for systemStore.$state.team to become non-null.'
           );
-          reject(new Error('Timed out waiting for system record to update with new team ID.'));
+          _reject(new Error('Timed out waiting for system record to update with new team ID.'));
         }, 15000);
         let stopWatchingSystemTeam;
         stopWatchingSystemTeam = watch(
@@ -262,16 +262,18 @@
         );
       });
       // Now wait for teamStore to be populated with the owner information for the new team
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve, _reject) => {
         console.debug(
-          '[MyTeam.vue] Waiting for teamStore.owner to match current user and password to be populated. Current teamStore.$state:',
+          '[MyTeam.vue] Waiting for teamStore.owner to match current user and ' +
+            'password to be populated. Current teamStore.$state:',
           JSON.parse(JSON.stringify(teamStore.$state || {})),
           'fireuser.uid:',
           fireuser.uid
         );
         const timeout = setTimeout(() => {
           console.warn(
-            '[MyTeam.vue] Timeout (15s) waiting for teamStore.owner to match fireuser.uid and password to be populated. Current teamStore.$state.owner:',
+            '[MyTeam] Timeout (15s) waiting for teamStore.owner to match fireuser.uid ' +
+              'and password to be populated. Current teamStore.$state.owner:',
             teamStore.owner, // Log current owner at timeout
             'Current teamStore.$state.password:',
             teamStore.$state.password // Log current password at timeout
@@ -299,7 +301,8 @@
                 stopWatchingTeamOwnerAndPassword();
               }
               console.debug(
-                '[MyTeam.vue] teamStore.owner now matches fireuser.uid and teamStore.password is populated via $state watch.'
+                '[MyTeam] teamStore.owner now matches fireuser.uid ' +
+                  'and teamStore.password is populated via $state watch.'
               );
               resolve(newState); // Resolve with the new state containing owner and password
             }
@@ -333,17 +336,19 @@
           const randomTeamName = generateRandomName();
           tarkovStore.setDisplayName(randomTeamName);
           console.log(
-            '[MyTeam.vue] New team created by owner, set random display name:',
+            '[MyTeam.vue] Team created/joined by owner, set random display name:',
             randomTeamName
           );
         } else {
           console.warn(
-            "[MyTeam.vue] Team created and user is in team, but 'isTeamOwner' is still false. This might indicate an issue with owner state propagation or comparison."
+            "[MyTeam.vue] Team created and user is in team, but 'isTeamOwner' is still false. " +
+              'This might indicate an issue with owner state propagation or comparison.'
           );
         }
       } else {
         console.error(
-          '[MyTeam.vue] Team creation failed: UI state (localUserTeam) did not update after nextTick. $state.team:',
+          '[MyTeam.vue] Team creation failed: UI state (localUserTeam) did not update ' +
+            'after nextTick. $state.team:',
           systemStore.$state.team
         );
         createTeamResult.value = t('page.team.card.myteam.create_team_error_ui_update');
@@ -354,12 +359,12 @@
       console.error('[MyTeam.vue] Error in createTeam function. Full error object below:');
       console.dir(error);
       console.error(
-        '[MyTeam.vue] ERROR OBJECT (stringified, in case dir is not showing full details):'
+        '[MyTeam.vue] ERROR OBJECT (stringified, ' + "'in case dir is not showing full details):'"
       );
       try {
         console.log(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      } catch (e) {
-        console.error('[MyTeam.vue] Could not stringify the error object:', e);
+      } catch {
+        console.error('[MyTeam.vue] Could not stringify the error object');
       }
       let messageForSnackbar = null;
       if (error && typeof error === 'object') {
@@ -373,9 +378,9 @@
               if (parsedDetails && typeof parsedDetails.error === 'string') {
                 messageForSnackbar = parsedDetails.error;
               } else {
-                messageForSnackbar = error.details; // Use the string itself if not the expected JSON structure
+                messageForSnackbar = error.details;
               }
-            } catch (e) {
+            } catch {
               // Parsing failed, use error.details as is if it's a string
               messageForSnackbar = error.details;
             }
@@ -395,7 +400,8 @@
     }
     creatingTeam.value = false;
     console.debug(
-      '[MyTeam.vue] createTeam finished. creatingTeam=false. localUserTeam for final UI render check:',
+      '[MyTeam.vue] createTeam finished. creatingTeam=false. ' +
+        'localUserTeam for final UI render check:',
       localUserTeam.value,
       '$state.team:',
       systemStore.$state.team
@@ -410,7 +416,8 @@
     // Check if our reactive state indicates a logged-in user
     if (!fireuser.loggedIn || !fireuser.uid) {
       console.error('[MyTeam.vue] leaveTeam - User not authenticated (reactive state).');
-      leaveTeamResult.value = t('page.team.card.myteam.user_not_authenticated'); // Use existing or new translation key
+      leaveTeamResult.value = t('page.team.card.myteam.user_not_authenticated');
+      // Use existing or new translation key
       leaveTeamSnackbar.value = true;
       leavingTeam.value = false;
       return;
@@ -419,9 +426,10 @@
     const currentUser = auth.currentUser;
     if (!currentUser) {
       console.error(
-        '[MyTeam.vue] leaveTeam - Firebase auth.currentUser is null, despite reactive state indicating login.'
+        '[MyTeam] leaveTeam - Firebase auth.currentUser is null, ' +
+          'despite reactive state indicating login.'
       );
-      leaveTeamResult.value = t('page.team.card.myteam.auth_inconsistency'); // Use existing or new translation key
+      leaveTeamResult.value = t('page.team.card.myteam.auth_inconsistency');
       leaveTeamSnackbar.value = true;
       leavingTeam.value = false;
       return;
@@ -444,6 +452,7 @@
       if (!response.ok) {
         leaveTeamResult.value = result.error || t('page.team.card.myteam.leave_team_error');
         leaveTeamSnackbar.value = true;
+        leavingTeam.value = false;
         throw new Error(result.error || 'Failed to leave team');
       }
       // Ensure result.data exists before trying to access result.data.left
@@ -452,16 +461,22 @@
         leaveTeamSnackbar.value = true;
         return;
       }
-      leaveTeamResult.value = isTeamOwner.value
-        ? t('page.team.card.myteam.disband_team_success')
-        : t('page.team.card.myteam.leave_team_success');
+      leaveTeamResult.value = t('page.team.card.myteam.leave_team_success');
       leaveTeamSnackbar.value = true;
-    } catch (error) {
-      if (!leaveTeamResult.value) {
-        leaveTeamResult.value = t('page.team.card.myteam.leave_team_error');
-        leaveTeamSnackbar.value = true;
+      // Reset the local display name as the user is no longer in a team
+      // This check ensures we only reset if they had a team-specific name
+      if (tarkovStore.displayName.startsWith('User ')) {
+        tarkovStore.setDisplayName(tarkovStore.getDefaultDisplayName());
+        console.log(
+          '[MyTeam] Left team, reset display name to default:',
+          tarkovStore.getDefaultDisplayName()
+        );
       }
-      console.error(error);
+    } catch (error) {
+      console.error('[MyTeam] Error leaving team:', error);
+      leaveTeamResult.value =
+        error.message || t('page.team.card.myteam.leave_team_error_unexpected');
+      leaveTeamSnackbar.value = true;
     }
     leavingTeam.value = false;
   };
@@ -473,25 +488,27 @@
     }
   };
   const teamUrl = computed(() => {
-    const teamIdForUrl = systemStore.$state.team; // Correct: Use the team ID from the system store
-    const passwordForUrl = teamStore.$state.password; // Correct: Use the password from the team store
+    const teamIdForUrl = systemStore.$state.team;
+    const passwordForUrl = teamStore.$state.password;
     console.debug(
-      '[Invite Debug - MyTeam.vue] Generating teamUrl. teamIdForUrl (from systemStore.$state.team):',
+      '[Invite Debug - MyTeam.vue] Generating teamUrl. ' +
+        'teamIdForUrl (from systemStore.$state.team):',
       teamIdForUrl,
       'passwordForUrl (from teamStore.$state.password):',
       passwordForUrl
     );
     if (!teamIdForUrl || !passwordForUrl) {
       console.warn(
-        '[Invite Debug - MyTeam.vue] Missing teamIdForUrl or passwordForUrl when generating invite URL:',
+        '[MyTeam.vue] Missing teamIdForUrl or passwordForUrl when generating invite URL:',
         teamIdForUrl,
         passwordForUrl
       );
     }
     if (teamIdForUrl && passwordForUrl) {
-      return `${window.location.href.split('?')[0]}?team=${encodeURIComponent(
-        teamIdForUrl
-      )}&code=${encodeURIComponent(passwordForUrl)}`;
+      const baseUrl = window.location.href.split('?')[0];
+      const teamParam = `team=${encodeURIComponent(teamIdForUrl)}`;
+      const codeParam = `code=${encodeURIComponent(passwordForUrl)}`;
+      return `${baseUrl}?${teamParam}&${codeParam}`;
     } else {
       return '';
     }
@@ -505,6 +522,15 @@
     }
   });
   const tarkovStore = useTarkovStore();
+  // If the user changes their tarkov display name, we need to update it in the team store
+  watch(
+    () => tarkovStore.getDisplayName,
+    (newDisplayName) => {
+      if (isTeamOwner.value && newDisplayName !== teamStore.getOwnerDisplayName) {
+        teamStore.setOwnerDisplayName(newDisplayName);
+      }
+    }
+  );
   const displayName = computed({
     get() {
       // Directly access the state property

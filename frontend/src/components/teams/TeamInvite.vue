@@ -38,7 +38,7 @@
   import { computed, ref } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import { useI18n } from 'vue-i18n';
-  import { auth } from '@/plugins/firebase.ts';
+  import { auth } from '@/plugins/firebase';
   import { useLiveData } from '@/composables/livedata';
   const router = useRouter();
   const { useSystemStore } = useLiveData();
@@ -100,7 +100,7 @@
             accepting.value = false;
             return;
           }
-        } catch (error) {
+        } catch {
           joinResult.value = t('page.team.card.teaminvite.leave_error');
           joinTeamSnackbar.value = true;
           accepting.value = false;
@@ -152,19 +152,18 @@
         joinResult.value = t('page.team.card.teaminvite.join_success');
         joinTeamSnackbar.value = true;
         accepting.value = false;
-        // Get rid of the invite code from the URL by navigating to the team page with no query/params
         router.push({ name: 'team' });
-      } catch (error) {
+      } catch (_error) {
         console.error(
-          '[Invite Debug] Error during fetch or JSON parsing for joinTeam:',
-          error,
-          JSON.stringify(error, Object.getOwnPropertyNames(error))
+          '[Invite Debug] Error joining team:',
+          _error,
+          JSON.stringify(_error, Object.getOwnPropertyNames(_error))
         );
         joinResult.value = t('page.team.card.teaminvite.join_error');
         joinTeamSnackbar.value = true;
         accepting.value = false;
       }
-    } catch (error) {
+    } catch {
       joinResult.value = t('page.team.card.teaminvite.join_error');
       joinTeamSnackbar.value = true;
       accepting.value = false;
