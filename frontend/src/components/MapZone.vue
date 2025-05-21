@@ -19,8 +19,8 @@
 <script setup>
   import { computed, defineAsyncComponent, ref } from 'vue';
   import { useTarkovData } from '@/composables/tarkovdata';
-  const TaskObjective = defineAsyncComponent(() => import('@/components/tasks/TaskObjective.vue'));
-  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink.vue'));
+  const TaskObjective = defineAsyncComponent(() => import('@/components/tasks/TaskObjective'));
+  const TaskLink = defineAsyncComponent(() => import('@/components/tasks/TaskLink'));
   const { objectives, tasks } = useTarkovData();
   const props = defineProps({
     mark: {

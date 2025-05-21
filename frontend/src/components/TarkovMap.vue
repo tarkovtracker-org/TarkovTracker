@@ -49,30 +49,26 @@
     </v-row>
   </v-container>
 </template>
-<script setup>
-  import { ref, onMounted, defineAsyncComponent, watch } from 'vue';
+<script setup lang="ts">
+  import { ref, onMounted, watch, defineAsyncComponent, defineProps, withDefaults } from 'vue';
   import { v4 as uuidv4 } from 'uuid';
   import * as d3 from 'd3';
+
+  interface Props {
+    map: Record<string, any>;
+    marks?: Record<string, any>[];
+  }
+
   const randomMapId = ref(uuidv4());
-  const emit = defineEmits(['gpsclick']);
-  const props = defineProps({
-    map: {
-      type: Object,
-      required: true,
-    },
-    marks: {
-      type: Array,
-      required: false,
-      default: () => [],
-    },
+  const props = withDefaults(defineProps<Props>(), {
+    marks: () => [],
   });
   const MapMarker = defineAsyncComponent(() => import('@/components/MapMarker.vue'));
   const MapZone = defineAsyncComponent(() => import('@/components/MapZone.vue'));
-  // selectedFloor is a ref which defaults to the last item in the floors array, or null if unavailable
-  const selectedFloor = ref(
-    props.map?.svg?.floors?.[props.map.svg.floors.length - 1] ?? null // Use optional chaining and nullish coalescing
-  );
-  const setFloor = (floor) => {
+  const selectedFloor = ref<
+    string | undefined // Changed from string | null
+  >(props.map?.svg?.floors?.[props.map.svg.floors.length - 1] ?? undefined);
+  const setFloor = (floor: string) => {
     selectedFloor.value = floor;
     draw();
   };
@@ -81,7 +77,8 @@
     (newMap) => {
       draw();
       // Safely update selectedFloor only if floors exist
-      selectedFloor.value = newMap?.svg?.floors?.[newMap.svg.floors.length - 1] ?? null;
+      const floors = newMap?.svg?.floors;
+      selectedFloor.value = floors?.[floors.length - 1] ?? undefined; // Changed from null
     }
   );
   const draw = async () => {
@@ -93,19 +90,22 @@
       return;
     }
     const svg = await d3.svg(
-      `https://tarkovtracker.github.io/tarkovdata/maps/${props.map.svg.file}`
+      `https://tarkovtracker.github.io/tarkovdata/maps/` + `${props.map.svg.file}`
     );
-    d3.select(document.getElementById(randomMapId.value)).selectAll('svg').remove();
-    d3.select(document.getElementById(randomMapId.value)).node().appendChild(svg.documentElement);
-    d3.select(document.getElementById(randomMapId.value)).select('svg').style('width', '100%');
-    d3.select(document.getElementById(randomMapId.value)).select('svg').style('height', '100%');
+    const mapContainer = document.getElementById(randomMapId.value);
+    if (mapContainer) {
+      d3.select(mapContainer).selectAll('svg').remove();
+      mapContainer.appendChild(svg.documentElement);
+      d3.select(mapContainer).select('svg').style('width', '100%');
+      d3.select(mapContainer).select('svg').style('height', '100%');
+    }
     // Calculate the index of the selected floor - Add safety check
     const floors = props.map?.svg?.floors;
     if (selectedFloor.value && floors && floors.length > 0) {
       const selectedFloorIndex = floors.indexOf(selectedFloor.value);
       if (selectedFloorIndex !== -1) {
         // Ensure floor exists in the array
-        floors.forEach((floor, index) => {
+        floors.forEach((floor: string, index: number) => {
           if (index > selectedFloorIndex) {
             d3.select(document.getElementById(randomMapId.value))
               .select('svg')

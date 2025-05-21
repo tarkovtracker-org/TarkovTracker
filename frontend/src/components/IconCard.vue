@@ -16,7 +16,6 @@
   </v-sheet>
 </template>
 <script setup>
-  // eslint-disable-next-line no-unused-vars
   const props = defineProps({
     icon: {
       type: String,

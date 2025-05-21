@@ -1,9 +1,9 @@
 <template>
-  <v-container v-if="userStore.showTip(props.tip)" class="mb-0 pb-0">
+  <v-container v-if="userStore.showTip(tipKey)" class="mb-0 pb-0">
     <v-row justify="center">
       <v-col cols="12" md="10" lg="8" xl="6">
         <v-alert :color="props.color" theme="dark" :icon="props.icon" border prominent>
-          {{ t('tips.' + props.tip + '.description') }}
+          {{ t('tips.' + tipKey + '.description') }}
           <v-container class="align-right pa-0 pt-2" fluid>
             <v-btn
               variant="tonal"
@@ -19,9 +19,10 @@
     </v-row>
   </v-container>
 </template>
-<script setup>
+<script setup lang="ts">
   import { useUserStore } from '@/stores/user';
   import { useI18n } from 'vue-i18n';
+
   const { t } = useI18n({ useScope: 'global' });
   const props = defineProps({
     icon: {
@@ -40,14 +41,26 @@
       required: false,
     },
     tip: {
-      type: String,
-      default: 'default',
-      required: true,
+      type: [String, Object],
+      required: false,
+      default: '',
+    },
+    closeable: {
+      type: Boolean,
+      default: true,
+      required: false,
     },
   });
   const userStore = useUserStore();
+  function getTipKey(tip: unknown): string {
+    if (typeof tip === 'string') return tip;
+    if (tip && typeof tip === 'object' && 'id' in tip && typeof (tip as any).id === 'string')
+      return (tip as any).id;
+    return '';
+  }
+  const tipKey = getTipKey(props.tip);
   const hideTip = () => {
-    userStore.hideTip(props.tip);
+    userStore.hideTip(tipKey);
   };
 </script>
 <style lang="scss" scoped></style>

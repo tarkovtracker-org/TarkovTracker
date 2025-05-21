@@ -51,35 +51,16 @@
     </v-row>
   </v-container>
 </template>
-<script setup>
-  import { computed, ref, watchEffect } from 'vue';
-  // Define the props for the component
-  const props = defineProps({
-    itemId: {
-      type: String,
-      required: true,
-    },
-    itemName: {
-      type: String,
-      required: false,
-      default: null,
-    },
-    devLink: {
-      type: String,
-      required: false,
-      default: null,
-    },
-    wikiLink: {
-      type: String,
-      required: false,
-      default: null,
-    },
-    count: {
-      type: Number,
-      required: false,
-      default: null,
-    },
-  });
+<script setup lang="ts">
+  import { ref, watch } from 'vue';
+
+  const props = defineProps<{
+    itemId: string;
+    itemName: string | null;
+    devLink: string | null;
+    wikiLink: string | null;
+    count: number | null;
+  }>();
   const linkHover = ref(false);
   const itemIconUrl = ref(`https://assets.tarkov.dev/${props.itemId}-icon.jpg`);
 
@@ -90,15 +71,28 @@
     }
   }
 
-  watchEffect(() => {
-    itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
-  });
+  watch(
+    () => props.itemId,
+    () => {
+      itemIconUrl.value = `https://assets.tarkov.dev/${props.itemId}-icon.jpg`;
+    }
+  );
 
   const openTarkovDevLink = () => {
-    window.open(props.devLink, '_blank');
+    if (props.devLink) {
+      window.open(props.devLink, '_blank');
+    }
   };
   const openWikiLink = () => {
-    window.open(props.wikiLink, '_blank');
+    if (props.wikiLink) {
+      window.open(props.wikiLink, '_blank');
+    }
+  };
+
+  const copyItemName = () => {
+    if (props.itemName) {
+      navigator.clipboard.writeText(props.itemName);
+    }
   };
 </script>
 <style lang="scss" scoped>
