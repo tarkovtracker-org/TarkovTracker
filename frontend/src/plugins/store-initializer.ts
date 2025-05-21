@@ -24,8 +24,8 @@ export function isInitialized(): boolean {
   return initializationStatus.initialized;
 }
 // Type for the store accessor function
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StoreAccessor<T extends StoreGeneric = StoreGeneric> = () => T | any; // Allow any for flexibility if types aren't perfect
+// Allow unknown for flexibility if types aren't perfect
+type StoreAccessor<T extends StoreGeneric = StoreGeneric> = () => T | unknown;
 export async function initializeStore<T extends StoreGeneric>(
   storeName: string,
   storeAccessor: StoreAccessor<T>
@@ -49,7 +49,7 @@ export async function initializeStore<T extends StoreGeneric>(
   initializationStatus.initializing = true;
   let storeInstance: T | null = null;
   try {
-    storeInstance = storeAccessor();
+    storeInstance = storeAccessor() as T;
     if (!storeInstance) {
       throw new Error(`Store instance for ${storeName} is null after initialization`);
     }
@@ -64,7 +64,7 @@ export async function initializeStore<T extends StoreGeneric>(
     console.error(`Error initializing store ${storeName}:`, error);
     await new Promise((resolve) => setTimeout(resolve, 500));
     try {
-      storeInstance = storeAccessor();
+      storeInstance = storeAccessor() as T;
       if (!storeInstance) {
         throw new Error(`Store instance for ${storeName} is null after retry initialization`);
       }
@@ -114,7 +114,7 @@ export function wasDataMigrated(): boolean {
     }
     try {
       return sessionStorage.getItem('tarkovDataMigrated') === 'true';
-    } catch (e) {
+    } catch {
       return false;
     }
   }

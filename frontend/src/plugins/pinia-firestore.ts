@@ -10,13 +10,8 @@ import {
 } from 'firebase/firestore';
 import { debounce, set, get } from 'lodash-es';
 import type { DebouncedFunc } from 'lodash-es';
-import type {
-  PiniaPluginContext,
-  Store,
-  StateTree,
-  SubscriptionCallbackMutation,
-  _StoreWithState,
-} from 'pinia';
+import type { PiniaPluginContext, Store, StateTree, SubscriptionCallbackMutation } from 'pinia';
+import type { StateTree as PiniaStateTree } from 'pinia';
 const db: Firestore = firestore;
 
 interface FireswapSettingInternal {
@@ -33,7 +28,8 @@ interface FireswapSettingInternal {
 }
 // Extend Pinia's options type to include our custom 'fireswap' option
 declare module 'pinia' {
-  export interface DefineStoreOptionsBase<S, Store> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  export interface DefineStoreOptionsBase<S extends PiniaStateTree, Store> {
     fireswap?: FireswapSettingInternal[];
   }
 }
@@ -45,7 +41,7 @@ interface FireswapStoreExtensions {
   fireunbindAll?: () => void;
 }
 // Helper type for store instance with extensions
-type StoreWithFireswapExt<StoreType extends Store> = StoreType & FireswapStoreExtensions;
+export type StoreWithFireswapExt<StoreType extends Store> = StoreType & FireswapStoreExtensions;
 // Helper Functions - Replace template variables in the doc path like user ID
 function parseDoc(docString: string): DocumentReference<DocumentData> {
   const uid = fireuser?.uid;
@@ -72,7 +68,7 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
           } else {
             fireswapSetting.defaultState = JSON.stringify(store.$state);
           }
-        } catch (e) {
+        } catch {
           fireswapSetting.defaultState = '{}';
         }
         fireswapSetting.loadLocal = () => {
@@ -95,7 +91,7 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
             } else {
               store.$patch(newStatePart || {});
             }
-          } catch (error) {
+          } catch {
             try {
               const defaultStateParsed = fireswapSetting.defaultState
                 ? JSON.parse(fireswapSetting.defaultState)
@@ -105,7 +101,9 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
               } else {
                 store.$patch(defaultStateParsed);
               }
-            } catch (resetError) {}
+            } catch {
+              /* Intentionally ignored */
+            }
           }
           fireswapSetting.lock = false;
         };
@@ -137,15 +135,21 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
                     const dataToStore = path !== '.' ? get(store.$state, path) : store.$state;
                     const dataString = JSON.stringify(dataToStore);
                     localStorage.setItem(fireswapSetting.localKey, dataString);
-                  } catch (lsError) {}
-                } catch (e) {}
+                  } catch {
+                    /* Intentionally ignored */
+                  }
+                } catch {
+                  /* Intentionally ignored */
+                }
                 fireswapSetting.lock = false;
               },
-              (error) => {
+              (_error) => {
                 fireswapSetting.lock = false;
               }
             );
-          } catch (error) {}
+          } catch {
+            /* Intentionally ignored */
+          }
         };
         if (!storeExt.fireunbind) storeExt.fireunbind = {};
         storeExt.fireunbind[fsIndex] = () => {
@@ -158,8 +162,7 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
         fireswapSetting.uploadDocument = debounce((currentStateSnapshot: StateTree) => {
           fireswapSetting.lock = true;
           // Ensure the 'saving' property is not part of the state to be saved.
-          const { saving, ...stateToSave } =
-            path !== '.' ? get(currentStateSnapshot, path) : currentStateSnapshot;
+          const stateToSave = path !== '.' ? get(currentStateSnapshot, path) : currentStateSnapshot;
 
           if (!Object.keys(stateToSave).length) {
             // Check if stateToSave is empty after destructuring
@@ -173,20 +176,29 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
           const stateString = JSON.stringify(stateToSave);
           try {
             localStorage.setItem(fireswapSetting.localKey, stateString);
-          } catch (lsError) {}
+          } catch {
+            /* Intentionally ignored */
+          }
           if (fireuser.loggedIn && fireuser.uid) {
             try {
               const docRef = parseDoc(fireswapSetting.document);
               setDoc(docRef, stateToSave, { merge: true })
-                .then(() => {})
-                .catch((error) => {})
+                .then(() => {
+                  /* Intentionally ignored */
+                })
+                .catch(() => {
+                  /* Intentionally ignored */
+                })
                 .finally(() => {
                   fireswapSetting.lock = false;
                   if (store.saving && typeof store.saving === 'object') {
                     Object.keys(store.saving).forEach((k) => (store.saving[k] = false));
                   }
                 });
-            } catch (error) {
+            } catch {
+              /* Intentionally ignored: This is for parseDoc errors */
+              // CRITICAL: If parseDoc fails, .finally() of setDoc is NOT called.
+              // We need to reset lock and saving flags here.
               fireswapSetting.lock = false;
               if (store.saving && typeof store.saving === 'object') {
                 Object.keys(store.saving).forEach((k) => (store.saving[k] = false));
@@ -213,7 +225,6 @@ export function PiniaFireswap(context: PiniaPluginContext): void {
           },
           { detached: true, deep: true }
         );
-      } else {
       }
     });
     storeExt.firebindAll = () => {

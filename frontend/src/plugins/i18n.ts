@@ -8,7 +8,8 @@ import {
   ru as vuetifyRu,
   uk as vuetifyUk,
 } from 'vuetify/locale';
-// Assume messages are structured appropriately, potentially needing manual type def if library doesn't provide
+// Assume messages are structured appropriately,
+// potentially needing manual type def if library doesn't provide
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - Assuming messages are untyped or need specific setup
 import messages from '@intlify/unplugin-vue-i18n/messages';
@@ -43,7 +44,13 @@ for (const [locale, vuetifyLocale] of Object.entries(vuetifyLocales)) {
   }
 }
 // Explicitly type the i18n instance
-const i18n: I18n<{}, {}, {}, string, false> = createI18n({
+const i18n: I18n<
+  AppMessages,
+  Record<string, never>,
+  Record<string, never>,
+  string,
+  false
+> = createI18n({
   legacy: false,
   globalInjection: true, // Enable global injection for $t
   locale: languageCode, // Use detected language code
