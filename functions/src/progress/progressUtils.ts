@@ -411,7 +411,8 @@ const _updateAlternativeTasks = (
       progressUpdate[`tasks.${altTaskId}.cAt`] = updateTime;
     } else if (newState !== 'failed') {
       // Current task is NOT FAILED (i.e., it's active or was un-completed from completed)
-      // Mark alternative as active and remove any 'failed' status that might have been set due to this task's prior completion.
+      // Mark alternative as active
+      // and remove any 'failed' status that might have been set due to this task's prior completion.
       progressUpdate[`tasks.${altTaskId}.st`] = 'uncompleted'; // Set to active (unlocked)
       progressUpdate[`tasks.${altTaskId}.failed`] = FieldValue.delete(); // Remove the 'failed' flag
       progressUpdate[`tasks.${altTaskId}.cAt`] = updateTime;
