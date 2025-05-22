@@ -365,9 +365,9 @@ const setPlayerLevel = async (req: AuthenticatedRequest, res: Response): Promise
 
 /**
  * @openapi
- * /api/v2/progress/task/{taskId}:
+ * /progress/task/{taskId}:
  *   post:
- *     summary: "Update task progress"
+ *     summary: "Update the progress state of a single task."
  *     tags:
  *       - "Progress"
  *     description: "Update the progress state of a single task."
@@ -608,7 +608,7 @@ const updateMultipleTasks = async (req: AuthenticatedRequest, res: Response): Pr
 
 /**
  * @openapi
- * /api/v2/progress/task/objective/{objectiveId}:
+ * /progress/task/objective/{objectiveId}:
  *   post:
  *     summary: "Update objective progress for a task."
  *     tags:
