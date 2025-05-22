@@ -53,7 +53,7 @@ interface ProgressDocData {
 }
 
 interface TaskProgressData {
-  st?: number; // Status
+  st?: string; // Status
   obj?: { [objectiveId: string]: number | boolean }; // Objectives
 }
 
@@ -92,8 +92,11 @@ interface AuthenticatedRequest extends Request {
 }
 
 // --- Helper Type Check Functions ---
-function isValidTaskStatus(status: unknown): status is number {
-  return typeof status === 'number' && [0, 1, 2, 3].includes(status);
+function isValidTaskStatus(status: unknown): status is string {
+  return (
+    typeof status === 'string' &&
+    (status === 'uncompleted' || status === 'completed' || status === 'failed')
+  );
 }
 
 // --- Handler Functions ---
@@ -412,37 +415,16 @@ const updateSingleTask = async (req: AuthenticatedRequest, res: Response): Promi
       .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>;
     const taskId: string = req.params.taskId;
-    const rawBodyState = req.body.state; // Read req.body.state instead of req.body.status
-    let numericState: number | undefined;
-
-    if (typeof rawBodyState === 'string') {
-      switch (rawBodyState.toLowerCase()) {
-        case 'completed':
-          numericState = 2;
-          break;
-        case 'failed':
-          numericState = 3;
-          break;
-        case 'uncompleted': // This corresponds to 'started' or 'active'
-          numericState = 1;
-          break;
-        default:
-          // If the string is not recognized, numericState remains undefined
-          // and will fail the isValidTaskStatus check later.
-          break;
-      }
-    } else if (typeof rawBodyState === 'number') {
-      numericState = rawBodyState;
-    }
+    const state = req.body.state;
 
     if (!taskId) {
       res.status(400).send({ error: 'Task ID is required.' });
       return;
     }
-    // Validate the converted numericState
-    if (!isValidTaskStatus(numericState)) {
+    // Validate the string state
+    if (!isValidTaskStatus(state)) {
       res.status(400).send({
-        error: "Invalid state provided should be 'completed', 'failed', or 'uncompleted'.",
+        error: "Invalid state provided. Should be 'completed', 'failed', or 'uncompleted'.",
       });
       return;
     }
@@ -454,7 +436,7 @@ const updateSingleTask = async (req: AuthenticatedRequest, res: Response): Promi
       // Use dot notation for specific field update
       updateData[`tasks.${taskId}`] = {
         ...existingTaskData, // Preserve existing fields (like objectives)
-        st: numericState, // Use the converted numeric state
+        st: state, // Use the string state directly
       };
       await progressRef.update(updateData);
       // Implement task dependency updates using updateTaskState
@@ -462,14 +444,14 @@ const updateSingleTask = async (req: AuthenticatedRequest, res: Response): Promi
         const { getTaskData } = await import('../utils/dataLoaders.js');
         const taskData = await getTaskData();
         // Use the top-level imported updateTaskState instead of dynamic import
-        await updateTaskState(taskId, numericState, ownerId, taskData);
+        await updateTaskState(taskId, state, ownerId, taskData);
       } catch (error) {
         // Log error but don't fail the request if dependency updates fail
         functions.logger.error('Error updating task dependencies:', {
           error: error instanceof Error ? error.message : String(error),
           userId: ownerId,
           taskId,
-          numericState,
+          state,
         });
       }
       res.status(200).send({ message: 'Task updated successfully.' });
@@ -478,7 +460,7 @@ const updateSingleTask = async (req: AuthenticatedRequest, res: Response): Promi
         error: error instanceof Error ? error.message : String(error),
         userId: ownerId,
         taskId: taskId,
-        status: numericState, // Log the numeric state
+        state, // Log the string state
       });
       res.status(500).send({ error: 'Failed to update task.' });
     }
@@ -525,7 +507,7 @@ const updateMultipleTasks = async (req: AuthenticatedRequest, res: Response): Pr
     const progressRef: DocumentReference<ProgressDocData> = db
       .collection('progress')
       .doc(ownerId) as DocumentReference<ProgressDocData>;
-    const taskUpdates: { [taskId: string]: number } = req.body;
+    const taskUpdates: { [taskId: string]: string } = req.body;
     if (
       typeof taskUpdates !== 'object' ||
       taskUpdates === null ||
@@ -551,8 +533,6 @@ const updateMultipleTasks = async (req: AuthenticatedRequest, res: Response): Pr
               taskId: taskId,
               status: status,
             });
-            // Decide whether to fail the whole batch or just skip invalid ones
-            // For now, fail the whole batch
             break;
           }
           const existingTaskData = existingTasksData[taskId] ?? {};
@@ -570,10 +550,8 @@ const updateMultipleTasks = async (req: AuthenticatedRequest, res: Response): Pr
               try {
                 const { getTaskData } = await import('../utils/dataLoaders.js');
                 const taskData = await getTaskData();
-                // Use the top-level imported updateTaskState instead of dynamic import
                 await updateTaskState(taskId, status, ownerId, taskData);
               } catch (error) {
-                // Log error but continue with other updates
                 functions.logger.error('Error updating task dependencies in batch:', {
                   error: error instanceof Error ? error.message : String(error),
                   userId: ownerId,
