@@ -16,6 +16,7 @@ interface ObjectiveItem {
 interface RawObjectiveData {
   [key: string]: {
     complete?: boolean;
+    st?: number; // Status for tasks
     count?: number;
     invalid?: boolean;
     failed?: boolean;
@@ -89,20 +90,45 @@ const formatObjective = (
 ): ObjectiveItem[] => {
   const processedObjectives: ObjectiveItem[] = [];
   if (!objectiveData) return processedObjectives;
-  for (const [objectiveKey, objective] of Object.entries(objectiveData)) {
+
+  for (const [objectiveKey, objectiveValue] of Object.entries(objectiveData)) {
+    let isComplete = false;
+    let isFailed = objectiveValue?.failed ?? false; // Default based on an explicit 'failed' field
+
+    // Check if this item uses 'st' field (likely a task)
+    if (typeof objectiveValue?.st === 'number') {
+      isComplete = objectiveValue.st === 2; // 2 indicates 'completed'
+      isFailed = objectiveValue.st === 3 || isFailed; // 3 indicates 'failed', or keep existing 'failed' status
+    } else if (typeof objectiveValue?.complete === 'boolean') {
+      // Otherwise, use the 'complete' boolean field (likely for objectives, hideout items)
+      isComplete = objectiveValue.complete;
+    }
+
     const newObjective: ObjectiveItem = {
       id: objectiveKey,
-      complete: objective?.complete ?? false,
+      complete: isComplete,
     };
-    if (showCount) {
-      newObjective.count = objective?.count ?? 0;
+
+    if (showCount && typeof objectiveValue?.count === 'number') {
+      newObjective.count = objectiveValue.count;
     }
-    if (showInvalid) {
-      newObjective.invalid = objective?.invalid ?? false;
+
+    // Apply invalid status if requested and present
+    if (showInvalid && typeof objectiveValue?.invalid === 'boolean') {
+      newObjective.invalid = objectiveValue.invalid;
     }
-    if (objective?.failed) {
-      newObjective.failed = objective.failed;
+
+    // Set the failed status
+    if (isFailed) {
+      newObjective.failed = true;
     }
+
+    // Ensure 'invalid' items are not marked 'complete'
+    // This reinforces logic that might also be in `invalidateTaskRecursive`
+    if (newObjective.invalid) {
+      newObjective.complete = false;
+    }
+
     processedObjectives.push(newObjective);
   }
   return processedObjectives;
