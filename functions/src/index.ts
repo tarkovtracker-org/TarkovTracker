@@ -321,21 +321,21 @@ async function _createTeamLogic(
         const teamId = await uidgen.generate();
         logger.log('[createTeam] Generated teamId', { teamId });
         let teamPassword = data.password;
-        logger.log('[createTeam] DEBUG PASVVOORD: Initial teamPassword from data (data.password):');
+        logger.log('[createTeam] DEBUG: Initial teamPassword from data (data.password):');
         logger.log(data.password === undefined ? 'undefined' : data.password);
         if (!teamPassword) {
-          logger.log('[createTeam] DEBUG PASVVOORD: No client password, generating one...');
+          logger.log('[createTeam] DEBUG: No client password, generating one...');
           try {
             const passGen = new UIDGenerator(48, UIDGenerator.BASE62);
             const generatedPass = await passGen.generate();
-            logger.log('[createTeam] DEBUG PASVVOORD: Raw generatedPass:');
+            logger.log('[createTeam] DEBUG: Raw generatedPass:');
             logger.log(generatedPass === undefined ? 'undefined' : generatedPass);
             if (generatedPass && generatedPass.length >= 4) {
               teamPassword = generatedPass;
-              logger.log('[createTeam] DEBUG PASVVOORD: Using generated password (masked): ****');
+              logger.log('[createTeam] DEBUG: Using generated password (masked): ****');
             } else {
               logger.warn(
-                '[createTeam] DEBUG PASVVOORD: Generated password was short or falsy. Raw:',
+                '[createTeam] DEBUG: Generated password was short or falsy. Raw:',
                 generatedPass,
                 'Using fallback: DEBUG_PASS_123'
               );
@@ -343,17 +343,17 @@ async function _createTeamLogic(
             }
           } catch (genError) {
             logger.error(
-              '[createTeam] DEBUG PASVVOORD: Error during password generation:',
+              '[createTeam] DEBUG: Error during password generation:',
               genError
             );
             teamPassword = 'ERROR_PASS_456';
           }
         } else {
-          logger.log('[createTeam] DEBUG PASVVOORD: Using client-provided password (masked): ****');
+          logger.log('[createTeam] DEBUG: Using client-provided password (masked): ****');
         }
         finalTeamPassword = teamPassword;
         logger.log(
-          '[createTeam] DEBUG PASVVOORD: Final teamPassword before set (masked):',
+          '[createTeam] DEBUG: Final teamPassword before set (masked):',
           teamPassword ? '****' : '(IT IS FALSY)',
           'Actual value for Firestore:',
           teamPassword
