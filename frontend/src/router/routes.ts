@@ -55,18 +55,6 @@ const routes: RouteRecordRaw[] = [
         meta: { background: 'busstation' },
         component: () => import('@/pages/TeamManagement.vue'),
       },
-      {
-        name: 'taskeditor',
-        path: '/taskeditor',
-        meta: {},
-        component: () => import('@/pages/TaskEditor.vue'),
-      },
-      {
-        name: 'usertester',
-        path: '/usertester',
-        meta: {},
-        component: () => import('@/pages/UserTester.vue'),
-      },
     ],
   },
 ];
