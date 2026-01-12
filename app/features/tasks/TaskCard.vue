@@ -404,6 +404,14 @@
           "
         />
         <ContextMenuItem
+          icon="i-mdi-alert-circle-outline"
+          :label="t('page.tasks.questcard.reportDataIssue', 'Report data issue')"
+          @click="
+            openTaskDataIssue();
+            close();
+          "
+        />
+        <ContextMenuItem
           v-if="task.wikiLink"
           icon="/img/logos/wikilogo.webp"
           :label="t('page.tasks.questcard.viewTaskOnWiki', 'View task on Wiki')"
@@ -788,5 +796,37 @@
     if (props.task.wikiLink) {
       window.open(props.task.wikiLink, '_blank');
     }
+  };
+  // Builds the data issue report URL with prefilled query params for the issue form.
+  const getTaskDataIssueUrl = () => {
+    const title = `${props.task.name} (${props.task.id})`;
+    const objectiveIds = taskObjectives.value.map((objective) => objective.id).filter(Boolean);
+    const minLevel = props.task.minPlayerLevel ?? 0;
+    const playerLevel = tarkovStore.playerLevel();
+    const gameMode = tarkovStore.getCurrentGameMode().toUpperCase();
+    const descriptionLines = [
+      `Task Name: ${props.task.name}`,
+      `Task ID: ${props.task.id}`,
+      objectiveIds.length ? `Objective IDs: ${objectiveIds.join(', ')}` : '',
+      minLevel > 0 ? `Task Req Level: ${minLevel}` : '',
+      `Dev Link: https://tarkov.dev/task/${props.task.id}`,
+      playerLevel > 0 ? `\nUSER LEVEL: ${playerLevel}` : '',
+      `USER MODE: ${gameMode}`,
+    ].filter(Boolean);
+    // Prompt + padding so the form opens with a clear place to start typing.
+    const description = `>--Describe issue here--<\n\n\n${descriptionLines.join('\n')}`;
+    const params = new URLSearchParams({
+      title,
+      category: 'Overlay - Quests',
+      description,
+    });
+    if (props.task.wikiLink) {
+      params.set('reference', props.task.wikiLink);
+    }
+    return `https://issue.tarkovtracker.org/data?${params.toString()}`;
+  };
+  // Opens the data issue form in a new tab using the prefilled report URL.
+  const openTaskDataIssue = () => {
+    window.open(getTaskDataIssueUrl(), '_blank');
   };
 </script>
