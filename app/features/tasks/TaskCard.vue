@@ -388,35 +388,43 @@
     <ContextMenu ref="taskContextMenu">
       <template #default="{ close }">
         <ContextMenuItem
-          icon="i-mdi-content-copy"
-          :label="t('page.tasks.questcard.copyTaskId', 'Copy task ID')"
+          v-if="task.wikiLink"
+          icon="/img/logos/wikilogo.webp"
+          :label="t('page.tasks.questcard.viewTaskOnWiki', 'View on Wiki')"
           @click="
-            copyTaskId();
+            openTaskWiki();
+            close();
+          "
+        />
+        <ContextMenuItem
+          icon="/img/logos/tarkovdevlogo.webp"
+          :label="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')"
+          @click="
+            openTaskOnTarkovDev();
             close();
           "
         />
         <ContextMenuItem
           icon="i-mdi-link-variant"
-          :label="t('page.tasks.questcard.copyTaskLink', 'Copy task link')"
+          :label="t('page.tasks.questcard.copyTaskLink', 'Copy Task Link')"
           @click="
             copyTaskLink();
             close();
           "
         />
         <ContextMenuItem
-          icon="i-mdi-alert-circle-outline"
-          :label="t('page.tasks.questcard.reportDataIssue', 'Report data issue')"
+          icon="i-mdi-content-copy"
+          :label="t('page.tasks.questcard.copyTaskId', 'Copy Task ID')"
           @click="
-            openTaskDataIssue();
+            copyTaskId();
             close();
           "
         />
         <ContextMenuItem
-          v-if="task.wikiLink"
-          icon="/img/logos/wikilogo.webp"
-          :label="t('page.tasks.questcard.viewTaskOnWiki', 'View task on Wiki')"
+          icon="i-mdi-alert-circle-outline"
+          :label="t('page.tasks.questcard.reportDataIssue', 'Report Data Issue')"
           @click="
-            openTaskWiki();
+            openTaskDataIssue();
             close();
           "
         />
@@ -436,7 +444,7 @@
       <template #default="{ close }">
         <ContextMenuItem
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="t('page.tasks.questcard.viewOnTarkovDev', 'View on tarkov.dev')"
+          :label="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')"
           @click="
             openItemOnTarkovDev();
             close();
@@ -796,6 +804,9 @@
     if (props.task.wikiLink) {
       window.open(props.task.wikiLink, '_blank');
     }
+  };
+  const openTaskOnTarkovDev = () => {
+    window.open(tarkovDevTaskUrl.value, '_blank');
   };
   // Builds the data issue report URL with prefilled query params for the issue form.
   const getTaskDataIssueUrl = () => {
