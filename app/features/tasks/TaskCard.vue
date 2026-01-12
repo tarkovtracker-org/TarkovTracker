@@ -102,12 +102,19 @@
               {{ t('page.tasks.questcard.levelBadge', { count: task.minPlayerLevel }) }}
             </UBadge>
           </AppTooltip>
-          <AppTooltip :text="task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')">
+          <AppTooltip
+            :text="
+              isGlobalTask
+                ? t('page.tasks.questcard.globalTaskTooltip', 'This task can be completed on any map')
+                : task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')
+            "
+          >
             <UBadge
               size="xs"
-              color="neutral"
+              :color="isGlobalTask ? 'info' : 'neutral'"
               variant="soft"
               class="inline-flex max-w-40 items-center gap-1 text-[11px]"
+              :class="isGlobalTask ? 'border border-info-500/30' : ''"
             >
               <UIcon
                 :name="task?.map?.name ? 'i-mdi-map-marker' : 'i-mdi-earth'"
@@ -115,7 +122,11 @@
                 class="h-3 w-3"
               />
               <span class="truncate">
-                {{ task?.map?.name || t('page.tasks.questcard.anyMap', 'Any') }}
+                {{
+                  isGlobalTask
+                    ? t('page.tasks.questcard.globalTask', 'Any Map')
+                    : task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')
+                }}
               </span>
             </UBadge>
           </AppTooltip>
@@ -675,6 +686,10 @@
     return 'available';
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
+  // Check if this task is marked as a global task (shown in map view without specific map)
+  const isGlobalTask = computed(
+    () => (props.task as Task & { _isGlobalTask?: boolean })._isGlobalTask === true
+  );
   // Get objectives from props or fall back to store when props are stale
   // This handles the case where visibleTasks holds old task objects after objectives merge
   const taskObjectives = computed(() => {

@@ -245,7 +245,7 @@
     <!-- Map selector (shown when MAPS is selected) - Horizontal scrollable -->
     <div v-if="primaryView === 'maps' && maps.length > 0" class="w-full overflow-x-auto">
       <div
-        class="flex w-max min-w-full justify-center gap-1 rounded-lg bg-[hsl(240,5%,5%)] px-4 py-2.5"
+        class="flex w-max min-w-full items-center justify-center gap-1 rounded-lg bg-[hsl(240,5%,5%)] px-4 py-2.5"
       >
         <button
           v-for="mapOption in mapOptions"
@@ -272,6 +272,27 @@
             {{ mapOption.count ?? 0 }}
           </span>
         </button>
+        <!-- Divider -->
+        <div class="mx-2 h-6 w-px shrink-0 bg-white/20" />
+        <!-- Global Tasks Toggle -->
+        <UButton
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          :aria-pressed="showGlobalTasks"
+          :title="
+            showGlobalTasks
+              ? t('page.tasks.filters.hide_global_tasks', 'Hide global tasks on map view')
+              : t('page.tasks.filters.show_global_tasks', 'Show global tasks on map view')
+          "
+          :class="showGlobalTasks ? 'bg-white/10 text-white' : 'text-gray-400'"
+          @click="toggleGlobalTasks"
+        >
+          <UIcon name="i-mdi-earth" class="h-4 w-4 sm:mr-1" />
+          <span class="hidden text-xs sm:inline">
+            {{ t('page.tasks.show_global_tasks', 'Show Global Tasks').toUpperCase() }}
+          </span>
+        </UButton>
       </div>
     </div>
     <!-- Trader selector (shown when TRADERS is selected) - Horizontal scrollable -->
@@ -513,5 +534,10 @@
     if (selected?.value) {
       preferencesStore.setTaskUserView(selected.value);
     }
+  };
+  // Global tasks toggle
+  const showGlobalTasks = computed(() => !preferencesStore.getHideGlobalTasks);
+  const toggleGlobalTasks = () => {
+    preferencesStore.setHideGlobalTasks(!preferencesStore.getHideGlobalTasks);
   };
 </script>
