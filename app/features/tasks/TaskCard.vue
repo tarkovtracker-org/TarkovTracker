@@ -117,7 +117,7 @@
               :class="isGlobalTask ? 'border border-info-500/30' : ''"
             >
               <UIcon
-                :name="task?.map?.name ? 'i-mdi-map-marker' : 'i-mdi-earth'"
+                :name="isGlobalTask || !task?.map?.name ? 'i-mdi-earth' : 'i-mdi-map-marker'"
                 aria-hidden="true"
                 class="h-3 w-3"
               />

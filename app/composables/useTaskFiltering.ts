@@ -94,6 +94,7 @@ export function useTaskFiltering() {
   const isGlobalRaidTask = (task: Task): boolean => {
     return isGlobalTask(task) && (task.objectives?.some(isRaidRelevantObjective) ?? false);
   };
+
   /**
    * Filter tasks by primary view (all, maps, traders)
    */

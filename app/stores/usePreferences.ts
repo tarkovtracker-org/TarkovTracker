@@ -36,7 +36,6 @@ export interface PreferencesState {
   neededItemsKappaOnly: boolean;
   itemsHideNonFIR: boolean;
   hideGlobalTasks: boolean;
-  globalTasksRaidRelevantOnly: boolean;
   hideNonKappaTasks: boolean;
   neededitemsStyle: string | null;
   hideoutPrimaryView?: string | null;
@@ -92,7 +91,6 @@ export const preferencesDefaultState: PreferencesState = {
   neededItemsKappaOnly: false,
   itemsHideNonFIR: false,
   hideGlobalTasks: false,
-  globalTasksRaidRelevantOnly: true,
   hideNonKappaTasks: false,
   neededitemsStyle: null,
   hideoutPrimaryView: null,
@@ -223,9 +221,6 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     getHideGlobalTasks: (state) => {
       return state.hideGlobalTasks ?? false;
-    },
-    getGlobalTasksRaidRelevantOnly: (state) => {
-      return state.globalTasksRaidRelevantOnly ?? true;
     },
     getHideNonKappaTasks: (state) => {
       return state.hideNonKappaTasks ?? false;
@@ -372,9 +367,6 @@ export const usePreferencesStore = defineStore('preferences', {
       this.saving = this.saving ?? { ...initialSavingState };
       this.saving.hideGlobalTasks = true;
     },
-    setGlobalTasksRaidRelevantOnly(raidOnly: boolean) {
-      this.globalTasksRaidRelevantOnly = raidOnly;
-    },
     setHideNonKappaTasks(hide: boolean) {
       this.hideNonKappaTasks = hide;
       // Persistence handled automatically by plugin
@@ -467,7 +459,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'neededItemsKappaOnly',
       'itemsHideNonFIR',
       'hideGlobalTasks',
-      'globalTasksRaidRelevantOnly',
       'hideNonKappaTasks',
       'neededitemsStyle',
       'hideoutPrimaryView',
@@ -582,7 +573,6 @@ if (shouldInitPreferencesWatchers) {
                       needed_items_kappa_only: preferencesState.neededItemsKappaOnly,
                       items_hide_non_fir: preferencesState.itemsHideNonFIR,
                       hide_global_tasks: preferencesState.hideGlobalTasks,
-                      global_tasks_raid_relevant_only: preferencesState.globalTasksRaidRelevantOnly,
                       hide_non_kappa_tasks: preferencesState.hideNonKappaTasks,
                       show_non_special_tasks: preferencesState.showNonSpecialTasks,
                       show_lightkeeper_tasks: preferencesState.showLightkeeperTasks,

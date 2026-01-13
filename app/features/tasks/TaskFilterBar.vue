@@ -1,7 +1,7 @@
 <template>
   <div class="mb-6 space-y-3">
     <!-- Top Bar: Search (left) | Primary View Tabs (center) | Settings (right) -->
-    <div class="flex items-center gap-3 rounded-lg bg-[hsl(240,5%,5%)] px-4 py-2.5">
+    <div class="flex items-center gap-3 rounded-lg bg-surface-950 px-4 py-2.5">
       <!-- Search - larger width -->
       <div class="w-56 shrink-0 sm:w-64 lg:w-72">
         <UInput
@@ -99,7 +99,7 @@
       </div>
     </div>
     <!-- Secondary filters: Status Filters + User View (centered) -->
-    <div class="flex items-center justify-center gap-3 rounded-lg bg-[hsl(240,5%,5%)] px-4 py-2.5">
+    <div class="flex items-center justify-center gap-3 rounded-lg bg-surface-950 px-4 py-2.5">
       <!-- Status filters (ALL / AVAILABLE / LOCKED / COMPLETED) -->
       <div class="flex items-center gap-1">
         <UButton
@@ -245,7 +245,7 @@
     <!-- Map selector (shown when MAPS is selected) - Horizontal scrollable -->
     <div v-if="primaryView === 'maps' && maps.length > 0" class="w-full overflow-x-auto">
       <div
-        class="flex w-max min-w-full items-center justify-center gap-1 rounded-lg bg-[hsl(240,5%,5%)] px-4 py-2.5"
+        class="flex w-max min-w-full items-center justify-center gap-1 rounded-lg bg-surface-950 px-4 py-2.5"
       >
         <button
           v-for="mapOption in mapOptions"
@@ -290,7 +290,11 @@
         >
           <UIcon name="i-mdi-earth" class="h-4 w-4 sm:mr-1" />
           <span class="hidden text-xs sm:inline">
-            {{ t('page.tasks.show_global_tasks', 'Show Global Tasks').toUpperCase() }}
+            {{
+              showGlobalTasks
+                ? t('page.tasks.hide_global_tasks', 'Hide Global Tasks').toUpperCase()
+                : t('page.tasks.show_global_tasks', 'Show Global Tasks').toUpperCase()
+            }}
           </span>
         </UButton>
       </div>
@@ -298,7 +302,7 @@
     <!-- Trader selector (shown when TRADERS is selected) - Horizontal scrollable -->
     <div v-if="primaryView === 'traders' && traders.length > 0" class="w-full overflow-x-auto">
       <div
-        class="flex w-max min-w-full justify-center gap-1 rounded-lg bg-[hsl(240,5%,5%)] px-4 py-2.5"
+        class="flex w-max min-w-full justify-center gap-1 rounded-lg bg-surface-950 px-4 py-2.5"
       >
         <button
           v-for="trader in traders"
