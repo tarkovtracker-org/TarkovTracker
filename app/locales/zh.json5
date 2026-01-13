@@ -224,7 +224,6 @@
         copyTaskId: '复制任务ID',
         copyTaskLink: '复制任务链接',
         reportDataIssue: '报告数据问题',
-        viewTaskOnWiki: '在维基查看任务',
         viewOnTarkovDev: '在 Tarkov.dev 查看',
         viewOnWiki: '在维基查看',
         showChainDetails: '显示任务链详情',

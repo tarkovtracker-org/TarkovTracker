@@ -137,7 +137,6 @@
         lockedbefore: 'Завдань до: {count}',
         lockedbehind: 'Завдань після: {count}',
         reportDataIssue: 'Повідомити про помилку даних',
-        viewTaskOnWiki: 'Відкрити завдання у вікі',
         viewOnTarkovDev: 'Відкрити на Tarkov.dev',
         viewOnWiki: 'Відкрити у вікі',
         completebutton: 'Завершено',

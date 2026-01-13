@@ -390,7 +390,7 @@
         <ContextMenuItem
           v-if="task.wikiLink"
           icon="/img/logos/wikilogo.webp"
-          :label="t('page.tasks.questcard.viewTaskOnWiki', 'View on Wiki')"
+          :label="t('page.tasks.questcard.viewOnWiki', 'View on Wiki')"
           @click="
             openTaskWiki();
             close();

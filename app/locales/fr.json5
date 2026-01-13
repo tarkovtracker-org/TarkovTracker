@@ -137,7 +137,6 @@
         lockedbefore: 'Quêtes avant : {count}',
         lockedbehind: 'Quêtes après : {count}',
         reportDataIssue: 'Signaler un problème de données',
-        viewTaskOnWiki: 'Voir la quête sur le wiki',
         viewOnTarkovDev: 'Voir sur Tarkov.dev',
         viewOnWiki: 'Voir sur le wiki',
         completebutton: 'Terminer',

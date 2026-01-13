@@ -166,7 +166,6 @@
         copyTaskId: 'Aufgaben-ID kopieren',
         copyTaskLink: 'Aufgaben-Link kopieren',
         reportDataIssue: 'Datenproblem melden',
-        viewTaskOnWiki: 'Aufgabe im Wiki ansehen',
         viewOnTarkovDev: 'Auf Tarkov.dev ansehen',
         viewOnWiki: 'Im Wiki ansehen',
         showChainDetails: 'Kettendetails anzeigen',
