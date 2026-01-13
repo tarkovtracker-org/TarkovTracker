@@ -63,13 +63,13 @@
                 <img src="/img/logos/wikilogo.webp" alt="Wiki" aria-hidden="true" class="h-5 w-5" />
               </a>
             </AppTooltip>
-            <AppTooltip :text="t('page.tasks.questcard.viewOnTarkovDev', 'View on tarkov.dev')">
+            <AppTooltip :text="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')">
               <a
                 :href="tarkovDevTaskUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 inline-flex items-center justify-center rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                :aria-label="t('page.tasks.questcard.viewOnTarkovDev', 'View on tarkov.dev')"
+                :aria-label="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')"
                 @click.stop
               >
                 <img
