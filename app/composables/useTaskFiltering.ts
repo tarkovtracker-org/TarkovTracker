@@ -12,6 +12,25 @@ interface MergedMap {
   id: string;
   mergedIds?: string[];
 }
+
+/**
+ * Objective types that require being in a raid.
+ * Used to identify global tasks that are still raid-relevant for map view filtering.
+ */
+const RAID_RELEVANT_OBJECTIVE_TYPES = [
+  'shoot',
+  'extract',
+  'mark',
+  'visit',
+  'findItem',
+  'findQuestItem',
+  'giveQuestItem', // Quest items can only be obtained in raid
+  'plantItem',
+  'plantQuestItem',
+  'useItem',
+  'experience',
+];
+
 export function useTaskFiltering() {
   const progressStore = useProgressStore();
   const metadataStore = useMetadataStore();
@@ -48,27 +67,10 @@ export function useTaskFiltering() {
   ];
 
   /**
-   * Objective types that require being in a raid
-   */
-  const raidRelevantObjectiveTypes = [
-    'shoot',
-    'extract',
-    'mark',
-    'visit',
-    'findItem',
-    'findQuestItem',
-    'giveQuestItem', // Quest items can only be obtained in raid
-    'plantItem',
-    'plantQuestItem',
-    'useItem',
-    'experience',
-  ];
-
-  /**
    * Check if an objective requires being in a raid
    */
   const isRaidRelevantObjective = (obj: TaskObjective): boolean => {
-    if (raidRelevantObjectiveTypes.includes(obj.type || '')) return true;
+    if (RAID_RELEVANT_OBJECTIVE_TYPES.includes(obj.type || '')) return true;
     // giveItem with foundInRaid requirement (regular items that need FIR)
     if (obj.type === 'giveItem' && obj.foundInRaid) return true;
     return false;
@@ -154,7 +156,12 @@ export function useTaskFiltering() {
     // Always use raid-relevant filter for map view (only show tasks that require being in raid)
     if (showGlobalTasks) {
       const globalTasks = taskList.filter(isGlobalRaidTask);
-      // Mark global tasks with _isGlobalTask flag for visual distinction
+      // Clone global tasks with _isGlobalTask flag for visual distinction in consumers.
+      // We create new objects here because Task type doesn't include this internal flag,
+      // and consumers (e.g., TaskCard.vue) use it to show a "global task" indicator.
+      // Consumers access it via type assertion: (task as Task & { _isGlobalTask?: boolean }).
+      // Alternative: consumers could call isGlobalRaidTask(task) directly, but this flag
+      // avoids redundant recomputation when iterating the filtered task list.
       const markedGlobalTasks = globalTasks.map((task) => ({
         ...task,
         _isGlobalTask: true,
@@ -993,7 +1000,7 @@ export function useTaskFiltering() {
     updateVisibleTasks,
     resetTraderOrderMapCache,
     mapObjectiveTypes,
-    raidRelevantObjectiveTypes,
+    RAID_RELEVANT_OBJECTIVE_TYPES,
     isRaidRelevantObjective,
     isGlobalTask,
     isGlobalRaidTask,
