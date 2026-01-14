@@ -17,6 +17,16 @@ function getGameModeData(store: Store<string, UserState> | undefined): UserProgr
   const gameModeState = store.$state[currentGameMode as keyof UserState];
   return (gameModeState || store.$state) as UserProgressData;
 }
+type RawTaskCompletion = { complete?: boolean; failed?: boolean } | boolean | null | undefined;
+const getCompletionFlags = (completion: RawTaskCompletion) => {
+  if (typeof completion === 'boolean') {
+    return { complete: completion, failed: false };
+  }
+  return {
+    complete: completion?.complete === true,
+    failed: completion?.failed === true,
+  };
+};
 type TeamStoresMap = Record<string, Store<string, UserState>>;
 type CompletionsMap = Record<string, Record<string, boolean>>;
 type FailedTasksMap = Record<string, Record<string, boolean>>;
@@ -94,7 +104,8 @@ export const useProgressStore = defineStore('progress', () => {
       for (const teamId of Object.keys(visibleTeamStores.value)) {
         const store = visibleTeamStores.value[teamId];
         const currentData = getGameModeData(store);
-        completions[task.id]![teamId] = currentData?.taskCompletions?.[task.id]?.complete ?? false;
+        const completionFlags = getCompletionFlags(currentData?.taskCompletions?.[task.id]);
+        completions[task.id]![teamId] = completionFlags.complete;
       }
     }
     perfEnd(perfTimer, { tasks: metadataStore.tasks.length, teams: teamCount });
@@ -113,7 +124,8 @@ export const useProgressStore = defineStore('progress', () => {
       for (const teamId of Object.keys(visibleTeamStores.value)) {
         const store = visibleTeamStores.value[teamId];
         const currentData = getGameModeData(store);
-        failures[task.id]![teamId] = currentData?.taskCompletions?.[task.id]?.failed ?? false;
+        const completionFlags = getCompletionFlags(currentData?.taskCompletions?.[task.id]);
+        failures[task.id]![teamId] = completionFlags.failed;
       }
     }
     perfEnd(perfTimer, { tasks: metadataStore.tasks.length, teams: teamCount });
@@ -195,11 +207,14 @@ export const useProgressStore = defineStore('progress', () => {
       (statuses ?? []).map((status) => status.toLowerCase());
     const hasAnyStatus = (statuses: string[], values: string[]) =>
       values.some((value) => statuses.includes(value));
-    const isTaskComplete = (completion?: { complete?: boolean; failed?: boolean }) =>
-      completion?.complete === true && completion?.failed !== true;
-    const isTaskFailed = (completion?: { complete?: boolean; failed?: boolean }) =>
-      completion?.failed === true;
-    const isTaskActiveRecord = (completion?: { complete?: boolean; failed?: boolean }) => {
+    const isTaskComplete = (completion?: RawTaskCompletion) => {
+      const flags = getCompletionFlags(completion);
+      return flags.complete && !flags.failed;
+    };
+    const isTaskFailed = (completion?: RawTaskCompletion) => {
+      return getCompletionFlags(completion).failed;
+    };
+    const isTaskActiveRecord = (completion?: RawTaskCompletion) => {
       if (!completion) return false;
       return !isTaskComplete(completion) && !isTaskFailed(completion);
     };
@@ -626,7 +641,8 @@ export const useProgressStore = defineStore('progress', () => {
     let calculatedQuestXP = 0;
     for (const task of tasks) {
       const completion = completions[task.id];
-      if (completion?.complete === true && completion?.failed !== true) {
+      const flags = getCompletionFlags(completion);
+      if (flags.complete && !flags.failed) {
         calculatedQuestXP += task.experience || 0;
       }
     }
@@ -671,15 +687,17 @@ export const useProgressStore = defineStore('progress', () => {
     const store = teamStores.value[storeKey];
     const currentData = getGameModeData(store);
     const taskCompletion = currentData?.taskCompletions?.[taskId];
-    return taskCompletion?.complete === true && taskCompletion?.failed !== true;
+    const flags = getCompletionFlags(taskCompletion);
+    return flags.complete && !flags.failed;
   };
   const getTaskStatus = (teamId: string, taskId: string): 'completed' | 'failed' | 'incomplete' => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
     const currentData = getGameModeData(store);
     const taskCompletion = currentData?.taskCompletions?.[taskId];
-    if (taskCompletion?.failed) return 'failed';
-    if (taskCompletion?.complete) return 'completed';
+    const flags = getCompletionFlags(taskCompletion);
+    if (flags.failed) return 'failed';
+    if (flags.complete) return 'completed';
     return 'incomplete';
   };
   const getProgressPercentage = (teamId: string, category: string): number => {
@@ -693,7 +711,7 @@ export const useProgressStore = defineStore('progress', () => {
       case 'tasks': {
         const totalTasks = Object.keys(currentData.taskCompletions || {}).length;
         const completedTasks = Object.values(currentData.taskCompletions || {}).filter(
-          (completion) => completion?.complete === true
+          (completion) => getCompletionFlags(completion).complete
         ).length;
         return totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
       }

@@ -57,6 +57,7 @@ vi.mock('@/stores/useMetadata', () => ({
     loading: false,
     hasInitialized: true,
     mapsWithSvg: [],
+    sortedTraders: [],
     editions: [],
     objectiveMaps: {},
     objectiveGPS: {},
@@ -97,7 +98,10 @@ vi.mock('vue-i18n', () => ({
 }));
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {} }),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({
+    replace: vi.fn(() => Promise.resolve()),
+    push: vi.fn(() => Promise.resolve()),
+  }),
 }));
 vi.mock('@/features/maps/LeafletMap.vue', () => ({
   default: { template: '<div data-testid="leaflet-map" />' },

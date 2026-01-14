@@ -137,6 +137,22 @@ export function useTaskFiltering() {
     return { isUnlocked, isCompleted, isFailed };
   };
   /**
+   * Helper to get task status for a specific user view (uses store data directly)
+   */
+  const getUserTaskStatus = (taskId: string, userView: string) => {
+    if (progressStore.getTaskStatus) {
+      const status = progressStore.getTaskStatus(userView, taskId);
+      return {
+        isCompleted: status === 'completed',
+        isFailed: status === 'failed',
+      };
+    }
+    return {
+      isCompleted: progressStore.tasksCompletions?.[taskId]?.[userView] === true,
+      isFailed: progressStore.tasksFailed?.[taskId]?.[userView] === true,
+    };
+  };
+  /**
    * Filter tasks for all team members view
    */
   const filterTasksForAllUsers = (taskList: Task[], secondaryView: string) => {
@@ -218,33 +234,28 @@ export function useTaskFiltering() {
         // Exclude permanently invalid/blocked tasks from available view
         if (isTaskInvalid(task.id, userView)) return false;
         const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
-        const isCompleted = progressStore.tasksCompletions?.[task.id]?.[userView] === true;
-        const isFailed = progressStore.tasksFailed?.[task.id]?.[userView] === true;
+        const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
         return isUnlocked && !isCompleted && !isFailed;
       });
     } else if (secondaryView === 'failed') {
-      filtered = filtered.filter(
-        (task) => progressStore.tasksFailed?.[task.id]?.[userView] === true
-      );
+      filtered = filtered.filter((task) => getUserTaskStatus(task.id, userView).isFailed);
     } else if (secondaryView === 'locked') {
       filtered = filtered.filter((task) => {
         // Exclude permanently invalid/blocked tasks from locked view
         if (isTaskInvalid(task.id, userView)) return false;
-        const taskCompletions = progressStore.tasksCompletions?.[task.id];
+        const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
         const unlockedTasks = progressStore.unlockedTasks?.[task.id];
-        const failedTasks = progressStore.tasksFailed?.[task.id];
         return (
-          taskCompletions?.[userView] !== true &&
-          failedTasks?.[userView] !== true &&
+          isCompleted !== true &&
+          isFailed !== true &&
           unlockedTasks?.[userView] !== true
         );
       });
     } else if (secondaryView === 'completed') {
-      filtered = filtered.filter(
-        (task) =>
-          progressStore.tasksCompletions?.[task.id]?.[userView] === true &&
-          progressStore.tasksFailed?.[task.id]?.[userView] !== true
-      );
+      filtered = filtered.filter((task) => {
+        const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
+        return isCompleted && !isFailed;
+      });
     }
     // 'all' case: no status filtering, just filter by faction below
     // Filter by faction
