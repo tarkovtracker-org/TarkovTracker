@@ -164,7 +164,7 @@
         title: '任务筛选',
         close: '关闭',
         hide_global_tasks: '地图视图隐藏全局任务',
-        show_global_tasks: '地图视图显示全局任务',
+        show_global_tasks: '地图视图显示全局任务（仅战局相关）',
         hide_non_kappa_tasks: '隐藏非 Kappa任务',
         show_non_kappa_tasks: '显示非 Kappa任务',
         level: '等级',
@@ -309,6 +309,9 @@
         blocked: '不再可用',
         blockedTooltip: '因为你在其他任务中的抉择，此任务已永久不可用',
         editionExclusiveTooltip: '此任务仅对 {editions} 游戏版本开放',
+        anyMap: '任意',
+        globalTask: '任意地图',
+        globalTaskTooltip: '此任务可在任意地图上完成',
       },
     },
     traders: {
