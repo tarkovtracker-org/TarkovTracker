@@ -504,6 +504,11 @@
     });
   });
   const normalizedSearch = computed(() => debouncedSearch.value.toLowerCase().trim());
+  // Split search into tokens for multi-word matching (e.g., "punisher 5" matches "The Punisher - Part 5")
+  const searchTokens = computed(() => {
+    if (!normalizedSearch.value) return [];
+    return normalizedSearch.value.split(/\s+/).filter((token) => token.length > 0);
+  });
   // Cache lowercase task names to avoid repeated toLowerCase() calls in filter
   type TaskWithLowerName = Task & { _lowerName: string };
   const tasksWithLowerName = computed((): TaskWithLowerName[] => {
@@ -512,13 +517,15 @@
       _lowerName: (task.name ?? '').toLowerCase(),
     }));
   });
-  // Filter tasks by search query
+  // Filter tasks by search query - all tokens must be present in the task name
   const filteredTasks = computed((): Task[] => {
-    if (!normalizedSearch.value) {
+    const tokens = searchTokens.value;
+    if (tokens.length === 0) {
       return visibleTasks.value;
     }
-    const query = normalizedSearch.value;
-    return tasksWithLowerName.value.filter((task) => task._lowerName.includes(query)) as Task[];
+    return tasksWithLowerName.value.filter((task) =>
+      tokens.every((token) => task._lowerName.includes(token))
+    ) as Task[];
   });
   const pinnedTaskId = ref<string | null>(null);
   const pinnedTaskTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
