@@ -292,8 +292,8 @@
           <span class="hidden text-xs sm:inline">
             {{
               showGlobalTasks
-                ? t('page.tasks.hide_global_tasks', 'Hide Global Tasks').toUpperCase()
-                : t('page.tasks.show_global_tasks', 'Show Global Tasks').toUpperCase()
+                ? t('page.tasks.filters.hide_global_tasks', 'Hide Global Tasks').toUpperCase()
+                : t('page.tasks.filters.show_global_tasks', 'Show Global Tasks').toUpperCase()
             }}
           </span>
         </UButton>
