@@ -289,11 +289,11 @@
           @click="toggleGlobalTasks"
         >
           <UIcon name="i-mdi-earth" class="h-4 w-4 sm:mr-1" />
-          <span class="hidden text-xs sm:inline">
+          <span class="hidden text-xs uppercase sm:inline">
             {{
               showGlobalTasks
-                ? t('page.tasks.filters.hide_global_tasks', 'Hide Global Tasks').toUpperCase()
-                : t('page.tasks.filters.show_global_tasks', 'Show Global Tasks').toUpperCase()
+                ? t('page.tasks.filters.hide_global_tasks', 'Hide Global Tasks')
+                : t('page.tasks.filters.show_global_tasks', 'Show Global Tasks')
             }}
           </span>
         </UButton>

@@ -156,17 +156,9 @@ export function useTaskFiltering() {
     // Always use raid-relevant filter for map view (only show tasks that require being in raid)
     if (showGlobalTasks) {
       const globalTasks = taskList.filter(isGlobalRaidTask);
-      // Clone global tasks with _isGlobalTask flag for visual distinction in consumers.
-      // We create new objects here because Task type doesn't include this internal flag,
-      // and consumers (e.g., TaskCard.vue) use it to show a "global task" indicator.
-      // Consumers access it via type assertion: (task as Task & { _isGlobalTask?: boolean }).
-      // Alternative: consumers could call isGlobalRaidTask(task) directly, but this flag
-      // avoids redundant recomputation when iterating the filtered task list.
-      const markedGlobalTasks = globalTasks.map((task) => ({
-        ...task,
-        _isGlobalTask: true,
-      }));
-      return [...mapSpecificTasks, ...markedGlobalTasks];
+      // Consumers (e.g., TaskCard.vue) can call isGlobalRaidTask(task) directly to detect
+      // global tasks for visual distinction. The function is exported from this composable.
+      return [...mapSpecificTasks, ...globalTasks];
     }
 
     return mapSpecificTasks;
