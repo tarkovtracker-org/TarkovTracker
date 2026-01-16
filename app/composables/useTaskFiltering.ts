@@ -80,6 +80,7 @@ export function useTaskFiltering() {
    * Check if a task is global (no specific map assignments)
    */
   const isGlobalTask = (task: Task): boolean => {
+    const hasMap = task.map?.id != null;
     const hasLocations = Array.isArray(task.locations) && task.locations.length > 0;
     const hasMapObjectives = task.objectives?.some(
       (obj) =>
@@ -87,7 +88,7 @@ export function useTaskFiltering() {
         obj.maps.length > 0 &&
         mapObjectiveTypes.includes(obj.type || '')
     );
-    return !hasLocations && !hasMapObjectives;
+    return !hasMap && !hasLocations && !hasMapObjectives;
   };
 
   /**
