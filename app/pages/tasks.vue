@@ -123,6 +123,7 @@
   import type { Task, TaskObjective } from '@/types/tarkov';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
+  import { splitSearchTokens } from '@/utils/search';
   // Route meta for layout behavior
   definePageMeta({
     usesWindowScroll: true,
@@ -503,12 +504,8 @@
       logger.error('[Tasks] Debounced search update failed:', error);
     });
   });
-  const normalizedSearch = computed(() => debouncedSearch.value.toLowerCase().trim());
   // Split search into tokens for multi-word matching (e.g., "punisher 5" matches "The Punisher - Part 5")
-  const searchTokens = computed(() => {
-    if (!normalizedSearch.value) return [];
-    return normalizedSearch.value.split(/\s+/).filter((token) => token.length > 0);
-  });
+  const searchTokens = computed(() => splitSearchTokens(debouncedSearch.value));
   // Cache lowercase task names to avoid repeated toLowerCase() calls in filter
   type TaskWithLowerName = Task & { _lowerName: string };
   const tasksWithLowerName = computed((): TaskWithLowerName[] => {

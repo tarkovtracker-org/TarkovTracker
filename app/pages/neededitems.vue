@@ -148,6 +148,7 @@
   } from '@/types/tarkov';
   import { isTaskAvailableForEdition } from '@/utils/editionHelpers';
   import { logger } from '@/utils/logger';
+  import { splitSearchTokens } from '@/utils/search';
   // Route meta for layout behavior
   definePageMeta({
     usesWindowScroll: true,
@@ -432,8 +433,7 @@
     // Filter by search - multi-token search across item name, task name, and hideout station
     // e.g., "gas analyzer lavatory" finds gas analyzers needed for Lavatory
     if (search.value) {
-      const searchLower = search.value.toLowerCase().trim();
-      const tokens = searchLower.split(/\s+/).filter((t) => t.length > 0);
+      const tokens = splitSearchTokens(search.value);
       if (tokens.length > 0) {
         items = items.filter((item) => {
           // Build searchable text from all relevant fields
