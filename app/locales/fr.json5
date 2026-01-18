@@ -135,8 +135,8 @@
       filters: {
         title: 'Filtres de Quêtes',
         close: 'Fermer',
-        hide_global_tasks: 'Cacher les quêtes globales sur la vue carte',
-        show_global_tasks: 'Afficher les quêtes globales sur la vue carte',
+        hide_global_tasks: 'Cacher les quêtes globales',
+        show_global_tasks: 'Afficher les quêtes globales',
         hide_non_kappa_tasks: 'Cacher les quêtes hors Kappa',
         show_non_kappa_tasks: 'Afficher les quêtes hors Kappa',
         level: 'Niveau',

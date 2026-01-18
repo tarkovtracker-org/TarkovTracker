@@ -131,8 +131,8 @@
       filters: {
         title: 'Filtros de Misiones',
         close: 'Cerrar',
-        hide_global_tasks: 'Ocultar misiones globales en vista de mapa',
-        show_global_tasks: 'Mostrar misiones globales en vista de mapa',
+        hide_global_tasks: 'Ocultar misiones globales',
+        show_global_tasks: 'Mostrar misiones globales',
         hide_non_kappa_tasks: 'Ocultar misiones no-Kappa',
         show_non_kappa_tasks: 'Mostrar misiones no-Kappa',
       },

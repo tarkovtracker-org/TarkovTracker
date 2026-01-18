@@ -152,8 +152,8 @@
       filters: {
         title: 'Aufgabenfilter',
         close: 'Schließen',
-        hide_global_tasks: 'Globale Aufgaben in Kartenansicht ausblenden',
-        show_global_tasks: 'Globale Aufgaben in Kartenansicht anzeigen',
+        hide_global_tasks: 'Globale Aufgaben ausblenden',
+        show_global_tasks: 'Globale Aufgaben anzeigen',
         hide_non_kappa_tasks: 'Nicht-Kappa-Aufgaben ausblenden',
         show_non_kappa_tasks: 'Nicht-Kappa-Aufgaben anzeigen',
         level: 'Level',

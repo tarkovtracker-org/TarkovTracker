@@ -163,8 +163,8 @@
       filters: {
         title: 'Task Filters',
         close: 'Close',
-        hide_global_tasks: 'Hide global tasks on map view',
-        show_global_tasks: 'Show global tasks on map view',
+        hide_global_tasks: 'Hide global tasks',
+        show_global_tasks: 'Show global tasks',
         hide_non_kappa_tasks: 'Hide non-Kappa tasks',
         show_non_kappa_tasks: 'Show non-Kappa tasks',
         level: 'Level',

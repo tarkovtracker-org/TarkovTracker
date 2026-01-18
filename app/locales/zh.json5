@@ -163,8 +163,8 @@
       filters: {
         title: '任务筛选',
         close: '关闭',
-        hide_global_tasks: '地图视图隐藏全局任务',
-        show_global_tasks: '地图视图显示全局任务',
+        hide_global_tasks: '隐藏全局任务',
+        show_global_tasks: '显示全局任务',
         hide_non_kappa_tasks: '隐藏非 Kappa任务',
         show_non_kappa_tasks: '显示非 Kappa任务',
         level: '等级',

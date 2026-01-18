@@ -135,8 +135,8 @@
       filters: {
         title: 'Фильтры заданий',
         close: 'Закрыть',
-        hide_global_tasks: 'Скрыть глобальные задания на карте',
-        show_global_tasks: 'Показать глобальные задания на карте',
+        hide_global_tasks: 'Скрыть глобальные задания',
+        show_global_tasks: 'Показать глобальные задания',
         hide_non_kappa_tasks: 'Скрыть не Каппа задания',
         show_non_kappa_tasks: 'Показать не Каппа задания',
         level: 'Уровень',
