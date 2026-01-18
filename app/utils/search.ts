@@ -27,18 +27,3 @@ export function splitSearchTokens(search: string): string[] {
   if (!normalized) return [];
   return normalized.split(/\s+/).filter((token) => token.length > 0);
 }
-/**
- * Checks if all search tokens are present in the target text.
- * Useful for multi-token search where all terms must match.
- *
- * @example
- * matchesAllTokens(['punisher', '5'], 'the punisher - part 5') // returns true
- * matchesAllTokens(['punisher', '6'], 'the punisher - part 5') // returns false
- *
- * @param tokens - Array of search tokens (should be lowercase)
- * @param text - The text to search in (should be lowercase)
- * @returns True if all tokens are found in the text
- */
-export function matchesAllTokens(tokens: string[], text: string): boolean {
-  return tokens.every((token) => text.includes(token));
-}
