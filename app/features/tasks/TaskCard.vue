@@ -533,7 +533,7 @@
   const tarkovStore = useTarkovStore();
   const preferencesStore = usePreferencesStore();
   const metadataStore = useMetadataStore();
-  const { isGlobalRaidTask } = useTaskFiltering();
+  const { isGlobalTask: isGlobalTaskFn } = useTaskFiltering();
   const formatNumber = useLocaleNumberFormatter();
   const taskContextMenu = ref<ContextMenuRef | null>(null);
   const itemContextMenu = ref<ContextMenuRef | null>(null);
@@ -689,7 +689,7 @@
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
   // Check if this task is a global task (no specific map, but has raid-relevant objectives)
-  const isGlobalTask = computed(() => isGlobalRaidTask(props.task));
+  const isGlobalTask = computed(() => isGlobalTaskFn(props.task));
   // Get objectives from props or fall back to store when props are stale
   // This handles the case where visibleTasks holds old task objects after objectives merge
   const taskObjectives = computed(() => {

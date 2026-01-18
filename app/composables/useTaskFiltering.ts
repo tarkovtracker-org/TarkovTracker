@@ -77,9 +77,18 @@ export function useTaskFiltering() {
   };
 
   /**
-   * Check if a task is global (no specific map assignments)
+   * Check if a task is a "global" task suitable for Map View display.
+   *
+   * A global task has no specific map assignments AND has raid-relevant objectives
+   * (e.g., shoot, extract, find items). For Map View, we assume all displayed global
+   * tasks are raid-relevant since non-raid tasks (like trader turn-ins) aren't
+   * meaningful to show on a map.
+   *
+   * @param task - The task to check
+   * @returns true if the task is global with raid-relevant objectives
    */
   const isGlobalTask = (task: Task): boolean => {
+    // Check if task has any map-specific assignments
     const hasMap = task.map?.id != null;
     const hasLocations = Array.isArray(task.locations) && task.locations.length > 0;
     const hasMapObjectives = task.objectives?.some(
@@ -88,14 +97,12 @@ export function useTaskFiltering() {
         obj.maps.length > 0 &&
         mapObjectiveTypes.includes(obj.type || '')
     );
-    return !hasMap && !hasLocations && !hasMapObjectives;
-  };
+    const isMapless = !hasMap && !hasLocations && !hasMapObjectives;
 
-  /**
-   * Check if a task is global AND has raid-relevant objectives
-   */
-  const isGlobalRaidTask = (task: Task): boolean => {
-    return isGlobalTask(task) && (task.objectives?.some(isRaidRelevantObjective) ?? false);
+    // Only consider it a global task if it has raid-relevant objectives
+    const hasRaidRelevantObjectives = task.objectives?.some(isRaidRelevantObjective) ?? false;
+
+    return isMapless && hasRaidRelevantObjectives;
   };
 
   /**
@@ -116,13 +123,19 @@ export function useTaskFiltering() {
     return taskList;
   };
   /**
-   * Filter tasks by map, handling merged maps (Ground Zero, Factory)
-   * Optionally includes global raid-relevant tasks based on preferences
+   * Filter tasks by map, handling merged maps (Ground Zero, Factory).
+   *
+   * When the user has "Show Global Tasks" enabled (hideGlobalTasks = false),
+   * this also includes global tasks (tasks with no map but with raid-relevant
+   * objectives) in the results. This allows users to see tasks like "Kill PMCs"
+   * that can be completed on any map while viewing a specific map.
+   *
+   * @see isGlobalTask for the definition of a global task
    */
   const filterTasksByMap = (taskList: Task[], mapView: string, mergedMaps: MergedMap[]) => {
     const showGlobalTasks = !preferencesStore.getHideGlobalTasks;
 
-    // Filter map-specific tasks
+    // First, filter tasks that are specifically assigned to this map
     let mapSpecificTasks: Task[];
     const mergedMap = mergedMaps.find((m) => m.mergedIds && m.mergedIds.includes(mapView));
     if (mergedMap && mergedMap.mergedIds) {
@@ -153,12 +166,9 @@ export function useTaskFiltering() {
       );
     }
 
-    // Include global raid-relevant tasks if preference enabled
-    // Always use raid-relevant filter for map view (only show tasks that require being in raid)
+    // Include global tasks if preference enabled
     if (showGlobalTasks) {
-      const globalTasks = taskList.filter(isGlobalRaidTask);
-      // Consumers (e.g., TaskCard.vue) can call isGlobalRaidTask(task) directly to detect
-      // global tasks for visual distinction. The function is exported from this composable.
+      const globalTasks = taskList.filter(isGlobalTask);
       return [...mapSpecificTasks, ...globalTasks];
     }
 
@@ -393,20 +403,6 @@ export function useTaskFiltering() {
     return locations;
   };
   /**
-   * Helper to check if task passes all filters
-   */
-  const taskPassesFilters = (
-    task: Task,
-    disabledTasks: string[],
-    hideGlobalTasks: boolean,
-    hideNonKappaTasks: boolean
-  ): boolean => {
-    if (disabledTasks.includes(task.id)) return false;
-    if (hideGlobalTasks && !task.map) return false;
-    if (hideNonKappaTasks && task.kappaRequired !== true) return false;
-    return true;
-  };
-  /**
    * Helper to check if user has unlocked task
    */
   const isTaskUnlockedForUser = (taskId: string, activeUserView: string): boolean => {
@@ -464,8 +460,7 @@ export function useTaskFiltering() {
         if (disabledTasks.includes(task.id)) continue;
         if (hideNonKappaTasks && task.kappaRequired !== true) continue;
 
-        // Always use raid-relevant filter for map view
-        if (!isGlobalRaidTask(task)) continue;
+        if (!isGlobalTask(task)) continue;
 
         if (secondaryView === 'available') {
           if (!isTaskUnlockedForUser(task.id, activeUserView)) continue;
@@ -996,7 +991,6 @@ export function useTaskFiltering() {
     RAID_RELEVANT_OBJECTIVE_TYPES,
     isRaidRelevantObjective,
     isGlobalTask,
-    isGlobalRaidTask,
     disabledTasks: EXCLUDED_SCAV_KARMA_TASKS,
   };
 }
