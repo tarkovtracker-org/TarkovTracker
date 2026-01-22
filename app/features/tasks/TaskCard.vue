@@ -105,7 +105,10 @@
           <AppTooltip
             :text="
               isGlobalTask
-                ? t('page.tasks.questcard.globalTaskTooltip', 'This task can be completed on any map')
+                ? t(
+                    'page.tasks.questcard.globalTaskTooltip',
+                    'This task can be completed on any map'
+                  )
                 : task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')
             "
           >
@@ -114,7 +117,7 @@
               :color="isGlobalTask ? 'info' : 'neutral'"
               variant="soft"
               class="inline-flex max-w-40 items-center gap-1 text-[11px]"
-              :class="isGlobalTask ? 'border border-info-500/30' : ''"
+              :class="isGlobalTask ? 'border-info-500/30 border' : ''"
             >
               <UIcon
                 :name="isGlobalTask || !task?.map?.name ? 'i-mdi-earth' : 'i-mdi-map-marker'"

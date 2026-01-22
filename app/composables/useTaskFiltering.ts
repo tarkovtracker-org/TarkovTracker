@@ -12,7 +12,6 @@ interface MergedMap {
   id: string;
   mergedIds?: string[];
 }
-
 /**
  * Objective types that require being in a raid.
  * Used to identify global tasks that are still raid-relevant for map view filtering.
@@ -30,7 +29,6 @@ const RAID_RELEVANT_OBJECTIVE_TYPES = [
   'useItem',
   'experience',
 ];
-
 export function useTaskFiltering() {
   const progressStore = useProgressStore();
   const metadataStore = useMetadataStore();
@@ -65,7 +63,6 @@ export function useTaskFiltering() {
     'plantQuestItem',
     'shoot',
   ];
-
   /**
    * Check if an objective requires being in a raid
    */
@@ -75,7 +72,6 @@ export function useTaskFiltering() {
     if (obj.type === 'giveItem' && obj.foundInRaid) return true;
     return false;
   };
-
   /**
    * Check if a task is a "global" task suitable for Map View display.
    *
@@ -93,18 +89,13 @@ export function useTaskFiltering() {
     const hasLocations = Array.isArray(task.locations) && task.locations.length > 0;
     const hasMapObjectives = task.objectives?.some(
       (obj) =>
-        Array.isArray(obj.maps) &&
-        obj.maps.length > 0 &&
-        mapObjectiveTypes.includes(obj.type || '')
+        Array.isArray(obj.maps) && obj.maps.length > 0 && mapObjectiveTypes.includes(obj.type || '')
     );
     const isMapless = !hasMap && !hasLocations && !hasMapObjectives;
-
     // Only consider it a global task if it has raid-relevant objectives
     const hasRaidRelevantObjectives = task.objectives?.some(isRaidRelevantObjective) ?? false;
-
     return isMapless && hasRaidRelevantObjectives;
   };
-
   /**
    * Filter tasks by primary view (all, maps, traders)
    */
@@ -134,7 +125,6 @@ export function useTaskFiltering() {
    */
   const filterTasksByMap = (taskList: Task[], mapView: string, mergedMaps: MergedMap[]) => {
     const showGlobalTasks = !preferencesStore.getHideGlobalTasks;
-
     // First, filter tasks that are specifically assigned to this map
     let mapSpecificTasks: Task[];
     const mergedMap = mergedMaps.find((m) => m.mergedIds && m.mergedIds.includes(mapView));
@@ -165,13 +155,11 @@ export function useTaskFiltering() {
         )
       );
     }
-
     // Include global tasks if preference enabled
     if (showGlobalTasks) {
       const globalTasks = taskList.filter(isGlobalTask);
       return [...mapSpecificTasks, ...globalTasks];
     }
-
     return mapSpecificTasks;
   };
   /**
@@ -452,36 +440,29 @@ export function useTaskFiltering() {
     const mapTaskCounts: Record<string, number> = {};
     const typedTasks = filterTasksByTypeSettings(tasks);
     const statusFilteredTasks = filterTasksByStatus(typedTasks, secondaryView, activeUserView);
-
     // Calculate global raid-relevant task count once (same for all maps)
     let globalTaskCount = 0;
     if (!hideGlobalTasks) {
       for (const task of statusFilteredTasks) {
         if (disabledTasks.includes(task.id)) continue;
         if (hideNonKappaTasks && task.kappaRequired !== true) continue;
-
         if (!isGlobalTask(task)) continue;
-
         if (secondaryView === 'available') {
           if (!isTaskUnlockedForUser(task.id, activeUserView)) continue;
         }
         globalTaskCount++;
       }
     }
-
     for (const map of mergedMaps) {
       const ids = map.mergedIds || [map.id];
       const mapId = map.id;
       if (!mapId) continue;
       mapTaskCounts[mapId] = globalTaskCount; // Start with global task count
-
       for (const task of statusFilteredTasks) {
         if (disabledTasks.includes(task.id)) continue;
         if (hideNonKappaTasks && task.kappaRequired !== true) continue;
-
         const taskLocations = extractTaskLocations(task);
         if (!ids.some((id: string) => taskLocations.includes(id))) continue;
-
         if (secondaryView === 'available') {
           if (!isTaskUnlockedForUser(task.id, activeUserView)) continue;
           if (!hasIncompleteObjectives(task, ids, activeUserView)) continue;

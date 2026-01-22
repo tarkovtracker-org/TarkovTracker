@@ -193,9 +193,9 @@
         alternatives: 'Quêtes alternatives',
         alternativefailed: 'Les quêtes alternatives seront également réniitialisées',
         differentfaction: "Cette quête n'est pas disponible pour votre faction",
-        anyMap: 'N\'importe',
-        globalTask: 'N\'importe quelle carte',
-        globalTaskTooltip: 'Cette quête peut être complétée sur n\'importe quelle carte',
+        anyMap: "N'importe",
+        globalTask: "N'importe quelle carte",
+        globalTaskTooltip: "Cette quête peut être complétée sur n'importe quelle carte",
       },
     },
     traders: {

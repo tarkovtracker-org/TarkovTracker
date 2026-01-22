@@ -1,7 +1,7 @@
 <template>
   <div class="mb-6 space-y-3">
     <!-- Top Bar: Search (left) | Primary View Tabs (center) | Settings (right) -->
-    <div class="flex items-center gap-3 rounded-lg bg-surface-950 px-4 py-2.5">
+    <div class="bg-surface-950 flex items-center gap-3 rounded-lg px-4 py-2.5">
       <!-- Search - larger width -->
       <div class="w-56 shrink-0 sm:w-64 lg:w-72">
         <UInput
@@ -99,7 +99,7 @@
       </div>
     </div>
     <!-- Secondary filters: Status Filters + User View (centered) -->
-    <div class="flex items-center justify-center gap-3 rounded-lg bg-surface-950 px-4 py-2.5">
+    <div class="bg-surface-950 flex items-center justify-center gap-3 rounded-lg px-4 py-2.5">
       <!-- Status filters (ALL / AVAILABLE / LOCKED / COMPLETED) -->
       <div class="flex items-center gap-1">
         <UButton
@@ -245,7 +245,7 @@
     <!-- Map selector (shown when MAPS is selected) - Horizontal scrollable -->
     <div v-if="primaryView === 'maps' && maps.length > 0" class="w-full overflow-x-auto">
       <div
-        class="flex w-max min-w-full items-center justify-center gap-1 rounded-lg bg-surface-950 px-4 py-2.5"
+        class="bg-surface-950 flex w-max min-w-full items-center justify-center gap-1 rounded-lg px-4 py-2.5"
       >
         <button
           v-for="mapOption in mapOptions"
@@ -282,8 +282,8 @@
           :aria-pressed="showGlobalTasks"
           :title="
             showGlobalTasks
-              ? t('page.tasks.filters.hide_global_tasks', 'Hide global tasks on map view')
-              : t('page.tasks.filters.show_global_tasks', 'Show global tasks on map view')
+              ? t('page.tasks.filters.hide_global_tasks', 'Hide Global Tasks')
+              : t('page.tasks.filters.show_global_tasks', 'Show Global Tasks')
           "
           :class="showGlobalTasks ? 'bg-white/10 text-white' : 'text-gray-400'"
           @click="toggleGlobalTasks"
@@ -301,9 +301,7 @@
     </div>
     <!-- Trader selector (shown when TRADERS is selected) - Horizontal scrollable -->
     <div v-if="primaryView === 'traders' && traders.length > 0" class="w-full overflow-x-auto">
-      <div
-        class="flex w-max min-w-full justify-center gap-1 rounded-lg bg-surface-950 px-4 py-2.5"
-      >
+      <div class="bg-surface-950 flex w-max min-w-full justify-center gap-1 rounded-lg px-4 py-2.5">
         <button
           v-for="trader in traders"
           :key="trader.id"
