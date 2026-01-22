@@ -364,7 +364,7 @@
   const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
   const teamStore = useTeamStore();
-  const { calculateMapTaskTotals, calculateStatusCounts, calculateTraderCounts, disabledTasks } =
+  const { calculateMapTaskTotals, calculateStatusCounts, calculateTraderCounts } =
     useTaskFiltering();
   const maps = computed(() => metadataStore.mapsWithSvg);
   const traders = computed(() => metadataStore.sortedTraders);
@@ -476,9 +476,7 @@
     return calculateMapTaskTotals(
       mergedMaps.value,
       metadataStore.tasks,
-      disabledTasks,
       preferencesStore.getHideGlobalTasks,
-      preferencesStore.getHideNonKappaTasks,
       preferencesStore.getTaskUserView,
       preferencesStore.getTaskSecondaryView
     );

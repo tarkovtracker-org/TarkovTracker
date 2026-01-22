@@ -48,7 +48,6 @@ const setup = async () => {
         failed: 0,
       }),
       calculateTraderCounts: () => ({ 'trader-1': 2 }),
-      disabledTasks: [],
     }),
   }));
   vi.doMock('@/stores/useMetadata', () => ({

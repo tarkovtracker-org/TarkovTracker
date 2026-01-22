@@ -425,9 +425,7 @@ export function useTaskFiltering() {
   const calculateMapTaskTotals = (
     mergedMaps: MergedMap[],
     tasks: Task[],
-    disabledTasks: string[],
     hideGlobalTasks: boolean,
-    hideNonKappaTasks: boolean,
     activeUserView: string,
     secondaryView: string
   ) => {
@@ -444,8 +442,6 @@ export function useTaskFiltering() {
     let globalTaskCount = 0;
     if (!hideGlobalTasks) {
       for (const task of statusFilteredTasks) {
-        if (disabledTasks.includes(task.id)) continue;
-        if (hideNonKappaTasks && task.kappaRequired !== true) continue;
         if (!isGlobalTask(task)) continue;
         if (secondaryView === 'available') {
           if (!isTaskUnlockedForUser(task.id, activeUserView)) continue;
@@ -459,8 +455,6 @@ export function useTaskFiltering() {
       if (!mapId) continue;
       mapTaskCounts[mapId] = globalTaskCount; // Start with global task count
       for (const task of statusFilteredTasks) {
-        if (disabledTasks.includes(task.id)) continue;
-        if (hideNonKappaTasks && task.kappaRequired !== true) continue;
         const taskLocations = extractTaskLocations(task);
         if (!ids.some((id: string) => taskLocations.includes(id))) continue;
         if (secondaryView === 'available') {
@@ -972,6 +966,5 @@ export function useTaskFiltering() {
     RAID_RELEVANT_OBJECTIVE_TYPES,
     isRaidRelevantObjective,
     isGlobalTask,
-    disabledTasks: EXCLUDED_SCAV_KARMA_TASKS,
   };
 }
