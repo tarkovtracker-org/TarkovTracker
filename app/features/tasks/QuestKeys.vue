@@ -17,6 +17,7 @@
             <GameItem
               :item-id="key.id"
               :item-name="`${key.name} (${key.shortName})`"
+              :copy-value="key.name"
               :dev-link="key.link"
               :wiki-link="key.wikiLink"
               :count="1"
