@@ -98,7 +98,7 @@
         <AppTooltip v-if="props.itemName" text="Copy Name">
           <button
             type="button"
-            class="cursor-pointer inline-flex items-center justify-center rounded p-1.5 text-gray-200 transition-colors hover:bg-white/20 hover:text-white"
+            class="inline-flex cursor-pointer items-center justify-center rounded p-1.5 text-gray-200 transition-colors hover:bg-white/20 hover:text-white"
             @click.stop="copyItemName"
           >
             <UIcon name="i-mdi-content-copy" class="h-5 w-5" />
@@ -225,7 +225,6 @@
       image512pxLink?: string;
       backgroundColor?: string;
     };
-    // Optional value to copy instead of itemName
     copyValue?: string | null;
   }
   const props = withDefaults(defineProps<Props>(), {
