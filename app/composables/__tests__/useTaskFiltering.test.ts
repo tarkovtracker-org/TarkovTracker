@@ -175,9 +175,21 @@ describe('useTaskFiltering', () => {
     });
   });
   describe('isRaidRelevantObjective', () => {
-    it('returns true for raid-relevant objective types', async () => {
+    it('returns true for all raid-relevant objective types', async () => {
       const { taskFiltering } = await setup();
-      const raidTypes = ['shoot', 'extract', 'mark', 'visit', 'findItem', 'findQuestItem'];
+      const raidTypes = [
+        'shoot',
+        'extract',
+        'mark',
+        'visit',
+        'findItem',
+        'findQuestItem',
+        'giveQuestItem',
+        'plantItem',
+        'plantQuestItem',
+        'useItem',
+        'experience',
+      ];
       for (const type of raidTypes) {
         const obj: TaskObjective = { id: 'test', type };
         expect(taskFiltering.isRaidRelevantObjective(obj)).toBe(true);
@@ -248,6 +260,58 @@ describe('useTaskFiltering', () => {
       const resultIds = result.map((t) => t.id);
       expect(resultIds).toContain('task-map');
       expect(resultIds).not.toContain('task-global');
+    });
+  });
+  describe('calculateMapTaskTotals with global tasks', () => {
+    it('includes global tasks in map counts when hideGlobalTasks is false', async () => {
+      const { taskFiltering, metadataStore } = await setup();
+      const mergedMaps = [
+        { id: 'map-1', mergedIds: ['map-1'] },
+        { id: 'map-2', mergedIds: ['map-2'] },
+      ];
+      const counts = taskFiltering.calculateMapTaskTotals(
+        mergedMaps,
+        metadataStore.tasks,
+        false,
+        'self',
+        'available'
+      );
+      expect(counts['map-1']).toBeGreaterThanOrEqual(1);
+      expect(counts['map-2']).toBeGreaterThanOrEqual(1);
+    });
+    it('excludes global tasks from map counts when hideGlobalTasks is true', async () => {
+      const { taskFiltering, metadataStore } = await setup();
+      const mergedMaps = [{ id: 'map-1', mergedIds: ['map-1'] }];
+      const countsWithGlobal = taskFiltering.calculateMapTaskTotals(
+        mergedMaps,
+        metadataStore.tasks,
+        false,
+        'self',
+        'available'
+      );
+      const countsWithoutGlobal = taskFiltering.calculateMapTaskTotals(
+        mergedMaps,
+        metadataStore.tasks,
+        true,
+        'self',
+        'available'
+      );
+      expect(countsWithGlobal['map-1']).toBeGreaterThan(countsWithoutGlobal['map-1']);
+    });
+    it('adds same global count to all maps', async () => {
+      const { taskFiltering, metadataStore } = await setup();
+      const mergedMaps = [
+        { id: 'map-1', mergedIds: ['map-1'] },
+        { id: 'map-other', mergedIds: ['map-other'] },
+      ];
+      const counts = taskFiltering.calculateMapTaskTotals(
+        mergedMaps,
+        metadataStore.tasks,
+        false,
+        'self',
+        'available'
+      );
+      expect(counts['map-other']).toBeGreaterThanOrEqual(1);
     });
   });
 });

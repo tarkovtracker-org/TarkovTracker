@@ -535,8 +535,6 @@
       preferencesStore.setTaskUserView(selected.value);
     }
   };
-  // Global tasks toggle - controls whether tasks without specific map assignments
-  // (but with raid-relevant objectives) appear in Map View alongside map-specific tasks
   const showGlobalTasks = computed(() => !preferencesStore.getHideGlobalTasks);
   const toggleGlobalTasks = () => {
     preferencesStore.setHideGlobalTasks(!preferencesStore.getHideGlobalTasks);
