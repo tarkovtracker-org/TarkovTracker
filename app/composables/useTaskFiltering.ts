@@ -729,7 +729,7 @@ export function useTaskFiltering() {
       userView,
     });
     const counts = { all: 0, available: 0, locked: 0, completed: 0, failed: 0 };
-    const taskList = metadataStore.tasks;
+    const taskList = filterTasksByTypeSettings(metadataStore.tasks);
     // Get prestige filtering data
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap;
@@ -818,7 +818,7 @@ export function useTaskFiltering() {
       secondaryView,
     });
     const counts: Record<string, number> = {};
-    const taskList = metadataStore.tasks;
+    const taskList = filterTasksByTypeSettings(metadataStore.tasks);
     // Get prestige filtering data
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap;
