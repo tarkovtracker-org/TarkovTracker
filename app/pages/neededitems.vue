@@ -430,8 +430,6 @@
         return task?.kappaRequired === true;
       });
     }
-    // Filter by search - multi-token search across item name, task name, and hideout station
-    // e.g., "gas analyzer lavatory" finds gas analyzers needed for Lavatory
     if (search.value) {
       const tokens = splitSearchTokens(search.value);
       if (tokens.length > 0) {

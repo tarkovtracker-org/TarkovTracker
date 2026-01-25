@@ -504,7 +504,6 @@
       logger.error('[Tasks] Debounced search update failed:', error);
     });
   });
-  // Split search into tokens for multi-word matching (e.g., "punisher 5" matches "The Punisher - Part 5")
   const searchTokens = computed(() => splitSearchTokens(debouncedSearch.value));
   // Cache lowercase task names to avoid repeated toLowerCase() calls in filter
   type TaskWithLowerName = Task & { _lowerName: string };
