@@ -69,6 +69,22 @@ const createProgressStore = () => ({
   },
   playerFaction: { self: 'USEC' },
   getDisplayName: (teamId: string) => teamId,
+  getTaskStatus: (teamId: string, taskId: string) => {
+    const completions: Record<string, Record<string, boolean>> = {
+      'task-map': { self: false },
+      'task-trader': { self: true },
+      'task-locked': { self: false },
+      'task-failed': { self: false },
+      'task-invalid': { self: false },
+      'task-bear': { self: false },
+    };
+    const failed: Record<string, Record<string, boolean>> = {
+      'task-failed': { self: true },
+    };
+    if (failed[taskId]?.[teamId]) return 'failed';
+    if (completions[taskId]?.[teamId]) return 'completed';
+    return 'incomplete';
+  },
 });
 const createMetadataStore = (tasks: Task[]) => {
   const traders = [

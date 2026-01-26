@@ -1114,7 +1114,12 @@ const formatApiUpdateDescription = (
 };
 const getApiUpdateMeta = (data: UserProgressData | undefined): ApiUpdateMeta | null => {
   const meta = data?.lastApiUpdate;
-  if (!meta || meta.source !== 'api' || typeof meta.id !== 'string' || typeof meta.at !== 'number') {
+  if (
+    !meta ||
+    meta.source !== 'api' ||
+    typeof meta.id !== 'string' ||
+    typeof meta.at !== 'number'
+  ) {
     return null;
   }
   return meta;

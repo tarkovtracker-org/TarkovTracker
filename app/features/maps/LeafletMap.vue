@@ -81,14 +81,14 @@
           Scav
         </UButton>
         <div class="bg-surface-900/40 flex items-center gap-2 rounded px-2 py-1">
-          <span class="text-[10px] font-semibold uppercase text-gray-400">Zoom</span>
+          <span class="text-[10px] font-semibold text-gray-400 uppercase">Zoom</span>
           <input
             v-model.number="mapZoomSpeed"
             type="range"
             :min="ZOOM_SPEED_MIN"
             :max="ZOOM_SPEED_MAX"
             step="0.1"
-            class="h-1.5 w-24 cursor-pointer accent-primary-500"
+            class="accent-primary-500 h-1.5 w-24 cursor-pointer"
             aria-label="Zoom speed"
           />
           <span class="text-[10px] text-gray-300 tabular-nums">{{ zoomSpeedLabel }}</span>

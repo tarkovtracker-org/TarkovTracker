@@ -128,11 +128,24 @@ export function useInfiniteScroll(
         isLoading.value = false;
         // Only use autoFill when NOT actively scrolling - scroll handler will trigger loads
         // This prevents the recursive nextTick/rAF chain from competing with scroll events
-        if (autoFill && !isActivelyScrolling && !isStopped && !pendingNextTick && pendingRafId === null) {
+        if (
+          autoFill &&
+          !isActivelyScrolling &&
+          !isStopped &&
+          !pendingNextTick &&
+          pendingRafId === null
+        ) {
           pendingNextTick = true;
           nextTick(() => {
             pendingNextTick = false;
-            if (isStopped || isActivelyScrolling || pendingRafId !== null || !enabled.value || !sentinelRef.value) return;
+            if (
+              isStopped ||
+              isActivelyScrolling ||
+              pendingRafId !== null ||
+              !enabled.value ||
+              !sentinelRef.value
+            )
+              return;
             pendingRafId = requestAnimationFrame(() => {
               pendingRafId = null;
               if (isStopped || isActivelyScrolling || !enabled.value || !sentinelRef.value) return;

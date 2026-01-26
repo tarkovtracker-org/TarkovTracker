@@ -136,20 +136,11 @@ export function useTaskFiltering() {
     const isFailed = progressStore.tasksFailed?.[taskId]?.[teamId] === true;
     return { isUnlocked, isCompleted, isFailed };
   };
-  /**
-   * Helper to get task status for a specific user view (uses store data directly)
-   */
   const getUserTaskStatus = (taskId: string, userView: string) => {
-    if (progressStore.getTaskStatus) {
-      const status = progressStore.getTaskStatus(userView, taskId);
-      return {
-        isCompleted: status === 'completed',
-        isFailed: status === 'failed',
-      };
-    }
+    const status = progressStore.getTaskStatus(userView, taskId);
     return {
-      isCompleted: progressStore.tasksCompletions?.[taskId]?.[userView] === true,
-      isFailed: progressStore.tasksFailed?.[taskId]?.[userView] === true,
+      isCompleted: status === 'completed',
+      isFailed: status === 'failed',
     };
   };
   /**
@@ -245,11 +236,7 @@ export function useTaskFiltering() {
         if (isTaskInvalid(task.id, userView)) return false;
         const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
         const unlockedTasks = progressStore.unlockedTasks?.[task.id];
-        return (
-          isCompleted !== true &&
-          isFailed !== true &&
-          unlockedTasks?.[userView] !== true
-        );
+        return isCompleted !== true && isFailed !== true && unlockedTasks?.[userView] !== true;
       });
     } else if (secondaryView === 'completed') {
       filtered = filtered.filter((task) => {
@@ -652,7 +639,14 @@ export function useTaskFiltering() {
       visibleTaskList = afterType;
       // Apply primary view filter
       const [afterView, filterViewMs] = timed(
-        () => filterTasksByView(visibleTaskList, activePrimaryView, activeMapView, activeTraderView, mergedMaps),
+        () =>
+          filterTasksByView(
+            visibleTaskList,
+            activePrimaryView,
+            activeMapView,
+            activeTraderView,
+            mergedMaps
+          ),
         perfOn
       );
       visibleTaskList = afterView;

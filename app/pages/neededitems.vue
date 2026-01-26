@@ -17,15 +17,23 @@
     <!-- Items Container -->
     <UCard class="bg-contentbackground border border-white/5">
       <!-- Error state with retry button -->
-      <div v-if="itemsError" class="text-surface-400 flex flex-col items-center justify-center gap-4 p-8">
+      <div
+        v-if="itemsError"
+        class="text-surface-400 flex flex-col items-center justify-center gap-4 p-8"
+      >
         <UIcon name="i-mdi-alert-circle" class="text-error-400 h-8 w-8" />
-        <span class="text-error-400">{{ $t('page.neededitems.error', 'Failed to load items.') }}</span>
+        <span class="text-error-400">
+          {{ $t('page.neededitems.error', 'Failed to load items.') }}
+        </span>
         <UButton color="primary" @click="ensureNeededItemsData">
           {{ $t('page.neededitems.retry', 'Retry') }}
         </UButton>
       </div>
       <!-- Loading state while items are being fetched -->
-      <div v-else-if="!itemsReady" class="text-surface-400 flex items-center justify-center gap-2 p-8">
+      <div
+        v-else-if="!itemsReady"
+        class="text-surface-400 flex items-center justify-center gap-2 p-8"
+      >
         <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" />
         <span>{{ $t('page.neededitems.loading', 'Loading items...') }}</span>
       </div>

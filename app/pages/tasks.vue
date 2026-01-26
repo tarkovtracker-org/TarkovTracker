@@ -329,8 +329,8 @@
           const entries = value.filter(
             (entry): entry is string | number => entry !== undefined && entry !== null
           );
-          const nonEmptyEntries = entries.filter(
-            (entry) => (typeof entry === 'string' ? entry !== '' : true)
+          const nonEmptyEntries = entries.filter((entry) =>
+            typeof entry === 'string' ? entry !== '' : true
           );
           if (nonEmptyEntries.length === 0) return;
           normalized[key] = nonEmptyEntries.map(String).join(',');
@@ -404,9 +404,7 @@
       preferencesStore.setTaskPrimaryView(targetView);
     }
     if (targetView === 'maps') {
-      const mapId = maps.value.some((map) => map.id === mapParam)
-        ? mapParam
-        : maps.value[0]?.id;
+      const mapId = maps.value.some((map) => map.id === mapParam) ? mapParam : maps.value[0]?.id;
       if (mapId && mapId !== preferencesStore.getTaskMapView) {
         preferencesStore.setTaskMapView(mapId);
       }
