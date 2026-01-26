@@ -11,17 +11,37 @@ import {
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
 
-// Cache key patterns for targeted purging
-const TARKOV_CACHE_PREFIXES = [
-  '/__edge-cache/tarkov/data-',
-  '/__edge-cache/tarkov/tasks-core-',
-  '/__edge-cache/tarkov/tasks-objectives-',
-  '/__edge-cache/tarkov/tasks-rewards-',
-  '/__edge-cache/tarkov/bootstrap-',
-  '/__edge-cache/tarkov/hideout-',
-  '/__edge-cache/tarkov/items-',
-  '/__edge-cache/tarkov/prestige-',
+const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
+const TARKOV_CACHE_KEYS = [
+  { key: 'bootstrap', includesGameMode: false },
+  { key: 'tasks-core', includesGameMode: true },
+  { key: 'tasks-objectives', includesGameMode: true },
+  { key: 'tasks-rewards', includesGameMode: true },
+  { key: 'hideout', includesGameMode: true },
+  { key: 'items', includesGameMode: false },
+  { key: 'items-lite', includesGameMode: false },
+  { key: 'prestige', includesGameMode: false },
 ];
+// Keep in sync with app/utils/constants.ts (API_SUPPORTED_LANGUAGES)
+const TARKOV_LANGUAGES = [
+  'cs',
+  'de',
+  'en',
+  'es',
+  'fr',
+  'hu',
+  'it',
+  'ja',
+  'ko',
+  'pl',
+  'pt',
+  'ro',
+  'ru',
+  'sk',
+  'tr',
+  'zh',
+];
+const TARKOV_GAME_MODES = ['regular', 'pve'];
 
 interface PurgeRequest {
   purgeType: 'all' | 'tarkov-data';
@@ -156,16 +176,38 @@ async function purgeTarkovDataCache(
   apiToken: string,
   baseUrl: string
 ): Promise<CloudflarePurgeResponse> {
-  // Build list of cache URLs to purge
-  const languages = ['en', 'ru', 'de', 'fr', 'es', 'pt', 'pl', 'ja', 'ko', 'zh'];
-  const gameModes = ['regular', 'pve'];
+  const normalizedBaseUrl = baseUrl.trim();
+  const baseUrls = (() => {
+    try {
+      const parsed = new URL(normalizedBaseUrl);
+      const origins = new Set<string>();
+      origins.add(parsed.origin);
+      const host = parsed.hostname;
+      const portSuffix = parsed.port ? `:${parsed.port}` : '';
+      if (host.startsWith('www.')) {
+        origins.add(`${parsed.protocol}//${host.replace(/^www\./, '')}${portSuffix}`);
+      } else {
+        origins.add(`${parsed.protocol}//www.${host}${portSuffix}`);
+      }
+      return Array.from(origins);
+    } catch {
+      return ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
+    }
+  })();
 
   const urlsToPurge: string[] = [];
 
-  for (const prefix of TARKOV_CACHE_PREFIXES) {
-    for (const lang of languages) {
-      for (const gameMode of gameModes) {
-        urlsToPurge.push(`${baseUrl}${prefix}${lang}-${gameMode}`);
+  for (const base of baseUrls) {
+    const cacheBase = `${base}${EDGE_CACHE_PATH}`;
+    for (const entry of TARKOV_CACHE_KEYS) {
+      for (const lang of TARKOV_LANGUAGES) {
+        if (entry.includesGameMode) {
+          for (const gameMode of TARKOV_GAME_MODES) {
+            urlsToPurge.push(`${cacheBase}/${entry.key}-${lang}-${gameMode}`);
+          }
+        } else {
+          urlsToPurge.push(`${cacheBase}/${entry.key}-${lang}`);
+        }
       }
     }
   }
@@ -321,7 +363,11 @@ serve(async (req) => {
     }
 
     // Get base URL for cache key construction
-    const baseUrl = Deno.env.get('APP_BASE_URL') || 'https://tarkovtracker.org';
+    const baseUrl =
+      Deno.env.get('APP_BASE_URL') ||
+      Deno.env.get('NUXT_PUBLIC_APP_URL') ||
+      Deno.env.get('SITE_URL') ||
+      'https://tarkovtracker.org';
 
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;

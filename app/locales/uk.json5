@@ -12,6 +12,44 @@
   menu: {
     language: 'Мова',
   },
+  maps: {
+    zoom: 'Масштаб',
+    notAvailableTitle: 'Карта недоступна',
+    notAvailableDescription: 'Інтерактивна карта для {mapName} поки недоступна. Ми чекаємо на створення сумісної карти.',
+    placeholder: 'цієї локації',
+    floors: 'Поверхи',
+    reset: 'Скинути',
+    resetTitle: 'Скинути вигляд за замовчуванням',
+    factions: {
+      pmc: 'PMC',
+      scav: 'Scav',
+    },
+    legend: {
+      yourObjectives: 'Ваші цілі',
+      teamObjectives: 'Цілі команди',
+      pmcExtract: 'Вихід PMC',
+      scavExtract: 'Вихід Scav',
+      sharedExtract: 'Спільний вихід (будь-яка фракція)',
+      coopExtract: 'Кооп-вихід (PMC + Scav)',
+    },
+    controls: {
+      keyboard: {
+        cycleFloors: '+ Прокрутка для зміни поверхів',
+        zoom: '+ Прокрутка для масштабу',
+      },
+    },
+    aria: {
+      zoomSpeed: 'Швидкість масштабування',
+    },
+    tooltip: {
+      goTo: 'Перейти до цілі',
+      goToInTaskList: 'Перейти до цілі у списку завдань',
+      complete: 'Виконати ціль',
+      uncomplete: 'Скасувати виконання цілі',
+      objectiveUnavailable: 'Ціль недоступна.',
+      taskFallback: 'Завдання',
+    },
+  },
   page: {
     index: {
       title: 'Приладова Панель',
@@ -105,8 +143,8 @@
       filters: {
         title: 'Фільтри Завдань',
         close: 'Закрити',
-        hide_global_tasks: 'Приховати глобальні завдання на карті',
-        show_global_tasks: 'Показати глобальні завдання на карті',
+        hide_global_tasks: 'Приховати глобальні завдання',
+        show_global_tasks: 'Показати глобальні завдання',
         hide_non_kappa_tasks: 'Приховати не Каппа завдання',
         show_non_kappa_tasks: 'Показати не Каппа завдання',
         level: 'Рівень',
@@ -131,11 +169,15 @@
       notasksfound: 'Завдання не знайдено. Спробуйте змінити фільтри або оновити рівень.',
       showing_all_sources: 'Показати всі джерела',
       loading: 'Завантажуємо завдання',
+      selectedTask: 'Обране завдання',
       questcard: {
         level: 'Потрібний рівень: {count}',
         wiki: 'Wiki сторінка',
         lockedbefore: 'Завдань до: {count}',
         lockedbehind: 'Завдань після: {count}',
+        reportDataIssue: 'Повідомити про помилку даних',
+        viewOnTarkovDev: 'Відкрити на Tarkov.dev',
+        viewOnWiki: 'Відкрити у вікі',
         completebutton: 'Завершено',
         availablebutton: 'Відзначити Доступним',
         uncompletebutton: 'Відзначити Незавершене',
@@ -159,7 +201,13 @@
         objectiveshidden: '{count} цілей не на цій карті ({uncompleted} не завершено)',
         alternatives: 'Альтернативні завдання',
         alternativefailed: 'Альтернативні завдання також будуть перезавантаженні',
+        anyMap: 'Будь-яка',
+        globalTask: 'Будь-яка карта',
+        globalTaskTooltip: 'Це завдання можна виконати на будь-якій карті',
+        jumpToMap: 'Перейти до карти',
       },
+      scrollToMap: 'Прокрутити до карти',
+      scrollToTop: 'Вгору',
     },
     traders: {
       title: 'Торговці',
@@ -528,6 +576,7 @@
     item: 'Предмет',
     items: 'Предмети',
     close_button: 'Закрити',
+    dismiss: 'Відхилити',
     loading: 'Завантаження...',
     error: 'Помилка',
   },

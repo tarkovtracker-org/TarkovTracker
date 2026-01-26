@@ -11,7 +11,7 @@ TarkovTracker is a Nuxt 4 Single Page Application (SPA) for tracking Escape from
 - Pinia for state management
 - Supabase for auth, database, and realtime
 - Cloudflare Pages/Workers for deployment
-- Tailwind CSS v4 with SCSS
+- Tailwind CSS v4 (no SCSS/scoped styles)
 - Vitest + Vue Test Utils for testing
 
 ## Directory Structure
@@ -70,13 +70,11 @@ Always use this structure:
 </script>
 
 <template>
-  <!-- Template content -->
+  <!-- Template content with Tailwind classes -->
 </template>
-
-<style scoped lang="scss">
-  // Indented SCSS styles
-</style>
 ```
+
+**No `<style>` blocks.** Use Tailwind CSS v4 utilities exclusively. For complex animations or utilities not available in Tailwind, add them to `app/assets/css/tailwind.css`.
 
 ### Import Rules (Critical)
 
@@ -172,11 +170,12 @@ describe('ComponentName', () => {
 
 ## Styling Guidelines
 
-- Use Tailwind CSS v4 theme layer only - **no hex colors**
-- SCSS for component styles with `<style scoped lang="scss">`
+- **Tailwind v4 only**—no `<style>` blocks, SCSS, or scoped CSS in components
+- Use Tailwind theme layer for colors—no hex values in templates
+- For complex animations, define them in `app/assets/css/tailwind.css` using `@theme` or `@keyframes`
 - Tailwind classes are auto-sorted by Prettier
 - Use `@nuxt/ui` components consistently with existing patterns
-- Avoid inline styles
+- Inline styles are acceptable only for truly dynamic values (e.g., computed positions)
 
 ## Localization
 
@@ -207,6 +206,16 @@ export default defineEventHandler(async (event) => {
 
 - `supabase/functions/**` - Deno code with different lint rules
 - `node_modules/`, `dist/`, `.nuxt/`
+
+## Agent Rules
+
+- **No over-thinking in responses**. Sacrifice explanatory language for brevity—layman's terms only when necessary.
+- **Be concise**. Direct responses only: "Fixed X by changing Y to Z." Minimize explanation unless asked. Use file references for context.
+- **No comments** unless explicitly requested. Comments are token overhead.
+- **Run `npm run format` once** before leaving code. It handles both formatting and linting. Only show errors, skip success output.
+- **Own all issues**. Fix formatting, linting, and pre-existing bugs without being asked. Don't deflect with "these are from earlier changes."
+- **Self-assess code**. Don't ask "what does this do?" Read and understand it. Only clarify ambiguous intent ("Is this supposed to do X or Y?").
+- **Ask before acting on complex requests**. Clarify ambiguous or multi-interpretation tasks before proceeding—it's better to ask one question than redo work.
 
 ## Common Pitfalls to Avoid
 

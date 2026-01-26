@@ -20,6 +20,15 @@
             }}
           </template>
         </UAlert>
+        <!-- Usage Hint -->
+        <p class="text-surface-400 text-sm">
+          {{
+            $t(
+              'settings.skills.manual_hint',
+              'Enter your total skill level from the game to adjust the offset automatically.'
+            )
+          }}
+        </p>
         <!-- Skills Grid -->
         <div
           v-if="allGameSkills.length > 0"

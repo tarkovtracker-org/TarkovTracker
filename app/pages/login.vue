@@ -115,16 +115,25 @@
       'Sign in to TarkovTracker to sync your progress across devices and collaborate with your team.',
   });
   const { $supabase } = useNuxtApp();
+  const route = useRoute();
   const loading = ref({
     twitch: false,
     discord: false,
     google: false,
     github: false,
   });
+  const redirectPath = computed(() => {
+    const value = route.query.redirect;
+    return typeof value === 'string' && value.startsWith('/') ? value : '';
+  });
   const buildCallbackUrl = () => {
     const config = useRuntimeConfig();
     const origin = typeof window !== 'undefined' ? window.location.origin : config.public.appUrl;
-    return `${origin}/auth/callback`;
+    const url = new URL('/auth/callback', origin);
+    if (redirectPath.value) {
+      url.searchParams.set('redirect', redirectPath.value);
+    }
+    return url.toString();
   };
   const openPopupOrRedirect = (
     url: string,
@@ -144,7 +153,7 @@
         if (event.origin === window.location.origin && event.data?.type === 'OAUTH_SUCCESS') {
           loading.value[provider] = false;
           cleanup();
-          navigateTo('/', { replace: true });
+          navigateTo(redirectPath.value || '/', { replace: true });
         }
       };
       const pollTimer = setInterval(() => {

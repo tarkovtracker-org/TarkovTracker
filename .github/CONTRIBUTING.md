@@ -11,6 +11,7 @@ Thank you for your interest in contributing to TarkovTracker! This document prov
 - [Label System](#label-system)
 - [Project Board](#project-board)
 - [Coding Standards](#coding-standards)
+- [Guidelines for AI Coding Agents](#guidelines-for-ai-coding-agents)
 
 ## Code of Conduct
 
@@ -188,7 +189,7 @@ Issues move automatically based on actions:
 
 ### TypeScript & Vue
 - Use `<script setup lang="ts">` with TypeScript
-- Use `<style scoped lang="scss">` for styles
+- **No `<style>` blocks**—Tailwind v4 is the only styling approach
 - 2-space indentation, 100-char line width
 - Single quotes, semicolons, trailing commas (es5)
 
@@ -199,8 +200,9 @@ Issues move automatically based on actions:
 - PascalCase components, camelCase functions, kebab-case files
 
 ### Styling
-- Tailwind CSS v4 theme layer only - no hex colors
-- Use semantic color variables from theme
+- **Tailwind v4 only**—no `<style>` blocks, SCSS, or scoped CSS
+- Use Tailwind theme layer for colors—no hex values in templates
+- Complex animations go in `app/assets/css/tailwind.css` using `@theme` or `@keyframes`
 - Responsive design (mobile-first)
 
 ### Error Handling
@@ -220,9 +222,29 @@ Issues move automatically based on actions:
 - Reference issue numbers when applicable
 - Keep commits focused and atomic
 
+## Guidelines for AI Coding Agents
+
+When working with AI coding assistants on this project:
+
+### Ask Before Acting
+- **Clarify complex or ambiguous requests** before proceeding—don't assume intent
+- If a task has multiple valid interpretations, ask which approach is preferred
+- When uncertain about scope, confirm boundaries before making changes
+- It's better to ask one clarifying question than to redo work
+
+### Communicate Proactively
+- Surface potential issues or trade-offs early
+- If you encounter blockers or unexpected complexity, report them
+- Propose alternatives when the requested approach has significant downsides
+
+### Stay Focused
+- Complete one task fully before moving to the next
+- Avoid scope creep—stick to what was requested
+- Flag related issues you notice, but don't fix them without permission
+
 ## Questions?
 
-- Join our [Discord](https://discord.gg/tarkovtracker)
+- Join our [Discord](https://discord.gg/M8nBgA2sT6)
 - Ask in issue comments
 - Check existing documentation
 

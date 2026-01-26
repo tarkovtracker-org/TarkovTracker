@@ -148,6 +148,7 @@
   } from '@/types/tarkov';
   import { isTaskAvailableForEdition } from '@/utils/editionHelpers';
   import { logger } from '@/utils/logger';
+  import { splitSearchTokens } from '@/utils/search';
   // Route meta for layout behavior
   definePageMeta({
     usesWindowScroll: true,
@@ -429,49 +430,36 @@
         return task?.kappaRequired === true;
       });
     }
-    // Filter by search - searches item name, task name, and hideout station name
     if (search.value) {
-      const searchLower = search.value.toLowerCase();
-      items = items.filter((item) => {
-        const itemObj = getNeededItemData(item);
-        const itemName = itemObj?.name;
-        const itemShortName = itemObj?.shortName;
-        if (
-          itemName?.toLowerCase()?.includes(searchLower) ||
-          itemShortName?.toLowerCase()?.includes(searchLower)
-        ) {
-          return true;
-        }
-        // Search by task name for task objectives
-        if (item.needType === 'taskObjective') {
-          const task = metadataStore.getTaskById((item as NeededItemTaskObjective).taskId);
-          if (task?.name?.toLowerCase().includes(searchLower)) {
-            return true;
+      const tokens = splitSearchTokens(search.value);
+      if (tokens.length > 0) {
+        items = items.filter((item) => {
+          // Build searchable text from all relevant fields
+          const searchableTexts: string[] = [];
+          const itemObj = getNeededItemData(item);
+          if (itemObj?.name) searchableTexts.push(itemObj.name.toLowerCase());
+          if (itemObj?.shortName) searchableTexts.push(itemObj.shortName.toLowerCase());
+          // Add task name for task objectives
+          if (item.needType === 'taskObjective') {
+            const task = metadataStore.getTaskById((item as NeededItemTaskObjective).taskId);
+            if (task?.name) searchableTexts.push(task.name.toLowerCase());
           }
-        }
-        // Search by hideout station name and level for hideout modules
-        if (item.needType === 'hideoutModule') {
-          const hideoutModule = (item as NeededItemHideoutModule).hideoutModule;
-          const station = metadataStore.getStationById(hideoutModule.stationId);
-          if (station?.name) {
-            // Match station name alone (e.g., "Lavatory")
-            if (station.name.toLowerCase().includes(searchLower)) {
-              return true;
-            }
-            // Match station name with level (e.g., "Lavatory 1" or "Lavatory Level 1")
-            const stationWithLevel = `${station.name} ${hideoutModule.level}`.toLowerCase();
-            const stationWithLevelText =
-              `${station.name} level ${hideoutModule.level}`.toLowerCase();
-            if (
-              stationWithLevel.includes(searchLower) ||
-              stationWithLevelText.includes(searchLower)
-            ) {
-              return true;
+          // Add hideout station name and level for hideout modules
+          if (item.needType === 'hideoutModule') {
+            const hideoutModule = (item as NeededItemHideoutModule).hideoutModule;
+            const station = metadataStore.getStationById(hideoutModule.stationId);
+            if (station?.name) {
+              searchableTexts.push(station.name.toLowerCase());
+              searchableTexts.push(`${hideoutModule.level}`);
+              searchableTexts.push('level');
             }
           }
-        }
-        return false;
-      });
+          // Combine all searchable text
+          const combinedText = searchableTexts.join(' ');
+          // All tokens must be present in the combined searchable text
+          return tokens.every((token) => combinedText.includes(token));
+        });
+      }
     }
     return items;
   });

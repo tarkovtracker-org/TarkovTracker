@@ -30,6 +30,9 @@ const mockFetch = vi.fn(async (input: FetchInput, _init?: RequestInit) => {
   if (url.includes('/api/tarkov/tasks-rewards')) {
     return { data: { tasks: [] } };
   }
+  if (url.includes('/api/tarkov/cache-meta')) {
+    return { data: { lastPurgeAt: null } };
+  }
   if (url.includes('tarkov-data-overlay') || url.includes('/overlay.json')) {
     return { editions: {} };
   }

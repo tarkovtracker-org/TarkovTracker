@@ -3,7 +3,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
-import type { Task } from '@/types/tarkov';
+import type { Task, TaskObjective } from '@/types/tarkov';
 import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
 import { EXCLUDED_SCAV_KARMA_TASKS, TRADER_ORDER } from '@/utils/constants';
 import { logger } from '@/utils/logger';
@@ -12,6 +12,19 @@ interface MergedMap {
   id: string;
   mergedIds?: string[];
 }
+const RAID_RELEVANT_OBJECTIVE_TYPES = [
+  'shoot',
+  'extract',
+  'mark',
+  'visit',
+  'findItem',
+  'findQuestItem',
+  'giveQuestItem',
+  'plantItem',
+  'plantQuestItem',
+  'useItem',
+  'experience',
+];
 export function useTaskFiltering() {
   const progressStore = useProgressStore();
   const metadataStore = useMetadataStore();
@@ -46,9 +59,22 @@ export function useTaskFiltering() {
     'plantQuestItem',
     'shoot',
   ];
-  /**
-   * Filter tasks by primary view (all, maps, traders)
-   */
+  const isRaidRelevantObjective = (obj: TaskObjective): boolean => {
+    if (RAID_RELEVANT_OBJECTIVE_TYPES.includes(obj.type || '')) return true;
+    if (obj.type === 'giveItem' && obj.foundInRaid) return true;
+    return false;
+  };
+  const isGlobalTask = (task: Task): boolean => {
+    const hasMap = task.map?.id != null;
+    const hasLocations = Array.isArray(task.locations) && task.locations.length > 0;
+    const hasMapObjectives = task.objectives?.some(
+      (obj) =>
+        Array.isArray(obj.maps) && obj.maps.length > 0 && mapObjectiveTypes.includes(obj.type || '')
+    );
+    const isMapless = !hasMap && !hasLocations && !hasMapObjectives;
+    const hasRaidRelevantObjectives = task.objectives?.some(isRaidRelevantObjective) ?? false;
+    return isMapless && hasRaidRelevantObjectives;
+  };
   const filterTasksByView = (
     taskList: Task[],
     primaryView: string,
@@ -63,18 +89,15 @@ export function useTaskFiltering() {
     }
     return taskList;
   };
-  /**
-   * Filter tasks by map, handling merged maps (Ground Zero, Factory)
-   */
   const filterTasksByMap = (taskList: Task[], mapView: string, mergedMaps: MergedMap[]) => {
+    const showGlobalTasks = !preferencesStore.getHideGlobalTasks;
+    let mapSpecificTasks: Task[];
     const mergedMap = mergedMaps.find((m) => m.mergedIds && m.mergedIds.includes(mapView));
     if (mergedMap && mergedMap.mergedIds) {
       const ids = mergedMap.mergedIds;
-      return taskList.filter((task) => {
-        // Check locations field
+      mapSpecificTasks = taskList.filter((task) => {
         const taskLocations = Array.isArray(task.locations) ? task.locations : [];
         let hasMap = ids.some((id: string) => taskLocations.includes(id));
-        // Check objectives[].maps
         if (!hasMap && Array.isArray(task.objectives)) {
           hasMap = task.objectives.some(
             (obj) =>
@@ -86,8 +109,7 @@ export function useTaskFiltering() {
         return hasMap;
       });
     } else {
-      // Default: single map logic
-      return taskList.filter((task) =>
+      mapSpecificTasks = taskList.filter((task) =>
         task.objectives?.some(
           (obj) =>
             obj.maps?.some((map) => map.id === mapView) &&
@@ -95,6 +117,11 @@ export function useTaskFiltering() {
         )
       );
     }
+    if (showGlobalTasks) {
+      const globalTasks = taskList.filter(isGlobalTask);
+      return [...mapSpecificTasks, ...globalTasks];
+    }
+    return mapSpecificTasks;
   };
   /**
    * Check if a task is invalid (permanently blocked) for a user
@@ -323,20 +350,6 @@ export function useTaskFiltering() {
     return locations;
   };
   /**
-   * Helper to check if task passes all filters
-   */
-  const taskPassesFilters = (
-    task: Task,
-    disabledTasks: string[],
-    hideGlobalTasks: boolean,
-    hideNonKappaTasks: boolean
-  ): boolean => {
-    if (disabledTasks.includes(task.id)) return false;
-    if (hideGlobalTasks && !task.map) return false;
-    if (hideNonKappaTasks && task.kappaRequired !== true) return false;
-    return true;
-  };
-  /**
    * Helper to check if user has unlocked task
    */
   const isTaskUnlockedForUser = (taskId: string, activeUserView: string): boolean => {
@@ -364,15 +377,10 @@ export function useTaskFiltering() {
       }) ?? false
     );
   };
-  /**
-   * Calculate task totals per map for badge display
-   */
   const calculateMapTaskTotals = (
     mergedMaps: MergedMap[],
     tasks: Task[],
-    disabledTasks: string[],
     hideGlobalTasks: boolean,
-    hideNonKappaTasks: boolean,
     activeUserView: string,
     secondaryView: string
   ) => {
@@ -385,13 +393,22 @@ export function useTaskFiltering() {
     const mapTaskCounts: Record<string, number> = {};
     const typedTasks = filterTasksByTypeSettings(tasks);
     const statusFilteredTasks = filterTasksByStatus(typedTasks, secondaryView, activeUserView);
+    let globalTaskCount = 0;
+    if (!hideGlobalTasks) {
+      for (const task of statusFilteredTasks) {
+        if (!isGlobalTask(task)) continue;
+        if (secondaryView === 'available') {
+          if (!isTaskUnlockedForUser(task.id, activeUserView)) continue;
+        }
+        globalTaskCount++;
+      }
+    }
     for (const map of mergedMaps) {
       const ids = map.mergedIds || [map.id];
       const mapId = map.id;
       if (!mapId) continue;
-      mapTaskCounts[mapId] = 0;
+      mapTaskCounts[mapId] = globalTaskCount;
       for (const task of statusFilteredTasks) {
-        if (!taskPassesFilters(task, disabledTasks, hideGlobalTasks, hideNonKappaTasks)) continue;
         const taskLocations = extractTaskLocations(task);
         if (!ids.some((id: string) => taskLocations.includes(id))) continue;
         if (secondaryView === 'available') {
@@ -900,6 +917,8 @@ export function useTaskFiltering() {
     updateVisibleTasks,
     resetTraderOrderMapCache,
     mapObjectiveTypes,
-    disabledTasks: EXCLUDED_SCAV_KARMA_TASKS,
+    RAID_RELEVANT_OBJECTIVE_TYPES,
+    isRaidRelevantObjective,
+    isGlobalTask,
   };
 }

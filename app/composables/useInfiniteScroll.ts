@@ -144,8 +144,9 @@ export function useInfiniteScroll(
               pendingRafId !== null ||
               !enabled.value ||
               !sentinelRef.value
-            )
+            ) {
               return;
+            }
             pendingRafId = requestAnimationFrame(() => {
               pendingRafId = null;
               if (isStopped || isActivelyScrolling || !enabled.value || !sentinelRef.value) return;

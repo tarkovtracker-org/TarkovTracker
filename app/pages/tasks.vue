@@ -6,7 +6,7 @@
         <!-- Task Filter Bar -->
         <TaskFilterBar v-model:search-query="searchQuery" />
         <!-- Map Display (shown when MAPS view is selected) -->
-        <div v-if="showMapDisplay" class="mb-6">
+        <div v-if="showMapDisplay" ref="mapContainerRef" data-map-container class="mb-6">
           <div class="bg-surface-800/50 rounded-lg p-4">
             <div class="mb-3 flex items-center justify-between">
               <h3 class="text-lg font-medium text-gray-200">
@@ -18,6 +18,7 @@
             </div>
             <LeafletMapComponent
               v-if="selectedMapData"
+              ref="leafletMapRef"
               :map="selectedMapData"
               :marks="mapObjectiveMarks"
               :show-extracts="true"
@@ -37,8 +38,34 @@
           <TaskEmptyState />
         </div>
         <div v-else ref="taskListRef" data-testid="task-list">
+          <!-- Pinned/Selected Task (shown separately at top with visual distinction) -->
+          <div v-if="pinnedTask" class="mb-6">
+            <div class="text-primary-400 mb-2 flex items-center gap-2 text-xs">
+              <UIcon name="i-mdi-pin" class="h-4 w-4" />
+              <span>{{ t('page.tasks.selectedTask', 'Selected Task') }}</span>
+              <button
+                type="button"
+                class="ml-auto rounded p-1 text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                :aria-label="t('generic.dismiss', 'Dismiss')"
+                @click="clearPinnedTaskAndClosePopup"
+              >
+                <UIcon name="i-mdi-close" class="h-4 w-4" />
+              </button>
+            </div>
+            <div :id="`task-${pinnedTask.id}`" class="pinned-task-wrapper pb-4">
+              <TaskCard
+                :key="`pinned-${pinnedTask.id}`"
+                :task="pinnedTask"
+                @on-task-action="onTaskAction"
+              />
+            </div>
+            <!-- Separator -->
+            <div class="border-t border-white/10" />
+          </div>
+          <!-- Regular task list -->
           <div
-            v-for="task in visibleTasksSlice"
+            v-for="task in unpinnedTasksSlice"
+            :id="pinnedTask?.id === task.id ? undefined : `task-${task.id}`"
             :key="task.id"
             class="pb-4"
             style="content-visibility: auto; contain-intrinsic-size: auto 280px"
@@ -55,6 +82,52 @@
         </div>
       </div>
     </div>
+    <!-- Floating scroll buttons -->
+    <Teleport to="body">
+      <!-- Scroll to Map button (floating at top, only in maps view) -->
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0 -translate-y-3"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 -translate-y-3"
+      >
+        <div
+          v-if="showMapDisplay && showScrollToMapButton"
+          class="fixed top-20 left-1/2 z-40 -translate-x-1/2"
+        >
+          <button
+            type="button"
+            class="bg-primary-600 hover:bg-primary-500 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:shadow-xl"
+            @click="scrollToMap"
+          >
+            <UIcon name="i-mdi-map" class="h-4 w-4" />
+            <span>{{ t('page.tasks.scrollToMap', 'Scroll to Map') }}</span>
+            <UIcon name="i-mdi-arrow-up" class="h-4 w-4" />
+          </button>
+        </div>
+      </Transition>
+      <!-- Scroll to Top button (floating at bottom right) -->
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0 translate-y-3"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-3"
+      >
+        <button
+          v-if="showScrollToTopButton"
+          type="button"
+          class="fixed right-6 bottom-20 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-white/20 hover:shadow-xl"
+          :aria-label="t('page.tasks.scrollToTop', 'Scroll to top')"
+          @click="scrollToTop"
+        >
+          <UIcon name="i-mdi-arrow-up" class="h-6 w-6" />
+        </button>
+      </Transition>
+    </Teleport>
     <Teleport to="body">
       <Transition
         enter-active-class="transition ease-out duration-200"
@@ -101,7 +174,16 @@
 </template>
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
-  import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+  import {
+    computed,
+    defineAsyncComponent,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    provide,
+    ref,
+    watch,
+  } from 'vue';
   import { useI18n } from 'vue-i18n';
   import {
     useRoute,
@@ -123,6 +205,7 @@
   import type { Task, TaskObjective } from '@/types/tarkov';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
+  import { splitSearchTokens } from '@/utils/search';
   // Route meta for layout behavior
   definePageMeta({
     usesWindowScroll: true,
@@ -148,6 +231,7 @@
     getTaskSortMode,
     getTaskSortDirection,
     getTaskSharedByAllOnly,
+    getHideGlobalTasks,
     getHideNonKappaTasks,
     getShowNonSpecialTasks,
     getShowLightkeeperTasks,
@@ -466,6 +550,7 @@
       getTaskSortMode,
       getTaskSortDirection,
       getTaskSharedByAllOnly,
+      getHideGlobalTasks,
       getHideNonKappaTasks,
       getShowNonSpecialTasks,
       getShowLightkeeperTasks,
@@ -503,7 +588,7 @@
       logger.error('[Tasks] Debounced search update failed:', error);
     });
   });
-  const normalizedSearch = computed(() => debouncedSearch.value.toLowerCase().trim());
+  const searchTokens = computed(() => splitSearchTokens(debouncedSearch.value));
   // Cache lowercase task names to avoid repeated toLowerCase() calls in filter
   type TaskWithLowerName = Task & { _lowerName: string };
   const tasksWithLowerName = computed((): TaskWithLowerName[] => {
@@ -512,32 +597,51 @@
       _lowerName: (task.name ?? '').toLowerCase(),
     }));
   });
-  // Filter tasks by search query
+  // Filter tasks by search query - all tokens must be present in the task name
   const filteredTasks = computed((): Task[] => {
-    if (!normalizedSearch.value) {
+    const tokens = searchTokens.value;
+    if (tokens.length === 0) {
       return visibleTasks.value;
     }
-    const query = normalizedSearch.value;
-    return tasksWithLowerName.value.filter((task) => task._lowerName.includes(query)) as Task[];
+    return tasksWithLowerName.value.filter((task) =>
+      tokens.every((token) => task._lowerName.includes(token))
+    ) as Task[];
   });
   const pinnedTaskId = ref<string | null>(null);
-  const pinnedTaskTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const pinnedTask = computed(() => {
     if (!pinnedTaskId.value) return null;
     return filteredTasks.value.find((task) => task.id === pinnedTaskId.value) ?? null;
   });
+  const clearPinnedTask = () => {
+    pinnedTaskId.value = null;
+  };
+  const clearPinnedTaskAndClosePopup = () => {
+    clearPinnedTask();
+    // Also close the map tooltip and deselect the marker
+    leafletMapRef.value?.closeActivePopup();
+  };
   // Progressive rendering - load tasks incrementally for smooth scrolling
   const INITIAL_BATCH = 15;
   const BATCH_SIZE = 10;
+  /**
+   * Timing constants (in milliseconds) for task navigation and highlighting
+   */
+  const SCROLL_TO_MAP_POPUP_DELAY = 150; // Delay before activating popup after scrolling to map
+  const ELEMENT_WAIT_RETRY_DELAY = 50; // Delay between retries when waiting for DOM element
+  const HIGHLIGHT_SETTLE_DELAY = 100; // Delay to let element settle before highlighting
+  const HIGHLIGHT_DURATION = 3500; // How long the highlight animation stays visible
+  const POPUP_ACTIVATE_RETRY_DELAY = 150;
+  const POPUP_ACTIVATE_MAX_ATTEMPTS = 6;
   const visibleTaskCount = ref(INITIAL_BATCH);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
-  const visibleTasksSlice = computed(() => {
-    if (!pinnedTask.value) {
-      return filteredTasks.value.slice(0, visibleTaskCount.value);
-    }
-    const remaining = filteredTasks.value.filter((task) => task.id !== pinnedTask.value?.id);
-    const sliceCount = Math.max(visibleTaskCount.value - 1, 0);
-    return [pinnedTask.value, ...remaining.slice(0, sliceCount)];
+  // Flag to prevent visibleTaskCount reset during task navigation (e.g., from map tooltip)
+  const isNavigatingToTask = ref(false);
+  // Tasks slice excluding the pinned task (shown separately)
+  const unpinnedTasksSlice = computed(() => {
+    const tasks = pinnedTask.value
+      ? filteredTasks.value.filter((task) => task.id !== pinnedTask.value?.id)
+      : filteredTasks.value;
+    return tasks.slice(0, visibleTaskCount.value);
   });
   const hasMoreTasks = computed(() => visibleTaskCount.value < filteredTasks.value.length);
   const loadMoreTasks = () => {
@@ -552,9 +656,11 @@
     enabled: hasMoreTasks,
     useScrollFallback: true,
   });
-  // Reset visible count when filters change
+  // Reset visible count when filters change (but not during scroll-to-task)
   watch(filteredTasks, () => {
-    visibleTaskCount.value = INITIAL_BATCH;
+    if (!isNavigatingToTask.value) {
+      visibleTaskCount.value = INITIAL_BATCH;
+    }
     if (pinnedTaskId.value && !filteredTasks.value.some((task) => task.id === pinnedTaskId.value)) {
       pinnedTaskId.value = null;
     }
@@ -563,6 +669,119 @@
     });
   });
   const taskListRef = ref<HTMLElement | null>(null);
+  const mapContainerRef = ref<HTMLElement | null>(null);
+  const leafletMapRef = ref<{
+    activateObjectivePopup: (id: string) => boolean;
+    closeActivePopup: () => void;
+  } | null>(null);
+  // Scroll position tracking for floating buttons
+  const scrollY = ref(0);
+  const showScrollToTopButton = computed(() => scrollY.value > 400);
+  const showScrollToMapButton = computed(() => scrollY.value > 300);
+  const handleScroll = () => {
+    scrollY.value = window.scrollY;
+  };
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  // Alias for semantic clarity - scrolls to top where the map is located
+  const scrollToMap = scrollToTop;
+  let jumpToMapTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let waitForElementAbortController: AbortController | null = null;
+  const popupActivateTimers = ref<ReturnType<typeof setTimeout>[]>([]);
+  /**
+   * Finds which map an objective is on (for map switching).
+   * Checks zones, possibleLocations, and GPS fallback.
+   */
+  const findObjectiveMapId = (objectiveId: string): string | null => {
+    const objective = metadataStore.objectives.find((o) => o.id === objectiveId);
+    if (!objective) return null;
+    const taskId = objective.taskId;
+    if (!taskId) return null;
+    // Check zones
+    const objWithZones = objective as typeof objective & {
+      zones?: Array<{ map?: { id: string } }>;
+    };
+    if (objWithZones.zones?.length) {
+      const zoneMapId = objWithZones.zones[0]?.map?.id;
+      if (zoneMapId) return zoneMapId;
+    }
+    // Check possibleLocations
+    const objWithLocs = objective as typeof objective & {
+      possibleLocations?: Array<{ map?: { id: string } }>;
+    };
+    if (objWithLocs.possibleLocations?.length) {
+      const locMapId = objWithLocs.possibleLocations[0]?.map?.id;
+      if (locMapId) return locMapId;
+    }
+    // Check GPS fallback via objectiveMaps
+    const objectiveMapsForTask = metadataStore.objectiveMaps?.[taskId] ?? [];
+    const mapInfo = objectiveMapsForTask.find((m) => m.objectiveID === objectiveId);
+    if (mapInfo?.mapID) return mapInfo.mapID;
+    return null;
+  };
+  /**
+   * Scrolls to the map and activates the popup for a specific objective.
+   * Switches to the correct map if needed.
+   * Used by TaskObjective's "Jump to map" button.
+   */
+  const clearPopupActivateTimers = () => {
+    popupActivateTimers.value.forEach((timerId) => clearTimeout(timerId));
+    popupActivateTimers.value = [];
+  };
+  const activateObjectivePopupWithRetry = (objectiveId: string) => {
+    clearPopupActivateTimers();
+    let attempts = 0;
+    const tryActivate = () => {
+      const success = leafletMapRef.value?.activateObjectivePopup(objectiveId);
+      if (success) return;
+      attempts += 1;
+      if (attempts > POPUP_ACTIVATE_MAX_ATTEMPTS) return;
+      const timerId = setTimeout(tryActivate, POPUP_ACTIVATE_RETRY_DELAY);
+      popupActivateTimers.value.push(timerId);
+    };
+    tryActivate();
+  };
+  const jumpToMapObjective = async (objectiveId: string) => {
+    // Clear any pending jumpToMap timeout
+    if (jumpToMapTimeoutId) {
+      clearTimeout(jumpToMapTimeoutId);
+      jumpToMapTimeoutId = null;
+    }
+    // Find which map this objective is on
+    const targetMapId = findObjectiveMapId(objectiveId);
+    const currentMapId = getTaskMapView.value;
+    // Switch map if needed
+    if (targetMapId && targetMapId !== currentMapId) {
+      preferencesStore.setTaskMapView(targetMapId);
+      await nextTick();
+      // Wait a bit for map to re-render with new markers
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    // Always scroll to map first
+    const isNearTop = window.scrollY < 100;
+    if (!isNearTop) {
+      scrollToMap();
+    }
+    // Try to activate popup, with retry after delay if scroll needed
+    if (isNearTop) {
+      activateObjectivePopupWithRetry(objectiveId);
+    } else {
+      jumpToMapTimeoutId = setTimeout(() => {
+        jumpToMapTimeoutId = null;
+        activateObjectivePopupWithRetry(objectiveId);
+      }, SCROLL_TO_MAP_POPUP_DELAY);
+    }
+  };
+  // Provide functions for child components
+  provide('jumpToMapObjective', jumpToMapObjective);
+  provide('isMapView', showMapDisplay);
+  provide('clearPinnedTask', clearPinnedTask);
+  // Set up scroll listener
+  onMounted(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Initialize
+  });
   // Handle deep linking to a specific task via ?task=taskId query param
   const getTaskStatus = (taskId: string): 'available' | 'locked' | 'completed' | 'failed' => {
     const isFailed = tasksFailed.value?.[taskId]?.['self'] ?? false;
@@ -573,138 +792,237 @@
     if (isUnlocked) return 'available';
     return 'locked';
   };
-  const highlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
-  const highlightTask = (taskElement: HTMLElement) => {
-    taskElement.classList.add(
-      'ring-2',
-      'ring-primary-500',
-      'ring-offset-2',
-      'ring-offset-surface-900'
-    );
-    if (highlightTimeout.value) {
-      clearTimeout(highlightTimeout.value);
-    }
-    highlightTimeout.value = setTimeout(() => {
-      taskElement.classList.remove(
-        'ring-2',
-        'ring-primary-500',
-        'ring-offset-2',
-        'ring-offset-surface-900'
-      );
-      highlightTimeout.value = null;
-    }, 2000);
-  };
+  // Track highlightObjective timers (can have multiple nested timeouts)
+  const highlightObjectiveTimers = ref<ReturnType<typeof setTimeout>[]>([]);
+  // Track IntersectionObserver instances for cleanup
+  const activeObservers = ref<IntersectionObserver[]>([]);
   onBeforeUnmount(() => {
     updateDebouncedSearch.cancel();
-    if (highlightTimeout.value) {
-      clearTimeout(highlightTimeout.value);
-      highlightTimeout.value = null;
+    window.removeEventListener('scroll', handleScroll);
+    // Clear highlightObjective timers
+    highlightObjectiveTimers.value.forEach((timerId) => clearTimeout(timerId));
+    highlightObjectiveTimers.value = [];
+    // Disconnect all active IntersectionObservers
+    activeObservers.value.forEach((observer) => observer.disconnect());
+    activeObservers.value = [];
+    // Clear jumpToMapObjective timeout
+    if (jumpToMapTimeoutId) {
+      clearTimeout(jumpToMapTimeoutId);
+      jumpToMapTimeoutId = null;
     }
-    if (pinnedTaskTimeout.value) {
-      clearTimeout(pinnedTaskTimeout.value);
-      pinnedTaskTimeout.value = null;
+    clearPopupActivateTimers();
+    // Abort any pending waitForElement calls
+    if (waitForElementAbortController) {
+      waitForElementAbortController.abort();
+      waitForElementAbortController = null;
     }
   });
-  const scrollToTask = async (taskId: string) => {
+  /**
+   * Waits for an element to appear in the DOM using Vue's nextTick.
+   * More reliable than requestAnimationFrame for Vue-rendered content.
+   * Uses AbortController to allow cancellation on component unmount.
+   */
+  const waitForElement = async (
+    elementId: string,
+    maxAttempts = 50
+  ): Promise<HTMLElement | null> => {
+    // Cancel any previous waitForElement call
+    if (waitForElementAbortController) {
+      waitForElementAbortController.abort();
+    }
+    waitForElementAbortController = new AbortController();
+    const signal = waitForElementAbortController.signal;
+    for (let i = 0; i < maxAttempts; i++) {
+      // Check if aborted
+      if (signal.aborted) return null;
+      await nextTick();
+      // First try by ID
+      const el = document.getElementById(elementId);
+      if (el) {
+        return el;
+      }
+      // For objectives in item groups, also search by data-objective-ids attribute
+      // Item groups consolidate multiple objectives, so the ID might not be the primary one
+      if (elementId.startsWith('objective-')) {
+        const objectiveId = elementId.replace('objective-', '');
+        const elByData = document.querySelector<HTMLElement>(
+          `[data-objective-ids*="${objectiveId}"]`
+        );
+        if (elByData) {
+          return elByData;
+        }
+      }
+      // Small delay between attempts to let Vue batch updates
+      await new Promise<void>((resolve) => {
+        const timerId = setTimeout(() => resolve(), ELEMENT_WAIT_RETRY_DELAY);
+        // If aborted during wait, resolve immediately and clear timeout
+        signal.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timerId);
+            resolve();
+          },
+          { once: true }
+        );
+      });
+    }
+    return null;
+  };
+  /**
+   * Pins a task to the top of the task list.
+   * Always pins regardless of current visibility to keep behavior consistent.
+   */
+  const pinTask = async (taskId: string) => {
     await nextTick();
     const taskIndex = filteredTasks.value.findIndex((t) => t.id === taskId);
     if (taskIndex === -1) return;
-    const pinTaskToTop = () => {
-      pinnedTaskId.value = taskId;
-      if (pinnedTaskTimeout.value) {
-        clearTimeout(pinnedTaskTimeout.value);
-      }
-      pinnedTaskTimeout.value = setTimeout(() => {
-        pinnedTaskId.value = null;
-        pinnedTaskTimeout.value = null;
-      }, 8000);
+    pinnedTaskId.value = taskId;
+  };
+  /**
+   * Applies objective-highlight class to an element when it becomes visible.
+   */
+  const highlightObjectiveWhenVisible = (element: HTMLElement) => {
+    // Clear any existing highlightObjective timers
+    highlightObjectiveTimers.value.forEach((timerId) => clearTimeout(timerId));
+    highlightObjectiveTimers.value = [];
+    // Disconnect any existing observers
+    activeObservers.value.forEach((obs) => obs.disconnect());
+    activeObservers.value = [];
+    // Clear any existing highlights from other elements
+    document.querySelectorAll('.objective-highlight').forEach((el) => {
+      el.classList.remove('objective-highlight');
+    });
+    const applyHighlight = () => {
+      element.classList.add('objective-highlight');
+      const removeTimer = setTimeout(() => {
+        element.classList.remove('objective-highlight');
+      }, HIGHLIGHT_DURATION);
+      highlightObjectiveTimers.value.push(removeTimer);
     };
-    // If task is already in DOM, scroll to it
-    const taskElement = document.getElementById(`task-${taskId}`);
-    if (taskElement) {
-      const rect = taskElement.getBoundingClientRect();
-      const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-      if (isVisible) {
-        highlightTask(taskElement);
-        return;
-      }
-      const nearbyThreshold = window.innerHeight * 1.5;
-      const isNearby = Math.abs(rect.top) <= nearbyThreshold;
-      if (isNearby) {
-        taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        highlightTask(taskElement);
-        return;
-      }
-      pinTaskToTop();
-      await nextTick();
-      const pinnedElement = document.getElementById(`task-${taskId}`);
-      if (pinnedElement) {
-        highlightTask(pinnedElement);
-      }
+    // Always scroll to element to ensure visibility (user may be viewing map above)
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Check if already in view (scroll may be instant if nearby)
+    const rect = element.getBoundingClientRect();
+    const isInView = rect.top >= 0 && rect.bottom <= window.innerHeight;
+    if (isInView) {
+      applyHighlight();
       return;
     }
-    pinTaskToTop();
-    await nextTick();
-    const newTaskElement = document.getElementById(`task-${taskId}`);
-    if (!newTaskElement) return;
-    highlightTask(newTaskElement);
+    // Wait for element to become visible after scroll
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          observer.disconnect();
+          // Remove from tracked observers
+          const idx = activeObservers.value.indexOf(observer);
+          if (idx !== -1) activeObservers.value.splice(idx, 1);
+          // Small delay to let element settle (tracked for cleanup)
+          const settleTimer = setTimeout(applyHighlight, HIGHLIGHT_SETTLE_DELAY);
+          highlightObjectiveTimers.value.push(settleTimer);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    // Track observer for cleanup on unmount
+    activeObservers.value.push(observer);
+    observer.observe(element);
+    // Cleanup observer after timeout
+    const cleanupTimer = setTimeout(() => {
+      observer.disconnect();
+      const idx = activeObservers.value.indexOf(observer);
+      if (idx !== -1) activeObservers.value.splice(idx, 1);
+    }, 5000);
+    highlightObjectiveTimers.value.push(cleanupTimer);
+  };
+  /**
+   * Highlights a specific objective within a task.
+   * Task should already be pinned before calling this.
+   */
+  const highlightObjective = async (objectiveId: string) => {
+    // Clear any existing highlightObjective timers before starting new ones
+    highlightObjectiveTimers.value.forEach((timerId) => clearTimeout(timerId));
+    highlightObjectiveTimers.value = [];
+    // Wait for objective element to appear in DOM (only highlight objectives, never task cards)
+    const objectiveEl = await waitForElement(`objective-${objectiveId}`, 30);
+    if (!objectiveEl) return;
+    highlightObjectiveWhenVisible(objectiveEl);
   };
   const handleTaskQueryParam = async () => {
     const taskId = getQueryString(route.query.task);
+    const objectiveIdToHighlight = getQueryString(route.query.highlightObjective);
     if (!taskId || tasksLoading.value) return;
     const taskInMetadata = tasks.value.find((t) => t.id === taskId);
     if (!taskInMetadata) return;
-    // Enable the appropriate type filter based on task properties
-    const isKappaRequired = taskInMetadata.kappaRequired === true;
-    const isLightkeeperRequired = taskInMetadata.lightkeeperRequired === true;
-    const isLightkeeperTraderTask =
-      lightkeeperTraderId.value !== undefined
-        ? taskInMetadata.trader?.id === lightkeeperTraderId.value
-        : taskInMetadata.trader?.name?.toLowerCase() === 'lightkeeper';
-    const isNonSpecial = !isKappaRequired && !isLightkeeperRequired && !isLightkeeperTraderTask;
-    // Ensure the task's type filter is enabled so task will appear
-    if (
-      (isLightkeeperRequired || isLightkeeperTraderTask) &&
-      !preferencesStore.getShowLightkeeperTasks
-    ) {
-      preferencesStore.setShowLightkeeperTasks(true);
-    }
-    if (isKappaRequired && preferencesStore.getHideNonKappaTasks) {
-      preferencesStore.setHideNonKappaTasks(false);
-    }
-    if (isNonSpecial && !preferencesStore.getShowNonSpecialTasks) {
-      preferencesStore.setShowNonSpecialTasks(true);
-    }
-    // Determine task status and set appropriate filter
-    // Skip if already in 'all' view since all tasks are visible there
-    const currentSecondaryView = preferencesStore.getTaskSecondaryView;
-    if (currentSecondaryView !== 'all') {
-      const status = getTaskStatus(taskId);
-      if (currentSecondaryView !== status) {
-        preferencesStore.setTaskSecondaryView(status);
+    // Set flag to prevent filter watch from resetting visibleTaskCount during navigation
+    isNavigatingToTask.value = true;
+    try {
+      // If highlighting from map tooltip, only clear search (keep current filters)
+      // Otherwise, adjust all filters to ensure task visibility
+      const isMapHighlight = !!objectiveIdToHighlight;
+      // Always clear search query so the target task is visible
+      if (searchQuery.value) {
+        searchQuery.value = '';
       }
+      if (!isMapHighlight) {
+        // Enable the appropriate type filter based on task properties
+        const isKappaRequired = taskInMetadata.kappaRequired === true;
+        const isLightkeeperRequired = taskInMetadata.lightkeeperRequired === true;
+        const isLightkeeperTraderTask =
+          lightkeeperTraderId.value !== undefined
+            ? taskInMetadata.trader?.id === lightkeeperTraderId.value
+            : taskInMetadata.trader?.name?.toLowerCase() === 'lightkeeper';
+        const isNonSpecial = !isKappaRequired && !isLightkeeperRequired && !isLightkeeperTraderTask;
+        // Ensure the task's type filter is enabled so task will appear
+        if (
+          (isLightkeeperRequired || isLightkeeperTraderTask) &&
+          !preferencesStore.getShowLightkeeperTasks
+        ) {
+          preferencesStore.setShowLightkeeperTasks(true);
+        }
+        if (isKappaRequired && preferencesStore.getHideNonKappaTasks) {
+          preferencesStore.setHideNonKappaTasks(false);
+        }
+        if (isNonSpecial && !preferencesStore.getShowNonSpecialTasks) {
+          preferencesStore.setShowNonSpecialTasks(true);
+        }
+        // Determine task status and set appropriate filter
+        // Skip if already in 'all' view since all tasks are visible there
+        const currentSecondaryView = preferencesStore.getTaskSecondaryView;
+        if (currentSecondaryView !== 'all') {
+          const status = getTaskStatus(taskId);
+          if (currentSecondaryView !== status) {
+            preferencesStore.setTaskSecondaryView(status);
+          }
+        }
+        // Set primary view to 'all' to ensure the task is visible regardless of map/trader
+        if (preferencesStore.getTaskPrimaryView !== 'all') {
+          preferencesStore.setTaskPrimaryView('all');
+        }
+      }
+      // Wait for filter/watch updates to settle
+      await nextTick();
+      // Pin the task to the top for consistent behavior
+      await pinTask(taskId);
+      // Highlight specific objective if requested
+      if (objectiveIdToHighlight) {
+        highlightObjective(objectiveIdToHighlight);
+        // Also activate the map marker to keep map and list selection coupled
+        leafletMapRef.value?.activateObjectivePopup(objectiveIdToHighlight);
+      }
+    } finally {
+      isNavigatingToTask.value = false;
     }
-    // Set primary view to 'all' to ensure the task is visible regardless of map/trader
-    if (preferencesStore.getTaskPrimaryView !== 'all') {
-      preferencesStore.setTaskPrimaryView('all');
-    }
-    // Clear search query so the target task is visible
-    if (searchQuery.value) {
-      searchQuery.value = '';
-    }
-    // Wait for filter/watch updates to settle
-    await nextTick();
-    // scrollToTask handles scrolling directly via scrollIntoView
-    await scrollToTask(taskId);
-    // Clear the query param to avoid re-triggering on filter changes
+    // Clear the query params to avoid re-triggering on filter changes
     const nextQuery = { ...route.query } as Record<string, string | string[] | undefined>;
     delete nextQuery.task;
+    delete nextQuery.highlightObjective;
     router.replace({ query: nextQuery });
   };
   // Watch for task query param and handle it when tasks are loaded
   watch(
-    [() => route.query.task, tasksLoading, tasksCompletions],
-    ([taskQueryParam, loading]) => {
+    [() => route.query.task, () => route.query.highlightObjective, tasksLoading, tasksCompletions],
+    ([taskQueryParam, , loading]) => {
       if (taskQueryParam && !loading) {
         handleTaskQueryParam();
       }

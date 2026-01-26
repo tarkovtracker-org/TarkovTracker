@@ -1,6 +1,5 @@
 <template>
   <UCard
-    :id="`task-${task.id}`"
     class="relative overflow-hidden border border-white/10 bg-[hsl(240_5%_7%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.35)]"
     :class="taskClasses"
     :ui="{ body: cardBodyClass }"
@@ -63,13 +62,13 @@
                 <img src="/img/logos/wikilogo.webp" alt="Wiki" aria-hidden="true" class="h-5 w-5" />
               </a>
             </AppTooltip>
-            <AppTooltip :text="t('page.tasks.questcard.viewOnTarkovDev', 'View on tarkov.dev')">
+            <AppTooltip :text="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')">
               <a
                 :href="tarkovDevTaskUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 inline-flex items-center justify-center rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                :aria-label="t('page.tasks.questcard.viewOnTarkovDev', 'View on tarkov.dev')"
+                :aria-label="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')"
                 @click.stop
               >
                 <img
@@ -102,20 +101,34 @@
               {{ t('page.tasks.questcard.levelBadge', { count: task.minPlayerLevel }) }}
             </UBadge>
           </AppTooltip>
-          <AppTooltip :text="task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')">
+          <AppTooltip
+            :text="
+              isGlobalTask
+                ? t(
+                    'page.tasks.questcard.globalTaskTooltip',
+                    'This task can be completed on any map'
+                  )
+                : task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')
+            "
+          >
             <UBadge
               size="xs"
-              color="neutral"
+              :color="isGlobalTask ? 'info' : 'neutral'"
               variant="soft"
               class="inline-flex max-w-40 items-center gap-1 text-[11px]"
+              :class="isGlobalTask ? 'border-info-500/30 border' : ''"
             >
               <UIcon
-                :name="task?.map?.name ? 'i-mdi-map-marker' : 'i-mdi-earth'"
+                :name="isGlobalTask || !task?.map?.name ? 'i-mdi-earth' : 'i-mdi-map-marker'"
                 aria-hidden="true"
                 class="h-3 w-3"
               />
               <span class="truncate">
-                {{ task?.map?.name || t('page.tasks.questcard.anyMap', 'Any') }}
+                {{
+                  isGlobalTask
+                    ? t('page.tasks.questcard.globalTask', 'Any Map')
+                    : task?.map?.name || t('page.tasks.questcard.anyMap', 'Any')
+                }}
               </span>
             </UBadge>
           </AppTooltip>
@@ -388,27 +401,43 @@
     <ContextMenu ref="taskContextMenu">
       <template #default="{ close }">
         <ContextMenuItem
-          icon="i-mdi-content-copy"
-          :label="t('page.tasks.questcard.copyTaskId', 'Copy task ID')"
+          v-if="task.wikiLink"
+          icon="/img/logos/wikilogo.webp"
+          :label="t('page.tasks.questcard.viewOnWiki', 'View on Wiki')"
           @click="
-            copyTaskId();
+            openTaskWiki();
+            close();
+          "
+        />
+        <ContextMenuItem
+          icon="/img/logos/tarkovdevlogo.webp"
+          :label="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')"
+          @click="
+            openTaskOnTarkovDev();
             close();
           "
         />
         <ContextMenuItem
           icon="i-mdi-link-variant"
-          :label="t('page.tasks.questcard.copyTaskLink', 'Copy task link')"
+          :label="t('page.tasks.questcard.copyTaskLink', 'Copy Task Link')"
           @click="
             copyTaskLink();
             close();
           "
         />
         <ContextMenuItem
-          v-if="task.wikiLink"
-          icon="/img/logos/wikilogo.webp"
-          :label="t('page.tasks.questcard.viewTaskOnWiki', 'View task on Wiki')"
+          icon="i-mdi-content-copy"
+          :label="t('page.tasks.questcard.copyTaskId', 'Copy Task ID')"
           @click="
-            openTaskWiki();
+            copyTaskId();
+            close();
+          "
+        />
+        <ContextMenuItem
+          icon="i-mdi-alert-circle-outline"
+          :label="t('page.tasks.questcard.reportDataIssue', 'Report Data Issue')"
+          @click="
+            openTaskDataIssue();
             close();
           "
         />
@@ -428,7 +457,7 @@
       <template #default="{ close }">
         <ContextMenuItem
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="t('page.tasks.questcard.viewOnTarkovDev', 'View on tarkov.dev')"
+          :label="t('page.tasks.questcard.viewOnTarkovDev', 'View on Tarkov.dev')"
           @click="
             openItemOnTarkovDev();
             close();
@@ -454,6 +483,7 @@
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import { useTaskActions, type TaskActionPayload } from '@/composables/useTaskActions';
+  import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -505,6 +535,7 @@
   const tarkovStore = useTarkovStore();
   const preferencesStore = usePreferencesStore();
   const metadataStore = useMetadataStore();
+  const { isGlobalTask: isGlobalTaskFn } = useTaskFiltering();
   const formatNumber = useLocaleNumberFormatter();
   const taskContextMenu = ref<ContextMenuRef | null>(null);
   const itemContextMenu = ref<ContextMenuRef | null>(null);
@@ -659,6 +690,7 @@
     return 'available';
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
+  const isGlobalTask = computed(() => isGlobalTaskFn(props.task));
   // Get objectives from props or fall back to store when props are stale
   // This handles the case where visibleTasks holds old task objects after objectives merge
   const taskObjectives = computed(() => {
@@ -788,5 +820,40 @@
     if (props.task.wikiLink) {
       window.open(props.task.wikiLink, '_blank');
     }
+  };
+  const openTaskOnTarkovDev = () => {
+    window.open(tarkovDevTaskUrl.value, '_blank');
+  };
+  // Builds the data issue report URL with prefilled query params for the issue form.
+  const getTaskDataIssueUrl = () => {
+    const title = `${props.task.name} (${props.task.id})`;
+    const objectiveIds = taskObjectives.value.map((objective) => objective.id).filter(Boolean);
+    const minLevel = props.task.minPlayerLevel ?? 0;
+    const playerLevel = tarkovStore.playerLevel();
+    const gameMode = tarkovStore.getCurrentGameMode().toUpperCase();
+    const descriptionLines = [
+      `Task Name: ${props.task.name}`,
+      `Task ID: ${props.task.id}`,
+      objectiveIds.length ? `Objective IDs: ${objectiveIds.join(', ')}` : '',
+      minLevel > 0 ? `Task Req Level: ${minLevel}` : '',
+      `Dev Link: https://tarkov.dev/task/${props.task.id}`,
+      playerLevel > 0 ? `\nUSER LEVEL: ${playerLevel}` : '',
+      `USER MODE: ${gameMode}`,
+    ].filter(Boolean);
+    // Prompt + padding so the form opens with a clear place to start typing.
+    const description = `>--Describe issue here--<\n\n\n${descriptionLines.join('\n')}`;
+    const params = new URLSearchParams({
+      title,
+      category: 'Overlay - Quests',
+      description,
+    });
+    if (props.task.wikiLink) {
+      params.set('reference', props.task.wikiLink);
+    }
+    return `https://issue.tarkovtracker.org/data?${params.toString()}`;
+  };
+  // Opens the data issue form in a new tab using the prefilled report URL.
+  const openTaskDataIssue = () => {
+    window.open(getTaskDataIssueUrl(), '_blank');
   };
 </script>

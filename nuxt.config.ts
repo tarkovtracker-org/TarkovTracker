@@ -11,10 +11,15 @@ export default defineNuxtConfig({
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
     // Server-only (private) runtime config
-    supabaseUrl: process.env.SB_URL || process.env.SUPABASE_URL || '',
+    supabaseUrl:
+      process.env.SB_URL || process.env.SUPABASE_URL || process.env.NUXT_SUPABASE_URL || '',
     supabaseServiceKey:
       process.env.SB_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    supabaseAnonKey: process.env.SB_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    supabaseAnonKey:
+      process.env.SB_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.NUXT_SUPABASE_ANON_KEY ||
+      '',
     // API protection configuration (server-only)
     apiProtection: {
       // Comma-separated list of allowed hosts (e.g., "tarkovtracker.org,www.tarkovtracker.org")
@@ -35,7 +40,13 @@ export default defineNuxtConfig({
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
       teamGatewayUrl: process.env.NUXT_PUBLIC_TEAM_GATEWAY_URL || '',
       tokenGatewayUrl: process.env.NUXT_PUBLIC_TOKEN_GATEWAY_URL || '',
-      // Admin middleware watch timeout (milliseconds)
+      supabaseUrl:
+        process.env.SB_URL || process.env.SUPABASE_URL || process.env.NUXT_SUPABASE_URL || '',
+      supabaseAnonKey:
+        process.env.SB_ANON_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.NUXT_SUPABASE_ANON_KEY ||
+        '',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,
     },
   },
@@ -124,7 +135,7 @@ export default defineNuxtConfig({
       ],
     },
   },
-  css: ['~/assets/css/tailwind.css', 'leaflet/dist/leaflet.css'],
+  css: ['~/assets/css/tailwind.css'],
   alias: {
     '@': appDir,
     '~': appDir,

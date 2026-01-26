@@ -1,5 +1,5 @@
 import type { TarkovTasksCoreQueryResult } from '~/types/tarkov';
-import { createTarkovFetcher, edgeCache } from '~/server/utils/edgeCache';
+import { createTarkovFetcher, edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
 import { GraphQLResponseError, validateGraphQLResponse } from '~/server/utils/graphql-validation';
 import { createLogger } from '~/server/utils/logger';
 import { applyOverlay } from '~/server/utils/overlay';
@@ -9,6 +9,7 @@ import { API_SUPPORTED_LANGUAGES } from '~/utils/constants';
 const logger = createLogger('TarkovTasksCore');
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
+  const bypassOverlayCache = shouldBypassCache(event);
   // Validate and sanitize inputs
   let lang = (query.lang as string)?.toLowerCase() || 'en';
   const gameMode = validateGameMode(query.gameMode as string);
@@ -36,7 +37,7 @@ export default defineEventHandler(async (event) => {
     }
     // Apply community overlay corrections
     try {
-      return await applyOverlay(rawResponse);
+      return await applyOverlay(rawResponse, { bypassCache: bypassOverlayCache });
     } catch (overlayError) {
       logger.error('Failed to apply overlay:', overlayError);
       throw overlayError;

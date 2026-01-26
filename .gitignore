@@ -6,28 +6,13 @@
 .cache
 dist
 .wrangler
-
-# Node dependencies
-node_modules
-
-# AI generated files
-.factory
 .claude
-claude.md
-CLAUDE.md
-GEMINI.md
-AGENTS.md
-
-# Logs
-logs
-*.log
-
-# Misc
+node_modules
 .DS_Store
 .fleet
 .idea
-
-# Local env files
+logs
+*.log
 .env
 .env.*
 !.env.example

@@ -108,10 +108,12 @@ function buildOverlayMeta(
 /**
  * Fetch the overlay data from CDN (with caching)
  */
-async function fetchOverlay(): Promise<{ overlay: OverlayData | null; meta: OverlayMeta }> {
+async function fetchOverlay(
+  forceRefresh: boolean = false
+): Promise<{ overlay: OverlayData | null; meta: OverlayMeta }> {
   const now = Date.now();
   // Return cached overlay if still valid
-  if (cachedOverlay && now - cacheTimestamp < OVERLAY_CACHE_TTL) {
+  if (!forceRefresh && cachedOverlay && now - cacheTimestamp < OVERLAY_CACHE_TTL) {
     lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'cached', {
       cacheAgeMs: now - cacheTimestamp,
     });
@@ -317,8 +319,11 @@ type OverlayTargetData = {
   traders?: Array<{ id: string }>;
   hideoutStations?: Array<{ id: string }>;
 };
-export async function applyOverlay<T extends { data?: OverlayTargetData }>(data: T): Promise<T> {
-  const { overlay, meta } = await fetchOverlay();
+export async function applyOverlay<T extends { data?: OverlayTargetData }>(
+  data: T,
+  options: { bypassCache?: boolean } = {}
+): Promise<T> {
+  const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
   if (!overlay || !data?.data) {
     return result;

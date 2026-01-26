@@ -12,6 +12,44 @@
   menu: {
     language: 'Язык',
   },
+  maps: {
+    zoom: 'Масштаб',
+    notAvailableTitle: 'Карта недоступна',
+    notAvailableDescription: 'Интерактивная карта для {mapName} пока недоступна. Мы ждём появления совместимой карты.',
+    placeholder: 'этой локации',
+    floors: 'Этажи',
+    reset: 'Сброс',
+    resetTitle: 'Сбросить вид по умолчанию',
+    factions: {
+      pmc: 'PMC',
+      scav: 'Scav',
+    },
+    legend: {
+      yourObjectives: 'Ваши цели',
+      teamObjectives: 'Цели команды',
+      pmcExtract: 'Выход PMC',
+      scavExtract: 'Выход Scav',
+      sharedExtract: 'Общий выход (любая фракция)',
+      coopExtract: 'Совместный выход (PMC + Scav)',
+    },
+    controls: {
+      keyboard: {
+        cycleFloors: '+ Прокрутка для смены этажей',
+        zoom: '+ Прокрутка для зума',
+      },
+    },
+    aria: {
+      zoomSpeed: 'Скорость зума',
+    },
+    tooltip: {
+      goTo: 'Перейти к цели',
+      goToInTaskList: 'Перейти к цели в списке задач',
+      complete: 'Завершить цель',
+      uncomplete: 'Отменить завершение цели',
+      objectiveUnavailable: 'Цель недоступна.',
+      taskFallback: 'Задача',
+    },
+  },
   page: {
     index: {
       title: 'Приборная панель',
@@ -105,8 +143,8 @@
       filters: {
         title: 'Фильтры заданий',
         close: 'Закрыть',
-        hide_global_tasks: 'Скрыть глобальные задания на карте',
-        show_global_tasks: 'Показать глобальные задания на карте',
+        hide_global_tasks: 'Скрыть глобальные задания',
+        show_global_tasks: 'Показать глобальные задания',
         hide_non_kappa_tasks: 'Скрыть не Каппа задания',
         show_non_kappa_tasks: 'Показать не Каппа задания',
         level: 'Уровень',
@@ -131,11 +169,15 @@
       notasksfound: 'Задания не найдены. Попробуйте изменить фильтры или обновить уровень.',
       showing_all_sources: 'Показать все источники',
       loading: 'Загружаем задания',
+      selectedTask: 'Выбранное задание',
       questcard: {
         level: 'Требуемый уровень: {count}',
         wiki: 'Wiki страница',
         lockedbefore: 'Заданий до: {count}',
         lockedbehind: 'Заданий после: {count}',
+        reportDataIssue: 'Сообщить об ошибке данных',
+        viewOnTarkovDev: 'Открыть на Tarkov.dev',
+        viewOnWiki: 'Открыть в вики',
         completebutton: 'Завершено',
         availablebutton: 'Отметить Доступным',
         uncompletebutton: 'Отметить Не Завершенным',
@@ -159,7 +201,13 @@
         objectiveshidden: '{count} целей не на этой карте ({uncompleted} не завершено)',
         alternatives: 'Альтернативные задания',
         alternativefailed: 'Альтернативные задания также будут сброшены',
+        anyMap: 'Любая',
+        globalTask: 'Любая карта',
+        globalTaskTooltip: 'Это задание можно выполнить на любой карте',
+        jumpToMap: 'Перейти к карте',
       },
+      scrollToMap: 'Прокрутить к карте',
+      scrollToTop: 'Наверх',
     },
     traders: {
       title: 'Торговцы',
@@ -516,6 +564,7 @@
     item: 'Предмет',
     items: 'Предметы',
     close_button: 'Закрыть',
+    dismiss: 'Отклонить',
     loading: 'Загрузка...',
     error: 'Ошибка',
   },

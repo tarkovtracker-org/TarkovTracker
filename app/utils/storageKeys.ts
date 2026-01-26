@@ -6,6 +6,8 @@ export const STORAGE_KEYS = {
   preferences: `${STORAGE_PREFIX}preferences`,
   progressBackupPrefix: `${STORAGE_PREFIX}progress_backup_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
+  cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
+  cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,
   sessionDataMigrated: `${STORAGE_PREFIX}tarkovDataMigrated`,
 } as const;
 export const LEGACY_STORAGE_KEYS = {
@@ -14,5 +16,7 @@ export const LEGACY_STORAGE_KEYS = {
   user: 'user',
   progressBackupPrefix: 'progress_backup_',
   adminLastPurge: 'tt:admin:last-purge',
+  cachePurgeAt: 'tt:cache:last-purge',
+  cachePurgeCheckAt: 'tt:cache:last-check',
   sessionDataMigrated: 'tarkovDataMigrated',
 } as const;

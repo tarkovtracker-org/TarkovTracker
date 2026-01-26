@@ -31,7 +31,7 @@ function isTruthyFlag(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return ['1', 'true', 'yes', 'y', 'on'].includes(value.toLowerCase());
 }
-function shouldBypassCache(event: H3Event): boolean {
+export function shouldBypassCache(event: H3Event): boolean {
   const headerValue =
     event.node?.req?.headers?.['x-bypass-cache'] ?? event.node?.req?.headers?.['x-cache-bypass'];
   if (isTruthyFlag(headerValue)) return true;
@@ -86,9 +86,37 @@ export async function edgeCache<T>(
       // Create a normalized cache key URL using the current host (avoids hardcoding a cache subdomain)
       const runtimeConfig = useRuntimeConfig();
       const appUrl = runtimeConfig?.public?.appUrl;
-      const configuredHost = appUrl ? new URL(appUrl).host : null;
-      const protocol = appUrl ? new URL(appUrl).protocol : 'https:';
+      let configuredHost: string | null = null;
+      let configuredProtocol: string | null = null;
+      if (appUrl) {
+        try {
+          const parsedAppUrl = new URL(appUrl);
+          const hostname = parsedAppUrl.hostname;
+          const isLocalhost =
+            hostname === 'localhost' ||
+            hostname === '0.0.0.0' ||
+            hostname === '::1' ||
+            /^127\./.test(hostname);
+          if (!isLocalhost) {
+            configuredHost = parsedAppUrl.host;
+            configuredProtocol = parsedAppUrl.protocol;
+          }
+        } catch (error) {
+          logger.warn('[EdgeCache] Invalid appUrl, falling back to request host', error);
+        }
+      }
       const requestHost = event.node?.req?.headers?.host;
+      const forwardedProto = event.node?.req?.headers?.['x-forwarded-proto'];
+      const forwardedProtoValue = Array.isArray(forwardedProto)
+        ? forwardedProto[0]
+        : forwardedProto;
+      let protocol = 'https:';
+      if (configuredProtocol) {
+        protocol = configuredProtocol;
+      } else if (forwardedProtoValue) {
+        const forwardedProtoToken = String(forwardedProtoValue).split(',')[0]?.trim();
+        protocol = `${forwardedProtoToken || 'https'}:`;
+      }
       const cacheHost = configuredHost || requestHost || 'tarkovtracker.org';
       const cacheUrl = new URL(`${protocol}//${cacheHost}/__edge-cache/${cacheKeyPrefix}/${key}`);
       const cacheKeyRequest = new Request(cacheUrl.toString());

@@ -29,6 +29,44 @@
   menu: {
     language: 'Sprache',
   },
+  maps: {
+    zoom: 'Zoom',
+    notAvailableTitle: 'Karte nicht verfügbar',
+    notAvailableDescription: 'Die interaktive Karte für {mapName} ist noch nicht verfügbar. Wir warten auf eine kompatible Karte.',
+    placeholder: 'diesen Ort',
+    floors: 'Stockwerke',
+    reset: 'Zurücksetzen',
+    resetTitle: 'Ansicht auf Standard zurücksetzen',
+    factions: {
+      pmc: 'PMC',
+      scav: 'Scav',
+    },
+    legend: {
+      yourObjectives: 'Deine Ziele',
+      teamObjectives: 'Teamziele',
+      pmcExtract: 'PMC-Extrakt',
+      scavExtract: 'Scav-Extrakt',
+      sharedExtract: 'Gemeinsamer Extrakt (beide Fraktionen)',
+      coopExtract: 'Co-op-Extrakt (PMC + Scav)',
+    },
+    controls: {
+      keyboard: {
+        cycleFloors: '+ Scrollen zum Ebenenwechsel',
+        zoom: '+ Scrollen zum Zoomen',
+      },
+    },
+    aria: {
+      zoomSpeed: 'Zoomgeschwindigkeit',
+    },
+    tooltip: {
+      goTo: 'Zum Ziel gehen',
+      goToInTaskList: 'Zum Ziel in der Aufgabenliste gehen',
+      complete: 'Ziel abschließen',
+      uncomplete: 'Ziel nicht abschließen',
+      objectiveUnavailable: 'Ziel nicht verfügbar.',
+      taskFallback: 'Aufgabe',
+    },
+  },
   page: {
     index: {
       title: 'Dashboard',
@@ -122,8 +160,8 @@
       filters: {
         title: 'Aufgabenfilter',
         close: 'Schließen',
-        hide_global_tasks: 'Globale Aufgaben in Kartenansicht ausblenden',
-        show_global_tasks: 'Globale Aufgaben in Kartenansicht anzeigen',
+        hide_global_tasks: 'Globale Aufgaben ausblenden',
+        show_global_tasks: 'Globale Aufgaben anzeigen',
         hide_non_kappa_tasks: 'Nicht-Kappa-Aufgaben ausblenden',
         show_non_kappa_tasks: 'Nicht-Kappa-Aufgaben anzeigen',
         level: 'Level',
@@ -148,6 +186,7 @@
       notasksfound: 'Keine Aufgaben gefunden. Ändere deine Filter oder passe dein Level an.',
       showing_all_sources: 'Zeige alle Quellen',
       loading: 'Lade Aufgaben',
+      selectedTask: 'Ausgewählte Aufgabe',
       questcard: {
         level: 'Level: {count}',
         levelBadge: 'Lv {count}',
@@ -165,6 +204,9 @@
         more: 'Mehr',
         copyTaskId: 'Aufgaben-ID kopieren',
         copyTaskLink: 'Aufgaben-Link kopieren',
+        reportDataIssue: 'Datenproblem melden',
+        viewOnTarkovDev: 'Auf Tarkov.dev ansehen',
+        viewOnWiki: 'Im Wiki ansehen',
         showChainDetails: 'Kettendetails anzeigen',
         hideChainDetails: 'Kettendetails ausblenden',
         handOver: 'Abgeben',
@@ -215,7 +257,13 @@
         unlocksPurchase: 'Schaltet Kauf frei',
         traderRep: '+{standing} {trader}',
         skillReward: '+{level} {skill}',
+        anyMap: 'Beliebig',
+        globalTask: 'Beliebige Karte',
+        globalTaskTooltip: 'Diese Aufgabe kann auf jeder Karte abgeschlossen werden',
+        jumpToMap: 'Zur Karte springen',
       },
+      scrollToMap: 'Zur Karte scrollen',
+      scrollToTop: 'Nach oben scrollen',
     },
     traders: {
       title: 'Händler',
@@ -605,6 +653,7 @@
     item: 'Gegenstand',
     items: 'Gegenstände',
     close_button: 'Schließen',
+    dismiss: 'Verwerfen',
     loading: 'Lädt...',
     error: 'Fehler',
   },

@@ -95,6 +95,15 @@
             <img src="/img/logos/wikilogo.webp" alt="Wiki" class="h-5 w-5" />
           </a>
         </AppTooltip>
+        <AppTooltip v-if="props.itemName" text="Copy Name">
+          <button
+            type="button"
+            class="inline-flex cursor-pointer items-center justify-center rounded p-1.5 text-gray-200 transition-colors hover:bg-white/20 hover:text-white"
+            @click.stop="copyItemName"
+          >
+            <UIcon name="i-mdi-content-copy" class="h-5 w-5" />
+          </button>
+        </AppTooltip>
       </div>
     </div>
     <!-- Context Menu -->
@@ -216,6 +225,7 @@
       image512pxLink?: string;
       backgroundColor?: string;
     };
+    copyValue?: string | null;
   }
   const props = withDefaults(defineProps<Props>(), {
     itemId: '',
@@ -240,6 +250,7 @@
     neededCount: 1,
     fill: false,
     imageItem: undefined,
+    copyValue: null,
   });
   const emit = defineEmits<{
     click: [event: MouseEvent];
@@ -356,8 +367,9 @@
     }
   };
   const copyItemName = () => {
-    if (props.itemName) {
-      navigator.clipboard.writeText(props.itemName);
+    const textToCopy = props.copyValue || props.itemName;
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
     }
   };
   const handleClick = (event: MouseEvent) => {

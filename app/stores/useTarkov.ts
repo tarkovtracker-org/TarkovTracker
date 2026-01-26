@@ -18,9 +18,24 @@ import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { useToast } from '#imports';
-// Throttle state for localStorage quota checks (module-level to persist across serializations)
+// ============================================================================
+// Constants
+// ============================================================================
+const QUOTA_CHECK_INTERVAL_MS = 60000;
+const ESTIMATED_QUOTA_BYTES = 5 * 1024 * 1024;
+const QUOTA_SAFETY_BUFFER_BYTES = 512 * 1024;
+const SYNC_DEBOUNCE_MS = 5000;
+const SELF_ORIGIN_THRESHOLD_MS = 3000;
+const SYNC_RESUME_DELAY_MS = 1000;
+const RESET_SETTLE_DELAY_MS = 100;
+const API_UPDATE_FRESHNESS_MS = 30000;
+const ISSUE_71_ACCOUNT_AGE_THRESHOLD_MS = 5000;
+const LOAD_RETRY_COUNT = 3;
+const LOAD_RETRY_DELAY_MS = 500;
+// ============================================================================
+// Module State
+// ============================================================================
 let lastQuotaCheckTime = 0;
-const QUOTA_CHECK_INTERVAL_MS = 60000; // Only check quota every 60 seconds
 type UserProgressRow = {
   user_id: string;
   current_game_mode: string | null;
@@ -48,7 +63,101 @@ type TarkovStoreInstance = UserState & {
     tasksMap: Map<string, Task>
   ): number;
 };
-// Create typed getters object with the additional store-specific getters
+// ============================================================================
+// Utility Functions
+// ============================================================================
+const deepClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
+const hasProgress = (data: unknown): boolean => {
+  const state = data as UserState;
+  if (!state) return false;
+  const modeHasData = (mode: UserProgressData | undefined) =>
+    mode &&
+    (mode.level > 1 ||
+      Object.keys(mode.taskCompletions || {}).length > 0 ||
+      Object.keys(mode.hideoutModules || {}).length > 0);
+  return Boolean(modeHasData(state.pvp) || modeHasData(state.pve));
+};
+const buildUpsertPayload = (
+  userId: string,
+  state: UserState,
+  partial?: Partial<{ pvp_data: UserProgressData; pve_data: UserProgressData }>
+) => ({
+  user_id: userId,
+  current_game_mode: state.currentGameMode || GAME_MODES.PVP,
+  game_edition: state.gameEdition || defaultState.gameEdition,
+  pvp_data: partial?.pvp_data ?? state.pvp ?? defaultState.pvp,
+  pve_data: partial?.pve_data ?? state.pve ?? defaultState.pve,
+});
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
+const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
+  local: T | undefined,
+  remote: T | undefined
+): T => {
+  const merged = { ...local, ...remote } as T;
+  for (const id of Object.keys(merged)) {
+    const l = local?.[id];
+    const r = remote?.[id];
+    if (l && r) {
+      merged[id as keyof T] = {
+        complete: l.complete || r.complete,
+        count: Math.max(l.count || 0, r.count || 0),
+        timestamp:
+          l.timestamp && r.timestamp
+            ? Math.max(l.timestamp, r.timestamp)
+            : l.timestamp || r.timestamp,
+      } as T[keyof T];
+    }
+  }
+  return merged;
+};
+type ResetMode = 'pvp' | 'pve' | 'all';
+const executeWithSyncPause = async <T>(operation: () => Promise<T>): Promise<T> => {
+  const controller = getSyncController();
+  controller?.pause();
+  try {
+    const result = await operation();
+    await delay(RESET_SETTLE_DELAY_MS);
+    controller?.resume();
+    return result;
+  } catch (error) {
+    logger.error('[TarkovStore] Reset operation failed:', error);
+    getSyncController()?.resume();
+    throw error;
+  }
+};
+const performReset = async (
+  mode: ResetMode,
+  store: { $patch: (fn: (state: UserState) => void) => void }
+): Promise<void> => {
+  const { $supabase } = useNuxtApp();
+  const freshState = deepClone(defaultState);
+  if ($supabase.user.loggedIn && $supabase.user.id) {
+    const payload =
+      mode === 'all'
+        ? buildUpsertPayload($supabase.user.id, freshState)
+        : mode === 'pvp'
+          ? { user_id: $supabase.user.id, pvp_data: freshState.pvp }
+          : { user_id: $supabase.user.id, pve_data: freshState.pve };
+    await $supabase.client.from('user_progress').upsert(payload);
+  }
+  if (mode === 'all') {
+    localStorage.clear();
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.progress);
+  }
+  store.$patch((state) => {
+    if (mode === 'all' || mode === 'pvp') state.pvp = freshState.pvp;
+    if (mode === 'all' || mode === 'pve') state.pve = freshState.pve;
+    if (mode === 'all') {
+      state.currentGameMode = freshState.currentGameMode;
+      state.gameEdition = freshState.gameEdition;
+    }
+  });
+};
+// ============================================================================
+// Store Definition
+// ============================================================================
 const tarkovGetters = {
   ...getters,
   // Removed side-effect causing getters. Migration should be handled in actions or initialization.
@@ -83,8 +192,7 @@ const tarkovActions = {
       ((this as unknown as Record<string, unknown>).level !== undefined && !this.pvp?.level);
     if (needsMigration) {
       logger.debug('Migrating legacy data structure to gamemode-aware structure');
-      const currentState = JSON.parse(JSON.stringify(this.$state));
-      const migratedData = migrateToGameModeStructure(currentState);
+      const migratedData = migrateToGameModeStructure(deepClone(this.$state));
       this.$patch(migratedData);
       const { $supabase } = useNuxtApp();
       if ($supabase.user.loggedIn && $supabase.user.id) {
@@ -110,17 +218,11 @@ const tarkovActions = {
       return;
     }
     try {
-      const freshDefaultState = JSON.parse(JSON.stringify(defaultState));
-      await $supabase.client.from('user_progress').upsert({
-        user_id: $supabase.user.id,
-        current_game_mode: freshDefaultState.currentGameMode,
-        game_edition: freshDefaultState.gameEdition,
-        pvp_data: freshDefaultState.pvp,
-        pve_data: freshDefaultState.pve,
-      });
+      const freshState = deepClone(defaultState);
+      await $supabase.client
+        .from('user_progress')
+        .upsert(buildUpsertPayload($supabase.user.id, freshState));
       localStorage.clear();
-      // Use $patch with a function to fully replace all nested objects (not deep merge)
-      const freshState = JSON.parse(JSON.stringify(defaultState));
       this.$patch((state) => {
         state.currentGameMode = freshState.currentGameMode;
         state.gameEdition = freshState.gameEdition;
@@ -143,137 +245,19 @@ const tarkovActions = {
     }
   },
   async resetPvPData(this: TarkovStoreInstance) {
-    const { $supabase } = useNuxtApp();
     logger.debug('[TarkovStore] Resetting PvP data...');
-    try {
-      // Pause sync to prevent re-sync loops
-      const controller = getSyncController();
-      if (controller) {
-        controller.pause();
-      }
-      const freshPvPData = JSON.parse(JSON.stringify(defaultState.pvp));
-      if ($supabase.user.loggedIn && $supabase.user.id) {
-        // User is logged in - reset both Supabase and localStorage
-        logger.debug('[TarkovStore] Resetting PvP data in Supabase');
-        await $supabase.client.from('user_progress').upsert({
-          user_id: $supabase.user.id,
-          pvp_data: freshPvPData,
-        });
-      }
-      // Clear localStorage and update store
-      logger.debug('[TarkovStore] Clearing localStorage and updating store');
-      localStorage.removeItem(STORAGE_KEYS.progress);
-      // Use $patch with a function to fully replace the pvp object (not deep merge)
-      this.$patch((state) => {
-        state.pvp = freshPvPData;
-      });
-      // Small delay to ensure all operations complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      // Resume sync
-      if (controller) {
-        controller.resume();
-      }
-      logger.debug('[TarkovStore] PvP data reset complete');
-    } catch (error) {
-      logger.error('[TarkovStore] Error resetting PvP data:', error);
-      // Resume sync even on error
-      const controller = getSyncController();
-      if (controller) {
-        controller.resume();
-      }
-      throw error;
-    }
+    await executeWithSyncPause(() => performReset('pvp', this));
+    logger.debug('[TarkovStore] PvP data reset complete');
   },
   async resetPvEData(this: TarkovStoreInstance) {
-    const { $supabase } = useNuxtApp();
     logger.debug('[TarkovStore] Resetting PvE data...');
-    try {
-      // Pause sync to prevent re-sync loops
-      const controller = getSyncController();
-      if (controller) {
-        controller.pause();
-      }
-      const freshPvEData = JSON.parse(JSON.stringify(defaultState.pve));
-      if ($supabase.user.loggedIn && $supabase.user.id) {
-        // User is logged in - reset both Supabase and localStorage
-        logger.debug('[TarkovStore] Resetting PvE data in Supabase');
-        await $supabase.client.from('user_progress').upsert({
-          user_id: $supabase.user.id,
-          pve_data: freshPvEData,
-        });
-      }
-      // Clear localStorage and update store
-      logger.debug('[TarkovStore] Clearing localStorage and updating store');
-      localStorage.removeItem(STORAGE_KEYS.progress);
-      // Use $patch with a function to fully replace the pve object (not deep merge)
-      this.$patch((state) => {
-        state.pve = freshPvEData;
-      });
-      // Small delay to ensure all operations complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      // Resume sync
-      if (controller) {
-        controller.resume();
-      }
-      logger.debug('[TarkovStore] PvE data reset complete');
-    } catch (error) {
-      logger.error('[TarkovStore] Error resetting PvE data:', error);
-      // Resume sync even on error
-      const controller = getSyncController();
-      if (controller) {
-        controller.resume();
-      }
-      throw error;
-    }
+    await executeWithSyncPause(() => performReset('pve', this));
+    logger.debug('[TarkovStore] PvE data reset complete');
   },
   async resetAllData(this: TarkovStoreInstance) {
-    const { $supabase } = useNuxtApp();
     logger.debug('[TarkovStore] Resetting all data (both PvP and PvE)...');
-    try {
-      // Pause sync to prevent re-sync loops
-      const controller = getSyncController();
-      if (controller) {
-        controller.pause();
-      }
-      const freshDefaultState = JSON.parse(JSON.stringify(defaultState));
-      if ($supabase.user.loggedIn && $supabase.user.id) {
-        // User is logged in - reset both Supabase and localStorage
-        logger.debug('[TarkovStore] Resetting all data in Supabase');
-        await $supabase.client.from('user_progress').upsert({
-          user_id: $supabase.user.id,
-          current_game_mode: freshDefaultState.currentGameMode,
-          game_edition: freshDefaultState.gameEdition,
-          pvp_data: freshDefaultState.pvp,
-          pve_data: freshDefaultState.pve,
-          // Ensure we don't lose the ID
-        });
-      }
-      // Clear localStorage and reset entire store
-      logger.debug('[TarkovStore] Clearing localStorage and resetting store');
-      localStorage.clear();
-      // Use $patch with a function to fully replace all nested objects (not deep merge)
-      this.$patch((state) => {
-        state.currentGameMode = freshDefaultState.currentGameMode;
-        state.gameEdition = freshDefaultState.gameEdition;
-        state.pvp = freshDefaultState.pvp;
-        state.pve = freshDefaultState.pve;
-      });
-      // Small delay to ensure all operations complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      // Resume sync
-      if (controller) {
-        controller.resume();
-      }
-      logger.debug('[TarkovStore] All data reset complete');
-    } catch (error) {
-      logger.error('[TarkovStore] Error resetting all data:', error);
-      // Resume sync even on error
-      const controller = getSyncController();
-      if (controller) {
-        controller.resume();
-      }
-      throw error;
-    }
+    await executeWithSyncPause(() => performReset('all', this));
+    logger.debug('[TarkovStore] All data reset complete');
   },
   /**
    * Repair failed task states for existing users.
@@ -578,9 +562,7 @@ const tarkovActions = {
 // Export type for external usage
 export type TarkovStoreActions = typeof tarkovActions;
 export const useTarkovStore = defineStore('swapTarkov', {
-  state: () => {
-    return JSON.parse(JSON.stringify(defaultState)) as UserState;
-  },
+  state: () => deepClone(defaultState),
   getters: tarkovGetters,
   actions: tarkovActions,
   // Enable automatic localStorage persistence with user scoping
@@ -620,8 +602,8 @@ export const useTarkovStore = defineStore('swapTarkov', {
               }
             }
             const neededSpace = serialized.length;
-            const estimatedQuota = 5 * 1024 * 1024; // 5MB typical limit
-            const safetyBuffer = 512 * 1024; // 512KB buffer
+            const estimatedQuota = ESTIMATED_QUOTA_BYTES;
+            const safetyBuffer = QUOTA_SAFETY_BUFFER_BYTES;
             // If we're close to quota, clean up old backups
             if (currentUsage + neededSpace > estimatedQuota - safetyBuffer) {
               logger.warn('[TarkovStore] localStorage quota low, cleaning up old backups', {
@@ -707,13 +689,13 @@ export const useTarkovStore = defineStore('swapTarkov', {
                 logger.error('[TarkovStore] Error backing up/clearing localStorage:', e);
               }
             }
-            return JSON.parse(JSON.stringify(defaultState)) as UserState;
+            return deepClone(defaultState);
           }
           // UserId matches or user not logged in - safe to restore
           return parsed.data as UserState;
         } catch (e) {
           logger.error('[TarkovStore] Error deserializing localStorage:', e);
-          return JSON.parse(JSON.stringify(defaultState)) as UserState;
+          return deepClone(defaultState);
         }
       },
     },
@@ -791,29 +773,13 @@ export async function initializeTarkovSync() {
       hasShownLocalIgnoreToast = true;
     };
     const resetStoreToDefault = () => {
-      const freshDefaultState = JSON.parse(JSON.stringify(defaultState));
+      const freshState = deepClone(defaultState);
       tarkovStore.$patch((state) => {
-        state.currentGameMode = freshDefaultState.currentGameMode;
-        state.gameEdition = freshDefaultState.gameEdition;
-        state.pvp = freshDefaultState.pvp;
-        state.pve = freshDefaultState.pve;
+        state.currentGameMode = freshState.currentGameMode;
+        state.gameEdition = freshState.gameEdition;
+        state.pvp = freshState.pvp;
+        state.pve = freshState.pve;
       });
-    };
-    // Helper to check if data has meaningful progress
-    const hasProgress = (data: unknown) => {
-      const state = data as UserState;
-      if (!state) return false;
-      const pvpHasData =
-        state.pvp &&
-        (state.pvp.level > 1 ||
-          Object.keys(state.pvp.taskCompletions || {}).length > 0 ||
-          Object.keys(state.pvp.hideoutModules || {}).length > 0);
-      const pveHasData =
-        state.pve &&
-        (state.pve.level > 1 ||
-          Object.keys(state.pve.taskCompletions || {}).length > 0 ||
-          Object.keys(state.pve.hideoutModules || {}).length > 0);
-      return pvpHasData || pveHasData;
     };
     const loadData = async (): Promise<{ ok: boolean; hadRemoteData: boolean }> => {
       const localMeta = getLocalStorageMeta();
@@ -863,12 +829,10 @@ export async function initializeTarkovSync() {
       // Try to load from Supabase with retry logic to prevent race conditions
       let data: UserProgressRow | null = null;
       let error: { code?: string; message?: string } | null = null;
-      const maxRetries = 3;
-      const retryDelayMs = 500;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
+      for (let attempt = 0; attempt < LOAD_RETRY_COUNT; attempt++) {
         if (attempt > 0) {
-          logger.debug(`[TarkovStore] Retry attempt ${attempt + 1}/${maxRetries}`);
-          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          logger.debug(`[TarkovStore] Retry attempt ${attempt + 1}/${LOAD_RETRY_COUNT}`);
+          await delay(LOAD_RETRY_DELAY_MS);
         }
         const result = await $supabase.client
           .from('user_progress')
@@ -971,7 +935,7 @@ export async function initializeTarkovSync() {
         // Check 1: Account age
         const accountCreatedAt = $supabase.user.createdAt;
         const accountAgeMs = accountCreatedAt ? Date.now() - Date.parse(accountCreatedAt) : 0;
-        const isRecentlyCreated = accountAgeMs < 5000; // 5 seconds threshold
+        const isRecentlyCreated = accountAgeMs < ISSUE_71_ACCOUNT_AGE_THRESHOLD_MS;
         // Check 2: Multiple OAuth providers - strongest signal of Issue #71
         const linkedProviders = $supabase.user.providers || [];
         const hasMultipleProviders = linkedProviders.length > 1;
@@ -1033,7 +997,7 @@ export async function initializeTarkovSync() {
       syncController = useSupabaseSync({
         store: tarkovStore,
         table: 'user_progress',
-        debounceMs: 5000, // Increased from 1s to reduce egress
+        debounceMs: SYNC_DEBOUNCE_MS,
         transform: (state: unknown) => {
           const userState = state as UserState;
           // SAFETY CHECK: Prevent syncing completely empty state for existing accounts
@@ -1086,7 +1050,6 @@ let realtimeChannel: unknown = null;
 let lastLocalSyncTime = 0; // Track when we last synced locally to filter self-origin updates
 const lastApiUpdateIds: { pvp: string | null; pve: string | null } = { pvp: null, pve: null };
 const API_TASK_STATES = ['completed', 'failed', 'uncompleted'] as const;
-const API_UPDATE_FRESHNESS_MS = 30000;
 const isApiTaskState = (state: unknown): state is ApiTaskUpdate['state'] => {
   return API_TASK_STATES.includes(state as ApiTaskUpdate['state']);
 };
@@ -1252,12 +1215,9 @@ function setupRealtimeListener() {
           pve_data?: UserProgressData;
           updated_at?: string;
         };
-        // SELF-ORIGIN FILTERING: Ignore updates that are likely from this client
-        // If update came within 3 seconds of our last local sync, it's probably ours
         const parsedUpdateTime = remoteData.updated_at ? Date.parse(remoteData.updated_at) : NaN;
         const updateTime = Number.isNaN(parsedUpdateTime) ? Date.now() : parsedUpdateTime;
         const timeSinceLastSync = updateTime - lastLocalSyncTime;
-        const SELF_ORIGIN_THRESHOLD_MS = 3000; // 3 seconds
         // Get current local state
         const localState = tarkovStore.$state;
         // Merge remote changes with local state
@@ -1309,13 +1269,12 @@ function setupRealtimeListener() {
         }
         // Apply merged state
         tarkovStore.$patch(nextState);
-        // Resume sync after a short delay
         setTimeout(() => {
           const currentController = getSyncController();
           if (currentController && currentController === controller) {
             currentController.resume();
           }
-        }, 1000);
+        }, SYNC_RESUME_DELAY_MS);
         // Only notify user if there was an actual data conflict that required merging
         // Silent sync for API updates or other-device updates that don't conflict
         if (hasRealConflict && !apiUpdateHandled) {
@@ -1407,63 +1366,9 @@ function mergeProgressData(
       }
       return merged;
     })(),
-    // Merge objectives - max counts
-    taskObjectives: {
-      ...local.taskObjectives,
-      ...remote.taskObjectives,
-      ...Object.fromEntries(
-        Object.entries({ ...local.taskObjectives, ...remote.taskObjectives }).map(
-          ([id, objective]) => {
-            const localObj = local.taskObjectives?.[id];
-            const remoteObj = remote.taskObjectives?.[id];
-            if (localObj && remoteObj) {
-              return [
-                id,
-                {
-                  complete: localObj.complete || remoteObj.complete,
-                  count: Math.max(localObj.count || 0, remoteObj.count || 0),
-                  timestamp:
-                    localObj.timestamp && remoteObj.timestamp
-                      ? Math.max(localObj.timestamp, remoteObj.timestamp)
-                      : localObj.timestamp || remoteObj.timestamp,
-                },
-              ];
-            }
-            return [id, objective];
-          }
-        )
-      ),
-    },
-    // Merge hideout modules - union
-    hideoutModules: {
-      ...local.hideoutModules,
-      ...remote.hideoutModules,
-    },
-    // Merge hideout parts - max counts
-    hideoutParts: {
-      ...local.hideoutParts,
-      ...remote.hideoutParts,
-      ...Object.fromEntries(
-        Object.entries({ ...local.hideoutParts, ...remote.hideoutParts }).map(([id, part]) => {
-          const localPart = local.hideoutParts?.[id];
-          const remotePart = remote.hideoutParts?.[id];
-          if (localPart && remotePart) {
-            return [
-              id,
-              {
-                complete: localPart.complete || remotePart.complete,
-                count: Math.max(localPart.count || 0, remotePart.count || 0),
-                timestamp:
-                  localPart.timestamp && remotePart.timestamp
-                    ? Math.max(localPart.timestamp, remotePart.timestamp)
-                    : localPart.timestamp || remotePart.timestamp,
-              },
-            ];
-          }
-          return [id, part];
-        })
-      ),
-    },
+    taskObjectives: mergeCountableObjects(local.taskObjectives, remote.taskObjectives),
+    hideoutModules: { ...local.hideoutModules, ...remote.hideoutModules },
+    hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts),
     // Merge traders - max level and reputation
     traders: {
       ...local.traders,

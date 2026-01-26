@@ -29,6 +29,44 @@
   menu: {
     language: '语言',
   },
+  maps: {
+    zoom: '缩放',
+    notAvailableTitle: '地图不可用',
+    notAvailableDescription: '"{mapName}"的互动地图尚不可用。我们正在等待兼容地图的制作。',
+    placeholder: '该地点',
+    floors: '楼层',
+    reset: '重置',
+    resetTitle: '重置为默认视图',
+    factions: {
+      pmc: 'PMC',
+      scav: 'Scav',
+    },
+    legend: {
+      yourObjectives: '你的目标',
+      teamObjectives: '团队目标',
+      pmcExtract: 'PMC撤离点',
+      scavExtract: 'Scav撤离点',
+      sharedExtract: '共享撤离点（任一阵营）',
+      coopExtract: '合作撤离点（PMC + Scav）',
+    },
+    controls: {
+      keyboard: {
+        cycleFloors: '+ 滚轮切换楼层',
+        zoom: '+ 滚轮缩放',
+      },
+    },
+    aria: {
+      zoomSpeed: '缩放速度',
+    },
+    tooltip: {
+      goTo: '前往目标',
+      goToInTaskList: '在任务列表中前往目标',
+      complete: '完成目标',
+      uncomplete: '取消完成目标',
+      objectiveUnavailable: '目标不可用。',
+      taskFallback: '任务',
+    },
+  },
   page: {
     index: {
       title: '总览面板',
@@ -133,8 +171,8 @@
       filters: {
         title: '任务筛选',
         close: '关闭',
-        hide_global_tasks: '地图视图隐藏全局任务',
-        show_global_tasks: '地图视图显示全局任务',
+        hide_global_tasks: '隐藏全局任务',
+        show_global_tasks: '显示全局任务',
         hide_non_kappa_tasks: '隐藏非 Kappa任务',
         show_non_kappa_tasks: '显示非 Kappa任务',
         level: '等级',
@@ -205,6 +243,7 @@
       notasksfound: '未找到任务，可尝试修改筛选条件或更新人物等级',
       showing_all_sources: '显示全部来源',
       loading: '加载任务中',
+      selectedTask: '已选任务',
       questcard: {
         level: '等级要求：{count}',
         levelBadge: '等级 {count}',
@@ -223,6 +262,9 @@
         andMore: '，另有 {count} 个',
         copyTaskId: '复制任务ID',
         copyTaskLink: '复制任务链接',
+        reportDataIssue: '报告数据问题',
+        viewOnTarkovDev: '在 Tarkov.dev 查看',
+        viewOnWiki: '在维基查看',
         showChainDetails: '显示任务链详情',
         hideChainDetails: '隐藏任务链详情',
         handOver: '交付',
@@ -276,7 +318,13 @@
         blocked: '不再可用',
         blockedTooltip: '因为你在其他任务中的抉择，此任务已永久不可用',
         editionExclusiveTooltip: '此任务仅对 {editions} 游戏版本开放',
+        anyMap: '任意',
+        globalTask: '任意地图',
+        globalTaskTooltip: '此任务可在任意地图上完成',
+        jumpToMap: '跳转到地图',
       },
+      scrollToMap: '滚动到地图',
+      scrollToTop: '滚动到顶部',
     },
     traders: {
       title: '商人',
@@ -657,6 +705,7 @@
     item: '物品',
     items: '物品',
     close_button: '关闭',
+    dismiss: '关闭',
     loading: '加载中...',
     error: '出错了',
   },
