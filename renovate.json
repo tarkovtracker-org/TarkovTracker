@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergeDigest",
+    ":automergeMinor"
+  ],
+  "schedule": ["after 10pm every weekday", "before 5am every weekday", "every weekend"],
+  "timezone": "America/New_York",
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": true,
+    "assignees": ["@maintainers"]
+  },
+  "packageRules": [
+    {
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "automergeType": "pr",
+      "labels": ["dependencies", "automerge"]
+    },
+    {
+      "matchPackagePatterns": ["^@types/"],
+      "automerge": true,
+      "labels": ["dependencies", "types"]
+    },
+    {
+      "matchPackageNames": ["node"],
+      "enabled": false
+    },
+    {
+      "matchPackagePatterns": ["^eslint"],
+      "groupName": "eslint packages",
+      "automerge": true
+    },
+    {
+      "matchPackagePatterns": ["^@nuxt/"],
+      "groupName": "nuxt packages",
+      "schedule": ["before 3am on monday"]
+    },
+    {
+      "matchPackagePatterns": ["^@cloudflare/"],
+      "groupName": "cloudflare packages"
+    },
+    {
+      "matchPackageNames": ["tailwindcss", "@tailwindcss/postcss", "prettier-plugin-tailwindcss"],
+      "groupName": "tailwind packages"
+    },
+    {
+      "matchPackageNames": ["vitest", "@vitest/ui", "@nuxt/test-utils", "@vue/test-utils"],
+      "groupName": "testing packages"
+    }
+  ],
+  "postUpdateOptions": ["npmDedupe"],
+  "prConcurrentLimit": 3,
+  "prCreation": "not-pending",
+  "rebaseWhen": "behind-base-branch",
+  "semanticCommitScope": "deps",
+  "commitMessagePrefix": "chore(deps):"
+}

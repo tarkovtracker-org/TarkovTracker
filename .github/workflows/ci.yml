@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'wip/**']
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '24.12.0'
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Type checking
+        run: npx nuxt typecheck
+
+      - name: Format check
+        run: npx prettier --check "app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}" "nuxt.config.ts" "vitest.config.ts"
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npx vitest run --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittests
+          fail_ci_if_error: false
+
+  build:
+    name: Build Application
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: .output
+          retention-days: 7
+
+  workers:
+    name: Workers Validation
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        worker: [api-gateway]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install worker dependencies
+        working-directory: workers/${{ matrix.worker }}
+        run: npm ci
+
+      - name: Type check worker
+        working-directory: workers/${{ matrix.worker }}
+        run: npm run typecheck
+
+      - name: Validate OpenAPI
+        if: matrix.worker == 'api-gateway'
+        working-directory: workers/${{ matrix.worker }}
+        run: npm run validate:openapi
