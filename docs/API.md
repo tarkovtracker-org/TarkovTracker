@@ -25,9 +25,9 @@ Fetches minimal player level data for early UI rendering.
 
 **Query Parameters:**
 
-| Parameter | Type   | Default | Description                            |
-| --------- | ------ | ------- | -------------------------------------- |
-| `lang`    | string | `en`    | Language code (en, de, es, fr, ru, uk) |
+| Parameter | Type   | Default | Description                                     |
+| --------- | ------ | ------- | ----------------------------------------------- |
+| `lang`    | string | `en`    | Language code (see Supported Languages section) |
 
 **Response:**
 
@@ -42,7 +42,7 @@ Fetches minimal player level data for early UI rendering.
 }
 ```
 
-**Cache TTL:** 1 hour
+**Cache TTL:** 12 hours
 
 ---
 
@@ -78,7 +78,7 @@ Fetches core task data (tasks, maps, traders) without objectives or rewards.
 }
 ```
 
-**Cache TTL:** 1 hour
+**Cache TTL:** 12 hours
 
 ---
 
@@ -93,7 +93,7 @@ Fetches task objectives and fail conditions.
 | `lang`     | string | `en`      | Language code |
 | `gameMode` | string | `regular` | Game mode     |
 
-**Cache TTL:** 1 hour
+**Cache TTL:** 12 hours
 
 ---
 
@@ -108,7 +108,7 @@ Fetches task rewards (start, finish, failure).
 | `lang`     | string | `en`      | Language code |
 | `gameMode` | string | `regular` | Game mode     |
 
-**Cache TTL:** 1 hour
+**Cache TTL:** 12 hours
 
 ---
 
@@ -123,7 +123,7 @@ Fetches hideout stations with levels, requirements, and crafts.
 | `lang`     | string | `en`      | Language code |
 | `gameMode` | string | `regular` | Game mode     |
 
-**Cache TTL:** 1 hour
+**Cache TTL:** 12 hours
 
 ---
 
@@ -182,6 +182,8 @@ Fetches cache purge timestamp to detect server-side cache clears.
   }
 }
 ```
+
+**Cache TTL:** Never cached (`Cache-Control: no-store`)
 
 ---
 
@@ -249,17 +251,19 @@ All endpoints return errors in this format:
 
 The client caches API responses in IndexedDB with keys like:
 
-- `tarkov-tasks-core-regular-en`
-- `tarkov-hideout-pve-de`
-- `tarkov-items-all-en`
+- `tasks-core-en-regular`
+- `hideout-de-pve`
+- `items-lite-en`
 
 ### Server-Side (Edge)
 
 Cloudflare edge caching with `Cache-Control` headers:
 
 ```http
-Cache-Control: public, max-age=3600
+Cache-Control: public, max-age=43200
 ```
+
+Note: 43200 seconds = 12 hours (default), 86400 seconds = 24 hours (extended)
 
 ### Cache Busting
 
@@ -269,14 +273,26 @@ Pass `cacheBust=1` query parameter to bypass cache.
 
 ## Supported Languages
 
-| Code | Language  |
-| ---- | --------- |
-| `en` | English   |
-| `de` | German    |
-| `es` | Spanish   |
-| `fr` | French    |
-| `ru` | Russian   |
-| `uk` | Ukrainian |
+| Code | Language   |
+| ---- | ---------- |
+| `cs` | Czech      |
+| `de` | German     |
+| `en` | English    |
+| `es` | Spanish    |
+| `fr` | French     |
+| `hu` | Hungarian  |
+| `it` | Italian    |
+| `ja` | Japanese   |
+| `ko` | Korean     |
+| `pl` | Polish     |
+| `pt` | Portuguese |
+| `ro` | Romanian   |
+| `ru` | Russian    |
+| `sk` | Slovak     |
+| `tr` | Turkish    |
+| `zh` | Chinese    |
+
+> **Note:** Ukrainian (`uk`) is supported in the UI but maps to English for API requests.
 
 ---
 

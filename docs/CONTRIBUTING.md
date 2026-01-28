@@ -44,7 +44,7 @@ NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## Project Structure
 
-```
+```text
 app/
 ├── components/      # Global UI components
 ├── composables/     # Reusable composition functions
@@ -123,17 +123,20 @@ npm run format
 
 ```bash
 # Run all tests
-npm test
+npx vitest run
 
-# Watch mode
-npm run test:watch
+# Watch mode (default)
+npx vitest
+
+# API Gateway tests
+npm run test:api-gateway
 ```
 
 ### Writing Tests
 
 Tests are located in `__tests__/` directories alongside the code:
 
-```
+```text
 app/features/tasks/
 ├── TaskCard.vue
 ├── __tests__/
@@ -226,4 +229,4 @@ logger.error('Error message', error);
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's MIT License.
+By contributing, you agree that your contributions will be licensed under the project's GNU General Public License v3.0.

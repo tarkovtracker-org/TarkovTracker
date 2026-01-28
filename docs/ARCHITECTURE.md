@@ -22,7 +22,7 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 
 ## Project Structure
 
-```
+```text
 /
 ├── app/                      # Application source (Nuxt srcDir)
 │   ├── assets/              # Static assets (CSS, images)
@@ -116,14 +116,17 @@ graph TB
 
 ## State Management
 
-### Three-Store Pattern
+### Three-Store Pattern + Facade
 
-TarkovTracker uses a **three-store facade pattern** with Pinia:
+TarkovTracker uses a **three-store pattern** with Pinia plus a computed facade:
 
 1. **useTarkovStore** - User progress (tasks, hideout, level)
 2. **useMetadataStore** - Game data (tasks, items, maps)
 3. **usePreferencesStore** - UI settings
-4. **useProgressStore** - Computed facade combining all stores
+
+**Facade:**
+
+- **useProgressStore** - Computed properties combining all three stores
 
 ### Store Responsibilities
 
@@ -303,10 +306,10 @@ runtimeConfig: {
 
 ```bash
 # Run all tests
-npm test
+npx vitest run
 
-# Watch mode
-npm run test:watch
+# Watch mode (default)
+npx vitest
 
 # API Gateway tests
 npm run test:api-gateway
