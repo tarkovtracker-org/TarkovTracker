@@ -54,6 +54,20 @@ const createTasks = (): Task[] => [
     factionName: 'Any',
     objectives: [{ id: 'obj-non-raid', type: 'traderLevel', count: 2 }],
   },
+  {
+    id: 'task-kappa',
+    name: 'Kappa Task',
+    factionName: 'Any',
+    kappaRequired: true,
+    trader: { id: 'trader-1', name: 'Trader One' },
+  },
+  {
+    id: 'task-lightkeeper',
+    name: 'Lightkeeper Task',
+    factionName: 'Any',
+    lightkeeperRequired: true,
+    trader: { id: 'trader-2', name: 'Trader Two' },
+  },
 ];
 const createProgressStore = () => ({
   visibleTeamStores: { self: {} },
@@ -66,6 +80,8 @@ const createProgressStore = () => ({
     'task-bear': { self: false },
     'task-global': { self: false },
     'task-non-raid': { self: false },
+    'task-kappa': { self: false },
+    'task-lightkeeper': { self: false },
   },
   tasksFailed: {
     'task-failed': { self: true },
@@ -76,6 +92,8 @@ const createProgressStore = () => ({
     'task-invalid': { self: true },
     'task-global': { self: true },
     'task-non-raid': { self: true },
+    'task-kappa': { self: true },
+    'task-lightkeeper': { self: true },
   },
   objectiveCompletions: {
     'obj-map': { self: false },
@@ -156,23 +174,58 @@ describe('useTaskFiltering', () => {
     const { taskFiltering, tasks } = await setup();
     const mergedMaps = [{ id: 'map-1', mergedIds: ['map-1'] }];
     const result = taskFiltering.filterTasksByView(tasks, 'traders', 'all', 'trader-2', mergedMaps);
-    expect(result.map((task) => task.id)).toEqual(['task-trader']);
+    expect(result.map((task) => task.id)).toEqual(['task-trader', 'task-lightkeeper']);
   });
   it('filters tasks by available status for a user', async () => {
     const { taskFiltering, tasks } = await setup();
     const result = taskFiltering.filterTasksByStatus(tasks, 'available', 'self');
-    expect(result.map((task) => task.id)).toEqual(['task-map', 'task-global', 'task-non-raid']);
+    expect(result.map((task) => task.id)).toEqual([
+      'task-map',
+      'task-global',
+      'task-non-raid',
+      'task-kappa',
+      'task-lightkeeper',
+    ]);
   });
   it('calculates status counts excluding invalid availability', async () => {
     const { taskFiltering } = await setup();
     const counts = taskFiltering.calculateStatusCounts('self');
     expect(counts).toEqual({
-      all: 7,
-      available: 3,
+      all: 9,
+      available: 5,
       locked: 1,
       completed: 1,
       failed: 1,
     });
+  });
+  it('calculateStatusCounts respects task type settings (Kappa only)', async () => {
+    const { taskFiltering, preferencesStore } = await setup();
+    preferencesStore.getHideNonKappaTasks = false;
+    preferencesStore.getShowLightkeeperTasks = false;
+    preferencesStore.getShowNonSpecialTasks = false;
+    const counts = taskFiltering.calculateStatusCounts('self');
+    expect(counts.all).toBe(1);
+    expect(counts.available).toBe(1);
+  });
+  it('calculateStatusCounts respects task type settings (Kappa + Lightkeeper)', async () => {
+    const { taskFiltering, preferencesStore } = await setup();
+    preferencesStore.getHideNonKappaTasks = false;
+    preferencesStore.getShowLightkeeperTasks = true;
+    preferencesStore.getShowNonSpecialTasks = false;
+    const counts = taskFiltering.calculateStatusCounts('self');
+    expect(counts.all).toBe(2);
+  });
+  it('calculateTraderCounts respects task type settings', async () => {
+    const { taskFiltering, preferencesStore } = await setup();
+    const allCounts = taskFiltering.calculateTraderCounts('self', 'all');
+    expect(allCounts['trader-1']).toBe(3);
+    expect(allCounts['trader-2']).toBe(2);
+    preferencesStore.getHideNonKappaTasks = false;
+    preferencesStore.getShowLightkeeperTasks = false;
+    preferencesStore.getShowNonSpecialTasks = false;
+    const kappaCounts = taskFiltering.calculateTraderCounts('self', 'all');
+    expect(kappaCounts['trader-1']).toBe(1);
+    expect(kappaCounts['trader-2']).toBeUndefined();
   });
   describe('isRaidRelevantObjective', () => {
     it('returns true for all raid-relevant objective types', async () => {

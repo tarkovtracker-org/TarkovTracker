@@ -729,24 +729,10 @@ export function useTaskFiltering() {
       userView,
     });
     const counts = { all: 0, available: 0, locked: 0, completed: 0, failed: 0 };
+    // filterTasksByTypeSettings already handles edition, prestige, and type filtering
     const taskList = filterTasksByTypeSettings(metadataStore.tasks);
-    // Get prestige filtering data
-    const userPrestigeLevel = tarkovStore.getPrestigeLevel();
-    const prestigeTaskMap = metadataStore.prestigeTaskMap;
-    const prestigeTaskIds = metadataStore.prestigeTaskIds;
-    // Get edition-based excluded tasks
-    const userEdition = tarkovStore.getGameEdition();
-    const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
     for (const task of taskList) {
-      // Skip excluded tasks
       if (EXCLUDED_SCAV_KARMA_TASKS.includes(task.id)) continue;
-      // Skip tasks not available for user's game edition
-      if (excludedTaskIds.has(task.id)) continue;
-      // Skip prestige tasks that don't match user's prestige level
-      if (prestigeTaskIds.includes(task.id)) {
-        const taskPrestigeLevel = prestigeTaskMap.get(task.id);
-        if (taskPrestigeLevel !== userPrestigeLevel) continue;
-      }
       if (userView === 'all') {
         // For "all" view
         const teamIds = Object.keys(progressStore.visibleTeamStores || {});
@@ -818,24 +804,10 @@ export function useTaskFiltering() {
       secondaryView,
     });
     const counts: Record<string, number> = {};
+    // filterTasksByTypeSettings already handles edition, prestige, and type filtering
     const taskList = filterTasksByTypeSettings(metadataStore.tasks);
-    // Get prestige filtering data
-    const userPrestigeLevel = tarkovStore.getPrestigeLevel();
-    const prestigeTaskMap = metadataStore.prestigeTaskMap;
-    const prestigeTaskIds = metadataStore.prestigeTaskIds;
-    // Get edition-based excluded tasks
-    const userEdition = tarkovStore.getGameEdition();
-    const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
     for (const task of taskList) {
-      // Skip excluded tasks
       if (EXCLUDED_SCAV_KARMA_TASKS.includes(task.id)) continue;
-      // Skip tasks not available for user's game edition
-      if (excludedTaskIds.has(task.id)) continue;
-      // Skip prestige tasks that don't match user's prestige level
-      if (prestigeTaskIds.includes(task.id)) {
-        const taskPrestigeLevel = prestigeTaskMap.get(task.id);
-        if (taskPrestigeLevel !== userPrestigeLevel) continue;
-      }
       const traderId = task.trader?.id;
       if (!traderId) continue;
       // Initialize count for this trader
