@@ -63,6 +63,9 @@ npx eslint .
 
 # Run tests
 npx vitest
+
+# Check for dependency updates
+npm run deps
 ```
 
 ## Production
