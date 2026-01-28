@@ -78,184 +78,125 @@
               </span>
             </AppTooltip>
           </template>
-          <template v-else-if="pendingParentTasks.length">
-            <span class="ml-2 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-              <AppTooltip
-                v-for="parent in displayedPendingParents"
-                :key="parent.id"
-                :text="getPendingParentTooltipText(parent)"
-              >
-                <span class="inline-flex items-center gap-1.5">
-                  <router-link
-                    :to="`/tasks?task=${parent.id}`"
-                    class="text-surface-200 text-[11px] underline decoration-white/30 underline-offset-2 hover:decoration-white/60"
-                  >
-                    <span class="truncate">{{ parent.name }}</span>
-                  </router-link>
-                  <span class="text-surface-500 text-[11px]">
-                    {{
-                      t(
-                        'page.tasks.questcard.requires_must_be',
-                        {
-                          status: formatRequirementExpectedStatuses(parent.expectedStatuses),
-                        },
-                        `must be ${formatRequirementExpectedStatuses(parent.expectedStatuses)}`
-                      )
-                    }}
-                  </span>
-                  <span class="inline-flex items-center gap-0.5 text-[10px] text-amber-400/80">
-                    <UIcon name="i-mdi-information-outline" class="h-3 w-3 shrink-0" />
-                    {{
-                      t(
-                        'page.tasks.questcard.requires_currently',
-                        {
-                          status: formatRequirementCurrentStatus(parent.currentStatus),
-                        },
-                        `currently ${formatRequirementCurrentStatus(parent.currentStatus)}`
-                      )
-                    }}
-                  </span>
-                </span>
-              </AppTooltip>
-              <span v-if="extraPendingParentsCount > 0" class="text-surface-500">
-                +{{ extraPendingParentsCount }}
-              </span>
-            </span>
-          </template>
-          <template v-else>
-            <span class="text-surface-300 ml-2">{{ lockedBefore }}</span>
-          </template>
-        </div>
-        <div
-          v-if="isFailed || isInvalid"
-          class="text-xs"
-          :class="isFailed ? 'text-error-300' : 'text-surface-300'"
-        >
-          <span :class="isFailed ? 'text-error-200/70' : 'text-surface-500'">
-            {{
-              isFailed
-                ? t('page.tasks.questcard.failed_because')
-                : t('page.tasks.questcard.blocked_because', 'Blocked because')
-            }}:
-          </span>
-          <template v-if="statusSources.length > 0">
-            <span class="ml-2 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-              <AppTooltip
-                v-for="source in statusSources"
-                :key="source.id"
-                :text="getStatusSourceTooltipText(source)"
-              >
-                <span class="inline-flex items-center gap-1.5">
-                  <router-link
-                    :to="`/tasks?task=${source.id}`"
-                    :class="
-                      isFailed
-                        ? 'text-error-200 decoration-error-400/40 hover:decoration-error-400/70'
-                        : 'text-surface-200 decoration-white/30 hover:decoration-white/60'
-                    "
-                    class="text-[11px] underline underline-offset-2"
-                  >
-                    {{ source.name }}
-                  </router-link>
-                  <span
-                    :class="isFailed ? 'text-error-300' : 'text-surface-400'"
-                    class="text-[11px]"
-                  >
-                    {{
-                      isFailed
-                        ? t(
-                            'page.tasks.questcard.failed_because_was',
-                            {
-                              status: formatRequirementExpectedStatuses(source.triggerStatuses),
-                            },
-                            `was ${formatRequirementExpectedStatuses(source.triggerStatuses)}`
-                          )
-                        : t(
-                            'page.tasks.questcard.blocked_because_was',
-                            {
-                              status: formatRequirementExpectedStatuses(source.triggerStatuses),
-                            },
-                            `was ${formatRequirementExpectedStatuses(source.triggerStatuses)}`
-                          )
-                    }}
-                  </span>
-                </span>
-              </AppTooltip>
-            </span>
-          </template>
-          <span v-else class="ml-2" :class="isFailed ? 'text-error-200/80' : 'text-surface-400'">
-            {{
-              isFailed
-                ? t('page.tasks.questcard.failed_because_unknown')
-                : t('page.tasks.questcard.blocked_because_unknown', 'Blocked by prerequisites')
-            }}
-          </span>
-        </div>
-        <div v-if="showNeededBy" class="text-surface-400 text-xs">
-          <span class="text-surface-500">
-            <UIcon name="i-mdi-account-multiple-outline" class="mr-1 inline h-4 w-4" />
-            {{
-              t(
-                'page.tasks.questcard.needed_by',
-                { names: neededByDisplayText },
-                `Needed by: ${neededByDisplayText}`
-              )
-            }}
-          </span>
+          <!-- Menu button -->
+          <AppTooltip v-if="isOurFaction" :text="t('page.tasks.questcard.more', 'More')">
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              class="shrink-0"
+              :aria-label="t('page.tasks.questcard.more', 'More')"
+              @click="openOverflowMenu"
+            >
+              <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />
+            </UButton>
+          </AppTooltip>
         </div>
       </div>
-      <!-- 2) Body: objectives (Full Width) -->
-      <div class="border-surface-700/50 border-t">
-        <div
-          class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex cursor-pointer items-center justify-between rounded-sm transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-          :class="compactClasses.objectivesToggle"
-          role="button"
-          tabindex="0"
-          :aria-expanded="objectivesVisible"
-          :aria-controls="`objectives-content-${task.id}`"
-          @click="toggleObjectivesVisibility"
-          @keydown.enter.prevent="toggleObjectivesVisibility"
-          @keydown.space.prevent="toggleObjectivesVisibility"
+      <!-- 2) Top strip: Before (only show when there are pending prerequisites) -->
+      <div v-if="lockedBefore > 0" class="text-xs text-gray-400">
+        <span class="text-gray-500">{{ t('page.tasks.questcard.requires', 'Requires') }}:</span>
+        <template v-if="pendingParentTasks.length">
+          <span class="ml-2 inline-flex flex-wrap items-center gap-1.5">
+            <AppTooltip
+              v-for="parent in displayedPendingParents"
+              :key="parent.id"
+              :text="parent.name"
+            >
+              <router-link
+                :to="`/tasks?task=${parent.id}`"
+                class="inline-flex max-w-[16rem] items-center rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-200 hover:bg-white/10"
+              >
+                <span class="truncate">{{ parent.name }}</span>
+              </router-link>
+            </AppTooltip>
+            <span v-if="extraPendingParentsCount > 0" class="text-gray-500">
+              +{{ extraPendingParentsCount }}
+            </span>
+          </span>
+        </template>
+        <template v-else>
+          <span class="ml-2 text-gray-300">{{ lockedBefore }}</span>
+        </template>
+      </div>
+      <div v-if="isFailed" class="text-xs text-red-300">
+        <span class="text-red-200/70">
+          {{ t('page.tasks.questcard.failedbecause', 'Failed because') }}:
+        </span>
+        <template v-if="failureSources.length > 0">
+          <span class="ml-2 inline-flex flex-wrap items-center gap-1.5">
+            <router-link
+              v-for="source in failureSources"
+              :key="source.id"
+              :to="`/tasks?task=${source.id}`"
+              class="inline-flex max-w-[16rem] items-center rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-500/20"
+            >
+              {{ source.name }}
+            </router-link>
+          </span>
+        </template>
+        <span v-else class="ml-2 text-red-200/80">
+          {{ t('page.tasks.questcard.failedbecauseunknown', 'Failed manually or data missing') }}
+        </span>
+      </div>
+      <div v-if="showNeededBy" class="text-xs text-gray-400">
+        <span class="text-gray-500">
+          <UIcon name="i-mdi-account-multiple-outline" class="mr-1 inline h-4 w-4" />
+          {{
+            t(
+              'page.tasks.questcard.neededby',
+              { names: neededByDisplayText },
+              `Needed by: ${neededByDisplayText}`
+            )
+          }}
+        </span>
+      </div>
+      <!-- 3) Body: objectives -->
+      <div class="space-y-3">
+        <QuestEquipment v-if="neededEquipment.length" :equipment="neededEquipment" />
+        <QuestKeys v-if="task?.neededKeys?.length" :needed-keys="task.neededKeys" />
+        <QuestObjectivesSkeleton
+          v-if="showObjectivesSkeleton"
+          :objectives="relevantViewObjectives"
+          :irrelevant-count="irrelevantObjectives.length"
+          :uncompleted-irrelevant="uncompletedIrrelevantObjectives.length"
+        />
+        <QuestObjectives
+          v-else
+          :objectives="relevantViewObjectives"
+          :irrelevant-count="irrelevantObjectives.length"
+          :uncompleted-irrelevant="uncompletedIrrelevantObjectives.length"
+        />
+      </div>
+      <!-- 4) Chain info -->
+      <div v-if="afterHasContent" class="text-xs text-gray-400">
+        <AppTooltip
+          v-if="unlocksNextCount > 0"
+          :text="
+            t(
+              'page.tasks.questcard.unlocksNextTooltip',
+              'Number of quests that become available after completing this task'
+            )
+          "
         >
-          <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-            {{ t('page.tasks.questcard.objectives') }}
-          </div>
-          <UButton
-            icon="i-mdi-chevron-down"
-            variant="ghost"
-            color="neutral"
-            size="xs"
-            :class="{ 'rotate-180': objectivesVisible }"
-            class="pointer-events-none transition-transform duration-200"
-          />
-        </div>
-        <Transition
-          enter-active-class="transition duration-150 ease-out"
-          enter-from-class="opacity-0 -translate-y-1"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition duration-100 ease-in"
-          leave-from-class="opacity-100 translate-y-0"
-          leave-to-class="opacity-0 -translate-y-1"
+          <span class="cursor-help border-b border-dotted border-gray-500">
+            {{ t('page.tasks.questcard.unlocksNext', 'Unlocks next') }}: {{ unlocksNextCount }}
+          </span>
+        </AppTooltip>
+        <span v-if="unlocksNextCount > 0 && impactCount > 0" class="mx-2 text-gray-600">•</span>
+        <AppTooltip
+          v-if="impactCount > 0"
+          :text="
+            t(
+              'page.tasks.questcard.impactTooltip',
+              'Number of incomplete quests that depend on this task being completed'
+            )
+          "
         >
-          <div
-            v-if="objectivesVisible"
-            :id="`objectives-content-${task.id}`"
-            :class="[isCompact ? 'space-y-1.5' : 'space-y-3', compactClasses.objectivesBody]"
-          >
-            <QuestObjectivesSkeleton
-              v-if="showObjectivesSkeleton"
-              :objectives="relevantViewObjectives"
-              :irrelevant-count="irrelevantObjectives.length"
-              :uncompleted-irrelevant="uncompletedIrrelevantObjectives.length"
-            />
-            <QuestObjectives
-              v-else
-              :objectives="relevantViewObjectives"
-              :irrelevant-count="irrelevantObjectives.length"
-              :uncompleted-irrelevant="uncompletedIrrelevantObjectives.length"
-            />
-          </div>
-        </Transition>
+          <span class="cursor-help border-b border-dotted border-gray-500">
+            {{ t('page.tasks.questcard.impact', 'Impact') }}: {{ impactCount }}
+          </span>
+        </AppTooltip>
       </div>
     </div>
     <!-- 3) Rewards Summary Section (Fixed to bottom, Full Width) -->
@@ -389,6 +330,7 @@
     loadingComponent: QuestObjectivesSkeleton,
     delay: 150, // Prevents skeleton flash on fast loads
   });
+  const QuestEquipment = defineAsyncComponent(() => import('@/features/tasks/QuestEquipment.vue'));
   const TaskCardRewards = defineAsyncComponent(
     () => import('@/features/tasks/TaskCardRewards.vue')
   );
@@ -857,6 +799,32 @@
   const uncompletedIrrelevantObjectives = computed(
     () => categorizedObjectives.value.uncompletedIrrelevant
   );
+  const neededEquipment = computed(() => {
+    if (isComplete.value) return [];
+    const equipmentMap = new Map<string, TarkovItem & { count: number }>();
+    relevantViewObjectives.value.forEach((obj) => {
+      if (tarkovStore.isTaskObjectiveComplete(obj.id)) return;
+      let item = obj.markerItem;
+      if (!item && (obj.type === 'plantItem' || obj.type === 'useItem')) {
+        item = obj.item;
+      }
+      if (item) {
+        if (!item.id) return;
+        const needed = obj.count ?? 1;
+        const current = tarkovStore.getObjectiveCount(obj.id);
+        const remaining = Math.max(0, needed - current);
+        if (remaining > 0) {
+          const existing = equipmentMap.get(item.id);
+          if (existing) {
+            existing.count += remaining;
+          } else {
+            equipmentMap.set(item.id, { ...item, count: remaining });
+          }
+        }
+      }
+    });
+    return Array.from(equipmentMap.values());
+  });
   const showObjectivesSkeleton = computed(() => {
     // If we have objectives (from props or store fallback), no skeleton needed
     if (taskObjectives.value.length > 0) return false;
