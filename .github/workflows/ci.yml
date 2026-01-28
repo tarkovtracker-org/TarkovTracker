@@ -50,15 +50,7 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: npx vitest run --coverage
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unittests
-          fail_ci_if_error: false
+        run: npx vitest run
 
   build:
     name: Build Application
