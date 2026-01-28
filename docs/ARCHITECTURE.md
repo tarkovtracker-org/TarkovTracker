@@ -222,15 +222,15 @@ All game data is fetched through Nuxt server routes that proxy to tarkov.dev Gra
 
 | Endpoint                       | Purpose              | Cache TTL |
 | ------------------------------ | -------------------- | --------- |
-| `/api/tarkov/bootstrap`        | Player levels        | 1h        |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 1h        |
-| `/api/tarkov/tasks-objectives` | Task objectives      | 1h        |
-| `/api/tarkov/tasks-rewards`    | Task rewards         | 1h        |
-| `/api/tarkov/hideout`          | Hideout stations     | 1h        |
+| `/api/tarkov/bootstrap`        | Player levels        | 12h       |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 12h       |
+| `/api/tarkov/tasks-objectives` | Task objectives      | 12h       |
+| `/api/tarkov/tasks-rewards`    | Task rewards         | 12h       |
+| `/api/tarkov/hideout`          | Hideout stations     | 12h       |
 | `/api/tarkov/items-lite`       | Items (minimal)      | 24h       |
 | `/api/tarkov/items`            | Items (full)         | 24h       |
 | `/api/tarkov/prestige`         | Prestige levels      | 24h       |
-| `/api/tarkov/cache-meta`       | Cache purge status   | -         |
+| `/api/tarkov/cache-meta`       | Cache purge status   | no-store  |
 
 ### Team API
 
@@ -334,14 +334,25 @@ Node.js version: 24.x
 
 ### Environment Variables
 
-| Variable                    | Description          | Required |
-| --------------------------- | -------------------- | -------- |
-| `SUPABASE_URL`              | Supabase project URL | Yes      |
-| `SUPABASE_ANON_KEY`         | Supabase anon key    | Yes      |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Yes      |
-| `NUXT_PUBLIC_APP_URL`       | Application URL      | Yes      |
-| `API_ALLOWED_HOSTS`         | Allowed origin hosts | No       |
-| `API_TRUST_PROXY`           | Trust proxy headers  | No       |
+**Client-side (browser):**
+
+| Variable                 | Description          | Required    |
+| ------------------------ | -------------------- | ----------- |
+| `VITE_SUPABASE_URL`      | Supabase project URL | For auth    |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key    | For auth    |
+
+**Server-side (Nuxt/Workers):**
+
+| Variable                    | Description          | Required    |
+| --------------------------- | -------------------- | ----------- |
+| `SUPABASE_URL`              | Supabase project URL | Production  |
+| `SUPABASE_ANON_KEY`         | Supabase anon key    | Production  |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Production  |
+| `NUXT_PUBLIC_APP_URL`       | Application URL      | Production  |
+| `API_ALLOWED_HOSTS`         | Allowed origin hosts | No          |
+| `API_TRUST_PROXY`           | Trust proxy headers  | No          |
+
+> **Note:** Most features work without Supabase configuration in local development. Auth and sync will be disabled.
 
 ## Code Conventions
 

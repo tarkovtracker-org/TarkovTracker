@@ -31,12 +31,14 @@ The app will be available at `http://localhost:3000`.
 Create a `.env` file in the project root:
 
 ```env
-# Supabase (required for auth/sync features)
+# Client-side (for browser auth)
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+
+# Server-side (for API routes - production only)
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# App URL
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
