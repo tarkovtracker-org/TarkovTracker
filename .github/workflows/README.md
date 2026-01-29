@@ -44,6 +44,7 @@ Required secrets in repository settings:
 CLOUDFLARE_API_TOKEN      - Cloudflare API token with Pages/Workers permissions
 CLOUDFLARE_ACCOUNT_ID     - Cloudflare account ID
 DISCORD_WEBHOOK           - Discord webhook for notifications (optional)
+GITLEAKS_LICENSE          - Gitleaks license key (optional, free tier available)
 ```
 
 ## Workflow Status

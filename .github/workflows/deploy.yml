@@ -46,6 +46,8 @@ jobs:
     name: Deploy Workers
     runs-on: ubuntu-latest
     needs: deploy-app
+    permissions:
+      contents: read
     strategy:
       matrix:
         worker: [api-gateway, team-gateway]
@@ -74,6 +76,8 @@ jobs:
     name: Post-deployment Tasks
     runs-on: ubuntu-latest
     needs: [deploy-app, deploy-workers]
+    permissions:
+      contents: read
     steps:
       - name: Smoke test
         run: |

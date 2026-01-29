@@ -16,7 +16,11 @@ check_prerequisites() {
     done
 
     node_version=$(node -v | cut -d'v' -f2)
-    required_version="24.12.0"
+    if [ -f .nvmrc ]; then
+        required_version=$(cat .nvmrc | tr -d 'v')
+    else
+        required_version="24.12.0"
+    fi
 
     if ! printf '%s\n' "$required_version" "$node_version" | sort -V -C; then
         echo "WARNING: Node.js version $node_version found, but $required_version or higher is recommended"
@@ -66,12 +70,19 @@ EOF
 setup_workers() {
     echo "Setting up Cloudflare Workers..."
 
+    if [ ! -d workers ]; then
+        echo "INFO: workers directory not found, skipping worker setup"
+        return
+    fi
+
+    shopt -s nullglob
     for worker in workers/*/; do
         if [ -f "$worker/package.json" ]; then
             echo "Installing dependencies for $(basename "$worker")..."
             (cd "$worker" && npm ci)
         fi
     done
+    shopt -u nullglob
 }
 
 main() {
