@@ -26,6 +26,12 @@ check_prerequisites() {
         echo "WARNING: Node.js version $node_version found, but $required_version or higher is recommended"
     fi
 
+    npm_version=$(npm -v)
+    required_npm="11.6.2"
+    if ! printf '%s\n' "$required_npm" "$npm_version" | sort -V -C; then
+        echo "WARNING: npm version $npm_version found, but $required_npm or higher is recommended"
+    fi
+
     echo "All prerequisites installed"
 }
 

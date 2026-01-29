@@ -176,9 +176,11 @@ Automated via Renovate (`renovate.json`):
 {
   "schedule": ["after 10pm every weekday", "before 5am every weekday", "every weekend"],
   "prConcurrentLimit": 3,
-  "automerge": true (for dev deps, types, security)
+  "automerge": true
 }
 ```
+
+_Automerge enabled for dev deps, types, and security updates._
 
 ## Development Environment Setup
 

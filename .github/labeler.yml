@@ -54,3 +54,5 @@ config:
       - 'commitlint.config.js'
       - 'renovate.json'
       - 'eslint.config.*'
+      - '.prettierrc*'
+      - '.nvmrc'

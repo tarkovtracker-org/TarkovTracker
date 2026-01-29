@@ -81,6 +81,7 @@
     "postinstall": "nuxt prepare",
     "prepare": "husky",
     "preview": "nuxt preview",
+    "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts"
   },
