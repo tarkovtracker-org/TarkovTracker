@@ -59,7 +59,12 @@ function isPublicRoute(pathname: string, publicRoutes: string[]): boolean {
 function ipInRange(clientIp: string, range: string): boolean {
   try {
     const addr = ipaddr.process(clientIp);
-    const [rangeIp, cidrStr] = range.split('/');
+    const parts = range.split('/');
+    const rangeIp = parts[0];
+    const cidrStr = parts[1];
+    if (!rangeIp) {
+      return false;
+    }
     if (!cidrStr) {
       // Single IP exact match
       const rangeAddr = ipaddr.process(rangeIp);
@@ -149,7 +154,7 @@ function isHostAllowed(
     return false;
   }
   // Extract hostname (remove port if present)
-  const host = hostHeader.split(':')[0].toLowerCase();
+  const host = (hostHeader.split(':')[0] ?? '').toLowerCase();
   return allowedHosts.some((allowed) => {
     const allowedLower = allowed.toLowerCase();
     // Exact match or subdomain match (e.g., "tarkovtracker.org" matches "www.tarkovtracker.org")
