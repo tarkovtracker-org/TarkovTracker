@@ -50,7 +50,7 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: npx vitest run --dangerouslyIgnoreUnhandledErrors
+        run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default
 
   build:
     name: Build Application
