@@ -106,10 +106,10 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Run Lighthouse
+      - name: Start preview server
         run: |
-          npm run preview &
-          npx wait-on http://localhost:3000 --timeout 30000
+          npx serve .output/public -l 3000 &
+          npx wait-on http://localhost:3000 --timeout 60000
 
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
