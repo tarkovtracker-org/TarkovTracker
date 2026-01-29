@@ -42,6 +42,10 @@ i18n:
   - changed-files:
     - any-glob-to-any-file: 'app/locales/**/*'
 
+supabase:
+  - changed-files:
+    - any-glob-to-any-file: 'supabase/**/*'
+
 config:
   - changed-files:
     - any-glob-to-any-file:
