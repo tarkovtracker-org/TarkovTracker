@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default
+        run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
 
       - name: Build
         run: npm run build
