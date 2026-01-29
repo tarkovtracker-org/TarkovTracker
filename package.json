@@ -79,7 +79,7 @@
     "lint": "eslint app --max-warnings=0",
     "lint:fix": "eslint app --fix",
     "postinstall": "nuxt prepare",
-    "prepare": "node -e \"try{require.resolve('husky')}catch{process.exit(0)}\" && husky",
+    "prepare": "husky || true",
     "preview": "nuxt preview",
     "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
