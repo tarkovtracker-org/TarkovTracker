@@ -10,15 +10,27 @@ export default defineVitestConfig({
     'import.meta.env.VITE_LOG_LEVEL': JSON.stringify(logLevel),
   },
   test: {
-    environment: 'nuxt',
+    environment: 'happy-dom',
+    environmentMatchGlobs: [
+      ['app/pages/**/__tests__/**/*.test.ts', 'nuxt'],
+      ['app/server/**/__tests__/**/*.test.ts', 'nuxt'],
+    ],
     globals: true,
     setupFiles: ['./test-setup.ts'],
     exclude: [...configDefaults.exclude, 'workers/**'],
     clearMocks: true,
     logHeapUsage: false,
     isolate: false,
-    maxWorkers: 4,
-    minWorkers: 1,
+    maxWorkers: process.env.CI ? 2 : 8,
+    minWorkers: process.env.CI ? 1 : 2,
     teardownTimeout: 10000,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: false,
+        isolate: false,
+      },
+    },
+    watchExclude: ['**/.nuxt/**', '**/.output/**', '**/dist/**'],
   },
 });
