@@ -49,6 +49,8 @@ jobs:
         env:
           NODE_ENV: production
           NUXT_PUBLIC_APP_VERSION: ${{ github.sha }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1.5.0
