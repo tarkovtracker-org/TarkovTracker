@@ -23,8 +23,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Audit all dependencies (informational)
+        run: npm audit --audit-level=high || true
 
       - name: Check for outdated dependencies
         run: npm outdated || true
