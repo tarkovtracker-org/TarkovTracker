@@ -168,6 +168,9 @@ export default defineNuxtConfig({
       ],
     },
   },
+  icon: {
+    serverBundle: 'local',
+  },
   components: [
     {
       path: '~/components',
