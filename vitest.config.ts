@@ -12,14 +12,13 @@ export default defineVitestConfig({
     'import.meta.env.VITE_LOG_LEVEL': JSON.stringify(logLevel),
   },
   test: {
-    environment: 'nuxt', // The Nuxt environment handles the DOM setup automatically
+    environment: 'nuxt',
     globals: true,
     setupFiles: ['./test-setup.ts'],
     exclude: [...configDefaults.exclude, 'workers/**'],
-    // Don't auto-clean up DOM elements as Nuxt environment handles this
     clearMocks: true,
-    // Suppress some console warnings during tests
     logHeapUsage: false,
     isolate: false,
+    teardownTimeout: 10000,
   },
 });
