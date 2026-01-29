@@ -31,7 +31,7 @@ install_dependencies() {
 
     echo "Setting up git hooks..."
     npx husky
-    chmod +x .husky/*
+    find .husky -maxdepth 1 -type f -name '[!_]*' -exec chmod +x {} \;
 }
 
 setup_environment() {

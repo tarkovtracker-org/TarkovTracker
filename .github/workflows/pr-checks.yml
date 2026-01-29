@@ -45,11 +45,30 @@ jobs:
             else if (total > 250) label = 'size/L';
             else if (total > 100) label = 'size/M';
 
+            const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const sizeLabels = existingLabels
+              .map(l => l.name)
+              .filter(name => name.startsWith('size/'));
+
+            for (const name of sizeLabels) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name,
+              });
+            }
+
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              labels: [label]
+              labels: [label],
             });
 
   conventional-commits:
@@ -100,7 +119,7 @@ jobs:
         run: npx wait-on http://localhost:3000 --timeout 15000
 
       - name: Run Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v10
+        uses: treosh/lighthouse-ci-action@v12
         with:
           urls: |
             http://localhost:3000

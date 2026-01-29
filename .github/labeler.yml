@@ -50,3 +50,7 @@ config:
       - 'vitest.config.ts'
       - 'tailwind.config.ts'
       - 'tsconfig.json'
+      - '.releaserc.json'
+      - 'commitlint.config.js'
+      - 'renovate.json'
+      - 'eslint.config.*'

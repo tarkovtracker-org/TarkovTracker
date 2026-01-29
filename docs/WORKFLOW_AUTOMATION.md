@@ -22,7 +22,7 @@ Runs on every push and PR:
 **Jobs:**
 
 - `quality` - Linting, type checking, format validation
-- `test` - Vitest test suite with coverage
+- `test` - Vitest test suite
 - `build` - Production build validation
 - `workers` - Cloudflare Workers validation
 
@@ -42,7 +42,7 @@ Automated deployment to production:
 
 **Required Secrets:**
 
-```
+```text
 CLOUDFLARE_API_TOKEN
 CLOUDFLARE_ACCOUNT_ID
 DISCORD_WEBHOOK (optional)
@@ -114,8 +114,7 @@ npm run prepare
 
 **pre-commit (`.husky/pre-commit`):**
 
-- Runs `npm run format` (Prettier + ESLint)
-- Runs `npm run lint`
+- Runs `lint-staged` for fast, targeted formatting and linting
 
 **commit-msg (`.husky/commit-msg`):**
 
@@ -124,7 +123,7 @@ npm run prepare
 
 ### Commit Message Format
 
-```
+```text
 <type>(<scope>): <subject>
 
 [optional body]
@@ -195,7 +194,7 @@ npm run setup
 
 1. Update `.env.local` with Supabase credentials
 2. Run `npm run dev`
-3. Visit http://localhost:3000
+3. Visit <http://localhost:3000>
 
 ## Deployment Process
 
@@ -235,11 +234,11 @@ Configure `DISCORD_WEBHOOK` secret for deployment notifications:
 
 ### Coverage Reports
 
-Codecov integration via `CODECOV_TOKEN`:
+Coverage reporting can be enabled by:
 
-- Tracks test coverage trends
-- Comments on PRs with coverage diff
-- Blocks PRs if coverage drops significantly
+- Adding `CODECOV_TOKEN` secret to repository
+- Configuring vitest with coverage options
+- Adding coverage upload step to CI workflow
 
 ## Local Development Workflow
 

@@ -76,8 +76,8 @@ jobs:
     steps:
       - name: Smoke test
         run: |
-          curl -f https://tarkovtracker.org || exit 1
-          curl -f https://api.tarkovtracker.io/health || echo "API health check skipped"
+          curl --fail --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 30 https://tarkovtracker.org
+          curl --fail --show-error --retry 3 --retry-delay 5 --max-time 15 https://api.tarkovtracker.io/health || echo "API health check skipped"
           echo "Deployment successful"
 
       - name: Notify Discord
