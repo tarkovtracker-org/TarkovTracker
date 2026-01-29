@@ -111,14 +111,14 @@ jobs:
       - name: Start preview server
         run: |
           npx nuxi preview &
-          npx wait-on http://localhost:3000 --timeout 60000
+          npx wait-on http://localhost:8788 --timeout 60000
 
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
           urls: |
-            http://localhost:3000
-            http://localhost:3000/tasks
-            http://localhost:3000/hideout
+            http://localhost:8788
+            http://localhost:8788/tasks
+            http://localhost:8788/hideout
           uploadArtifacts: true
           temporaryPublicStorage: true

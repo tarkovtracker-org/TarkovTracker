@@ -65,24 +65,27 @@ function ipInRange(clientIp: string, range: string): boolean {
     if (!rangeIp) {
       return false;
     }
-    if (!cidrStr) {
-      // Single IP exact match
+    if (parts.length === 1) {
       const rangeAddr = ipaddr.process(rangeIp);
       return addr.toString() === rangeAddr.toString();
     }
+    if (!cidrStr || !/^\d+$/.test(cidrStr)) {
+      return false;
+    }
     const rangeAddr = ipaddr.parse(rangeIp);
     const cidr = parseInt(cidrStr, 10);
-    // Families must match for CIDR check
+    const maxPrefix = rangeAddr.kind() === 'ipv4' ? 32 : 128;
+    if (cidr < 0 || cidr > maxPrefix) {
+      return false;
+    }
     if (addr.kind() !== rangeAddr.kind()) {
       return false;
     }
-    // Perform CIDR match using the library
     if (addr.kind() === 'ipv4') {
       return (addr as ipaddr.IPv4).match(rangeAddr as ipaddr.IPv4, cidr);
     }
     return (addr as ipaddr.IPv6).match(rangeAddr as ipaddr.IPv6, cidr);
   } catch {
-    // Return false for any parsing errors
     return false;
   }
 }
