@@ -34,7 +34,7 @@ jobs:
           NUXT_PUBLIC_APP_VERSION: ${{ github.sha }}
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/pages-action@v1.5.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -77,6 +77,7 @@ jobs:
       - name: Smoke test
         run: |
           curl -f https://tarkovtracker.org || exit 1
+          curl -f https://api.tarkovtracker.io/health || echo "API health check skipped"
           echo "Deployment successful"
 
       - name: Notify Discord

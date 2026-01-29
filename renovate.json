@@ -11,8 +11,7 @@
   "timezone": "America/New_York",
   "vulnerabilityAlerts": {
     "labels": ["security"],
-    "automerge": true,
-    "assignees": ["@maintainers"]
+    "automerge": true
   },
   "packageRules": [
     {

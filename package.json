@@ -32,6 +32,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260114.0",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@nuxt/test-utils": "^3.23.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/d3": "^7.4.3",
@@ -50,6 +52,11 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "supabase": "^2.72.7",
     "tailwindcss": "^4.1.18",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "semantic-release": "^24.2.5",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
     "vitest": "^3.2.4"
   },
   "engines": {
@@ -72,9 +79,22 @@
     "lint": "eslint app --max-warnings=0",
     "lint:fix": "eslint app --fix",
     "postinstall": "nuxt prepare",
+    "prepare": "husky",
     "preview": "nuxt preview",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts"
   },
-  "type": "module"
+  "type": "module",
+  "lint-staged": {
+    "app/**/*.{js,ts,tsx,vue}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "app/**/*.{json,json5,css,md}": [
+      "prettier --write"
+    ],
+    "*.{ts,json}": [
+      "prettier --write"
+    ]
+  }
 }

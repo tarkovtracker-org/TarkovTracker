@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-echo "🚀 Setting up TarkovTracker development environment..."
+echo "Setting up TarkovTracker development environment..."
 
 check_prerequisites() {
     echo "Checking prerequisites..."
@@ -10,7 +10,7 @@ check_prerequisites() {
     commands=("git" "node" "npm")
     for cmd in "${commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
-            echo "❌ $cmd is not installed"
+            echo "ERROR: $cmd is not installed"
             exit 1
         fi
     done
@@ -19,19 +19,18 @@ check_prerequisites() {
     required_version="24.12.0"
 
     if ! printf '%s\n' "$required_version" "$node_version" | sort -V -C; then
-        echo "⚠️  Node.js version $node_version found, but $required_version or higher is recommended"
+        echo "WARNING: Node.js version $node_version found, but $required_version or higher is recommended"
     fi
 
-    echo "✅ All prerequisites installed"
+    echo "All prerequisites installed"
 }
 
 install_dependencies() {
     echo "Installing dependencies..."
     npm ci
 
-    echo "Installing git hooks..."
-    npm install -D husky @commitlint/cli @commitlint/config-conventional
-    npx husky install
+    echo "Setting up git hooks..."
+    npx husky
     chmod +x .husky/*
 }
 
@@ -57,10 +56,10 @@ CLOUDFLARE_API_TOKEN=
 VITE_LOG_LEVEL=debug
 NODE_ENV=development
 EOF
-        echo "✅ Created .env.local"
-        echo "⚠️  Please update .env.local with your Supabase credentials"
+        echo "Created .env.local"
+        echo "WARNING: Please update .env.local with your Supabase credentials"
     else
-        echo "ℹ️  .env.local already exists"
+        echo "INFO: .env.local already exists"
     fi
 }
 
@@ -82,7 +81,7 @@ main() {
     setup_workers
 
     echo ""
-    echo "✅ Development environment setup complete!"
+    echo "Development environment setup complete!"
     echo ""
     echo "Next steps:"
     echo "1. Update .env.local with your Supabase credentials"

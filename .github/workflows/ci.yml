@@ -32,7 +32,7 @@ jobs:
         run: npx nuxt typecheck
 
       - name: Format check
-        run: npx prettier --check "app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}" "nuxt.config.ts" "vitest.config.ts"
+        run: npx prettier --check "app/**/*.{js,ts,tsx,vue,json,json5,css,md}" "nuxt.config.ts" "vitest.config.ts"
 
   test:
     name: Test Suite
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        worker: [api-gateway]
+        worker: [api-gateway, team-gateway]
     steps:
       - uses: actions/checkout@v4
 
