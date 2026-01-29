@@ -17,6 +17,8 @@ export default defineVitestConfig({
     clearMocks: true,
     logHeapUsage: false,
     isolate: false,
+    maxWorkers: 4,
+    minWorkers: 1,
     teardownTimeout: 10000,
   },
 });
