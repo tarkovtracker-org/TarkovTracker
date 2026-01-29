@@ -9,7 +9,7 @@ on:
 
 jobs:
   release:
-    name: Create Release
+    name: Release
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'skip ci')"
     permissions:
@@ -29,9 +29,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Run tests
-        run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
 
       - name: Build
         run: npm run build

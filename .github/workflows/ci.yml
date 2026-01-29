@@ -10,8 +10,8 @@ env:
   NODE_VERSION: '24.12.0'
 
 jobs:
-  quality:
-    name: Code Quality
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,67 +25,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run linting
+      - name: Lint
         run: npm run lint
 
-      - name: Type checking
+      - name: Type check
         run: npx nuxt typecheck
 
       - name: Format check
         run: npx prettier --check "app/**/*.{js,ts,tsx,vue,json,json5,css,md}" "nuxt.config.ts" "vitest.config.ts"
 
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
+      - name: Test
         run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
 
-  build:
-    name: Build Application
-    needs: [quality, test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build app
+      - name: Build
         run: npm run build
         env:
           NODE_ENV: production
 
       - name: Upload build artifacts
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: build-${{ github.sha }}
           path: .output
           retention-days: 7
 
   workers:
-    name: Workers Validation
+    name: Workers
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        worker: [api-gateway, team-gateway]
     steps:
       - uses: actions/checkout@v4
 
@@ -95,17 +62,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install worker dependencies
-        if: hashFiles(format('workers/{0}/package.json', matrix.worker)) != ''
-        working-directory: workers/${{ matrix.worker }}
-        run: npm ci
+      - name: Validate api-gateway
+        working-directory: workers/api-gateway
+        run: |
+          npm ci
+          npm run typecheck
+          npm run validate:openapi
 
-      - name: Type check worker
-        if: hashFiles(format('workers/{0}/package.json', matrix.worker)) != ''
-        working-directory: workers/${{ matrix.worker }}
-        run: npm run typecheck
-
-      - name: Validate OpenAPI
-        if: matrix.worker == 'api-gateway'
-        working-directory: workers/${{ matrix.worker }}
-        run: npm run validate:openapi
+      - name: Validate team-gateway
+        if: hashFiles('workers/team-gateway/package.json') != ''
+        working-directory: workers/team-gateway
+        run: |
+          npm ci
+          npm run typecheck

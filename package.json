@@ -93,7 +93,10 @@
     "app/**/*.{json,json5,css,md}": [
       "prettier --write"
     ],
-    "*.{ts,json}": [
+    "{nuxt,vitest,app}.config.ts": [
+      "prettier --write"
+    ],
+    "*.json": [
       "prettier --write"
     ]
   }

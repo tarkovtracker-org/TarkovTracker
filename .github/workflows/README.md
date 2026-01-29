@@ -7,54 +7,62 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 ### CI (`ci.yml`)
 
 **Trigger:** Push to main/develop/wip branches, PRs
-**Jobs:** Quality checks, tests, build validation, workers validation
+**Jobs:** `Validate` (lint, typecheck, format, test, build), `Workers` (validate both workers)
+**Artifacts:** Build uploaded on main branch for deploy reuse
 
 ### Deploy (`deploy.yml`)
 
-**Trigger:** Push to main, manual
-**Jobs:** Deploy app to Cloudflare Pages, deploy workers, smoke tests
+**Trigger:** After CI succeeds on main, or manual dispatch
+**Jobs:** `Deploy` (app + workers), `Verify` (smoke tests + Discord)
+**Note:** Reuses build artifact from CI (no redundant builds)
 **Requires:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 
 ### Security (`security.yml`)
 
-**Trigger:** Push, PR, weekly schedule
-**Jobs:** Dependency audit, secret scanning, CodeQL analysis
+**Trigger:** Push to main/develop, PRs, weekly schedule
+**Jobs:** `Security Scan` (audit + gitleaks), `CodeQL` (static analysis)
 
 ### Release (`release.yml`)
 
 **Trigger:** Push to main (non-docs)
-**Jobs:** Tests, build, semantic release
-**Requires:** `GITHUB_TOKEN`
+**Jobs:** `Release` (build + semantic-release)
 
 ### PR Checks (`pr-checks.yml`)
 
-**Trigger:** PR opened/updated
-**Jobs:** Auto-labeling, size check, commit validation, lighthouse (optional)
+**Trigger:** PR opened/updated/labeled
+**Jobs:** `PR Meta` (labels, size, commit validation), `Lighthouse` (conditional on ui/performance label)
 
 ### Stale (`stale.yml`)
 
 **Trigger:** Daily schedule
 **Jobs:** Mark and close stale issues/PRs
 
-## Secrets Configuration
+## Check Count
 
-Required secrets in repository settings:
+| Context | Checks |
+|---------|--------|
+| PR | ~6 (Validate, Workers, PR Meta, Security Scan, CodeQL, Lighthouse*) |
+| Main push | ~5 (Validate, Workers, Security Scan, CodeQL, Release) |
+| After CI | ~2 (Deploy, Verify) |
+
+*Lighthouse only runs with `performance` or `ui` label
+
+## Secrets
 
 ```text
-CLOUDFLARE_API_TOKEN      - Cloudflare API token with Pages/Workers permissions
-CLOUDFLARE_ACCOUNT_ID     - Cloudflare account ID
-DISCORD_WEBHOOK           - Discord webhook for notifications (optional)
-GITLEAKS_LICENSE          - Gitleaks license key (optional, free tier available)
+CLOUDFLARE_API_TOKEN   - Cloudflare API token
+CLOUDFLARE_ACCOUNT_ID  - Cloudflare account ID
+DISCORD_WEBHOOK        - Discord notifications (optional)
+GITLEAKS_LICENSE       - Gitleaks license key (optional)
 ```
 
-## Workflow Status
-
-Check workflow status:
+## Commands
 
 ```bash
-gh run list
-gh run view <run-id>
-gh run watch
+gh run list              # List recent runs
+gh run view <run-id>     # View run details
+gh run watch             # Watch running workflow
+gh workflow run deploy   # Manual deploy trigger
 ```
 
 ## Local Testing
@@ -62,7 +70,7 @@ gh run watch
 Test workflows locally with [act](https://github.com/nektos/act):
 
 ```bash
-act -j quality
-act -j test
-act -j build
+act -j validate
+act -j workers
+act -j pr-meta
 ```

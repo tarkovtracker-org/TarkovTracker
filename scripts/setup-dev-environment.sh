@@ -101,6 +101,13 @@ main() {
     echo ""
     echo "For workers development:"
     echo "  cd workers/api-gateway && npm run dev"
+    echo ""
+    echo "For CI/CD (maintainers):"
+    echo "  Configure these GitHub secrets:"
+    echo "    CLOUDFLARE_API_TOKEN  - Cloudflare API token"
+    echo "    CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID"
+    echo "    DISCORD_WEBHOOK       - Discord notifications (optional)"
+    echo "    GITLEAKS_LICENSE      - Gitleaks license key (optional)"
 }
 
 main

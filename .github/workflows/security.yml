@@ -8,11 +8,13 @@ on:
     - cron: '0 0 * * 0'
 
 jobs:
-  dependency-audit:
-    name: Dependency Audit
+  security-scan:
+    name: Security Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,14 +34,6 @@ jobs:
       - name: Check for outdated dependencies
         run: npm outdated || true
 
-  secret-scanning:
-    name: Secret Scanning
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
         continue-on-error: ${{ secrets.GITLEAKS_LICENSE == '' }}
@@ -48,7 +42,7 @@ jobs:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   codeql:
-    name: CodeQL Analysis
+    name: CodeQL
     runs-on: ubuntu-latest
     permissions:
       security-events: write
