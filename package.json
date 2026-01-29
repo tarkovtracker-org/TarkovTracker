@@ -55,9 +55,11 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "semantic-release": "^24.2.9",
+    "serve": "^14.2.5",
     "supabase": "^2.72.9",
     "tailwindcss": "^4.1.18",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^9.0.3"
   },
   "engines": {
     "node": ">=24.12.0",
