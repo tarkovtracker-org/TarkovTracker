@@ -59,6 +59,7 @@ jobs:
           cache: 'npm'
 
       - name: Install worker dependencies
+        if: hashFiles(format('workers/{0}/package.json', matrix.worker)) != ''
         working-directory: workers/${{ matrix.worker }}
         run: npm ci
 
