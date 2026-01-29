@@ -53,7 +53,11 @@ const mockFetch = vi.fn(async (input: FetchInput, _init?: RequestInit) => {
 });
 vi.stubGlobal('$fetch', mockFetch);
 // Auto-unmount VTU wrappers after each test
-enableAutoUnmount(afterEach);
+try {
+  enableAutoUnmount(afterEach);
+} catch {
+  // Already enabled by @nuxt/test-utils in nuxt environment tests
+}
 // Global setup for Nuxt testing
 beforeAll(() => {
   // Mock console methods that might be noisy in tests
