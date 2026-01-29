@@ -65,7 +65,7 @@ jobs:
       - name: Validate api-gateway
         working-directory: workers/api-gateway
         run: |
-          npm ci
+          npm install
           npm run typecheck
           npm run validate:openapi
 
@@ -73,5 +73,5 @@ jobs:
         if: hashFiles('workers/team-gateway/package.json') != ''
         working-directory: workers/team-gateway
         run: |
-          npm ci
+          npm install
           npm run typecheck
