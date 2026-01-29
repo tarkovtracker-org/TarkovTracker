@@ -60,6 +60,12 @@ Weekly security audits:
 
 **Triggers:** Push, PR, weekly schedule (Sunday)
 
+**Required Secrets:**
+
+```text
+GITLEAKS_LICENSE (required for organization repos, free at gitleaks.io)
+```
+
 ### 4. Release Automation (`.github/workflows/release.yml`)
 
 Semantic versioning with automated releases:
