@@ -52,6 +52,11 @@ jobs:
               .map(l => l.name)
               .filter(name => name.startsWith('size/'));
 
+            if (sizeLabels.length === 1 && sizeLabels[0] === label) {
+              console.log(`Size label ${label} already correct, skipping`);
+              return;
+            }
+
             for (const name of sizeLabels) {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
