@@ -152,6 +152,7 @@ export default defineNuxtConfig({
     domains: ['avatars.githubusercontent.com', 'github.com'],
   },
   ui: {
+    colorMode: false,
     theme: {
       colors: [
         'primary',

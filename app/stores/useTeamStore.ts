@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, nextTick, ref, watch, type Ref } from 'vue';
 import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
+import { actions, defaultState, getters } from '@/stores/progressState';
 import type { UserState } from '@/stores/progressState';
 import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -480,10 +481,6 @@ export function useTeammateStores() {
   // Create a store for a specific teammate
   const createTeammateStore = async (teammateId: string) => {
     try {
-      // Import required dependencies
-      const { defineStore } = await import('pinia');
-      const { getters, actions, defaultState } = await import('@/stores/progressState');
-      // Define the teammate store
       const storeDefinition = defineStore(`teammate-${teammateId}`, {
         state: () => JSON.parse(JSON.stringify(defaultState)),
         getters: getters,
