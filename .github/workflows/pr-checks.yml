@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   pr-meta:
     name: PR Meta
@@ -60,12 +64,16 @@ jobs:
             }
 
             for (const name of sizeLabels) {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                name,
-              });
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name,
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
             }
 
             await github.rest.issues.addLabels({
@@ -116,14 +124,25 @@ jobs:
       - name: Start preview server
         run: |
           npx wrangler pages dev dist --port 3000 &
+          echo $! > /tmp/server.pid
+          trap 'kill $(cat /tmp/server.pid) 2>/dev/null || true' EXIT
           npx wait-on http://localhost:3000 --timeout 60000
 
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
+          configPath: lighthouserc.json
           urls: |
             http://localhost:3000
             http://localhost:3000/tasks
             http://localhost:3000/hideout
           uploadArtifacts: true
           temporaryPublicStorage: true
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) 2>/dev/null || true
+            rm -f /tmp/server.pid
+          fi

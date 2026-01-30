@@ -14,6 +14,16 @@
 
 set -e  # Exit on error
 
+if [ -z "$WORKTREE_PATH" ]; then
+    echo "Error: WORKTREE_PATH is not set. Ensure WORKTREE_PATH is exported before running this script." >&2
+    exit 1
+fi
+
+if [ -z "$REPO_PATH" ]; then
+    echo "Error: REPO_PATH is not set. Ensure REPO_PATH is exported before running this script." >&2
+    exit 1
+fi
+
 echo "Setting up worktree: $WORKTREE_PATH"
 
 # Uncomment and modify as needed:
@@ -30,10 +40,14 @@ echo "Setting up worktree: $WORKTREE_PATH"
 #     npm install
 # fi
 
-# Install dependencies (Python)
+# Install dependencies (Python with virtual environment)
 # if [ -f "$WORKTREE_PATH/requirements.txt" ]; then
 #     cd "$WORKTREE_PATH"
-#     pip install -r requirements.txt
+#     python -m venv .venv
+#     # Activate: source .venv/bin/activate (Unix) or .venv\Scripts\activate (Windows)
+#     source .venv/bin/activate
+#     python -m pip install --upgrade pip
+#     python -m pip install -r requirements.txt
 # fi
 
 echo "Setup complete!"

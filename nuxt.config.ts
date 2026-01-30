@@ -59,6 +59,9 @@ export default defineNuxtConfig({
   serverDir: resolve(__dirname, 'app/server'),
   nitro: {
     preset: 'cloudflare-pages',
+    output: {
+      publicDir: 'dist',
+    },
     cloudflare: {
       pages: {
         routes: {

@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
-import { sharedDefine } from './vitest.shared';
+import { SHARED_DEFINE } from './vitest.shared';
 
 export default defineConfig({
-  define: sharedDefine,
+  define: SHARED_DEFINE,
   test: {
     projects: ['vitest.nuxt.config.ts', 'vitest.happy-dom.config.ts'],
   },

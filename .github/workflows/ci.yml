@@ -26,16 +26,16 @@ jobs:
         run: npm run lint
 
       - name: Type check
-        run: npx nuxt typecheck
+        run: npm run typecheck
 
       - name: Format check
-        run: npx prettier --check "app/**/*.{js,ts,tsx,vue,json,json5,css,md}" "nuxt.config.ts" "vitest.config.ts"
+        run: npm run format:check
 
       # --dangerouslyIgnoreUnhandledErrors: Works around @nuxt/test-utils worker timeout
       # during cleanup that causes false CI failures. Tracked upstream:
       # https://github.com/nuxt/test-utils/issues/888
       - name: Test
-        run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
+        run: npm run test
 
       - name: Build
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
@@ -50,7 +50,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ github.sha }}
-          path: .output/public
+          path: dist
           retention-days: 7
 
   workers:
@@ -64,6 +64,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            workers/*/package-lock.json
 
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''

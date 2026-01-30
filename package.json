@@ -2,6 +2,7 @@
   "__pinnedNotes": {
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui."
   },
+  "version": "0.0.0",
   "dependencies": {
     "@iconify-json/mdi": "^1.2.3",
     "@intlify/unplugin-vue-i18n": "^11.0.3",
@@ -77,8 +78,10 @@
     "deps": "npx taze --r --I",
     "dev": "nuxt dev",
     "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" && eslint app --fix",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,md}\" \"nuxt.config.ts\" \"vitest.config.ts\"",
     "generate": "nuxt generate",
     "lint": "eslint app --max-warnings=0",
+    "typecheck": "nuxt typecheck",
     "lint:fix": "eslint app --fix",
     "postinstall": "nuxt prepare",
     "prepare": "husky || true",
@@ -86,6 +89,7 @@
     "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "test": "vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2",
+    "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts"
   },
   "type": "module",

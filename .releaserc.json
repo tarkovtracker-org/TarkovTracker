@@ -12,12 +12,12 @@
       {
         "preset": "angular",
         "releaseRules": [
-          {"type": "feat", "release": "minor"},
-          {"type": "fix", "release": "patch"},
-          {"type": "perf", "release": "patch"},
-          {"type": "revert", "release": "patch"},
-          {"type": "docs", "scope": "README", "release": "patch"},
-          {"scope": "no-release", "release": false}
+          { "type": "feat", "release": "minor" },
+          { "type": "fix", "release": "patch" },
+          { "type": "perf", "release": "patch" },
+          { "type": "revert", "release": "patch" },
+          { "type": "docs", "scope": "README", "release": "patch" },
+          { "scope": "no-release", "release": false }
         ]
       }
     ],
@@ -54,7 +54,7 @@
       {
         "assets": [
           {
-            "path": ".output/**",
+            "path": "dist/**",
             "label": "Build artifacts"
           }
         ]

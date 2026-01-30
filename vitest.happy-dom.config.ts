@@ -1,6 +1,6 @@
 import { defineVitestProject } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
-import { sharedDefine } from './vitest.shared';
+import { SHARED_DEFINE } from './vitest.shared';
 
 export default defineVitestProject({
   test: {
@@ -30,5 +30,5 @@ export default defineVitestProject({
     },
     watchExclude: ['**/.nuxt/**', '**/.output/**', '**/dist/**'],
   },
-  define: sharedDefine,
+  define: SHARED_DEFINE,
 });

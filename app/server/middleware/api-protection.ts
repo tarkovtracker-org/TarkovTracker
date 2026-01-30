@@ -18,7 +18,9 @@ import {
   type H3Event,
 } from 'h3';
 import ipaddr from 'ipaddr.js';
+import { createLogger } from '../utils/logger';
 import { useRuntimeConfig } from '#imports';
+const logger = createLogger('API Protection');
 // Type for runtime config API protection settings
 interface ApiProtectionConfig {
   allowedHosts: string;
@@ -89,7 +91,7 @@ function ipInRange(clientIp: string, range: string): boolean {
     }
     return (addr as ipaddr.IPv6).match(rangeAddr as ipaddr.IPv6, cidr);
   } catch (error) {
-    console.warn('[API Protection] IP range parse error', {
+    logger.warn('IP range parse error', {
       clientIp,
       range,
       error: error instanceof Error ? error.message : String(error),
@@ -185,7 +187,7 @@ async function validateAuthToken(
     return null;
   }
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('[API Protection] Supabase configuration missing for auth validation');
+    logger.error('Supabase configuration missing for auth validation');
     return null;
   }
   const controller = new AbortController();
@@ -205,9 +207,9 @@ async function validateAuthToken(
     return user?.id ? user : null;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('[API Protection] Auth validation timed out after 5000ms');
+      logger.warn('Auth validation timed out after 5000ms');
     } else {
-      console.error('[API Protection] Auth validation error:', error);
+      logger.error('Auth validation error:', error);
     }
     return null;
   } finally {
@@ -227,9 +229,9 @@ function logSecurityEvent(
     ...details,
   };
   if (level === 'warn') {
-    console.warn(`[API Protection] ${message}`, JSON.stringify(logData));
+    logger.warn(message, JSON.stringify(logData));
   } else {
-    console.info(`[API Protection] ${message}`, JSON.stringify(logData));
+    logger.info(message, JSON.stringify(logData));
   }
 }
 export default defineEventHandler(async (event) => {
@@ -324,7 +326,7 @@ export default defineEventHandler(async (event) => {
         setResponseHeader(event, 'Access-Control-Max-Age', 86400); // 24 hours
       }
     } catch (error) {
-      console.warn('[API Protection] Invalid origin URL, skipping CORS headers:', {
+      logger.warn('Invalid origin URL, skipping CORS headers:', {
         origin,
         error: error instanceof Error ? error.message : String(error),
       });

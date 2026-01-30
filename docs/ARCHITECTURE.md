@@ -327,7 +327,7 @@ npm run test:api-gateway
 
 ```yaml
 Build command: npm run build
-Build output: .output/public
+Build output: dist
 Root directory: /
 Node.js version: 24.x
 ```
@@ -336,23 +336,23 @@ Node.js version: 24.x
 
 **Client-side (browser):**
 
-| Variable                 | Description          | Required |
-| ------------------------ | -------------------- | -------- |
-| `VITE_SUPABASE_URL`      | Supabase project URL | For auth |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key    | For auth |
+| Variable                 | Description                      | Required |
+| ------------------------ | -------------------------------- | -------- |
+| `VITE_SUPABASE_URL`      | Supabase project URL (auth/sync) | Optional |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (auth/sync)    | Optional |
 
 **Server-side (Nuxt/Workers):**
 
-| Variable                    | Description          | Required   |
-| --------------------------- | -------------------- | ---------- |
-| `SUPABASE_URL`              | Supabase project URL | Production |
-| `SUPABASE_ANON_KEY`         | Supabase anon key    | Production |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Production |
-| `NUXT_PUBLIC_APP_URL`       | Application URL      | Production |
-| `API_ALLOWED_HOSTS`         | Allowed origin hosts | No         |
-| `API_TRUST_PROXY`           | Trust proxy headers  | No         |
+| Variable                    | Description          | Required     |
+| --------------------------- | -------------------- | ------------ |
+| `SUPABASE_URL`              | Supabase project URL | Yes (prod)\* |
+| `SUPABASE_ANON_KEY`         | Supabase anon key    | Yes (prod)\* |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Yes (prod)\* |
+| `NUXT_PUBLIC_APP_URL`       | Application URL      | Yes (prod)\* |
+| `API_ALLOWED_HOSTS`         | Allowed origin hosts | No           |
+| `API_TRUST_PROXY`           | Trust proxy headers  | No           |
 
-> **Note:** Most features work without Supabase configuration in local development. Auth and sync will be disabled.
+> **\* Yes (prod):** Required in production deployments; optional in local/dev where auth and sync will be disabled.
 
 ## Code Conventions
 

@@ -32,13 +32,27 @@ jobs:
           cache: 'npm'
 
       - name: Download build artifact from CI
+        id: download-artifact
         if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: build-${{ github.event.workflow_run.head_sha }}
-          path: .output/public
+          path: dist
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
+
+      - name: Verify artifact downloaded
+        if: github.event_name == 'workflow_run'
+        env:
+          ARTIFACT_NAME: build-${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "::error::Build artifact not found. The CI workflow may not have uploaded the artifact '$ARTIFACT_NAME'."
+            echo "Check that the CI workflow completed successfully and uploaded artifacts."
+            exit 1
+          fi
+          echo "Artifact verified: $(find dist -type f | wc -l) files downloaded"
 
       - name: Build (manual trigger only)
         if: github.event_name == 'workflow_dispatch'
@@ -57,7 +71,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: tarkovtracker
-          directory: .output/public
+          directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy api-gateway

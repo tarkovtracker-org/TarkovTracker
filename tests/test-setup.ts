@@ -1,6 +1,6 @@
 import { enableAutoUnmount } from '@vue/test-utils';
 import 'fake-indexeddb/auto';
-import { beforeAll, afterEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 type FetchInput = string | Request | URL;
 const getFetchUrl = (input: FetchInput) => {
   if (typeof input === 'string') return input;
@@ -60,18 +60,15 @@ try {
     throw error;
   }
 }
-// Global setup for Nuxt testing
+let warnSpy: ReturnType<typeof vi.spyOn>;
 beforeAll(() => {
-  // Mock console methods that might be noisy in tests
-  const originalConsole = { ...console };
-  global.console = {
-    ...originalConsole,
-    // Uncomment to suppress specific warnings during tests
-    warn: (...args: unknown[]) => {
-      const first = args[0];
-      if (typeof first === 'string' && first.startsWith('[Icon]')) return;
-      originalConsole.warn(...args);
-    },
-    // error: vi.fn(),
-  };
+  const originalWarn = console.warn.bind(console);
+  warnSpy = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+    const first = args[0];
+    if (typeof first === 'string' && first.startsWith('[Icon]')) return;
+    originalWarn(...args);
+  });
+});
+afterAll(() => {
+  warnSpy.mockRestore();
 });

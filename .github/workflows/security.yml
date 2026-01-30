@@ -34,9 +34,21 @@ jobs:
       - name: Check for outdated dependencies
         run: npm outdated || true
 
+      - name: Check Gitleaks license
+        id: gitleaks-check
+        run: |
+          if [ -z "$GITLEAKS_LICENSE" ]; then
+            echo "::warning::GITLEAKS_LICENSE secret not configured - Gitleaks scan will be skipped"
+            echo "has-license=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-license=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
       - name: Gitleaks scan
+        if: steps.gitleaks-check.outputs.has-license == 'true'
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: ${{ secrets.GITLEAKS_LICENSE == '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

@@ -10,8 +10,8 @@ on:
 jobs:
   release:
     name: Release
-    runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    runs-on: ubuntu-24.04
+    if: ${{ !contains(toLower(github.event.head_commit.message), 'skip ci') && !contains(toLower(github.event.head_commit.message), '[skip ci]') && !contains(toLower(github.event.head_commit.message), 'ci skip') && !contains(toLower(github.event.head_commit.message), '[ci skip]') && !contains(toLower(github.event.head_commit.message), 'skip-ci') }}
     permissions:
       contents: write
       issues: write
@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
+        run: npm run test
 
       - name: Build
         run: npm run build

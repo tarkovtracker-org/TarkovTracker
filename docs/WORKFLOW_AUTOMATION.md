@@ -136,6 +136,8 @@ npm run prepare
 
 **Types:** feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, wip
 
+_Note: `wip` is a project-specific extension and is not part of the Conventional Commits spec._
+
 **Scopes:** app, workers, api, ui, tasks, hideout, maps, team, settings, admin, i18n, deps, config, ci
 
 **Examples:**
@@ -199,7 +201,7 @@ npm run setup
 
 1. Update `.env.local` with Supabase credentials
 2. Run `npm run dev`
-3. Visit <http://localhost:3000>
+3. Visit http://localhost:3000
 
 ## Deployment Process
 
@@ -319,7 +321,7 @@ npm run lint:fix
 
 - Check Cloudflare API token permissions
 - Verify project name in workflow
-- Check build output in `.output/public` (Nuxt cloudflare-pages preset)
+- Check build output in `dist` (Nuxt cloudflare-pages preset)
 
 **Workers deployment:**
 

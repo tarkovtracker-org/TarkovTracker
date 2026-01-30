@@ -5,7 +5,7 @@
     ":dependencyDashboard",
     ":semanticCommits",
     ":automergeDigest",
-    ":automergeMinor"
+    ":automergePatch"
   ],
   "schedule": ["after 10pm every weekday", "before 5am every weekday", "every weekend"],
   "timezone": "America/New_York",
