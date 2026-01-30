@@ -17,11 +17,13 @@ jobs:
           fetch-depth: 0
 
       - name: Auto-label PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/labeler@v5
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Calculate and apply size label
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |
