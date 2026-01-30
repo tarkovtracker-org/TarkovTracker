@@ -88,7 +88,12 @@ function ipInRange(clientIp: string, range: string): boolean {
       return (addr as ipaddr.IPv4).match(rangeAddr as ipaddr.IPv4, cidr);
     }
     return (addr as ipaddr.IPv6).match(rangeAddr as ipaddr.IPv6, cidr);
-  } catch {
+  } catch (error) {
+    console.warn('[API Protection] IP range parse error', {
+      clientIp,
+      range,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 }
