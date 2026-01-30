@@ -21,13 +21,13 @@ jobs:
           fetch-depth: 0
 
       - name: Auto-label PR
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event.action != 'labeled' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/labeler@v5
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Calculate and apply size label
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event.action != 'labeled' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |
@@ -123,10 +123,10 @@ jobs:
 
       - name: Start preview server
         run: |
-          npx wrangler pages dev dist --port 3000 &
+          setsid npx wrangler pages dev dist --port 3000 &
           echo $! > /tmp/server.pid
-          trap 'kill $(cat /tmp/server.pid) 2>/dev/null || true' EXIT
-          npx wait-on http://localhost:3000 --timeout 60000
+          trap 'kill -TERM -$(cat /tmp/server.pid) 2>/dev/null || pkill -f wrangler || true' EXIT
+          npx wait-on http://localhost:3000 --timeout 60000 --httpTimeout 20000
 
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
@@ -143,6 +143,8 @@ jobs:
         if: always()
         run: |
           if [ -f /tmp/server.pid ]; then
-            kill $(cat /tmp/server.pid) 2>/dev/null || true
+            kill -TERM -$(cat /tmp/server.pid) 2>/dev/null || pkill -f wrangler || true
             rm -f /tmp/server.pid
+          else
+            pkill -f wrangler || true
           fi

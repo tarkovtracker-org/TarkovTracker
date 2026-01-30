@@ -17,7 +17,7 @@ check_prerequisites() {
 
     node_version=$(node -v | cut -d'v' -f2)
     if [ -f .nvmrc ]; then
-        required_version=$(cat .nvmrc | tr -d 'v')
+        required_version=$(tr -d 'v' < .nvmrc)
     else
         required_version="24.12.0"
     fi
@@ -59,8 +59,8 @@ NUXT_PUBLIC_TEAM_GATEWAY_URL=http://localhost:8787
 NUXT_PUBLIC_TOKEN_GATEWAY_URL=http://localhost:8788
 
 # Cloudflare Workers (for local development)
-CLOUDFLARE_ACCOUNT_ID=
-CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=your_account_id_here
+CLOUDFLARE_API_TOKEN=your_api_token_here
 
 # Development
 VITE_LOG_LEVEL=debug

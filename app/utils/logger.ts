@@ -15,7 +15,8 @@ const normalizedLevel = typeof rawEnvLevel === 'string' ? rawEnvLevel.toLowerCas
 const configuredLevel: LogLevel | undefined = isLogLevel(normalizedLevel)
   ? normalizedLevel
   : undefined;
-const isDev = env.DEV === true || process.env.NODE_ENV === 'development';
+const isDev =
+  env.DEV === true || (typeof process !== 'undefined' && process.env.NODE_ENV === 'development');
 const LOG_LEVEL: LogLevel = configuredLevel ?? (isDev ? 'info' : 'warn');
 const shouldLog = (level: LogLevel) => levelPriority[level] >= levelPriority[LOG_LEVEL];
 export const logger = {

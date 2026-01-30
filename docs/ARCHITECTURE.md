@@ -336,10 +336,12 @@ Node.js version: 24.x
 
 **Client-side (browser):**
 
-| Variable                 | Description                      | Required |
-| ------------------------ | -------------------------------- | -------- |
-| `VITE_SUPABASE_URL`      | Supabase project URL (auth/sync) | Optional |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (auth/sync)    | Optional |
+| Variable                 | Description                            | Required |
+| ------------------------ | -------------------------------------- | -------- |
+| `VITE_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
+
+> **¹ Yes:** Required in production; optional for local development. Without `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, authentication, multi-device sync, real-time collaboration, and team features will be unavailable. The app will function in offline mode with localStorage persistence only.
 
 **Server-side (Nuxt/Workers):**
 

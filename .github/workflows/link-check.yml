@@ -1,0 +1,44 @@
+name: Link Check
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**/*.md'
+      - '*.md'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**/*.md'
+      - '*.md'
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --verbose
+            --no-progress
+            --accept 200,204,206,301,302,308
+            --exclude-mail
+            --exclude 'localhost'
+            --exclude '127\.0\.0\.1'
+            --exclude 'tarkovtracker\.org'
+            './docs/**/*.md'
+            './*.md'
+          fail: true
+
+      - name: Upload Link Check Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-check-report
+          path: ./lychee/out.md
+          retention-days: 7

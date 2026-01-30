@@ -11,7 +11,9 @@
   "timezone": "America/New_York",
   "vulnerabilityAlerts": {
     "labels": ["security"],
-    "automerge": true
+    "automerge": false,
+    "dependencyDashboardApproval": true,
+    "stabilityDays": 1
   },
   "packageRules": [
     {
@@ -22,7 +24,8 @@
       "labels": ["dependencies", "automerge"]
     },
     {
-      "matchPackagePatterns": ["^@types/"],
+      "matchPackageNames": ["/^@types//"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
       "labels": ["dependencies", "types"]
     },
@@ -31,17 +34,18 @@
       "enabled": false
     },
     {
-      "matchPackagePatterns": ["^eslint"],
+      "matchPackageNames": ["/^eslint/"],
       "groupName": "eslint packages",
+      "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
     {
-      "matchPackagePatterns": ["^@nuxt/"],
+      "matchPackageNames": ["/^@nuxt//"],
       "groupName": "nuxt packages",
       "schedule": ["before 3am on monday"]
     },
     {
-      "matchPackagePatterns": ["^@cloudflare/"],
+      "matchPackageNames": ["/^@cloudflare//"],
       "groupName": "cloudflare packages"
     },
     {

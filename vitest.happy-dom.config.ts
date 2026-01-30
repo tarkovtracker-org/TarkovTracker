@@ -1,7 +1,6 @@
 import { defineVitestProject } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
 import { SHARED_DEFINE } from './vitest.shared';
-
 export default defineVitestProject({
   test: {
     name: 'happy-dom',
@@ -18,6 +17,7 @@ export default defineVitestProject({
     clearMocks: true,
     logHeapUsage: false,
     isolate: false,
+    // @ts-expect-error - valid vitest options not in @nuxt/test-utils types
     maxWorkers: process.env.CI ? 2 : 8,
     minWorkers: process.env.CI ? 1 : 2,
     teardownTimeout: 10000,

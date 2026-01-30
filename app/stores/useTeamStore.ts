@@ -11,7 +11,6 @@ import { GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
-import { useToast } from '#imports';
 function getCurrentGameMode(): 'pvp' | 'pve' {
   try {
     const tarkovStore = useTarkovStore();

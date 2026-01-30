@@ -1,10 +1,10 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { useXpCalculation } from '@/composables/useXpCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { Task, PlayerLevel } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
-import { useXpCalculation } from '../useXpCalculation';
 // Mock data for testing
 const mockTasks: Partial<Task>[] = [
   {

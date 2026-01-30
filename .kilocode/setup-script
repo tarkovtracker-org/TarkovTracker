@@ -12,14 +12,14 @@
 #   - Run database migrations
 #   - Set up local configuration
 
-set -e  # Exit on error
+set -euo pipefail  # Exit on error, unset vars, or pipeline failures
 
-if [ -z "$WORKTREE_PATH" ]; then
+if [ -z "${WORKTREE_PATH:-}" ]; then
     echo "Error: WORKTREE_PATH is not set. Ensure WORKTREE_PATH is exported before running this script." >&2
     exit 1
 fi
 
-if [ -z "$REPO_PATH" ]; then
+if [ -z "${REPO_PATH:-}" ]; then
     echo "Error: REPO_PATH is not set. Ensure REPO_PATH is exported before running this script." >&2
     exit 1
 fi
@@ -44,8 +44,9 @@ echo "Setting up worktree: $WORKTREE_PATH"
 # if [ -f "$WORKTREE_PATH/requirements.txt" ]; then
 #     cd "$WORKTREE_PATH"
 #     python -m venv .venv
-#     # Activate: source .venv/bin/activate (Unix) or .venv\Scripts\activate (Windows)
+#     # Unix activation (this script is bash-only):
 #     source .venv/bin/activate
+#     # Windows (PowerShell/CMD, for manual use): .venv\Scripts\activate
 #     python -m pip install --upgrade pip
 #     python -m pip install -r requirements.txt
 # fi

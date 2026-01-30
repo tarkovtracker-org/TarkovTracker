@@ -32,11 +32,11 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue';
   import { useRoute } from 'vue-router';
+  import { useToast } from '#imports';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useSystemStore } from '@/stores/useSystemStore';
   import type { SystemState } from '@/types/tarkov';
   import { logger } from '@/utils/logger';
-  import { useToast } from '#imports';
   const systemStore = useSystemStore();
   const route = useRoute();
   const toast = useToast();

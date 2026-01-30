@@ -102,6 +102,20 @@ Automatic stale issue/PR management:
 - Exempts issues: `pinned`, `security`, `enhancement` labels
 - Exempts PRs: `pinned`, `security` labels
 
+### 7. Link Check (`.github/workflows/link-check.yml`)
+
+Validates external links in documentation:
+
+**Checks:**
+
+- All markdown files in `docs/` and project root
+- Validates HTTP status codes (200, 204, 206, 301, 302, 308)
+- Excludes localhost, internal domains, and email links
+
+**Triggers:** PRs/pushes affecting markdown files, weekly (Sunday 00:00 UTC), manual dispatch
+
+**On failure:** Uploads report artifact with broken links
+
 ## Pre-commit Hooks
 
 Git hooks via Husky enforce quality standards:
@@ -221,11 +235,14 @@ Push to `main` triggers:
 # Via GitHub Actions
 gh workflow run deploy.yml
 
-# Local deployment
+# Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)
 npm run build
 cd workers/api-gateway && npx wrangler deploy
-cd workers/team-gateway && npx wrangler deploy
+cd "$OLDPWD" && cd workers/team-gateway && npx wrangler deploy
 ```
+
+> **Note:** All local deployment commands assume you are in the project root directory.
+> The `cd "$OLDPWD"` returns to the previous directory before switching to the next worker.
 
 ## Monitoring & Notifications
 
@@ -373,8 +390,13 @@ npm run lint:fix
 
 ## Additional Resources
 
-- [GitHub Actions Docs](https://docs.github.com/en/actions)
-- [Conventional Commits](https://www.conventionalcommits.org/)
-- [Semantic Release](https://semantic-release.gitbook.io/)
-- [Renovate Docs](https://docs.renovatebot.com/)
-- [Cloudflare Pages](https://developers.cloudflare.com/pages/)
+> **Note:** External links are validated automatically on PRs via the `link-check` workflow.
+> Last manual verification: 2026-01-30
+
+| Resource             | Link                                                                                 | Notes                     |
+| -------------------- | ------------------------------------------------------------------------------------ | ------------------------- |
+| GitHub Actions Docs  | [docs.github.com/en/actions](https://docs.github.com/en/actions)                     | Stable documentation URL  |
+| Conventional Commits | [conventionalcommits.org/en/v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)  | Versioned spec permalink  |
+| Semantic Release     | [semantic-release.gitbook.io](https://semantic-release.gitbook.io/semantic-release/) | GitBook hosted docs       |
+| Renovate Docs        | [docs.renovatebot.com](https://docs.renovatebot.com/)                                | Official documentation    |
+| Cloudflare Pages     | [developers.cloudflare.com/pages](https://developers.cloudflare.com/pages/)          | Cloudflare developer docs |

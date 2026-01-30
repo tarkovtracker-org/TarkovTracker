@@ -78,7 +78,7 @@
     "deps": "npx taze --r --I",
     "dev": "nuxt dev",
     "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" && eslint app --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,md}\" \"nuxt.config.ts\" \"vitest.config.ts\"",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\"",
     "generate": "nuxt generate",
     "lint": "eslint app --max-warnings=0",
     "typecheck": "nuxt typecheck",
@@ -94,15 +94,22 @@
   },
   "type": "module",
   "lint-staged": {
-    "app/**/*.{js,ts,tsx,vue}": [
+    "app/**/*.{js,ts,tsx,vue,scss}": [
       "prettier --write",
       "eslint --fix"
     ],
     "app/**/*.{json,json5,css,md}": [
       "prettier --write"
     ],
-    "{nuxt,vitest,app}.config.ts": [
+    "docs/**/*.{md,markdown}": [
       "prettier --write"
+    ],
+    "tests/test-setup.ts": [
+      "prettier --write"
+    ],
+    "{nuxt,vitest,app}.config.ts": [
+      "prettier --write",
+      "eslint --fix"
     ],
     "*.json": [
       "prettier --write"

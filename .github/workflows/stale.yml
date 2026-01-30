@@ -20,7 +20,9 @@ jobs:
           close-pr-message: 'This PR was closed because it has been stalled for 14 days with no activity.'
           days-before-stale: 60
           days-before-close: 14
+          operations-per-run: 100
           stale-issue-label: 'stale'
           stale-pr-label: 'stale'
           exempt-issue-labels: 'pinned,security,enhancement'
-          exempt-pr-labels: 'pinned,security'
+          exempt-pr-labels: 'pinned,security,enhancement'
+

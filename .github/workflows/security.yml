@@ -11,6 +11,8 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +69,8 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
+          queries: security-extended
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+

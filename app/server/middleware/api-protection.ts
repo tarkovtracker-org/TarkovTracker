@@ -18,8 +18,8 @@ import {
   type H3Event,
 } from 'h3';
 import ipaddr from 'ipaddr.js';
-import { createLogger } from '../utils/logger';
 import { useRuntimeConfig } from '#imports';
+import { createLogger } from '../utils/logger';
 const logger = createLogger('API Protection');
 // Type for runtime config API protection settings
 interface ApiProtectionConfig {
@@ -207,9 +207,12 @@ async function validateAuthToken(
     return user?.id ? user : null;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      logger.warn('Auth validation timed out after 5000ms');
+      logger.warn('Auth validation timed out', { timeoutMs: 5000 });
     } else {
-      logger.error('Auth validation error:', error);
+      logger.error('Auth validation error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
     return null;
   } finally {
@@ -229,9 +232,9 @@ function logSecurityEvent(
     ...details,
   };
   if (level === 'warn') {
-    logger.warn(message, JSON.stringify(logData));
+    logger.warn(message, logData);
   } else {
-    logger.info(message, JSON.stringify(logData));
+    logger.info(message, logData);
   }
 }
 export default defineEventHandler(async (event) => {
@@ -326,7 +329,7 @@ export default defineEventHandler(async (event) => {
         setResponseHeader(event, 'Access-Control-Max-Age', 86400); // 24 hours
       }
     } catch (error) {
-      logger.warn('Invalid origin URL, skipping CORS headers:', {
+      logger.warn('Invalid origin URL, skipping CORS headers', {
         origin,
         error: error instanceof Error ? error.message : String(error),
       });

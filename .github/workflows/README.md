@@ -24,7 +24,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ### Release (`release.yml`)
 
-**Trigger:** Push to main (non-docs)
+**Trigger:** Push to main (excluding `**.md`, `docs/**`)
 **Jobs:** `Release` (build + semantic-release)
 
 ### PR Checks (`pr-checks.yml`)
