@@ -34,6 +34,9 @@ jobs:
       - name: Format check
         run: npx prettier --check "app/**/*.{js,ts,tsx,vue,json,json5,css,md}" "nuxt.config.ts" "vitest.config.ts"
 
+      # --dangerouslyIgnoreUnhandledErrors: Works around @nuxt/test-utils worker timeout
+      # during cleanup that causes false CI failures. Tracked upstream:
+      # https://github.com/nuxt/test-utils/issues/888
       - name: Test
         run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
 

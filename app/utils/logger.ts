@@ -8,7 +8,8 @@ const levelPriority: Record<LogLevel, number> = {
 function isLogLevel(value: unknown): value is LogLevel {
   return typeof value === 'string' && value in levelPriority;
 }
-const env = (import.meta as unknown as { env?: Record<string, unknown> }).env ?? {};
+type ViteEnv = { VITE_LOG_LEVEL?: string; DEV?: boolean };
+const env: ViteEnv = (import.meta as { env?: ViteEnv }).env ?? {};
 const rawEnvLevel = env.VITE_LOG_LEVEL;
 const normalizedLevel = typeof rawEnvLevel === 'string' ? rawEnvLevel.toLowerCase() : undefined;
 const configuredLevel: LogLevel | undefined = isLogLevel(normalizedLevel)
