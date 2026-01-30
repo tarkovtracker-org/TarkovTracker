@@ -36,7 +36,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-${{ github.event.workflow_run.head_sha }}
-          path: .output
+          path: dist
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
@@ -57,7 +57,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: tarkovtracker
-          directory: .output/public
+          directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy api-gateway
