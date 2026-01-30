@@ -88,7 +88,10 @@ jobs:
   lighthouse:
     name: Lighthouse
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'performance') || contains(github.event.pull_request.labels.*.name, 'ui')
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (contains(github.event.pull_request.labels.*.name, 'performance') ||
+       contains(github.event.pull_request.labels.*.name, 'ui'))
     steps:
       - uses: actions/checkout@v4
 

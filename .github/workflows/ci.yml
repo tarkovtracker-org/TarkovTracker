@@ -38,6 +38,7 @@ jobs:
         run: npx vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2
 
       - name: Build
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         run: npm run build
         env:
           NODE_ENV: production
