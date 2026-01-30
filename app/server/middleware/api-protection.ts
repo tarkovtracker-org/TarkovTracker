@@ -60,6 +60,9 @@ function ipInRange(clientIp: string, range: string): boolean {
   try {
     const addr = ipaddr.process(clientIp);
     const parts = range.split('/');
+    if (parts.length > 2) {
+      return false;
+    }
     const rangeIp = parts[0];
     const cidrStr = parts[1];
     if (!rangeIp) {

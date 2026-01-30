@@ -55,8 +55,10 @@ vi.stubGlobal('$fetch', mockFetch);
 // Auto-unmount VTU wrappers after each test
 try {
   enableAutoUnmount(afterEach);
-} catch {
-  // Already enabled by @nuxt/test-utils in nuxt environment tests
+} catch (error) {
+  if (!(error instanceof Error && error.message.includes('already'))) {
+    throw error;
+  }
 }
 // Global setup for Nuxt testing
 beforeAll(() => {

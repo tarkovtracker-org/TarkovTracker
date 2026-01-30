@@ -8,7 +8,6 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '24.12.0'
   PRODUCTION_URL: 'https://tarkovtracker.org'
   API_URL: 'https://api.tarkovtracker.org'
 
@@ -29,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Download build artifact from CI
