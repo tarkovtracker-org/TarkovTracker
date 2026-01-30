@@ -4,16 +4,14 @@ import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener'
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { SystemGetters, SystemState } from '@/types/tarkov';
 import { GAME_MODES } from '@/utils/constants';
+import { logger } from '@/utils/logger';
 import type { PostgrestError } from '@supabase/supabase-js';
-/**
- * Helper to get the current game mode from tarkov store.
- * Returns 'pvp' if not available.
- */
 function getCurrentGameMode(): 'pvp' | 'pve' {
   try {
     const tarkovStore = useTarkovStore();
     return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
-  } catch {
+  } catch (error) {
+    logger.warn('[useSystemStore] Failed to get game mode, defaulting to PVP:', error);
     return GAME_MODES.PVP;
   }
 }

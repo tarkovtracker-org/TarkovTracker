@@ -323,8 +323,11 @@ export default defineEventHandler(async (event) => {
         setResponseHeader(event, 'Access-Control-Allow-Credentials', 'true');
         setResponseHeader(event, 'Access-Control-Max-Age', 86400); // 24 hours
       }
-    } catch {
-      // Invalid origin URL - ignore CORS headers
+    } catch (error) {
+      console.warn('[API Protection] Invalid origin URL, skipping CORS headers:', {
+        origin,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
   // Handle preflight OPTIONS requests

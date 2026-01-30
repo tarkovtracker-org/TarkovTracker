@@ -12,14 +12,12 @@ import { logger } from '@/utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
 import { useToast } from '#imports';
-/**
- * Helper to get current game mode
- */
 function getCurrentGameMode(): 'pvp' | 'pve' {
   try {
     const tarkovStore = useTarkovStore();
     return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
-  } catch {
+  } catch (error) {
+    logger.warn('[useTeamStore] Failed to get game mode, defaulting to PVP:', error);
     return GAME_MODES.PVP;
   }
 }

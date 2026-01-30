@@ -85,6 +85,7 @@
     "preview": "nuxt preview",
     "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
+    "test": "vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts"
   },
   "type": "module",

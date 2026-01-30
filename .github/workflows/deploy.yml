@@ -36,7 +36,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-${{ github.event.workflow_run.head_sha }}
-          path: dist
+          path: .output/public
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
@@ -57,7 +57,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: tarkovtracker
-          directory: dist
+          directory: .output/public
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy api-gateway
@@ -92,7 +92,7 @@ jobs:
           echo "Deployment successful"
 
       - name: Notify Discord
-        if: always()
+        if: always() && vars.DISCORD_WEBHOOK_ENABLED == 'true'
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

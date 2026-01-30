@@ -50,7 +50,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ github.sha }}
-          path: dist
+          path: .output/public
           retention-days: 7
 
   workers:

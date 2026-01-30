@@ -21,10 +21,8 @@ Runs on every push and PR:
 
 **Jobs:**
 
-- `quality` - Linting, type checking, format validation
-- `test` - Vitest test suite
-- `build` - Production build validation
-- `workers` - Cloudflare Workers validation
+- `validate` - Lint, type checking, format check, tests, production build (sequential steps)
+- `workers` - Cloudflare Workers typecheck and OpenAPI validation
 
 **Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
 
@@ -34,11 +32,10 @@ Automated deployment to production:
 
 **Jobs:**
 
-- `deploy-app` - Deploy Nuxt SPA to Cloudflare Pages
-- `deploy-workers` - Deploy api-gateway and team-gateway workers
-- `post-deploy` - Smoke tests and notifications
+- `deploy` - Deploy Nuxt SPA to Cloudflare Pages, deploy api-gateway and team-gateway workers
+- `verify` - Smoke tests and Discord notifications
 
-**Triggers:** Push to `main` branch, manual dispatch
+**Triggers:** After CI workflow succeeds on main (workflow_run), manual dispatch
 
 **Required Secrets:**
 
@@ -54,11 +51,10 @@ Weekly security audits:
 
 **Jobs:**
 
-- `dependency-audit` - npm audit for vulnerabilities
-- `secret-scanning` - Gitleaks secret detection
-- `codeql` - CodeQL security analysis
+- `security-scan` - npm audit (prod and all deps), outdated check, Gitleaks secret detection
+- `codeql` - CodeQL static analysis
 
-**Triggers:** Push, PR, weekly schedule (Sunday)
+**Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
 
 **Required Secrets:**
 
@@ -103,7 +99,8 @@ Automatic stale issue/PR management:
 
 - Marks issues/PRs stale after 60 days
 - Closes stale items after 14 days
-- Exempts: `pinned`, `security`, `enhancement` labels
+- Exempts issues: `pinned`, `security`, `enhancement` labels
+- Exempts PRs: `pinned`, `security` labels
 
 ## Pre-commit Hooks
 
@@ -322,7 +319,7 @@ npm run lint:fix
 
 - Check Cloudflare API token permissions
 - Verify project name in workflow
-- Check build output in `.output/public`
+- Check build output in `.output/public` (Nuxt cloudflare-pages preset)
 
 **Workers deployment:**
 
