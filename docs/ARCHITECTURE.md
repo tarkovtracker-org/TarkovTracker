@@ -345,16 +345,16 @@ Node.js version: 24.x
 
 **Server-side (Nuxt/Workers):**
 
-| Variable                    | Description          | Required     |
-| --------------------------- | -------------------- | ------------ |
-| `SUPABASE_URL`              | Supabase project URL | Yes (prod)\* |
-| `SUPABASE_ANON_KEY`         | Supabase anon key    | Yes (prod)\* |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Yes (prod)\* |
-| `NUXT_PUBLIC_APP_URL`       | Application URL      | Yes (prod)\* |
-| `API_ALLOWED_HOSTS`         | Allowed origin hosts | No           |
-| `API_TRUST_PROXY`           | Trust proxy headers  | No           |
+| Variable                    | Description          | Required    |
+| --------------------------- | -------------------- | ----------- |
+| `SUPABASE_URL`              | Supabase project URL | Yes (prod)² |
+| `SUPABASE_ANON_KEY`         | Supabase anon key    | Yes (prod)² |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Yes (prod)² |
+| `NUXT_PUBLIC_APP_URL`       | Application URL      | Yes (prod)² |
+| `API_ALLOWED_HOSTS`         | Allowed origin hosts | No          |
+| `API_TRUST_PROXY`           | Trust proxy headers  | No          |
 
-> **\* Yes (prod):** Required in production deployments; optional in local/dev where auth and sync will be disabled.
+> **² Yes (prod):** Required in production deployments; optional in local/dev where auth and sync will be disabled.
 
 ## Code Conventions
 

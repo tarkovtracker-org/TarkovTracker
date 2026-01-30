@@ -19,7 +19,7 @@ import {
 } from 'h3';
 import ipaddr from 'ipaddr.js';
 import { useRuntimeConfig } from '#imports';
-import { createLogger } from '../utils/logger';
+import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('API Protection');
 // Type for runtime config API protection settings
 interface ApiProtectionConfig {

@@ -16,19 +16,19 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
       - name: Auto-label PR
         if: github.event.action != 'labeled' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/labeler@v5
+        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Calculate and apply size label
         if: github.event.action != 'labeled' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
             const files = await github.paginate(github.rest.pulls.listFiles, {
@@ -84,7 +84,7 @@ jobs:
             });
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
           cache: 'npm'
@@ -102,11 +102,13 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (contains(github.event.pull_request.labels.*.name, 'performance') ||
        contains(github.event.pull_request.labels.*.name, 'ui'))
+    env:
+      API_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
           cache: 'npm'
@@ -118,6 +120,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          NUXT_PUBLIC_APP_URL: http://localhost:3000
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
@@ -125,11 +128,11 @@ jobs:
         run: |
           setsid npx wrangler pages dev dist --port 3000 &
           echo $! > /tmp/server.pid
-          trap 'kill -TERM -$(cat /tmp/server.pid) 2>/dev/null || pkill -f wrangler || true' EXIT
+          trap 'kill -TERM -"$(cat /tmp/server.pid)" 2>/dev/null || pkill -f wrangler || true' EXIT
           npx wait-on http://localhost:3000 --timeout 60000 --httpTimeout 20000
 
       - name: Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v12
+        uses: treosh/lighthouse-ci-action@fcd65974f7c4c2bf0ee9d09b84d2489183c29726
         with:
           configPath: lighthouserc.json
           urls: |
@@ -143,7 +146,7 @@ jobs:
         if: always()
         run: |
           if [ -f /tmp/server.pid ]; then
-            kill -TERM -$(cat /tmp/server.pid) 2>/dev/null || pkill -f wrangler || true
+            kill -TERM -"$(cat /tmp/server.pid)" 2>/dev/null || pkill -f wrangler || true
             rm -f /tmp/server.pid
           else
             pkill -f wrangler || true

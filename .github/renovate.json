@@ -24,7 +24,7 @@
       "labels": ["dependencies", "automerge"]
     },
     {
-      "matchPackageNames": ["/^@types//"],
+      "matchPackageNames": ["/^@types\\//"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
       "labels": ["dependencies", "types"]
@@ -40,12 +40,12 @@
       "automerge": true
     },
     {
-      "matchPackageNames": ["/^@nuxt//"],
+      "matchPackageNames": ["/^@nuxt\\//"],
       "groupName": "nuxt packages",
       "schedule": ["before 3am on monday"]
     },
     {
-      "matchPackageNames": ["/^@cloudflare//"],
+      "matchPackageNames": ["/^@cloudflare\\//"],
       "groupName": "cloudflare packages"
     },
     {
