@@ -30,6 +30,7 @@ jobs:
             --exclude 'localhost'
             --exclude '127\.0\.0\.1'
             --exclude 'tarkovtracker\.org'
+            --exclude 'gnu\.org'
             './docs/**/*.md'
             './*.md'
           fail: true
