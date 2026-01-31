@@ -24,7 +24,7 @@ if [ -z "${REPO_PATH:-}" ]; then
     exit 1
 fi
 
-echo "Setting up worktree: $WORKTREE_PATH"
+echo "Setting up worktree: ${WORKTREE_PATH}"
 
 # Uncomment and modify as needed:
 
