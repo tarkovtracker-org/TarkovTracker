@@ -100,7 +100,7 @@ Automatic stale issue/PR management:
 - Marks issues/PRs stale after 60 days
 - Closes stale items after 14 days
 - Exempts issues: `pinned`, `security`, `enhancement` labels
-- Exempts PRs: `pinned`, `security` labels
+- Exempts PRs: `pinned`, `security`, `enhancement` labels
 
 ### 7. Link Check (`.github/workflows/link-check.yml`)
 

@@ -77,8 +77,8 @@
     "build": "nuxt build",
     "deps": "npx taze --r --I",
     "dev": "nuxt dev",
-    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" && eslint app --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\"",
+    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && eslint app --fix",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
     "generate": "nuxt generate",
     "lint": "eslint app --max-warnings=0",
     "typecheck": "nuxt typecheck",
@@ -107,7 +107,11 @@
     "tests/test-setup.ts": [
       "prettier --write"
     ],
-    "{nuxt,vitest,app}.config.ts": [
+    "{nuxt,app}.config.ts": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "vitest*.ts": [
       "prettier --write",
       "eslint --fix"
     ],
