@@ -1,20 +1,9 @@
 import { defineStore, type Store } from 'pinia';
 import { computed, type Ref } from 'vue';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
-import { useTarkovStore } from '@/stores/useTarkov';
+import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import type { SystemGetters, SystemState } from '@/types/tarkov';
-import { GAME_MODES } from '@/utils/constants';
-import { logger } from '@/utils/logger';
 import type { PostgrestError } from '@supabase/supabase-js';
-function getCurrentGameMode(): 'pvp' | 'pve' {
-  try {
-    const tarkovStore = useTarkovStore();
-    return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
-  } catch (error) {
-    logger.warn('[useSystemStore] Failed to get game mode, defaulting to PVP:', error);
-    return GAME_MODES.PVP;
-  }
-}
 /**
  * Helper to extract team ID from system store state.
  * Now handles game-mode-specific team IDs (pvp_team_id, pve_team_id).

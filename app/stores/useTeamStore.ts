@@ -6,20 +6,12 @@ import { actions, defaultState, getters } from '@/stores/progressState';
 import type { UserState } from '@/stores/progressState';
 import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import { GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
-function getCurrentGameMode(): 'pvp' | 'pve' {
-  try {
-    const tarkovStore = useTarkovStore();
-    return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
-  } catch (error) {
-    logger.warn('[useTeamStore] Failed to get game mode, defaulting to PVP:', error);
-    return GAME_MODES.PVP;
-  }
-}
 /**
  * Helper to extract team ID from system store for the current game mode
  * Reads directly from state to avoid getter reactivity issues

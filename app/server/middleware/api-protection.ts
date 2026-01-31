@@ -201,6 +201,7 @@ async function validateAuthToken(
       signal: controller.signal,
     });
     if (!response.ok) {
+      logger.warn('Auth validation failed', { status: response.status });
       return null;
     }
     const user = (await response.json()) as { id: string };
