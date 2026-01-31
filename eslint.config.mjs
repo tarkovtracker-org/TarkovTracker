@@ -27,7 +27,6 @@ export default withNuxt({
       alphabetize: { order: 'asc', caseInsensitive: true },
       groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'object', 'type'],
       pathGroups: [
-        { pattern: '#imports', group: 'internal', position: 'before' },
         { pattern: '@/**', group: 'internal', position: 'before' },
       ],
       pathGroupsExcludedImportTypes: ['builtin'],

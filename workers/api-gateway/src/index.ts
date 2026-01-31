@@ -200,7 +200,7 @@ function docsResponse(envOrigin?: string, requestOrigin?: string): Response {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TarkovTracker API Docs</title>
-    <link rel="icon" href="https://tarkovtracker.org/favicon.ico" />
+    <link rel="icon" href="https://tarkovtracker.io/favicon.ico" />
   </head>
   <body style="margin:0;min-height:100vh;background:#0e0f12;">
     <div id="app"></div>

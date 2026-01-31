@@ -1,10 +1,13 @@
+/**
+ * Test file for useXpCalculation composable
+ * Tests the XP calculation functionality and dual game mode support
+ */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useXpCalculation } from '@/composables/useXpCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { Task, PlayerLevel } from '@/types/tarkov';
-import type { GameMode } from '@/utils/constants';
+import { useXpCalculation } from '../useXpCalculation';
 // Mock data for testing
 const mockTasks: Partial<Task>[] = [
   {
@@ -107,19 +110,20 @@ describe('useXpCalculation', () => {
     expect(derivedLevel.value).toBe(5);
     expect(totalXP.value).toBe(10000);
   });
-  it('works with dual game mode system', () => {
+  it('works with dual game mode system', async () => {
     const tarkovStore = useTarkovStore();
     const { totalXP, setTotalXP } = useXpCalculation();
-    const switchMode = (mode: GameMode) => {
-      tarkovStore.$patch({ currentGameMode: mode });
-    };
+    // Set XP in PVP mode
     setTotalXP(2000);
     expect(totalXP.value).toBe(2000);
-    switchMode('pve');
-    expect(totalXP.value).toBe(0);
+    // Switch to PVE mode
+    await tarkovStore.switchGameMode('pve');
+    expect(totalXP.value).toBe(0); // Should be 0 in fresh PVE mode
+    // Set different XP in PVE mode
     setTotalXP(1500);
     expect(totalXP.value).toBe(1500);
-    switchMode('pvp');
+    // Switch back to PVP - should retain original XP
+    await tarkovStore.switchGameMode('pvp');
     expect(totalXP.value).toBe(2000);
   });
 });

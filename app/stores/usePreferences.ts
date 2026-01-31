@@ -10,6 +10,7 @@ import { pinia as pluginPinia } from '@/plugins/01.pinia.client';
 import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { useNuxtApp } from '#imports';
 // Define the state structure
 export interface PreferencesState {
   streamerMode: boolean;

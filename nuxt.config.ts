@@ -59,9 +59,6 @@ export default defineNuxtConfig({
   serverDir: resolve(__dirname, 'app/server'),
   nitro: {
     preset: 'cloudflare-pages',
-    output: {
-      publicDir: 'dist',
-    },
     cloudflare: {
       pages: {
         routes: {
@@ -155,7 +152,6 @@ export default defineNuxtConfig({
     domains: ['avatars.githubusercontent.com', 'github.com'],
   },
   ui: {
-    colorMode: false,
     theme: {
       colors: [
         'primary',
@@ -171,9 +167,6 @@ export default defineNuxtConfig({
         'error',
       ],
     },
-  },
-  icon: {
-    serverBundle: 'local',
   },
   components: [
     {

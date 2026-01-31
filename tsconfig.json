@@ -11,7 +11,7 @@
     "typeRoots": ["./app/types", "./types", "./node_modules/@types"],
     "types": ["node", "vitest"]
   },
-  "exclude": ["supabase/functions/**/*", ".claude-plugin/**/*", "workers/**/*"],
+  "exclude": ["supabase/functions/**/*"],
   // https://nuxt.com/docs/guide/concepts/typescript
   "files": [],
   "references": [

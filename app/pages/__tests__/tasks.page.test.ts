@@ -73,7 +73,6 @@ vi.mock('@/stores/usePreferences', () => ({
     getTaskSortMode: 'none',
     getTaskSortDirection: 'asc',
     getTaskSharedByAllOnly: false,
-    getHideGlobalTasks: false,
     getHideNonKappaTasks: false,
     getShowNonSpecialTasks: true,
     getShowLightkeeperTasks: true,

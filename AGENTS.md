@@ -4,7 +4,7 @@
 
 - Project: Nuxt 4 SPA for TarkovTracker.
 - Node >=24.12.0, npm >=11.6.2 (see `package.json` engines).
-- Package manager: npm (`packageManager` is `npm@11.8.0`).
+- Package manager: npm (`packageManager` is `npm@11.7.0`).
 - SSR is disabled (`ssr: false`), treat the app as client-only.
 - API + proxy handlers live in Nuxt server routes.
 - Copilot instructions are in `.github/copilot-instructions.md`.

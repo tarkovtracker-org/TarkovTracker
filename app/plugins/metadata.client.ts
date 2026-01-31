@@ -7,13 +7,6 @@ import { logger } from '@/utils/logger';
  */
 export default defineNuxtPlugin(() => {
   const metadataStore = useMetadataStore();
-  if (process.env.NODE_ENV === 'test') {
-    return {
-      provide: {
-        metadata: metadataStore,
-      },
-    };
-  }
   const toast = useToast();
   // Initialize the metadata store and fetch data (non-blocking)
   // This allows the app to render immediately while data loads in the background

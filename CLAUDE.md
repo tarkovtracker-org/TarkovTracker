@@ -51,7 +51,6 @@ Node.js >=24.12.0 required (see `.nvmrc`)
 
 ## Rules
 
-- **Always use `.org` domain**—`tarkovtracker.org`, never `tarkovtracker.io` (old domain, no longer owned). Exception: migration code referencing the old site.
 - **No over-thinking in responses**. Sacrifice explanatory language for brevity—layman's terms only when necessary.
 - **Be concise**. Direct responses only: "Fixed X by changing Y to Z." Minimize explanation unless asked. Use file references for context.
 - **No comments** unless explicitly requested. Comments are token overhead.

@@ -1,5 +1,2 @@
 # Cloudflare Pages/Workers compatibility settings
-name = "tarkovtracker"
 compatibility_date = "2026-01-09"
-compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "dist"

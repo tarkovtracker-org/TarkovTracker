@@ -169,6 +169,7 @@
   import { MAP_MARKER_COLORS as MAP_COLORS } from '@/utils/theme-colors';
   import LeafletObjectiveTooltip from './LeafletObjectiveTooltip.vue';
   import type L from 'leaflet';
+  import { useNuxtApp } from '#imports';
   // Types for marks (matching TarkovMap.vue structure)
   interface MapZone {
     map: { id: string };

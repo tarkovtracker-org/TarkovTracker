@@ -327,7 +327,7 @@ npm run test:api-gateway
 
 ```yaml
 Build command: npm run build
-Build output: dist
+Build output: .output/public
 Root directory: /
 Node.js version: 24.x
 ```
@@ -336,25 +336,23 @@ Node.js version: 24.x
 
 **Client-side (browser):**
 
-| Variable                 | Description                            | Required |
-| ------------------------ | -------------------------------------- | -------- |
-| `VITE_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
-
-> **¹ Yes:** Required in production; optional for local development. Without `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, authentication, multi-device sync, real-time collaboration, and team features will be unavailable. The app will function in offline mode with localStorage persistence only.
+| Variable                 | Description          | Required    |
+| ------------------------ | -------------------- | ----------- |
+| `VITE_SUPABASE_URL`      | Supabase project URL | For auth    |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key    | For auth    |
 
 **Server-side (Nuxt/Workers):**
 
 | Variable                    | Description          | Required    |
 | --------------------------- | -------------------- | ----------- |
-| `SUPABASE_URL`              | Supabase project URL | Yes (prod)² |
-| `SUPABASE_ANON_KEY`         | Supabase anon key    | Yes (prod)² |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Yes (prod)² |
-| `NUXT_PUBLIC_APP_URL`       | Application URL      | Yes (prod)² |
+| `SUPABASE_URL`              | Supabase project URL | Production  |
+| `SUPABASE_ANON_KEY`         | Supabase anon key    | Production  |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key     | Production  |
+| `NUXT_PUBLIC_APP_URL`       | Application URL      | Production  |
 | `API_ALLOWED_HOSTS`         | Allowed origin hosts | No          |
 | `API_TRUST_PROXY`           | Trust proxy headers  | No          |
 
-> **² Yes (prod):** Required in production deployments; optional in local/dev where auth and sync will be disabled.
+> **Note:** Most features work without Supabase configuration in local development. Auth and sync will be disabled.
 
 ## Code Conventions
 

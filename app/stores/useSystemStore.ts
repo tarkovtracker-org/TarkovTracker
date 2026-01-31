@@ -1,9 +1,36 @@
 import { defineStore, type Store } from 'pinia';
 import { computed, type Ref } from 'vue';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
-import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import type { SystemGetters, SystemState } from '@/types/tarkov';
+import { GAME_MODES } from '@/utils/constants';
 import type { PostgrestError } from '@supabase/supabase-js';
+// Import useTarkovStore lazily to avoid circular dependency issues
+let _useTarkovStore: (() => { getCurrentGameMode?: () => string }) | null = null;
+async function loadTarkovStore() {
+  if (!_useTarkovStore) {
+    const module = await import('@/stores/useTarkov');
+    _useTarkovStore = module.useTarkovStore;
+  }
+  return _useTarkovStore;
+}
+/**
+ * Helper to get the current game mode from tarkov store.
+ * Returns 'pvp' if not available.
+ * Note: This is synchronous but uses cached import to avoid circular deps.
+ */
+function getCurrentGameMode(): 'pvp' | 'pve' {
+  try {
+    if (_useTarkovStore) {
+      const tarkovStore = _useTarkovStore();
+      return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
+    }
+    // Trigger async load for next call
+    loadTarkovStore().catch(() => {});
+    return GAME_MODES.PVP;
+  } catch {
+    return GAME_MODES.PVP;
+  }
+}
 /**
  * Helper to extract team ID from system store state.
  * Now handles game-mode-specific team IDs (pvp_team_id, pve_team_id).
