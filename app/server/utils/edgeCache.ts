@@ -6,9 +6,9 @@
  */
 import { getQuery } from 'h3';
 import { $fetch } from 'ofetch';
-import { createLogger } from './logger';
-import type { H3Event } from 'h3';
 import { useRuntimeConfig } from '#imports';
+import { createLogger } from '@/server/utils/logger';
+import type { H3Event } from 'h3';
 const logger = createLogger('EdgeCache');
 interface CacheOptions {
   ttl?: number;

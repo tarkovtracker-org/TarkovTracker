@@ -36,7 +36,6 @@
   import { useSystemStore } from '@/stores/useSystemStore';
   import type { SystemState } from '@/types/tarkov';
   import { logger } from '@/utils/logger';
-  import { useToast } from '#imports';
   const systemStore = useSystemStore();
   const route = useRoute();
   const toast = useToast();

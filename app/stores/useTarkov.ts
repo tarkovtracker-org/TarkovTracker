@@ -17,7 +17,6 @@ import type { Task } from '@/types/tarkov';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import { useToast } from '#imports';
 // ============================================================================
 // Constants
 // ============================================================================
