@@ -13,14 +13,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: >-
-      ${{
-        !contains(toLower(github.event.head_commit.message), 'skip ci') &&
-        !contains(toLower(github.event.head_commit.message), 'skip-ci') &&
-        !contains(toLower(github.event.head_commit.message), 'ci skip') &&
-        !contains(toLower(github.event.head_commit.message), 'ci-skip') &&
-        !contains(toLower(github.event.head_commit.message), 'no ci') &&
-        !contains(toLower(github.event.head_commit.message), 'no-ci')
-      }}
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[ci skip]') &&
+      !contains(github.event.head_commit.message, '[no ci]')
     permissions:
       contents: write
       issues: write
