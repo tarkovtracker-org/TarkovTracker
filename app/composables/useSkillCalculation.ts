@@ -110,9 +110,10 @@ export function useSkillCalculation() {
       );
       return false;
     }
-    const validatedLevel = Math.min(MAX_SKILL_LEVEL, Math.max(0, Math.floor(totalLevel)));
+    const validatedLevel = Math.min(MAX_SKILL_LEVEL, Math.max(0, totalLevel));
+    const normalizedLevel = Number(validatedLevel.toFixed(2));
     const questLevel = calculatedQuestSkills.value[skillName] || 0;
-    const offset = validatedLevel - questLevel;
+    const offset = Number((normalizedLevel - questLevel).toFixed(2));
     tarkovStore.setSkillOffset(skillName, offset);
     return true;
   };

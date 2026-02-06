@@ -44,7 +44,7 @@ mockNuxtImport('useToast', () => () => ({
 const _GenericCard = { template: '<div><slot name="content" /></div>' };
 const UInput = {
   template:
-    '<input type="text" @keydown="$emit(\'keydown\', $event)" @input="$emit(\'update:model-value\', $event.target.value)" />',
+    '<input type="text" :value="modelValue" @keydown="$emit(\'keydown\', $event)" @input="$emit(\'update:model-value\', $event.target.value)" />',
   props: ['modelValue'],
 };
 const _UButton = { template: '<button />' };
@@ -124,7 +124,22 @@ describe('SkillsCard', () => {
     inputEl.selectionStart = 2;
     inputEl.selectionEnd = 2;
     await dispatchKey('.', '10.');
-    expect(inputEl.value).toBe('10');
+    expect(inputEl.value).toBe('10.');
+    expect(setTotalSkillLevel).not.toHaveBeenCalled();
+    await dispatchKey('5', '10.5');
+    expect(inputEl.value).toBe('10.5');
+    expect(setTotalSkillLevel).toHaveBeenCalledWith('Strength', 10.5);
+    setTotalSkillLevel.mockClear();
+    inputEl.selectionStart = inputEl.value.length;
+    inputEl.selectionEnd = inputEl.value.length;
+    await dispatchKey('5', '10.55');
+    expect(inputEl.value).toBe('10.55');
+    expect(setTotalSkillLevel).toHaveBeenCalledWith('Strength', 10.55);
+    setTotalSkillLevel.mockClear();
+    inputEl.selectionStart = inputEl.value.length;
+    inputEl.selectionEnd = inputEl.value.length;
+    await dispatchKey('5', '10.555');
+    expect(inputEl.value).toBe('10.55');
     expect(setTotalSkillLevel).not.toHaveBeenCalled();
     setTotalSkillLevel.mockClear();
     inputEl.value = '';
@@ -171,5 +186,21 @@ describe('SkillsCard', () => {
     };
     await input.trigger('keydown', eventLength);
     expect(eventLength.preventDefault).toHaveBeenCalled();
+  });
+  it('allows edits when displayed value is fractional', async () => {
+    const wrapper = createWrapper({
+      getSkillLevel: () => 1.5,
+      setTotalSkillLevel: vi.fn(() => true),
+    });
+    const input = wrapper.find('input');
+    const inputEl = input.element as HTMLInputElement;
+    inputEl.selectionStart = inputEl.value.length;
+    inputEl.selectionEnd = inputEl.value.length;
+    const event = {
+      key: '1',
+      preventDefault: vi.fn(),
+    };
+    await input.trigger('keydown', event);
+    expect(event.preventDefault).not.toHaveBeenCalled();
   });
 });

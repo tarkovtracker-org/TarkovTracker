@@ -306,7 +306,7 @@ export const actions = {
     if (!currentData.skillOffsets) {
       currentData.skillOffsets = {};
     }
-    currentData.skillOffsets[skillName] = Number.isFinite(offset) ? Math.trunc(offset) : 0;
+    currentData.skillOffsets[skillName] = Number.isFinite(offset) ? offset : 0;
   },
   resetSkillOffset(this: UserState, skillName: string) {
     const currentData = getCurrentData(this);

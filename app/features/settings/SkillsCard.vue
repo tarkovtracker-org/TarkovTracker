@@ -129,7 +129,7 @@
                 :id="`skill-input-${skill.name}`"
                 :model-value="getSkillLevel(skill.name)"
                 type="text"
-                inputmode="numeric"
+                inputmode="decimal"
                 :min="0"
                 placeholder="0"
                 size="sm"
@@ -254,8 +254,17 @@
       setTotalSkillLevel(skillName, 0);
       return;
     }
-    const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
-    if (!isNaN(numValue) && numValue >= 0) {
+    if (typeof value === 'string') {
+      const trimmedValue = value.trim();
+      if (trimmedValue === '.' || trimmedValue.endsWith('.')) {
+        return;
+      }
+      if (!/^\d*\.?\d{0,2}$/.test(trimmedValue)) {
+        return;
+      }
+    }
+    const numValue = typeof value === 'string' ? Number(value) : value;
+    if (Number.isFinite(numValue) && numValue >= 0) {
       const clampedValue = Math.min(Math.max(numValue, 0), MAX_SKILL_LEVEL);
       setTotalSkillLevel(skillName, clampedValue);
     }
@@ -264,7 +273,7 @@
     if (e.ctrlKey || e.metaKey) {
       return;
     }
-    if (['-', '+', 'e', '.'].includes(e.key)) {
+    if (['-', '+', 'e'].includes(e.key)) {
       e.preventDefault();
       return;
     }
@@ -291,9 +300,9 @@
     const selectionStart = target.selectionStart ?? 0;
     const selectionEnd = target.selectionEnd ?? currentVal.length;
     const nextValStr = currentVal.slice(0, selectionStart) + e.key + currentVal.slice(selectionEnd);
-    const nextVal = parseInt(nextValStr, 10);
-    const isNumeric = /^\d+$/.test(nextValStr);
-    if (!isNumeric || isNaN(nextVal) || nextVal > MAX_SKILL_LEVEL) {
+    const nextVal = parseFloat(nextValStr);
+    const isNumeric = /^\d*\.?\d{0,2}$/.test(nextValStr);
+    if (!isNumeric || Number.isNaN(nextVal) || nextVal > MAX_SKILL_LEVEL) {
       e.preventDefault();
       showSkillLimitToast();
     }
@@ -317,8 +326,8 @@
     e.preventDefault();
     const pastedText = e.clipboardData?.getData('text');
     if (!pastedText) return;
-    const numVal = parseInt(pastedText, 10);
-    if (!isNaN(numVal)) {
+    const numVal = Number(pastedText.trim());
+    if (Number.isFinite(numVal)) {
       const clamped = Math.min(Math.max(numVal, 0), MAX_SKILL_LEVEL);
       setTotalSkillLevel(skillName, clamped);
     }

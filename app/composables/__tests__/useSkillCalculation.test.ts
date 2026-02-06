@@ -5,8 +5,10 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { useTarkovStore } from '@/stores/useTarkov';
 import { MAX_SKILL_LEVEL } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import type { Task } from '@/types/tarkov';
 // Mock logger
 vi.mock('@/utils/logger', () => ({
   logger: {
@@ -48,10 +50,35 @@ describe('useSkillCalculation', () => {
       expect.stringContaining('Invalid totalLevel "Infinity" for skill "Strength"')
     );
   });
-  it('coerces totalLevel to integer', () => {
+  it('preserves decimal totalLevel', () => {
     const { setTotalSkillLevel, totalSkills } = useSkillCalculation();
     const skillName = 'Strength';
     expect(setTotalSkillLevel(skillName, 10.7)).toBe(true);
-    expect(totalSkills.value[skillName]).toBe(10);
+    expect(totalSkills.value[skillName]).toBe(10.7);
+  });
+  it('limits totalLevel precision to two decimals', () => {
+    const { setTotalSkillLevel, totalSkills } = useSkillCalculation();
+    const skillName = 'Strength';
+    expect(setTotalSkillLevel(skillName, 10.789)).toBe(true);
+    expect(totalSkills.value[skillName]).toBe(10.79);
+  });
+  it('supports fractional quest rewards when setting target skill level', () => {
+    const metadataStore = useMetadataStore();
+    const tarkovStore = useTarkovStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-perception-bonus',
+        name: 'Task Perception Bonus',
+        objectives: [],
+        finishRewards: {
+          skillLevelReward: [{ name: 'Perception', level: 1.5 }],
+        },
+      },
+    ] as Task[];
+    tarkovStore.setTaskComplete('task-perception-bonus');
+    const { getSkillOffset, setTotalSkillLevel, totalSkills } = useSkillCalculation();
+    expect(setTotalSkillLevel('Perception', 16)).toBe(true);
+    expect(totalSkills.value.Perception).toBe(16);
+    expect(getSkillOffset('Perception')).toBe(14.5);
   });
 });
