@@ -324,11 +324,7 @@
   });
   const getItemTooltip = (item?: { shortName?: string; name?: string }) => {
     const name = item?.shortName || item?.name || t('page.tasks.questcard.item');
-    return t(
-      'page.tasks.questcard.open_item_on_tarkov_dev',
-      { name },
-      `Open ${name} on tarkov.dev`
-    );
+    return t('page.tasks.questcard.open_item_on_tarkov_dev', { name });
   };
   const toggleDetails = () => {
     if (!hasExpandableDetails.value) return;

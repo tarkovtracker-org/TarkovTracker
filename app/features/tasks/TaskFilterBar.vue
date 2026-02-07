@@ -20,7 +20,7 @@
               variant="link"
               size="xs"
               icon="i-mdi-close-circle"
-              aria-label="Clear search"
+              :aria-label="t('page.tasks.search.clear')"
               @click="$emit('update:searchQuery', '')"
             />
           </template>
@@ -368,7 +368,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskSettingsDrawer } from '@/composables/useTaskSettingsDrawer';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -453,19 +452,10 @@
     teammates: 'i-mdi-account-multiple',
     xp: 'i-mdi-star',
   };
-  const SORT_MODE_FALLBACK_LABELS: Record<TaskSortMode, string> = {
-    none: 'Default order',
-    impact: 'Impact',
-    alphabetical: 'Alphabetical',
-    level: 'Level required',
-    trader: 'Trader order',
-    teammates: 'Teammates available',
-    xp: 'XP Reward',
-  };
   const sortOptions = computed<SortOption[]>(() =>
     TASK_SORT_MODES.map((mode) => ({
       value: mode,
-      label: t(`page.tasks.sort.${mode}`, SORT_MODE_FALLBACK_LABELS[mode]),
+      label: t(`page.tasks.sort.${mode}`),
       icon: SORT_MODE_ICONS[mode],
     }))
   );

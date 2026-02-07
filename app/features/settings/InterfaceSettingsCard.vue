@@ -108,12 +108,7 @@
                   {{ $t('settings.general.privacy_mode') }}
                 </p>
                 <p class="text-surface-400 text-xs">
-                  {{
-                    $t(
-                      'settings.general.privacy_mode_hint',
-                      "Hides sensitive information while you're streaming."
-                    )
-                  }}
+                  {{ $t('settings.general.privacy_mode_hint') }}
                 </p>
               </div>
               <USwitch v-model="streamerMode" :disabled="!isLoggedIn || streamerModeCooldown" />

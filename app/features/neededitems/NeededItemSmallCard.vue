@@ -132,11 +132,11 @@
                 class="flex items-center gap-1"
               >
                 <UIcon name="i-mdi-account" class="h-3.5 w-3.5" />
-                Lvl {{ levelRequired }}
+                {{ $t('needed_items.level_required', { level: levelRequired }) }}
               </span>
               <span v-if="lockedBefore > 0" class="flex items-center gap-1">
                 <UIcon name="i-mdi-lock-outline" class="h-3.5 w-3.5" />
-                {{ lockedBefore }} before
+                {{ $t('needed_items.locked_before', { count: lockedBefore }) }}
               </span>
             </div>
             <div v-if="!isSingleItem" class="mt-auto flex items-center justify-center pt-2">

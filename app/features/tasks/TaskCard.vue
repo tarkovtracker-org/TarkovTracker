@@ -395,11 +395,7 @@
     }
     const mapName = props.task?.map?.name;
     if (mapName) {
-      return t(
-        'page.tasks.questcard.location_tooltip',
-        { map: mapName },
-        `Quest objectives are on ${mapName}`
-      );
+      return t('page.tasks.questcard.location_tooltip', { map: mapName });
     }
     return t('page.tasks.questcard.any_location_tooltip');
   });

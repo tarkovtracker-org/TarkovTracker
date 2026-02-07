@@ -5,7 +5,7 @@
     <UIcon name="i-mdi-key-variant" aria-hidden="true" class="text-surface-400 h-3.5 w-3.5" />
     <span
       v-for="(key, keyIndex) in flatKeys"
-      :key="keyIndex"
+      :key="key.id"
       class="relative inline-flex items-center gap-1"
       @contextmenu="handleKeyContextMenu($event, key)"
     >
@@ -48,7 +48,11 @@
           class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
           @click.stop
         >
-          <img src="/img/logos/tarkovdevlogo.webp" alt="tarkov.dev" class="h-3.5 w-3.5" />
+          <img
+            src="/img/logos/tarkovdevlogo.webp"
+            :alt="t('page.tasks.questcard.view_on_tarkov_dev')"
+            class="h-3.5 w-3.5"
+          />
         </a>
       </AppTooltip>
       <span
@@ -171,7 +175,11 @@
   };
   const copyKeyName = async () => {
     if (activeKey.value?.name) {
-      await copyToClipboard(activeKey.value.name);
+      try {
+        await copyToClipboard(activeKey.value.name);
+      } catch {
+        return;
+      }
     }
   };
 </script>

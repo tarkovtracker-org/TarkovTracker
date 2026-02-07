@@ -74,7 +74,11 @@
                 class="text-surface-400 hover:text-surface-200 inline-flex items-center rounded p-0.5 transition-colors"
                 @click.stop
               >
-                <img src="/img/logos/tarkovdevlogo.webp" alt="tarkov.dev" class="h-4 w-4" />
+                <img
+                  src="/img/logos/tarkovdevlogo.webp"
+                  :alt="t('page.tasks.questcard.view_on_tarkov_dev')"
+                  class="h-4 w-4"
+                />
               </a>
             </AppTooltip>
           </span>

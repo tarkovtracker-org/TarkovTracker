@@ -262,6 +262,7 @@
       search: {
         placeholder: 'Suchen...',
         aria_label: 'Suchaufgaben',
+        clear: 'Suche löschen',
       },
       sort: {
         none: 'Standardreihenfolge',
@@ -921,6 +922,8 @@
       fetching: 'Daten werden abgerufen...',
       ready: 'Daten sind bereit für den Import',
       fetch_button: 'Daten abrufen',
+      api_token_label: 'API-Token von der alten Seite',
+      api_token_placeholder: 'Füge deinen API-Token hier ein...',
       objectives_modal_title: 'Informationen zu Aufgabenzielen',
       objectives_modal_count: 'Die Anzahl der {count}-Aufgabenziele repräsentiert alle Zieldaten in Ihrem Import.',
       objectives_modal_dashboard: 'Das Dashboard zeigt möglicherweise eine andere Zahl an, da es nur einzelne Aufgabenziele zählt, die aktuell für Ihren Fortschritt relevant sind.',
@@ -930,6 +933,7 @@
       failed_modal_task_id: 'Aufgaben-ID: {id}',
       failed_modal_task_status: 'Diese Aufgabe bleibt nach der Migration als fehlgeschlagen markiert.',
       failed_modal_note: 'Dies ist bei Aufgaben normal, die sich gegenseitig mit anderen von Ihnen erledigten Aufgaben ausschließen.',
+      failed_badge: 'Fehlgeschlagen',
       close: 'Schließen',
     },
     reset: {
@@ -1102,6 +1106,9 @@
     kappa: 'Kappa',
     lvl: 'Lvl',
     needed: 'benötigt',
+    view_details_for: 'Details für {name} anzeigen',
+    level_required: 'Stufe {level}',
+    locked_before: '{count} davor',
     filters: {
       all: 'Alle',
       tasks: 'Aufgaben',
@@ -1114,10 +1121,15 @@
     collected: 'Gesammelt',
     mark_collected: 'Als abgeholt markieren',
     aria: {
+      enter_count: 'Gegenstandsanzahl eingeben',
       decrease_fir: 'FIR-Anzahl verringern',
       increase_fir: 'Erhöhen Sie die FIR-Anzahl',
       decrease_non_fir: 'Verringern Sie die Anzahl der Nicht-FIR',
       increase_non_fir: 'Erhöhen Sie die Anzahl der Nicht-FIR',
+      decrease_objective_count: 'Zielanzahl für {task_name} verringern',
+      increase_objective_count: 'Zielanzahl für {task_name} erhöhen',
+      decrease_hideout_count: 'Versteckanzahl für {station_name} verringern',
+      increase_hideout_count: 'Versteckanzahl für {station_name} erhöhen',
     },
     item: 'Artikel',
     not_collected: 'Nicht gesammelt',

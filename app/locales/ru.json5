@@ -262,6 +262,7 @@
       search: {
         placeholder: 'Поиск...',
         aria_label: 'Поиск задач',
+        clear: 'Очистить поиск',
       },
       sort: {
         none: 'Порядок по умолчанию',
@@ -921,6 +922,8 @@
       fetching: 'Получение данных...',
       ready: 'Данные готовы к импорту',
       fetch_button: 'Получить данные',
+      api_token_label: 'API-токен со старого сайта',
+      api_token_placeholder: 'Вставьте API-токен сюда...',
       objectives_modal_title: 'Информация о целях задачи',
       objectives_modal_count: 'Количество целей задачи {count} представляет все объективные данные при импорте.',
       objectives_modal_dashboard: 'На информационной панели может отображаться другое число, поскольку она учитывает только уникальные цели задач, которые в данный момент имеют отношение к вашему прогрессу.',
@@ -930,6 +933,7 @@
       failed_modal_task_id: 'Идентификатор задачи: {id}',
       failed_modal_task_status: 'После миграции эта задача останется помеченной как невыполненная.',
       failed_modal_note: 'Это нормально для задач, которые являются взаимоисключающими с другими выполненными вами задачами.',
+      failed_badge: 'Не выполнено',
       close: 'Закрывать',
     },
     reset: {
@@ -1102,6 +1106,9 @@
     kappa: 'ТТХ0ZZ',
     lvl: 'Уровень',
     needed: 'нужный',
+    view_details_for: 'Открыть подробности для {name}',
+    level_required: 'Ур. {level}',
+    locked_before: 'До: {count}',
     filters: {
       all: 'Все',
       tasks: 'Задачи',
@@ -1114,10 +1121,15 @@
     collected: 'Собрано',
     mark_collected: 'Отметить как собранное',
     aria: {
+      enter_count: 'Введите количество предметов',
       decrease_fir: 'Уменьшить количество FIR',
       increase_fir: 'Увеличьте количество FIR',
       decrease_non_fir: 'Уменьшить количество не-FIR',
       increase_non_fir: 'Увеличение количества не-FIR',
+      decrease_objective_count: 'Уменьшить количество цели для {task_name}',
+      increase_objective_count: 'Увеличить количество цели для {task_name}',
+      decrease_hideout_count: 'Уменьшить количество убежища для {station_name}',
+      increase_hideout_count: 'Увеличить количество убежища для {station_name}',
     },
     item: 'Элемент',
     not_collected: 'Не собрано',

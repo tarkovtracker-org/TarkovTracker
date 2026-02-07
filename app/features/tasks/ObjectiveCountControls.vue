@@ -103,22 +103,23 @@
   const { t } = useI18n({ useScope: 'global' });
   const formatNumber = useLocaleNumberFormatter();
   const toast = useToast();
-  const { isEditing, editValue, startEdit, commitEdit, cancelEdit } = useCountEditController({
-    current: () => props.currentCount,
-    max: () => props.neededCount,
-    onUpdate: (value) => {
-      if (value !== props.currentCount) {
-        emit('set-count', value);
-      }
-    },
-    onExternalChange: (value) => {
-      toast.add({
-        title: t('toast.count_edit_updated.title'),
-        description: t('toast.count_edit_updated.description', { value }),
-        color: 'warning',
-      });
-    },
-  });
+  const { isEditing, editValue, inputRef, startEdit, commitEdit, cancelEdit } =
+    useCountEditController({
+      current: () => props.currentCount,
+      max: () => props.neededCount,
+      onUpdate: (value) => {
+        if (value !== props.currentCount) {
+          emit('set-count', value);
+        }
+      },
+      onExternalChange: (value) => {
+        toast.add({
+          title: t('toast.count_edit_updated.title'),
+          description: t('toast.count_edit_updated.description', { value }),
+          color: 'warning',
+        });
+      },
+    });
   const startEditing = () => {
     if (props.disabled) return;
     startEdit();

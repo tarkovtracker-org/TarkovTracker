@@ -268,6 +268,7 @@
       search: {
         placeholder: 'Search...',
         aria_label: 'Search tasks',
+        clear: 'Clear search',
       },
       sort: {
         none: 'Default order',
@@ -927,6 +928,8 @@
       fetching: 'Fetching data...',
       ready: 'Data ready to import',
       fetch_button: 'Fetch Data',
+      api_token_label: 'API Token from Old Site',
+      api_token_placeholder: 'Paste your API token here...',
       objectives_modal_title: 'Task Objectives Information',
       objectives_modal_count: 'The count of {count} task objectives represents all objective data in your import.',
       objectives_modal_dashboard: 'The dashboard may show a different number because it only counts unique task objectives that are currently relevant to your progress.',
@@ -936,6 +939,7 @@
       failed_modal_task_id: 'Task ID: {id}',
       failed_modal_task_status: 'This task will remain marked as failed after migration.',
       failed_modal_note: "This is normal for tasks that are mutually exclusive with other tasks you've completed.",
+      failed_badge: 'Failed',
       close: 'Close',
     },
     reset: {
@@ -1108,6 +1112,9 @@
     kappa: 'Kappa',
     lvl: 'Lvl',
     needed: 'needed',
+    view_details_for: 'View details for {name}',
+    level_required: 'Lvl {level}',
+    locked_before: '{count} before',
     filters: {
       all: 'All',
       tasks: 'Tasks',
@@ -1120,10 +1127,15 @@
     collected: 'Collected',
     mark_collected: 'Mark as collected',
     aria: {
+      enter_count: 'Enter item count',
       decrease_fir: 'Decrease FIR count',
       increase_fir: 'Increase FIR count',
       decrease_non_fir: 'Decrease Non-FIR count',
       increase_non_fir: 'Increase Non-FIR count',
+      decrease_objective_count: 'Decrease objective count for {task_name}',
+      increase_objective_count: 'Increase objective count for {task_name}',
+      decrease_hideout_count: 'Decrease hideout count for {station_name}',
+      increase_hideout_count: 'Increase hideout count for {station_name}',
     },
     item: 'Item',
     not_collected: 'Not collected',

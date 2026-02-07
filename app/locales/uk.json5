@@ -262,6 +262,7 @@
       search: {
         placeholder: 'пошук...',
         aria_label: 'Пошукові завдання',
+        clear: 'Очистити пошук',
       },
       sort: {
         none: 'Порядок за замовчуванням',
@@ -921,6 +922,8 @@
       fetching: 'Отримання даних...',
       ready: 'Дані готові до імпорту',
       fetch_button: 'Отримати дані',
+      api_token_label: 'API-токен зі старого сайту',
+      api_token_placeholder: 'Вставте API-токен сюди...',
       objectives_modal_title: 'Завдання Цілі Інформація',
       objectives_modal_count: 'Кількість цілей завдання {count} представляє всі об’єктивні дані у вашому імпорті.',
       objectives_modal_dashboard: 'Інформаційна панель може відображати інше число, оскільки враховуються лише унікальні цілі завдань, які на даний момент відповідають вашому прогресу.',
@@ -930,6 +933,7 @@
       failed_modal_task_id: 'Ідентифікатор завдання: {id}',
       failed_modal_task_status: 'Це завдання залишатиметься позначеним як невдале після міграції.',
       failed_modal_note: 'Це нормально для завдань, які взаємовиключають інші завдання, які ви виконали.',
+      failed_badge: 'Не виконано',
       close: 'Закрити',
     },
     reset: {
@@ -1102,6 +1106,9 @@
     kappa: 'Kappa',
     lvl: 'Lvl',
     needed: 'необхідний',
+    view_details_for: 'Переглянути деталі для {name}',
+    level_required: 'Рів. {level}',
+    locked_before: 'До: {count}',
     filters: {
       all: 'все',
       tasks: 'завдання',
@@ -1114,10 +1121,15 @@
     collected: 'Зібрано',
     mark_collected: 'Позначити як зібране',
     aria: {
+      enter_count: 'Введіть кількість предметів',
       decrease_fir: 'Зменшити кількість FIR',
       increase_fir: 'Збільшити кількість FIR',
       decrease_non_fir: 'Зменшити кількість не-FIR',
       increase_non_fir: 'Збільшити кількість не-FIR',
+      decrease_objective_count: 'Зменшити кількість цілі для {task_name}',
+      increase_objective_count: 'Збільшити кількість цілі для {task_name}',
+      decrease_hideout_count: 'Зменшити кількість схованки для {station_name}',
+      increase_hideout_count: 'Збільшити кількість схованки для {station_name}',
     },
     item: 'Пункт',
     not_collected: 'Не зібрано',

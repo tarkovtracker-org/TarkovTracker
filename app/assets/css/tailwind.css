@@ -135,6 +135,8 @@ html.no-smooth-scroll {
   --color-completed-800: hsl(95 12% 18%);
   --color-completed-900: hsl(95 10% 12%);
   --color-completed-950: hsl(95 8% 8%);
+  /* Locked state (matches legacy task lock icon accent) */
+  --color-locked-500: hsl(20 100% 50%);
   /* Warning (amber) */
   --color-warning-50: hsl(45 80% 96%);
   --color-warning-100: hsl(45 80% 90%);

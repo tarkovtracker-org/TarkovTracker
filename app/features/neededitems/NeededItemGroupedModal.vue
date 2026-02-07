@@ -109,7 +109,11 @@
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
                       class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
-                      :aria-label="`Decrease objective count for ${taskLookup[obj.taskId]?.name || $t('needed_items.unknown_task')}`"
+                      :aria-label="
+                        t('needed_items.aria.decrease_objective_count', {
+                          task_name: getTaskName(obj.taskId),
+                        })
+                      "
                       @click="decreaseObjective(obj)"
                     >
                       <UIcon name="i-mdi-minus" class="h-3 w-3" />
@@ -124,7 +128,11 @@
                     </span>
                     <button
                       class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
-                      :aria-label="`Increase objective count for ${taskLookup[obj.taskId]?.name || $t('needed_items.unknown_task')}`"
+                      :aria-label="
+                        t('needed_items.aria.increase_objective_count', {
+                          task_name: getTaskName(obj.taskId),
+                        })
+                      "
                       @click="increaseObjective(obj)"
                     >
                       <UIcon name="i-mdi-plus" class="h-3 w-3" />
@@ -179,7 +187,11 @@
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
                       class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
-                      :aria-label="`Decrease hideout count for ${getStation(mod)?.name || $t('needed_items.unknown_station')}`"
+                      :aria-label="
+                        t('needed_items.aria.decrease_hideout_count', {
+                          station_name: getStationName(mod),
+                        })
+                      "
                       @click="decreaseHideout(mod)"
                     >
                       <UIcon name="i-mdi-minus" class="h-3 w-3" />
@@ -192,7 +204,11 @@
                     </span>
                     <button
                       class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
-                      :aria-label="`Increase hideout count for ${getStation(mod)?.name || $t('needed_items.unknown_station')}`"
+                      :aria-label="
+                        t('needed_items.aria.increase_hideout_count', {
+                          station_name: getStationName(mod),
+                        })
+                      "
                       @click="increaseHideout(mod)"
                     >
                       <UIcon name="i-mdi-plus" class="h-3 w-3" />
@@ -208,7 +224,6 @@
   </UModal>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import NeededItemGroupedInputControls from '@/features/neededitems/NeededItemGroupedInputControls.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -252,6 +267,10 @@
   const getTask = (taskId: string) => metadataStore.getTaskById(taskId);
   const getStation = (mod: NeededItemHideoutModule) =>
     metadataStore.getStationById(mod.hideoutModule.stationId);
+  const getTaskName = (taskId: string) =>
+    taskLookup.value[taskId]?.name || t('needed_items.unknown_task');
+  const getStationName = (mod: NeededItemHideoutModule) =>
+    getStation(mod)?.name || t('needed_items.unknown_station');
   const taskLookup = computed(() => {
     const lookup: Record<string, ReturnType<typeof getTask>> = {};
     for (const obj of taskObjectivesList.value) {

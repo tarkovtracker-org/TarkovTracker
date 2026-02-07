@@ -8,8 +8,8 @@
         <form @submit.prevent="void migration.fetchWithApiToken()">
           <UInput
             v-model="migration.apiToken.value"
-            label="API Token from Old Site"
-            placeholder="Paste your API token here..."
+            :label="t('settings.data_migration.api_token_label')"
+            :placeholder="t('settings.data_migration.api_token_placeholder')"
             :disabled="migration.fetchingApi?.value"
             :error="!!migration.apiError?.value"
             class="mb-4"
@@ -111,7 +111,9 @@
                   <span>
                     {{ t('settings.data_migration.failed_modal_task_id', { id: task.id }) }}
                   </span>
-                  <UBadge size="xs" color="error" class="ml-2">Failed</UBadge>
+                  <UBadge size="xs" color="error" class="ml-2">
+                    {{ t('settings.data_migration.failed_badge') }}
+                  </UBadge>
                 </div>
                 <div class="text-surface-400 text-sm">
                   {{ t('settings.data_migration.failed_modal_task_status') }}

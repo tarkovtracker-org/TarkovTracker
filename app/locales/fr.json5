@@ -262,6 +262,7 @@
       search: {
         placeholder: 'Recherche...',
         aria_label: 'Tâches de recherche',
+        clear: 'Effacer la recherche',
       },
       sort: {
         none: 'Ordre par défaut',
@@ -921,6 +922,8 @@
       fetching: 'Récupération des données...',
       ready: 'Données prêtes à être importées',
       fetch_button: 'Récupérer les données',
+      api_token_label: "Jeton API de l'ancien site",
+      api_token_placeholder: 'Collez votre jeton API ici...',
       objectives_modal_title: 'Informations sur les objectifs de la tâche',
       objectives_modal_count: "Le nombre d'objectifs de tâche {count} représente toutes les données d'objectif de votre importation.",
       objectives_modal_dashboard: 'Le tableau de bord peut afficher un nombre différent car il ne compte que les objectifs de tâches uniques qui sont actuellement pertinents pour votre progression.',
@@ -930,6 +933,7 @@
       failed_modal_task_id: 'ID de tâche : {id}',
       failed_modal_task_status: 'Cette tâche restera marquée comme ayant échoué après la migration.',
       failed_modal_note: "Ceci est normal pour les tâches qui s'excluent mutuellement avec d'autres tâches que vous avez accomplies.",
+      failed_badge: 'Échec',
       close: 'Fermer',
     },
     reset: {
@@ -1102,6 +1106,9 @@
     kappa: 'Kappa',
     lvl: 'Niveau',
     needed: 'nécessaire',
+    view_details_for: 'Voir les détails de {name}',
+    level_required: 'Niv {level}',
+    locked_before: '{count} avant',
     filters: {
       all: 'Tous',
       tasks: 'Tâches',
@@ -1114,10 +1121,15 @@
     collected: 'Collecté',
     mark_collected: 'Marquer comme collecté',
     aria: {
+      enter_count: "Saisir le nombre d'objets",
       decrease_fir: 'Diminuer le nombre de FIR',
       increase_fir: 'Augmenter le nombre de FIR',
       decrease_non_fir: 'Diminuer le nombre de non-FIR',
       increase_non_fir: 'Augmenter le nombre de non-FIR',
+      decrease_objective_count: "Diminuer l'objectif de {task_name}",
+      increase_objective_count: "Augmenter l'objectif de {task_name}",
+      decrease_hideout_count: 'Diminuer le décompte de cachette pour {station_name}',
+      increase_hideout_count: 'Augmenter le décompte de cachette pour {station_name}',
     },
     item: 'Article',
     not_collected: 'Non collecté',
