@@ -128,7 +128,12 @@ jobs:
         run: |
           npx serve dist -s -l 3000 &
           echo $! > /tmp/server.pid
-          npx wait-on http://localhost:3000 --timeout 60000 --httpTimeout 20000
+          npx wait-on \
+            http-get://localhost:3000 \
+            http-get://localhost:3000/tasks \
+            http-get://localhost:3000/hideout \
+            --timeout 120000 \
+            --httpTimeout 20000
 
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@fcd65974f7c4c2bf0ee9d09b84d2489183c29726
