@@ -11,6 +11,12 @@
       :key="keyGroupIndex"
       class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1"
     >
+      <span
+        v-if="keyGroup.optional"
+        class="border-warning-500/30 bg-warning-500/10 text-warning-300 rounded border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+      >
+        {{ t('page.tasks.questcard.keys_optional_badge', 'Optional') }}
+      </span>
       <i18n-t
         keypath="page.tasks.questcard.keys_needed"
         :plural="keyGroup.keys.length"
@@ -38,6 +44,7 @@
 </template>
 <script setup lang="ts">
   import type { SuggestedKeyGroup } from '@/types/tarkov';
+  const { t } = useI18n({ useScope: 'global' });
   const { suggestedKeys } = defineProps<{ suggestedKeys: SuggestedKeyGroup[] }>();
   const getMapLabel = (maps?: SuggestedKeyGroup['maps']) =>
     maps?.map((map) => map.name || map.id).join(', ') ?? '';

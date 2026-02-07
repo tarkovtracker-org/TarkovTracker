@@ -22,8 +22,8 @@ export const buildSuggestedKeysFromObjectives = (
   objectives?: TaskObjective[]
 ): SuggestedKeyGroup[] => {
   if (!objectives?.length) return [];
-  const groups: SuggestedKeyGroup[] = [];
-  const seenGroups = new Set<string>();
+  const requiredGroupsByMap = new Map<string, SuggestedKeyGroup>();
+  const optionalGroupsByMap = new Map<string, SuggestedKeyGroup>();
   objectives.forEach((objective) => {
     const objectiveMaps = dedupeMaps(objective.maps);
     const mapSignature =
@@ -31,18 +31,29 @@ export const buildSuggestedKeysFromObjectives = (
         ?.map((map) => map.id)
         .sort()
         .join(',') ?? '';
-    objective.requiredKeys?.forEach((requiredGroup) => {
-      const keys = dedupeItems(requiredGroup ?? []);
-      if (!keys.length) return;
-      const keySignature = keys
-        .map((key) => key.id)
-        .sort()
-        .join(',');
-      const groupSignature = `${mapSignature}|${keySignature}`;
-      if (seenGroups.has(groupSignature)) return;
-      seenGroups.add(groupSignature);
-      groups.push({ keys, maps: objectiveMaps });
+    const flattenedObjectiveKeys = dedupeItems((objective.requiredKeys ?? []).flat());
+    if (!flattenedObjectiveKeys.length) return;
+    const isOptional = objective.optional === true;
+    const targetGroups = isOptional ? optionalGroupsByMap : requiredGroupsByMap;
+    const existingGroup = targetGroups.get(mapSignature);
+    if (existingGroup) {
+      existingGroup.keys = dedupeItems([...existingGroup.keys, ...flattenedObjectiveKeys]);
+      return;
+    }
+    targetGroups.set(mapSignature, {
+      keys: flattenedObjectiveKeys,
+      maps: objectiveMaps,
+      optional: isOptional,
     });
   });
-  return groups;
+  optionalGroupsByMap.forEach((optionalGroup, mapSignature) => {
+    const requiredGroup = requiredGroupsByMap.get(mapSignature);
+    if (!requiredGroup?.keys.length) return;
+    const requiredKeyIds = new Set(requiredGroup.keys.map((key) => key.id));
+    optionalGroup.keys = optionalGroup.keys.filter((key) => !requiredKeyIds.has(key.id));
+  });
+  return [
+    ...requiredGroupsByMap.values(),
+    ...Array.from(optionalGroupsByMap.values()).filter((group) => group.keys.length > 0),
+  ];
 };

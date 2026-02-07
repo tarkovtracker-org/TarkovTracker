@@ -445,6 +445,7 @@
         keys_header: 'Empfohlene Schlüssel',
         keys_subtext: '(können helfen, aber nicht immer erforderlich)',
         keys_needed: '{keys} auf {map} | Einer von {keys} auf {map}',
+        keys_optional_badge: 'Optional',
         objectives_hidden: '{count} Ziele nicht auf dieser Karte ({uncompleted} unvollständig)',
         alternatives: 'Alternative Aufgaben',
         alternative_failed: 'Alternative Aufgaben werden auch zurückgesetzt',

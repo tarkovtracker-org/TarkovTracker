@@ -445,6 +445,7 @@
         keys_header: '推荐钥匙',
         keys_subtext: '(可能有帮助，非强制要求)',
         keys_needed: '{map} 地图需 {keys} | {map} 地图需 {keys} 其中一把',
+        keys_optional_badge: '可选',
         objectives_hidden: '其他地图中有 {count} 个任务目标({uncompleted} 个未完成)',
         alternatives: '替代任务',
         alternative_failed: '替代任务也将同步重置',

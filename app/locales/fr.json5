@@ -445,6 +445,7 @@
         keys_header: 'Clés suggérées',
         keys_subtext: '(peut aider mais pas toujours obligatoire)',
         keys_needed: '{keys} requis sur {map} | Une des {keys} requis sur {map}',
+        keys_optional_badge: 'Optionnel',
         objectives_hidden: '{count} objectifs non présent sur la carte ({uncompleted} non terminés)',
         alternatives: 'Quêtes alternatives',
         alternative_failed: 'Les quêtes alternatives seront également réinitialisées',

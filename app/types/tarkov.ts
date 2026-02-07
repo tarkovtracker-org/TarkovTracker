@@ -220,6 +220,7 @@ export interface FinishReward {
 export interface SuggestedKeyGroup {
   keys: TarkovItem[];
   maps?: { id: string; name?: string }[];
+  optional?: boolean;
 }
 export interface Task {
   id: string;
