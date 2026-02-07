@@ -1,9 +1,30 @@
 <template>
   <div class="inline-block">
-    <div class="text-surface-400 mb-2 text-xs font-medium">
-      {{ $t('page.tasks.questcard.keys_header', 'Suggested Keys') }}
+    <div class="text-surface-400 mb-2 flex flex-wrap items-center gap-1 text-xs font-medium">
+      <span>{{ $t('page.tasks.questcard.keys_header', 'Required Keys') }}</span>
+      <AppTooltip
+        :text="
+          $t(
+            'page.tasks.questcard.keys_disclaimer_tooltip',
+            'Based on API data and not always 100% required. Doors may already be unlocked. Verify in-game or on the wiki before buying keys.'
+          )
+        "
+      >
+        <button
+          type="button"
+          class="text-surface-500 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 hover:text-surface-300 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+          :aria-label="$t('page.tasks.questcard.keys_disclaimer_aria', 'Required keys disclaimer')"
+        >
+          <UIcon name="i-mdi-information-outline" class="h-3.5 w-3.5" />
+        </button>
+      </AppTooltip>
       <span class="text-surface-500 font-normal">
-        {{ $t('page.tasks.questcard.keys_subtext', '(may help but not always required)') }}
+        {{
+          $t(
+            'page.tasks.questcard.keys_subtext',
+            '(API-based and situational; verify in-game/wiki)'
+          )
+        }}
       </span>
     </div>
     <div
