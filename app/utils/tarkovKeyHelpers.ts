@@ -1,6 +1,6 @@
 import { buildItemImageUrl, buildItemPageUrl } from '@/utils/tarkovUrls';
 import type { TarkovItem } from '@/types/tarkov';
-const BACKGROUND_CLASS_MAP: Record<string, string> = {
+const BACKGROUND_CLASS_MAP: Record<string, string> & { default: string } = {
   violet: 'bg-rarity-violet',
   grey: 'bg-rarity-grey',
   yellow: 'bg-rarity-yellow',
