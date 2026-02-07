@@ -451,6 +451,7 @@
         keys_disclaimer_aria: 'Пояснение к требуемым ключам',
         keys_needed: '{keys} нужны на {map} | Один из {keys} нужен на {map}',
         keys_optional_badge: 'Необязательно',
+        keys_or: 'или',
         objective_optional_badge: 'Необязательно',
         objectives_hidden: '{count} целей не на этой карте ({uncompleted} не завершено)',
         alternatives: 'Альтернативные задания',

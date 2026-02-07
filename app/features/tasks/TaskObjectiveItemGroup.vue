@@ -102,16 +102,22 @@
         </button>
       </div>
     </div>
+    <ObjectiveRequiredKeys
+      v-if="groupRequiredKeys.length > 0"
+      :required-keys="groupRequiredKeys"
+      class="ml-6"
+    />
   </div>
 </template>
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
+  import ObjectiveRequiredKeys from '@/features/tasks/ObjectiveRequiredKeys.vue';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import type { TaskObjective } from '@/types/tarkov';
+  import type { TaskObjective, TarkovItem } from '@/types/tarkov';
   const jumpToMapObjective = inject<((id: string) => void) | null>('jumpToMapObjective', null);
   const isMapView = inject<Ref<boolean>>('isMapView', ref(false));
   const props = defineProps<{
@@ -144,6 +150,26 @@
     currentCount: number;
   };
   const fullObjectives = computed(() => metadataStore.objectives);
+  const groupRequiredKeys = computed<TarkovItem[][]>(() => {
+    const allKeys: TarkovItem[][] = [];
+    const seen = new Set<string>();
+    for (const objective of props.objectives) {
+      const full = fullObjectives.value.find((o) => o.id === objective.id);
+      const keys = full?.requiredKeys ?? objective.requiredKeys;
+      if (!keys) continue;
+      for (const group of keys) {
+        if (group.length === 0) continue;
+        const groupKey = group
+          .map((k) => k.id)
+          .sort()
+          .join(',');
+        if (seen.has(groupKey)) continue;
+        seen.add(groupKey);
+        allKeys.push(group);
+      }
+    }
+    return allKeys;
+  });
   const objectiveMetaById = computed<Record<string, ObjectiveMeta>>(() => {
     const map: Record<string, ObjectiveMeta> = {};
     props.objectives.forEach((objective) => {

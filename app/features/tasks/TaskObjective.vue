@@ -39,6 +39,10 @@
             ({{ t('page.tasks.questcard.objective_optional_badge', 'Optional') }})
           </span>
         </div>
+        <ObjectiveRequiredKeys
+          v-if="objectiveRequiredKeys.length"
+          :required-keys="objectiveRequiredKeys"
+        />
         <AppTooltip
           v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
           :text="userNeedsTitle"
@@ -110,6 +114,7 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
+  import ObjectiveRequiredKeys from '@/features/tasks/ObjectiveRequiredKeys.vue';
   import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -163,6 +168,10 @@
   });
   const fullObjective = computed(() => {
     return objectives.value.find((o) => o.id == props.objective.id);
+  });
+  const objectiveRequiredKeys = computed(() => {
+    const keys = fullObjective.value?.requiredKeys ?? props.objective.requiredKeys;
+    return (keys ?? []).filter((group) => group.length > 0);
   });
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;

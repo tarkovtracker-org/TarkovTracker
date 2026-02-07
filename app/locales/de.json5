@@ -451,6 +451,7 @@
         keys_disclaimer_aria: 'Hinweis zu erforderlichen Schlüsseln',
         keys_needed: '{keys} auf {map} | Einer von {keys} auf {map}',
         keys_optional_badge: 'Optional',
+        keys_or: 'oder',
         objective_optional_badge: 'Optional',
         objectives_hidden: '{count} Ziele nicht auf dieser Karte ({uncompleted} unvollständig)',
         alternatives: 'Alternative Aufgaben',

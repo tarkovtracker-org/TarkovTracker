@@ -147,6 +147,7 @@ const createMetadataStore = (tasks: Task[]) => {
   return {
     tasks,
     traders,
+    tasksObjectivesHydrated: true,
     prestigeTaskMap: new Map<string, number>(),
     getTraderByName: (name: string) => traders.find((trader) => trader.name === name),
     getExcludedTaskIdsForEdition: () => new Set<string>(),
@@ -306,6 +307,42 @@ describe('useTaskFiltering', () => {
       'task-map',
       'task-lightkeeper',
     ]);
+  });
+  it('does not apply required-keys filtering before objectives hydrate', async () => {
+    const { taskFiltering, tasks, preferencesStore, metadataStore } = await setup();
+    preferencesStore.getOnlyTasksWithRequiredKeys = true;
+    metadataStore.tasksObjectivesHydrated = false;
+    tasks.forEach((task) => {
+      task.requiredKeys = undefined;
+    });
+    await taskFiltering.updateVisibleTasks(
+      {
+        primaryView: 'all',
+        secondaryView: 'available',
+        userView: 'self',
+        mapView: 'all',
+        traderView: 'all',
+        mergedMaps: [],
+        sortMode: 'none',
+        sortDirection: 'asc',
+      },
+      false
+    );
+    expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
+      'task-map',
+      'task-global',
+      'task-non-raid',
+      'task-kappa',
+      'task-lightkeeper',
+    ]);
+    const statusCounts = taskFiltering.calculateStatusCounts('self');
+    expect(statusCounts).toEqual({
+      all: 9,
+      available: 5,
+      locked: 1,
+      completed: 1,
+      failed: 1,
+    });
   });
   it('filters status, trader, and map counts by required keys when enabled', async () => {
     const { taskFiltering, preferencesStore, metadataStore } = await setup();

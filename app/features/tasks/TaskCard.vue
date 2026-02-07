@@ -163,7 +163,6 @@
             :id="`objectives-content-${task.id}`"
             :class="[isCompact ? 'space-y-1.5' : 'space-y-3', compactClasses.objectivesBody]"
           >
-            <QuestKeys v-if="taskRequiredKeys.length" :required-keys="taskRequiredKeys" />
             <QuestObjectivesSkeleton
               v-if="showObjectivesSkeleton"
               :objectives="relevantViewObjectives"
@@ -296,7 +295,6 @@
     'Left Behind': 'Left Behind',
     'Prepare for Escape': 'PFE',
   };
-  const QuestKeys = defineAsyncComponent(() => import('@/features/tasks/QuestKeys.vue'));
   const QuestObjectives = defineAsyncComponent({
     loader: () => import('@/features/tasks/QuestObjectives.vue'),
     loadingComponent: QuestObjectivesSkeleton,
@@ -548,12 +546,6 @@
     // Props empty - check store for latest data
     const storeTask = metadataStore.getTaskById(props.task.id);
     return storeTask?.objectives ?? [];
-  });
-  const taskRequiredKeys = computed(() => {
-    const keys = props.task.requiredKeys;
-    if (keys && keys.length > 0) return keys;
-    const storeTask = metadataStore.getTaskById(props.task.id);
-    return storeTask?.requiredKeys ?? [];
   });
   /**
    * Consolidated objective categorization - single pass through objectives array.

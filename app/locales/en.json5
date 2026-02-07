@@ -457,6 +457,7 @@
         keys_disclaimer_aria: 'Required keys disclaimer',
         keys_needed: '{keys} on {map} | One of {keys} on {map}',
         keys_optional_badge: 'Optional',
+        keys_or: 'or',
         objective_optional_badge: 'Optional',
         objectives_hidden: '{count} objectives not on this map ({uncompleted} uncompleted)',
         alternatives: 'Alternative tasks',

@@ -451,6 +451,7 @@
         keys_disclaimer_aria: '所需钥匙说明',
         keys_needed: '{map} 地图需 {keys} | {map} 地图需 {keys} 其中一把',
         keys_optional_badge: '可选',
+        keys_or: '或',
         objective_optional_badge: '可选',
         objectives_hidden: '其他地图中有 {count} 个任务目标({uncompleted} 个未完成)',
         alternatives: '替代任务',

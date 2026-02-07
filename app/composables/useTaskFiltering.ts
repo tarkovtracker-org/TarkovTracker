@@ -314,8 +314,10 @@ export function useTaskFiltering() {
   const filterTasksByTypeSettings = (taskList: Task[]): Task[] =>
     filterTasksByTypeSettingsUtil(taskList, getTaskTypeOptions());
   const taskHasRequiredKeys = (task: Task): boolean => (task.requiredKeys?.length ?? 0) > 0;
+  const shouldApplyRequiredKeysFilter = (): boolean =>
+    preferencesStore.getOnlyTasksWithRequiredKeys && metadataStore.tasksObjectivesHydrated;
   const filterTasksByRequiredKeysSetting = (taskList: Task[]): Task[] => {
-    if (!preferencesStore.getOnlyTasksWithRequiredKeys) {
+    if (!shouldApplyRequiredKeysFilter()) {
       return taskList;
     }
     return taskList.filter(taskHasRequiredKeys);
@@ -718,7 +720,7 @@ export function useTaskFiltering() {
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
     const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
     const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
-    const onlyTasksWithRequiredKeys = preferencesStore.getOnlyTasksWithRequiredKeys;
+    const onlyTasksWithRequiredKeys = shouldApplyRequiredKeysFilter();
     // Get prestige filtering data
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
@@ -825,7 +827,7 @@ export function useTaskFiltering() {
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
     const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
     const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
-    const onlyTasksWithRequiredKeys = preferencesStore.getOnlyTasksWithRequiredKeys;
+    const onlyTasksWithRequiredKeys = shouldApplyRequiredKeysFilter();
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
     const prestigeTaskIds = Array.from(prestigeTaskMap.keys());

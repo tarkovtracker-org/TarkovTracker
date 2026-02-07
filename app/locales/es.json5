@@ -451,6 +451,7 @@
         keys_disclaimer_aria: 'Aviso sobre llaves requeridas',
         keys_needed: '{keys} necesaria en {map} | {keys} necesarias en {map}',
         keys_optional_badge: 'Opcional',
+        keys_or: 'o',
         objective_optional_badge: 'Opcional',
         objectives_hidden: '{count} objetivos no están en este mapa ({uncompleted} sin completar)',
         alternatives: 'Misiones alternativas',
