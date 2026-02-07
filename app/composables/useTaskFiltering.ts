@@ -313,6 +313,13 @@ export function useTaskFiltering() {
     buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore);
   const filterTasksByTypeSettings = (taskList: Task[]): Task[] =>
     filterTasksByTypeSettingsUtil(taskList, getTaskTypeOptions());
+  const taskHasSuggestedKeys = (task: Task): boolean => (task.suggestedKeys?.length ?? 0) > 0;
+  const filterTasksBySuggestedKeysSetting = (taskList: Task[]): Task[] => {
+    if (!preferencesStore.getOnlyTasksWithSuggestedKeys) {
+      return taskList;
+    }
+    return taskList.filter(taskHasSuggestedKeys);
+  };
   /**
    * Helper to extract all map locations from a task
    */
@@ -374,7 +381,12 @@ export function useTaskFiltering() {
     });
     const mapTaskCounts: Record<string, number> = {};
     const typedTasks = filterTasksByTypeSettings(tasks);
-    const statusFilteredTasks = filterTasksByStatus(typedTasks, secondaryView, activeUserView);
+    const keyFilteredTasks = filterTasksBySuggestedKeysSetting(typedTasks);
+    const statusFilteredTasks = filterTasksByStatus(
+      keyFilteredTasks,
+      secondaryView,
+      activeUserView
+    );
     let globalTaskCount = 0;
     if (!hideGlobalTasks) {
       for (const task of statusFilteredTasks) {
@@ -459,7 +471,11 @@ export function useTaskFiltering() {
     const directionFactor = sortDirection === 'desc' ? -1 : 1;
     const teamIds = resolveImpactTeamIds(userView, progressStore.visibleTeamStores);
     const impactEligibleTaskIds = preferencesStore.getRespectTaskFiltersForImpact
-      ? new Set(filterTasksByTypeSettings(metadataStore.tasks).map((task) => task.id))
+      ? new Set(
+          filterTasksBySuggestedKeysSetting(filterTasksByTypeSettings(metadataStore.tasks)).map(
+            (task) => task.id
+          )
+        )
       : undefined;
     const impactScores = buildTaskImpactScores(
       taskList,
@@ -638,6 +654,11 @@ export function useTaskFiltering() {
         perfOn
       );
       visibleTaskList = afterStatus;
+      const [afterSuggestedKeys, filterSuggestedKeysMs] = timed(
+        () => filterTasksBySuggestedKeysSetting(visibleTaskList),
+        perfOn
+      );
+      visibleTaskList = afterSuggestedKeys;
       let sharedFilterMs = 0;
       if (
         preferencesStore.getTaskSharedByAllOnly &&
@@ -672,6 +693,7 @@ export function useTaskFiltering() {
         filterTypeMs: perfOn ? roundMs(filterTypeMs) : undefined,
         filterViewMs: perfOn ? roundMs(filterViewMs) : undefined,
         filterStatusMs: perfOn ? roundMs(filterStatusMs) : undefined,
+        filterSuggestedKeysMs: perfOn ? roundMs(filterSuggestedKeysMs) : undefined,
         sharedFilterMs: perfOn ? roundMs(sharedFilterMs) : undefined,
         sortMs: perfOn ? roundMs(sortMs) : undefined,
       });
@@ -695,6 +717,7 @@ export function useTaskFiltering() {
     const showKappa = !preferencesStore.getHideNonKappaTasks;
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
     const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
+    const onlyTasksWithSuggestedKeys = preferencesStore.getOnlyTasksWithSuggestedKeys;
     // Get prestige filtering data
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
@@ -719,6 +742,9 @@ export function useTaskFiltering() {
         (isLightkeeperRequired && !showLightkeeper) ||
         (isNonSpecial && !showNonSpecial)
       ) {
+        continue;
+      }
+      if (onlyTasksWithSuggestedKeys && !taskHasSuggestedKeys(task)) {
         continue;
       }
       if (isAllUsersView(userView)) {
@@ -796,6 +822,7 @@ export function useTaskFiltering() {
     const showKappa = !preferencesStore.getHideNonKappaTasks;
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
     const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
+    const onlyTasksWithSuggestedKeys = preferencesStore.getOnlyTasksWithSuggestedKeys;
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
     const prestigeTaskIds = Array.from(prestigeTaskMap.keys());
@@ -820,6 +847,9 @@ export function useTaskFiltering() {
         (isLightkeeperRequired && !showLightkeeper) ||
         (isNonSpecial && !showNonSpecial)
       ) {
+        continue;
+      }
+      if (onlyTasksWithSuggestedKeys && !taskHasSuggestedKeys(task)) {
         continue;
       }
       const traderId = task.trader?.id;

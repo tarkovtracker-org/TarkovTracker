@@ -205,6 +205,7 @@
     getHideNonKappaTasks,
     getShowNonSpecialTasks,
     getShowLightkeeperTasks,
+    getOnlyTasksWithSuggestedKeys,
     getRespectTaskFiltersForImpact,
     getHideGlobalTasks,
     getPinnedTaskIds,
@@ -341,7 +342,11 @@
   const impactEligibleTaskIds = computed<Set<string> | undefined>(() => {
     if (!getRespectTaskFiltersForImpact.value) return undefined;
     const options = buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore);
-    return new Set(filterTasksByTypeSettings(tasks.value, options).map((task) => task.id));
+    const typeFilteredTasks = filterTasksByTypeSettings(tasks.value, options);
+    const filteredTasks = getOnlyTasksWithSuggestedKeys.value
+      ? typeFilteredTasks.filter((task) => (task.suggestedKeys?.length ?? 0) > 0)
+      : typeFilteredTasks;
+    return new Set(filteredTasks.map((task) => task.id));
   });
   const mapContainerRef = ref<HTMLElement | null>(null);
   const leafletMapRef = ref<{
@@ -402,6 +407,7 @@
       getHideNonKappaTasks,
       getShowNonSpecialTasks,
       getShowLightkeeperTasks,
+      getOnlyTasksWithSuggestedKeys,
       getRespectTaskFiltersForImpact,
       getHideGlobalTasks,
       getPinnedTaskIds,

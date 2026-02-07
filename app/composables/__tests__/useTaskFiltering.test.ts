@@ -6,6 +6,12 @@ const createTasks = (): Task[] => [
     name: 'Map Task',
     factionName: 'Any',
     trader: { id: 'trader-1', name: 'Trader One' },
+    suggestedKeys: [
+      {
+        keys: [{ id: 'key-map', name: 'Map Key' }],
+        maps: [{ id: 'map-1', name: 'Map One' }],
+      },
+    ],
     objectives: [
       {
         id: 'obj-map',
@@ -26,6 +32,11 @@ const createTasks = (): Task[] => [
     name: 'Locked Task',
     factionName: 'Any',
     trader: { id: 'trader-1', name: 'Trader One' },
+    suggestedKeys: [
+      {
+        keys: [{ id: 'key-locked', name: 'Locked Key' }],
+      },
+    ],
   },
   {
     id: 'task-failed',
@@ -68,6 +79,11 @@ const createTasks = (): Task[] => [
     factionName: 'Any',
     lightkeeperRequired: true,
     trader: { id: 'trader-2', name: 'Trader Two' },
+    suggestedKeys: [
+      {
+        keys: [{ id: 'key-lightkeeper', name: 'Lightkeeper Key' }],
+      },
+    ],
   },
 ];
 const createProgressStore = () => ({
@@ -141,6 +157,7 @@ const createPreferencesStore = () => ({
   getShowLightkeeperTasks: true,
   getShowNonSpecialTasks: true,
   getRespectTaskFiltersForImpact: true,
+  getOnlyTasksWithSuggestedKeys: false,
   getTaskSharedByAllOnly: false,
   getHideGlobalTasks: false,
   getTaskUserView: 'self',
@@ -268,6 +285,50 @@ describe('useTaskFiltering', () => {
       'task-lightkeeper',
       'task-kappa',
     ]);
+  });
+  it('filters visible tasks to only tasks with suggested keys when enabled', async () => {
+    const { taskFiltering, preferencesStore } = await setup();
+    preferencesStore.getOnlyTasksWithSuggestedKeys = true;
+    await taskFiltering.updateVisibleTasks(
+      {
+        primaryView: 'all',
+        secondaryView: 'available',
+        userView: 'self',
+        mapView: 'all',
+        traderView: 'all',
+        mergedMaps: [],
+        sortMode: 'none',
+        sortDirection: 'asc',
+      },
+      false
+    );
+    expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
+      'task-map',
+      'task-lightkeeper',
+    ]);
+  });
+  it('filters status, trader, and map counts by suggested keys when enabled', async () => {
+    const { taskFiltering, preferencesStore, metadataStore } = await setup();
+    preferencesStore.getOnlyTasksWithSuggestedKeys = true;
+    const statusCounts = taskFiltering.calculateStatusCounts('self');
+    expect(statusCounts).toEqual({
+      all: 3,
+      available: 2,
+      locked: 1,
+      completed: 0,
+      failed: 0,
+    });
+    const traderCounts = taskFiltering.calculateTraderCounts('self', 'all');
+    expect(traderCounts['trader-1']).toBe(2);
+    expect(traderCounts['trader-2']).toBe(1);
+    const mapCounts = taskFiltering.calculateMapTaskTotals(
+      [{ id: 'map-1', mergedIds: ['map-1'] }],
+      metadataStore.tasks,
+      false,
+      'self',
+      'available'
+    );
+    expect(mapCounts['map-1']).toBe(1);
   });
   it('sorts impact using all successors when enforcement is disabled', async () => {
     const { taskFiltering, preferencesStore } = await setup();

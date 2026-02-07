@@ -25,6 +25,7 @@ export type TaskFilterSettings = {
   hideNonKappaTasks: boolean;
   showNonSpecialTasks: boolean;
   showLightkeeperTasks: boolean;
+  onlyTasksWithSuggestedKeys: boolean;
   respectTaskFiltersForImpact: boolean;
   showAllFilter: boolean;
   showAvailableFilter: boolean;
@@ -78,6 +79,7 @@ export interface PreferencesState {
   // Task filter settings
   showNonSpecialTasks: boolean;
   showLightkeeperTasks: boolean;
+  onlyTasksWithSuggestedKeys: boolean;
   respectTaskFiltersForImpact: boolean;
   // Task appearance settings
   showRequiredLabels: boolean;
@@ -152,6 +154,7 @@ export const preferencesDefaultState: PreferencesState = {
   // Task filter settings (all shown by default)
   showNonSpecialTasks: true,
   showLightkeeperTasks: true,
+  onlyTasksWithSuggestedKeys: false,
   respectTaskFiltersForImpact: true,
   // Task appearance settings
   showRequiredLabels: true,
@@ -334,6 +337,9 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     getShowLightkeeperTasks: (state) => {
       return state.showLightkeeperTasks ?? true;
+    },
+    getOnlyTasksWithSuggestedKeys: (state) => {
+      return state.onlyTasksWithSuggestedKeys ?? false;
     },
     getRespectTaskFiltersForImpact: (state) => {
       return state.respectTaskFiltersForImpact ?? true;
@@ -535,6 +541,9 @@ export const usePreferencesStore = defineStore('preferences', {
     setShowLightkeeperTasks(show: boolean) {
       this.showLightkeeperTasks = show;
     },
+    setOnlyTasksWithSuggestedKeys(onlyWithSuggestedKeys: boolean) {
+      this.onlyTasksWithSuggestedKeys = onlyWithSuggestedKeys;
+    },
     setRespectTaskFiltersForImpact(enabled: boolean) {
       this.respectTaskFiltersForImpact = enabled;
     },
@@ -664,6 +673,7 @@ export const usePreferencesStore = defineStore('preferences', {
       // Task filter settings
       'showNonSpecialTasks',
       'showLightkeeperTasks',
+      'onlyTasksWithSuggestedKeys',
       'respectTaskFiltersForImpact',
       // Task appearance settings
       'showRequiredLabels',
