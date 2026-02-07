@@ -22,11 +22,20 @@ describe('buildSuggestedKeysFromObjectives', () => {
     const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
     expect(suggestedKeys).toHaveLength(1);
     expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2', 'key-3']);
-    expect(suggestedKeys[0]!.anyOf).toBe(true);
+    expect(suggestedKeys[0]!.anyOf).toBe(false);
   });
-  it('keeps objective alternatives as one "one-of" group', () => {
+  it('does not mark multi-group requirements as one-of', () => {
     const objective = createObjective({
       requiredKeys: [[createItem('key-1')], [createItem('key-2')]],
+    });
+    const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
+    expect(suggestedKeys).toHaveLength(1);
+    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(suggestedKeys[0]!.anyOf).toBe(false);
+  });
+  it('marks single-group alternatives as one-of', () => {
+    const objective = createObjective({
+      requiredKeys: [[createItem('key-1'), createItem('key-2')]],
     });
     const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
     expect(suggestedKeys).toHaveLength(1);

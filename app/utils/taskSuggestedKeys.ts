@@ -48,7 +48,7 @@ export const buildSuggestedKeysFromObjectives = (
       keys: flattenedObjectiveKeys,
       maps: objectiveMaps,
       optional: objective.optional === true,
-      anyOf: keyMatrix.length > 1,
+      anyOf: keyMatrix.length === 1 && keyMatrix[0]!.length > 1,
     };
     const groupSignature = buildGroupSignature(keyGroup);
     if (keyGroup.optional) {
