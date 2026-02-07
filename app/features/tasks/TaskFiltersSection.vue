@@ -25,10 +25,10 @@
       >
         <UCheckbox v-model="showKappaTasksModel" />
         <div class="flex min-w-0 flex-1 items-center gap-2">
+          <UIcon name="i-mdi-trophy" class="text-kappa h-4 w-4 shrink-0" aria-hidden="true" />
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.kappa_required', 'Kappa Required') }}
+            {{ t('page.tasks.settings.filters.kappa_required', 'Required') }}
           </span>
-          <UBadge color="kappa" variant="soft" size="xs">KAPPA</UBadge>
         </div>
       </label>
       <label
@@ -36,10 +36,14 @@
       >
         <UCheckbox v-model="showLightkeeperTasksModel" />
         <div class="flex min-w-0 flex-1 items-center gap-2">
+          <UIcon
+            name="i-mdi-lighthouse"
+            class="text-lightkeeper h-4 w-4 shrink-0"
+            aria-hidden="true"
+          />
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.lightkeeper_required', 'Lightkeeper Required') }}
+            {{ t('page.tasks.settings.filters.lightkeeper_required', 'Required') }}
           </span>
-          <UBadge color="lightkeeper" variant="soft" size="xs">LIGHTKEEPER</UBadge>
         </div>
       </label>
       <label

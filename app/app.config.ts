@@ -213,8 +213,11 @@ export default defineAppConfig({
     checkbox: {
       slots: {
         root: 'relative flex items-start',
-        base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800 data-[state=checked]:bg-primary-500 data-[state=checked]:border-primary-500',
+        base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800',
         icon: 'h-4 w-4 text-surface-900',
+      },
+      defaultVariants: {
+        color: 'success',
       },
     },
   },
