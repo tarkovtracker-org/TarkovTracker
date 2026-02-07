@@ -24,15 +24,8 @@
         v-if="!supportsRawTokens"
         color="warning"
         variant="soft"
-        :title="
-          t('page.settings.card.apitokens.token_value_unavailable', 'Token values are hidden')
-        "
-        :description="
-          t(
-            'page.settings.card.apitokens.token_value_unavailable_desc',
-            'Token viewing requires the latest database migration. Tokens will still work, but create a new token after updating the database to view and copy it here.'
-          )
-        "
+        :title="t('page.settings.card.apitokens.token_value_unavailable')"
+        :description="t('page.settings.card.apitokens.token_value_unavailable_desc')"
       />
       <div v-if="loading" class="space-y-2">
         <div class="h-12 animate-pulse rounded-lg bg-white/5"></div>
@@ -91,14 +84,8 @@
                   <template v-else>
                     {{
                       supportsRawTokens
-                        ? t(
-                            'page.settings.card.apitokens.token_value_missing',
-                            'Token value not stored. Create a new token to view and copy it.'
-                          )
-                        : t(
-                            'page.settings.card.apitokens.token_value_hidden',
-                            'Token values are temporarily hidden until the database migration runs.'
-                          )
+                        ? t('page.settings.card.apitokens.token_value_missing')
+                        : t('page.settings.card.apitokens.token_value_hidden')
                     }}
                   </template>
                 </code>
@@ -112,8 +99,8 @@
                     :disabled="!token.tokenValue"
                     :aria-label="
                       visibleTokens.has(token.id)
-                        ? t('page.settings.card.apitokens.hide_token', 'Hide token')
-                        : t('page.settings.card.apitokens.show_token', 'Show token')
+                        ? t('page.settings.card.apitokens.hide_token')
+                        : t('page.settings.card.apitokens.show_token')
                     "
                     @click="toggleTokenVisibility(token.id)"
                   />
@@ -124,7 +111,7 @@
                     size="xs"
                     :padded="false"
                     :disabled="!token.tokenValue"
-                    :aria-label="t('page.settings.card.apitokens.copy_token', 'Copy token')"
+                    :aria-label="t('page.settings.card.apitokens.copy_token')"
                     @click="copyTokenValue(token.tokenValue)"
                   />
                 </div>
@@ -284,7 +271,7 @@
                 variant="ghost"
                 icon="i-mdi-clipboard-multiple-outline"
                 :padded="false"
-                :aria-label="t('page.settings.card.apitokens.copy_token', 'Copy token')"
+                :aria-label="t('page.settings.card.apitokens.copy_token')"
                 @click="copyToken"
               />
             </template>
@@ -560,7 +547,7 @@
     } catch (error) {
       logger.error('[ApiTokens] Failed to copy token:', error);
       toast.add({
-        title: t('page.settings.card.apitokens.copy_failed', 'Failed to copy token'),
+        title: t('page.settings.card.apitokens.copy_failed'),
         color: 'error',
       });
     }

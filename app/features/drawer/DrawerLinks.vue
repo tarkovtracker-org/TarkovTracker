@@ -2,7 +2,7 @@
   <div>
     <div v-if="!props.isCollapsed" class="px-4 py-1">
       <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-        {{ t('navigation_drawer.section_navigation', 'Navigation') }}
+        {{ t('navigation_drawer.section_navigation') }}
       </h3>
     </div>
     <ul class="flex flex-col gap-0.5 px-1">

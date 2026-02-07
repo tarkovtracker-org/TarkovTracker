@@ -4,13 +4,13 @@
   >
     <div class="flex h-full items-center gap-1 px-2 sm:gap-2 sm:px-3">
       <!-- Left: Toggle Button -->
-      <AppTooltip :text="t('navigation_drawer.toggle', 'Toggle Menu Drawer')">
+      <AppTooltip :text="t('navigation_drawer.toggle')">
         <UButton
           :icon="NAV_BAR_ICON"
           variant="ghost"
           color="neutral"
           size="md"
-          :aria-label="t('navigation_drawer.toggle', 'Toggle Menu Drawer')"
+          :aria-label="t('navigation_drawer.toggle')"
           :class="{ 'rotate-180': isDrawerCollapsed }"
           class="transition-transform duration-200"
           @click.stop="changeNavigationDrawer"
@@ -22,18 +22,12 @@
       </span>
       <!-- Right: Status Icons & Settings -->
       <div class="ml-auto flex items-center gap-1 sm:gap-2">
-        <AppTooltip
-          v-if="dataError"
-          :text="t('app_bar.error_loading', 'Error Loading Tarkov Data')"
-        >
+        <AppTooltip v-if="dataError" :text="t('app_bar.error_loading')">
           <span class="inline-flex rounded">
             <UIcon name="i-mdi-database-alert" class="text-error-500 h-5 w-5" />
           </span>
         </AppTooltip>
-        <AppTooltip
-          v-if="dataLoading || hideoutLoading"
-          :text="t('app_bar.loading', 'Loading Tarkov Data')"
-        >
+        <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">
           <span class="inline-flex rounded">
             <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-5 w-5 animate-spin" />
           </span>
@@ -44,7 +38,7 @@
             href="https://discord.gg/M8nBgA2sT6"
             target="_blank"
             rel="noopener noreferrer"
-            :aria-label="t('footer.call_to_action.discord', 'Discord')"
+            :aria-label="t('footer.call_to_action.discord')"
             class="hover:bg-surface-700 group flex h-7 w-7 items-center justify-center rounded transition-colors"
           >
             <DiscordIcon class="text-discord group-hover:text-discord-hover" />
@@ -55,7 +49,7 @@
             href="https://github.com/tarkovtracker-org/TarkovTracker"
             target="_blank"
             rel="noopener noreferrer"
-            :aria-label="t('footer.call_to_action.github', 'GitHub')"
+            :aria-label="t('footer.call_to_action.github')"
             class="hover:bg-surface-700 flex h-7 w-7 items-center justify-center rounded transition-colors"
           >
             <UIcon name="i-mdi-github" class="text-surface-300 h-4.5 w-4.5 hover:text-white" />
@@ -87,12 +81,12 @@
           <button
             type="button"
             class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors"
-            :aria-label="t('navigation_drawer.logout', 'Logout')"
+            :aria-label="t('navigation_drawer.logout')"
             @click="logout"
           >
             <img
               :src="avatarSrc"
-              :alt="t('app_bar.user_avatar_alt', 'User avatar')"
+              :alt="t('app_bar.user_avatar_alt')"
               class="h-4 w-4 rounded-full"
               loading="lazy"
             />
@@ -108,12 +102,12 @@
             to="/login"
             class="hover:bg-surface-700 hidden rounded px-2 py-1 text-sm text-white sm:inline-flex"
           >
-            {{ t('navigation_drawer.login', 'Login') }}
+            {{ t('navigation_drawer.login') }}
           </NuxtLink>
           <NuxtLink
             to="/login"
             class="hover:bg-surface-700 rounded p-1 text-white sm:hidden"
-            :aria-label="t('navigation_drawer.login', 'Login')"
+            :aria-label="t('navigation_drawer.login')"
           >
             <UIcon name="i-mdi-fingerprint" class="h-4 w-4" />
           </NuxtLink>
@@ -146,7 +140,7 @@
       : $supabase.user.photoURL;
   });
   const userDisplayName = computed(() => {
-    const fallbackLabel = t('app_bar.user_label', 'User');
+    const fallbackLabel = t('app_bar.user_label');
     if (preferencesStore.getStreamerMode) return fallbackLabel;
     const displayName = tarkovStore.getDisplayName();
     if (displayName && displayName.trim() !== '') {

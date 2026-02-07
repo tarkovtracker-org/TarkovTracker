@@ -12,7 +12,6 @@
   </Transition>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   const { t } = useI18n({ useScope: 'global' });
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
@@ -24,6 +23,7 @@
   };
   onMounted(() => {
     window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
   });
   onUnmounted(() => {
     window.removeEventListener('scroll', onScroll);

@@ -3,11 +3,11 @@
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-filter-variant" class="text-primary-400 h-4 w-4" />
       <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
-        {{ t('page.tasks.settings.tabs.filters', 'Task Filters') }}
+        {{ t('page.tasks.settings.tabs.filters') }}
       </h3>
     </div>
     <p class="text-surface-500 mb-2 text-xs">
-      {{ t('page.tasks.settings.filters.hint', 'Control which tasks appear.') }}
+      {{ t('page.tasks.settings.filters.hint') }}
     </p>
     <div class="space-y-1">
       <label
@@ -16,7 +16,7 @@
         <UCheckbox v-model="showNonSpecialTasksModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.regular_tasks', 'Regular Tasks') }}
+            {{ t('page.tasks.settings.filters.regular_tasks') }}
           </span>
         </div>
       </label>
@@ -27,7 +27,7 @@
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <UIcon name="i-mdi-trophy" class="text-kappa h-4 w-4 shrink-0" aria-hidden="true" />
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.kappa_required', 'Required') }}
+            {{ t('page.tasks.settings.filters.kappa_required') }}
           </span>
         </div>
       </label>
@@ -42,7 +42,7 @@
             aria-hidden="true"
           />
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.lightkeeper_required', 'Required') }}
+            {{ t('page.tasks.settings.filters.lightkeeper_required') }}
           </span>
         </div>
       </label>
@@ -53,7 +53,7 @@
         <UCheckbox v-model="sharedByAllOnlyModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.team_shared_only', 'Team Shared Only') }}
+            {{ t('page.tasks.settings.filters.team_shared_only') }}
           </span>
         </div>
       </label>
@@ -63,7 +63,7 @@
         <UCheckbox v-model="onlyTasksWithRequiredKeysModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.has_required_keys', 'Has Required Keys') }}
+            {{ t('page.tasks.settings.filters.has_required_keys') }}
           </span>
         </div>
       </label>
@@ -73,7 +73,7 @@
         <UCheckbox v-model="showGlobalTasksModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.show_global_tasks', 'Show Global Tasks on Map') }}
+            {{ t('page.tasks.settings.filters.show_global_tasks') }}
           </span>
         </div>
       </label>
@@ -83,12 +83,7 @@
         <UCheckbox v-model="respectTaskFiltersForImpactModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{
-              t(
-                'page.tasks.settings.filters.impact_respects_filters',
-                'Impact Respects Task Filters'
-              )
-            }}
+            {{ t('page.tasks.settings.filters.impact_respects_filters') }}
           </span>
         </div>
       </label>

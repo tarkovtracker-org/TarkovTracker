@@ -9,7 +9,7 @@
         footer: 'p-0 sm:px-0',
       }"
       role="article"
-      :aria-label="$t('page.login.login_options', 'Login options')"
+      :aria-label="$t('page.login.login_options')"
     >
       <template #header>
         <div class="flex flex-col items-center px-8 pt-8 pb-6 text-center">

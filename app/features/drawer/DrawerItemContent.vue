@@ -37,7 +37,7 @@
     <span v-if="!props.isCollapsed" class="flex items-center gap-1 truncate">
       {{ props.labelText }}
       <UIcon name="i-mdi-open-in-new" class="h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
-      <span class="sr-only">({{ $t('common.opens_in_new_tab', 'opens in new tab') }})</span>
+      <span class="sr-only">({{ $t('common.opens_in_new_tab') }})</span>
     </span>
   </a>
   <span

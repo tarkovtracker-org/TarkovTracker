@@ -119,7 +119,7 @@
               </div>
             </div>
             <p>
-              <strong>{{ t('common.note', 'Note') }}:</strong>
+              <strong>{{ t('common.note') }}:</strong>
               {{ t('settings.data_migration.failed_modal_note') }}
             </p>
           </div>

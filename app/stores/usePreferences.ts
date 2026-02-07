@@ -760,12 +760,22 @@ if (shouldInitPreferencesWatchers) {
                 }
                 if (data) {
                   logger.debug('[PreferencesStore] Loading preferences from Supabase:', data);
-                  const hasRequiredKeysColumn =
-                    'only_tasks_with_required_keys' in (data as Record<string, unknown>);
+                  const preferenceRow = data as Record<string, unknown>;
+                  const requiredKeysValue = preferenceRow.only_tasks_with_required_keys;
+                  const suggestedKeysValue = preferenceRow.only_tasks_with_suggested_keys;
+                  const shouldPreferRequiredKeys = typeof requiredKeysValue === 'boolean';
                   // Update store with server data
-                  Object.keys(data).forEach((key) => {
+                  Object.keys(preferenceRow).forEach((key) => {
                     if (key !== 'user_id' && key !== 'created_at' && key !== 'updated_at') {
-                      if (key === 'only_tasks_with_suggested_keys' && hasRequiredKeysColumn) {
+                      const value = preferenceRow[key];
+                      if (key === 'only_tasks_with_suggested_keys' && shouldPreferRequiredKeys) {
+                        return;
+                      }
+                      if (
+                        key === 'only_tasks_with_required_keys' &&
+                        typeof value !== 'boolean' &&
+                        typeof suggestedKeysValue === 'boolean'
+                      ) {
                         return;
                       }
                       const normalizedKey =
@@ -776,9 +786,8 @@ if (shouldInitPreferencesWatchers) {
                         letter.toUpperCase()
                       );
                       if (camelKey in preferencesStore.$state) {
-                        // Fix type issue by casting through unknown first
                         (preferencesStore.$state as unknown as Record<string, unknown>)[camelKey] =
-                          data[key];
+                          value;
                       }
                     }
                   });

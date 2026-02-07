@@ -447,7 +447,9 @@
         failed_because_unknown: 'Marcado como fallido manualmente o faltan datos',
         keys_header: 'Llaves requeridas',
         keys_subtext: '(basado en API y situacional; verifica en juego/wiki)',
-        keys_disclaimer_tooltip: 'Basado en datos de la API y no siempre es 100 % obligatorio. Es posible que las puertas ya estén abiertas. Verifícalo en el juego o en la wiki antes de comprar llaves.',
+        keys_disclaimer_tooltip: 'Basado en datos de la API y no siempre es 100 % obligatorio. \
+Es posible que las puertas ya estén abiertas. \
+Verifícalo en el juego o en la wiki antes de comprar llaves.',
         keys_disclaimer_aria: 'Aviso sobre llaves requeridas',
         keys_needed: '{keys} necesaria en {map} | {keys} necesarias en {map}',
         keys_optional_badge: 'Opcional',

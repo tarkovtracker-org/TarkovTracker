@@ -4,21 +4,21 @@
     icon-color="info"
     highlight-color="info"
     :fill-height="false"
-    :title="$t('settings.skills.title', 'Skills Management')"
+    :title="$t('settings.skills.title')"
     title-classes="text-lg font-semibold"
   >
     <template #title-right>
       <div class="flex items-center gap-1">
         <UButton
           size="xs"
-          :label="$t('settings.skills.sort.priority', 'Priority')"
+          :label="$t('settings.skills.sort.priority')"
           :variant="skillSortMode === 'priority' ? 'solid' : 'outline'"
           :color="skillSortMode === 'priority' ? 'primary' : 'neutral'"
           @click="setSkillSortMode('priority')"
         />
         <UButton
           size="xs"
-          :label="$t('settings.skills.sort.ingame', 'In-Game')"
+          :label="$t('settings.skills.sort.ingame')"
           :variant="skillSortMode === 'ingame' ? 'solid' : 'outline'"
           :color="skillSortMode === 'ingame' ? 'primary' : 'neutral'"
           @click="setSkillSortMode('ingame')"
@@ -70,7 +70,7 @@
                     :text="$t('skills.required_for', { items: skill.requiredByTasks.join(', ') })"
                   >
                     <UBadge color="warning" variant="soft" size="xs">
-                      {{ $t('skills.req', 'Req') }}
+                      {{ $t('skills.req') }}
                     </UBadge>
                   </UTooltip>
                   <UTooltip
@@ -78,13 +78,13 @@
                     :text="$t('skills.required_levels', { items: skill.requiredLevels.join(', ') })"
                   >
                     <UBadge color="accent" variant="soft" size="xs">
-                      {{ $t('skills.lv', 'Lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
+                      {{ $t('skills.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
                     </UBadge>
                   </UTooltip>
                 </div>
                 <div class="text-surface-400 truncate text-xs">
                   <span v-if="skill.requiredByTasks.length > 0">
-                    {{ $t('settings.skills.req_count', 'Req:') }} {{ skill.requiredByTasks.length }}
+                    {{ $t('settings.skills.req_count') }} {{ skill.requiredByTasks.length }}
                   </span>
                   <span
                     v-if="skill.requiredByTasks.length > 0 && skill.rewardedByTasks.length > 0"
@@ -93,7 +93,7 @@
                     •
                   </span>
                   <span v-if="skill.rewardedByTasks.length > 0">
-                    {{ $t('settings.skills.reward_count', 'Reward:') }}
+                    {{ $t('settings.skills.reward_count') }}
                     {{ skill.rewardedByTasks.length }}
                   </span>
                 </div>
@@ -111,19 +111,19 @@
             </div>
             <div class="mb-2 flex gap-3 text-xs">
               <div class="text-surface-400 flex-1">
-                {{ $t('settings.skills.quest', 'Quest:') }}
+                {{ $t('settings.skills.quest') }}
                 <span class="text-surface-200 font-medium">
                   {{ getQuestSkillLevel(skill.name) }}
                 </span>
               </div>
               <div class="text-surface-400 flex-1">
-                {{ $t('settings.skills.offset', 'Offset:') }}
+                {{ $t('settings.skills.offset') }}
                 <span class="text-surface-200 font-medium">{{ getSkillOffset(skill.name) }}</span>
               </div>
             </div>
             <div class="flex items-center gap-2">
               <label :for="`skill-input-${skill.name}`" class="sr-only">
-                {{ formatSkillName(skill.name) }} {{ $t('settings.skills.level', 'level') }}
+                {{ formatSkillName(skill.name) }} {{ $t('settings.skills.level') }}
               </label>
               <UInput
                 :id="`skill-input-${skill.name}`"
@@ -158,9 +158,7 @@
         <div v-if="hasShowAllToggle" class="flex justify-center pt-2">
           <UButton
             :label="
-              showAllSkills
-                ? $t('settings.skills.show_less', 'Show less')
-                : $t('settings.skills.show_all', 'Show all')
+              showAllSkills ? $t('settings.skills.show_less') : $t('settings.skills.show_all')
             "
             variant="soft"
             color="neutral"
@@ -168,7 +166,7 @@
           />
         </div>
         <div v-if="allGameSkills.length === 0" class="text-surface-400 py-6 text-center text-sm">
-          {{ $t('settings.skills.no_skills', 'No skills found in game data.') }}
+          {{ $t('settings.skills.no_skills') }}
         </div>
       </div>
     </template>
@@ -232,12 +230,12 @@
   const getSkillOffset = (skillName: string) => skillCalculation.getSkillOffset(skillName);
   const getDisplayLevel = (skillName: string) => {
     const level = getSkillLevel(skillName);
-    return level >= MAX_SKILL_LEVEL ? t('skills.elite_level', 'ELITE Level') : level;
+    return level >= MAX_SKILL_LEVEL ? t('skills.elite_level') : level;
   };
   const showInvalidSkillValueToast = () => {
     toast.add({
       id: 'skill-invalid-value-error',
-      title: t('settings.display_name.validation_error', 'Validation Error'),
+      title: t('settings.display_name.validation_error'),
       description: t('settings.skills.valid_range', `Valid range: 0-${MAX_SKILL_LEVEL}`),
       color: 'error',
       icon: 'i-mdi-alert-circle',
@@ -312,7 +310,7 @@
     skillLimitToastShown.value = true;
     toast.add({
       id: 'skill-limit-error',
-      title: t('settings.skills.limit_exceeded', 'Limit Exceeded'),
+      title: t('settings.skills.limit_exceeded'),
       description: t('settings.skills.max_level', `Maximum skill level is ${MAX_SKILL_LEVEL}.`),
       color: 'error',
       icon: 'i-mdi-alert-circle',

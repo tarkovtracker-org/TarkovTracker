@@ -3,7 +3,7 @@
     <div v-if="firNeeded > 0" class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-checkbox-marked-circle-outline" class="text-warning-400 h-4 w-4" />
-        <span class="text-sm font-medium">{{ $t('needed_items.fir', 'FIR') }}</span>
+        <span class="text-sm font-medium">{{ $t('needed_items.fir') }}</span>
       </div>
       <div class="flex items-center gap-2">
         <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">
@@ -59,14 +59,14 @@
           </button>
         </div>
         <span class="text-surface-400 text-sm">
-          / {{ firNeeded }} {{ $t('needed_items.needed', 'needed') }}
+          / {{ firNeeded }} {{ $t('needed_items.needed') }}
         </span>
       </div>
     </div>
     <div v-if="nonFirNeeded > 0" class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-checkbox-blank-circle-outline" class="text-surface-400 h-4 w-4" />
-        <span class="text-sm font-medium">{{ $t('needed_items.non_fir', 'Non-FIR') }}</span>
+        <span class="text-sm font-medium">{{ $t('needed_items.non_fir') }}</span>
       </div>
       <div class="flex items-center gap-2">
         <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">
@@ -122,7 +122,7 @@
           </button>
         </div>
         <span class="text-surface-400 text-sm">
-          / {{ nonFirNeeded }} {{ $t('needed_items.needed', 'needed') }}
+          / {{ nonFirNeeded }} {{ $t('needed_items.needed') }}
         </span>
       </div>
     </div>

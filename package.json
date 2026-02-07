@@ -62,7 +62,8 @@
     "supabase": "^2.72.9",
     "tailwindcss": "^4.1.18",
     "vitest": "^3.2.4",
-    "wait-on": "^9.0.3"
+    "wait-on": "^9.0.3",
+    "wrangler": "4.63.0"
   },
   "engines": {
     "node": ">=24.12.0",

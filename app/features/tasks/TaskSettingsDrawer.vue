@@ -10,14 +10,14 @@
   >
     <div class="mb-3 flex items-center justify-between">
       <h2 id="task-settings-drawer-title" class="text-sm font-semibold text-white">
-        {{ t('page.tasks.settings.title', 'Task Settings') }}
+        {{ t('page.tasks.settings.title') }}
       </h2>
       <UButton
         variant="ghost"
         color="neutral"
         icon="i-mdi-close"
         size="xs"
-        :aria-label="t('common.close', 'Close')"
+        :aria-label="t('common.close')"
         @click="handleClose"
       />
     </div>
@@ -78,23 +78,18 @@
               <UIcon name="i-mdi-alert" class="text-warning-400 h-5 w-5" />
             </div>
             <h3 class="text-surface-100 text-base font-semibold">
-              {{ t('page.tasks.settings.advanced.repair_failed', 'Repair failed tasks') }}
+              {{ t('page.tasks.settings.advanced.repair_failed') }}
             </h3>
           </div>
           <p class="text-surface-300 mb-5 text-sm">
-            {{
-              t(
-                'page.tasks.settings.advanced.repair_failed_confirm',
-                'Repair failed tasks by clearing failed flags that are not supported by current fail conditions?'
-              )
-            }}
+            {{ t('page.tasks.settings.advanced.repair_failed_confirm') }}
           </p>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="resolveRepairConfirm(false)">
-              {{ t('page.tasks.settings.advanced.repair_failed_cancel', 'Cancel') }}
+              {{ t('page.tasks.settings.advanced.repair_failed_cancel') }}
             </UButton>
             <UButton color="warning" variant="soft" @click="resolveRepairConfirm(true)">
-              {{ t('page.tasks.settings.advanced.repair_failed_action', 'Repair') }}
+              {{ t('page.tasks.settings.advanced.repair_failed_action') }}
             </UButton>
           </div>
         </div>

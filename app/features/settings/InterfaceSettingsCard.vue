@@ -4,36 +4,33 @@
     icon-color="accent"
     highlight-color="accent"
     :fill-height="false"
-    :title="$t('settings.interface.title', 'Interface Customization')"
+    :title="$t('settings.interface.title')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
       <div class="space-y-6 px-4 py-4">
         <div class="space-y-3">
           <h3 class="text-surface-200 text-sm font-semibold tracking-wider uppercase">
-            {{ $t('settings.interface.tasks.title', 'Task Cards') }}
+            {{ $t('settings.interface.tasks.title') }}
           </h3>
           <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <UCheckbox
               v-model="showRequiredLabels"
-              :label="$t('settings.interface.tasks.show_required', 'Show Required Labels')"
+              :label="$t('settings.interface.tasks.show_required')"
             />
             <UCheckbox
               v-model="showExperienceRewards"
-              :label="$t('settings.interface.tasks.show_xp', 'Show XP Rewards')"
+              :label="$t('settings.interface.tasks.show_xp')"
             />
-            <UCheckbox
-              v-model="showNextQuests"
-              :label="$t('settings.interface.tasks.show_next', 'Show Next Quests')"
-            />
+            <UCheckbox v-model="showNextQuests" :label="$t('settings.interface.tasks.show_next')" />
             <UCheckbox
               v-model="showPreviousQuests"
-              :label="$t('settings.interface.tasks.show_prev', 'Show Previous Quests')"
+              :label="$t('settings.interface.tasks.show_prev')"
             />
           </div>
           <div class="mt-4 max-w-xs space-y-2">
             <p class="text-surface-300 text-sm">
-              {{ $t('settings.interface.tasks.density', 'Card Density') }}
+              {{ $t('settings.interface.tasks.density') }}
             </p>
             <SelectMenuFixed
               v-model="taskCardDensity"
@@ -46,11 +43,11 @@
         <USeparator />
         <div class="space-y-3">
           <h3 class="text-surface-200 text-sm font-semibold tracking-wider uppercase">
-            {{ $t('settings.interface.defaults.title', 'Default Views') }}
+            {{ $t('settings.interface.defaults.title') }}
           </h3>
           <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div class="space-y-1">
-              <span class="text-sm font-medium">{{ $t('page.tasks.title', 'Tasks') }}</span>
+              <span class="text-sm font-medium">{{ $t('page.tasks.title') }}</span>
               <SelectMenuFixed
                 v-model="taskDefaultView"
                 :items="taskViewOptions"
@@ -59,7 +56,7 @@
               />
             </div>
             <div class="space-y-1">
-              <span class="text-sm font-medium">{{ $t('page.hideout.title', 'Hideout') }}</span>
+              <span class="text-sm font-medium">{{ $t('page.hideout.title') }}</span>
               <SelectMenuFixed
                 v-model="hideoutDefaultView"
                 :items="hideoutViewOptions"
@@ -72,17 +69,17 @@
         <USeparator />
         <div class="space-y-3">
           <h3 class="text-surface-200 text-sm font-semibold tracking-wider uppercase">
-            {{ $t('settings.interface.maps.title', 'Maps') }}
+            {{ $t('settings.interface.maps.title') }}
           </h3>
           <div class="grid gap-4 md:grid-cols-2">
             <UCheckbox
               v-model="showMapExtracts"
-              :label="$t('settings.interface.maps.show_extracts', 'Show Extracts by Default')"
+              :label="$t('settings.interface.maps.show_extracts')"
             />
             <div class="space-y-1">
               <div class="flex justify-between">
                 <span class="text-sm font-medium">
-                  {{ $t('settings.interface.maps.zoom_speed', 'Zoom Speed') }}
+                  {{ $t('settings.interface.maps.zoom_speed') }}
                 </span>
                 <span class="text-primary-400 text-xs">{{ mapZoomSpeed }}x</span>
               </div>
@@ -100,7 +97,7 @@
         <USeparator />
         <div class="space-y-3">
           <h3 class="text-surface-200 text-sm font-semibold tracking-wider uppercase">
-            {{ $t('settings.interface.misc.title', 'Miscellaneous') }}
+            {{ $t('settings.interface.misc.title') }}
           </h3>
           <div class="space-y-3">
             <div
@@ -108,7 +105,7 @@
             >
               <div class="space-y-0.5">
                 <p class="text-surface-200 text-sm font-medium">
-                  {{ $t('settings.general.privacy_mode', 'Privacy Mode') }}
+                  {{ $t('settings.general.privacy_mode') }}
                 </p>
                 <p class="text-surface-400 text-xs">
                   {{
@@ -124,7 +121,7 @@
             <div class="grid gap-4 md:grid-cols-2">
               <UCheckbox
                 v-model="enableHolidayEffects"
-                :label="$t('settings.interface.misc.holiday_effects', 'Enable Holiday Effects')"
+                :label="$t('settings.interface.misc.holiday_effects')"
               />
             </div>
           </div>
@@ -189,27 +186,27 @@
     set: (val) => preferencesStore.setTaskCardDensity(val),
   });
   const densityOptions = computed(() => [
-    { label: t('settings.density.compact', 'Compact'), value: 'compact' },
-    { label: t('settings.density.comfortable', 'Comfortable'), value: 'comfortable' },
+    { label: t('settings.density.compact'), value: 'compact' },
+    { label: t('settings.density.comfortable'), value: 'comfortable' },
   ]);
   const taskDefaultView = computed({
     get: () => preferencesStore.getTaskPrimaryView,
     set: (val) => preferencesStore.setTaskPrimaryView(val),
   });
   const taskViewOptions = computed(() => [
-    { label: t('tasks.view.all', 'List'), value: 'all' },
-    { label: t('tasks.view.map', 'Map'), value: 'maps' },
-    { label: t('tasks.view.traders', 'Traders'), value: 'traders' },
+    { label: t('tasks.view.all'), value: 'all' },
+    { label: t('tasks.view.map'), value: 'maps' },
+    { label: t('tasks.view.traders'), value: 'traders' },
   ]);
   const hideoutDefaultView = computed({
     get: () => preferencesStore.getHideoutPrimaryView,
     set: (val) => preferencesStore.setHideoutPrimaryView(val),
   });
   const hideoutViewOptions = computed(() => [
-    { label: t('hideout.view.available', 'Available'), value: 'available' },
-    { label: t('hideout.view.all', 'All'), value: 'all' },
-    { label: t('hideout.view.maxed', 'Maxed'), value: 'maxed' },
-    { label: t('hideout.view.locked', 'Locked'), value: 'locked' },
+    { label: t('hideout.view.available'), value: 'available' },
+    { label: t('hideout.view.all'), value: 'all' },
+    { label: t('hideout.view.maxed'), value: 'maxed' },
+    { label: t('hideout.view.locked'), value: 'locked' },
   ]);
   const showMapExtracts = computed({
     get: () => preferencesStore.getShowMapExtracts,

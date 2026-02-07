@@ -4,8 +4,8 @@
       :text="
         isSingleItem && !selfCompletedNeed
           ? currentCount >= neededCount
-            ? t('needed_items.click_to_uncollect', 'Click to uncollect')
-            : t('needed_items.click_to_collect', 'Click to collect')
+            ? t('needed_items.click_to_uncollect')
+            : t('needed_items.click_to_collect')
           : ''
       "
     >
@@ -41,15 +41,10 @@
                   craftable-icon-base-class="h-4 w-4 opacity-90"
                   :craftable-icon-class="craftableIconClass"
                   :kappa-required="isKappaRequired"
-                  :kappa-title="$t('needed_items.task_kappa_req', 'Required for Kappa quest')"
+                  :kappa-title="$t('needed_items.task_kappa_req')"
                   kappa-icon-class="h-4 w-4 text-kappa"
                   :lightkeeper-required="isLightkeeperRequired"
-                  :lightkeeper-title="
-                    $t(
-                      'page.tasks.questcard.lightkeeper_tooltip',
-                      'This quest is required to unlock the Lightkeeper trader'
-                    )
-                  "
+                  :lightkeeper-title="$t('page.tasks.questcard.lightkeeper_tooltip')"
                   lightkeeper-icon-class="h-4 w-4 text-lightkeeper"
                   @craft="goToCraftStation"
                 />
@@ -228,15 +223,15 @@
   const hasItem = computed(() => Boolean(item.value));
   const isSingleItem = computed(() => neededCount.value === 1);
   const cardAriaLabel = computed(() => {
-    const itemName = item.value?.name || t('needed_items.item', 'Item');
+    const itemName = item.value?.name || t('needed_items.item');
     const status =
       currentCount.value >= neededCount.value
-        ? t('needed_items.collected', 'Collected')
-        : t('needed_items.not_collected', 'Not collected');
+        ? t('needed_items.collected')
+        : t('needed_items.not_collected');
     const action =
       currentCount.value >= neededCount.value
-        ? t('needed_items.click_to_uncollect', 'Click to uncollect')
-        : t('needed_items.click_to_collect', 'Click to collect');
+        ? t('needed_items.click_to_uncollect')
+        : t('needed_items.click_to_collect');
     return `${itemName}. ${status}. ${action}`;
   });
   const handleCardClick = () => {

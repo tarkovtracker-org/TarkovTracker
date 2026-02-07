@@ -7,7 +7,7 @@
       variant="soft"
       @click.stop="emit('available')"
     >
-      {{ t('page.tasks.questcard.available_button', 'Mark Available') }}
+      {{ t('page.tasks.questcard.available_button') }}
     </UButton>
     <UButton
       v-else-if="state === 'complete'"
@@ -18,8 +18,8 @@
     >
       {{
         isFailed
-          ? t('page.tasks.questcard.reset_failed', 'Reset Failed')
-          : t('page.tasks.questcard.uncomplete_button', 'Mark Uncompleted')
+          ? t('page.tasks.questcard.reset_failed')
+          : t('page.tasks.questcard.uncomplete_button')
       }}
     </UButton>
     <div v-else-if="state === 'hotwheels'" class="flex flex-col gap-1">
@@ -30,10 +30,10 @@
         class="px-3 font-semibold"
         @click.stop="emit('complete')"
       >
-        {{ t('page.tasks.questcard.complete_button', 'Complete') }}
+        {{ t('page.tasks.questcard.complete_button') }}
       </UButton>
       <UButton :size="size" color="error" variant="soft" @click.stop="emit('failed')">
-        {{ t('page.tasks.questcard.fail_button', 'Fail') }}
+        {{ t('page.tasks.questcard.fail_button') }}
       </UButton>
     </div>
     <UButton
@@ -44,7 +44,7 @@
       class="px-3 font-semibold"
       @click.stop="emit('complete')"
     >
-      {{ t('page.tasks.questcard.complete_button', 'Complete') }}
+      {{ t('page.tasks.questcard.complete_button') }}
     </UButton>
   </div>
 </template>

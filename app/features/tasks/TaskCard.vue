@@ -27,7 +27,7 @@
               color="neutral"
               variant="ghost"
               class="shrink-0 sm:hidden"
-              :aria-label="t('page.tasks.questcard.more', 'More')"
+              :aria-label="t('page.tasks.questcard.more')"
               @click.stop="openOverflowMenu"
             >
               <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />
@@ -64,9 +64,7 @@
         </div>
         <!-- Extra Info Strips (padded area) -->
         <div v-if="lockedBefore > 0" class="text-surface-400 text-xs">
-          <span class="text-surface-500">
-            {{ t('page.tasks.questcard.requires', 'Requires') }}:
-          </span>
+          <span class="text-surface-500">{{ t('page.tasks.questcard.requires') }}:</span>
           <template v-if="pendingParentTasks.length">
             <span class="ml-2 inline-flex flex-wrap items-center gap-1.5">
               <AppTooltip
@@ -91,9 +89,7 @@
           </template>
         </div>
         <div v-if="isFailed" class="text-error-300 text-xs">
-          <span class="text-error-200/70">
-            {{ t('page.tasks.questcard.failed_because', 'Failed because') }}:
-          </span>
+          <span class="text-error-200/70">{{ t('page.tasks.questcard.failed_because') }}:</span>
           <template v-if="failureSources.length > 0">
             <span class="ml-2 inline-flex flex-wrap items-center gap-1.5">
               <router-link
@@ -107,9 +103,7 @@
             </span>
           </template>
           <span v-else class="text-error-200/80 ml-2">
-            {{
-              t('page.tasks.questcard.failed_because_unknown', 'Failed manually or data missing')
-            }}
+            {{ t('page.tasks.questcard.failed_because_unknown') }}
           </span>
         </div>
         <div v-if="showNeededBy" class="text-surface-400 text-xs">
@@ -139,7 +133,7 @@
           @keydown.space.prevent="toggleObjectivesVisibility"
         >
           <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-            {{ t('page.tasks.questcard.objectives', 'Objectives') }}
+            {{ t('page.tasks.questcard.objectives') }}
           </div>
           <UButton
             icon="i-mdi-chevron-down"
@@ -202,7 +196,7 @@
       <template #default="{ close }">
         <ContextMenuItem
           icon="i-mdi-link-variant"
-          :label="t('page.tasks.questcard.copy_task_link', 'Copy Task Link')"
+          :label="t('page.tasks.questcard.copy_task_link')"
           @click="
             copyTaskLink();
             close();
@@ -210,7 +204,7 @@
         />
         <ContextMenuItem
           icon="i-mdi-alert-circle-outline"
-          :label="t('page.tasks.questcard.report_data_issue', 'Report Data Issue')"
+          :label="t('page.tasks.questcard.report_data_issue')"
           @click="
             openTaskDataIssue();
             close();
@@ -219,7 +213,7 @@
         <ContextMenuItem
           v-if="preferencesStore.getEnableManualTaskFail && isOurFaction && !isFailed"
           icon="i-mdi-close-circle"
-          :label="t('page.tasks.questcard.mark_failed', 'Mark Failed')"
+          :label="t('page.tasks.questcard.mark_failed')"
           @click="
             confirmMarkFailed();
             close();
@@ -232,7 +226,7 @@
       <template #default="{ close }">
         <ContextMenuItem
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
+          :label="t('page.tasks.questcard.view_on_tarkov_dev')"
           @click="
             openItemOnTarkovDev();
             close();
@@ -240,7 +234,7 @@
         />
         <ContextMenuItem
           icon="/img/logos/wikilogo.webp"
-          :label="t('page.tasks.questcard.view_on_wiki', 'View on Wiki')"
+          :label="t('page.tasks.questcard.view_on_wiki')"
           @click="
             openItemOnWiki();
             close();
@@ -397,7 +391,7 @@
   });
   const locationTooltip = computed(() => {
     if (isGlobalTask.value) {
-      return t('page.tasks.questcard.global_task_tooltip', 'This task can be completed on any map');
+      return t('page.tasks.questcard.global_task_tooltip');
     }
     const mapName = props.task?.map?.name;
     if (mapName) {
@@ -407,7 +401,7 @@
         `Quest objectives are on ${mapName}`
       );
     }
-    return t('page.tasks.questcard.any_location_tooltip', 'Quest can be completed on any map');
+    return t('page.tasks.questcard.any_location_tooltip');
   });
   const exclusiveEditions = computed<GameEdition[]>(() =>
     getExclusiveEditionsForTask(props.task.id, metadataStore.editions)

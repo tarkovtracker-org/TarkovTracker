@@ -31,29 +31,26 @@
     <div class="ml-2 flex shrink-0 items-center gap-1.5">
       <AppTooltip
         v-if="task?.wikiLink && !shouldLinkToWiki"
-        :text="t('page.tasks.questcard.view_on_wiki', 'View on Wiki')"
+        :text="t('page.tasks.questcard.view_on_wiki')"
       >
         <a
           :href="task.wikiLink"
           target="_blank"
           rel="noopener noreferrer"
           :class="ICON_BUTTON_CLASS"
-          :aria-label="t('page.tasks.questcard.view_on_wiki', 'View on Wiki')"
+          :aria-label="t('page.tasks.questcard.view_on_wiki')"
           @click.stop
         >
           <img src="/img/logos/wikilogo.webp" alt="Wiki" aria-hidden="true" class="h-5 w-5" />
         </a>
       </AppTooltip>
-      <AppTooltip
-        v-if="task?.id"
-        :text="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
-      >
+      <AppTooltip v-if="task?.id" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
         <a
           :href="tarkovDevTaskUrl"
           target="_blank"
           rel="noopener noreferrer"
           :class="ICON_BUTTON_CLASS"
-          :aria-label="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
+          :aria-label="t('page.tasks.questcard.view_on_tarkov_dev')"
           @click.stop
         >
           <img

@@ -3,7 +3,7 @@
     <!-- Primary Filter: ALL / TASKS / HIDEOUT (Centered) -->
     <div
       role="tablist"
-      :aria-label="$t('needed_items.filter_type_label', 'Filter by item type')"
+      :aria-label="$t('needed_items.filter_type_label')"
       class="bg-surface-900 flex flex-wrap items-center justify-center gap-1 overflow-x-auto rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:gap-2 sm:px-4 sm:py-3"
     >
       <UButton
@@ -77,12 +77,7 @@
         <UInput
           ref="searchInput"
           :model-value="search"
-          :placeholder="
-            $t(
-              'page.needed_items.search_placeholder',
-              'Search items, tasks, or hideout stations...'
-            )
-          "
+          :placeholder="$t('page.needed_items.search_placeholder')"
           icon="i-mdi-magnify"
           size="md"
           :ui="{ trailing: 'pe-1' }"
@@ -95,7 +90,7 @@
               variant="link"
               size="sm"
               icon="i-mdi-close-circle"
-              :aria-label="$t('page.needed_items.clear_search', 'Clear search')"
+              :aria-label="$t('page.needed_items.clear_search')"
               @click="$emit('update:search', '')"
             />
           </template>
@@ -108,7 +103,7 @@
           <template v-if="groupByItem && ungroupedCount !== totalCount">
             {{ totalCount }} unique ({{ ungroupedCount }} total)
           </template>
-          <template v-else>{{ totalCount }} {{ $t('page.needed_items.items', 'items') }}</template>
+          <template v-else>{{ totalCount }} {{ $t('page.needed_items.items') }}</template>
         </UBadge>
         <!-- Divider (hidden on mobile) -->
         <div class="hidden h-6 w-px bg-white/10 sm:block" />
@@ -120,13 +115,13 @@
             variant="ghost"
             size="sm"
             class="shrink-0"
-            :title="$t('page.needed_items.sort.label', 'Sort')"
-            :aria-label="$t('page.needed_items.sort.label', 'Sort')"
+            :title="$t('page.needed_items.sort.label')"
+            :aria-label="$t('page.needed_items.sort.label')"
           />
           <template #content>
             <div class="w-64 space-y-3 p-3">
               <div class="text-surface-400 text-xs font-medium">
-                {{ $t('page.needed_items.sort.by', 'SORT BY') }}
+                {{ $t('page.needed_items.sort.by') }}
               </div>
               <div class="flex flex-col gap-2">
                 <UButton
@@ -160,8 +155,8 @@
             variant="ghost"
             size="sm"
             class="shrink-0"
-            :title="$t('page.needed_items.filters.label', 'Filters')"
-            :aria-label="$t('page.needed_items.filters.label', 'Filters')"
+            :title="$t('page.needed_items.filters.label')"
+            :aria-label="$t('page.needed_items.filters.label')"
           >
             <UBadge
               v-if="activeFiltersCount > 0"
@@ -176,7 +171,7 @@
           <template #content>
             <div class="w-80 space-y-3 p-3">
               <div class="text-surface-400 text-xs font-medium">
-                {{ $t('page.needed_items.filters.sections.items', 'ITEMS') }}
+                {{ $t('page.needed_items.filters.sections.items') }}
               </div>
               <div class="flex flex-wrap gap-2">
                 <UButton
@@ -186,7 +181,7 @@
                   @click="$emit('update:firFilter', firFilter === 'fir' ? 'all' : 'fir')"
                 >
                   <UIcon name="i-mdi-checkbox-marked-circle" class="mr-1 h-4 w-4" />
-                  {{ $t('page.needed_items.filters.fir', 'FIR') }}
+                  {{ $t('page.needed_items.filters.fir') }}
                 </UButton>
                 <UButton
                   :variant="firFilter === 'non-fir' ? 'soft' : 'ghost'"
@@ -195,7 +190,7 @@
                   @click="$emit('update:firFilter', firFilter === 'non-fir' ? 'all' : 'non-fir')"
                 >
                   <UIcon name="i-mdi-checkbox-blank-circle-outline" class="mr-1 h-4 w-4" />
-                  {{ $t('page.needed_items.filters.non_fir', 'NON-FIR') }}
+                  {{ $t('page.needed_items.filters.non_fir') }}
                 </UButton>
                 <!-- Hide Owned Toggle -->
                 <UButton
@@ -207,17 +202,12 @@
                   <UIcon name="i-mdi-check-circle-outline" class="mr-1 h-4 w-4" />
                   {{
                     hideOwned
-                      ? $t('page.needed_items.filters.show_owned', 'SHOW OWNED')
-                      : $t('page.needed_items.filters.hide_owned', 'HIDE OWNED')
+                      ? $t('page.needed_items.filters.show_owned')
+                      : $t('page.needed_items.filters.hide_owned')
                   }}
                 </UButton>
                 <AppTooltip
-                  :text="
-                    $t(
-                      'page.needed_items.filters.hide_non_fir_special_equipment_title',
-                      'Hide non-FIR special equipment (e.g., MS2000 Markers, Wi-Fi Cameras)'
-                    )
-                  "
+                  :text="$t('page.needed_items.filters.hide_non_fir_special_equipment_title')"
                 >
                   <UButton
                     :variant="hideNonFirSpecialEquipment ? 'soft' : 'ghost'"
@@ -228,22 +218,16 @@
                     <UIcon name="i-mdi-briefcase-outline" class="mr-1 h-4 w-4" />
                     {{
                       hideNonFirSpecialEquipment
-                        ? $t('page.needed_items.filters.no_special', 'NO-SPECIAL')
-                        : $t('page.needed_items.filters.special', 'SPECIAL')
+                        ? $t('page.needed_items.filters.no_special')
+                        : $t('page.needed_items.filters.special')
                     }}
                   </UButton>
                 </AppTooltip>
                 <AppTooltip
                   :text="
                     isKappaDisabled
-                      ? $t(
-                          'page.needed_items.filters.kappa_only_disabled_tooltip',
-                          'Kappa filter applies to tasks only.'
-                        )
-                      : $t(
-                          'page.needed_items.filters.kappa_only_tooltip',
-                          'Show only items required for Kappa quests'
-                        )
+                      ? $t('page.needed_items.filters.kappa_only_disabled_tooltip')
+                      : $t('page.needed_items.filters.kappa_only_tooltip')
                   "
                 >
                   <UButton
@@ -254,13 +238,13 @@
                     @click="$emit('update:kappaOnly', !kappaOnly)"
                   >
                     <UIcon name="i-mdi-trophy" class="mr-1 h-4 w-4" />
-                    {{ $t('page.needed_items.filters.kappa_only', 'KAPPA') }}
+                    {{ $t('page.needed_items.filters.kappa_only') }}
                   </UButton>
                 </AppTooltip>
               </div>
               <div class="border-t border-white/10 pt-3">
                 <div class="text-surface-400 mb-2 text-xs font-medium">
-                  {{ $t('page.needed_items.filters.sections.team', 'TEAM') }}
+                  {{ $t('page.needed_items.filters.sections.team') }}
                 </div>
                 <UButton
                   :variant="hideTeamItems ? 'soft' : 'ghost'"
@@ -272,8 +256,8 @@
                   <UIcon name="i-mdi-account-group-outline" class="mr-1 h-4 w-4" />
                   {{
                     hideTeamItems
-                      ? $t('page.needed_items.filters.hide_team_needs', 'HIDE TEAM NEEDS')
-                      : $t('page.needed_items.filters.show_team_needs', 'SHOW TEAM NEEDS')
+                      ? $t('page.needed_items.filters.hide_team_needs')
+                      : $t('page.needed_items.filters.show_team_needs')
                   }}
                 </UButton>
               </div>
@@ -289,8 +273,8 @@
             :color="!groupByItem && viewMode === 'list' ? 'primary' : 'neutral'"
             :variant="!groupByItem && viewMode === 'list' ? 'soft' : 'ghost'"
             size="sm"
-            :title="$t('page.needed_items.view.list', 'List view')"
-            :aria-label="$t('page.needed_items.view.list', 'List view')"
+            :title="$t('page.needed_items.view.list')"
+            :aria-label="$t('page.needed_items.view.list')"
             @click="setViewMode('list')"
           />
           <UButton
@@ -298,8 +282,8 @@
             :color="!groupByItem && viewMode === 'grid' ? 'primary' : 'neutral'"
             :variant="!groupByItem && viewMode === 'grid' ? 'soft' : 'ghost'"
             size="sm"
-            :title="$t('page.needed_items.view.grid', 'Grid view')"
-            :aria-label="$t('page.needed_items.view.grid', 'Grid view')"
+            :title="$t('page.needed_items.view.grid')"
+            :aria-label="$t('page.needed_items.view.grid')"
             @click="setViewMode('grid')"
           />
           <UButton
@@ -307,8 +291,8 @@
             :color="groupByItem ? 'primary' : 'neutral'"
             :variant="groupByItem ? 'soft' : 'ghost'"
             size="sm"
-            :title="$t('page.needed_items.view.combined', 'Combined view')"
-            :aria-label="$t('page.needed_items.view.combined', 'Combined view')"
+            :title="$t('page.needed_items.view.combined')"
+            :aria-label="$t('page.needed_items.view.combined')"
             @click="setGroupedView"
           />
           <!-- Card Style Toggle (Only visible in Grid View and not Grouped) -->
@@ -323,13 +307,13 @@
               size="sm"
               :title="
                 cardStyle === 'compact'
-                  ? $t('needed_items.switch_to_expanded', 'Switch to Expanded view')
-                  : $t('needed_items.switch_to_compact', 'Switch to Compact view')
+                  ? $t('needed_items.switch_to_expanded')
+                  : $t('needed_items.switch_to_compact')
               "
               :aria-label="
                 cardStyle === 'compact'
-                  ? $t('needed_items.switch_to_expanded', 'Switch to Expanded view')
-                  : $t('needed_items.switch_to_compact', 'Switch to Compact view')
+                  ? $t('needed_items.switch_to_expanded')
+                  : $t('needed_items.switch_to_compact')
               "
               @click="$emit('update:cardStyle', cardStyle === 'compact' ? 'expanded' : 'compact')"
             />
@@ -431,22 +415,22 @@
   });
   const sortOptions = computed(() => [
     {
-      label: t('page.needed_items.sort.priority', 'Priority'),
+      label: t('page.needed_items.sort.priority'),
       value: 'priority' as SortBy,
       icon: 'i-mdi-alert-circle-outline',
     },
     {
-      label: t('page.needed_items.sort.name', 'Name'),
+      label: t('page.needed_items.sort.name'),
       value: 'name' as SortBy,
       icon: 'i-mdi-format-title',
     },
     {
-      label: t('page.needed_items.sort.category', 'Category'),
+      label: t('page.needed_items.sort.category'),
       value: 'category' as SortBy,
       icon: 'i-mdi-shape-outline',
     },
     {
-      label: t('page.needed_items.sort.count', 'Count'),
+      label: t('page.needed_items.sort.count'),
       value: 'count' as SortBy,
       icon: 'i-mdi-counter',
     },

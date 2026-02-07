@@ -123,7 +123,7 @@ export function useTaskActions(
   };
   const markTaskComplete = (isUndo = false) => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('page.tasks.questcard.task', 'Task');
+    const taskName = currentTask.name ?? t('page.tasks.questcard.task');
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -150,7 +150,7 @@ export function useTaskActions(
   };
   const markTaskUncomplete = (isUndo = false) => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('page.tasks.questcard.task', 'Task');
+    const taskName = currentTask.name ?? t('page.tasks.questcard.task');
     const wasFailed = tarkovStore.isTaskFailed(currentTask.id);
     if (!isUndo) {
       emitAction({
@@ -184,7 +184,7 @@ export function useTaskActions(
   };
   const markTaskAvailable = () => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('page.tasks.questcard.task', 'Task');
+    const taskName = currentTask.name ?? t('page.tasks.questcard.task');
     const handledRequirementTaskIds = new Set<string>();
     const failedRequirementTaskIds = new Set<string>();
     currentTask.taskRequirements?.forEach((req) => {
@@ -214,7 +214,7 @@ export function useTaskActions(
   };
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('page.tasks.questcard.task', 'Task');
+    const taskName = currentTask.name ?? t('page.tasks.questcard.task');
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,

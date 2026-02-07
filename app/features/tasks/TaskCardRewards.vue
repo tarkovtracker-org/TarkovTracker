@@ -19,7 +19,7 @@
     >
       <span class="text-surface-500 font-bold tracking-wider uppercase">
         <UIcon name="i-mdi-gift" aria-hidden="true" class="mr-1 inline h-3.5 w-3.5" />
-        {{ t('page.tasks.questcard.rewards', 'Rewards') }}:
+        {{ t('page.tasks.questcard.rewards') }}:
       </span>
       <template v-for="standing in traderStandingRewards" :key="`standing-${standing.trader.id}`">
         <div class="bg-surface-800 inline-flex items-center gap-1 rounded px-1.5 py-0.5">
@@ -95,36 +95,24 @@
       <div class="hidden flex-1 sm:block"></div>
       <AppTooltip
         v-if="unlocksNextCount && unlocksNextCount > 0"
-        :text="
-          t(
-            'page.tasks.questcard.unlocks_next_tooltip',
-            'Number of quests that become available after completing this task'
-          )
-        "
+        :text="t('page.tasks.questcard.unlocks_next_tooltip')"
       >
         <div
           class="text-surface-400 border-surface-600 inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs"
         >
           <UIcon name="i-mdi-arrow-right-circle-outline" class="h-3.5 w-3.5" />
-          <span>
-            {{ t('page.tasks.questcard.unlocks_next', 'Unlocks next') }}: {{ unlocksNextCount }}
-          </span>
+          <span>{{ t('page.tasks.questcard.unlocks_next') }}: {{ unlocksNextCount }}</span>
         </div>
       </AppTooltip>
       <AppTooltip
         v-if="impactCount && impactCount > 0"
-        :text="
-          t(
-            'page.tasks.questcard.impact_tooltip',
-            'Number of incomplete quests that depend on this task being completed'
-          )
-        "
+        :text="t('page.tasks.questcard.impact_tooltip')"
       >
         <div
           class="text-surface-400 border-surface-600 inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs"
         >
           <UIcon name="i-mdi-sitemap" class="h-3.5 w-3.5" />
-          <span>{{ t('page.tasks.questcard.impact', 'Impact') }}: {{ impactCount }}</span>
+          <span>{{ t('page.tasks.questcard.impact') }}: {{ impactCount }}</span>
         </div>
       </AppTooltip>
       <UIcon
@@ -151,7 +139,7 @@
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div v-if="showPreviousTasks" class="space-y-2">
             <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
-              {{ t('page.tasks.questcard.previous_tasks', 'Previous Tasks:') }}
+              {{ t('page.tasks.questcard.previous_tasks') }}
             </div>
             <div class="flex flex-col gap-1.5">
               <NuxtLink
@@ -167,7 +155,7 @@
           </div>
           <div v-if="itemRewards.length > 0" class="space-y-3">
             <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
-              {{ t('page.tasks.questcard.reward_items', 'Items:') }}
+              {{ t('page.tasks.questcard.reward_items') }}
             </div>
             <div class="flex flex-wrap gap-2">
               <AppTooltip
@@ -204,7 +192,7 @@
           </div>
           <div v-if="offerUnlockRewards.length > 0" class="space-y-3">
             <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
-              {{ t('page.tasks.questcard.unlocks_purchase', 'Unlocks Purchase:') }}
+              {{ t('page.tasks.questcard.unlocks_purchase') }}
             </div>
             <div class="flex flex-wrap gap-2">
               <AppTooltip
@@ -241,7 +229,7 @@
           </div>
           <div v-if="showNextTasks && childTasks.length > 0" class="space-y-2">
             <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
-              {{ t('page.tasks.questcard.next_tasks', 'Next Tasks:') }}
+              {{ t('page.tasks.questcard.next_tasks') }}
             </div>
             <div class="flex flex-col gap-1.5">
               <NuxtLink
@@ -335,7 +323,7 @@
     return hasDetailedRewards.value || hasVisibleNextTasks || hasVisiblePreviousTasks;
   });
   const getItemTooltip = (item?: { shortName?: string; name?: string }) => {
-    const name = item?.shortName || item?.name || t('page.tasks.questcard.item', 'Item');
+    const name = item?.shortName || item?.name || t('page.tasks.questcard.item');
     return t(
       'page.tasks.questcard.open_item_on_tarkov_dev',
       { name },

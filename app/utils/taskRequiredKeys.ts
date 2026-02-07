@@ -42,29 +42,31 @@ export const buildRequiredKeysFromObjectives = (
     const keyMatrix = (objective.requiredKeys ?? [])
       .map((keyGroup) => dedupeItems(keyGroup))
       .filter((keyGroup) => keyGroup.length > 0);
-    const flattenedObjectiveKeys = dedupeItems(keyMatrix.flat());
-    if (!flattenedObjectiveKeys.length) return;
-    const keyGroup: RequiredKeyGroup = {
-      keys: flattenedObjectiveKeys,
-      maps: objectiveMaps,
-      optional: objective.optional === true,
-      anyOf: keyMatrix.length === 1 && keyMatrix[0]!.length > 1,
-    };
-    const groupSignature = buildGroupSignature(keyGroup);
-    if (keyGroup.optional) {
-      if (
-        requiredGroupSignatures.has(groupSignature) ||
-        optionalGroupsBySignature.has(groupSignature)
-      ) {
-        return;
+    if (!keyMatrix.length) return;
+    const isOptional = objective.optional === true;
+    for (const innerGroup of keyMatrix) {
+      const keyGroup: RequiredKeyGroup = {
+        keys: innerGroup,
+        maps: objectiveMaps,
+        optional: isOptional,
+        anyOf: innerGroup.length > 1,
+      };
+      const groupSignature = buildGroupSignature(keyGroup);
+      if (keyGroup.optional) {
+        if (
+          requiredGroupSignatures.has(groupSignature) ||
+          optionalGroupsBySignature.has(groupSignature)
+        ) {
+          continue;
+        }
+        optionalGroupsBySignature.set(groupSignature, keyGroup);
+        continue;
       }
-      optionalGroupsBySignature.set(groupSignature, keyGroup);
-      return;
+      if (requiredGroupSignatures.has(groupSignature)) continue;
+      requiredGroupSignatures.add(groupSignature);
+      requiredGroups.push(keyGroup);
+      optionalGroupsBySignature.delete(groupSignature);
     }
-    if (requiredGroupSignatures.has(groupSignature)) return;
-    requiredGroupSignatures.add(groupSignature);
-    requiredGroups.push(keyGroup);
-    optionalGroupsBySignature.delete(groupSignature);
   });
   return [...requiredGroups, ...Array.from(optionalGroupsBySignature.values())];
 };

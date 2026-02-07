@@ -5,15 +5,10 @@
         icon="i-mdi-alert"
         color="warning"
         variant="soft"
-        :title="$t('settings.ui_notice.title', 'Interface update in progress')"
+        :title="$t('settings.ui_notice.title')"
       >
         <template #description>
-          {{
-            $t(
-              'settings.ui_notice.description',
-              'The UI/UX is being actively improved. Some areas may look messy or feel unpolished for now.'
-            )
-          }}
+          {{ $t('settings.ui_notice.description') }}
         </template>
       </UAlert>
       <UTabs :items="tabs" class="w-full">
@@ -25,14 +20,14 @@
               icon-color="accent"
               highlight-color="accent"
               :fill-height="false"
-              :title="$t('settings.game_settings.title', 'Game Settings')"
+              :title="$t('settings.game_settings.title')"
               title-classes="text-lg font-semibold"
             >
               <template #content>
                 <div class="grid gap-4 px-4 py-4 md:grid-cols-2 lg:grid-cols-2">
                   <div class="space-y-2">
                     <p class="text-surface-200 text-sm font-semibold">
-                      {{ $t('settings.game_profile.game_edition', 'Game Edition') }}
+                      {{ $t('settings.game_profile.game_edition') }}
                     </p>
                     <SelectMenuFixed
                       v-model="selectedGameEdition"
@@ -46,7 +41,7 @@
                   </div>
                   <div class="space-y-2">
                     <p class="text-surface-200 text-sm font-semibold">
-                      {{ $t('settings.prestige.current_level', 'Current Prestige Level') }}
+                      {{ $t('settings.prestige.current_level') }}
                     </p>
                     <SelectMenuFixed
                       v-model="currentPrestige"
@@ -81,7 +76,7 @@
               icon-color="secondary"
               highlight-color="secondary"
               :fill-height="false"
-              :title="$t('page.settings.card.apitokens.title', 'API Tokens')"
+              :title="$t('page.settings.card.apitokens.title')"
               title-classes="text-lg font-semibold"
             >
               <template #content>
@@ -109,7 +104,7 @@
                 class="hover:text-error-400 text-surface-500 flex items-center gap-1.5 text-xs transition-colors"
               >
                 <UIcon name="i-mdi-shield-crown" class="size-3.5" />
-                {{ $t('settings.general.admin_panel', 'Admin Panel') }}
+                {{ $t('settings.general.admin_panel') }}
               </NuxtLink>
             </div>
           </div>
@@ -121,7 +116,7 @@
         <div class="flex items-center gap-2">
           <UIcon name="i-mdi-alert" class="text-pvp-400 h-5 w-5" />
           <h3 class="text-lg font-semibold">
-            {{ $t('settings.data_management.reset_pvp_title', 'Reset PvP Data') }}
+            {{ $t('settings.data_management.reset_pvp_title') }}
           </h3>
         </div>
       </template>
@@ -131,20 +126,10 @@
             icon="i-mdi-alert"
             color="pvp"
             variant="subtle"
-            :title="
-              $t(
-                'settings.data_management.reset_pvp_confirmation',
-                'Are you sure you want to reset your PvP progress?'
-              )
-            "
+            :title="$t('settings.data_management.reset_pvp_confirmation')"
           />
           <p class="text-surface-200 text-sm">
-            {{
-              $t(
-                'settings.data_management.reset_pvp_warning',
-                'This will permanently delete all your PvP progress including tasks, hideout, and level. Your PvE data will not be affected.'
-              )
-            }}
+            {{ $t('settings.data_management.reset_pvp_warning') }}
           </p>
         </div>
       </template>
@@ -156,7 +141,7 @@
             class="min-w-26 justify-center text-center"
             @click="close"
           >
-            {{ $t('settings.data_management.reset_cancel', 'Cancel') }}
+            {{ $t('settings.data_management.reset_cancel') }}
           </UButton>
           <UButton
             color="error"
@@ -165,7 +150,7 @@
             :loading="resetting"
             @click="resetPvPData"
           >
-            {{ $t('settings.data_management.reset_confirm', 'Reset PvP Data') }}
+            {{ $t('settings.data_management.reset_confirm') }}
           </UButton>
         </div>
       </template>
@@ -175,7 +160,7 @@
         <div class="flex items-center gap-2">
           <UIcon name="i-mdi-alert" class="text-pve-400 h-5 w-5" />
           <h3 class="text-lg font-semibold">
-            {{ $t('settings.data_management.reset_pve_title', 'Reset PvE Data') }}
+            {{ $t('settings.data_management.reset_pve_title') }}
           </h3>
         </div>
       </template>
@@ -185,20 +170,10 @@
             icon="i-mdi-alert"
             color="pve"
             variant="subtle"
-            :title="
-              $t(
-                'settings.data_management.reset_pve_confirmation',
-                'Are you sure you want to reset your PvE progress?'
-              )
-            "
+            :title="$t('settings.data_management.reset_pve_confirmation')"
           />
           <p class="text-surface-200 text-sm">
-            {{
-              $t(
-                'settings.data_management.reset_pve_warning',
-                'This will permanently delete all your PvE progress including tasks, hideout, and level. Your PvP data will not be affected.'
-              )
-            }}
+            {{ $t('settings.data_management.reset_pve_warning') }}
           </p>
         </div>
       </template>
@@ -210,7 +185,7 @@
             class="min-w-26 justify-center text-center"
             @click="close"
           >
-            {{ $t('settings.data_management.reset_cancel', 'Cancel') }}
+            {{ $t('settings.data_management.reset_cancel') }}
           </UButton>
           <UButton
             color="error"
@@ -219,7 +194,7 @@
             :loading="resetting"
             @click="resetPvEData"
           >
-            {{ $t('settings.data_management.reset_confirm', 'Reset PvE Data') }}
+            {{ $t('settings.data_management.reset_confirm') }}
           </UButton>
         </div>
       </template>
@@ -229,7 +204,7 @@
         <div class="flex items-center gap-2">
           <UIcon name="i-mdi-alert-octagon" class="text-error-400 h-5 w-5" />
           <h3 class="text-lg font-semibold">
-            {{ $t('settings.data_management.reset_all_title', 'Reset All Data') }}
+            {{ $t('settings.data_management.reset_all_title') }}
           </h3>
         </div>
       </template>
@@ -239,34 +214,24 @@
             icon="i-mdi-alert-octagon"
             color="error"
             variant="subtle"
-            :title="
-              $t(
-                'settings.data_management.reset_all_confirmation',
-                'Are you sure you want to reset ALL your progress?'
-              )
-            "
+            :title="$t('settings.data_management.reset_all_confirmation')"
           />
           <p class="text-surface-200 text-sm">
-            {{
-              $t(
-                'settings.data_management.reset_all_warning',
-                'This will permanently delete ALL your progress for both PvP and PvE modes. This action cannot be undone!'
-              )
-            }}
+            {{ $t('settings.data_management.reset_all_warning') }}
           </p>
           <div class="space-y-2">
             <p class="text-surface-100 text-sm font-medium">
               <i18n-t keypath="settings.danger_zone.confirm_delete_instruction" tag="span">
                 <template #word>
                   <strong class="text-error-400">
-                    {{ $t('settings.danger_zone.confirm_word', 'DELETE') }}
+                    {{ $t('settings.danger_zone.confirm_word') }}
                   </strong>
                 </template>
               </i18n-t>
             </p>
             <UInput
               v-model="resetAllConfirmText"
-              :placeholder="$t('settings.danger_zone.confirm_word', 'DELETE')"
+              :placeholder="$t('settings.danger_zone.confirm_word')"
               class="font-mono"
             />
           </div>
@@ -280,17 +245,17 @@
             class="min-w-26 justify-center text-center"
             @click="close"
           >
-            {{ $t('settings.data_management.reset_cancel', 'Cancel') }}
+            {{ $t('settings.data_management.reset_cancel') }}
           </UButton>
           <UButton
             color="error"
             variant="solid"
             class="ml-auto min-w-30 justify-center text-center"
             :loading="resetting"
-            :disabled="resetAllConfirmText !== $t('settings.danger_zone.confirm_word', 'DELETE')"
+            :disabled="resetAllConfirmText !== $t('settings.danger_zone.confirm_word')"
             @click="resetAllData"
           >
-            {{ $t('settings.data_management.reset_confirm', 'Reset All Data') }}
+            {{ $t('settings.data_management.reset_confirm') }}
           </UButton>
         </div>
       </template>
@@ -330,9 +295,9 @@
   const showResetAllDialog = ref(false);
   const resetAllConfirmText = ref('');
   const tabs = computed(() => [
-    { slot: 'gameplay', label: t('settings.tabs.gameplay', 'Gameplay'), icon: 'i-mdi-controller' },
-    { slot: 'interface', label: t('settings.tabs.interface', 'Interface'), icon: 'i-mdi-palette' },
-    { slot: 'account', label: t('settings.tabs.account', 'Account'), icon: 'i-mdi-shield-account' },
+    { slot: 'gameplay', label: t('settings.tabs.gameplay'), icon: 'i-mdi-controller' },
+    { slot: 'interface', label: t('settings.tabs.interface'), icon: 'i-mdi-palette' },
+    { slot: 'account', label: t('settings.tabs.account'), icon: 'i-mdi-shield-account' },
   ]);
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn));
   const isAdmin = computed(() => hasInitiallyLoaded.value && systemStore.isAdmin);
@@ -389,7 +354,7 @@
     } catch (error) {
       logger.error(`[Settings] Error resetting ${config.errorLogContext}:`, error);
       toast.add({
-        title: t('settings.reset.error_title', 'Reset Failed'),
+        title: t('settings.reset.error_title'),
         description: config.errorDescription,
         color: 'error',
       });
@@ -399,44 +364,26 @@
   };
   const resetPvPData = createResetHandler({
     resetFn: () => tarkovStore.resetPvPData(),
-    successTitle: t('settings.reset_pvp.success_title', 'PvP Data Reset'),
-    successDescription: t(
-      'settings.reset_pvp.success_description',
-      'Your PvP progress has been reset successfully.'
-    ),
+    successTitle: t('settings.reset_pvp.success_title'),
+    successDescription: t('settings.reset_pvp.success_description'),
     errorLogContext: 'PvP data',
-    errorDescription: t(
-      'settings.reset_pvp.error_description',
-      'Failed to reset PvP data. Please try again.'
-    ),
+    errorDescription: t('settings.reset_pvp.error_description'),
     dialogRef: showResetPvPDialog,
   });
   const resetPvEData = createResetHandler({
     resetFn: () => tarkovStore.resetPvEData(),
-    successTitle: t('settings.reset_pve.success_title', 'PvE Data Reset'),
-    successDescription: t(
-      'settings.reset_pve.success_description',
-      'Your PvE progress has been reset successfully.'
-    ),
+    successTitle: t('settings.reset_pve.success_title'),
+    successDescription: t('settings.reset_pve.success_description'),
     errorLogContext: 'PvE data',
-    errorDescription: t(
-      'settings.reset_pve.error_description',
-      'Failed to reset PvE data. Please try again.'
-    ),
+    errorDescription: t('settings.reset_pve.error_description'),
     dialogRef: showResetPvEDialog,
   });
   const resetAllData = createResetHandler({
     resetFn: () => tarkovStore.resetAllData(),
-    successTitle: t('settings.reset_all.success_title', 'All Data Reset'),
-    successDescription: t(
-      'settings.reset_all.success_description',
-      'All your progress has been reset successfully.'
-    ),
+    successTitle: t('settings.reset_all.success_title'),
+    successDescription: t('settings.reset_all.success_description'),
     errorLogContext: 'all data',
-    errorDescription: t(
-      'settings.reset_all.error_description',
-      'Failed to reset data. Please try again.'
-    ),
+    errorDescription: t('settings.reset_all.error_description'),
     dialogRef: showResetAllDialog,
   });
 </script>

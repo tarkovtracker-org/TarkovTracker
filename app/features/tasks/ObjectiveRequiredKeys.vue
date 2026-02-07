@@ -40,7 +40,7 @@
           <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
         </a>
       </AppTooltip>
-      <AppTooltip :text="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')">
+      <AppTooltip :text="t('page.tasks.questcard.view_on_tarkov_dev')">
         <a
           :href="getKeyDevUrl(key)"
           target="_blank"
@@ -55,21 +55,14 @@
         v-if="isAnyOf && keyIndex < flatKeys.length - 1"
         class="text-surface-500 text-[10px] italic"
       >
-        {{ $t('page.tasks.questcard.keys_or', 'or') }}
+        {{ $t('page.tasks.questcard.keys_or') }}
       </span>
     </span>
-    <AppTooltip
-      :text="
-        $t(
-          'page.tasks.questcard.keys_disclaimer_tooltip',
-          'Based on API data and not always 100% required. Doors may already be unlocked. Verify in-game or on the wiki before buying keys.'
-        )
-      "
-    >
+    <AppTooltip :text="$t('page.tasks.questcard.keys_disclaimer_tooltip')">
       <button
         type="button"
         class="text-surface-500 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 hover:text-surface-300 inline-flex items-center self-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-        :aria-label="$t('page.tasks.questcard.keys_disclaimer_aria', 'Required keys disclaimer')"
+        :aria-label="$t('page.tasks.questcard.keys_disclaimer_aria')"
         @click.stop
       >
         <UIcon name="i-mdi-information-outline" class="h-3.5 w-3.5" />
@@ -157,8 +150,8 @@
   const getKeyPrimaryUrl = (key: TarkovItem) => key.wikiLink || getKeyDevUrl(key);
   const getKeyPrimaryTooltip = (key: TarkovItem) =>
     key.wikiLink
-      ? t('page.tasks.questcard.view_on_wiki', 'View on Wiki')
-      : t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev');
+      ? t('page.tasks.questcard.view_on_wiki')
+      : t('page.tasks.questcard.view_on_tarkov_dev');
   const openKeyPrimaryLink = (key: TarkovItem) => {
     window.open(getKeyPrimaryUrl(key), '_blank', 'noopener,noreferrer');
   };

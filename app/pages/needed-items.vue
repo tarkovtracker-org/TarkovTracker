@@ -26,10 +26,10 @@
         >
           <UIcon name="i-mdi-alert-circle" class="text-error-400 h-8 w-8" />
           <span class="text-error-400">
-            {{ $t('page.needed_items.error', 'Failed to load items.') }}
+            {{ $t('page.needed_items.error') }}
           </span>
           <UButton color="primary" @click="ensureNeededItemsData">
-            {{ $t('page.needed_items.retry', 'Retry') }}
+            {{ $t('page.needed_items.retry') }}
           </UButton>
         </div>
         <div
@@ -38,7 +38,7 @@
           aria-live="polite"
         >
           <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" />
-          <span>{{ $t('page.needed_items.loading', 'Loading items...') }}</span>
+          <span>{{ $t('page.needed_items.loading') }}</span>
         </div>
         <template v-else>
           <div
@@ -46,7 +46,7 @@
             class="text-surface-400 p-8 text-center"
             aria-live="polite"
           >
-            {{ $t('page.needed_items.empty', 'No items match your search.') }}
+            {{ $t('page.needed_items.empty') }}
           </div>
           <div v-else-if="groupByItem" class="p-2">
             <div
@@ -132,11 +132,7 @@
   const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
     title: () => t('page.needed_items.title'),
-    description: () =>
-      t(
-        'page.needed_items.meta_description',
-        'View all items needed for your active quests and hideout upgrades. Filter by quest, craft, and find-in-raid requirements.'
-      ),
+    description: () => t('page.needed_items.meta_description'),
   });
   const props = withDefaults(
     defineProps<{

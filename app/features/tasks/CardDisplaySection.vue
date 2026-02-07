@@ -3,11 +3,11 @@
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-card-text" class="text-info-400 h-4 w-4" />
       <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
-        {{ t('page.tasks.settings.tabs.appearance', 'Card Display') }}
+        {{ t('page.tasks.settings.tabs.appearance') }}
       </h3>
     </div>
     <p class="text-surface-500 mb-2 text-xs">
-      {{ t('page.tasks.settings.appearance.hint', 'Choose what to show on cards.') }}
+      {{ t('page.tasks.settings.appearance.hint') }}
     </p>
     <div class="space-y-1">
       <label
@@ -15,7 +15,7 @@
       >
         <UCheckbox v-model="showRequiredLabelsModel" />
         <span class="text-surface-200 text-sm">
-          {{ t('page.tasks.settings.appearance.required_labels', '"Required" Labels') }}
+          {{ t('page.tasks.settings.appearance.required_labels') }}
         </span>
       </label>
       <label
@@ -23,7 +23,7 @@
       >
         <UCheckbox v-model="showExperienceRewardsModel" />
         <span class="text-surface-200 text-sm">
-          {{ t('page.tasks.settings.appearance.experience_rewards', 'Experience Rewards') }}
+          {{ t('page.tasks.settings.appearance.experience_rewards') }}
         </span>
       </label>
       <label
@@ -31,7 +31,7 @@
       >
         <UCheckbox v-model="showNextQuestsModel" />
         <span class="text-surface-200 text-sm">
-          {{ t('page.tasks.settings.appearance.next_tasks', 'Next Tasks') }}
+          {{ t('page.tasks.settings.appearance.next_tasks') }}
         </span>
       </label>
       <label
@@ -39,7 +39,7 @@
       >
         <UCheckbox v-model="showPreviousQuestsModel" />
         <span class="text-surface-200 text-sm">
-          {{ t('page.tasks.settings.appearance.previous_tasks', 'Previous Tasks') }}
+          {{ t('page.tasks.settings.appearance.previous_tasks') }}
         </span>
       </label>
       <label
@@ -47,12 +47,7 @@
       >
         <UCheckbox v-model="hideCompletedTaskObjectivesModel" />
         <span class="text-surface-200 text-sm">
-          {{
-            t(
-              'page.tasks.settings.appearance.collapse_completed_objectives',
-              'Collapse Objectives on Completed Tasks'
-            )
-          }}
+          {{ t('page.tasks.settings.appearance.collapse_completed_objectives') }}
         </span>
       </label>
     </div>

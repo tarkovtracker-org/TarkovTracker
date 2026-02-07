@@ -93,34 +93,21 @@
           class="h-3 w-3"
         />
         <span class="truncate">
-          {{ task?.map?.name || t('page.tasks.questcard.any_map', 'Any') }}
+          {{ task?.map?.name || t('page.tasks.questcard.any_map') }}
         </span>
       </UBadge>
     </AppTooltip>
     <UBadge v-if="isFailed" size="xs" color="error" variant="soft" class="shrink-0 text-[11px]">
-      {{ t('page.dashboard.stats.failed.stat', 'Failed') }}
+      {{ t('page.dashboard.stats.failed.stat') }}
     </UBadge>
-    <AppTooltip
-      v-if="isInvalid && !isFailed"
-      :text="
-        t(
-          'page.tasks.questcard.blocked_tooltip',
-          'This quest is permanently blocked and can never be completed due to choices made in other quests'
-        )
-      "
-    >
+    <AppTooltip v-if="isInvalid && !isFailed" :text="t('page.tasks.questcard.blocked_tooltip')">
       <UBadge size="xs" color="neutral" variant="soft" class="shrink-0 cursor-help text-[11px]">
-        {{ t('page.tasks.questcard.blocked', 'Blocked') }}
+        {{ t('page.tasks.questcard.blocked') }}
       </UBadge>
     </AppTooltip>
     <AppTooltip
       v-if="showRequiredLabels && task.kappaRequired"
-      :text="
-        t(
-          'page.tasks.questcard.kappa_tooltip',
-          'This quest is required to obtain the Kappa Secure Container'
-        )
-      "
+      :text="t('page.tasks.questcard.kappa_tooltip')"
     >
       <UIcon
         name="i-mdi-trophy"
@@ -130,12 +117,7 @@
     </AppTooltip>
     <AppTooltip
       v-if="showRequiredLabels && task.lightkeeperRequired"
-      :text="
-        t(
-          'page.tasks.questcard.lightkeeper_tooltip',
-          'This quest is required to unlock the Lightkeeper trader'
-        )
-      "
+      :text="t('page.tasks.questcard.lightkeeper_tooltip')"
     >
       <UIcon
         name="i-mdi-lighthouse"
@@ -159,13 +141,13 @@
     </AppTooltip>
     <slot name="actions" />
     <div class="hidden sm:flex">
-      <AppTooltip v-if="isOurFaction" :text="t('page.tasks.questcard.more', 'More')">
+      <AppTooltip v-if="isOurFaction" :text="t('page.tasks.questcard.more')">
         <UButton
           size="xs"
           color="neutral"
           variant="ghost"
           class="shrink-0"
-          :aria-label="t('page.tasks.questcard.more', 'More')"
+          :aria-label="t('page.tasks.questcard.more')"
           @click="emit('openMenu', $event)"
         >
           <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />

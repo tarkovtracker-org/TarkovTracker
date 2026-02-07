@@ -30,7 +30,7 @@
             <UIcon name="i-mdi-arrow-left" class="mt-0.5 mr-1 h-4 w-4 shrink-0" />
             <div>
               <span class="text-surface-500">
-                {{ t('page.tasks.questcard.previous_tasks', 'Previous Task(s):') }}
+                {{ t('page.tasks.questcard.previous_tasks') }}
               </span>
               <div class="flex flex-col">
                 <router-link
@@ -62,7 +62,7 @@
             <UIcon name="i-mdi-arrow-right" class="mt-0.5 mr-1 h-4 w-4 shrink-0" />
             <div>
               <span class="text-surface-500">
-                {{ t('page.tasks.questcard.next_tasks', 'Next Task(s):') }}
+                {{ t('page.tasks.questcard.next_tasks') }}
               </span>
               <div class="flex flex-col">
                 <router-link
@@ -87,10 +87,10 @@
         <!-- Required labels (Kappa, Lightkeeper) -->
         <div v-if="preferencesStore.getShowRequiredLabels" class="mb-1 flex flex-wrap gap-1">
           <UBadge v-if="task.kappaRequired" size="xs" color="primary" variant="solid">
-            {{ t('page.tasks.questcard.kappa_required', 'KAPPA REQUIRED') }}
+            {{ t('page.tasks.questcard.kappa_required') }}
           </UBadge>
           <UBadge v-if="task.lightkeeperRequired" size="xs" color="info" variant="solid">
-            {{ t('page.tasks.questcard.lightkeeper_required', 'LIGHTKEEPER REQUIRED') }}
+            {{ t('page.tasks.questcard.lightkeeper_required') }}
           </UBadge>
         </div>
         <InfoRow

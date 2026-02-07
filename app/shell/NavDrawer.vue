@@ -9,13 +9,13 @@
       v-if="belowMd && mobileExpanded"
       role="button"
       tabindex="-1"
-      :aria-label="t('navigation_drawer.close_menu', 'Close navigation menu')"
+      :aria-label="t('navigation_drawer.close_menu')"
       class="fixed inset-0 z-40 bg-black/60"
       @click="closeMobileDrawer"
     />
   </Transition>
   <nav
-    :aria-label="t('navigation_drawer.main_navigation', 'Main navigation')"
+    :aria-label="t('navigation_drawer.main_navigation')"
     class="bg-sidebar border-surface-700/50 shadow-nav-drawer fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
     :class="[sidebarWidth]"
   >
@@ -24,7 +24,7 @@
     >
       <NuxtLink
         to="/"
-        :aria-label="t('navigation_drawer.home', 'Dashboard')"
+        :aria-label="t('navigation_drawer.home')"
         class="group mt-1 flex shrink-0 flex-col items-center px-3 py-1.5 transition-opacity hover:opacity-90"
       >
         <div
@@ -64,7 +64,7 @@
       <div class="flex flex-col gap-0.5">
         <div v-if="!isCollapsed" class="px-4 py-2">
           <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-            {{ t('navigation_drawer.section_external', 'External') }}
+            {{ t('navigation_drawer.section_external') }}
           </h3>
         </div>
         <ul class="flex flex-col gap-0.5 px-1">

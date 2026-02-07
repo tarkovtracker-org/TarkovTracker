@@ -3,7 +3,7 @@
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-cog" class="text-warning-400 h-4 w-4" />
       <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
-        {{ t('page.tasks.settings.tabs.advanced', 'Advanced') }}
+        {{ t('page.tasks.settings.tabs.advanced') }}
       </h3>
     </div>
     <div class="space-y-1">
@@ -12,13 +12,13 @@
       >
         <UCheckbox v-model="enableManualTaskFailModel" />
         <span class="text-surface-200 text-sm">
-          {{ t('page.tasks.settings.advanced.manual_fail_actions', 'Manual Fail Actions') }}
+          {{ t('page.tasks.settings.advanced.manual_fail_actions') }}
         </span>
       </label>
       <div v-if="failedTasksCount > 0" class="bg-surface-900/50 mt-2 rounded p-2">
         <div class="mb-1.5 flex items-center justify-between">
           <span class="text-surface-400 text-xs">
-            {{ t('page.tasks.settings.advanced.failed_tasks_label', 'Failed tasks') }}
+            {{ t('page.tasks.settings.advanced.failed_tasks_label') }}
           </span>
           <UBadge color="warning" variant="soft" size="xs">
             {{ failedTasksCount }}
@@ -26,7 +26,7 @@
         </div>
         <UButton color="warning" variant="soft" size="xs" block @click="emit('repair')">
           <UIcon name="i-mdi-wrench" class="mr-1 h-3.5 w-3.5" />
-          {{ t('page.tasks.settings.advanced.repair_failed_action', 'Repair') }}
+          {{ t('page.tasks.settings.advanced.repair_failed_action') }}
         </UButton>
       </div>
     </div>

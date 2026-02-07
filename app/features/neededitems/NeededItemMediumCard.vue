@@ -18,29 +18,18 @@
     <div v-if="item" class="flex h-12 shrink-0 items-center justify-center px-2 pt-2">
       <div class="line-clamp-2 text-center text-sm leading-tight">
         {{ item.name }}
-        <AppTooltip
-          v-if="props.need.foundInRaid"
-          :text="$t('needed_items.fir_required', 'Found in Raid required')"
-        >
+        <AppTooltip v-if="props.need.foundInRaid" :text="$t('needed_items.fir_required')">
           <UIcon
             name="i-mdi-checkbox-marked-circle-outline"
             class="ml-0.5 inline-block h-3.5 w-3.5"
           />
         </AppTooltip>
-        <AppTooltip
-          v-if="isKappaRequired"
-          :text="$t('needed_items.task_kappa_req', 'Required for Kappa quest')"
-        >
+        <AppTooltip v-if="isKappaRequired" :text="$t('needed_items.task_kappa_req')">
           <UIcon name="i-mdi-trophy" class="text-kappa ml-0.5 inline-block h-3.5 w-3.5" />
         </AppTooltip>
         <AppTooltip
           v-if="isLightkeeperRequired"
-          :text="
-            $t(
-              'page.tasks.questcard.lightkeeper_tooltip',
-              'This quest is required to unlock the Lightkeeper trader'
-            )
-          "
+          :text="$t('page.tasks.questcard.lightkeeper_tooltip')"
         >
           <UIcon name="i-mdi-lighthouse" class="text-lightkeeper ml-0.5 inline-block h-3.5 w-3.5" />
         </AppTooltip>
@@ -67,7 +56,7 @@
         <div class="line-clamp-2 text-center">
           <task-link v-if="relatedTask" :task="relatedTask" />
           <span v-else class="text-surface-300 text-sm">
-            {{ $t('needed_items.unknown_task', 'Unknown Task') }}
+            {{ $t('needed_items.unknown_task') }}
           </span>
         </div>
       </template>
@@ -80,7 +69,7 @@
             class="justify-center"
           />
           <span v-else class="text-surface-300 text-sm">
-            {{ $t('needed_items.unknown_station', 'Unknown Station') }}
+            {{ $t('needed_items.unknown_station') }}
           </span>
           <span class="ml-1 text-sm">{{ props.need.hideoutModule.level }}</span>
         </div>

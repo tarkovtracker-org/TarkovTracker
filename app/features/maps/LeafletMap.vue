@@ -86,7 +86,7 @@
           icon="i-mdi-crosshairs-gps"
           @click="showPmcSpawns = !showPmcSpawns"
         >
-          {{ t('maps.layers.pmc_spawns', 'PMC Spawns') }}
+          {{ t('maps.layers.pmc_spawns') }}
         </UButton>
         <div class="bg-surface-900/40 flex items-center gap-2 rounded px-2 py-1">
           <span class="text-surface-400 text-[10px] font-semibold uppercase">
@@ -124,7 +124,7 @@
           </div>
           <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1">
             <div class="h-3 w-3 rounded-full" :style="{ backgroundColor: MAP_COLORS.PMC_SPAWN }" />
-            <span>{{ t('maps.legend.pmc_spawn', 'PMC Spawn') }}</span>
+            <span>{{ t('maps.legend.pmc_spawn') }}</span>
           </div>
           <div v-if="showPmcExtracts" class="flex items-center gap-1">
             <UIcon name="i-mdi-exit-run" class="text-success-500 h-3 w-3" />

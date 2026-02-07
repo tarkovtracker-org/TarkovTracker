@@ -26,14 +26,9 @@
                   :craftable-title="craftableTitle"
                   :craftable-icon-class="craftableIconClass"
                   :kappa-required="isKappaRequired"
-                  :kappa-title="$t('needed_items.task_kappa_req', 'Required for Kappa quest')"
+                  :kappa-title="$t('needed_items.task_kappa_req')"
                   :lightkeeper-required="isLightkeeperRequired"
-                  :lightkeeper-title="
-                    $t(
-                      'page.tasks.questcard.lightkeeper_tooltip',
-                      'This quest is required to unlock the Lightkeeper trader'
-                    )
-                  "
+                  :lightkeeper-title="$t('page.tasks.questcard.lightkeeper_tooltip')"
                   @craft="goToCraftStation"
                 />
               </span>
@@ -41,7 +36,7 @@
                 <template v-if="props.need.needType == 'taskObjective'">
                   <TaskLink v-if="relatedTask" :task="relatedTask" />
                   <span v-else class="text-surface-300 text-sm">
-                    {{ $t('needed_items.unknown_task', 'Unknown Task') }}
+                    {{ $t('needed_items.unknown_task') }}
                   </span>
                 </template>
                 <template v-else-if="props.need.needType == 'hideoutModule'">
@@ -51,7 +46,7 @@
                     :module-id="props.need.hideoutModule.id"
                   />
                   <span v-else class="text-surface-300 text-sm">
-                    {{ $t('needed_items.unknown_station', 'Unknown Station') }}
+                    {{ $t('needed_items.unknown_station') }}
                   </span>
                 </template>
               </span>
@@ -112,17 +107,10 @@
                           craftable-icon-base-class="ml-1 h-4 w-4"
                           :craftable-icon-class="craftableIconClass"
                           :kappa-required="isKappaRequired"
-                          :kappa-title="
-                            $t('needed_items.task_kappa_req', 'Required for Kappa quest')
-                          "
+                          :kappa-title="$t('needed_items.task_kappa_req')"
                           kappa-icon-class="ml-1 h-4 w-4 text-kappa"
                           :lightkeeper-required="isLightkeeperRequired"
-                          :lightkeeper-title="
-                            $t(
-                              'page.tasks.questcard.lightkeeper_tooltip',
-                              'This quest is required to unlock the Lightkeeper trader'
-                            )
-                          "
+                          :lightkeeper-title="$t('page.tasks.questcard.lightkeeper_tooltip')"
                           lightkeeper-icon-class="ml-1 h-4 w-4 text-lightkeeper"
                           @craft="goToCraftStation"
                         />
@@ -132,7 +120,7 @@
                         <template v-if="props.need.needType == 'taskObjective'">
                           <TaskLink v-if="relatedTask" :task="relatedTask" />
                           <span v-else class="text-surface-300 text-sm">
-                            {{ $t('needed_items.unknown_task', 'Unknown Task') }}
+                            {{ $t('needed_items.unknown_task') }}
                           </span>
                           <RequirementInfo
                             :need-type="props.need.needType"
@@ -153,7 +141,7 @@
                               </template>
                               <template v-else>
                                 <span class="text-surface-300 text-sm">
-                                  {{ $t('needed_items.unknown_station', 'Unknown Station') }}
+                                  {{ $t('needed_items.unknown_station') }}
                                 </span>
                               </template>
                             </div>
@@ -191,8 +179,8 @@
                           <AppTooltip
                             :text="
                               isCollected
-                                ? $t('needed_items.collected', 'Collected')
-                                : $t('needed_items.mark_collected', 'Mark as collected')
+                                ? $t('needed_items.collected')
+                                : $t('needed_items.mark_collected')
                             "
                           >
                             <CollectedToggleButton
@@ -205,8 +193,8 @@
                               "
                               :aria-label="
                                 isCollected
-                                  ? $t('needed_items.collected', 'Collected')
-                                  : $t('needed_items.mark_collected', 'Mark as collected')
+                                  ? $t('needed_items.collected')
+                                  : $t('needed_items.mark_collected')
                               "
                               icon-class="h-6 w-6"
                               @toggle="$emit('toggleCount')"
@@ -271,9 +259,7 @@
                 <template v-else>
                   <AppTooltip
                     :text="
-                      isCollected
-                        ? $t('needed_items.collected', 'Collected')
-                        : $t('needed_items.mark_collected', 'Mark as collected')
+                      isCollected ? $t('needed_items.collected') : $t('needed_items.mark_collected')
                     "
                   >
                     <CollectedToggleButton
@@ -286,8 +272,8 @@
                       "
                       :aria-label="
                         isCollected
-                          ? $t('needed_items.collected', 'Collected')
-                          : $t('needed_items.mark_collected', 'Mark as collected')
+                          ? $t('needed_items.collected')
+                          : $t('needed_items.mark_collected')
                       "
                       icon-class="h-6 w-6"
                       @toggle="$emit('toggleCount')"

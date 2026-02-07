@@ -15,23 +15,27 @@ describe('buildRequiredKeysFromObjectives', () => {
   it('returns empty array when objectives are missing', () => {
     expect(buildRequiredKeysFromObjectives(undefined)).toEqual([]);
   });
-  it('builds one required entry per objective key set', () => {
+  it('builds one required entry per objective key group', () => {
     const objective = createObjective({
       requiredKeys: [[createItem('key-1'), createItem('key-2')], [createItem('key-3')]],
     });
     const requiredKeys = buildRequiredKeysFromObjectives([objective]);
-    expect(requiredKeys).toHaveLength(1);
-    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2', 'key-3']);
-    expect(requiredKeys[0]!.anyOf).toBe(false);
+    expect(requiredKeys).toHaveLength(2);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(requiredKeys[0]!.anyOf).toBe(true);
+    expect(requiredKeys[1]!.keys.map((item) => item.id)).toEqual(['key-3']);
+    expect(requiredKeys[1]!.anyOf).toBe(false);
   });
-  it('does not mark multi-group requirements as one-of', () => {
+  it('keeps separate non-anyOf groups for multi-group single-key requirements', () => {
     const objective = createObjective({
       requiredKeys: [[createItem('key-1')], [createItem('key-2')]],
     });
     const requiredKeys = buildRequiredKeysFromObjectives([objective]);
-    expect(requiredKeys).toHaveLength(1);
-    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(requiredKeys).toHaveLength(2);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1']);
     expect(requiredKeys[0]!.anyOf).toBe(false);
+    expect(requiredKeys[1]!.keys.map((item) => item.id)).toEqual(['key-2']);
+    expect(requiredKeys[1]!.anyOf).toBe(false);
   });
   it('marks single-group alternatives as one-of', () => {
     const objective = createObjective({

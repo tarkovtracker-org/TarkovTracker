@@ -69,9 +69,7 @@
         <!-- Collapse Toggle -->
         <UButton
           :icon="isContentVisible ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
-          :aria-label="
-            isContentVisible ? $t('hideout.collapse', 'Collapse') : $t('hideout.expand', 'Expand')
-          "
+          :aria-label="isContentVisible ? $t('hideout.collapse') : $t('hideout.expand')"
           color="neutral"
           variant="ghost"
           size="sm"
@@ -122,7 +120,7 @@
             <!-- Prerequisites Section -->
             <div v-if="hasPrerequisites" class="border-surface-700 space-y-2 border-t pt-3">
               <div class="text-surface-400 mb-2 text-xs font-medium tracking-wider uppercase">
-                {{ $t('page.hideout.stationcard.prerequisites', 'Prerequisites') }}
+                {{ $t('page.hideout.stationcard.prerequisites') }}
               </div>
               <!-- Station Level Requirements -->
               <div

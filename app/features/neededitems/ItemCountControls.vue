@@ -22,7 +22,7 @@
             type="number"
             :min="0"
             :max="neededCount"
-            :aria-label="$t('needed_items.enter_count', 'Enter item count')"
+            :aria-label="$t('needed_items.enter_count')"
             class="bg-surface-900 focus:ring-primary-500 h-full w-full px-0.5 text-center text-[10px] font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset sm:text-xs lg:px-2 lg:text-sm"
             @blur="submitEdit"
             @keydown.enter="submitEdit"

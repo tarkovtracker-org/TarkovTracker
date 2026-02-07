@@ -70,24 +70,22 @@
       if (category === 'both') {
         return {
           title: foundInRaid
-            ? t('page.tasks.questcard.find_and_hand_over_fir', 'Find and Hand over found in raid')
-            : t('page.tasks.questcard.find_and_hand_over', 'Find and Hand over'),
+            ? t('page.tasks.questcard.find_and_hand_over_fir')
+            : t('page.tasks.questcard.find_and_hand_over'),
           iconName: 'mdi-package-variant-closed',
         };
       }
       if (category === 'giveOnly') {
         return {
           title: foundInRaid
-            ? t('page.tasks.questcard.hand_over_fir', 'Hand over found in raid')
-            : t('page.tasks.questcard.hand_over', 'Hand over'),
+            ? t('page.tasks.questcard.hand_over_fir')
+            : t('page.tasks.questcard.hand_over'),
           iconName: 'mdi-package-variant-closed',
         };
       }
       // findOnly
       return {
-        title: foundInRaid
-          ? t('page.tasks.questcard.find_fir', 'Find in raid')
-          : t('page.tasks.questcard.find', 'Find'),
+        title: foundInRaid ? t('page.tasks.questcard.find_fir') : t('page.tasks.questcard.find'),
         iconName: 'mdi-magnify',
       };
     };

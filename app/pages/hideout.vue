@@ -45,10 +45,10 @@
                     color="neutral"
                     variant="ghost"
                     size="sm"
-                    :aria-label="t('settings.title', 'Settings')"
+                    :aria-label="t('settings.title')"
                   >
                     <span class="hidden sm:inline">
-                      {{ t('settings.title', 'Settings').toUpperCase() }}
+                      {{ t('settings.title').toUpperCase() }}
                     </span>
                   </UButton>
                   <template #content>
@@ -178,7 +178,7 @@
         </div>
         <div v-if="visibleStationCount < visibleStations.length" class="mt-4 flex justify-center">
           <UButton color="neutral" variant="outline" size="sm" @click="loadMoreStations">
-            {{ t('page.hideout.load_more_stations', 'Load more stations') }}
+            {{ t('page.hideout.load_more_stations') }}
           </UButton>
         </div>
       </div>

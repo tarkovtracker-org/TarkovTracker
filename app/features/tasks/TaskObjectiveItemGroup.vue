@@ -6,7 +6,7 @@
         <div class="text-surface-100 flex items-center gap-1.5 text-sm font-medium">
           {{ title }}
           <span v-if="props.optional" class="text-warning-300 text-[10px] font-semibold uppercase">
-            ({{ t('page.tasks.questcard.objective_optional_badge', 'Optional') }})
+            ({{ t('page.tasks.questcard.objective_optional_badge') }})
           </span>
         </div>
       </div>
@@ -46,19 +46,16 @@
           v-if="isRowOptional(row)"
           class="bg-warning-500/20 text-warning-300 rounded px-1 py-0.5 text-[10px] font-semibold uppercase"
         >
-          {{ t('page.tasks.questcard.objective_optional_badge', 'Optional') }}
+          {{ t('page.tasks.questcard.objective_optional_badge') }}
         </span>
-        <AppTooltip
-          v-if="rowHasMapLocation(row)"
-          :text="t('page.tasks.questcard.jump_to_map', 'Jump To Map')"
-        >
+        <AppTooltip v-if="rowHasMapLocation(row)" :text="t('page.tasks.questcard.jump_to_map')">
           <button
             type="button"
             class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             :class="
               isJumpToMapDisabledForRow(row) ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'
             "
-            :aria-label="t('page.tasks.questcard.jump_to_map', 'Jump To Map')"
+            :aria-label="t('page.tasks.questcard.jump_to_map')"
             :disabled="isJumpToMapDisabledForRow(row)"
             @click.stop="onJumpToMapClick($event, row)"
           >
@@ -82,8 +79,8 @@
           class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
           :aria-label="
             row.allComplete
-              ? t('page.tasks.questcard.uncomplete', 'Uncomplete')
-              : t('page.tasks.questcard.complete', 'Complete')
+              ? t('page.tasks.questcard.uncomplete')
+              : t('page.tasks.questcard.complete')
           "
           :aria-pressed="row.allComplete"
           :disabled="isParentTaskLocked"
@@ -195,10 +192,7 @@
         neededCount,
         currentCount,
         itemName:
-          item?.shortName ||
-          item?.name ||
-          objective.description ||
-          t('page.tasks.questcard.item', 'Item'),
+          item?.shortName || item?.name || objective.description || t('page.tasks.questcard.item'),
         itemIcon: imageItem?.iconLink || imageItem?.image512pxLink || image8xLink,
         foundInRaid: full?.foundInRaid === true || objective.foundInRaid === true,
       };
@@ -210,7 +204,7 @@
       const fallback: ObjectiveMeta = {
         neededCount: objective.count ?? 1,
         currentCount: tarkovStore.getObjectiveCount(objective.id),
-        itemName: objective.description || t('page.tasks.questcard.item', 'Item'),
+        itemName: objective.description || t('page.tasks.questcard.item'),
         itemIcon: undefined,
         foundInRaid: objective.foundInRaid === true,
       };

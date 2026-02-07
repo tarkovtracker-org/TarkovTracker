@@ -14,7 +14,7 @@
     layout: 'default',
   });
   useHead(() => ({
-    title: t('page.not_found.title', 'Not Found'),
+    title: t('page.not_found.title'),
     meta: [{ name: 'robots', content: 'noindex, nofollow' }],
   }));
 </script>

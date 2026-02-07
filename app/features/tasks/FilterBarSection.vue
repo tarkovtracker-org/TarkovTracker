@@ -3,11 +3,11 @@
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-filter-variant" class="text-success-400 h-4 w-4" />
       <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
-        {{ t('page.tasks.settings.tabs.filter_bar', 'Filter Bar') }}
+        {{ t('page.tasks.settings.tabs.filter_bar') }}
       </h3>
     </div>
     <p class="text-surface-500 mb-2 text-xs">
-      {{ t('page.tasks.settings.filter_bar.hint', 'Show or hide status filters.') }}
+      {{ t('page.tasks.settings.filter_bar.hint') }}
     </p>
     <div class="space-y-1">
       <label

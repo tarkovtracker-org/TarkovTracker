@@ -2,7 +2,7 @@
   <div v-if="teamNeeds.length > 0" class="flex flex-col items-center text-xs">
     <div class="text-surface-400 mb-1 flex items-center gap-1">
       <UIcon name="i-mdi-account-group" class="h-4 w-4" />
-      <span>{{ $t('page.needed_items.teammates_needed', 'Teammates need this') }}</span>
+      <span>{{ $t('page.needed_items.teammates_needed') }}</span>
     </div>
     <div class="flex flex-wrap justify-center gap-1">
       <UBadge

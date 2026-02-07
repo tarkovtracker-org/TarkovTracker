@@ -4,7 +4,7 @@
     icon-color="primary"
     highlight-color="primary"
     :fill-height="false"
-    :title="$t('settings.experience.title', 'Experience & Level')"
+    :title="$t('settings.experience.title')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
@@ -12,16 +12,9 @@
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <span class="text-surface-200 text-sm font-semibold">
-              {{ $t('settings.experience.auto_level_title', 'Automatic Level Calculation') }}
+              {{ $t('settings.experience.auto_level_title') }}
             </span>
-            <UTooltip
-              :text="
-                $t(
-                  'settings.experience.auto_level_description',
-                  'When enabled, your level will be automatically calculated based on total XP. When disabled, you can manually set your level independently of XP calculations.'
-                )
-              "
-            >
+            <UTooltip :text="$t('settings.experience.auto_level_description')">
               <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
             </UTooltip>
           </div>
@@ -35,7 +28,7 @@
         </div>
         <div class="flex items-center justify-between">
           <span class="text-surface-200 text-sm font-semibold">
-            {{ $t('settings.experience.current_level', 'Current Level') }}
+            {{ $t('settings.experience.current_level') }}
           </span>
           <span class="text-primary-400 text-2xl font-bold">{{ derivedLevel }}</span>
         </div>
@@ -54,16 +47,9 @@
         <div class="flex items-center gap-2">
           <div class="flex flex-1 items-center gap-2">
             <label class="text-surface-200 text-sm font-semibold">
-              {{ $t('settings.experience.set_total_xp', 'Set Total XP') }}
+              {{ $t('settings.experience.set_total_xp') }}
             </label>
-            <UTooltip
-              :text="
-                $t(
-                  'settings.experience.manual_hint',
-                  'Enter your actual total XP to adjust the offset automatically.'
-                )
-              "
-            >
+            <UTooltip :text="$t('settings.experience.manual_hint')">
               <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
             </UTooltip>
           </div>
@@ -81,7 +67,7 @@
               size="sm"
               color="primary"
               :disabled="!isValidXPInput"
-              :aria-label="$t('settings.experience.apply', 'Apply')"
+              :aria-label="$t('settings.experience.apply')"
               @click="applyManualXP"
             />
           </div>
@@ -94,7 +80,7 @@
           :disabled="tarkovStore.getXpOffset() === 0"
           @click="resetOffset"
         >
-          {{ $t('settings.experience.reset_offset', 'Reset XP Offset') }}
+          {{ $t('settings.experience.reset_offset') }}
         </UButton>
       </div>
     </template>
