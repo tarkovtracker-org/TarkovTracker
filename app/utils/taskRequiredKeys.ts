@@ -1,4 +1,4 @@
-import type { SuggestedKeyGroup, TaskObjective, TarkovItem } from '@/types/tarkov';
+import type { RequiredKeyGroup, TaskObjective, TarkovItem } from '@/types/tarkov';
 const dedupeItems = (items: TarkovItem[]): TarkovItem[] => {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -9,7 +9,7 @@ const dedupeItems = (items: TarkovItem[]): TarkovItem[] => {
 };
 const dedupeMaps = (
   maps: TaskObjective['maps']
-): NonNullable<SuggestedKeyGroup['maps']> | undefined => {
+): NonNullable<RequiredKeyGroup['maps']> | undefined => {
   if (!maps?.length) return undefined;
   const seen = new Set<string>();
   return maps.filter((map) => {
@@ -18,7 +18,7 @@ const dedupeMaps = (
     return true;
   });
 };
-const buildGroupSignature = (group: SuggestedKeyGroup): string => {
+const buildGroupSignature = (group: RequiredKeyGroup): string => {
   const mapSignature =
     group.maps
       ?.map((map) => map.id)
@@ -30,13 +30,13 @@ const buildGroupSignature = (group: SuggestedKeyGroup): string => {
     .join(',');
   return `${group.anyOf === true ? 'any' : 'all'}|${mapSignature}|${keySignature}`;
 };
-export const buildSuggestedKeysFromObjectives = (
+export const buildRequiredKeysFromObjectives = (
   objectives?: TaskObjective[]
-): SuggestedKeyGroup[] => {
+): RequiredKeyGroup[] => {
   if (!objectives?.length) return [];
-  const requiredGroups: SuggestedKeyGroup[] = [];
+  const requiredGroups: RequiredKeyGroup[] = [];
   const requiredGroupSignatures = new Set<string>();
-  const optionalGroupsBySignature = new Map<string, SuggestedKeyGroup>();
+  const optionalGroupsBySignature = new Map<string, RequiredKeyGroup>();
   objectives.forEach((objective) => {
     const objectiveMaps = dedupeMaps(objective.maps);
     const keyMatrix = (objective.requiredKeys ?? [])
@@ -44,7 +44,7 @@ export const buildSuggestedKeysFromObjectives = (
       .filter((keyGroup) => keyGroup.length > 0);
     const flattenedObjectiveKeys = dedupeItems(keyMatrix.flat());
     if (!flattenedObjectiveKeys.length) return;
-    const keyGroup: SuggestedKeyGroup = {
+    const keyGroup: RequiredKeyGroup = {
       keys: flattenedObjectiveKeys,
       maps: objectiveMaps,
       optional: objective.optional === true,

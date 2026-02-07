@@ -205,7 +205,7 @@
     getHideNonKappaTasks,
     getShowNonSpecialTasks,
     getShowLightkeeperTasks,
-    getOnlyTasksWithSuggestedKeys,
+    getOnlyTasksWithRequiredKeys,
     getRespectTaskFiltersForImpact,
     getHideGlobalTasks,
     getPinnedTaskIds,
@@ -343,8 +343,8 @@
     if (!getRespectTaskFiltersForImpact.value) return undefined;
     const options = buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore);
     const typeFilteredTasks = filterTasksByTypeSettings(tasks.value, options);
-    const filteredTasks = getOnlyTasksWithSuggestedKeys.value
-      ? typeFilteredTasks.filter((task) => (task.suggestedKeys?.length ?? 0) > 0)
+    const filteredTasks = getOnlyTasksWithRequiredKeys.value
+      ? typeFilteredTasks.filter((task) => (task.requiredKeys?.length ?? 0) > 0)
       : typeFilteredTasks;
     return new Set(filteredTasks.map((task) => task.id));
   });
@@ -407,7 +407,7 @@
       getHideNonKappaTasks,
       getShowNonSpecialTasks,
       getShowLightkeeperTasks,
-      getOnlyTasksWithSuggestedKeys,
+      getOnlyTasksWithRequiredKeys,
       getRespectTaskFiltersForImpact,
       getHideGlobalTasks,
       getPinnedTaskIds,

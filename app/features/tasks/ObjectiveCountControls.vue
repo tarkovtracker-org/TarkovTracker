@@ -1,7 +1,8 @@
 <template>
   <div class="flex items-center gap-1">
     <span class="sr-only" aria-live="polite" aria-atomic="true">
-      {{ currentCount }} {{ t('page.tasks.questcard.of', 'of') }} {{ neededCount }}
+      {{ formatNumber(currentCount) }} {{ t('page.tasks.questcard.of', 'of') }}
+      {{ formatNumber(neededCount) }}
     </span>
     <div class="flex items-center rounded-md border border-white/10 bg-white/5">
       <AppTooltip :text="t('page.tasks.questcard.decrease', 'Decrease')">
@@ -23,7 +24,7 @@
         :title="t('page.tasks.questcard.click_to_edit', 'Click to edit')"
         @click="startEditing"
       >
-        {{ currentCount }}/{{ neededCount }}
+        {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
       </div>
       <div v-else class="flex h-7 min-w-14 items-center justify-center px-1">
         <input
@@ -37,7 +38,9 @@
           @keydown.enter="commitEdit"
           @keydown.escape="cancelEdit"
         />
-        <span class="text-surface-100 text-[11px] font-semibold">/{{ neededCount }}</span>
+        <span class="text-surface-100 text-[11px] font-semibold">
+          /{{ formatNumber(neededCount) }}
+        </span>
       </div>
       <AppTooltip :text="t('page.tasks.questcard.increase', 'Increase')">
         <span class="inline-flex">
@@ -85,6 +88,7 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   import { useCountEditController } from '@/composables/useCountEditController';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   const props = defineProps<{
     currentCount: number;
     neededCount: number;
@@ -97,6 +101,7 @@
     'set-count': [value: number];
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  const formatNumber = useLocaleNumberFormatter();
   const toast = useToast();
   const { isEditing, editValue, startEdit, commitEdit, cancelEdit } = useCountEditController({
     current: () => props.currentCount,

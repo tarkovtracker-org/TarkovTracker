@@ -6,6 +6,7 @@
         :title="row.title"
         :icon-name="row.iconName"
         :objectives="row.objectives"
+        :optional="row.optional"
       />
       <TaskObjective v-else :objective="row.objective" />
     </div>
@@ -45,6 +46,7 @@
         title: string;
         iconName: string;
         objectives: TaskObjectiveType[];
+        optional: boolean;
       };
   const rows = computed<Row[]>(() => {
     // Types that should be grouped together with item display
@@ -170,6 +172,7 @@
             title: config.title,
             iconName: config.iconName,
             objectives: group.objectives,
+            optional: group.objectives.every((o) => o.optional === true),
           });
           inserted.add(groupKey);
         }

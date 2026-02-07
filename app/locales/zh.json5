@@ -75,6 +75,7 @@
   common: {
     cancel: '取消',
     close: '关闭',
+    back_to_top: '回到顶部',
     refresh_button: '重试',
     opens_in_new_tab: '在新选项卡中打开',
   },
@@ -321,7 +322,7 @@
           kappa_required: 'Kappa必需',
           lightkeeper_required: '灯塔守护者必需',
           team_shared_only: '仅全队共享',
-          has_suggested_keys: '有推荐钥匙',
+          has_required_keys: '有必需钥匙',
           show_global_tasks: '在地图上显示全局任务',
           impact_respects_filters: '影响值遵循任务筛选',
           show_non_special_tasks: '显示非Kappa安全箱或灯塔守护者任务',

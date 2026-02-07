@@ -28,14 +28,14 @@
         :show-kappa-tasks="showKappaTasks"
         :show-lightkeeper-tasks="showLightkeeperTasks"
         :shared-by-all-only="sharedByAllOnly"
-        :only-tasks-with-suggested-keys="onlyTasksWithSuggestedKeys"
+        :only-tasks-with-required-keys="onlyTasksWithRequiredKeys"
         :show-global-tasks="showGlobalTasks"
         :respect-task-filters-for-impact="respectTaskFiltersForImpact"
         @update:show-non-special-tasks="showNonSpecialTasks = $event"
         @update:show-kappa-tasks="showKappaTasks = $event"
         @update:show-lightkeeper-tasks="showLightkeeperTasks = $event"
         @update:shared-by-all-only="sharedByAllOnly = $event"
-        @update:only-tasks-with-suggested-keys="onlyTasksWithSuggestedKeys = $event"
+        @update:only-tasks-with-required-keys="onlyTasksWithRequiredKeys = $event"
         @update:show-global-tasks="showGlobalTasks = $event"
         @update:respect-task-filters-for-impact="respectTaskFiltersForImpact = $event"
       />
@@ -216,9 +216,9 @@
     get: () => preferencesStore.getTaskSharedByAllOnly,
     set: (value) => preferencesStore.setTaskSharedByAllOnly(value),
   });
-  const onlyTasksWithSuggestedKeys = computed({
-    get: () => preferencesStore.getOnlyTasksWithSuggestedKeys,
-    set: (value) => preferencesStore.setOnlyTasksWithSuggestedKeys(value),
+  const onlyTasksWithRequiredKeys = computed({
+    get: () => preferencesStore.getOnlyTasksWithRequiredKeys,
+    set: (value) => preferencesStore.setOnlyTasksWithRequiredKeys(value),
   });
   const showGlobalTasks = computed({
     get: () => !preferencesStore.getHideGlobalTasks,

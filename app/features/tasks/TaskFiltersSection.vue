@@ -60,10 +60,10 @@
       <label
         class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
-        <UCheckbox v-model="onlyTasksWithSuggestedKeysModel" />
+        <UCheckbox v-model="onlyTasksWithRequiredKeysModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.has_suggested_keys', 'Has Suggested Keys') }}
+            {{ t('page.tasks.settings.filters.has_required_keys', 'Has Required Keys') }}
           </span>
         </div>
       </label>
@@ -102,7 +102,7 @@
     showKappaTasks: boolean;
     showLightkeeperTasks: boolean;
     sharedByAllOnly: boolean;
-    onlyTasksWithSuggestedKeys: boolean;
+    onlyTasksWithRequiredKeys: boolean;
     showGlobalTasks: boolean;
     respectTaskFiltersForImpact: boolean;
   }>();
@@ -111,7 +111,7 @@
     'update:showKappaTasks': [value: boolean];
     'update:showLightkeeperTasks': [value: boolean];
     'update:sharedByAllOnly': [value: boolean];
-    'update:onlyTasksWithSuggestedKeys': [value: boolean];
+    'update:onlyTasksWithRequiredKeys': [value: boolean];
     'update:showGlobalTasks': [value: boolean];
     'update:respectTaskFiltersForImpact': [value: boolean];
   }>();
@@ -132,9 +132,9 @@
     get: () => props.sharedByAllOnly,
     set: (value: boolean) => emit('update:sharedByAllOnly', value),
   });
-  const onlyTasksWithSuggestedKeysModel = computed({
-    get: () => props.onlyTasksWithSuggestedKeys,
-    set: (value: boolean) => emit('update:onlyTasksWithSuggestedKeys', value),
+  const onlyTasksWithRequiredKeysModel = computed({
+    get: () => props.onlyTasksWithRequiredKeys,
+    set: (value: boolean) => emit('update:onlyTasksWithRequiredKeys', value),
   });
   const showGlobalTasksModel = computed({
     get: () => props.showGlobalTasks,

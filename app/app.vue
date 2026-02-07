@@ -1,5 +1,5 @@
 <template>
-  <UApp>
+  <UApp :tooltip="{ delayDuration: 300 }">
     <!-- Loading Screen (shows while initial data is loading) -->
     <LoadingScreen />
     <NuxtRouteAnnouncer />

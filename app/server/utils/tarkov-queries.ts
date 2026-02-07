@@ -170,6 +170,8 @@ export const TARKOV_MAP_SPAWNS_QUERY = `
 const ITEM_REF_FRAGMENT = `
   fragment ItemRef on Item {
     id
+    link
+    wikiLink
     iconLink
     image512pxLink
     backgroundColor

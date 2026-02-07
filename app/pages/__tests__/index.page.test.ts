@@ -78,7 +78,7 @@ const setup = async (
     showKappaTasks?: boolean;
     showNonSpecialTasks?: boolean;
     showLightkeeperTasks?: boolean;
-    onlyTasksWithSuggestedKeys?: boolean;
+    onlyTasksWithRequiredKeys?: boolean;
   } = {}
 ) => {
   const {
@@ -89,7 +89,7 @@ const setup = async (
     showKappaTasks = true,
     showNonSpecialTasks = true,
     showLightkeeperTasks = true,
-    onlyTasksWithSuggestedKeys = false,
+    onlyTasksWithRequiredKeys = false,
   } = storeOverrides;
   vi.resetModules();
   vi.doMock('@/composables/useDashboardStats', () => ({
@@ -125,8 +125,8 @@ const setup = async (
       get getShowLightkeeperTasks() {
         return showLightkeeperTasks;
       },
-      get getOnlyTasksWithSuggestedKeys() {
-        return onlyTasksWithSuggestedKeys;
+      get getOnlyTasksWithRequiredKeys() {
+        return onlyTasksWithRequiredKeys;
       },
       dashboardNoticeDismissed: false,
       setDashboardNoticeDismissed: vi.fn(),
@@ -315,8 +315,8 @@ describe('dashboard page', () => {
       expect(notice.exists()).toBe(true);
       expect(notice.attributes('data-filter-active')).toBe('true');
     });
-    it('renders warning state when suggested keys filter is enabled', async () => {
-      const { DashboardPage } = await setup({}, { onlyTasksWithSuggestedKeys: true });
+    it('renders warning state when required keys filter is enabled', async () => {
+      const { DashboardPage } = await setup({}, { onlyTasksWithRequiredKeys: true });
       const wrapper = await mountSuspended(DashboardPage, {
         global: { stubs: defaultGlobalStubs },
       });

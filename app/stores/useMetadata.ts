@@ -237,7 +237,9 @@ function createItemPicker(itemsById: Map<string, TarkovItem>) {
     const mergedProperties = item.properties
       ? { ...(fullItem.properties ?? {}), ...item.properties }
       : fullItem.properties;
-    return mergedProperties ? { ...fullItem, properties: mergedProperties } : fullItem;
+    const merged = { ...item, ...fullItem };
+    if (mergedProperties) merged.properties = mergedProperties;
+    return merged;
   };
   const pickItemArray = (items?: TarkovItem[] | null): TarkovItem[] | undefined => {
     if (!Array.isArray(items)) return items ?? undefined;

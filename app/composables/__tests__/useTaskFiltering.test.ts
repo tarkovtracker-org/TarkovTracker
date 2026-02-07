@@ -6,7 +6,7 @@ const createTasks = (): Task[] => [
     name: 'Map Task',
     factionName: 'Any',
     trader: { id: 'trader-1', name: 'Trader One' },
-    suggestedKeys: [
+    requiredKeys: [
       {
         keys: [{ id: 'key-map', name: 'Map Key' }],
         maps: [{ id: 'map-1', name: 'Map One' }],
@@ -32,7 +32,7 @@ const createTasks = (): Task[] => [
     name: 'Locked Task',
     factionName: 'Any',
     trader: { id: 'trader-1', name: 'Trader One' },
-    suggestedKeys: [
+    requiredKeys: [
       {
         keys: [{ id: 'key-locked', name: 'Locked Key' }],
       },
@@ -79,7 +79,7 @@ const createTasks = (): Task[] => [
     factionName: 'Any',
     lightkeeperRequired: true,
     trader: { id: 'trader-2', name: 'Trader Two' },
-    suggestedKeys: [
+    requiredKeys: [
       {
         keys: [{ id: 'key-lightkeeper', name: 'Lightkeeper Key' }],
       },
@@ -157,7 +157,7 @@ const createPreferencesStore = () => ({
   getShowLightkeeperTasks: true,
   getShowNonSpecialTasks: true,
   getRespectTaskFiltersForImpact: true,
-  getOnlyTasksWithSuggestedKeys: false,
+  getOnlyTasksWithRequiredKeys: false,
   getTaskSharedByAllOnly: false,
   getHideGlobalTasks: false,
   getTaskUserView: 'self',
@@ -286,9 +286,9 @@ describe('useTaskFiltering', () => {
       'task-kappa',
     ]);
   });
-  it('filters visible tasks to only tasks with suggested keys when enabled', async () => {
+  it('filters visible tasks to only tasks with required keys when enabled', async () => {
     const { taskFiltering, preferencesStore } = await setup();
-    preferencesStore.getOnlyTasksWithSuggestedKeys = true;
+    preferencesStore.getOnlyTasksWithRequiredKeys = true;
     await taskFiltering.updateVisibleTasks(
       {
         primaryView: 'all',
@@ -307,9 +307,9 @@ describe('useTaskFiltering', () => {
       'task-lightkeeper',
     ]);
   });
-  it('filters status, trader, and map counts by suggested keys when enabled', async () => {
+  it('filters status, trader, and map counts by required keys when enabled', async () => {
     const { taskFiltering, preferencesStore, metadataStore } = await setup();
-    preferencesStore.getOnlyTasksWithSuggestedKeys = true;
+    preferencesStore.getOnlyTasksWithRequiredKeys = true;
     const statusCounts = taskFiltering.calculateStatusCounts('self');
     expect(statusCounts).toEqual({
       all: 3,

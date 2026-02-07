@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSuggestedKeysFromObjectives } from '@/utils/taskSuggestedKeys';
+import { buildRequiredKeysFromObjectives } from '@/utils/taskRequiredKeys';
 import type { TaskObjective, TarkovItem } from '@/types/tarkov';
 const createItem = (id: string, name = id): TarkovItem => ({
   id,
@@ -11,36 +11,36 @@ const createObjective = (overrides: Partial<TaskObjective> = {}): TaskObjective 
   requiredKeys: [[createItem('key-1', 'Dorm 206')]],
   ...overrides,
 });
-describe('buildSuggestedKeysFromObjectives', () => {
+describe('buildRequiredKeysFromObjectives', () => {
   it('returns empty array when objectives are missing', () => {
-    expect(buildSuggestedKeysFromObjectives(undefined)).toEqual([]);
+    expect(buildRequiredKeysFromObjectives(undefined)).toEqual([]);
   });
-  it('builds one suggested entry per objective key set', () => {
+  it('builds one required entry per objective key set', () => {
     const objective = createObjective({
       requiredKeys: [[createItem('key-1'), createItem('key-2')], [createItem('key-3')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2', 'key-3']);
-    expect(suggestedKeys[0]!.anyOf).toBe(false);
+    const requiredKeys = buildRequiredKeysFromObjectives([objective]);
+    expect(requiredKeys).toHaveLength(1);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2', 'key-3']);
+    expect(requiredKeys[0]!.anyOf).toBe(false);
   });
   it('does not mark multi-group requirements as one-of', () => {
     const objective = createObjective({
       requiredKeys: [[createItem('key-1')], [createItem('key-2')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
-    expect(suggestedKeys[0]!.anyOf).toBe(false);
+    const requiredKeys = buildRequiredKeysFromObjectives([objective]);
+    expect(requiredKeys).toHaveLength(1);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(requiredKeys[0]!.anyOf).toBe(false);
   });
   it('marks single-group alternatives as one-of', () => {
     const objective = createObjective({
       requiredKeys: [[createItem('key-1'), createItem('key-2')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
-    expect(suggestedKeys[0]!.anyOf).toBe(true);
+    const requiredKeys = buildRequiredKeysFromObjectives([objective]);
+    expect(requiredKeys).toHaveLength(1);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(requiredKeys[0]!.anyOf).toBe(true);
   });
   it('dedupes repeated key groups on the same map set', () => {
     const firstObjective = createObjective({
@@ -51,9 +51,9 @@ describe('buildSuggestedKeysFromObjectives', () => {
       id: 'objective-b',
       requiredKeys: [[createItem('key-2'), createItem('key-1')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([firstObjective, secondObjective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    const requiredKeys = buildRequiredKeysFromObjectives([firstObjective, secondObjective]);
+    expect(requiredKeys).toHaveLength(1);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
   });
   it('keeps separate key groups for separate required objectives on the same map', () => {
     const firstObjective = createObjective({
@@ -64,11 +64,11 @@ describe('buildSuggestedKeysFromObjectives', () => {
       id: 'objective-b',
       requiredKeys: [[createItem('key-2')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([firstObjective, secondObjective]);
-    expect(suggestedKeys).toHaveLength(2);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1']);
-    expect(suggestedKeys[1]!.keys.map((item) => item.id)).toEqual(['key-2']);
-    expect(suggestedKeys.every((group) => group.anyOf !== true)).toBe(true);
+    const requiredKeys = buildRequiredKeysFromObjectives([firstObjective, secondObjective]);
+    expect(requiredKeys).toHaveLength(2);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1']);
+    expect(requiredKeys[1]!.keys.map((item) => item.id)).toEqual(['key-2']);
+    expect(requiredKeys.every((group) => group.anyOf !== true)).toBe(true);
   });
   it('marks key groups as optional when objective is optional', () => {
     const optionalObjective = createObjective({
@@ -76,9 +76,9 @@ describe('buildSuggestedKeysFromObjectives', () => {
       optional: true,
       requiredKeys: [[createItem('key-1')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([optionalObjective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.optional).toBe(true);
+    const requiredKeys = buildRequiredKeysFromObjectives([optionalObjective]);
+    expect(requiredKeys).toHaveLength(1);
+    expect(requiredKeys[0]!.optional).toBe(true);
   });
   it('keeps groups required when shared by required and optional objectives', () => {
     const requiredObjective = createObjective({
@@ -91,9 +91,9 @@ describe('buildSuggestedKeysFromObjectives', () => {
       optional: true,
       requiredKeys: [[createItem('key-1')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([optionalObjective, requiredObjective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.optional).toBe(false);
+    const requiredKeys = buildRequiredKeysFromObjectives([optionalObjective, requiredObjective]);
+    expect(requiredKeys).toHaveLength(1);
+    expect(requiredKeys[0]!.optional).toBe(false);
   });
   it('sorts required key groups before optional groups', () => {
     const optionalObjective = createObjective({
@@ -106,11 +106,11 @@ describe('buildSuggestedKeysFromObjectives', () => {
       optional: false,
       requiredKeys: [[createItem('key-1')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([optionalObjective, requiredObjective]);
-    expect(suggestedKeys).toHaveLength(2);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1']);
-    expect(suggestedKeys[1]!.keys.map((item) => item.id)).toEqual(['key-2']);
-    expect(suggestedKeys[1]!.optional).toBe(true);
+    const requiredKeys = buildRequiredKeysFromObjectives([optionalObjective, requiredObjective]);
+    expect(requiredKeys).toHaveLength(2);
+    expect(requiredKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1']);
+    expect(requiredKeys[1]!.keys.map((item) => item.id)).toEqual(['key-2']);
+    expect(requiredKeys[1]!.optional).toBe(true);
   });
   it('keeps identical key groups when objectives are on different maps', () => {
     const customsObjective = createObjective({
@@ -123,9 +123,9 @@ describe('buildSuggestedKeysFromObjectives', () => {
       maps: [{ id: 'woods', name: 'Woods' }],
       requiredKeys: [[createItem('key-1')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([customsObjective, woodsObjective]);
-    expect(suggestedKeys).toHaveLength(2);
-    expect(suggestedKeys.map((group) => group.maps?.[0]?.id)).toEqual(['customs', 'woods']);
+    const requiredKeys = buildRequiredKeysFromObjectives([customsObjective, woodsObjective]);
+    expect(requiredKeys).toHaveLength(2);
+    expect(requiredKeys.map((group) => group.maps?.[0]?.id)).toEqual(['customs', 'woods']);
   });
   it('retains all objective maps for map context', () => {
     const objective = createObjective({
@@ -135,8 +135,8 @@ describe('buildSuggestedKeysFromObjectives', () => {
       ],
       requiredKeys: [[createItem('key-1')]],
     });
-    const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
-    expect(suggestedKeys[0]!.maps).toEqual([
+    const requiredKeys = buildRequiredKeysFromObjectives([objective]);
+    expect(requiredKeys[0]!.maps).toEqual([
       { id: 'factory4_day', name: 'Factory' },
       { id: 'factory4_night', name: 'Factory (Night)' },
     ]);
@@ -160,14 +160,14 @@ describe('buildSuggestedKeysFromObjectives', () => {
         requiredKeys: [[createItem('rb-orb3')]],
       }),
     ];
-    const suggestedKeys = buildSuggestedKeysFromObjectives(objectives);
-    expect(suggestedKeys).toHaveLength(4);
-    expect(suggestedKeys.map((group) => group.keys[0]!.id)).toEqual([
+    const requiredKeys = buildRequiredKeysFromObjectives(objectives);
+    expect(requiredKeys).toHaveLength(4);
+    expect(requiredKeys.map((group) => group.keys[0]!.id)).toEqual([
       'rb-ob',
       'rb-orb1',
       'rb-orb2',
       'rb-orb3',
     ]);
-    expect(suggestedKeys.every((group) => group.anyOf !== true)).toBe(true);
+    expect(requiredKeys.every((group) => group.anyOf !== true)).toBe(true);
   });
 });

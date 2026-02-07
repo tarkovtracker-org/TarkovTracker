@@ -32,6 +32,8 @@
         <slot />
       </div>
     </main>
+    <!-- Back to top button -->
+    <BackToTop />
     <!-- Footer pinned to bottom when content is short -->
     <AppFooter
       class="shrink-0"

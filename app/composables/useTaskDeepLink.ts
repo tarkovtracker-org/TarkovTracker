@@ -205,7 +205,7 @@ export function useTaskDeepLink({
           ? taskInMetadata.trader?.id === lightkeeperTraderId.value
           : taskInMetadata.trader?.name?.toLowerCase() === 'lightkeeper';
       const isNonSpecial = !isKappaRequired && !isLightkeeperRequired && !isLightkeeperTraderTask;
-      const hasSuggestedKeys = (taskInMetadata.suggestedKeys?.length ?? 0) > 0;
+      const hasRequiredKeys = (taskInMetadata.requiredKeys?.length ?? 0) > 0;
       if (
         (isLightkeeperRequired || isLightkeeperTraderTask) &&
         !preferencesStore.getShowLightkeeperTasks
@@ -218,8 +218,8 @@ export function useTaskDeepLink({
       if (isNonSpecial && !preferencesStore.getShowNonSpecialTasks) {
         preferencesStore.setShowNonSpecialTasks(true);
       }
-      if (!hasSuggestedKeys && preferencesStore.getOnlyTasksWithSuggestedKeys) {
-        preferencesStore.setOnlyTasksWithSuggestedKeys(false);
+      if (!hasRequiredKeys && preferencesStore.getOnlyTasksWithRequiredKeys) {
+        preferencesStore.setOnlyTasksWithRequiredKeys(false);
       }
       const currentSecondaryView = preferencesStore.getTaskSecondaryView;
       if (currentSecondaryView !== 'all') {

@@ -75,6 +75,7 @@
   common: {
     cancel: 'Скасувати',
     close: 'Закрити',
+    back_to_top: 'Нагору',
     refresh_button: 'Спробувати знову',
     opens_in_new_tab: 'Відкрити в новій вкладці',
   },
@@ -321,7 +322,7 @@
           kappa_required: 'Kappa Необхідно',
           lightkeeper_required: 'Lightkeeper Необхідно',
           team_shared_only: 'Лише спільний доступ до команди',
-          has_suggested_keys: 'З рекомендованими ключами',
+          has_required_keys: "З обов'язковими ключами",
           show_global_tasks: 'Показати глобальні завдання на карті',
           impact_respects_filters: 'Вплив враховує фільтри завдань',
           show_non_special_tasks: 'Показати завдання без вимог Lightkeeper або Kappa',

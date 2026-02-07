@@ -75,6 +75,7 @@
   common: {
     cancel: 'Cancelar',
     close: 'Cerrar',
+    back_to_top: 'Volver arriba',
     refresh_button: 'Intentar de nuevo',
     opens_in_new_tab: 'Abrir en una pestaña nueva',
   },
@@ -321,7 +322,7 @@
           kappa_required: 'Kappa Requerido',
           lightkeeper_required: 'Lightkeeper Requerido',
           team_shared_only: 'Equipo compartido únicamente',
-          has_suggested_keys: 'Tiene llaves sugeridas',
+          has_required_keys: 'Con llaves requeridas',
           show_global_tasks: 'Mostrar tareas globales en el mapa',
           impact_respects_filters: 'El impacto respeta los filtros de tareas',
           show_non_special_tasks: 'Mostrar tareas sin requisito Lightkeeper o Kappa',

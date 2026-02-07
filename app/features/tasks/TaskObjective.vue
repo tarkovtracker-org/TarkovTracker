@@ -32,6 +32,12 @@
       <div class="min-w-0">
         <div class="text-surface-100 text-sm leading-5">
           {{ props.objective?.description }}
+          <span
+            v-if="props.objective.optional"
+            class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
+          >
+            ({{ t('page.tasks.questcard.objective_optional_badge', 'Optional') }})
+          </span>
         </div>
         <AppTooltip
           v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
@@ -144,13 +150,16 @@
     return `${actionLabel}: ${objectiveLabel.value}`;
   });
   const objectiveAriaLabel = computed(() => {
+    const optionalPrefix = props.objective.optional
+      ? `${t('page.tasks.questcard.objective_optional_badge', 'Optional')}. `
+      : '';
     const status = isComplete.value
       ? t('page.tasks.questcard.completed', 'Completed')
       : t('page.tasks.questcard.not_completed', 'Not completed');
     const toggleAction = isComplete.value
       ? t('page.tasks.questcard.uncomplete', 'Uncomplete')
       : t('page.tasks.questcard.complete', 'Complete');
-    return `${objectiveLabel.value}. ${status}. ${toggleAction}.`;
+    return `${optionalPrefix}${objectiveLabel.value}. ${status}. ${toggleAction}.`;
   });
   const fullObjective = computed(() => {
     return objectives.value.find((o) => o.id == props.objective.id);

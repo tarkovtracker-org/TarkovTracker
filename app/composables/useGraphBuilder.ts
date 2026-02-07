@@ -21,7 +21,7 @@ import {
 } from '@/utils/graphHelpers';
 import { logger } from '@/utils/logger';
 import { normalizeTaskObjectives } from '@/utils/taskNormalization';
-import { buildSuggestedKeysFromObjectives } from '@/utils/taskSuggestedKeys';
+import { buildRequiredKeysFromObjectives } from '@/utils/taskRequiredKeys';
 /**
  * Composable for building task and hideout dependency graphs
  * Extracts complex graph algorithms from the metadata store
@@ -212,7 +212,7 @@ export function useGraphBuilder() {
       ...task,
       traderIcon: task.trader?.imageLink,
       alternatives: alternativeTasks[task.id] ?? task.alternatives,
-      suggestedKeys: buildSuggestedKeysFromObjectives(
+      requiredKeys: buildRequiredKeysFromObjectives(
         normalizeTaskObjectives<TaskObjective>(task.objectives)
       ),
       predecessors: getPredecessors(graph, task.id),

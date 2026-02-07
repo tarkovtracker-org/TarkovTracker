@@ -17,7 +17,7 @@
           :alt="task?.factionName"
           class="h-6 w-6 shrink-0 object-contain invert"
         />
-        <span class="text-surface-100 min-w-0 text-sm font-semibold sm:truncate sm:text-base">
+        <span class="min-w-0 text-sm font-semibold sm:truncate sm:text-base">
           {{ task?.name }}
         </span>
         <UIcon
@@ -100,7 +100,7 @@
   });
   const titleClass = computed(() =>
     titleComponent.value === 'div'
-      ? 'flex min-w-0 items-center gap-2'
+      ? 'text-surface-100 flex min-w-0 items-center gap-2'
       : 'text-link hover:text-link-hover flex min-w-0 items-center gap-2 no-underline'
   );
   const ICON_BUTTON_CLASS = [

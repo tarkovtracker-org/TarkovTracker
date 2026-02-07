@@ -3,7 +3,12 @@
     <div class="grid grid-cols-[16px_1fr] items-start gap-2">
       <UIcon :name="`i-${iconName}`" aria-hidden="true" class="text-surface-400 mt-0.5 h-4 w-4" />
       <div class="min-w-0">
-        <div class="text-surface-100 text-sm font-medium">{{ title }}</div>
+        <div class="text-surface-100 flex items-center gap-1.5 text-sm font-medium">
+          {{ title }}
+          <span v-if="props.optional" class="text-warning-300 text-[10px] font-semibold uppercase">
+            ({{ t('page.tasks.questcard.objective_optional_badge', 'Optional') }})
+          </span>
+        </div>
       </div>
     </div>
     <div class="flex flex-wrap gap-2 pl-6">
@@ -36,6 +41,12 @@
           class="bg-kappa-500/20 text-kappa-300 rounded px-1 py-0.5 text-[10px] font-semibold"
         >
           FiR
+        </span>
+        <span
+          v-if="isRowOptional(row)"
+          class="bg-warning-500/20 text-warning-300 rounded px-1 py-0.5 text-[10px] font-semibold uppercase"
+        >
+          {{ t('page.tasks.questcard.objective_optional_badge', 'Optional') }}
         </span>
         <AppTooltip
           v-if="rowHasMapLocation(row)"
@@ -107,6 +118,7 @@
     title: string;
     iconName: string;
     objectives: TaskObjective[];
+    optional?: boolean;
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const tarkovStore = useTarkovStore();
@@ -400,5 +412,9 @@
       }
       remaining -= objCount;
     });
+  };
+  const isRowOptional = (row: ConsolidatedRow): boolean => {
+    if (props.optional) return false;
+    return row.objectives.every((obj) => obj.objective.optional === true);
   };
 </script>

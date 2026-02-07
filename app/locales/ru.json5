@@ -75,6 +75,7 @@
   common: {
     cancel: 'Отмена',
     close: 'Закрыть',
+    back_to_top: 'Наверх',
     refresh_button: 'Попробовать снова',
     opens_in_new_tab: 'Открыть в новой вкладке',
   },
@@ -321,7 +322,7 @@
           kappa_required: 'Kappa Требуется',
           lightkeeper_required: 'Lightkeeper Требуется',
           team_shared_only: 'Только общий доступ для команды',
-          has_suggested_keys: 'С рекомендуемыми ключами',
+          has_required_keys: 'С обязательными ключами',
           show_global_tasks: 'Показать глобальные задачи на карте',
           impact_respects_filters: 'Влияние учитывает фильтры задач',
           show_non_special_tasks: 'Показать задачи без требования Lightkeeper или Kappa.',

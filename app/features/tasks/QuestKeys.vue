@@ -20,7 +20,7 @@
       </AppTooltip>
     </div>
     <div
-      v-for="(keyGroup, keyGroupIndex) in suggestedKeys"
+      v-for="(keyGroup, keyGroupIndex) in requiredKeys"
       :key="keyGroupIndex"
       class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1"
     >
@@ -36,16 +36,52 @@
         scope="global"
       >
         <template #keys>
-          <span v-for="(key, keyIndex) in keyGroup.keys" :key="keyIndex" class="inline-block">
-            <GameItem
-              :item-id="key.id"
-              :item-name="`${key.name} (${key.shortName})`"
-              :copy-value="key.name"
-              :dev-link="key.link"
-              :wiki-link="key.wikiLink"
-              :count="1"
-              size="xs"
-            />
+          <span
+            v-for="(key, keyIndex) in keyGroup.keys"
+            :key="keyIndex"
+            class="relative mr-1 inline-flex items-center gap-1.5"
+            @contextmenu="handleKeyContextMenu($event, key)"
+          >
+            <AppTooltip :ui="{ content: 'p-0 h-auto rounded-lg overflow-hidden' }">
+              <img
+                :src="getKeyIconSrc(key)"
+                :alt="key.name || key.shortName || key.id"
+                class="h-8 w-8 shrink-0 cursor-pointer rounded transition-opacity hover:opacity-80"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
+                @click="openKeyPrimaryLink(key)"
+              />
+              <template #content>
+                <img
+                  :src="getKeyPreviewSrc(key)"
+                  :alt="key.name || key.shortName || key.id"
+                  class="block h-32 w-32 object-contain"
+                  :class="getKeyBackgroundClass(key)"
+                />
+              </template>
+            </AppTooltip>
+            <AppTooltip :text="getKeyPrimaryTooltip(key)">
+              <a
+                :href="getKeyPrimaryUrl(key)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-link hover:text-link-hover focus-visible:ring-primary-500 inline-flex items-center gap-0.5 rounded-sm text-sm font-bold no-underline focus:outline-none focus-visible:ring-2"
+              >
+                {{ key.name || key.shortName || key.id }}
+                <template v-if="key.shortName && key.name">({{ key.shortName }})</template>
+                <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-3 w-3 shrink-0" />
+              </a>
+            </AppTooltip>
+            <AppTooltip text="View on tarkov.dev">
+              <a
+                :href="getKeyDevUrl(key)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-surface-400 hover:text-surface-200 inline-flex items-center rounded p-0.5 transition-colors"
+                @click.stop
+              >
+                <img src="/img/logos/tarkovdevlogo.webp" alt="tarkov.dev" class="h-4 w-4" />
+              </a>
+            </AppTooltip>
           </span>
         </template>
         <template #map>
@@ -53,12 +89,93 @@
         </template>
       </i18n-t>
     </div>
+    <ContextMenu ref="contextMenu">
+      <template #default="{ close }">
+        <ContextMenuItem
+          v-if="activeKey?.wikiLink"
+          icon="/img/logos/wikilogo.webp"
+          :label="`View ${activeKey.name || activeKey.shortName || ''} on Wiki`"
+          @click="
+            openKeyWikiLink();
+            close();
+          "
+        />
+        <ContextMenuItem
+          icon="/img/logos/tarkovdevlogo.webp"
+          :label="`View ${activeKey?.name || activeKey?.shortName || ''} on Tarkov.dev`"
+          @click="
+            openKeyDevLink();
+            close();
+          "
+        />
+        <div v-if="activeKey?.name" class="border-surface-700 my-1 border-t" />
+        <ContextMenuItem
+          v-if="activeKey?.name"
+          icon="i-mdi-content-copy"
+          label="Copy Key Name"
+          @click="
+            copyKeyName();
+            close();
+          "
+        />
+      </template>
+    </ContextMenu>
   </div>
 </template>
 <script setup lang="ts">
-  import type { SuggestedKeyGroup } from '@/types/tarkov';
+  import { buildItemImageUrl, buildItemPageUrl } from '@/utils/tarkovUrls';
+  import type ContextMenu from '@/components/ui/ContextMenu.vue';
+  import type { RequiredKeyGroup, TarkovItem } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
-  const { suggestedKeys } = defineProps<{ suggestedKeys: SuggestedKeyGroup[] }>();
-  const getMapLabel = (maps?: SuggestedKeyGroup['maps']) =>
-    maps?.map((map) => map.name || map.id).join(', ') ?? '';
+  const { requiredKeys } = defineProps<{ requiredKeys: RequiredKeyGroup[] }>();
+  const { copyToClipboard } = useCopyToClipboard();
+  const contextMenu = ref<InstanceType<typeof ContextMenu>>();
+  const activeKey = ref<TarkovItem>();
+  const getMapLabel = (maps?: RequiredKeyGroup['maps']) =>
+    maps?.map((map: { id: string; name?: string }) => map.name || map.id).join(', ') ?? '';
+  const BACKGROUND_CLASS_MAP: Record<string, string> = {
+    violet: 'bg-rarity-violet',
+    grey: 'bg-rarity-grey',
+    yellow: 'bg-rarity-yellow',
+    orange: 'bg-rarity-orange',
+    green: 'bg-rarity-green',
+    red: 'bg-rarity-red',
+    black: 'bg-rarity-black',
+    blue: 'bg-rarity-blue',
+    default: 'bg-rarity-default',
+  };
+  const getKeyIconSrc = (key: TarkovItem) => key.iconLink || buildItemImageUrl(key.id, 'icon');
+  const getKeyPreviewSrc = (key: TarkovItem) =>
+    key.image512pxLink || buildItemImageUrl(key.id, '512');
+  const getKeyBackgroundClass = (key: TarkovItem) =>
+    BACKGROUND_CLASS_MAP[(key.backgroundColor || 'default').toLowerCase()] ??
+    BACKGROUND_CLASS_MAP.default;
+  const getKeyDevUrl = (key: TarkovItem) => key.link || buildItemPageUrl(key.id);
+  const getKeyPrimaryUrl = (key: TarkovItem) => key.wikiLink || getKeyDevUrl(key);
+  const getKeyPrimaryTooltip = (key: TarkovItem) =>
+    key.wikiLink
+      ? t('page.tasks.questcard.view_on_wiki', 'View on Wiki')
+      : t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev');
+  const openKeyPrimaryLink = (key: TarkovItem) => {
+    window.open(getKeyPrimaryUrl(key), '_blank', 'noopener,noreferrer');
+  };
+  const handleKeyContextMenu = (event: MouseEvent, key: TarkovItem) => {
+    activeKey.value = key;
+    contextMenu.value?.open(event);
+  };
+  const openKeyDevLink = () => {
+    if (activeKey.value) {
+      window.open(getKeyDevUrl(activeKey.value), '_blank');
+    }
+  };
+  const openKeyWikiLink = () => {
+    if (activeKey.value?.wikiLink) {
+      window.open(activeKey.value.wikiLink, '_blank');
+    }
+  };
+  const copyKeyName = async () => {
+    if (activeKey.value?.name) {
+      await copyToClipboard(activeKey.value.name);
+    }
+  };
 </script>

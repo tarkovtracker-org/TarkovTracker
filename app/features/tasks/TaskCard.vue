@@ -163,7 +163,7 @@
             :id="`objectives-content-${task.id}`"
             :class="[isCompact ? 'space-y-1.5' : 'space-y-3', compactClasses.objectivesBody]"
           >
-            <QuestKeys v-if="taskSuggestedKeys.length" :suggested-keys="taskSuggestedKeys" />
+            <QuestKeys v-if="taskRequiredKeys.length" :required-keys="taskRequiredKeys" />
             <QuestObjectivesSkeleton
               v-if="showObjectivesSkeleton"
               :objectives="relevantViewObjectives"
@@ -549,11 +549,11 @@
     const storeTask = metadataStore.getTaskById(props.task.id);
     return storeTask?.objectives ?? [];
   });
-  const taskSuggestedKeys = computed(() => {
-    const keys = props.task.suggestedKeys;
+  const taskRequiredKeys = computed(() => {
+    const keys = props.task.requiredKeys;
     if (keys && keys.length > 0) return keys;
     const storeTask = metadataStore.getTaskById(props.task.id);
-    return storeTask?.suggestedKeys ?? [];
+    return storeTask?.requiredKeys ?? [];
   });
   /**
    * Consolidated objective categorization - single pass through objectives array.

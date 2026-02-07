@@ -81,6 +81,7 @@
   common: {
     cancel: 'Cancel',
     close: 'Close',
+    back_to_top: 'Back to top',
     refresh_button: 'Try again',
     opens_in_new_tab: 'Opens in new tab',
   },
@@ -327,7 +328,7 @@
           kappa_required: 'Kappa Required',
           lightkeeper_required: 'Lightkeeper Required',
           team_shared_only: 'Team Shared Only',
-          has_suggested_keys: 'Has Suggested Keys',
+          has_required_keys: 'Has Required Keys',
           show_global_tasks: 'Show Global Tasks on Map',
           impact_respects_filters: 'Impact Respects Task Filters',
           show_non_special_tasks: 'Show tasks without Lightkeeper or Kappa requirement',

@@ -217,7 +217,7 @@ export interface FinishReward {
   status?: string;
   quest?: { id: string };
 }
-export interface SuggestedKeyGroup {
+export interface RequiredKeyGroup {
   keys: TarkovItem[];
   maps?: { id: string; name?: string }[];
   optional?: boolean;
@@ -252,7 +252,7 @@ export interface Task {
   neededBy?: string[];
   type?: string;
   wikiLink?: string;
-  suggestedKeys?: SuggestedKeyGroup[];
+  requiredKeys?: RequiredKeyGroup[];
   alternatives?: string[];
   /** Flag indicating the task is disabled or removed from standard gameplay */
   disabled?: boolean;
