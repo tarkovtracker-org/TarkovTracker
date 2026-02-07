@@ -1081,7 +1081,6 @@
     },
   },
   quest: {
-    view_on_wiki: 'Voir {name} sur le wiki',
     view_on_dev: 'Voir {name} sur Tarkov.dev',
   },
   needed_items: {

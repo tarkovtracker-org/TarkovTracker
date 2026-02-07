@@ -1081,7 +1081,6 @@
     },
   },
   quest: {
-    view_on_wiki: 'Открыть {name} в вики',
     view_on_dev: 'Открыть {name} на Tarkov.dev',
   },
   needed_items: {

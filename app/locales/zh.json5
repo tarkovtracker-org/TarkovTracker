@@ -1081,7 +1081,6 @@
     },
   },
   quest: {
-    view_on_wiki: '在维基查看{name}',
     view_on_dev: '在 Tarkov.dev 查看{name}',
   },
   needed_items: {

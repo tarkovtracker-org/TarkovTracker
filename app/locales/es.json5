@@ -1083,7 +1083,6 @@ Verifícalo en el juego o en la wiki antes de comprar llaves.',
     },
   },
   quest: {
-    view_on_wiki: 'Ver {name} en la Wiki',
     view_on_dev: 'Ver {name} en Tarkov.dev',
   },
   needed_items: {

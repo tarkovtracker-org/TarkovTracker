@@ -90,7 +90,7 @@
           v-if="activeKey?.wikiLink"
           icon="/img/logos/wikilogo.webp"
           :label="
-            t('quest.view_on_wiki', {
+            t('page.tasks.questcard.view_task_on_wiki', {
               name: activeKey?.name || activeKey?.shortName || '',
             })
           "
