@@ -322,7 +322,7 @@
           kappa_required: 'Kappa Erforderlich',
           lightkeeper_required: 'Lightkeeper Erforderlich',
           team_shared_only: 'Nur vom Team geteilt',
-          has_required_keys: 'Mit erforderlichen Schlüsseln',
+          has_required_keys: 'Nur Aufgaben mit Schlüsseln',
           show_global_tasks: 'Globale Aufgaben auf der Karte anzeigen',
           impact_respects_filters: 'Impact respektiert Aufgabenfilter',
           show_non_special_tasks: 'Aufgaben ohne Lightkeeper- oder Kappa-Anforderung anzeigen',
@@ -408,6 +408,7 @@
         more: 'Mehr',
         and_more: ', +{count} mehr',
         copy_task_link: 'Aufgaben-Link kopieren',
+        copy_key_name: 'Schlüsselname kopieren',
         report_data_issue: 'Datenproblem melden',
         view_on_tarkov_dev: 'Auf Tarkov.dev ansehen',
         view_on_wiki: 'Im Wiki ansehen',
@@ -1077,6 +1078,10 @@
       map: 'Karte',
       traders: 'Händler',
     },
+  },
+  quest: {
+    view_on_wiki: '{name} im Wiki ansehen',
+    view_on_dev: '{name} auf Tarkov.dev ansehen',
   },
   needed_items: {
     filter_type_label: 'Filtern Sie nach Artikeltyp',

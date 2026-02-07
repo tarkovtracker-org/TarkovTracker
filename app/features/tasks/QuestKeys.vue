@@ -46,6 +46,7 @@
               <img
                 :src="getKeyIconSrc(key)"
                 :alt="key.name || key.shortName || key.id"
+                loading="lazy"
                 class="h-8 w-8 shrink-0 cursor-pointer rounded transition-opacity hover:opacity-80"
                 @error="($event.target as HTMLImageElement).style.display = 'none'"
                 @click="openKeyPrimaryLink(key)"
@@ -54,6 +55,7 @@
                 <img
                   :src="getKeyPreviewSrc(key)"
                   :alt="key.name || key.shortName || key.id"
+                  loading="lazy"
                   class="block h-32 w-32 object-contain"
                   :class="getKeyBackgroundClass(key)"
                 />
@@ -71,7 +73,7 @@
                 <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-3 w-3 shrink-0" />
               </a>
             </AppTooltip>
-            <AppTooltip text="View on tarkov.dev">
+            <AppTooltip :text="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')">
               <a
                 :href="getKeyDevUrl(key)"
                 target="_blank"
@@ -94,7 +96,11 @@
         <ContextMenuItem
           v-if="activeKey?.wikiLink"
           icon="/img/logos/wikilogo.webp"
-          :label="`View ${activeKey.name || activeKey.shortName || ''} on Wiki`"
+          :label="
+            t('quest.view_on_wiki', {
+              name: activeKey?.name || activeKey?.shortName || '',
+            })
+          "
           @click="
             openKeyWikiLink();
             close();
@@ -102,7 +108,11 @@
         />
         <ContextMenuItem
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="`View ${activeKey?.name || activeKey?.shortName || ''} on Tarkov.dev`"
+          :label="
+            t('quest.view_on_dev', {
+              name: activeKey?.name || activeKey?.shortName || '',
+            })
+          "
           @click="
             openKeyDevLink();
             close();
@@ -112,7 +122,7 @@
         <ContextMenuItem
           v-if="activeKey?.name"
           icon="i-mdi-content-copy"
-          label="Copy Key Name"
+          :label="$t('page.tasks.questcard.copy_key_name')"
           @click="
             copyKeyName();
             close();

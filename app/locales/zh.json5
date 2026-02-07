@@ -322,7 +322,7 @@
           kappa_required: 'Kappa必需',
           lightkeeper_required: '灯塔守护者必需',
           team_shared_only: '仅全队共享',
-          has_required_keys: '有必需钥匙',
+          has_required_keys: '仅显示需要钥匙的任务',
           show_global_tasks: '在地图上显示全局任务',
           impact_respects_filters: '影响值遵循任务筛选',
           show_non_special_tasks: '显示非Kappa安全箱或灯塔守护者任务',
@@ -408,6 +408,7 @@
         more: '更多',
         and_more: '，另有 {count} 个',
         copy_task_link: '复制任务链接',
+        copy_key_name: '复制钥匙名称',
         report_data_issue: '报告数据问题',
         view_on_tarkov_dev: '在 Tarkov.dev 查看',
         view_on_wiki: '在维基查看',
@@ -1077,6 +1078,10 @@
       map: '地图',
       traders: '贸易商',
     },
+  },
+  quest: {
+    view_on_wiki: '在维基查看{name}',
+    view_on_dev: '在 Tarkov.dev 查看{name}',
   },
   needed_items: {
     filter_type_label: '按项目类型过滤',

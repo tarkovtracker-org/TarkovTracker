@@ -322,7 +322,7 @@
           kappa_required: 'Kappa Requerido',
           lightkeeper_required: 'Lightkeeper Requerido',
           team_shared_only: 'Equipo compartido únicamente',
-          has_required_keys: 'Con llaves requeridas',
+          has_required_keys: 'Solo misiones con llaves',
           show_global_tasks: 'Mostrar tareas globales en el mapa',
           impact_respects_filters: 'El impacto respeta los filtros de tareas',
           show_non_special_tasks: 'Mostrar tareas sin requisito Lightkeeper o Kappa',
@@ -408,6 +408,7 @@
         more: 'Más',
         and_more: ', +{count} más',
         copy_task_link: 'Copiar enlace de tarea',
+        copy_key_name: 'Copiar nombre de la llave',
         report_data_issue: 'Reportar problema de datos',
         view_on_tarkov_dev: 'Ver en Tarkov.dev',
         view_on_wiki: 'Ver en la Wiki',
@@ -1077,6 +1078,10 @@
       map: 'Mapa',
       traders: 'Comerciantes',
     },
+  },
+  quest: {
+    view_on_wiki: 'Ver {name} en la Wiki',
+    view_on_dev: 'Ver {name} en Tarkov.dev',
   },
   needed_items: {
     filter_type_label: 'Filtrar por tipo de artículo',

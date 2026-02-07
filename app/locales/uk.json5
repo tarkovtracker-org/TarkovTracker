@@ -322,7 +322,7 @@
           kappa_required: 'Kappa Необхідно',
           lightkeeper_required: 'Lightkeeper Необхідно',
           team_shared_only: 'Лише спільний доступ до команди',
-          has_required_keys: "З обов'язковими ключами",
+          has_required_keys: 'Лише завдання з ключами',
           show_global_tasks: 'Показати глобальні завдання на карті',
           impact_respects_filters: 'Вплив враховує фільтри завдань',
           show_non_special_tasks: 'Показати завдання без вимог Lightkeeper або Kappa',
@@ -408,6 +408,7 @@
         more: 'більше',
         and_more: ', ще +{count}',
         copy_task_link: 'Копіювати посилання на завдання',
+        copy_key_name: 'Скопіювати назву ключа',
         report_data_issue: 'Повідомити про помилку даних',
         view_on_tarkov_dev: 'Відкрити на Tarkov.dev',
         view_on_wiki: 'Відкрити у вікі',
@@ -1077,6 +1078,10 @@
       map: 'Карта',
       traders: 'Трейдери',
     },
+  },
+  quest: {
+    view_on_wiki: 'Відкрити {name} у вікі',
+    view_on_dev: 'Відкрити {name} на Tarkov.dev',
   },
   needed_items: {
     filter_type_label: 'Фільтрувати за типом елемента',

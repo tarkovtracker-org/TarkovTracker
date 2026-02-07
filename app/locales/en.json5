@@ -328,7 +328,7 @@
           kappa_required: 'Kappa Required',
           lightkeeper_required: 'Lightkeeper Required',
           team_shared_only: 'Team Shared Only',
-          has_required_keys: 'Has Required Keys',
+          has_required_keys: 'Only Tasks with Keys',
           show_global_tasks: 'Show Global Tasks on Map',
           impact_respects_filters: 'Impact Respects Task Filters',
           show_non_special_tasks: 'Show tasks without Lightkeeper or Kappa requirement',
@@ -414,6 +414,7 @@
         more: 'More',
         and_more: ', +{count} more',
         copy_task_link: 'Copy Task Link',
+        copy_key_name: 'Copy Key Name',
         report_data_issue: 'Report Data Issue',
         view_on_tarkov_dev: 'View on Tarkov.dev',
         view_on_wiki: 'View on Wiki',
@@ -1083,6 +1084,10 @@
       map: 'Map',
       traders: 'Traders',
     },
+  },
+  quest: {
+    view_on_wiki: 'View {name} on Wiki',
+    view_on_dev: 'View {name} on Tarkov.dev',
   },
   needed_items: {
     filter_type_label: 'Filter by item type',
