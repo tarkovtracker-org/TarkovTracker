@@ -45,10 +45,10 @@
           :href="getKeyDevUrl(key)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-surface-400 hover:text-surface-200 inline-flex items-center rounded p-0.5 transition-colors"
+          class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
           @click.stop
         >
-          <img src="/img/logos/tarkovdevlogo.webp" alt="tarkov.dev" class="h-3 w-3" />
+          <img src="/img/logos/tarkovdevlogo.webp" alt="tarkov.dev" class="h-3.5 w-3.5" />
         </a>
       </AppTooltip>
       <span
@@ -68,7 +68,7 @@
     >
       <button
         type="button"
-        class="text-surface-500 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 hover:text-surface-300 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+        class="text-surface-500 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 hover:text-surface-300 inline-flex items-center self-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
         :aria-label="$t('page.tasks.questcard.keys_disclaimer_aria', 'Required keys disclaimer')"
         @click.stop
       >
