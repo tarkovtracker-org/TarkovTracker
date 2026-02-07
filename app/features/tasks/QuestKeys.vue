@@ -18,14 +18,6 @@
           <UIcon name="i-mdi-information-outline" class="h-3.5 w-3.5" />
         </button>
       </AppTooltip>
-      <span class="text-surface-500 font-normal">
-        {{
-          $t(
-            'page.tasks.questcard.keys_subtext',
-            '(API-based and situational; verify in-game/wiki)'
-          )
-        }}
-      </span>
     </div>
     <div
       v-for="(keyGroup, keyGroupIndex) in suggestedKeys"
