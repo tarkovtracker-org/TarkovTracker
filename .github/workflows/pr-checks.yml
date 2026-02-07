@@ -116,8 +116,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build static site
+        run: npm run generate
         env:
           NODE_ENV: production
           NUXT_PUBLIC_APP_URL: http://localhost:3000
@@ -126,7 +126,7 @@ jobs:
 
       - name: Start preview server
         run: |
-          npx wrangler pages dev dist --ip localhost --port 3000 &
+          npx serve dist -s -l 3000 &
           echo $! > /tmp/server.pid
           npx wait-on \
             http-get://localhost:3000 \
