@@ -13,7 +13,7 @@
       </AppTooltip>
     </div>
     <div
-      v-for="(keyGroup, keyGroupIndex) in requiredKeys"
+      v-for="(keyGroup, keyGroupIndex) in props.requiredKeys"
       :key="keyGroupIndex"
       class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1"
     >
@@ -130,35 +130,23 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { buildItemImageUrl, buildItemPageUrl } from '@/utils/tarkovUrls';
+  import { logger } from '@/utils/logger';
+  import {
+    getKeyBackgroundClass,
+    getKeyDevUrl,
+    getKeyIconSrc,
+    getKeyPreviewSrc,
+    getKeyPrimaryUrl,
+  } from '@/utils/tarkovKeyHelpers';
   import type ContextMenu from '@/components/ui/ContextMenu.vue';
   import type { RequiredKeyGroup, TarkovItem } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
-  const { requiredKeys } = defineProps<{ requiredKeys: RequiredKeyGroup[] }>();
+  const props = defineProps<{ requiredKeys: RequiredKeyGroup[] }>();
   const { copyToClipboard } = useCopyToClipboard();
   const contextMenu = ref<InstanceType<typeof ContextMenu>>();
   const activeKey = ref<TarkovItem>();
   const getMapLabel = (maps?: RequiredKeyGroup['maps']) =>
     maps?.map((map: { id: string; name?: string }) => map.name || map.id).join(', ') ?? '';
-  const BACKGROUND_CLASS_MAP: Record<string, string> = {
-    violet: 'bg-rarity-violet',
-    grey: 'bg-rarity-grey',
-    yellow: 'bg-rarity-yellow',
-    orange: 'bg-rarity-orange',
-    green: 'bg-rarity-green',
-    red: 'bg-rarity-red',
-    black: 'bg-rarity-black',
-    blue: 'bg-rarity-blue',
-    default: 'bg-rarity-default',
-  };
-  const getKeyIconSrc = (key: TarkovItem) => key.iconLink || buildItemImageUrl(key.id, 'icon');
-  const getKeyPreviewSrc = (key: TarkovItem) =>
-    key.image512pxLink || buildItemImageUrl(key.id, '512');
-  const getKeyBackgroundClass = (key: TarkovItem) =>
-    BACKGROUND_CLASS_MAP[(key.backgroundColor || 'default').toLowerCase()] ??
-    BACKGROUND_CLASS_MAP.default;
-  const getKeyDevUrl = (key: TarkovItem) => key.link || buildItemPageUrl(key.id);
-  const getKeyPrimaryUrl = (key: TarkovItem) => key.wikiLink || getKeyDevUrl(key);
   const getKeyPrimaryTooltip = (key: TarkovItem) =>
     key.wikiLink
       ? t('page.tasks.questcard.view_on_wiki')
@@ -182,7 +170,14 @@
   };
   const copyKeyName = async () => {
     if (activeKey.value?.name) {
-      await copyToClipboard(activeKey.value.name);
+      try {
+        await copyToClipboard(activeKey.value.name);
+      } catch (error) {
+        logger.error('Failed to copy key name', {
+          error,
+          keyName: activeKey.value?.name,
+        });
+      }
     }
   };
 </script>

@@ -92,7 +92,7 @@
                       class="h-6 w-6 shrink-0 rounded-full"
                     />
                     <span class="text-link hover:text-link-hover truncate text-sm font-medium">
-                      {{ taskLookup[obj.taskId]?.name || $t('needed_items.unknown_task') }}
+                      {{ getTaskName(obj.taskId) }}
                     </span>
                   </router-link>
                   <UBadge v-if="isKappa(obj)" color="kappa" size="xs">
@@ -166,11 +166,11 @@
                     <img
                       v-if="getStation(mod)?.imageLink"
                       :src="getStation(mod)?.imageLink"
-                      :alt="getStation(mod)?.name"
+                      :alt="getStationName(mod)"
                       class="h-6 w-6 shrink-0"
                     />
                     <span class="text-link hover:text-link-hover truncate text-sm font-medium">
-                      {{ getStation(mod)?.name || $t('needed_items.unknown_station') }}
+                      {{ getStationName(mod) }}
                     </span>
                   </router-link>
                   <span class="text-surface-400 text-xs">
