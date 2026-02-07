@@ -550,9 +550,8 @@
     return storeTask?.objectives ?? [];
   });
   const taskSuggestedKeys = computed(() => {
-    if ((props.task.suggestedKeys?.length ?? 0) > 0) {
-      return props.task.suggestedKeys!;
-    }
+    const keys = props.task.suggestedKeys;
+    if (keys && keys.length > 0) return keys;
     const storeTask = metadataStore.getTaskById(props.task.id);
     return storeTask?.suggestedKeys ?? [];
   });
