@@ -137,7 +137,7 @@ describe('filterTasksByTypeSettings', () => {
       const result = filterTasksByTypeSettings([], options);
       expect(result).toEqual([]);
     });
-    it('handles all filters disabled (returns empty)', () => {
+    it('handles all filters disabled by showing all task categories', () => {
       const tasks = [
         createBaseTask({ id: 'kappa', kappaRequired: true }),
         createBaseTask({ id: 'lk', lightkeeperRequired: true }),
@@ -149,7 +149,7 @@ describe('filterTasksByTypeSettings', () => {
         showNonSpecial: false,
       });
       const result = filterTasksByTypeSettings(tasks, options);
-      expect(result).toEqual([]);
+      expect(result.map((t) => t.id)).toEqual(['kappa', 'lk', 'normal']);
     });
     it('handles task with both kappa and lightkeeper required', () => {
       const tasks = [

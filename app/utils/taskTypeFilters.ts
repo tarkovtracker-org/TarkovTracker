@@ -19,12 +19,14 @@ export function filterTasksByTypeSettings(
     prestigeTaskMap,
     excludedTaskIds,
   } = options;
+  const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
   return taskList.filter((task) => {
     if (excludedTaskIds.has(task.id)) return false;
     if (prestigeTaskMap.has(task.id)) {
       const taskPrestigeLevel = prestigeTaskMap.get(task.id)!;
       if (taskPrestigeLevel !== userPrestigeLevel) return false;
     }
+    if (!hasTypeSelection) return true;
     const isKappaRequired = task.kappaRequired === true;
     const isLightkeeperRequired = task.lightkeeperRequired === true;
     const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;

@@ -717,6 +717,7 @@ export function useTaskFiltering() {
     const showKappa = !preferencesStore.getHideNonKappaTasks;
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
     const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
+    const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
     const onlyTasksWithSuggestedKeys = preferencesStore.getOnlyTasksWithSuggestedKeys;
     // Get prestige filtering data
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
@@ -738,9 +739,10 @@ export function useTaskFiltering() {
       const isLightkeeperRequired = task.lightkeeperRequired === true;
       const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
       if (
-        (isKappaRequired && !showKappa) ||
-        (isLightkeeperRequired && !showLightkeeper) ||
-        (isNonSpecial && !showNonSpecial)
+        hasTypeSelection &&
+        ((isKappaRequired && !showKappa) ||
+          (isLightkeeperRequired && !showLightkeeper) ||
+          (isNonSpecial && !showNonSpecial))
       ) {
         continue;
       }
@@ -822,6 +824,7 @@ export function useTaskFiltering() {
     const showKappa = !preferencesStore.getHideNonKappaTasks;
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
     const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
+    const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
     const onlyTasksWithSuggestedKeys = preferencesStore.getOnlyTasksWithSuggestedKeys;
     const userPrestigeLevel = tarkovStore.getPrestigeLevel();
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
@@ -843,9 +846,10 @@ export function useTaskFiltering() {
       const isLightkeeperRequired = task.lightkeeperRequired === true;
       const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
       if (
-        (isKappaRequired && !showKappa) ||
-        (isLightkeeperRequired && !showLightkeeper) ||
-        (isNonSpecial && !showNonSpecial)
+        hasTypeSelection &&
+        ((isKappaRequired && !showKappa) ||
+          (isLightkeeperRequired && !showLightkeeper) ||
+          (isNonSpecial && !showNonSpecial))
       ) {
         continue;
       }
