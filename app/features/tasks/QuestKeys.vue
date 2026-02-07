@@ -32,7 +32,7 @@
       </span>
       <i18n-t
         keypath="page.tasks.questcard.keys_needed"
-        :plural="keyGroup.keys.length"
+        :plural="keyGroup.anyOf ? 2 : 1"
         scope="global"
       >
         <template #keys>

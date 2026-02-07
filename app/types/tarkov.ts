@@ -221,6 +221,7 @@ export interface SuggestedKeyGroup {
   keys: TarkovItem[];
   maps?: { id: string; name?: string }[];
   optional?: boolean;
+  anyOf?: boolean;
 }
 export interface Task {
   id: string;

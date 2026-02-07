@@ -22,6 +22,7 @@ describe('buildSuggestedKeysFromObjectives', () => {
     const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
     expect(suggestedKeys).toHaveLength(1);
     expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2', 'key-3']);
+    expect(suggestedKeys[0]!.anyOf).toBe(true);
   });
   it('keeps objective alternatives as one "one-of" group', () => {
     const objective = createObjective({
@@ -30,6 +31,7 @@ describe('buildSuggestedKeysFromObjectives', () => {
     const suggestedKeys = buildSuggestedKeysFromObjectives([objective]);
     expect(suggestedKeys).toHaveLength(1);
     expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(suggestedKeys[0]!.anyOf).toBe(true);
   });
   it('dedupes repeated key groups on the same map set', () => {
     const firstObjective = createObjective({
@@ -44,7 +46,7 @@ describe('buildSuggestedKeysFromObjectives', () => {
     expect(suggestedKeys).toHaveLength(1);
     expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
   });
-  it('merges keys from multiple required objectives on the same map', () => {
+  it('keeps separate key groups for separate required objectives on the same map', () => {
     const firstObjective = createObjective({
       id: 'objective-a',
       requiredKeys: [[createItem('key-1')]],
@@ -54,8 +56,10 @@ describe('buildSuggestedKeysFromObjectives', () => {
       requiredKeys: [[createItem('key-2')]],
     });
     const suggestedKeys = buildSuggestedKeysFromObjectives([firstObjective, secondObjective]);
-    expect(suggestedKeys).toHaveLength(1);
-    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1', 'key-2']);
+    expect(suggestedKeys).toHaveLength(2);
+    expect(suggestedKeys[0]!.keys.map((item) => item.id)).toEqual(['key-1']);
+    expect(suggestedKeys[1]!.keys.map((item) => item.id)).toEqual(['key-2']);
+    expect(suggestedKeys.every((group) => group.anyOf !== true)).toBe(true);
   });
   it('marks key groups as optional when objective is optional', () => {
     const optionalObjective = createObjective({
@@ -127,5 +131,34 @@ describe('buildSuggestedKeysFromObjectives', () => {
       { id: 'factory4_day', name: 'Factory' },
       { id: 'factory4_night', name: 'Factory (Night)' },
     ]);
+  });
+  it('does not collapse multiple required objectives into a one-of group', () => {
+    const objectives = [
+      createObjective({
+        id: 'objective-1',
+        requiredKeys: [[createItem('rb-ob')]],
+      }),
+      createObjective({
+        id: 'objective-2',
+        requiredKeys: [[createItem('rb-orb1')]],
+      }),
+      createObjective({
+        id: 'objective-3',
+        requiredKeys: [[createItem('rb-orb2')]],
+      }),
+      createObjective({
+        id: 'objective-4',
+        requiredKeys: [[createItem('rb-orb3')]],
+      }),
+    ];
+    const suggestedKeys = buildSuggestedKeysFromObjectives(objectives);
+    expect(suggestedKeys).toHaveLength(4);
+    expect(suggestedKeys.map((group) => group.keys[0]!.id)).toEqual([
+      'rb-ob',
+      'rb-orb1',
+      'rb-orb2',
+      'rb-orb3',
+    ]);
+    expect(suggestedKeys.every((group) => group.anyOf !== true)).toBe(true);
   });
 });

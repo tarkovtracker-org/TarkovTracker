@@ -18,42 +18,53 @@ const dedupeMaps = (
     return true;
   });
 };
+const buildGroupSignature = (group: SuggestedKeyGroup): string => {
+  const mapSignature =
+    group.maps
+      ?.map((map) => map.id)
+      .sort()
+      .join(',') ?? '';
+  const keySignature = group.keys
+    .map((key) => key.id)
+    .sort()
+    .join(',');
+  return `${group.anyOf === true ? 'any' : 'all'}|${mapSignature}|${keySignature}`;
+};
 export const buildSuggestedKeysFromObjectives = (
   objectives?: TaskObjective[]
 ): SuggestedKeyGroup[] => {
   if (!objectives?.length) return [];
-  const requiredGroupsByMap = new Map<string, SuggestedKeyGroup>();
-  const optionalGroupsByMap = new Map<string, SuggestedKeyGroup>();
+  const requiredGroups: SuggestedKeyGroup[] = [];
+  const requiredGroupSignatures = new Set<string>();
+  const optionalGroupsBySignature = new Map<string, SuggestedKeyGroup>();
   objectives.forEach((objective) => {
     const objectiveMaps = dedupeMaps(objective.maps);
-    const mapSignature =
-      objectiveMaps
-        ?.map((map) => map.id)
-        .sort()
-        .join(',') ?? '';
-    const flattenedObjectiveKeys = dedupeItems((objective.requiredKeys ?? []).flat());
+    const keyMatrix = (objective.requiredKeys ?? [])
+      .map((keyGroup) => dedupeItems(keyGroup))
+      .filter((keyGroup) => keyGroup.length > 0);
+    const flattenedObjectiveKeys = dedupeItems(keyMatrix.flat());
     if (!flattenedObjectiveKeys.length) return;
-    const isOptional = objective.optional === true;
-    const targetGroups = isOptional ? optionalGroupsByMap : requiredGroupsByMap;
-    const existingGroup = targetGroups.get(mapSignature);
-    if (existingGroup) {
-      existingGroup.keys = dedupeItems([...existingGroup.keys, ...flattenedObjectiveKeys]);
-      return;
-    }
-    targetGroups.set(mapSignature, {
+    const keyGroup: SuggestedKeyGroup = {
       keys: flattenedObjectiveKeys,
       maps: objectiveMaps,
-      optional: isOptional,
-    });
+      optional: objective.optional === true,
+      anyOf: keyMatrix.length > 1,
+    };
+    const groupSignature = buildGroupSignature(keyGroup);
+    if (keyGroup.optional) {
+      if (
+        requiredGroupSignatures.has(groupSignature) ||
+        optionalGroupsBySignature.has(groupSignature)
+      ) {
+        return;
+      }
+      optionalGroupsBySignature.set(groupSignature, keyGroup);
+      return;
+    }
+    if (requiredGroupSignatures.has(groupSignature)) return;
+    requiredGroupSignatures.add(groupSignature);
+    requiredGroups.push(keyGroup);
+    optionalGroupsBySignature.delete(groupSignature);
   });
-  optionalGroupsByMap.forEach((optionalGroup, mapSignature) => {
-    const requiredGroup = requiredGroupsByMap.get(mapSignature);
-    if (!requiredGroup?.keys.length) return;
-    const requiredKeyIds = new Set(requiredGroup.keys.map((key) => key.id));
-    optionalGroup.keys = optionalGroup.keys.filter((key) => !requiredKeyIds.has(key.id));
-  });
-  return [
-    ...requiredGroupsByMap.values(),
-    ...Array.from(optionalGroupsByMap.values()).filter((group) => group.keys.length > 0),
-  ];
+  return [...requiredGroups, ...Array.from(optionalGroupsBySignature.values())];
 };
