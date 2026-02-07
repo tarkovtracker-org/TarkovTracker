@@ -138,6 +138,7 @@ export interface TaskObjective {
   description?: string;
   location?: { id: string; name?: string };
   maps?: { id: string; name?: string }[];
+  requiredKeys?: TarkovItem[][];
   zones?: Array<{
     map?: { id: string };
     outline?: Array<{ x: number; y: number; z: number }>;
@@ -216,9 +217,9 @@ export interface FinishReward {
   status?: string;
   quest?: { id: string };
 }
-export interface NeededKey {
+export interface SuggestedKeyGroup {
   keys: TarkovItem[];
-  map?: { id: string; name?: string };
+  maps?: { id: string; name?: string }[];
 }
 export interface Task {
   id: string;
@@ -249,7 +250,7 @@ export interface Task {
   neededBy?: string[];
   type?: string;
   wikiLink?: string;
-  neededKeys?: NeededKey[];
+  suggestedKeys?: SuggestedKeyGroup[];
   alternatives?: string[];
   /** Flag indicating the task is disabled or removed from standard gameplay */
   disabled?: boolean;

@@ -111,15 +111,6 @@ export const TARKOV_TASKS_CORE_QUERY = `
         value
       }
       factionName
-      neededKeys {
-        keys {
-          id
-        }
-        map {
-          id
-          name
-        }
-      }
     }
     maps {
       id
@@ -238,6 +229,43 @@ export const TARKOV_TASKS_OBJECTIVES_QUERY = `
     top
     bottom
   }
+  fragment ObjectiveRequiredKeys on TaskObjective {
+    ... on TaskObjectiveBasic {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+    ... on TaskObjectiveExtract {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+    ... on TaskObjectiveItem {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+    ... on TaskObjectiveMark {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+    ... on TaskObjectiveQuestItem {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+    ... on TaskObjectiveShoot {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+    ... on TaskObjectiveUseItem {
+      requiredKeys {
+        ...ItemRef
+      }
+    }
+  }
   query TarkovTaskObjectives($lang: LanguageCode, $gameMode: GameMode) {
     tasks(lang: $lang, gameMode: $gameMode) {
       id
@@ -249,6 +277,7 @@ export const TARKOV_TASKS_OBJECTIVES_QUERY = `
           id
           name
         }
+        ...ObjectiveRequiredKeys
         optional
         __typename
         ... on TaskObjectiveBasic {
@@ -430,6 +459,7 @@ export const TARKOV_TASKS_OBJECTIVES_QUERY = `
           id
           name
         }
+        ...ObjectiveRequiredKeys
         optional
         __typename
         ... on TaskObjectiveBasic {

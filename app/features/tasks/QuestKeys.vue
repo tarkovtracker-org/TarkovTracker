@@ -7,17 +7,17 @@
       </span>
     </div>
     <div
-      v-for="(keyMap, keyMapIndex) in neededKeys"
-      :key="keyMapIndex"
+      v-for="(keyGroup, keyGroupIndex) in suggestedKeys"
+      :key="keyGroupIndex"
       class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1"
     >
       <i18n-t
         keypath="page.tasks.questcard.keys_needed"
-        :plural="keyMap.keys.length"
+        :plural="keyGroup.keys.length"
         scope="global"
       >
         <template #keys>
-          <span v-for="(key, keyIndex) in keyMap.keys" :key="keyIndex" class="inline-block">
+          <span v-for="(key, keyIndex) in keyGroup.keys" :key="keyIndex" class="inline-block">
             <GameItem
               :item-id="key.id"
               :item-name="`${key.name} (${key.shortName})`"
@@ -30,13 +30,15 @@
           </span>
         </template>
         <template #map>
-          {{ keyMap.map?.name ?? '' }}
+          {{ getMapLabel(keyGroup.maps) }}
         </template>
       </i18n-t>
     </div>
   </div>
 </template>
 <script setup lang="ts">
-  import type { NeededKey } from '@/types/tarkov';
-  const { neededKeys } = defineProps<{ neededKeys: NeededKey[] }>();
+  import type { SuggestedKeyGroup } from '@/types/tarkov';
+  const { suggestedKeys } = defineProps<{ suggestedKeys: SuggestedKeyGroup[] }>();
+  const getMapLabel = (maps?: SuggestedKeyGroup['maps']) =>
+    maps?.map((map) => map.name || map.id).join(', ') ?? '';
 </script>

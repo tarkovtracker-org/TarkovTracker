@@ -202,6 +202,7 @@ type ObjectiveWithItems = TaskObjective & {
   items?: TarkovItem[];
   markerItem?: TarkovItem;
   questItem?: TarkovItem;
+  requiredKeys?: TarkovItem[][];
   containsAll?: TarkovItem[];
   useAny?: TarkovItem[];
   usingWeapon?: TarkovItem;
@@ -241,7 +242,11 @@ function createItemPicker(itemsById: Map<string, TarkovItem>) {
     if (!Array.isArray(items)) return items ?? undefined;
     return items.map((i) => pickItemLite(i) ?? i);
   };
-  return { pickItemLite, pickItemArray };
+  const pickItemMatrix = (items?: TarkovItem[][] | null): TarkovItem[][] | undefined => {
+    if (!Array.isArray(items)) return items ?? undefined;
+    return items.map((group) => pickItemArray(group) ?? []);
+  };
+  return { pickItemLite, pickItemArray, pickItemMatrix };
 }
 interface MetadataState {
   // Initialization and loading states
@@ -1555,7 +1560,7 @@ export const useMetadataStore = defineStore('metadata', {
       const itemsById = this.itemsById.size
         ? this.itemsById
         : new Map(this.items.map((item) => [item.id, item]));
-      const { pickItemLite, pickItemArray } = createItemPicker(itemsById);
+      const { pickItemLite, pickItemArray, pickItemMatrix } = createItemPicker(itemsById);
       const hydrateObjective = (objective: TaskObjective): TaskObjective => {
         const obj = objective as ObjectiveWithItems;
         return {
@@ -1564,6 +1569,7 @@ export const useMetadataStore = defineStore('metadata', {
           items: pickItemArray(obj.items),
           markerItem: pickItemLite(obj.markerItem),
           questItem: pickItemLite(obj.questItem),
+          requiredKeys: pickItemMatrix(obj.requiredKeys),
           containsAll: pickItemArray(obj.containsAll),
           useAny: pickItemArray(obj.useAny),
           usingWeapon: pickItemLite(obj.usingWeapon),
@@ -1590,10 +1596,6 @@ export const useMetadataStore = defineStore('metadata', {
         ...task,
         objectives: task.objectives?.map(hydrateObjective),
         failConditions: task.failConditions?.map(hydrateObjective),
-        neededKeys: task.neededKeys?.map((needed) => ({
-          ...needed,
-          keys: needed.keys?.map((key) => pickItemLite(key) ?? key) ?? needed.keys,
-        })),
         startRewards: hydrateRewards(task.startRewards),
         finishRewards: hydrateRewards(task.finishRewards),
         failureOutcome: hydrateRewards(task.failureOutcome),
