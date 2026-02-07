@@ -254,6 +254,7 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
+  import { isTaskRequirementSatisfied } from '@/features/tasks/task-requirement-helpers';
   import TaskCardActions from '@/features/tasks/TaskCardActions.vue';
   import TaskCardBackground from '@/features/tasks/TaskCardBackground.vue';
   import TaskCardBadges from '@/features/tasks/TaskCardBadges.vue';
@@ -458,8 +459,20 @@
       impactEligibleTaskIds.value
     );
   });
-  const lockedBefore = computed(() => {
-    return props.task.parents?.filter((s) => !isTaskSuccessful(s)).length || 0;
+  const taskCompletions = computed(
+    () => tarkovStore.getCurrentProgressData().taskCompletions ?? {}
+  );
+  const requirementStatusesByTaskId = computed(() => {
+    const map = new Map<string, Array<string[] | undefined>>();
+    (props.task.taskRequirements ?? []).forEach((requirement) => {
+      const requiredTaskId = requirement?.task?.id;
+      if (!requiredTaskId) return;
+      if (!map.has(requiredTaskId)) {
+        map.set(requiredTaskId, []);
+      }
+      map.get(requiredTaskId)!.push(requirement.status);
+    });
+    return map;
   });
   const parentTasks = computed(() => {
     if (!props.task.parents?.length) return [];
@@ -489,8 +502,19 @@
     return Array.from(sources.values());
   });
   const pendingParentTasks = computed(() => {
-    return parentTasks.value.filter((parent) => !isTaskSuccessful(parent.id));
+    return parentTasks.value.filter((parent) => {
+      const requirementStatuses = requirementStatusesByTaskId.value.get(parent.id);
+      if (!requirementStatuses?.length) {
+        return !isTaskSuccessful(parent.id);
+      }
+      const completion = taskCompletions.value[parent.id];
+      const isUnlockable = progressStore.unlockedTasks[parent.id]?.self === true;
+      return requirementStatuses.some(
+        (statuses) => !isTaskRequirementSatisfied(statuses, completion, isUnlockable)
+      );
+    });
   });
+  const lockedBefore = computed(() => pendingParentTasks.value.length);
   const displayedPendingParents = computed(() => pendingParentTasks.value.slice(0, 2));
   const extraPendingParentsCount = computed(() => {
     return Math.max(0, pendingParentTasks.value.length - displayedPendingParents.value.length);
