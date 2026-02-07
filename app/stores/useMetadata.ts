@@ -67,6 +67,7 @@ type IdleTask = {
   reject: (error: unknown) => void;
   expiresAt: number;
 };
+const TASK_OBJECTIVES_CACHE_VERSION = 'v2';
 const idleQueue: IdleTask[] = [];
 let idleRunnerActive = false;
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
@@ -1081,7 +1082,7 @@ export const useMetadataStore = defineStore('metadata', {
       const apiGameMode = this.getApiGameMode();
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
-        cacheKey: apiGameMode,
+        cacheKey: `${TASK_OBJECTIVES_CACHE_VERSION}-${apiGameMode}`,
         endpoint: '/api/tarkov/tasks-objectives',
         queryParams: { lang: this.languageCode, gameMode: apiGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
