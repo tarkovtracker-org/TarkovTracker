@@ -78,6 +78,7 @@
     back_to_top: 'Нагору',
     refresh_button: 'Спробувати знову',
     opens_in_new_tab: 'Відкрити в новій вкладці',
+    note: 'Примітка',
   },
   import_confirm: {
     title: 'Підтвердити імпорт даних',
@@ -411,6 +412,7 @@
         copy_task_link: 'Копіювати посилання на завдання',
         copy_key_name: 'Скопіювати назву ключа',
         report_data_issue: 'Повідомити про помилку даних',
+        tarkov_dev_logo: 'Логотип Tarkov.dev',
         view_on_tarkov_dev: 'Відкрити на Tarkov.dev',
         view_on_wiki: 'Відкрити у вікі',
         view_task_on_wiki: 'Відкрити {name} у вікі',
@@ -1059,6 +1061,8 @@
       set_total_xp: 'Встановити Total XP',
       manual_hint: 'Введіть ваш фактичний загальний XP, щоб автоматично налаштувати зсув.',
       apply: 'Застосувати',
+      xp_amount: '{amount} XP',
+      xp_to_next: '{amount} до наступного',
       reset_offset: 'Скинути XP Offset',
     },
     danger_zone: {
@@ -1122,6 +1126,11 @@
     mark_collected: 'Позначити як зібране',
     aria: {
       enter_count: 'Введіть кількість предметів',
+      decrease_count: 'Зменшити кількість',
+      increase_count: 'Збільшити кількість',
+      click_to_enter_value: 'Натисніть, щоб ввести значення',
+      mark_as_complete: 'Позначити як 100% виконано',
+      mark_as_incomplete: 'Позначити як незавершене',
       decrease_fir: 'Зменшити кількість FIR',
       increase_fir: 'Збільшити кількість FIR',
       decrease_non_fir: 'Зменшити кількість не-FIR',

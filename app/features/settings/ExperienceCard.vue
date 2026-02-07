@@ -34,8 +34,12 @@
         </div>
         <div class="space-y-1">
           <div class="text-surface-400 flex justify-between text-xs">
-            <span>{{ formatNumber(totalXP) }} XP</span>
-            <span>{{ formatNumber(xpToNextLevel) }} to next</span>
+            <span>
+              {{ $t('settings.experience.xp_amount', { amount: formatNumber(totalXP) }) }}
+            </span>
+            <span>
+              {{ $t('settings.experience.xp_to_next', { amount: formatNumber(xpToNextLevel) }) }}
+            </span>
           </div>
           <div class="bg-surface-800/35 h-2 overflow-hidden rounded-full">
             <div

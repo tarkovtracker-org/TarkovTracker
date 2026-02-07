@@ -50,7 +50,7 @@
         >
           <img
             src="/img/logos/tarkovdevlogo.webp"
-            :alt="t('page.tasks.questcard.view_on_tarkov_dev')"
+            :alt="t('page.tasks.questcard.tarkov_dev_logo')"
             class="h-3.5 w-3.5"
           />
         </a>

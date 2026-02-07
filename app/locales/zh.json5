@@ -78,6 +78,7 @@
     back_to_top: '回到顶部',
     refresh_button: '重试',
     opens_in_new_tab: '在新选项卡中打开',
+    note: '注意',
   },
   import_confirm: {
     title: '确认数据导入',
@@ -411,6 +412,7 @@
         copy_task_link: '复制任务链接',
         copy_key_name: '复制钥匙名称',
         report_data_issue: '报告数据问题',
+        tarkov_dev_logo: 'Tarkov.dev 徽标',
         view_on_tarkov_dev: '在 Tarkov.dev 查看',
         view_on_wiki: '在维基查看',
         view_task_on_wiki: '在维基查看{name}',
@@ -1059,6 +1061,8 @@
       set_total_xp: '设置总经验',
       manual_hint: '输入实际总经验可自动调整偏移量',
       apply: '申请',
+      xp_amount: '{amount} 经验',
+      xp_to_next: '距下一级还需 {amount}',
       reset_offset: '重置经验偏移量',
     },
     danger_zone: {
@@ -1122,6 +1126,11 @@
     mark_collected: '标记为已收集',
     aria: {
       enter_count: '输入物品数量',
+      decrease_count: '减少数量',
+      increase_count: '增加数量',
+      click_to_enter_value: '点击输入数值',
+      mark_as_complete: '标记为100%完成',
+      mark_as_incomplete: '标记为未完成',
       decrease_fir: '减少 FIR 计数',
       increase_fir: '增加 FIR 数量',
       decrease_non_fir: '减少非 FIR 计数',

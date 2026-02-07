@@ -84,6 +84,7 @@
     back_to_top: 'Back to top',
     refresh_button: 'Try again',
     opens_in_new_tab: 'Opens in new tab',
+    note: 'Note',
   },
   import_confirm: {
     title: 'Confirm Data Import',
@@ -417,6 +418,7 @@
         copy_task_link: 'Copy Task Link',
         copy_key_name: 'Copy Key Name',
         report_data_issue: 'Report Data Issue',
+        tarkov_dev_logo: 'Tarkov.dev logo',
         view_on_tarkov_dev: 'View on Tarkov.dev',
         view_on_wiki: 'View on Wiki',
         view_task_on_wiki: 'View {name} on Wiki',
@@ -1065,6 +1067,8 @@
       set_total_xp: 'Set Total XP',
       manual_hint: 'Enter your actual total XP to adjust the offset automatically.',
       apply: 'Apply',
+      xp_amount: '{amount} XP',
+      xp_to_next: '{amount} to next',
       reset_offset: 'Reset XP Offset',
     },
     danger_zone: {
@@ -1128,6 +1132,11 @@
     mark_collected: 'Mark as collected',
     aria: {
       enter_count: 'Enter item count',
+      decrease_count: 'Decrease count',
+      increase_count: 'Increase count',
+      click_to_enter_value: 'Click to enter value',
+      mark_as_complete: 'Mark as 100% complete',
+      mark_as_incomplete: 'Mark as incomplete',
       decrease_fir: 'Decrease FIR count',
       increase_fir: 'Increase FIR count',
       decrease_non_fir: 'Decrease Non-FIR count',

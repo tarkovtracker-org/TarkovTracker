@@ -78,6 +78,7 @@
     back_to_top: 'Zurück nach oben',
     refresh_button: 'Erneut versuchen',
     opens_in_new_tab: 'Öffnet in neuem Tab',
+    note: 'Hinweis',
   },
   import_confirm: {
     title: 'Datenimport bestätigen',
@@ -411,6 +412,7 @@
         copy_task_link: 'Aufgaben-Link kopieren',
         copy_key_name: 'Schlüsselname kopieren',
         report_data_issue: 'Datenproblem melden',
+        tarkov_dev_logo: 'Tarkov.dev-Logo',
         view_on_tarkov_dev: 'Auf Tarkov.dev ansehen',
         view_on_wiki: 'Im Wiki ansehen',
         view_task_on_wiki: '{name} im Wiki ansehen',
@@ -1059,6 +1061,8 @@
       set_total_xp: 'Gesamt-XP festlegen',
       manual_hint: 'Gib deine tatsächliche Gesamt-XP ein, um den Offset automatisch anzupassen.',
       apply: 'Anwenden',
+      xp_amount: '{amount} XP',
+      xp_to_next: '{amount} bis zum nächsten',
       reset_offset: 'XP-Offset zurücksetzen',
     },
     danger_zone: {
@@ -1122,6 +1126,11 @@
     mark_collected: 'Als abgeholt markieren',
     aria: {
       enter_count: 'Gegenstandsanzahl eingeben',
+      decrease_count: 'Anzahl verringern',
+      increase_count: 'Anzahl erhöhen',
+      click_to_enter_value: 'Klicken, um Wert einzugeben',
+      mark_as_complete: 'Als 100% abgeschlossen markieren',
+      mark_as_incomplete: 'Als unvollständig markieren',
       decrease_fir: 'FIR-Anzahl verringern',
       increase_fir: 'Erhöhen Sie die FIR-Anzahl',
       decrease_non_fir: 'Verringern Sie die Anzahl der Nicht-FIR',

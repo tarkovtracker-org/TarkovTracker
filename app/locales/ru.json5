@@ -78,6 +78,7 @@
     back_to_top: 'Наверх',
     refresh_button: 'Попробовать снова',
     opens_in_new_tab: 'Открыть в новой вкладке',
+    note: 'Примечание',
   },
   import_confirm: {
     title: 'Подтвердите импорт данных',
@@ -411,6 +412,7 @@
         copy_task_link: 'Копировать ссылку на задачу',
         copy_key_name: 'Скопировать название ключа',
         report_data_issue: 'Сообщить об ошибке данных',
+        tarkov_dev_logo: 'Логотип Tarkov.dev',
         view_on_tarkov_dev: 'Открыть на Tarkov.dev',
         view_on_wiki: 'Открыть в вики',
         view_task_on_wiki: 'Открыть {name} в вики',
@@ -1059,6 +1061,8 @@
       set_total_xp: 'Установить общий опыт',
       manual_hint: 'Введите фактическое общее количество очков опыта, чтобы автоматически скорректировать смещение.',
       apply: 'Применять',
+      xp_amount: '{amount} XP',
+      xp_to_next: '{amount} до следующего',
       reset_offset: 'Сбросить смещение опыта',
     },
     danger_zone: {
@@ -1122,6 +1126,11 @@
     mark_collected: 'Отметить как собранное',
     aria: {
       enter_count: 'Введите количество предметов',
+      decrease_count: 'Уменьшить количество',
+      increase_count: 'Увеличить количество',
+      click_to_enter_value: 'Нажмите, чтобы ввести значение',
+      mark_as_complete: 'Отметить как 100% выполнено',
+      mark_as_incomplete: 'Отметить как незавершённое',
       decrease_fir: 'Уменьшить количество FIR',
       increase_fir: 'Увеличьте количество FIR',
       decrease_non_fir: 'Уменьшить количество не-FIR',

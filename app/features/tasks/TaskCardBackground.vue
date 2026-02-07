@@ -34,7 +34,7 @@
   });
   const iconColor = computed(() => {
     if (props.isFailed) return 'text-error-400';
-    if (props.isComplete) return 'text-green-400';
+    if (props.isComplete) return 'text-completed-400';
     if (props.isInvalid) return 'text-surface-400';
     if (props.isLocked) return 'text-locked-500';
     return 'text-brand-200';

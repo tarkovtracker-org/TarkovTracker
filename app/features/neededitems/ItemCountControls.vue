@@ -3,10 +3,10 @@
     <!-- Counter controls group with background -->
     <div class="bg-surface-700 flex items-center rounded-lg border border-white/20 shadow-sm">
       <!-- Decrease button -->
-      <AppTooltip text="Decrease count">
+      <AppTooltip :text="$t('needed_items.aria.decrease_count')">
         <button
           class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 flex h-5 w-5 items-center justify-center rounded-l-lg transition-colors hover:text-white sm:h-6 sm:w-6 lg:h-8 lg:w-8"
-          aria-label="Decrease count"
+          :aria-label="$t('needed_items.aria.decrease_count')"
           @click="$emit('decrease')"
         >
           <UIcon name="i-mdi-minus" class="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-5 lg:w-5" />
@@ -30,10 +30,10 @@
           />
         </template>
         <template v-else>
-          <AppTooltip text="Click to enter value">
+          <AppTooltip :text="$t('needed_items.aria.click_to_enter_value')">
             <button
               class="hover:bg-surface-600 h-full w-full px-0.5 text-[10px] font-semibold text-white transition-colors sm:text-xs lg:px-2 lg:text-sm"
-              aria-label="Click to enter value"
+              :aria-label="$t('needed_items.aria.click_to_enter_value')"
               @click="startEditing"
             >
               {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
@@ -42,10 +42,10 @@
         </template>
       </div>
       <!-- Increase button -->
-      <AppTooltip text="Increase count">
+      <AppTooltip :text="$t('needed_items.aria.increase_count')">
         <button
           class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 flex h-5 w-5 items-center justify-center rounded-r-lg transition-colors hover:text-white sm:h-6 sm:w-6 lg:h-8 lg:w-8"
-          aria-label="Increase count"
+          :aria-label="$t('needed_items.aria.increase_count')"
           @click="$emit('increase')"
         >
           <UIcon name="i-mdi-plus" class="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-5 lg:w-5" />
@@ -54,11 +54,19 @@
     </div>
     <!-- Mark as 100% complete button - separated with more spacing -->
     <AppTooltip
-      :text="currentCount >= neededCount ? 'Mark as incomplete' : 'Mark as 100% complete'"
+      :text="
+        currentCount >= neededCount
+          ? $t('needed_items.aria.mark_as_incomplete')
+          : $t('needed_items.aria.mark_as_complete')
+      "
     >
       <button
         class="flex h-5 w-5 items-center justify-center rounded-lg border transition-colors sm:h-6 sm:w-6 lg:h-8 lg:w-8"
-        :aria-label="currentCount >= neededCount ? 'Mark as incomplete' : 'Mark as 100% complete'"
+        :aria-label="
+          currentCount >= neededCount
+            ? $t('needed_items.aria.mark_as_incomplete')
+            : $t('needed_items.aria.mark_as_complete')
+        "
         :class="
           currentCount >= neededCount
             ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
