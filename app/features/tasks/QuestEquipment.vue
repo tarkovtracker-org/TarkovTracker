@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="mb-2 text-xs font-medium text-gray-400">
-      {{ $t('page.tasks.questcard.equipmentHeader', 'Required Equipment') }}
+      {{ $t('page.tasks.questcard.equipment_header') }}
     </div>
     <div class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
       <div v-for="item in equipment" :key="item.id" class="inline-block">

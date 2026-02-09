@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: 'Pinned Tasks',
       questcard: {
+        equipment_header: 'Required equipment',
         pin_task: 'Pin task',
         unpin_task: 'Unpin task',
         level: 'Level: {count}',

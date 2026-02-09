@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: 'Закреплённые задания',
       questcard: {
+        equipment_header: 'Необходимое оборудование',
         pin_task: 'Закрепить задание',
         unpin_task: 'Открепить задание',
         level: 'Требуемый уровень: {count}',

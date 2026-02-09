@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: 'Quêtes épinglées',
       questcard: {
+        equipment_header: 'Équipement requis',
         pin_task: 'Épingler la quête',
         unpin_task: 'Désépingler la quête',
         level: 'Niveau requis : {count}',

@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: 'Закріплені завдання',
       questcard: {
+        equipment_header: 'Необхідне спорядження',
         pin_task: 'Закріпити завдання',
         unpin_task: 'Відкріпити завдання',
         level: 'Потрібний рівень: {count}',

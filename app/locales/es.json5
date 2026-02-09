@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: 'Misiones fijadas',
       questcard: {
+        equipment_header: 'Equipo requerido',
         pin_task: 'Fijar misión',
         unpin_task: 'Desfijar misión',
         level: 'Nivel requerido: {count}',

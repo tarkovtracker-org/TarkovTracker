@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: 'Angeheftete Aufgaben',
       questcard: {
+        equipment_header: 'Erforderliche ausrüstung',
         pin_task: 'Aufgabe anheften',
         unpin_task: 'Aufgabe lösen',
         level: 'Ebene: {count}',

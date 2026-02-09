@@ -302,6 +302,7 @@
       },
       pinned_tasks_section: '已固定任务',
       questcard: {
+        equipment_header: '所需设备',
         pin_task: '固定任务',
         unpin_task: '取消固定任务',
         level: '等级要求：{count}',
