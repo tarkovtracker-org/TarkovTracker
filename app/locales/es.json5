@@ -270,6 +270,7 @@
           has_required_keys: 'Solo misiones con llaves',
           show_global_tasks: 'Mostrar tareas globales en el mapa',
           impact_respects_filters: 'El impacto respeta los filtros de tareas',
+          sort_completed_map_objectives: 'Ordenar objetivos de mapa completados al final',
         },
         appearance: {
           hint: 'Ajusta el aspecto de las tarjetas de tareas.',

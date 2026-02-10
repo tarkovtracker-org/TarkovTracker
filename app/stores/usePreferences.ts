@@ -72,6 +72,7 @@ export interface PreferencesState {
   itemsHideNonFIR: boolean;
   hideGlobalTasks: boolean;
   hideNonKappaTasks: boolean;
+  hideCompletedMapObjectives: boolean;
   neededitemsStyle: string | null;
   hideoutPrimaryView?: string | null;
   hideoutCollapseCompleted: boolean;
@@ -147,6 +148,7 @@ export const preferencesDefaultState: PreferencesState = {
   itemsHideNonFIR: false,
   hideGlobalTasks: false,
   hideNonKappaTasks: false,
+  hideCompletedMapObjectives: false,
   neededitemsStyle: null,
   hideoutPrimaryView: null,
   hideoutCollapseCompleted: false,
@@ -323,6 +325,9 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     getHideNonKappaTasks: (state) => {
       return state.hideNonKappaTasks ?? false;
+    },
+    getHideCompletedMapObjectives: (state) => {
+      return state.hideCompletedMapObjectives ?? false;
     },
     getNeededItemsStyle: (state) => {
       return state.neededitemsStyle ?? 'mediumCard';
@@ -541,6 +546,9 @@ export const usePreferencesStore = defineStore('preferences', {
       this.saving = this.saving ?? { ...initialSavingState };
       this.saving.hideNonKappaTasks = true;
     },
+    setHideCompletedMapObjectives(hide: boolean) {
+      this.hideCompletedMapObjectives = hide;
+    },
     setNeededItemsStyle(style: string) {
       this.neededitemsStyle = style;
     },
@@ -705,6 +713,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'itemsHideNonFIR',
       'hideGlobalTasks',
       'hideNonKappaTasks',
+      'hideCompletedMapObjectives',
       'neededitemsStyle',
       'hideoutPrimaryView',
       'localeOverride',

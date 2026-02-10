@@ -9,6 +9,8 @@ export const MAP_OBJECTIVE_TYPES = [
   'plantQuestItem',
   'shoot',
   'useItem',
+  'buildWeapon',
+  'place',
 ] as const;
 const MAP_OBJECTIVE_TYPE_SET = new Set<string>(MAP_OBJECTIVE_TYPES);
 export const isMapObjectiveType = (objectiveType: string | null | undefined): boolean => {

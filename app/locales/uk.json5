@@ -270,6 +270,7 @@
           has_required_keys: 'Лише завдання з ключами',
           show_global_tasks: 'Показати глобальні завдання на карті',
           impact_respects_filters: 'Вплив враховує фільтри завдань',
+          sort_completed_map_objectives: 'Сортувати виконані цілі на карті вниз',
         },
         appearance: {
           hint: 'Налаштуйте вигляд карток завдань.',

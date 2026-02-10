@@ -108,6 +108,7 @@ const buildPreferencesSyncPayload = (
     items_hide_non_fir: preferencesState.itemsHideNonFIR,
     hide_global_tasks: preferencesState.hideGlobalTasks,
     hide_non_kappa_tasks: preferencesState.hideNonKappaTasks,
+    hide_completed_map_objectives: preferencesState.hideCompletedMapObjectives,
     show_non_special_tasks: preferencesState.showNonSpecialTasks,
     show_lightkeeper_tasks: preferencesState.showLightkeeperTasks,
     only_tasks_with_required_keys: Boolean(preferencesState.onlyTasksWithRequiredKeys),

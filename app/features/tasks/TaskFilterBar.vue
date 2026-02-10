@@ -553,7 +553,8 @@
       metadataStore.tasks,
       preferencesStore.getHideGlobalTasks,
       preferencesStore.getTaskUserView,
-      normalizeSecondaryView(preferencesStore.getTaskSecondaryView)
+      normalizeSecondaryView(preferencesStore.getTaskSecondaryView),
+      preferencesStore.getHideCompletedMapObjectives
     );
   });
   // Primary view (all / maps / traders)

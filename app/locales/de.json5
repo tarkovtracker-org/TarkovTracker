@@ -270,6 +270,7 @@
           has_required_keys: 'Nur Aufgaben mit Schlüsseln',
           show_global_tasks: 'Globale Aufgaben auf der Karte anzeigen',
           impact_respects_filters: 'Impact respektiert Aufgabenfilter',
+          sort_completed_map_objectives: 'Abgeschlossene Kartenziele nach unten sortieren',
         },
         appearance: {
           hint: 'Optimieren Sie das Aussehen von Aufgabenkarten.',

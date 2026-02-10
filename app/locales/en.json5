@@ -270,6 +270,7 @@
           has_required_keys: 'Only Tasks with Keys',
           show_global_tasks: 'Show Global Tasks on Map',
           impact_respects_filters: 'Impact Respects Task Filters',
+          sort_completed_map_objectives: 'Sort Completed Map Objectives to Bottom',
         },
         appearance: {
           hint: 'Tune how task cards look.',

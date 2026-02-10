@@ -270,6 +270,7 @@
           has_required_keys: '仅显示需要钥匙的任务',
           show_global_tasks: '在地图上显示全局任务',
           impact_respects_filters: '影响值遵循任务筛选',
+          sort_completed_map_objectives: '将已完成的地图目标排到底部',
         },
         appearance: {
           hint: '调整任务卡的外观',

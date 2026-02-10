@@ -242,6 +242,7 @@
     getOnlyTasksWithRequiredKeys,
     getRespectTaskFiltersForImpact,
     getHideGlobalTasks,
+    getHideCompletedMapObjectives,
     getPinnedTaskIds,
   } = storeToRefs(preferencesStore);
   const metadataStore = useMetadataStore();
@@ -250,7 +251,8 @@
   const sortedTraders = computed(() => metadataStore.sortedTraders);
   const editions = computed(() => metadataStore.editions);
   const progressStore = useProgressStore();
-  const { tasksCompletions, unlockedTasks, tasksFailed } = storeToRefs(progressStore);
+  const { tasksCompletions, unlockedTasks, tasksFailed, objectiveCompletions } =
+    storeToRefs(progressStore);
   const { visibleTasks, updateVisibleTasks, isGlobalTask: isGlobalTaskFn } = useTaskFiltering();
   const tarkovStore = useTarkovStore();
   const userGameEdition = computed(() => tarkovStore.getGameEdition());
@@ -479,6 +481,7 @@
       getOnlyTasksWithRequiredKeys,
       getRespectTaskFiltersForImpact,
       getHideGlobalTasks,
+      getHideCompletedMapObjectives,
       getPinnedTaskIds,
       tasksLoading,
       tasks,
@@ -486,6 +489,7 @@
       tasksCompletions,
       unlockedTasks,
       tasksFailed,
+      objectiveCompletions,
       userGameEdition,
       editions,
     ],
