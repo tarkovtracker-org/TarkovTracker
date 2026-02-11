@@ -26,6 +26,7 @@ export const perfNow = (): number => {
   }
   return Date.now();
 };
+export const roundPerfMs = (value: number): number => Math.round(value * 100) / 100;
 export const perfStart = (label: string, meta?: PerfMeta): PerfTimer | null => {
   if (!PERF_ENABLED) return null;
   return { label, start: perfNow(), meta };
@@ -38,9 +39,9 @@ export const perfEnd = (timer: PerfTimer | null, meta?: PerfMeta): number | null
   const payload = meta ? { ...(timer.meta ?? {}), ...meta } : timer.meta;
   const durationLabel = `${durationMs.toFixed(2)}ms`;
   if (payload) {
-    logger.info(`[Perf] ${timer.label} ${durationLabel}`, payload);
+    logger.debug(`[Perf] ${timer.label} ${durationLabel}`, payload);
   } else {
-    logger.info(`[Perf] ${timer.label} ${durationLabel}`);
+    logger.debug(`[Perf] ${timer.label} ${durationLabel}`);
   }
   return durationMs;
 };

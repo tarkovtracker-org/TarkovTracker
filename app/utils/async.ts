@@ -46,3 +46,6 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
     signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
+export function sleep(ms: number): Promise<void> {
+  return delay(ms);
+}

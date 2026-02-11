@@ -322,7 +322,7 @@ export async function getCachedData<T>(
       }
       logger.debug(`[TarkovCache] Cache HIT: ${cacheKey} (age: ${Math.round(age / 1000 / 60)}min)`);
       if (perfEnabled() && cachedResult.sizeBytes !== undefined) {
-        logger.info('[Perf] [Cache] entry size', { cacheKey, sizeBytes: cachedResult.sizeBytes });
+        logger.debug('[Perf] [Cache] entry size', { cacheKey, sizeBytes: cachedResult.sizeBytes });
       }
       return cachedResult.data;
     });

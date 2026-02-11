@@ -35,15 +35,9 @@ export function normalizeTaskObjectives<T = unknown>(objectives: unknown): T[] {
     return objectives.filter((value): value is T => value != null);
   }
   if (typeof objectives === 'object') {
-    if (import.meta.env.DEV) {
-      console.debug('[DEV] Normalized non-array objectives to array format');
-    }
     return Object.values(objectives as Record<string, T>).filter(
       (value): value is T => value != null
     );
-  }
-  if (import.meta.env.DEV) {
-    console.warn('[DEV] Task objectives in unexpected format, returning empty array', objectives);
   }
   return [];
 }
