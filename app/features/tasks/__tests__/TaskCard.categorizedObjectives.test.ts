@@ -153,7 +153,7 @@ describe('TaskCard categorizedObjectives', () => {
         createObjective('obj-1', 'mark', [{ id: 'map-customs' }]), // Map type
         createObjective('obj-2', 'zone', [{ id: 'map-customs' }]), // Map type
         createObjective('obj-3', 'giveItem', [{ id: 'map-customs' }]), // NOT map type (even though on map)
-        createObjective('obj-4', 'buildWeapon', [{ id: 'map-customs' }]), // Map type
+        createObjective('obj-4', 'buildWeapon', [{ id: 'map-customs' }]), // NOT map type (non-location)
       ];
       const result = computeCategorizedObjectives({
         objectives,
@@ -161,14 +161,14 @@ describe('TaskCard categorizedObjectives', () => {
         selectedMapId: 'map-customs',
         completedObjectiveIds: new Set(),
       });
-      // obj-1, obj-2, obj-4 are map types on selected map = relevant
-      // obj-3 has maps but is not a map type = irrelevant
-      expect(result.relevant).toHaveLength(3);
+      // obj-1, obj-2 are map types on selected map = relevant
+      // obj-3, obj-4 have maps but are not map types = irrelevant
+      expect(result.relevant).toHaveLength(2);
       expect(result.relevant).toContainEqual(expect.objectContaining({ id: 'obj-1' }));
       expect(result.relevant).toContainEqual(expect.objectContaining({ id: 'obj-2' }));
-      expect(result.relevant).toContainEqual(expect.objectContaining({ id: 'obj-4' }));
-      expect(result.irrelevant).toHaveLength(1);
+      expect(result.irrelevant).toHaveLength(2);
       expect(result.irrelevant).toContainEqual(expect.objectContaining({ id: 'obj-3' }));
+      expect(result.irrelevant).toContainEqual(expect.objectContaining({ id: 'obj-4' }));
     });
     it('handles all MAP_OBJECTIVE_TYPES correctly', () => {
       const objectives = MAP_OBJECTIVE_TYPES.map((type, i) =>
