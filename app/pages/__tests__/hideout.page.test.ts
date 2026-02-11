@@ -43,6 +43,11 @@ vi.mock('@/composables/useHideoutFiltering', () => ({
     stationCounts: ref({ available: 1, maxed: 0, locked: 0, all: 1 }),
   }),
 }));
+vi.mock('@/composables/useInfiniteScroll', () => ({
+  useInfiniteScroll: () => ({
+    checkAndLoadMore: vi.fn(),
+  }),
+}));
 vi.mock('@/composables/useHideoutStationStatus', () => ({
   useHideoutStationStatus: () => ({
     getStationStatus: () => 'available',

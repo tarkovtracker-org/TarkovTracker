@@ -176,10 +176,12 @@
             />
           </div>
         </div>
-        <div v-if="visibleStationCount < visibleStations.length" class="mt-4 flex justify-center">
-          <UButton color="neutral" variant="outline" size="sm" @click="loadMoreStations">
-            {{ t('page.hideout.load_more_stations') }}
-          </UButton>
+        <div
+          v-if="visibleStationCount < visibleStations.length"
+          ref="loadMoreSentinel"
+          class="flex items-center justify-center py-4"
+        >
+          <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
         </div>
       </div>
     </div>
@@ -191,6 +193,7 @@
   import { useRoute, useRouter } from 'vue-router';
   import { type HideoutPrimaryView, useHideoutFiltering } from '@/composables/useHideoutFiltering';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
+  import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { usePrereqModal, type PrereqType } from '@/composables/usePrereqModal';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -251,31 +254,32 @@
   // Hideout filtering composable
   const { activePrimaryView, isStoreLoading, visibleStations, stationCounts } =
     useHideoutFiltering();
-  const INITIAL_STATION_BATCH = 6;
-  const IDLE_STATION_BATCH = 15;
-  const STATION_BATCH_SIZE = 6;
-  const visibleStationCount = ref(INITIAL_STATION_BATCH);
+  const BATCH_SIZE = 9;
+  const visibleStationCount = ref(BATCH_SIZE);
+  const loadMoreSentinel = ref<HTMLElement | null>(null);
   const visibleStationsSlice = computed(() =>
     visibleStations.value.slice(0, visibleStationCount.value)
   );
+  const hasMoreStations = computed(() => visibleStationCount.value < visibleStations.value.length);
   const loadMoreStations = () => {
+    if (!hasMoreStations.value) return;
     visibleStationCount.value = Math.min(
-      visibleStationCount.value + STATION_BATCH_SIZE,
+      visibleStationCount.value + BATCH_SIZE,
       visibleStations.value.length
     );
   };
-  onMounted(() => {
-    const expandInitialStations = () => {
-      visibleStationCount.value = Math.min(IDLE_STATION_BATCH, visibleStations.value.length);
-    };
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(expandInitialStations, { timeout: 1200 });
-    } else {
-      globalThis.setTimeout(expandInitialStations, 0);
-    }
+  const { checkAndLoadMore } = useInfiniteScroll(loadMoreSentinel, loadMoreStations, {
+    enabled: hasMoreStations,
+    maxAutoLoads: 8,
+    rootMargin: '700px',
   });
-  watch(visibleStations, () => {
-    visibleStationCount.value = INITIAL_STATION_BATCH;
+  watch(visibleStations, (newStations) => {
+    if (visibleStationCount.value > newStations.length) {
+      visibleStationCount.value = newStations.length;
+    }
+    nextTick(() => {
+      checkAndLoadMore();
+    });
   });
   type HideoutPrimaryViewOption = {
     badgeColor: string;
