@@ -666,13 +666,8 @@
     maxAutoLoads: 8,
     rootMargin: '700px',
   });
-  watch(filteredTasks, (newTasks, oldTasks) => {
-    const tasksChanged = !oldTasks || newTasks !== oldTasks;
-    if (tasksChanged) {
-      visibleTaskCount.value = Math.min(BATCH_SIZE, newTasks.length);
-    } else if (visibleTaskCount.value > newTasks.length) {
-      visibleTaskCount.value = newTasks.length;
-    }
+  watch(filteredTasks, (newTasks) => {
+    visibleTaskCount.value = Math.min(BATCH_SIZE, newTasks.length);
     nextTick(() => {
       checkAndLoadMore();
     });

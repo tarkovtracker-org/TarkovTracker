@@ -305,8 +305,6 @@
       loading: 'Cargando misiones',
       map: {
         resize_handle: 'Ajustar altura del mapa',
-        hidden_tasks_notice: '{count} tareas están ocultas porque no tienen objetivos pendientes en este mapa.',
-        show_hidden_tasks: 'Mostrar tareas ocultas',
         map_complete_tasks_hidden: '{count} tareas completadas en este mapa están ocultas.',
         map_complete_tasks_showing: '{count} tareas completadas en este mapa se están mostrando.',
         map_complete_tasks_toggle_show: 'Mostrar ocultas',

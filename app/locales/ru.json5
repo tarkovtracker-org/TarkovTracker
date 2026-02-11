@@ -305,8 +305,6 @@
       loading: 'Загружаем задания',
       map: {
         resize_handle: 'Изменить высоту карты',
-        hidden_tasks_notice: '{count} задач скрыто, потому что на этой карте по ним не осталось целей.',
-        show_hidden_tasks: 'Показать скрытые задачи',
         map_complete_tasks_hidden: '{count} задач, завершённых для этой карты, скрыто.',
         map_complete_tasks_showing: '{count} задач, завершённых для этой карты, показано.',
         map_complete_tasks_toggle_show: 'Показать скрытые',

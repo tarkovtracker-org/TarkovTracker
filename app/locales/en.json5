@@ -305,8 +305,6 @@
       loading: 'Loading tasks',
       map: {
         resize_handle: 'Resize map height',
-        hidden_tasks_notice: '{count} tasks are hidden because they have no objectives left on this map.',
-        show_hidden_tasks: 'Show Hidden Tasks',
         map_complete_tasks_hidden: '{count} tasks hidden on this map.',
         map_complete_tasks_showing: '{count} map-complete tasks shown on this map.',
         map_complete_tasks_toggle_show: 'Show hidden',

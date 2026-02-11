@@ -305,8 +305,6 @@
       loading: '加载任务中',
       map: {
         resize_handle: '调整地图高度',
-        hidden_tasks_notice: '有 {count} 个任务被隐藏，因为它们在当前地图上已无剩余目标。',
-        show_hidden_tasks: '显示已隐藏任务',
         map_complete_tasks_hidden: '该地图上有 {count} 个已完成任务被隐藏。',
         map_complete_tasks_showing: '该地图上有 {count} 个地图目标已完成任务正在显示。',
         map_complete_tasks_toggle_show: '显示隐藏项',

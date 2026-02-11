@@ -305,8 +305,6 @@
       loading: 'Завантажуємо завдання',
       map: {
         resize_handle: 'Змінити висоту карти',
-        hidden_tasks_notice: '{count} завдань приховано, бо на цій карті для них не залишилось цілей.',
-        show_hidden_tasks: 'Показати приховані завдання',
         map_complete_tasks_hidden: '{count} завдань, завершених для цієї карти, приховано.',
         map_complete_tasks_showing: '{count} завдань, завершених для цієї карти, показано.',
         map_complete_tasks_toggle_show: 'Показати приховані',

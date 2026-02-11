@@ -305,8 +305,6 @@
       loading: 'Lade Aufgaben',
       map: {
         resize_handle: 'Kartenhöhe anpassen',
-        hidden_tasks_notice: '{count} Aufgaben sind ausgeblendet, da auf dieser Karte keine Ziele mehr offen sind.',
-        show_hidden_tasks: 'Ausgeblendete Aufgaben anzeigen',
         map_complete_tasks_hidden: '{count} kartenziel-erledigte Aufgaben auf dieser Karte ausgeblendet.',
         map_complete_tasks_showing: '{count} kartenziel-erledigte Aufgaben werden auf dieser Karte angezeigt.',
         map_complete_tasks_toggle_show: 'Ausgeblendete anzeigen',

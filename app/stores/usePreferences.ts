@@ -115,6 +115,7 @@ export interface PreferencesState {
     streamerMode: boolean;
     hideGlobalTasks: boolean;
     hideNonKappaTasks: boolean;
+    hideCompletedMapObjectives: boolean;
     itemsNeededHideNonFIR: boolean;
   };
 }
@@ -191,6 +192,7 @@ export const preferencesDefaultState: PreferencesState = {
     streamerMode: false,
     hideGlobalTasks: false,
     hideNonKappaTasks: false,
+    hideCompletedMapObjectives: false,
     itemsNeededHideNonFIR: false,
   },
 };

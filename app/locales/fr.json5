@@ -305,8 +305,6 @@
       loading: 'Chargement des quêtes',
       map: {
         resize_handle: 'Ajuster la hauteur de la carte',
-        hidden_tasks_notice: "{count} tâches sont masquées car elles n'ont plus d'objectifs sur cette carte.",
-        show_hidden_tasks: 'Afficher les tâches masquées',
         map_complete_tasks_hidden: '{count} tâches terminées sur cette carte sont masquées.',
         map_complete_tasks_showing: '{count} tâches terminées sur cette carte sont affichées.',
         map_complete_tasks_toggle_show: 'Afficher masquées',
