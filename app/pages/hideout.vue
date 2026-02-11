@@ -188,6 +188,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useDebounceFn } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import { useI18n } from 'vue-i18n';
   import { useRoute, useRouter } from 'vue-router';
@@ -273,13 +274,16 @@
     maxAutoLoads: 8,
     rootMargin: '700px',
   });
+  const debouncedCheckAndLoadMore = useDebounceFn(() => {
+    void nextTick(() => {
+      checkAndLoadMore();
+    });
+  }, 50);
   watch(visibleStations, (newStations) => {
     if (visibleStationCount.value > newStations.length) {
       visibleStationCount.value = newStations.length;
     }
-    nextTick(() => {
-      checkAndLoadMore();
-    });
+    debouncedCheckAndLoadMore();
   });
   type HideoutPrimaryViewOption = {
     badgeColor: string;
