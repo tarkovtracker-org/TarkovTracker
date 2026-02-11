@@ -89,6 +89,20 @@
                   </div>
                 </div>
               </div>
+              <MapTaskVisibilityNotice
+                v-if="
+                  showMapTaskVisibilityNotice &&
+                  (mapSpecificTasksInSlice.length > 0 ||
+                    (pinnedTasksInSlice.length > 0 &&
+                      globalTasksInSlice.length === 0 &&
+                      mapSpecificTasksInSlice.length === 0 &&
+                      mapCompleteTasksCountOnMap > 0))
+                "
+                class="mb-6"
+                :count="mapCompleteTasksCountOnMap"
+                :is-hiding="getHideCompletedMapObjectives"
+                @toggle="toggleMapTaskVisibilityFilter"
+              />
               <div>
                 <div
                   v-for="task in mapSpecificTasksInSlice"
@@ -98,13 +112,6 @@
                   <TaskCard :task="task" @on-task-action="handleTaskAction" />
                 </div>
               </div>
-              <MapTaskVisibilityNotice
-                v-if="showMapTaskVisibilityNotice && mapSpecificTasksInSlice.length > 0"
-                class="mb-6"
-                :count="mapCompleteTasksCountOnMap"
-                :is-hiding="getHideCompletedMapObjectives"
-                @toggle="toggleMapTaskVisibilityFilter"
-              />
               <div v-if="globalTasksInSlice.length > 0" class="mt-2 mb-6">
                 <div class="mb-3 flex items-center gap-2">
                   <UIcon name="i-mdi-earth" class="text-primary-400 h-4 w-4" />
@@ -489,18 +496,8 @@
   };
   useTaskRouteSync({ maps, traders: sortedTraders });
   const refreshVisibleTasks = () => {
-    const options: TaskFilterAndSortOptions = {
-      primaryView: getTaskPrimaryView.value as TaskPrimaryView,
-      secondaryView: getTaskSecondaryView.value as TaskSecondaryView,
-      userView: getTaskUserView.value,
-      mapView: getTaskMapView.value,
-      traderView: getTaskTraderView.value,
-      mergedMaps: mergedMaps.value,
-      sortMode: getTaskSortMode.value,
-      sortDirection: getTaskSortDirection.value,
-    };
     try {
-      updateVisibleTasks(options, tasksLoading.value);
+      updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
     } catch (error) {
       logger.error('[Tasks] Failed to refresh tasks:', error);
     }
