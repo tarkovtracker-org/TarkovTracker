@@ -19,6 +19,13 @@ export interface SupabaseListenerConfig {
   /** Optional sync controller to pause during remote updates */
   syncController?: { pause: () => void; resume: () => void };
 }
+interface SupabaseListenerReturn {
+  isSubscribed: Ref<boolean>;
+  hasInitiallyLoaded: Ref<boolean>;
+  loadError: Ref<PostgrestError | null>;
+  cleanup: () => void;
+  fetchData: () => Promise<void>;
+}
 const VUE_REACTIVITY_SETTLE_MS = 100;
 /**
  * Creates a Supabase realtime listener that automatically manages subscriptions
@@ -31,7 +38,7 @@ export function useSupabaseListener({
   storeId,
   onData,
   syncController,
-}: SupabaseListenerConfig) {
+}: SupabaseListenerConfig): SupabaseListenerReturn {
   const { $supabase } = useNuxtApp();
   const channel = ref<RealtimeChannel | null>(null);
   const isSubscribed = ref(false);

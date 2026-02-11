@@ -57,6 +57,7 @@ function isAbortRequestError(error: SupabaseErrorLike): boolean {
     `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
   return (
     combined.includes('aborterror') ||
+    combined.includes('aborted') ||
     combined.includes('signal is aborted') ||
     combined.includes('request was aborted')
   );
