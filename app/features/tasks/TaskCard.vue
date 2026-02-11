@@ -230,12 +230,12 @@
           />
         </div>
         <Transition
-          enter-active-class="transition duration-150 ease-out"
-          enter-from-class="opacity-0 -translate-y-1"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition duration-100 ease-in"
-          leave-from-class="opacity-100 translate-y-0"
-          leave-to-class="opacity-0 -translate-y-1"
+          :css="false"
+          @before-enter="onObjectivesBeforeEnter"
+          @enter="onObjectivesEnter"
+          @after-enter="onObjectivesAfterEnter"
+          @before-leave="onObjectivesBeforeLeave"
+          @leave="onObjectivesLeave"
         >
           <div
             v-if="objectivesVisible"
@@ -350,6 +350,7 @@
   import TaskCardBackground from '@/features/tasks/TaskCardBackground.vue';
   import TaskCardBadges from '@/features/tasks/TaskCardBadges.vue';
   import TaskCardHeader from '@/features/tasks/TaskCardHeader.vue';
+  import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
   import { isMapObjectiveType } from '@/features/tasks/taskObjectiveTypes';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -387,11 +388,8 @@
   const QuestObjectives = defineAsyncComponent({
     loader: () => import('@/features/tasks/QuestObjectives.vue'),
     loadingComponent: QuestObjectivesSkeleton,
-    delay: 150, // Prevents skeleton flash on fast loads
+    delay: 150,
   });
-  const TaskCardRewards = defineAsyncComponent(
-    () => import('@/features/tasks/TaskCardRewards.vue')
-  );
   const props = defineProps<{
     task: Task;
   }>();
@@ -427,6 +425,44 @@
   });
   const toggleObjectivesVisibility = () => {
     objectivesExpanded.value = !objectivesExpanded.value;
+  };
+  const OBJECTIVES_ENTER_MS = 150;
+  const OBJECTIVES_LEAVE_MS = 120;
+  const onObjectivesBeforeEnter = (el: Element) => {
+    const htmlEl = el as HTMLElement;
+    htmlEl.style.maxHeight = '0';
+    htmlEl.style.overflow = 'hidden';
+    htmlEl.style.opacity = '0';
+  };
+  const onObjectivesEnter = (el: Element, done: () => void) => {
+    const htmlEl = el as HTMLElement;
+    const height = htmlEl.scrollHeight;
+    htmlEl.style.transition = `max-height ${OBJECTIVES_ENTER_MS}ms ease-out, opacity ${OBJECTIVES_ENTER_MS}ms ease-out`;
+    requestAnimationFrame(() => {
+      htmlEl.style.maxHeight = `${height}px`;
+      htmlEl.style.opacity = '1';
+    });
+    setTimeout(done, OBJECTIVES_ENTER_MS + 10);
+  };
+  const onObjectivesAfterEnter = (el: Element) => {
+    const htmlEl = el as HTMLElement;
+    htmlEl.style.maxHeight = '';
+    htmlEl.style.overflow = '';
+    htmlEl.style.transition = '';
+  };
+  const onObjectivesBeforeLeave = (el: Element) => {
+    const htmlEl = el as HTMLElement;
+    htmlEl.style.maxHeight = `${htmlEl.scrollHeight}px`;
+    htmlEl.style.overflow = 'hidden';
+  };
+  const onObjectivesLeave = (el: Element, done: () => void) => {
+    const htmlEl = el as HTMLElement;
+    htmlEl.style.transition = `max-height ${OBJECTIVES_LEAVE_MS}ms ease-in, opacity ${OBJECTIVES_LEAVE_MS}ms ease-in`;
+    requestAnimationFrame(() => {
+      htmlEl.style.maxHeight = '0';
+      htmlEl.style.opacity = '0';
+    });
+    setTimeout(done, OBJECTIVES_LEAVE_MS + 10);
   };
   // Use extracted task actions composable
   const { markTaskComplete, markTaskUncomplete, markTaskAvailable, markTaskFailed } =

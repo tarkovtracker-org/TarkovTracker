@@ -177,8 +177,21 @@
   const objectiveEquipment = computed(() => {
     const obj = fullObjective.value ?? props.objective;
     const items: TarkovItem[] = [];
-    if (obj.markerItem) items.push(obj.markerItem);
-    return items;
+    if (obj.markerItem?.id) items.push(obj.markerItem);
+    if (obj.items?.length) items.push(...obj.items);
+    if (obj.questItem?.id) items.push(obj.questItem);
+    if (obj.useAny?.length) items.push(...obj.useAny);
+    if (obj.usingWeapon?.id) items.push(obj.usingWeapon);
+    if (obj.usingWeaponMods?.length) items.push(...obj.usingWeaponMods);
+    if (obj.wearing?.length) items.push(...obj.wearing);
+    const seenItemIds = new Set<TarkovItem['id']>();
+    const uniqueItems: TarkovItem[] = [];
+    for (const item of items) {
+      if (!item?.id || seenItemIds.has(item.id)) continue;
+      seenItemIds.add(item.id);
+      uniqueItems.push(item);
+    }
+    return uniqueItems;
   });
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
