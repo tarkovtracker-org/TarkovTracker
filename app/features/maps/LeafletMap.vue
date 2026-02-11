@@ -57,17 +57,6 @@
         class="bg-surface-800/90 absolute top-2 right-2 z-1000 flex flex-wrap items-center gap-2 rounded p-1.5"
       >
         <UButton
-          color="neutral"
-          variant="soft"
-          size="sm"
-          icon="i-mdi-fit-to-screen"
-          :class="MAP_BUTTON_ACTIVE_CLASS"
-          :title="t('maps.reset_title')"
-          @click="refreshView"
-        >
-          {{ t('maps.reset') }}
-        </UButton>
-        <UButton
           v-if="props.showExtractToggle"
           color="neutral"
           :variant="showPmcExtracts ? 'soft' : 'ghost'"
@@ -161,38 +150,60 @@
             </div>
           </template>
         </UPopover>
-        <div class="bg-surface-900/40 flex flex-col gap-1 rounded px-2 py-1">
-          <div class="flex items-center gap-2">
-            <span class="text-surface-400 w-10 text-[10px] font-semibold uppercase">
-              {{ t('maps.zoom_speed') }}
-            </span>
-            <input
-              v-model.number="mapZoomSpeed"
-              type="range"
-              :min="ZOOM_SPEED_MIN"
-              :max="ZOOM_SPEED_MAX"
-              step="0.1"
-              class="accent-surface-200 h-1.5 w-24 cursor-pointer"
-              :aria-label="t('maps.aria.zoom_speed')"
-            />
-            <span class="text-surface-200 text-[10px] tabular-nums">{{ zoomSpeedLabel }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-surface-400 w-10 text-[10px] font-semibold uppercase">
-              {{ t('maps.pan_speed') }}
-            </span>
-            <input
-              v-model.number="mapPanSpeed"
-              type="range"
-              :min="PAN_SPEED_MIN"
-              :max="PAN_SPEED_MAX"
-              step="0.1"
-              class="accent-surface-200 h-1.5 w-24 cursor-pointer"
-              :aria-label="t('maps.aria.pan_speed')"
-            />
-            <span class="text-surface-200 text-[10px] tabular-nums">{{ panSpeedLabel }}</span>
-          </div>
-        </div>
+        <UPopover>
+          <UButton
+            color="neutral"
+            variant="soft"
+            size="sm"
+            icon="i-mdi-cog"
+            :class="MAP_BUTTON_ACTIVE_CLASS"
+            :title="t('maps.map_settings')"
+            :aria-label="t('maps.map_settings')"
+          />
+          <template #content>
+            <div class="bg-surface-900 border-surface-700 w-56 space-y-2 rounded-md border p-3">
+              <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                {{ t('maps.map_settings') }}
+              </p>
+              <div class="space-y-2">
+                <div class="space-y-1">
+                  <div
+                    class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                  >
+                    <span>{{ t('maps.zoom_speed') }}</span>
+                    <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
+                  </div>
+                  <input
+                    v-model.number="mapZoomSpeed"
+                    type="range"
+                    :min="ZOOM_SPEED_MIN"
+                    :max="ZOOM_SPEED_MAX"
+                    step="0.1"
+                    class="accent-surface-200 h-1.5 w-full cursor-pointer"
+                    :aria-label="t('maps.aria.zoom_speed')"
+                  />
+                </div>
+                <div class="space-y-1">
+                  <div
+                    class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                  >
+                    <span>{{ t('maps.pan_speed') }}</span>
+                    <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
+                  </div>
+                  <input
+                    v-model.number="mapPanSpeed"
+                    type="range"
+                    :min="PAN_SPEED_MIN"
+                    :max="PAN_SPEED_MAX"
+                    step="0.1"
+                    class="accent-surface-200 h-1.5 w-full cursor-pointer"
+                    :aria-label="t('maps.aria.pan_speed')"
+                  />
+                </div>
+              </div>
+            </div>
+          </template>
+        </UPopover>
       </div>
       <div class="relative">
         <div
