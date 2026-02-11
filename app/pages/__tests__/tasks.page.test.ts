@@ -20,6 +20,7 @@ function createDefaultTask(overrides: Partial<Task> = {}): Task {
   };
 }
 const defaultTask: Task = createDefaultTask();
+const TASK_SEARCH_DEBOUNCE_MS = 180;
 const preferencesStoreMock = {
   getTaskPrimaryView: 'all',
   getTaskSecondaryView: 'available',
@@ -237,14 +238,17 @@ describe('tasks page', () => {
     wrapper = await mountSuspended(TasksPage, {
       global: { stubs: defaultGlobalStubs },
     });
-    expect(
-      wrapper.find('button[aria-label="page.tasks.map.map_complete_tasks_toggle_show"]').exists()
-    ).toBe(true);
-    await wrapper.find('[data-testid="task-search"]').setValue('no-match-query');
-    await new Promise((resolve) => setTimeout(resolve, 220));
-    await nextTick();
-    expect(
-      wrapper.find('button[aria-label="page.tasks.map.map_complete_tasks_toggle_show"]').exists()
-    ).toBe(false);
+    const mapVisibilitySelector =
+      'button[aria-label="page.tasks.map.map_complete_tasks_toggle_show"]';
+    expect(wrapper.find(mapVisibilitySelector).exists()).toBe(true);
+    vi.useFakeTimers();
+    try {
+      await wrapper.find('[data-testid="task-search"]').setValue('no-match-query');
+      await vi.advanceTimersByTimeAsync(TASK_SEARCH_DEBOUNCE_MS);
+      await nextTick();
+      expect(wrapper.find(mapVisibilitySelector).exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -90,10 +90,10 @@
       <label
         class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
-        <UCheckbox v-model="sortCompletedMapObjectivesModel" />
+        <UCheckbox v-model="hideCompletedMapObjectivesModel" />
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.filters.sort_completed_map_objectives') }}
+            {{ t('page.tasks.settings.filters.hide_completed_map_objectives') }}
           </span>
         </div>
       </label>
@@ -110,7 +110,7 @@
     onlyTasksWithRequiredKeys: boolean;
     showGlobalTasks: boolean;
     respectTaskFiltersForImpact: boolean;
-    sortCompletedMapObjectives: boolean;
+    hideCompletedMapObjectives: boolean;
   }>();
   const emit = defineEmits<{
     'update:showNonSpecialTasks': [value: boolean];
@@ -120,7 +120,7 @@
     'update:onlyTasksWithRequiredKeys': [value: boolean];
     'update:showGlobalTasks': [value: boolean];
     'update:respectTaskFiltersForImpact': [value: boolean];
-    'update:sortCompletedMapObjectives': [value: boolean];
+    'update:hideCompletedMapObjectives': [value: boolean];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const showNonSpecialTasksModel = computed({
@@ -151,8 +151,8 @@
     get: () => props.respectTaskFiltersForImpact,
     set: (value: boolean) => emit('update:respectTaskFiltersForImpact', value),
   });
-  const sortCompletedMapObjectivesModel = computed({
-    get: () => props.sortCompletedMapObjectives,
-    set: (value: boolean) => emit('update:sortCompletedMapObjectives', value),
+  const hideCompletedMapObjectivesModel = computed({
+    get: () => props.hideCompletedMapObjectives,
+    set: (value: boolean) => emit('update:hideCompletedMapObjectives', value),
   });
 </script>

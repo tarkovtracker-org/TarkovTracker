@@ -23,10 +23,13 @@ type SetupOptions = {
     getTaskUserView: string;
     getTaskMapView: string;
     getTaskTraderView: string;
+    getHideCompletedMapObjectives: boolean;
     taskTeamAllHidden: boolean;
   }>;
   sortedTraders?: Array<{ id: string; name: string }>;
   traderCounts?: Record<string, number>;
+  mapTaskTotals?: Record<string, number>;
+  mapTaskTotalsHideCompleted?: Record<string, number>;
   teammates?: string[];
   teamMembers?: string[];
   hiddenTeammates?: Record<string, boolean>;
@@ -50,6 +53,7 @@ const setup = async (options: SetupOptions = {}) => {
     getShowCompletedFilter: true,
     getShowFailedFilter: true,
     getHideGlobalTasks: false,
+    getHideCompletedMapObjectives: false,
     getHideNonKappaTasks: false,
     getTaskSharedByAllOnly: false,
     taskTeamAllHidden: false,
@@ -73,6 +77,8 @@ const setup = async (options: SetupOptions = {}) => {
   Object.assign(preferencesStore, options.preferencesStore ?? {});
   const sortedTraders = options.sortedTraders ?? [{ id: 'trader-1', name: 'Trader One' }];
   const traderCounts = options.traderCounts ?? { 'trader-1': 2 };
+  const mapTaskTotals = options.mapTaskTotals ?? { 'map-1': 2 };
+  const mapTaskTotalsHideCompleted = options.mapTaskTotalsHideCompleted ?? { 'map-1': 1 };
   const displayNames: Record<string, string> = {
     self: 'Self',
     ...(options.displayNames ?? {}),
@@ -82,7 +88,14 @@ const setup = async (options: SetupOptions = {}) => {
   vi.resetModules();
   vi.doMock('@/composables/useTaskFiltering', () => ({
     useTaskFiltering: () => ({
-      calculateMapTaskTotals: () => ({ 'map-1': 2 }),
+      calculateMapTaskTotals: (
+        _mergedMaps: unknown,
+        _tasks: unknown,
+        _hideGlobalTasks: boolean,
+        _activeUserView: string,
+        _secondaryView: string,
+        hideCompletedMapObjectives = false
+      ) => (hideCompletedMapObjectives ? mapTaskTotalsHideCompleted : mapTaskTotals),
       calculateStatusCounts: () => ({
         all: 2,
         available: 1,
@@ -172,6 +185,25 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     await wrapper.find('button[data-icon="i-mdi-sort-ascending"]').trigger('click');
     expect(preferencesStore.setTaskSortDirection).toHaveBeenCalledWith('desc');
+  });
+  it('hides completed map objectives from map counts when the preference is enabled', async () => {
+    const { TaskFilterBar } = await setup({
+      preferencesStore: {
+        getTaskPrimaryView: 'maps',
+        getHideCompletedMapObjectives: true,
+      },
+      mapTaskTotals: {
+        'map-1': 4,
+      },
+      mapTaskTotalsHideCompleted: {
+        'map-1': 1,
+      },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const mapButton = wrapper.findAll('button').find((button) => button.text().includes('Map One'));
+    expect(mapButton).toBeTruthy();
+    expect(mapButton!.text()).toContain('1');
+    expect(mapButton!.text()).not.toContain('4');
   });
   it('shows only traders with non-zero task counts for the active filter', async () => {
     const { TaskFilterBar } = await setup({
