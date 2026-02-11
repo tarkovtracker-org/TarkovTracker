@@ -1,6 +1,6 @@
 // Framework imports
 // Library imports
-import { devLog, logger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
 import type {
   PostgrestError,
@@ -19,6 +19,7 @@ export interface SupabaseListenerConfig {
   /** Optional sync controller to pause during remote updates */
   syncController?: { pause: () => void; resume: () => void };
 }
+const VUE_REACTIVITY_SETTLE_MS = 100;
 /**
  * Creates a Supabase realtime listener that automatically manages subscriptions
  * and syncs data with a Pinia store. Supports reactive filter refs for auth changes.
@@ -68,26 +69,20 @@ export function useSupabaseListener({
       return;
     }
     if (data) {
-      devLog(`[${storeIdForLogging}] Initial data received`, data);
       safePatchStore(store, data);
       clearStaleState(store, data);
       if (onData) onData(data);
     } else {
-      devLog(`[${storeIdForLogging}] No initial data found`);
       resetStore(store);
       if (onData) onData(null);
     }
     // Mark initial load as complete
     hasInitiallyLoaded.value = true;
-    devLog(`[${storeIdForLogging}] Initial data load complete`);
   };
   const setupSubscription = () => {
     const currentFilter = getFilterValue();
     if (channel.value) return;
     if (!currentFilter) return;
-    devLog(
-      `[${storeIdForLogging}] Setting up subscription for ${table} with filter ${currentFilter}`
-    );
     channel.value = $supabase.client
       .channel(`public:${table}:${currentFilter}`)
       .on(
@@ -99,7 +94,6 @@ export function useSupabaseListener({
           filter: currentFilter,
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          devLog(`[${storeIdForLogging}] Realtime event received`, payload);
           // Pause sync to prevent bounce loop
           syncController?.pause();
           try {
@@ -115,18 +109,16 @@ export function useSupabaseListener({
             }
           } finally {
             // Resume sync after a small delay to let Vue reactivity settle
-            setTimeout(() => syncController?.resume(), 100);
+            setTimeout(() => syncController?.resume(), VUE_REACTIVITY_SETTLE_MS);
           }
         }
       )
       .subscribe((status: string) => {
         isSubscribed.value = status === 'SUBSCRIBED';
-        devLog(`[${storeIdForLogging}] Subscription status: ${status}`);
       });
   };
   const cleanup = () => {
     if (channel.value) {
-      devLog(`[${storeIdForLogging}] Cleaning up subscription`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       $supabase.client.removeChannel(channel.value as any);
       channel.value = null;

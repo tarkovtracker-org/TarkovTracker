@@ -1,3 +1,4 @@
+import { delay } from '@/utils/async';
 import { debounce, isDebounceRejection } from '@/utils/debounce';
 import { logger } from '@/utils/logger';
 import type { Store } from 'pinia';
@@ -8,6 +9,7 @@ type SupabaseErrorLike = {
   details?: string | null;
   hint?: string | null;
 };
+const ABORT_RETRY_DELAY_MS = 150;
 export interface SupabaseSyncConfig {
   store: Store;
   table: string;
@@ -49,6 +51,15 @@ function isMissingColumnError(error: SupabaseErrorLike): boolean {
   const combined =
     `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
   return combined.includes('column') && combined.includes('does not exist');
+}
+function isAbortRequestError(error: SupabaseErrorLike): boolean {
+  const combined =
+    `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  return (
+    combined.includes('aborterror') ||
+    combined.includes('signal is aborted') ||
+    combined.includes('request was aborted')
+  );
 }
 function getFallbackPreferencesPayload(
   payload: Record<string, unknown>,
@@ -148,40 +159,62 @@ export function useSupabaseSync({
       }
       const upsert = async (payload: Record<string, unknown>) =>
         $supabase.client.from(table).upsert(payload);
-      let payloadToSync: Record<string, unknown> | null = dataToSave;
-      let error: SupabaseErrorLike | null = null;
-      let synced = false;
-      const removedMissingColumns = new Set<string>();
-      while (payloadToSync) {
-        const { error: syncError } = await upsert(payloadToSync);
-        if (!syncError) {
-          synced = true;
-          break;
+      const upsertWithFallback = async (payload: Record<string, unknown>) => {
+        let payloadToSync: Record<string, unknown> | null = payload;
+        let error: SupabaseErrorLike | null = null;
+        let synced = false;
+        const removedMissingColumns = new Set<string>();
+        while (payloadToSync) {
+          const { error: syncError } = await upsert(payloadToSync);
+          if (!syncError) {
+            synced = true;
+            break;
+          }
+          error = syncError;
+          if (table !== 'user_preferences' || !isMissingColumnError(syncError)) {
+            break;
+          }
+          const missingColumn = getMissingColumnName(syncError);
+          if (!missingColumn || removedMissingColumns.has(missingColumn)) {
+            break;
+          }
+          const fallbackPayload = getFallbackPreferencesPayload(payloadToSync, missingColumn);
+          if (!fallbackPayload) {
+            break;
+          }
+          removedMissingColumns.add(missingColumn);
+          payloadToSync = fallbackPayload;
         }
-        error = syncError;
-        if (table !== 'user_preferences' || !isMissingColumnError(syncError)) {
-          break;
+        return { synced, error, removedMissingColumns };
+      };
+      let syncResult = await upsertWithFallback(dataToSave);
+      if (
+        !syncResult.synced &&
+        syncResult.error &&
+        isAbortRequestError(syncResult.error) &&
+        !isPaused.value
+      ) {
+        await delay(ABORT_RETRY_DELAY_MS);
+        if (!isPaused.value && $supabase.user.loggedIn && $supabase.user.id) {
+          syncResult = await upsertWithFallback(dataToSave);
         }
-        const missingColumn = getMissingColumnName(syncError);
-        if (!missingColumn || removedMissingColumns.has(missingColumn)) {
-          break;
-        }
-        const fallbackPayload = getFallbackPreferencesPayload(payloadToSync, missingColumn);
-        if (!fallbackPayload) {
-          break;
-        }
-        removedMissingColumns.add(missingColumn);
-        payloadToSync = fallbackPayload;
       }
-      if (synced && removedMissingColumns.size) {
+      if (syncResult.synced && syncResult.removedMissingColumns.size) {
         logger.warn(
-          `[Sync] ${table} fallback sync succeeded after removing missing columns: ${Array.from(removedMissingColumns).join(', ')}`
+          `[Sync] ${table} fallback sync succeeded after removing missing columns: ${Array.from(syncResult.removedMissingColumns).join(', ')}`
         );
       }
-      if (!synced && error) {
-        logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(error));
+      if (!syncResult.synced && syncResult.error) {
+        if (isAbortRequestError(syncResult.error)) {
+          logger.warn(`[Sync] Sync to ${table} was aborted; retry did not succeed yet`, {
+            ...formatSupabaseError(syncResult.error),
+            retryDelayMs: ABORT_RETRY_DELAY_MS,
+          });
+        } else {
+          logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(syncResult.error));
+        }
       }
-      if (synced) {
+      if (syncResult.synced) {
         lastSyncedHash = currentHash;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
       }
