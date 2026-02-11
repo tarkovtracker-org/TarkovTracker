@@ -67,6 +67,7 @@
   maps: {
     zoom_speed: 'Швидкість масштабування',
     pan_speed: 'Швидкість переміщення',
+    map_settings: 'Налаштування карти',
     not_available_title: 'Карта недоступна',
     not_available_description: 'Інтерактивна карта для {mapName} поки недоступна. Ми чекаємо на створення сумісної карти.',
     placeholder: 'цієї локації',
@@ -270,7 +271,7 @@
           has_required_keys: 'Лише завдання з ключами',
           show_global_tasks: 'Показати глобальні завдання на карті',
           impact_respects_filters: 'Вплив враховує фільтри завдань',
-          sort_completed_map_objectives: 'Сортувати виконані цілі на карті вниз',
+          hide_completed_map_objectives: 'Приховати завершені на карті',
         },
         appearance: {
           hint: 'Налаштуйте вигляд карток завдань.',
@@ -304,6 +305,12 @@
       loading: 'Завантажуємо завдання',
       map: {
         resize_handle: 'Змінити висоту карти',
+        hidden_tasks_notice: '{count} завдань приховано, бо на цій карті для них не залишилось цілей.',
+        show_hidden_tasks: 'Показати приховані завдання',
+        map_complete_tasks_hidden: '{count} завдань, завершених для цієї карти, приховано.',
+        map_complete_tasks_showing: '{count} завдань, завершених для цієї карти, показано.',
+        map_complete_tasks_toggle_show: 'Показати приховані',
+        map_complete_tasks_toggle_hide: 'Приховати завершені на карті',
       },
       pinned_tasks_section: 'Закріплені завдання',
       global_tasks_section: 'Глобальні завдання',

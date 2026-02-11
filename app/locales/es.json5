@@ -67,6 +67,7 @@
   maps: {
     zoom_speed: 'Velocidad de zoom',
     pan_speed: 'Velocidad de desplazamiento',
+    map_settings: 'Ajustes del mapa',
     not_available_title: 'Mapa no disponible',
     not_available_description: 'El mapa interactivo de {mapName} aún no está disponible. Estamos esperando a que se cree un mapa compatible.',
     placeholder: 'esta ubicación',
@@ -270,7 +271,7 @@
           has_required_keys: 'Solo misiones con llaves',
           show_global_tasks: 'Mostrar tareas globales en el mapa',
           impact_respects_filters: 'El impacto respeta los filtros de tareas',
-          sort_completed_map_objectives: 'Ordenar objetivos de mapa completados al final',
+          hide_completed_map_objectives: 'Ocultar tareas completadas en mapa',
         },
         appearance: {
           hint: 'Ajusta el aspecto de las tarjetas de tareas.',
@@ -304,6 +305,12 @@
       loading: 'Cargando misiones',
       map: {
         resize_handle: 'Ajustar altura del mapa',
+        hidden_tasks_notice: '{count} tareas están ocultas porque no tienen objetivos pendientes en este mapa.',
+        show_hidden_tasks: 'Mostrar tareas ocultas',
+        map_complete_tasks_hidden: '{count} tareas completadas en este mapa están ocultas.',
+        map_complete_tasks_showing: '{count} tareas completadas en este mapa se están mostrando.',
+        map_complete_tasks_toggle_show: 'Mostrar ocultas',
+        map_complete_tasks_toggle_hide: 'Ocultar completadas en mapa',
       },
       pinned_tasks_section: 'Misiones fijadas',
       global_tasks_section: 'Misiones globales',

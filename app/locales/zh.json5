@@ -67,6 +67,7 @@
   maps: {
     zoom_speed: '缩放速度',
     pan_speed: '平移速度',
+    map_settings: '地图设置',
     not_available_title: '地图不可用',
     not_available_description: '"{mapName}"的互动地图尚不可用。我们正在等待兼容地图的制作。',
     placeholder: '该地点',
@@ -270,7 +271,7 @@
           has_required_keys: '仅显示需要钥匙的任务',
           show_global_tasks: '在地图上显示全局任务',
           impact_respects_filters: '影响值遵循任务筛选',
-          sort_completed_map_objectives: '将已完成的地图目标排到底部',
+          hide_completed_map_objectives: '隐藏地图已完成任务',
         },
         appearance: {
           hint: '调整任务卡的外观',
@@ -304,6 +305,12 @@
       loading: '加载任务中',
       map: {
         resize_handle: '调整地图高度',
+        hidden_tasks_notice: '有 {count} 个任务被隐藏，因为它们在当前地图上已无剩余目标。',
+        show_hidden_tasks: '显示已隐藏任务',
+        map_complete_tasks_hidden: '该地图上有 {count} 个已完成任务被隐藏。',
+        map_complete_tasks_showing: '该地图上有 {count} 个地图目标已完成任务正在显示。',
+        map_complete_tasks_toggle_show: '显示隐藏项',
+        map_complete_tasks_toggle_hide: '隐藏地图已完成',
       },
       pinned_tasks_section: '已固定任务',
       global_tasks_section: '全局任务',

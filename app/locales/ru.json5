@@ -67,6 +67,7 @@
   maps: {
     zoom_speed: 'Скорость зума',
     pan_speed: 'Скорость перемещения',
+    map_settings: 'Настройки карты',
     not_available_title: 'Карта недоступна',
     not_available_description: 'Интерактивная карта для {mapName} пока недоступна. Мы ждём появления совместимой карты.',
     placeholder: 'этой локации',
@@ -270,7 +271,7 @@
           has_required_keys: 'Только задания с ключами',
           show_global_tasks: 'Показать глобальные задачи на карте',
           impact_respects_filters: 'Влияние учитывает фильтры задач',
-          sort_completed_map_objectives: 'Сортировать выполненные цели на карте вниз',
+          hide_completed_map_objectives: 'Скрыть завершённые на карте',
         },
         appearance: {
           hint: 'Настройте внешний вид карточек задач.',
@@ -304,6 +305,12 @@
       loading: 'Загружаем задания',
       map: {
         resize_handle: 'Изменить высоту карты',
+        hidden_tasks_notice: '{count} задач скрыто, потому что на этой карте по ним не осталось целей.',
+        show_hidden_tasks: 'Показать скрытые задачи',
+        map_complete_tasks_hidden: '{count} задач, завершённых для этой карты, скрыто.',
+        map_complete_tasks_showing: '{count} задач, завершённых для этой карты, показано.',
+        map_complete_tasks_toggle_show: 'Показать скрытые',
+        map_complete_tasks_toggle_hide: 'Скрыть завершённые на карте',
       },
       pinned_tasks_section: 'Закреплённые задания',
       global_tasks_section: 'Глобальные задания',

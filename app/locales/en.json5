@@ -67,6 +67,7 @@
   maps: {
     zoom_speed: 'Zoom speed',
     pan_speed: 'Pan speed',
+    map_settings: 'Map settings',
     not_available_title: 'Map Not Available',
     not_available_description: 'The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.',
     placeholder: 'this location',
@@ -270,7 +271,7 @@
           has_required_keys: 'Only Tasks with Keys',
           show_global_tasks: 'Show Global Tasks on Map',
           impact_respects_filters: 'Impact Respects Task Filters',
-          sort_completed_map_objectives: 'Sort Completed Map Objectives to Bottom',
+          hide_completed_map_objectives: 'Hide Map-Complete Tasks',
         },
         appearance: {
           hint: 'Tune how task cards look.',
@@ -304,6 +305,12 @@
       loading: 'Loading tasks',
       map: {
         resize_handle: 'Resize map height',
+        hidden_tasks_notice: '{count} tasks are hidden because they have no objectives left on this map.',
+        show_hidden_tasks: 'Show Hidden Tasks',
+        map_complete_tasks_hidden: '{count} tasks hidden on this map.',
+        map_complete_tasks_showing: '{count} map-complete tasks shown on this map.',
+        map_complete_tasks_toggle_show: 'Show hidden',
+        map_complete_tasks_toggle_hide: 'Hide map-complete',
       },
       pinned_tasks_section: 'Pinned Tasks',
       global_tasks_section: 'Global Tasks',

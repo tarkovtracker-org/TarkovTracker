@@ -67,6 +67,7 @@
   maps: {
     zoom_speed: 'Zoomgeschwindigkeit',
     pan_speed: 'Schwenkgeschwindigkeit',
+    map_settings: 'Karteneinstellungen',
     not_available_title: 'Karte nicht verfügbar',
     not_available_description: 'Die interaktive Karte für {mapName} ist noch nicht verfügbar. Wir warten auf eine kompatible Karte.',
     placeholder: 'diesen Ort',
@@ -270,7 +271,7 @@
           has_required_keys: 'Nur Aufgaben mit Schlüsseln',
           show_global_tasks: 'Globale Aufgaben auf der Karte anzeigen',
           impact_respects_filters: 'Impact respektiert Aufgabenfilter',
-          sort_completed_map_objectives: 'Abgeschlossene Kartenziele nach unten sortieren',
+          hide_completed_map_objectives: 'Kartenziel-erledigte Aufgaben ausblenden',
         },
         appearance: {
           hint: 'Optimieren Sie das Aussehen von Aufgabenkarten.',
@@ -304,6 +305,12 @@
       loading: 'Lade Aufgaben',
       map: {
         resize_handle: 'Kartenhöhe anpassen',
+        hidden_tasks_notice: '{count} Aufgaben sind ausgeblendet, da auf dieser Karte keine Ziele mehr offen sind.',
+        show_hidden_tasks: 'Ausgeblendete Aufgaben anzeigen',
+        map_complete_tasks_hidden: '{count} kartenziel-erledigte Aufgaben auf dieser Karte ausgeblendet.',
+        map_complete_tasks_showing: '{count} kartenziel-erledigte Aufgaben werden auf dieser Karte angezeigt.',
+        map_complete_tasks_toggle_show: 'Ausgeblendete anzeigen',
+        map_complete_tasks_toggle_hide: 'Kartenziel-erledigte ausblenden',
       },
       pinned_tasks_section: 'Angeheftete Aufgaben',
       global_tasks_section: 'Globale Aufgaben',
