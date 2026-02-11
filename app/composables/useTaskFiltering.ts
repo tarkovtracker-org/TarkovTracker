@@ -8,6 +8,7 @@ import { TRADER_ORDER } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { perfEnabled, perfEnd, perfNow, perfStart } from '@/utils/perf';
 import { buildTaskImpactScores, resolveImpactTeamIds } from '@/utils/taskImpact';
+import { normalizeTaskObjectives } from '@/utils/taskNormalization';
 import {
   buildTaskTypeFilterOptions,
   filterTasksByTypeSettings as filterTasksByTypeSettingsUtil,
@@ -61,28 +62,38 @@ export function useTaskFiltering() {
     if (obj.type === 'giveItem' && obj.foundInRaid) return true;
     return false;
   };
+  const getTaskObjectives = (task: Task): TaskObjective[] => {
+    const objectives = task.objectives;
+    return Array.isArray(objectives)
+      ? objectives
+      : normalizeTaskObjectives<TaskObjective>(objectives);
+  };
+  const isObjectiveOnMap = (
+    objective: TaskObjective | null | undefined,
+    mapIds: string[]
+  ): boolean =>
+    Array.isArray(objective?.maps) &&
+    objective.maps.some((map) => mapIds.includes(map.id)) &&
+    isMapObjectiveType(objective.type);
   const isGlobalTask = (task: Task): boolean => {
+    const objectives = getTaskObjectives(task);
     const hasMap = task.map?.id != null;
     const hasLocations = Array.isArray(task.locations) && task.locations.length > 0;
-    const hasMapObjectives = task.objectives?.some(
-      (obj) => Array.isArray(obj.maps) && obj.maps.length > 0 && isMapObjectiveType(obj.type)
+    const hasMapObjectives = objectives.some(
+      (obj) => Array.isArray(obj?.maps) && obj.maps.length > 0 && isMapObjectiveType(obj.type)
     );
     const isMapless = !hasMap && !hasLocations && !hasMapObjectives;
-    const hasRaidRelevantObjectives = task.objectives?.some(isRaidRelevantObjective) ?? false;
+    const hasRaidRelevantObjectives = objectives.some(
+      (objective) => objective != null && isRaidRelevantObjective(objective)
+    );
     return isMapless && hasRaidRelevantObjectives;
   };
   const taskHasMap = (task: Task, mapIds: string[]): boolean => {
+    if (task.map?.id && mapIds.includes(task.map.id)) return true;
     const taskLocations = Array.isArray(task.locations) ? task.locations : [];
     if (mapIds.some((id) => taskLocations.includes(id))) return true;
-    if (Array.isArray(task.objectives)) {
-      return task.objectives.some(
-        (obj) =>
-          Array.isArray(obj.maps) &&
-          obj.maps.some((map) => mapIds.includes(map.id)) &&
-          isMapObjectiveType(obj.type)
-      );
-    }
-    return false;
+    const objectives = getTaskObjectives(task);
+    return objectives.some((objective) => isObjectiveOnMap(objective, mapIds));
   };
   const areAllMapObjectivesComplete = (
     task: Task,
@@ -90,13 +101,8 @@ export function useTaskFiltering() {
     userView: string,
     secondaryView: TaskSecondaryView = 'all'
   ): boolean => {
-    if (!Array.isArray(task.objectives)) return false;
-    const mapObjectives = task.objectives.filter(
-      (obj) =>
-        Array.isArray(obj.maps) &&
-        obj.maps.some((map) => mapIds.includes(map.id)) &&
-        isMapObjectiveType(obj.type)
-    );
+    const objectives = getTaskObjectives(task);
+    const mapObjectives = objectives.filter((objective) => isObjectiveOnMap(objective, mapIds));
     if (mapObjectives.length === 0) return false;
     if (isAllUsersView(userView)) {
       const teamIds = Object.keys(progressStore.visibleTeamStores || {});

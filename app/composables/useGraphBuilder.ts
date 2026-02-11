@@ -101,10 +101,10 @@ export function useGraphBuilder() {
     };
     const hasFailConditionForTask = (task: Task | undefined, targetTaskId: string) => {
       const failConditions = task?.failConditions;
-      if (!failConditions?.length) return false;
       const normalizedFailConditions = Array.isArray(failConditions)
         ? failConditions
         : normalizeTaskObjectives<TaskObjective>(failConditions);
+      if (!normalizedFailConditions.length) return false;
       return normalizedFailConditions.some(
         (objective) =>
           objective?.task?.id === targetTaskId &&

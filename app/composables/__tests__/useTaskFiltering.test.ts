@@ -207,6 +207,20 @@ describe('useTaskFiltering', () => {
     const result = taskFiltering.filterTasksByView(tasks, 'maps', 'map-1b', 'all', mergedMaps);
     expect(result.map((task) => task.id)).toEqual(['task-map']);
   });
+  it('includes tasks that only define top-level map id in map filtering', async () => {
+    const { taskFiltering, preferencesStore } = await setup();
+    preferencesStore.getHideGlobalTasks = true;
+    const mergedMaps = [{ id: 'map-1', mergedIds: ['map-1'] }];
+    const mapOnlyTask: Task = {
+      id: 'task-top-level-map',
+      name: 'Top Level Map Task',
+      factionName: 'Any',
+      map: { id: 'map-1' },
+      objectives: [],
+    };
+    const result = taskFiltering.filterTasksByMap([mapOnlyTask], 'map-1', mergedMaps);
+    expect(result.map((task) => task.id)).toEqual(['task-top-level-map']);
+  });
   it('includes useItem objectives in map filtering', async () => {
     const { taskFiltering } = await setup();
     const useItemTask: Task = {
@@ -467,6 +481,22 @@ describe('useTaskFiltering', () => {
       const mapTask = tasks.find((t) => t.id === 'task-map')!;
       expect(taskFiltering.isGlobalTask(mapTask)).toBe(false);
     });
+    it('returns false for map task with object-form objectives', async () => {
+      const { taskFiltering } = await setup();
+      const objectObjectiveTask: Task = {
+        id: 'task-object-objective-map',
+        name: 'Object Objective Map Task',
+        factionName: 'Any',
+        objectives: {
+          primary: {
+            id: 'obj-objective-map',
+            maps: [{ id: 'map-1' }],
+            type: 'mark',
+          },
+        } as unknown as Task['objectives'],
+      };
+      expect(taskFiltering.isGlobalTask(objectObjectiveTask)).toBe(false);
+    });
     it('returns false for mapless task with only non-raid objectives', async () => {
       const { taskFiltering, tasks } = await setup();
       const nonRaidTask = tasks.find((t) => t.id === 'task-non-raid')!;
@@ -485,6 +515,29 @@ describe('useTaskFiltering', () => {
     });
   });
   describe('filterTasksByMap with global tasks', () => {
+    it('includes tasks with object-form objectives when map matches', async () => {
+      const { taskFiltering, preferencesStore } = await setup();
+      preferencesStore.getHideGlobalTasks = true;
+      const taskWithObjectObjectives: Task = {
+        id: 'task-objective-map',
+        name: 'Task Objective Map',
+        factionName: 'Any',
+        objectives: {
+          primary: {
+            id: 'obj-objective-map-filter',
+            maps: [{ id: 'map-1' }],
+            type: 'mark',
+          },
+        } as unknown as Task['objectives'],
+      };
+      const mergedMaps = [{ id: 'map-1', mergedIds: ['map-1'] }];
+      const result = taskFiltering.filterTasksByMap(
+        [taskWithObjectObjectives],
+        'map-1',
+        mergedMaps
+      );
+      expect(result.map((task) => task.id)).toEqual(['task-objective-map']);
+    });
     it('includes global tasks when hideGlobalTasks is false', async () => {
       const { taskFiltering, tasks, preferencesStore } = await setup();
       preferencesStore.getHideGlobalTasks = false;
@@ -505,6 +558,34 @@ describe('useTaskFiltering', () => {
     });
   });
   describe('hide completed map objectives behavior', () => {
+    it('hides completed object-form map objectives when enabled', async () => {
+      const { taskFiltering, preferencesStore, progressStore } = await setup();
+      preferencesStore.getHideGlobalTasks = true;
+      progressStore.objectiveCompletions['obj-objective-map-complete'] = { self: true };
+      const taskWithObjectObjectives: Task = {
+        id: 'task-objective-map-complete',
+        name: 'Task Objective Map Complete',
+        factionName: 'Any',
+        objectives: {
+          primary: {
+            id: 'obj-objective-map-complete',
+            maps: [{ id: 'map-1' }],
+            type: 'mark',
+          },
+        } as unknown as Task['objectives'],
+      };
+      const result = taskFiltering.filterTasksByMap(
+        [taskWithObjectObjectives],
+        'map-1',
+        [{ id: 'map-1', mergedIds: ['map-1'] }],
+        {
+          hideMapObjectiveCompleteTasks: true,
+          userView: 'self',
+          secondaryView: 'available',
+        }
+      );
+      expect(result).toEqual([]);
+    });
     it('hides tasks with no remaining objectives on selected map when enabled', async () => {
       const { taskFiltering, preferencesStore, progressStore } = await setup();
       preferencesStore.getHideGlobalTasks = true;
