@@ -100,8 +100,12 @@ export function useGraphBuilder() {
       }
     };
     const hasFailConditionForTask = (task: Task | undefined, targetTaskId: string) => {
-      if (!task?.failConditions?.length) return false;
-      return normalizeTaskObjectives<TaskObjective>(task.failConditions).some(
+      const failConditions = task?.failConditions;
+      if (!failConditions?.length) return false;
+      const normalizedFailConditions = Array.isArray(failConditions)
+        ? failConditions
+        : normalizeTaskObjectives<TaskObjective>(failConditions);
+      return normalizedFailConditions.some(
         (objective) =>
           objective?.task?.id === targetTaskId &&
           hasStatus(objective.status, ['complete', 'completed'])
@@ -121,7 +125,10 @@ export function useGraphBuilder() {
         }
       });
       // Process objectives
-      normalizeTaskObjectives<TaskObjective>(task.objectives).forEach((objective) => {
+      const objectives = Array.isArray(task.objectives)
+        ? task.objectives
+        : normalizeTaskObjectives<TaskObjective>(task.objectives);
+      objectives.forEach((objective) => {
         // Map and location data
         if (objective?.location?.id) {
           const mapId = objective.location.id;
@@ -172,7 +179,10 @@ export function useGraphBuilder() {
         }
       });
       // Process fail conditions for alternative tasks (complete-status triggers)
-      normalizeTaskObjectives<TaskObjective>(task.failConditions).forEach((objective) => {
+      const failConditions = Array.isArray(task.failConditions)
+        ? task.failConditions
+        : normalizeTaskObjectives<TaskObjective>(task.failConditions);
+      failConditions.forEach((objective) => {
         if (objective?.task?.id && hasStatus(objective.status, ['complete', 'completed'])) {
           addAlternative(objective.task.id, task.id);
         }
