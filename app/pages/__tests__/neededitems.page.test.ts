@@ -189,7 +189,7 @@ describe('needed items page', () => {
       });
     });
   });
-  it('enables infinite-scroll autofill to prevent footer-adjacent loading stalls', async () => {
+  it('keeps grid infinite-scroll incremental to avoid heavy eager loading', async () => {
     const NeededItemsPage = await setup({ viewMode: 'grid' });
     await mountSuspended(NeededItemsPage, {
       global: { stubs: defaultGlobalStubs },
@@ -197,9 +197,9 @@ describe('needed items page', () => {
     expect(useInfiniteScrollMock).toHaveBeenCalled();
     const options = useInfiniteScrollMock.mock.calls[0]?.[2];
     expect(options).toMatchObject({
-      autoFill: true,
+      autoFill: false,
       autoLoadOnReady: true,
-      useScrollFallback: true,
+      maxAutoLoadsPerScrollTrigger: 1,
     });
   });
 });

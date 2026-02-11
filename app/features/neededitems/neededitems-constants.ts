@@ -1,10 +1,8 @@
 /**
  * Constants for the needed items page
  */
-/** Number of items to load per batch in grid view */
-export const BATCH_SIZE_GRID = 12;
-/** Number of items to load per batch in list view */
-export const BATCH_SIZE_LIST = 30;
+/** Number of items to load per infinite-scroll batch */
+export const INFINITE_SCROLL_BATCH_SIZE = 12;
 /** Root margin for infinite scroll intersection observer */
 export const INFINITE_SCROLL_MARGIN = '600px';
 /** Default initial render count before responsive adjustments */

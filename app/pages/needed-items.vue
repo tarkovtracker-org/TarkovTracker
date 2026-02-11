@@ -118,14 +118,15 @@
   import NeededItem from '@/features/neededitems/NeededItem.vue';
   import NeededItemGroupedCard from '@/features/neededitems/NeededItemGroupedCard.vue';
   import {
-    BATCH_SIZE_GRID,
-    BATCH_SIZE_LIST,
     DEFAULT_INITIAL_RENDER_COUNT,
+    INFINITE_SCROLL_BATCH_SIZE,
     INFINITE_SCROLL_MARGIN,
     MIN_RENDER_COUNTS,
     SCREEN_SIZE_MULTIPLIERS,
   } from '@/features/neededitems/neededitems-constants';
   import NeededItemsFilterBar from '@/features/neededitems/NeededItemsFilterBar.vue';
+  import { logger } from '@/utils/logger';
+  import { perfNow, roundPerfMs } from '@/utils/perf';
   definePageMeta({
     usesWindowScroll: true,
   });
@@ -143,6 +144,39 @@
     }
   );
   const search = ref('');
+  const route = useRoute();
+  const PERF_QUERY_PARAM = 'perfNeededItems';
+  const perfDebug = computed(() => {
+    const rawValue = route.query[PERF_QUERY_PARAM];
+    const normalizedValue = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+    if (typeof normalizedValue !== 'string') return false;
+    const normalizedFlag = normalizedValue.toLowerCase();
+    return (
+      normalizedFlag === '1' ||
+      normalizedFlag === 'true' ||
+      normalizedFlag === 'yes' ||
+      normalizedFlag === 'on'
+    );
+  });
+  const logPerf = (event: string, payload: Record<string, unknown> = {}) => {
+    if (!perfDebug.value) return;
+    logger.info(`[NeededItemsPerf] ${event}`, payload);
+  };
+  const perfSessionStartedAt = ref<number | null>(null);
+  const hasUserScrolled = ref(false);
+  const canPageScroll = ref(false);
+  const updatePageScrollState = () => {
+    if (typeof window === 'undefined') return;
+    const doc = document.documentElement;
+    canPageScroll.value = doc.scrollHeight > window.innerHeight + 1;
+  };
+  const markUserScrolled = () => {
+    if (hasUserScrolled.value) return;
+    hasUserScrolled.value = true;
+    if (perfDebug.value) {
+      logPerf('user-scroll-activated');
+    }
+  };
   const { belowMd, xs } = useSharedBreakpoints();
   const {
     activeFilter,
@@ -164,10 +198,32 @@
     itemsReady,
     itemsError,
     ensureNeededItemsData,
-  } = useNeededItems({ search, t });
+  } = useNeededItems({ perfDebug, search, t });
   useNeededItemsRouteSync({ activeFilter });
   onMounted(() => {
+    if (perfDebug.value) {
+      perfSessionStartedAt.value = perfNow();
+      logPerf('session-start', {
+        fullPath: route.fullPath,
+        groupByItem: groupByItem.value,
+        viewMode: viewMode.value,
+      });
+    }
+    if (typeof window !== 'undefined') {
+      hasUserScrolled.value = window.scrollY > 0;
+      window.addEventListener('scroll', markUserScrolled, { passive: true });
+      window.addEventListener('resize', updatePageScrollState, { passive: true });
+      nextTick(() => {
+        updatePageScrollState();
+      });
+    }
     ensureNeededItemsData();
+  });
+  onUnmounted(() => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('scroll', markUserScrolled);
+      window.removeEventListener('resize', updatePageScrollState);
+    }
   });
   const baseRenderCount = computed(() => {
     const value = props.baseRenderCount;
@@ -192,12 +248,13 @@
   });
   const initialVisibleCount = computed(() => {
     if (groupByItem.value) {
-      return BATCH_SIZE_GRID;
+      const groupedMinimum = xs.value || belowMd.value ? INFINITE_SCROLL_BATCH_SIZE : 30;
+      return Math.max(adjustedRenderCount.value, groupedMinimum);
     }
     if (viewMode.value === 'list') {
       return adjustedRenderCount.value;
     }
-    return Math.max(adjustedRenderCount.value, BATCH_SIZE_GRID * 2);
+    return Math.max(adjustedRenderCount.value, INFINITE_SCROLL_BATCH_SIZE * 2);
   });
   const visibleCount = ref(initialVisibleCount.value);
   const visibleGroupedItems = computed(() => {
@@ -206,11 +263,38 @@
   const visibleIndividualItems = computed(() => {
     return filteredItems.value.slice(0, visibleCount.value);
   });
+  const loadMoreCallCount = ref(0);
   const loadMore = () => {
-    if (visibleCount.value < displayItems.value.length) {
-      const batchSize = viewMode.value === 'list' ? BATCH_SIZE_LIST : BATCH_SIZE_GRID;
-      visibleCount.value += batchSize;
-    }
+    const previousVisibleCount = visibleCount.value;
+    if (previousVisibleCount >= displayItems.value.length) return;
+    const startedAt = perfDebug.value ? perfNow() : 0;
+    const batchSize = INFINITE_SCROLL_BATCH_SIZE;
+    const nextVisibleCount = Math.min(previousVisibleCount + batchSize, displayItems.value.length);
+    visibleCount.value = nextVisibleCount;
+    if (!perfDebug.value) return;
+    loadMoreCallCount.value += 1;
+    const callNumber = loadMoreCallCount.value;
+    const basePayload = {
+      batchSize,
+      callNumber,
+      from: previousVisibleCount,
+      to: nextVisibleCount,
+      totalItems: displayItems.value.length,
+    };
+    nextTick(() => {
+      const nextTickMs = roundPerfMs(perfNow() - startedAt);
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+          logPerf('load-more', {
+            ...basePayload,
+            nextTickMs,
+            paintMs: roundPerfMs(perfNow() - startedAt),
+          });
+        });
+        return;
+      }
+      logPerf('load-more', { ...basePayload, nextTickMs });
+    });
   };
   const gridSentinel = ref<HTMLElement | null>(null);
   const listSentinel = ref<HTMLElement | null>(null);
@@ -219,16 +303,21 @@
     return viewMode.value === 'list' ? listSentinel.value : gridSentinel.value;
   });
   const infiniteScrollEnabled = computed(() => {
-    return visibleCount.value < displayItems.value.length;
+    if (visibleCount.value >= displayItems.value.length) return false;
+    if (!canPageScroll.value) return true;
+    return hasUserScrolled.value;
   });
   const infiniteScrollOptions = {
     enabled: infiniteScrollEnabled,
     rootMargin: INFINITE_SCROLL_MARGIN,
-    autoFill: true,
+    autoFill: false,
     autoLoadOnReady: true,
+    maxAutoLoadsPerScrollTrigger: 1,
+    scrollThrottleMs: 120,
     useScrollFallback: true,
+    debug: perfDebug,
+    debugLabel: 'needed-items',
     maxAutoLoads: 12,
-    stickToBottomThreshold: 400,
   };
   const { checkAndLoadMore } = useInfiniteScroll(currentSentinel, loadMore, infiniteScrollOptions);
   const resetVisibleCount = () => {
@@ -249,8 +338,60 @@
       hideOwned,
     ],
     () => {
+      if (perfDebug.value) {
+        logPerf('filters-changed', {
+          activeFilter: activeFilter.value,
+          firFilter: firFilter.value,
+          groupByItem: groupByItem.value,
+          hideNonFirSpecialEquipment: hideNonFirSpecialEquipment.value,
+          hideOwned: hideOwned.value,
+          hideTeamItems: hideTeamItems.value,
+          kappaOnly: kappaOnly.value,
+          searchLength: search.value.length,
+          sortBy: sortBy.value,
+          sortDirection: sortDirection.value,
+          viewMode: viewMode.value,
+        });
+      }
       resetVisibleCount();
       nextTick(() => {
+        updatePageScrollState();
+        checkAndLoadMore();
+      });
+    }
+  );
+  watch(itemsReady, (ready, wasReady) => {
+    if (!perfDebug.value || !ready || wasReady) return;
+    const startedAt = perfSessionStartedAt.value;
+    logPerf('items-ready', {
+      elapsedMs: startedAt === null ? null : roundPerfMs(perfNow() - startedAt),
+      filteredItems: filteredItems.value.length,
+      groupedItems: groupedItems.value.length,
+      totalItems: displayItems.value.length,
+      visibleCount: visibleCount.value,
+    });
+  });
+  watch(visibleCount, (currentCount, previousCount) => {
+    updatePageScrollState();
+    if (!perfDebug.value) return;
+    logPerf('visible-count-changed', {
+      from: previousCount,
+      to: currentCount,
+      totalItems: displayItems.value.length,
+    });
+  });
+  watch(
+    () => displayItems.value.length,
+    (newLength, oldLength) => {
+      if (perfDebug.value) {
+        logPerf('display-items-length-changed', {
+          from: oldLength,
+          to: newLength,
+          visibleCount: visibleCount.value,
+        });
+      }
+      nextTick(() => {
+        updatePageScrollState();
         checkAndLoadMore();
       });
     }

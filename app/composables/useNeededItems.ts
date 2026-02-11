@@ -10,6 +10,7 @@ import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { fuzzyMatch } from '@/utils/fuzzySearch';
 import { logger } from '@/utils/logger';
+import { perfNow, roundPerfMs } from '@/utils/perf';
 import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
 import type {
   NeededItemsSortBy,
@@ -36,6 +37,7 @@ type FullItemsLoadOptions = {
 type NeededItemsViewMode = 'list' | 'grid';
 type NeededItemsCardStyle = 'compact' | 'expanded';
 export interface UseNeededItemsOptions {
+  perfDebug?: boolean | Ref<boolean> | ComputedRef<boolean>;
   search?: Ref<string>;
   t?: (key: string) => string;
 }
@@ -77,7 +79,7 @@ export interface UseNeededItemsReturn {
   queueFullItemsLoad: (loadOptions?: FullItemsLoadOptions) => void;
 }
 export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededItemsReturn {
-  const { search = ref(''), t } = options;
+  const { perfDebug: perfDebugOption = false, search = ref(''), t } = options;
   const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
   const preferencesStore = usePreferencesStore();
@@ -89,6 +91,11 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     'needed_items.filters.completed': 'Completed',
   };
   const translate = (key: string) => (t ? t(key) : defaultTranslations[key] || key);
+  const perfDebug = computed(() => Boolean(toValue(perfDebugOption)));
+  const logPerf = (event: string, payload: Record<string, unknown> = {}) => {
+    if (!perfDebug.value) return;
+    logger.info(`[NeededItemsPerf] ${event}`, payload);
+  };
   const neededItemTaskObjectives = computed(() => metadataStore.neededItemTaskObjectives);
   const neededItemHideoutModules = computed(() => metadataStore.neededItemHideoutModules);
   const itemsFullLoaded = computed(() => metadataStore.itemsFullLoaded);
@@ -253,6 +260,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
   });
   const allItems = computed(() => {
+    const startedAt = perfDebug.value ? perfNow() : 0;
     const combined = [
       ...(neededItemTaskObjectives.value || []),
       ...(neededItemHideoutModules.value || []),
@@ -310,7 +318,17 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         aggregated.set(key, { ...need, count: normalizedCount });
       }
     }
-    return Array.from(aggregated.values());
+    const result = Array.from(aggregated.values());
+    if (perfDebug.value) {
+      logPerf('all-items', {
+        inputItems: combined.length,
+        outputItems: result.length,
+        ms: roundPerfMs(perfNow() - startedAt),
+        taskObjectives: (neededItemTaskObjectives.value || []).length,
+        hideoutModules: (neededItemHideoutModules.value || []).length,
+      });
+    }
+    return result;
   });
   const isParentCompleted = (need: NeededItemTaskObjective | NeededItemHideoutModule): boolean => {
     if (need.needType === 'taskObjective') {
@@ -471,6 +489,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     return false;
   };
   const filteredItems = computed(() => {
+    const startedAt = perfDebug.value ? perfNow() : 0;
     const result = allItems.value
       .filter(passesCompletionFilter)
       .filter(passesTypeFilter)
@@ -480,10 +499,26 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       .filter(passesOwnershipToggleFilter)
       .filter(passesTeamToggleFilter)
       .filter(passesSearchFilter);
-    return sortNeededItems(result);
+    const sorted = sortNeededItems(result);
+    if (perfDebug.value) {
+      logPerf('filtered-items', {
+        activeFilter: activeFilter.value,
+        firFilter: firFilter.value,
+        hideOwned: hideOwned.value,
+        hideTeamItems: hideTeamItems.value,
+        hideNonFirSpecialEquipment: hideNonFirSpecialEquipment.value,
+        inputItems: allItems.value.length,
+        kappaOnly: kappaOnly.value,
+        ms: roundPerfMs(perfNow() - startedAt),
+        outputItems: sorted.length,
+        searchLength: search.value.length,
+      });
+    }
+    return sorted;
   });
   type GroupedNeededItemAccumulator = Omit<GroupedNeededItem, 'total' | 'currentCount'>;
   const groupedItems = computed((): GroupedNeededItem[] => {
+    const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
     for (const need of filteredItems.value) {
       const itemId = getNeededItemId(need);
@@ -545,9 +580,18 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         group.hideoutFirCurrent +
         group.hideoutNonFirCurrent,
     }));
-    return sortGroupedItems(mapped);
+    const sorted = sortGroupedItems(mapped);
+    if (perfDebug.value) {
+      logPerf('grouped-items', {
+        inputItems: filteredItems.value.length,
+        ms: roundPerfMs(perfNow() - startedAt),
+        outputItems: sorted.length,
+      });
+    }
+    return sorted;
   });
   const objectivesByItemId = computed(() => {
+    const startedAt = perfDebug.value ? perfNow() : 0;
     const map = new Map<
       string,
       {
@@ -568,6 +612,13 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       } else {
         entry.hideoutModules.push(need as NeededItemHideoutModule);
       }
+    }
+    if (perfDebug.value) {
+      logPerf('objectives-by-item-id', {
+        groups: map.size,
+        inputItems: filteredItems.value.length,
+        ms: roundPerfMs(perfNow() - startedAt),
+      });
     }
     return map;
   });
