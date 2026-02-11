@@ -199,6 +199,7 @@ const initialSavingState = {
   streamerMode: false,
   hideGlobalTasks: false,
   hideNonKappaTasks: false,
+  hideCompletedMapObjectives: false,
   itemsNeededHideNonFIR: false,
 };
 export const usePreferencesStore = defineStore('preferences', {
