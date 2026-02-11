@@ -379,7 +379,8 @@ export const useMetadataStore = defineStore('metadata', {
       if (!state.tasks.length) return [];
       const allObjectives: TaskObjective[] = [];
       state.tasks.forEach((task) => {
-        normalizeTaskObjectives<TaskObjective>(task.objectives).forEach((obj) => {
+        const normalizedObjectives = normalizeTaskObjectives<TaskObjective>(task.objectives);
+        normalizedObjectives.forEach((obj) => {
           if (obj) {
             allObjectives.push({ ...obj, taskId: task.id });
           }
@@ -1128,8 +1129,13 @@ export const useMetadataStore = defineStore('metadata', {
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
         processData: (data) => {
-          this.mergeTaskObjectives(data.tasks);
-          this.hydrateTaskItems();
+          this.mergeTaskObjectives(data.tasks, {
+            rebuildDerivedData: false,
+            repairFailedTaskStates: false,
+          });
+          this.hydrateTaskItems({ rebuildDerivedData: false });
+          this.rebuildTaskDerivedData();
+          useTarkovStore().repairFailedTaskStates();
         },
         logName: 'Task objectives',
         forceRefresh,
@@ -1148,7 +1154,7 @@ export const useMetadataStore = defineStore('metadata', {
         queryParams: { lang: this.languageCode, gameMode: apiGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         processData: (data) => {
-          this.mergeTaskRewards(data.tasks);
+          this.mergeTaskRewards(data.tasks, { rebuildDerivedData: false });
           this.hydrateTaskItems();
         },
         logName: 'Task rewards',
@@ -1418,20 +1424,32 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Merge objective payloads into existing tasks
      */
-    mergeTaskObjectives(tasks: TarkovTaskObjectivesQueryResult['tasks']) {
+    mergeTaskObjectives(
+      tasks: TarkovTaskObjectivesQueryResult['tasks'],
+      options: { rebuildDerivedData?: boolean; repairFailedTaskStates?: boolean } = {}
+    ) {
+      const { rebuildDerivedData = true, repairFailedTaskStates = rebuildDerivedData } = options;
+      const validUpdates = (tasks || []).filter(
+        (task): task is NonNullable<TarkovTaskObjectivesQueryResult['tasks'][number]> =>
+          Boolean(task?.id)
+      );
+      const updateMap = new Map(validUpdates.map((task) => [task.id, task]));
+      const duplicateUpdates = validUpdates.length - updateMap.size;
       const perfTimer = perfStart('[Metadata] mergeTaskObjectives', {
-        updates: tasks?.length ?? 0,
+        updates: updateMap.size,
+        duplicateUpdates,
         existing: this.tasks.length,
       });
-      if (!tasks?.length || !this.tasks.length) {
+      if (updateMap.size === 0 || !this.tasks.length) {
         perfEnd(perfTimer, { skipped: true });
         return;
       }
-      const updateMap = new Map(tasks.map((task) => [task.id, task]));
       let changed = false;
+      let matchedUpdates = 0;
       const merged = this.tasks.map((task) => {
         const update = updateMap.get(task.id);
         if (!update) return task;
+        matchedUpdates += 1;
         changed = true;
         return {
           ...task,
@@ -1461,32 +1479,59 @@ export const useMetadataStore = defineStore('metadata', {
         }
         const tarkovStore = useTarkovStore();
         tarkovStore.repairCompletedTaskObjectives();
-        this.rebuildTaskDerivedData();
-        tarkovStore.repairFailedTaskStates();
+        if (rebuildDerivedData) {
+          this.rebuildTaskDerivedData();
+        }
+        if (repairFailedTaskStates) {
+          tarkovStore.repairFailedTaskStates();
+        }
       }
       perfEnd(perfTimer, {
         changed,
         tasks: this.tasks.length,
         objectivesHydrated: this.tasksObjectivesHydrated,
+        matchedUpdates,
+        unmatchedUpdates: Math.max(updateMap.size - matchedUpdates, 0),
+        duplicateUpdates,
+        rebuildDerivedData,
+        repairFailedTaskStates,
       });
+      if (import.meta.env.DEV && duplicateUpdates > 0) {
+        logger.debug('[MetadataStore] Duplicate task objective updates detected', {
+          duplicateUpdates,
+          updates: updateMap.size,
+        });
+      }
     },
     /**
      * Merge reward payloads into existing tasks
      */
-    mergeTaskRewards(tasks: TarkovTaskRewardsQueryResult['tasks']) {
+    mergeTaskRewards(
+      tasks: TarkovTaskRewardsQueryResult['tasks'],
+      options: { rebuildDerivedData?: boolean } = {}
+    ) {
+      const { rebuildDerivedData = true } = options;
+      const validUpdates = (tasks || []).filter(
+        (task): task is NonNullable<TarkovTaskRewardsQueryResult['tasks'][number]> =>
+          Boolean(task?.id)
+      );
+      const updateMap = new Map(validUpdates.map((task) => [task.id, task]));
+      const duplicateUpdates = validUpdates.length - updateMap.size;
       const perfTimer = perfStart('[Metadata] mergeTaskRewards', {
-        updates: tasks?.length ?? 0,
+        updates: updateMap.size,
+        duplicateUpdates,
         existing: this.tasks.length,
       });
-      if (!tasks?.length || !this.tasks.length) {
+      if (updateMap.size === 0 || !this.tasks.length) {
         perfEnd(perfTimer, { skipped: true });
         return;
       }
-      const updateMap = new Map(tasks.map((task) => [task.id, task]));
       let changed = false;
+      let matchedUpdates = 0;
       const merged = this.tasks.map((task) => {
         const update = updateMap.get(task.id);
         if (!update) return task;
+        matchedUpdates += 1;
         changed = true;
         return {
           ...task,
@@ -1499,9 +1544,27 @@ export const useMetadataStore = defineStore('metadata', {
       });
       if (changed) {
         this.tasks = markRaw(merged);
-        this.rebuildTaskDerivedData();
+        if (rebuildDerivedData) {
+          this.rebuildTaskDerivedData();
+        }
       }
-      perfEnd(perfTimer, { changed, tasks: this.tasks.length });
+      perfEnd(perfTimer, {
+        changed,
+        tasks: this.tasks.length,
+        matchedUpdates,
+        unmatchedUpdates: Math.max(updateMap.size - matchedUpdates, 0),
+        duplicateUpdates,
+        rebuildDerivedData,
+      });
+      const unmatchedUpdates = Math.max(updateMap.size - matchedUpdates, 0);
+      if (import.meta.env.DEV && (unmatchedUpdates > 0 || duplicateUpdates > 0)) {
+        logger.debug('[MetadataStore] Task reward updates did not map cleanly to loaded tasks', {
+          unmatchedUpdates,
+          duplicateUpdates,
+          loadedTasks: this.tasks.length,
+          updates: updateMap.size,
+        });
+      }
     },
     /**
      * Rebuild derived task structures after incremental merges
@@ -1569,10 +1632,12 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Hydrate task item references with lightweight item data
      */
-    hydrateTaskItems() {
+    hydrateTaskItems(options: { rebuildDerivedData?: boolean } = {}) {
+      const { rebuildDerivedData = true } = options;
       const perfTimer = perfStart('[Metadata] hydrateTaskItems', {
         tasks: this.tasks.length,
         items: this.items.length,
+        rebuildDerivedData,
       });
       if (!this.items.length || !this.tasks.length) {
         perfEnd(perfTimer, { skipped: true });
@@ -1622,8 +1687,10 @@ export const useMetadataStore = defineStore('metadata', {
         failureOutcome: hydrateRewards(task.failureOutcome),
       }));
       this.tasks = markRaw(this.tasks);
-      this.rebuildTaskDerivedData();
-      perfEnd(perfTimer, { tasks: this.tasks.length });
+      if (rebuildDerivedData) {
+        this.rebuildTaskDerivedData();
+      }
+      perfEnd(perfTimer, { tasks: this.tasks.length, rebuildDerivedData });
     },
     /**
      * Hydrate hideout item references with full item data
