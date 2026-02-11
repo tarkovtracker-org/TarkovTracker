@@ -548,6 +548,9 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     setHideCompletedMapObjectives(hide: boolean) {
       this.hideCompletedMapObjectives = hide;
+      // Persistence handled automatically by plugin
+      this.saving = this.saving ?? { ...initialSavingState };
+      this.saving.hideCompletedMapObjectives = true;
     },
     setNeededItemsStyle(style: string) {
       this.neededitemsStyle = style;
