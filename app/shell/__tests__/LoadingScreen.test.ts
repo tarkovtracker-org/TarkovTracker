@@ -97,7 +97,7 @@ describe('LoadingScreen', () => {
     expect(metadataStore.fetchAllData).toHaveBeenCalledWith(true);
     expect(retryButton.attributes('disabled')).toBeDefined();
     expect(retryButton.attributes('data-loading')).toBe('true');
-    resolveRetry?.();
+    resolveRetry!();
     await flushPromises();
     expect(wrapper.findAll('button')[0]?.attributes('disabled')).toBeUndefined();
   });

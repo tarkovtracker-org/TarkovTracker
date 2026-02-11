@@ -197,7 +197,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       } catch (error) {
         logger.error('[PreferencesSyncPlugin] Failed to initialize preferences sync:', error);
       }
-      if (!$supabase.user.loggedIn || $supabase.user.id !== userId) return;
+      if (!$supabase.user.loggedIn || !userId || $supabase.user.id !== userId) return;
       startPreferencesSync(preferencesStore, userId);
     },
     { immediate: true }

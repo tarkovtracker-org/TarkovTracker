@@ -87,7 +87,7 @@ const createTasks = (): Task[] => [
   },
 ];
 const createProgressStore = () => ({
-  visibleTeamStores: { self: {} },
+  visibleTeamStores: { self: {} } as Record<string, Record<string, unknown>>,
   tasksCompletions: {
     'task-map': { self: false },
     'task-trader': { self: true },
@@ -99,10 +99,10 @@ const createProgressStore = () => ({
     'task-non-raid': { self: false },
     'task-kappa': { self: false },
     'task-lightkeeper': { self: false },
-  },
+  } as Record<string, Record<string, boolean>>,
   tasksFailed: {
     'task-failed': { self: true },
-  },
+  } as Record<string, Record<string, boolean>>,
   unlockedTasks: {
     'task-map': { self: true },
     'task-trader': { self: true },
@@ -111,16 +111,16 @@ const createProgressStore = () => ({
     'task-non-raid': { self: true },
     'task-kappa': { self: true },
     'task-lightkeeper': { self: true },
-  },
+  } as Record<string, Record<string, boolean>>,
   objectiveCompletions: {
     'obj-map': { self: false },
     'obj-global': { self: false },
     'obj-non-raid': { self: false },
-  },
+  } as Record<string, Record<string, boolean>>,
   invalidTasks: {
     'task-invalid': { self: true },
-  },
-  playerFaction: { self: 'USEC' },
+  } as Record<string, Record<string, boolean>>,
+  playerFaction: { self: 'USEC' } as Record<string, string>,
   getDisplayName: (teamId: string) => teamId,
   getTaskStatus: (teamId: string, taskId: string) => {
     const completions: Record<string, Record<string, boolean>> = {
@@ -161,6 +161,7 @@ const createPreferencesStore = () => ({
   getOnlyTasksWithRequiredKeys: false,
   getTaskSharedByAllOnly: false,
   getHideGlobalTasks: false,
+  getHideCompletedMapObjectives: false,
   getTaskUserView: 'self',
   getTaskSecondaryView: 'available',
   getPinnedTaskIds: [],
@@ -503,6 +504,113 @@ describe('useTaskFiltering', () => {
       expect(resultIds).not.toContain('task-global');
     });
   });
+  describe('hide completed map objectives behavior', () => {
+    it('hides tasks with no remaining objectives on selected map when enabled', async () => {
+      const { taskFiltering, preferencesStore, progressStore } = await setup();
+      preferencesStore.getHideGlobalTasks = true;
+      preferencesStore.getHideCompletedMapObjectives = true;
+      progressStore.objectiveCompletions['obj-map'] = { self: true };
+      await taskFiltering.updateVisibleTasks(
+        {
+          primaryView: 'maps',
+          secondaryView: 'available',
+          userView: 'self',
+          mapView: 'map-1',
+          traderView: 'all',
+          mergedMaps: [{ id: 'map-1', mergedIds: ['map-1'] }],
+          sortMode: 'none',
+          sortDirection: 'asc',
+        },
+        false
+      );
+      expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([]);
+    });
+    it('does not change status counts when map-objective hiding is enabled', async () => {
+      const { taskFiltering, preferencesStore, progressStore } = await setup();
+      const before = taskFiltering.calculateStatusCounts('self');
+      preferencesStore.getHideCompletedMapObjectives = true;
+      progressStore.objectiveCompletions['obj-map'] = { self: true };
+      const after = taskFiltering.calculateStatusCounts('self');
+      expect(after).toEqual(before);
+    });
+    it('treats all-users map objective completion by relevant faction members only', async () => {
+      const { taskFiltering, tasks, preferencesStore, progressStore } = await setup();
+      preferencesStore.getHideGlobalTasks = true;
+      preferencesStore.getHideCompletedMapObjectives = true;
+      progressStore.visibleTeamStores = { self: {}, bear: {} };
+      progressStore.playerFaction = { self: 'USEC', bear: 'BEAR' };
+      progressStore.objectiveCompletions['obj-map'] = { self: true, bear: false };
+      const mapTask = tasks.find((task) => task.id === 'task-map')!;
+      mapTask.factionName = 'USEC';
+      await taskFiltering.updateVisibleTasks(
+        {
+          primaryView: 'maps',
+          secondaryView: 'all',
+          userView: 'all',
+          mapView: 'map-1',
+          traderView: 'all',
+          mergedMaps: [{ id: 'map-1', mergedIds: ['map-1'] }],
+          sortMode: 'none',
+          sortDirection: 'asc',
+        },
+        false
+      );
+      expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([]);
+    });
+    it('hides all-users available tasks when only non-available teammates have incomplete map objectives', async () => {
+      const { taskFiltering, preferencesStore, progressStore } = await setup();
+      preferencesStore.getHideGlobalTasks = true;
+      preferencesStore.getHideCompletedMapObjectives = true;
+      progressStore.visibleTeamStores = { self: {}, teammate: {} };
+      progressStore.playerFaction = { self: 'USEC', teammate: 'USEC' };
+      progressStore.unlockedTasks['task-map'] = { self: true, teammate: true };
+      progressStore.tasksCompletions['task-map'] = { self: false, teammate: true };
+      progressStore.tasksFailed['task-map'] = { self: false, teammate: false };
+      progressStore.objectiveCompletions['obj-map'] = { self: true, teammate: false };
+      await taskFiltering.updateVisibleTasks(
+        {
+          primaryView: 'maps',
+          secondaryView: 'available',
+          userView: 'all',
+          mapView: 'map-1',
+          traderView: 'all',
+          mergedMaps: [{ id: 'map-1', mergedIds: ['map-1'] }],
+          sortMode: 'none',
+          sortDirection: 'asc',
+        },
+        false
+      );
+      expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([]);
+    });
+    it('can compare map-visible tasks with and without map-objective hiding for available view', async () => {
+      const { taskFiltering, metadataStore, preferencesStore, progressStore } = await setup();
+      preferencesStore.getHideGlobalTasks = true;
+      progressStore.objectiveCompletions['obj-map'] = { self: true };
+      const options = {
+        primaryView: 'maps' as const,
+        secondaryView: 'available' as const,
+        userView: 'self',
+        mapView: 'map-1',
+        traderView: 'all',
+        mergedMaps: [{ id: 'map-1', mergedIds: ['map-1'] }],
+        sortMode: 'none' as const,
+        sortDirection: 'asc' as const,
+      };
+      const withoutHiding = taskFiltering.calculateFilteredTasksForOptions(
+        metadataStore.tasks,
+        options,
+        false
+      );
+      const withHiding = taskFiltering.calculateFilteredTasksForOptions(
+        metadataStore.tasks,
+        options,
+        true
+      );
+      expect(withoutHiding.map((task) => task.id)).toContain('task-map');
+      expect(withHiding.map((task) => task.id)).not.toContain('task-map');
+      expect(withoutHiding.length - withHiding.length).toBe(1);
+    });
+  });
   describe('calculateMapTaskTotals with global tasks', () => {
     it('includes global tasks in map counts when hideGlobalTasks is false', async () => {
       const { taskFiltering, metadataStore } = await setup();
@@ -553,6 +661,29 @@ describe('useTaskFiltering', () => {
         'available'
       );
       expect(counts['map-other']).toBeGreaterThanOrEqual(1);
+    });
+    it('removes map-complete tasks from map totals when hiding is enabled', async () => {
+      const { taskFiltering, metadataStore, progressStore } = await setup();
+      progressStore.objectiveCompletions['obj-map'] = { self: true };
+      const mergedMaps = [{ id: 'map-1', mergedIds: ['map-1'] }];
+      const countsWithoutHiding = taskFiltering.calculateMapTaskTotals(
+        mergedMaps,
+        metadataStore.tasks,
+        false,
+        'self',
+        'available',
+        false
+      );
+      const countsWithHiding = taskFiltering.calculateMapTaskTotals(
+        mergedMaps,
+        metadataStore.tasks,
+        false,
+        'self',
+        'available',
+        true
+      );
+      expect(countsWithoutHiding['map-1']).toBeGreaterThan(countsWithHiding['map-1'] ?? 0);
+      expect(countsWithoutHiding['map-1']! - countsWithHiding['map-1']!).toBe(1);
     });
   });
 });
