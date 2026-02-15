@@ -746,6 +746,10 @@
       compact: 'Compacta',
       comfortable: 'Cómoda',
     },
+    account_moved: {
+      message: 'Buscas tokens de API o ajustes de cuenta?',
+      link: 'Ir a Cuenta',
+    },
     account: {
       begin_deletion: 'Iniciar eliminación de cuenta',
     },

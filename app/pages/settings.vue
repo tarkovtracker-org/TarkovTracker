@@ -1,6 +1,6 @@
 <template>
   <div class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-3xl space-y-4">
+    <div class="mx-auto max-w-5xl space-y-4">
       <ExperienceCard />
       <GenericCard
         icon="mdi-gamepad-variant"
@@ -52,33 +52,20 @@
       <MapSettingsCard />
       <SkillsCard />
       <PrivacyCard />
-      <GenericCard
-        icon="mdi-key-chain"
-        icon-color="secondary"
-        highlight-color="secondary"
-        :fill-height="false"
-        :title="$t('page.settings.card.apitokens.title')"
-        title-classes="text-lg font-semibold"
-      >
-        <template #content>
-          <div class="relative px-4 py-4">
-            <ApiTokens v-if="isLoggedIn" />
-            <UAlert
-              v-else
-              color="warning"
-              variant="soft"
-              icon="i-mdi-lock"
-              :title="$t('page.settings.card.apitokens.not_logged_in')"
-            />
-          </div>
-        </template>
-      </GenericCard>
+      <div class="text-surface-400 flex items-center justify-center gap-1.5 pt-2 text-sm">
+        <UIcon name="i-mdi-information-outline" class="h-4 w-4 shrink-0" />
+        <span>
+          {{ $t('settings.account_moved.message') }}
+          <NuxtLink to="/account" class="text-primary-400 hover:text-primary-300 underline">
+            {{ $t('settings.account_moved.link') }}
+          </NuxtLink>
+        </span>
+      </div>
     </div>
   </div>
 </template>
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import ApiTokens from '@/features/settings/ApiTokens.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import PrivacyCard from '@/features/settings/PrivacyCard.vue';
@@ -94,10 +81,8 @@
     robots: 'noindex, nofollow',
   });
   const { t } = useI18n({ useScope: 'global' });
-  const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
-  const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn));
   const isPveMode = computed(() => tarkovStore.getCurrentGameMode() === GAME_MODES.PVE);
   const gameEditionOptions = computed(() =>
     metadataStore.editions.map((edition) => ({

@@ -746,6 +746,10 @@
       compact: '紧凑',
       comfortable: '舒适',
     },
+    account_moved: {
+      message: '在找 API 令牌或账户设置？',
+      link: '前往账户',
+    },
     account: {
       begin_deletion: '开始删除账户',
     },

@@ -746,6 +746,10 @@
       compact: 'Компактная',
       comfortable: 'Комфортная',
     },
+    account_moved: {
+      message: 'Ищете API-токены или настройки аккаунта?',
+      link: 'Перейти к аккаунту',
+    },
     account: {
       begin_deletion: 'Начать удаление аккаунта',
     },

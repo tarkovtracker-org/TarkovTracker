@@ -746,6 +746,10 @@
       compact: 'Kompakt',
       comfortable: 'Komfortabel',
     },
+    account_moved: {
+      message: 'API-Token oder Kontoeinstellungen gesucht?',
+      link: 'Zum Konto',
+    },
     account: {
       begin_deletion: 'Kontolöschung starten',
     },
