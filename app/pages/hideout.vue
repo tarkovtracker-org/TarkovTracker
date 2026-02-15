@@ -252,9 +252,9 @@
     },
     setPreference: setPrereqPreference,
   });
-  // Hideout filtering composable
   const { activePrimaryView, isStoreLoading, visibleStations, stationCounts } =
     useHideoutFiltering();
+  useHideoutRouteSync();
   const BATCH_SIZE = 9;
   const visibleStationCount = ref(BATCH_SIZE);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
