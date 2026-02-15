@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeCriticalPathFloor, computeConfidence, dampenPace } from '../kappaProjectionHelpers';
+import {
+  computeCriticalPathFloor,
+  computeConfidence,
+  dampenPace,
+} from '@/features/profile/kappaProjectionHelpers';
 import type { Task } from '@/types/tarkov';
 const makeTask = (id: string, overrides: Partial<Task> = {}): Task => ({
   id,
@@ -137,6 +141,16 @@ describe('kappaProjectionHelpers', () => {
       ]);
       const result = computeCriticalPathFloor([a, b], allTasks, new Set(), 10);
       expect(result.floor).toBe(37);
+    });
+    it('handles cycles in predecessor data without crashing', () => {
+      const a = makeTask('a', { predecessors: ['b'] });
+      const b = makeTask('b', { predecessors: ['a'] });
+      const allTasks = new Map([
+        ['a', a],
+        ['b', b],
+      ]);
+      const result = computeCriticalPathFloor([a, b], allTasks, new Set(), 50);
+      expect(result.floor).toBeGreaterThanOrEqual(1);
     });
   });
 });

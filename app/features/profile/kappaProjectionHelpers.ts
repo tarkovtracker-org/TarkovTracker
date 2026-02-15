@@ -17,6 +17,7 @@ export const computeCriticalPathFloor = (
     if (completedTaskIds.has(taskId)) return 0;
     const cached = memo.get(taskId);
     if (cached !== undefined) return cached;
+    memo.set(taskId, 0);
     const task = allTasksById.get(taskId);
     if (!task) {
       memo.set(taskId, 1);
