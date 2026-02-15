@@ -54,6 +54,12 @@ describe('Team Members API', () => {
     runtimeConfig.supabaseServiceKey = 'test-service-key';
     runtimeConfig.supabaseAnonKey = 'test-anon-key';
     mockEvent = {
+      node: {
+        req: {} as H3Event['node']['req'],
+        res: {
+          setHeader: vi.fn(),
+        } as unknown as H3Event['node']['res'],
+      },
       context: {
         auth: {
           user: {
@@ -118,6 +124,11 @@ describe('Team Members API', () => {
       mockGetQuery.mockReturnValue({});
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('teamId is required');
+    });
+    it('should reject invalid teamId format', async () => {
+      mockGetQuery.mockReturnValue({ teamId: 'team-1&select=*' });
+      const { default: handler } = await import('@/server/api/team/members');
+      await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid teamId');
     });
     it('should require user to be team member', async () => {
       mockGetQuery.mockReturnValue({ teamId: 'team-456' });
@@ -263,6 +274,19 @@ describe('Team Members API', () => {
     });
   });
   describe('Authentication fallback', () => {
+    it('should reject malformed auth context user id', async () => {
+      mockEvent.context = {
+        auth: {
+          user: {
+            id: 'not-a-uuid',
+          },
+        },
+        ...BASE_SITE_CONTEXT,
+      };
+      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      const { default: handler } = await import('@/server/api/team/members');
+      await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid token');
+    });
     it('should validate auth token when context.auth is missing', async () => {
       mockEvent.context = { ...BASE_SITE_CONTEXT };
       mockGetQuery.mockReturnValue({ teamId: 'team-456' });

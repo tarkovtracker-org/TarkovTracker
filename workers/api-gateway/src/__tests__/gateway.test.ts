@@ -34,6 +34,59 @@ const jsonResponse = (payload: unknown, status = 200) =>
     status,
     headers: { 'content-type': 'application/json' },
   });
+type BaseFetchMockOptions = {
+  onPatch?: (body: Record<string, unknown>) => void;
+  tasks?: Array<Record<string, unknown>>;
+  userProgress?: Record<string, unknown>;
+};
+const createBaseFetchMock = ({
+  onPatch,
+  tasks = [],
+  userProgress = {
+    user_id: 'user-1',
+    game_edition: 1,
+    pvp_data: { taskCompletions: {} },
+    pve_data: null,
+  },
+}: BaseFetchMockOptions = {}) =>
+  vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.url;
+    if (url.includes('/rest/v1/api_tokens')) {
+      return jsonResponse([
+        {
+          token_id: 'token-1',
+          user_id: 'user-1',
+          token_hash: 'hash',
+          permissions: ['WP'],
+          game_mode: 'pvp',
+          note: 'test',
+          is_active: true,
+          usage_count: 0,
+          expires_at: null,
+        },
+      ]);
+    }
+    if (url.includes('/rest/v1/rpc/increment_token_usage')) {
+      return jsonResponse({ ok: true });
+    }
+    if (url.includes('/rest/v1/user_progress') && init?.method === 'PATCH') {
+      const patchBody = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      onPatch?.(patchBody);
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes('/rest/v1/user_progress')) {
+      return jsonResponse([userProgress]);
+    }
+    if (url === 'https://api.tarkov.dev/graphql') {
+      return jsonResponse({
+        data: {
+          tasks,
+          hideoutStations: [],
+        },
+      });
+    }
+    return new Response('Not Found', { status: 404 });
+  });
 beforeEach(() => {
   deleteMemoryCache('tarkov:tasks');
   deleteMemoryCache('tarkov:hideout');
@@ -113,65 +166,28 @@ describe('api-gateway', () => {
   });
   it('updates dependent and alternative tasks for single update', async () => {
     let patchBody: Record<string, unknown> | null = null;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('/rest/v1/api_tokens')) {
-        return jsonResponse([
-          {
-            token_id: 'token-1',
-            user_id: 'user-1',
-            token_hash: 'hash',
-            permissions: ['WP'],
-            game_mode: 'pvp',
-            note: 'test',
-            is_active: true,
-            usage_count: 0,
-            expires_at: null,
-          },
-        ]);
-      }
-      if (url.includes('/rest/v1/rpc/increment_token_usage')) {
-        return jsonResponse({ ok: true });
-      }
-      if (url.includes('/rest/v1/user_progress') && init?.method === 'PATCH') {
-        patchBody = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
-        return new Response(null, { status: 204 });
-      }
-      if (url.includes('/rest/v1/user_progress')) {
-        return jsonResponse([
-          {
-            user_id: 'user-1',
-            game_edition: 1,
-            pvp_data: { taskCompletions: {} },
-            pve_data: null,
-          },
-        ]);
-      }
-      if (url === 'https://api.tarkov.dev/graphql') {
-        const data = {
-          tasks: [
-            {
-              id: 'task-main',
-              name: 'Main Task',
-              factionName: 'Any',
-              alternatives: [{ id: 'task-alt' }],
-              objectives: [],
-              taskRequirements: [],
-            },
-            {
-              id: 'task-dependent',
-              name: 'Dependent Task',
-              factionName: 'Any',
-              alternatives: [],
-              objectives: [],
-              taskRequirements: [{ task: { id: 'task-main' }, status: ['complete'] }],
-            },
-          ],
-          hideoutStations: [],
-        };
-        return jsonResponse({ data });
-      }
-      return new Response('Not Found', { status: 404 });
+    const fetchMock = createBaseFetchMock({
+      onPatch: (body) => {
+        patchBody = body;
+      },
+      tasks: [
+        {
+          id: 'task-main',
+          name: 'Main Task',
+          factionName: 'Any',
+          alternatives: [{ id: 'task-alt' }],
+          objectives: [],
+          taskRequirements: [],
+        },
+        {
+          id: 'task-dependent',
+          name: 'Dependent Task',
+          factionName: 'Any',
+          alternatives: [],
+          objectives: [],
+          taskRequirements: [{ task: { id: 'task-main' }, status: ['complete'] }],
+        },
+      ],
     });
     vi.stubGlobal('fetch', fetchMock);
     const res = await worker.fetch(
@@ -195,6 +211,146 @@ describe('api-gateway', () => {
     expect(taskCompletions?.['task-alt']?.failed).toBe(true);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
+  });
+  it('skips lastApiUpdate for idempotent single task updates', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    const fetchMock = createBaseFetchMock({
+      onPatch: (body) => {
+        patchBody = body;
+      },
+      tasks: [
+        {
+          id: 'task-main',
+          name: 'Main Task',
+          factionName: 'Any',
+          alternatives: [],
+          objectives: [],
+          taskRequirements: [],
+        },
+      ],
+      userProgress: {
+        user_id: 'user-1',
+        game_edition: 1,
+        pvp_data: {
+          taskCompletions: { 'task-main': { complete: true, failed: false, timestamp: 1 } },
+        },
+        pve_data: null,
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/task/task-main', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(patchBody).not.toBeNull();
+    const pvpData = (patchBody as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
+    expect(pvpData.lastApiUpdate).toBeUndefined();
+  });
+  it('preserves explicit dependent task states in batch updates', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    const fetchMock = createBaseFetchMock({
+      onPatch: (body) => {
+        patchBody = body;
+      },
+      tasks: [
+        {
+          id: 'task-main',
+          name: 'Main Task',
+          factionName: 'Any',
+          alternatives: [],
+          objectives: [],
+          taskRequirements: [],
+        },
+        {
+          id: 'task-dependent',
+          name: 'Dependent Task',
+          factionName: 'Any',
+          alternatives: [],
+          objectives: [],
+          taskRequirements: [{ task: { id: 'task-main' }, status: ['complete'] }],
+        },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          { id: 'task-main', state: 'completed' },
+          { id: 'task-dependent', state: 'completed' },
+        ]),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(patchBody).not.toBeNull();
+    const pvpData = (patchBody as { pvp_data?: { taskCompletions?: Record<string, unknown> } })
+      .pvp_data;
+    const taskCompletions = pvpData?.taskCompletions as
+      | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
+      | undefined;
+    expect(taskCompletions?.['task-main']?.complete).toBe(true);
+    expect(taskCompletions?.['task-main']?.failed).toBe(false);
+    expect(taskCompletions?.['task-dependent']?.complete).toBe(true);
+    expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
+  });
+  it('skips lastApiUpdate for idempotent batch task updates', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    const fetchMock = createBaseFetchMock({
+      onPatch: (body) => {
+        patchBody = body;
+      },
+      tasks: [
+        {
+          id: 'task-main',
+          name: 'Main Task',
+          factionName: 'Any',
+          alternatives: [],
+          objectives: [],
+          taskRequirements: [],
+        },
+        {
+          id: 'task-second',
+          name: 'Second Task',
+          factionName: 'Any',
+          alternatives: [],
+          objectives: [],
+          taskRequirements: [],
+        },
+      ],
+      userProgress: {
+        user_id: 'user-1',
+        game_edition: 1,
+        pvp_data: {
+          taskCompletions: {
+            'task-main': { complete: true, failed: false, timestamp: 1 },
+            'task-second': { complete: false, failed: false, timestamp: 1 },
+          },
+        },
+        pve_data: null,
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          { id: 'task-main', state: 'completed' },
+          { id: 'task-second', state: 'uncompleted' },
+        ]),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const pvpData = (patchBody as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
+    expect(pvpData.lastApiUpdate).toBeUndefined();
   });
   it('returns progress for valid token', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

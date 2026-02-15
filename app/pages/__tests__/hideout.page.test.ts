@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import HideoutPage from '@/pages/hideout.vue';
 import type { HideoutStation } from '@/types/tarkov';
+const { useInfiniteScrollMock } = vi.hoisted(() => ({
+  useInfiniteScrollMock: vi.fn(() => ({ checkAndLoadMore: vi.fn() })),
+}));
 /**
  * Deep freezes an object and all nested objects/arrays to prevent accidental mutation.
  * Uses a WeakSet to protect against circular references.
@@ -44,9 +47,7 @@ vi.mock('@/composables/useHideoutFiltering', () => ({
   }),
 }));
 vi.mock('@/composables/useInfiniteScroll', () => ({
-  useInfiniteScroll: () => ({
-    checkAndLoadMore: vi.fn(),
-  }),
+  useInfiniteScroll: useInfiniteScrollMock,
 }));
 vi.mock('@/composables/useHideoutStationStatus', () => ({
   useHideoutStationStatus: () => ({
@@ -113,6 +114,23 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('hideout page', () => {
+  it('uses ready auto-loading for infinite scroll', async () => {
+    useInfiniteScrollMock.mockClear();
+    await mountSuspended(HideoutPage, {
+      global: {
+        stubs: {
+          HideoutCard: { template: '<div data-testid="hideout-card" />' },
+          RefreshButton: true,
+          UAlert: true,
+          UButton: true,
+          UIcon: true,
+          UModal: true,
+        },
+      },
+    });
+    const options = (useInfiniteScrollMock.mock.calls[0] as unknown[])?.[2];
+    expect(options).toMatchObject({ autoLoadOnReady: true });
+  });
   it('renders hideout cards', async () => {
     const wrapper = await mountSuspended(HideoutPage, {
       global: {

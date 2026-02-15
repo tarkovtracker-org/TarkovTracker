@@ -146,16 +146,26 @@
     if (provider === 'github') return 'i-mdi-github';
     return 'i-mdi-account';
   };
-  const getProviderColor = (provider: AuthProvider) => {
-    if (provider === 'discord') return 'primary';
-    if (provider === 'twitch') return 'warning';
-    if (provider === 'google') return 'error';
-    if (provider === 'github') return 'neutral';
-    return 'secondary';
+  const getProviderBadgeClass = (provider: AuthProvider) => {
+    if (provider === 'google') return 'ring-surface-600 text-surface-900 ring-1';
+    if (provider === 'github') return 'ring-surface-600 text-white ring-1';
+    return 'text-white ring-1 ring-white/10';
+  };
+  const getProviderBadgeStyle = (provider: AuthProvider) => {
+    if (provider === 'discord') return { backgroundColor: 'var(--color-discord)' };
+    if (provider === 'twitch') return { backgroundColor: 'var(--color-twitch)' };
+    if (provider === 'google') return { backgroundColor: 'white' };
+    if (provider === 'github') return { backgroundColor: 'var(--color-github)' };
+    return {};
   };
   const getProviderLabel = (provider: AuthProvider) => {
     return provider.charAt(0).toUpperCase() + provider.slice(1);
   };
+  const authMethodLabel = computed(() =>
+    providers.value.length > 1
+      ? t('settings.account_data.auth_methods_label')
+      : t('settings.account_data.auth_method_label')
+  );
   const confirmationPhrase = computed(() => t('settings.account_data.confirm_phrase_value'));
   const canDelete = computed(() => {
     return (
@@ -440,17 +450,15 @@
                   <div class="mb-2 flex items-center">
                     <UIcon name="i-mdi-login" class="text-surface-400 mr-2 h-4.5 w-4.5" />
                     <span class="flex flex-wrap items-center gap-1 text-sm">
-                      <span class="text-surface-400 mr-1">
-                        {{ $t('settings.account_data.auth_method_label') }}:
-                      </span>
+                      <span class="text-surface-400 mr-1">{{ authMethodLabel }}:</span>
                       <template v-if="providers.length > 0">
                         <UBadge
                           v-for="p in providers"
                           :key="p"
                           size="xs"
-                          :color="getProviderColor(p)"
                           variant="solid"
-                          :class="[p === 'github' ? 'bg-surface-900 text-white' : 'text-white']"
+                          :style="getProviderBadgeStyle(p)"
+                          :class="getProviderBadgeClass(p)"
                         >
                           <UIcon :name="getProviderIcon(p)" class="mr-1 h-4 w-4" />
                           {{ getProviderLabel(p) }}

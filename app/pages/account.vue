@@ -2,6 +2,7 @@
   <div class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-5xl space-y-4">
       <ProfileSharingCard />
+      <PrivacyCard />
       <GenericCard
         icon="mdi-key-chain"
         icon-color="secondary"
@@ -191,10 +192,10 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokens from '@/features/settings/ApiTokens.vue';
+  import PrivacyCard from '@/features/settings/PrivacyCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';

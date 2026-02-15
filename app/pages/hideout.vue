@@ -190,8 +190,6 @@
 <script setup lang="ts">
   import { useDebounceFn } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
-  import { useRoute, useRouter } from 'vue-router';
   import { type HideoutPrimaryView, useHideoutFiltering } from '@/composables/useHideoutFiltering';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
@@ -255,7 +253,7 @@
   // Hideout filtering composable
   const { activePrimaryView, isStoreLoading, visibleStations, stationCounts } =
     useHideoutFiltering();
-  const BATCH_SIZE = 9;
+  const BATCH_SIZE = 4;
   const visibleStationCount = ref(BATCH_SIZE);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const visibleStationsSlice = computed(() =>
@@ -270,9 +268,10 @@
     );
   };
   const { checkAndLoadMore } = useInfiniteScroll(loadMoreSentinel, loadMoreStations, {
+    autoLoadOnReady: true,
     enabled: hasMoreStations,
-    maxAutoLoads: 8,
-    rootMargin: '700px',
+    maxAutoLoads: 4,
+    rootMargin: '300px',
   });
   const debouncedCheckAndLoadMore = useDebounceFn(() => {
     void nextTick(() => {

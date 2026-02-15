@@ -12,6 +12,12 @@ function normalizeEnum<T>(value: T, allowed: readonly T[]): T | null {
 }
 let stopUserWatch: (() => void) | null = null;
 let preferencesSyncController: ReturnType<typeof useSupabaseSync> | null = null;
+function getRowLocaleOverride(row: Record<string, unknown>): string | null {
+  const localeOverride = row.locale_override;
+  if (typeof localeOverride !== 'string') return null;
+  const trimmedLocaleOverride = localeOverride.trim();
+  return trimmedLocaleOverride.length > 0 ? trimmedLocaleOverride : null;
+}
 type SupabasePreferencesClient = {
   from: (table: string) => {
     select: (query: string) => {
@@ -90,6 +96,8 @@ const buildPreferencesSyncPayload = (
   return {
     user_id: userId,
     streamer_mode: preferencesState.streamerMode,
+    profile_share_pvp_public: preferencesState.profileSharePvpPublic,
+    profile_share_pve_public: preferencesState.profileSharePvePublic,
     team_hide: preferencesState.teamHide,
     task_team_hide_all: preferencesState.taskTeamHideAll,
     items_team_hide_all: preferencesState.itemsTeamHideAll,
@@ -186,6 +194,9 @@ export default defineNuxtPlugin((nuxtApp) => {
   stopUserWatch = watch(
     () => [$supabase.user.loggedIn, $supabase.user.id] as const,
     async ([loggedIn, userId]) => {
+      const localLocaleOverride = preferencesStore.localeOverride;
+      let localeOverrideToRestore: string | null = null;
+      let shouldApplyShareVisibilityDefaults = false;
       try {
         stopPreferencesSync();
         if (!loggedIn || !userId) return;
@@ -196,15 +207,32 @@ export default defineNuxtPlugin((nuxtApp) => {
           .maybeSingle();
         if (error && error.code !== 'PGRST116') {
           logger.error('[PreferencesSyncPlugin] Error loading preferences from Supabase:', error);
-        } else if (data) {
+          return;
+        }
+        if (data) {
           logger.debug('[PreferencesSyncPlugin] Loading preferences from Supabase:', data);
-          applyPreferencesRow(preferencesStore, data as Record<string, unknown>);
+          const row = data as Record<string, unknown>;
+          const rowLocaleOverride = getRowLocaleOverride(row);
+          applyPreferencesRow(preferencesStore, row);
+          if (!rowLocaleOverride && localLocaleOverride) {
+            localeOverrideToRestore = localLocaleOverride;
+          }
+        } else {
+          shouldApplyShareVisibilityDefaults = true;
         }
       } catch (error) {
         logger.error('[PreferencesSyncPlugin] Failed to initialize preferences sync:', error);
+        return;
       }
       if (!$supabase.user.loggedIn || !userId || $supabase.user.id !== userId) return;
+      if (shouldApplyShareVisibilityDefaults) {
+        preferencesStore.setProfileSharePvePublic(false);
+        preferencesStore.setProfileSharePvpPublic(false);
+      }
       startPreferencesSync(preferencesStore, userId);
+      if (localeOverrideToRestore && preferencesStore.localeOverride !== localeOverrideToRestore) {
+        preferencesStore.setLocaleOverride(localeOverrideToRestore);
+      }
     },
     { immediate: true }
   );

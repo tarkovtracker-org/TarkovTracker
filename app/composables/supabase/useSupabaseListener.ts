@@ -16,6 +16,7 @@ export interface SupabaseListenerConfig {
   primaryKey?: string; // Defaults to 'id' or 'user_id'
   storeId?: string;
   onData?: (data: Record<string, unknown> | null) => void;
+  patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
   syncController?: { pause: () => void; resume: () => void };
 }
@@ -37,6 +38,7 @@ export function useSupabaseListener({
   filter,
   storeId,
   onData,
+  patchStore = true,
   syncController,
 }: SupabaseListenerConfig): SupabaseListenerReturn {
   const { $supabase } = useNuxtApp();
@@ -76,11 +78,15 @@ export function useSupabaseListener({
       return;
     }
     if (data) {
-      safePatchStore(store, data);
-      clearStaleState(store, data);
+      if (patchStore) {
+        safePatchStore(store, data);
+        clearStaleState(store, data);
+      }
       if (onData) onData(data);
     } else {
-      resetStore(store);
+      if (patchStore) {
+        resetStore(store);
+      }
       if (onData) onData(null);
     }
     // Mark initial load as complete
@@ -105,13 +111,17 @@ export function useSupabaseListener({
           syncController?.pause();
           try {
             if (payload.eventType === 'DELETE') {
-              resetStore(store);
+              if (patchStore) {
+                resetStore(store);
+              }
               if (onData) onData(null);
             } else {
               // INSERT or UPDATE
               const newData = payload.new as Record<string, unknown>;
-              safePatchStore(store, newData);
-              clearStaleState(store, newData);
+              if (patchStore) {
+                safePatchStore(store, newData);
+                clearStaleState(store, newData);
+              }
               if (onData) onData(newData);
             }
           } finally {
@@ -141,7 +151,9 @@ export function useSupabaseListener({
     (newFilter) => {
       cleanup();
       if (!newFilter) {
-        resetStore(store);
+        if (patchStore) {
+          resetStore(store);
+        }
         if (onData) onData(null);
         hasInitiallyLoaded.value = true;
         return;

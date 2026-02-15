@@ -31,7 +31,9 @@ export default defineNuxtConfig({
       requireAuth: process.env.API_REQUIRE_AUTH !== 'false', // defaults to true
       // Routes that are exempt from auth requirement (comma-separated, supports wildcards)
       // e.g., "/api/tarkov/*" for public data endpoints
-      publicRoutes: process.env.API_PUBLIC_ROUTES || '/api/tarkov/*,/api/changelog',
+      publicRoutes:
+        process.env.API_PUBLIC_ROUTES?.trim() ||
+        '/api/tarkov/*,/api/changelog,/api/profile/*,/api/streamer/*',
       // Whether to trust proxy headers (X-Forwarded-For, etc.)
       // ONLY enable this if the server is behind a trusted proxy like Cloudflare
       trustProxy: process.env.API_TRUST_PROXY === 'true',
@@ -148,7 +150,16 @@ export default defineNuxtConfig({
       { label: 'URL', width: '65%' },
       { label: 'Last Modified', select: 'sitemap:lastmod', width: '25%' },
     ],
-    exclude: ['/admin', '/auth/**', '/login', '/not-found', '/oauth/**', '/settings', '/team'],
+    exclude: [
+      '/account',
+      '/admin',
+      '/auth/**',
+      '/login',
+      '/not-found',
+      '/oauth/**',
+      '/settings',
+      '/team',
+    ],
     defaults: {
       changefreq: 'weekly',
       priority: 0.8,

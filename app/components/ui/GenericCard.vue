@@ -50,7 +50,7 @@
               <!-- Right side content -->
               <div
                 v-if="$slots['title-right'] || props.subtitle"
-                class="flex items-center gap-2 text-right"
+                class="flex items-center gap-2 pr-4 text-right"
               >
                 <slot name="title-right">
                   <span v-if="props.subtitle" class="text-surface-400 text-xs">

@@ -12,6 +12,7 @@ import type {
   LeaveTeamResponse,
 } from '@/types/team';
 type GameMode = 'pvp' | 'pve';
+const TEAM_ID_REGEX = /^[a-zA-Z0-9-]{1,64}$/;
 const GATEWAY_OUTAGE_COOLDOWN_MS = 60_000;
 let teamGatewayOutageUntil = 0;
 const getGatewayErrorData = (error: unknown): string | undefined => {
@@ -34,6 +35,11 @@ const getGatewayErrorData = (error: unknown): string | undefined => {
 };
 const isAuthOrMembershipStatus = (status: number | null): boolean =>
   status === 401 || status === 403;
+const assertValidTeamId = (teamId: string) => {
+  if (!TEAM_ID_REGEX.test(teamId)) {
+    throw new Error('Invalid team id');
+  }
+};
 const shouldCooldownGateway = (error: unknown): boolean => {
   const status = getErrorStatus(error);
   if (status !== null && status >= 500) {
@@ -121,6 +127,7 @@ export const useEdgeFunctions = () => {
       { displayName: string | null; level: number | null; tasksCompleted: number | null }
     >;
   }> => {
+    assertValidTeamId(teamId);
     const callTeamMembersApi = async (token: string) => {
       return await $fetch<{
         members: string[];
@@ -243,6 +250,7 @@ export const useEdgeFunctions = () => {
    * @param joinCode The team join/invite code
    */
   const joinTeam = async (teamId: string, joinCode: string): Promise<JoinTeamResponse> => {
+    assertValidTeamId(teamId);
     return await preferGateway<JoinTeamResponse>('join', { teamId, join_code: joinCode });
   };
   /**
@@ -250,6 +258,7 @@ export const useEdgeFunctions = () => {
    * @param teamId The ID of the team to leave
    */
   const leaveTeam = async (teamId: string): Promise<LeaveTeamResponse> => {
+    assertValidTeamId(teamId);
     return await preferGateway<LeaveTeamResponse>('leave', { teamId });
   };
   /**
@@ -258,6 +267,7 @@ export const useEdgeFunctions = () => {
    * @param memberId The ID of the member to kick
    */
   const kickTeamMember = async (teamId: string, memberId: string): Promise<KickMemberResponse> => {
+    assertValidTeamId(teamId);
     return await preferGateway<KickMemberResponse>('kick', { teamId, memberId });
   };
   const preferTokenGateway = async <T>(

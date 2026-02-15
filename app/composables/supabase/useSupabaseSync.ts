@@ -15,6 +15,7 @@ export interface SupabaseSyncConfig {
   table: string;
   transform?: (state: Record<string, unknown>) => Record<string, unknown> | null;
   debounceMs?: number;
+  onSynced?: () => void;
 }
 // Type for the transformed data that gets sent to Supabase
 interface SupabaseUserData {
@@ -101,6 +102,7 @@ export function useSupabaseSync({
   table,
   transform,
   debounceMs = 1000,
+  onSynced,
 }: SupabaseSyncConfig) {
   logger.debug(`[Sync] useSupabaseSync initialized for table: ${table}, debounce: ${debounceMs}ms`);
   const { $supabase } = useNuxtApp();
@@ -218,6 +220,7 @@ export function useSupabaseSync({
       if (syncResult.synced) {
         lastSyncedHash = currentHash;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
+        onSynced?.();
       }
     } catch (err) {
       logger.error('[Sync] Unexpected error:', err);

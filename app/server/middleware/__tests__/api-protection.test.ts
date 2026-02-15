@@ -126,6 +126,34 @@ describe('API Protection Middleware', () => {
       await expect(middleware(mockEvent as H3Event)).resolves.toBeUndefined();
       process.env.NODE_ENV = originalEnv;
     });
+    it('should treat configured public routes as authoritative', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      runtimeConfig.apiProtection.requireAuth = true;
+      runtimeConfig.apiProtection.publicRoutes = '/api/tarkov/*';
+      mockGetRequestURL.mockReturnValue(new URL('http://localhost:3000/api/profile/test'));
+      mockGetRequestHeader.mockImplementation((_: unknown, header: string) => {
+        if (header === 'host') return 'localhost:3000';
+        return undefined;
+      });
+      const { default: middleware } = await import('../api-protection');
+      await expect(middleware(mockEvent as H3Event)).rejects.toThrow();
+      process.env.NODE_ENV = originalEnv;
+    });
+    it('should fall back to default public routes when config value is blank', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      runtimeConfig.apiProtection.requireAuth = true;
+      runtimeConfig.apiProtection.publicRoutes = '   ';
+      mockGetRequestURL.mockReturnValue(new URL('http://localhost:3000/api/profile/test'));
+      mockGetRequestHeader.mockImplementation((_: unknown, header: string) => {
+        if (header === 'host') return 'localhost:3000';
+        return undefined;
+      });
+      const { default: middleware } = await import('../api-protection');
+      await expect(middleware(mockEvent as H3Event)).resolves.toBeUndefined();
+      process.env.NODE_ENV = originalEnv;
+    });
   });
   describe('Authentication requirement', () => {
     it('should allow all routes when requireAuth is false', async () => {

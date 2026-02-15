@@ -51,7 +51,6 @@
       <TaskDisplayCard />
       <MapSettingsCard />
       <SkillsCard />
-      <PrivacyCard />
       <div class="text-surface-400 flex items-center justify-center gap-1.5 pt-2 text-sm">
         <UIcon name="i-mdi-information-outline" class="h-4 w-4 shrink-0" />
         <span>
@@ -68,7 +67,6 @@
   import { useI18n } from 'vue-i18n';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
-  import PrivacyCard from '@/features/settings/PrivacyCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
   import { useMetadataStore } from '@/stores/useMetadata';

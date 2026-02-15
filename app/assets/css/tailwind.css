@@ -330,6 +330,8 @@ html.no-smooth-scroll {
   --color-sitebackground: var(--color-surface-950);
   --color-contentbackground: var(--color-surface-900);
   --color-border: var(--color-surface-600);
+  --color-checker-dark: hsl(240 27% 14%);
+  --color-checker-bg: hsl(240 27% 10%);
   /* Surface ladder: bg(950) → panel(900) → card(800) → hover(700) → border(600) */
   --color-bg: var(--color-surface-950);
   --color-panel: var(--color-surface-900);
@@ -463,6 +465,8 @@ html.no-smooth-scroll {
     --color-error-800: oklch(0.333236 0.097764 16.27);
     --color-error-900: oklch(0.27734 0.077642 16.16);
     --color-error-950: oklch(0.218875 0.055957 15.99);
+    --color-checker-dark: oklch(0.228228 0.03707 283.07);
+    --color-checker-bg: oklch(0.192364 0.027672 283.49);
     --color-kappa-50: oklch(0.97 0.08 25);
     --color-kappa-100: oklch(0.92 0.12 25);
     --color-kappa-200: oklch(0.84 0.16 25);

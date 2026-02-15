@@ -83,7 +83,23 @@
               </UButton>
             </div>
             <p class="text-surface-500 truncate text-[11px]">{{ shareUrl }}</p>
-            <p class="text-surface-400 text-[11px]">{{ shareAccessLabel }}</p>
+            <p class="text-surface-400 text-[11px]">
+              <template v-if="shareIsPrivate">
+                {{
+                  t('page.profile.share_private_intro', 'This mode is private. Enable sharing in ')
+                }}
+                <NuxtLink
+                  to="/account"
+                  class="text-primary-300 hover:text-primary-200 underline underline-offset-2"
+                >
+                  {{ t('page.profile.account_settings_link', 'Account Settings') }}
+                </NuxtLink>
+                {{ t('page.profile.share_private_outro', ' to make this link public.') }}
+              </template>
+              <template v-else>
+                {{ shareAccessLabel }}
+              </template>
+            </p>
           </div>
         </div>
       </section>
@@ -1451,24 +1467,27 @@
     }
     return sharePath.value;
   });
-  const shareAccessLabel = computed(() => {
+  const shareIsPrivate = computed(() => {
     if (isViewingSharedProfile.value) {
-      return t('page.profile.shared_mode_notice', 'Viewing shared progression for this mode.');
+      return false;
     }
     const modeIsPublic =
       selectedMode.value === GAME_MODES.PVE
         ? preferencesStore.getProfileSharePvePublic
         : preferencesStore.getProfileSharePvpPublic;
-    if (modeIsPublic) {
+    return !modeIsPublic;
+  });
+  const shareAccessLabel = computed(() => {
+    if (isViewingSharedProfile.value) {
+      return t('page.profile.shared_mode_notice', 'Viewing shared progression for this mode.');
+    }
+    if (!shareIsPrivate.value) {
       return t(
         'page.profile.share_public_enabled',
         'This mode is public. Anyone with the link can view it.'
       );
     }
-    return t(
-      'page.profile.share_private_enabled',
-      'This mode is private. Enable sharing in Settings to make this link public.'
-    );
+    return t('page.profile.share_private_enabled', 'This mode is private.');
   });
   const shareSnapshot = computed(() => {
     const lines = [

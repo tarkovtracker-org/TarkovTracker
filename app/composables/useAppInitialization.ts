@@ -16,6 +16,16 @@ export function useAppInitialization() {
   const { showLoadFailed } = useToastI18n();
   const isAvailableLocale = (value: string): value is typeof locale.value =>
     (availableLocales as readonly string[]).includes(value);
+  const applyLocaleOverride = async (localeOverride: string | null) => {
+    if (!localeOverride || !isAvailableLocale(localeOverride) || localeOverride === locale.value) {
+      return;
+    }
+    try {
+      await setLocale(localeOverride);
+    } catch (error) {
+      logger.error('[useAppInitialization] Failed to apply locale override:', error);
+    }
+  };
   let syncStarted = false;
   let migrationAttempted = false;
   const startSyncIfNeeded = async () => {
@@ -64,17 +74,14 @@ export function useAppInitialization() {
     },
     { immediate: true }
   );
+  watch(
+    () => preferencesStore.localeOverride,
+    async (localeOverride) => {
+      await applyLocaleOverride(localeOverride);
+    },
+    { immediate: true }
+  );
   onMounted(async () => {
-    // Apply user's locale preference
-    const localeOverride = preferencesStore.localeOverride;
-    if (localeOverride && isAvailableLocale(localeOverride) && localeOverride !== locale.value) {
-      try {
-        await setLocale(localeOverride);
-      } catch (error) {
-        logger.error('[useAppInitialization] Failed to apply locale override:', error);
-      }
-    }
-    // For users already logged in on first mount, ensure sync/migration run once
     await startSyncIfNeeded();
     await runMigrationIfNeeded();
   });

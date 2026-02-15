@@ -9,6 +9,7 @@ const setLocale = vi.fn(async (value: string) => {
 });
 const mockSupabase = {
   user: {
+    id: '',
     loggedIn: false,
     photoURL: '',
     displayName: '',
@@ -33,6 +34,16 @@ const mockPreferencesStore = {
   getLocaleOverride: 'en' as string | null,
   setLocaleOverride: vi.fn(),
 };
+const routeState = reactive({
+  name: 'tasks',
+  params: {} as Record<string, unknown>,
+});
+const mockTarkovStore = {
+  getCurrentGameMode: vi.fn(() => 'pvp'),
+  getDisplayName: vi.fn(() => ''),
+  getPvEProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
+  getPvPProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
+};
 function createDeferred<T>() {
   let resolve: (value: T | PromiseLike<T>) => void = () => {};
   let reject: (reason?: unknown) => void = () => {};
@@ -48,7 +59,19 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     availableLocales: ['en', 'de', 'fr'],
     locale: localeRef,
     setLocale,
-    t: (key: string) => key,
+    t: (key: string, params?: Record<string, unknown> | string) => {
+      if (params && typeof params === 'object' && !Array.isArray(params)) {
+        const templates: Record<string, string> = {
+          'profile.title_with_mode': '{name} Profile {mode}',
+        };
+        const template = templates[key] ?? key;
+        return Object.entries(params).reduce(
+          (result, [k, v]) => result.replaceAll(`{${k}}`, String(v)),
+          template
+        );
+      }
+      return key;
+    },
     te: () => false,
   }),
 }));
@@ -74,9 +97,7 @@ vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
 }));
 vi.mock('@/stores/useTarkov', () => ({
-  useTarkovStore: () => ({
-    getDisplayName: () => '',
-  }),
+  useTarkovStore: () => mockTarkovStore,
 }));
 vi.mock('@/utils/logger', () => ({
   logger: {
@@ -89,7 +110,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: mockSupabase,
 }));
 mockNuxtImport('useRoute', () => () => ({
-  name: 'tasks',
+  ...routeState,
 }));
 mockNuxtImport('useSkillCalculation', () => () => mockSkillCalculation);
 mockNuxtImport('useToast', () => () => mockToast);
@@ -110,6 +131,11 @@ const mountAppBar = async () => {
           emits: ['click'],
           template: '<button :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
         },
+        UDropdownMenu: {
+          props: ['items'],
+          template:
+            '<div><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><button v-for="item in group" :key="item.label" type="button" :data-menu-item="item.label" @click="item.onSelect?.()">{{ item.label }}</button></template></div>',
+        },
         UIcon: true,
       },
     },
@@ -118,6 +144,8 @@ const mountAppBar = async () => {
 describe('AppBar locale switching', () => {
   beforeEach(async () => {
     localeRef.value = 'en';
+    routeState.name = 'tasks';
+    routeState.params = {};
     setLocale.mockClear();
     setLocale.mockImplementation(async (value: string) => {
       localeRef.value = value;
@@ -134,6 +162,18 @@ describe('AppBar locale switching', () => {
       mockPreferencesStore.getLocaleOverride = value;
     });
     mockSkillCalculation.migrateLegacySkillOffsets.mockClear();
+    mockTarkovStore.getCurrentGameMode.mockClear();
+    mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
+    mockTarkovStore.getDisplayName.mockClear();
+    mockTarkovStore.getDisplayName.mockReturnValue('');
+    mockTarkovStore.getPvEProgressData.mockClear();
+    mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
+    mockTarkovStore.getPvPProgressData.mockClear();
+    mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
+    mockSupabase.user.id = '';
+    mockSupabase.user.displayName = '';
+    mockSupabase.user.username = '';
+    mockSupabase.user.loggedIn = false;
     mockSupabase.signOut.mockClear();
     mockToast.add.mockClear();
     const { logger } = await import('@/utils/logger');
@@ -229,6 +269,89 @@ describe('AppBar locale switching', () => {
       'de',
       'fr',
     ]);
+    wrapper.unmount();
+  });
+});
+describe('AppBar account menu', () => {
+  beforeEach(() => {
+    mockSupabase.user.loggedIn = true;
+    mockSupabase.signOut.mockClear();
+  });
+  it('does not log out when clicking the account trigger button', async () => {
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.get('button[aria-label="navigation_drawer.account_menu"]');
+    await trigger.trigger('click');
+    expect(mockSupabase.signOut).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('logs out when selecting the logout menu item', async () => {
+    const wrapper = await mountAppBar();
+    const logoutMenuItem = wrapper.get('[data-menu-item="navigation_drawer.logout"]');
+    await logoutMenuItem.trigger('click');
+    await flushPromises();
+    expect(mockSupabase.signOut).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+});
+describe('AppBar page title', () => {
+  beforeEach(() => {
+    routeState.name = 'tasks';
+    routeState.params = {};
+    mockPreferencesStore.getStreamerMode = false;
+    mockSupabase.user.id = '';
+    mockSupabase.user.displayName = '';
+    mockSupabase.user.loggedIn = false;
+    mockSupabase.user.username = '';
+    mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
+    mockTarkovStore.getDisplayName.mockReturnValue('');
+    mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
+    mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
+  });
+  it('renders profile title with username and route mode for own profile routes', async () => {
+    routeState.name = 'profile-userId-mode';
+    routeState.params = { mode: 'pve', userId: 'user-1' };
+    mockSupabase.user.id = 'user-1';
+    mockSupabase.user.username = 'Alpha';
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain('Alpha Profile PVE');
+    wrapper.unmount();
+  });
+  it('renders shared profile title from route user id instead of local progress data', async () => {
+    routeState.name = 'profile-userId-mode';
+    routeState.params = { mode: 'pve', userId: 'shared-user' };
+    mockSupabase.user.id = 'viewer-user';
+    mockTarkovStore.getDisplayName.mockReturnValue('ViewerDisplay');
+    mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: 'ViewerProgress' });
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain('shared-user Profile PVE');
+    expect(wrapper.text()).not.toContain('ViewerProgress Profile PVE');
+    expect(wrapper.text()).not.toContain('ViewerDisplay Profile PVE');
+    wrapper.unmount();
+  });
+  it('uses non-streamer fallback label for own profile title when no name resolves', async () => {
+    routeState.name = 'profile-userId-mode';
+    routeState.params = { mode: 'pvp', userId: 'user-1' };
+    mockSupabase.user.id = 'user-1';
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain('app_bar.user_label Profile PVP');
+    expect(wrapper.text()).not.toContain('app_bar.hidden_label Profile PVP');
+    wrapper.unmount();
+  });
+  it('masks own profile title in streamer mode', async () => {
+    routeState.name = 'profile-userId-mode';
+    routeState.params = { mode: 'pvp', userId: 'user-1' };
+    mockPreferencesStore.getStreamerMode = true;
+    mockSupabase.user.displayName = 'AccountName';
+    mockSupabase.user.id = 'user-1';
+    mockSupabase.user.username = 'AccountUsername';
+    mockTarkovStore.getDisplayName.mockReturnValue('OwnDisplayName');
+    mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: 'OwnProgressName' });
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain('app_bar.hidden_label Profile PVP');
+    expect(wrapper.text()).not.toContain('OwnProgressName Profile PVP');
+    expect(wrapper.text()).not.toContain('OwnDisplayName Profile PVP');
+    expect(wrapper.text()).not.toContain('AccountName Profile PVP');
+    expect(wrapper.text()).not.toContain('AccountUsername Profile PVP');
     wrapper.unmount();
   });
 });
