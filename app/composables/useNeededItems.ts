@@ -13,12 +13,10 @@ import { logger } from '@/utils/logger';
 import { perfNow, roundPerfMs } from '@/utils/perf';
 import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
 import type {
-  NeededItemsSortBy,
-  NeededItemsSortDirection,
-} from '@/composables/useNeededItemsSorting';
-import type {
   NeededItemsFirFilter,
   NeededItemsFilterType,
+  NeededItemsSortBy,
+  NeededItemsSortDirection,
 } from '@/features/neededitems/neededitems-constants';
 import type {
   GroupedNeededItem,
