@@ -13,11 +13,15 @@ export const computeCriticalPathFloor = (
 };
 export const computeConfidence = (
   sampleCount: number,
-  _sampleDays: number
+  sampleDays: number
 ): 'high' | 'low' | 'medium' | null => {
   if (sampleCount < 3) return null;
+  if (sampleCount >= 15 && sampleDays >= 7) return 'high';
+  if (sampleCount >= 7 && sampleDays >= 3) return 'medium';
   return 'low';
 };
-export const dampenPace = (rawPacePerDay: number, _sampleDays: number): number => {
-  return rawPacePerDay;
+const DAMPEN_THRESHOLD_DAYS = 3;
+export const dampenPace = (rawPacePerDay: number, sampleDays: number): number => {
+  if (sampleDays >= DAMPEN_THRESHOLD_DAYS) return rawPacePerDay;
+  return rawPacePerDay * (sampleDays / DAMPEN_THRESHOLD_DAYS);
 };
