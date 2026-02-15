@@ -1,3 +1,10 @@
+## [1.3.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.5...v1.3.6) (2026-02-15)
+
+
+### Bug Fixes
+
+* **streamer:** forward host header on internal $fetch to pass API protection ([b1792fa](https://github.com/tarkovtracker-org/TarkovTracker/commit/b1792fab21e8bd18d191cba8011d837461abe844))
+
 ## [1.3.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.4...v1.3.5) (2026-02-15)
 
 
