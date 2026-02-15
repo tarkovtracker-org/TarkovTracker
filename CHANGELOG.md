@@ -1,3 +1,12 @@
+## [1.2.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.2.0...v1.2.1) (2026-02-15)
+
+
+### Bug Fixes
+
+* **tasks:** address PR review — revert objective.item, truncate instead of drop, rename constant ([bdc2b5e](https://github.com/tarkovtracker-org/TarkovTracker/commit/bdc2b5e8733043fdf1c7f9f3bc37ad85a6ae80d8))
+* **tasks:** cap any/sell objective item rendering ([23ba8b0](https://github.com/tarkovtracker-org/TarkovTracker/commit/23ba8b081f957fb464d9e0b68a16eeab781bef62))
+* **tasks:** include objective.item in equipment aggregation ([210188c](https://github.com/tarkovtracker-org/TarkovTracker/commit/210188c5c299a458ed4e9c1738184839c16912ae))
+
 # [1.2.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.1.0...v1.2.0) (2026-02-15)
 
 
