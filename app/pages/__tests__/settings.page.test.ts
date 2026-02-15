@@ -113,10 +113,12 @@ const defaultGlobalStubs = {
   GenericCard: {
     template: '<div data-testid="generic-card"><slot /><slot name="content" /></div>',
   },
-  InterfaceSettingsCard: {
+  MapSettingsCard: true,
+  PrivacyCard: {
     template:
-      '<div data-testid="interface-settings-card"><input type="checkbox" data-testid="interface-settings-card-switch" /></div>',
+      '<div data-testid="privacy-card"><input type="checkbox" data-testid="privacy-card-switch" /></div>',
   },
+  ProfileSharingCard: true,
   SkillsCard: true,
   UAlert: true,
   UBadge: true,
@@ -129,9 +131,7 @@ const defaultGlobalStubs = {
   UIcon: true,
   UInput: true,
   UModal: true,
-  UTabs: {
-    template: '<div><slot name="gameplay" /><slot name="interface" /><slot name="account" /></div>',
-  },
+  TaskDisplayCard: true,
   USelectMenu: {
     props: ['modelValue', 'items', 'options'],
     emits: ['update:modelValue'],
@@ -233,7 +233,7 @@ describe('settings page', () => {
       const wrapper = mount(SettingsPage, {
         global: globalConfig,
       });
-      const toggle = wrapper.find('[data-testid="interface-settings-card-switch"]');
+      const toggle = wrapper.find('[data-testid="privacy-card-switch"]');
       expect(toggle.exists()).toBe(true);
     });
     it('renders with streamer mode enabled', () => {
