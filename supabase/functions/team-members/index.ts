@@ -8,6 +8,8 @@ import {
   createSuccessResponse,
   type AuthSuccess,
 } from "../_shared/auth.ts";
+const TEAM_ID_REGEX = /^[a-zA-Z0-9-]{1,64}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 serve(async (req) => {
   const cors = handleCorsPreflight(req);
@@ -28,6 +30,9 @@ serve(async (req) => {
     if (fieldsError) return fieldsError;
 
     const teamId = body.teamId as string;
+    if (!TEAM_ID_REGEX.test(teamId)) {
+      return createErrorResponse("Invalid team id", 400, req);
+    }
 
     // Ensure caller belongs to the team
     const { data: membership, error: membershipError } = await supabase
@@ -51,7 +56,13 @@ serve(async (req) => {
       return createErrorResponse("Failed to load team members", 500, req);
     }
 
-    const memberIds = (members || []).map((m) => m.user_id as string);
+    const memberIds = Array.from(
+      new Set(
+        (members || [])
+          .map((m) => m.user_id as string)
+          .filter((id) => UUID_REGEX.test(id))
+      )
+    );
 
     return createSuccessResponse({ members: memberIds });
   } catch (error) {

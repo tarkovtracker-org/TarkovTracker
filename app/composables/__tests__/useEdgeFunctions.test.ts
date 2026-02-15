@@ -49,6 +49,16 @@ describe('useEdgeFunctions.getTeamMembers', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+  it('rejects malformed team id before making requests', async () => {
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    const edgeFunctions = useEdgeFunctions();
+    await expect(edgeFunctions.getTeamMembers('team-1&select=*')).rejects.toThrow(
+      'Invalid team id'
+    );
+    expect(mockSupabaseClient.auth.getSession).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.functions.invoke).not.toHaveBeenCalled();
+  });
   it('falls back to team-members when refresh retry fails with server error', async () => {
     const firstError = { status: 401 };
     const secondError = { status: 500 };

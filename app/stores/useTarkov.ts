@@ -128,13 +128,16 @@ const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
     const l = local?.[id];
     const r = remote?.[id];
     if (l && r) {
+      const localTs = l.timestamp ?? 0;
+      const remoteTs = r.timestamp ?? 0;
+      const newer = remoteTs >= localTs ? r : l;
+      const older = newer === r ? l : r;
+      const newerHasComplete = typeof newer.complete === 'boolean';
+      const olderHasComplete = typeof older.complete === 'boolean';
       merged[id as keyof T] = {
-        complete: l.complete || r.complete,
+        complete: newerHasComplete ? newer.complete : olderHasComplete ? older.complete : false,
         count: Math.max(l.count || 0, r.count || 0),
-        timestamp:
-          l.timestamp && r.timestamp
-            ? Math.max(l.timestamp, r.timestamp)
-            : l.timestamp || r.timestamp,
+        timestamp: Math.max(localTs, remoteTs) || undefined,
       } as T[keyof T];
     }
   }
@@ -470,7 +473,10 @@ const performReset = async (
         : mode === 'pvp'
           ? { user_id: $supabase.user.id, pvp_data: freshState.pvp }
           : { user_id: $supabase.user.id, pve_data: freshState.pve };
-    await $supabase.client.from('user_progress').upsert(payload);
+    const { error } = await $supabase.client.from('user_progress').upsert(payload);
+    if (error) {
+      throw new Error(`Failed to reset remote progress: ${error.message}`);
+    }
   }
   if (mode === 'all') {
     localStorage.clear();
@@ -554,7 +560,7 @@ const tarkovActions = {
       }
     }
   },
-  migrateDataIfNeeded(this: TarkovStoreInstance) {
+  async migrateDataIfNeeded(this: TarkovStoreInstance) {
     const needsMigration =
       !this.currentGameMode ||
       !this.pvp ||
@@ -572,7 +578,7 @@ const tarkovActions = {
       if ($supabase.user.loggedIn && $supabase.user.id) {
         try {
           recordLocalSyncTime(); // Track for self-origin filtering
-          $supabase.client.from('user_progress').upsert({
+          await $supabase.client.from('user_progress').upsert({
             user_id: $supabase.user.id,
             current_game_mode: this.currentGameMode,
             game_edition: this.gameEdition,
@@ -588,7 +594,7 @@ const tarkovActions = {
       if ($supabase.user.loggedIn && $supabase.user.id) {
         try {
           recordLocalSyncTime();
-          $supabase.client.from('user_progress').upsert({
+          await $supabase.client.from('user_progress').upsert({
             user_id: $supabase.user.id,
             current_game_mode: this.currentGameMode,
             game_edition: this.gameEdition,
@@ -1051,7 +1057,7 @@ const tarkovActions = {
   },
 } satisfies UserActions & {
   switchGameMode(mode: GameMode): Promise<void>;
-  migrateDataIfNeeded(): void;
+  migrateDataIfNeeded(): Promise<void>;
   migrateTaskCompletionSchema(): { pvpMigrated: number; pveMigrated: number };
   resetOnlineProfile(): Promise<void>;
   resetCurrentGameModeData(): Promise<void>;
@@ -1552,6 +1558,13 @@ export async function initializeTarkovSync() {
         store: tarkovStore,
         table: 'user_progress',
         debounceMs: SYNC_DEBOUNCE_MS,
+        onSynced: () => {
+          if (typeof BroadcastChannel !== 'undefined') {
+            const bc = new BroadcastChannel(`tarkov-progress:${$supabase.user.id}`);
+            bc.postMessage('updated');
+            bc.close();
+          }
+        },
         transform: (state: unknown) => {
           const userState = state as UserState;
           // SAFETY CHECK: Prevent syncing completely empty state for existing accounts

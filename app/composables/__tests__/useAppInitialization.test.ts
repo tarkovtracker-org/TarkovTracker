@@ -2,15 +2,15 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h, reactive, ref } from 'vue';
 import { useAppInitialization } from '@/composables/useAppInitialization';
 const localeRef = ref('en');
 const setLocale = vi.fn(async (value: string) => {
   localeRef.value = value;
 });
-const mockPreferencesStore = {
+const mockPreferencesStore = reactive({
   localeOverride: 'de' as string | null,
-};
+});
 const mockShowLoadFailed = vi.fn();
 const mockSupabase = {
   user: {
@@ -119,6 +119,15 @@ describe('useAppInitialization locale setup', () => {
     const wrapper = await mountWithComposable();
     await flushPromises();
     expect(setLocale).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('reapplies locale when localeOverride changes after mount', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    setLocale.mockClear();
+    mockPreferencesStore.localeOverride = 'fr';
+    await flushPromises();
+    expect(setLocale).toHaveBeenCalledWith('fr');
     wrapper.unmount();
   });
 });

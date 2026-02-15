@@ -827,9 +827,15 @@
     maxAutoLoads: 8,
     rootMargin: '700px',
   });
-  watch(filteredTasks, (newTasks) => {
-    visibleTaskCount.value = Math.min(BATCH_SIZE, newTasks.length);
-    nextTick(() => {
+  watch(filteredTasks, (newTasks, oldTasks) => {
+    const listChanged =
+      !oldTasks ||
+      newTasks.length !== oldTasks.length ||
+      newTasks.some((task, i) => task.id !== oldTasks[i]!.id);
+    if (listChanged) {
+      visibleTaskCount.value = Math.min(BATCH_SIZE, newTasks.length);
+    }
+    void nextTick(() => {
       checkAndLoadMore();
     });
   });

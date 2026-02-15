@@ -9,6 +9,7 @@ import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import { GAME_MODES } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
+import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -498,19 +499,24 @@ export function useTeammateStores() {
       // Setup Supabase listener for this teammate with data transformation
       // Transform Supabase field names to match store structure
       const handleTeammateData = (data: Record<string, unknown> | null) => {
-        if (data) {
-          const gameMode =
-            data.current_game_mode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
-          const pvpData = (data.pvp_data as Partial<UserState['pvp']> | null) ?? {};
-          const pveData = (data.pve_data as Partial<UserState['pve']> | null) ?? {};
-          storeInstance.$patch({
-            currentGameMode: gameMode,
-            gameEdition:
-              typeof data.game_edition === 'number' ? data.game_edition : defaultState.gameEdition,
-            pvp: { ...defaultState.pvp, ...pvpData },
-            pve: { ...defaultState.pve, ...pveData },
-          });
+        if (!data) {
+          storeInstance.$reset();
+          return;
         }
+        const gameMode =
+          data.current_game_mode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
+        const gameEdition =
+          typeof data.game_edition === 'number' && Number.isFinite(data.game_edition)
+            ? Math.max(1, Math.trunc(data.game_edition))
+            : defaultState.gameEdition;
+        const pvpData = sanitizeTeammateProgressData(data.pvp_data);
+        const pveData = sanitizeTeammateProgressData(data.pve_data);
+        storeInstance.$patch({
+          currentGameMode: gameMode,
+          gameEdition,
+          pvp: { ...defaultState.pvp, ...pvpData },
+          pve: { ...defaultState.pve, ...pveData },
+        });
       };
       const { cleanup } = useSupabaseListener({
         store: storeInstance,
@@ -518,6 +524,7 @@ export function useTeammateStores() {
         filter: `user_id=eq.${teammateId}`,
         storeId: `teammate-${teammateId}`,
         onData: handleTeammateData,
+        patchStore: false,
       });
       teammateUnsubscribes.value[teammateId] = cleanup;
       // Listen for task-update broadcasts for this teammate

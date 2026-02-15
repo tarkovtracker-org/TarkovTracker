@@ -78,23 +78,24 @@
         <!-- Account section -->
         <template v-if="isLoggedIn">
           <div class="bg-surface-700/50 mx-1 h-5 w-px" />
-          <button
-            type="button"
-            class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors"
-            :aria-label="t('navigation_drawer.logout')"
-            @click="logout"
-          >
-            <img
-              :src="avatarSrc"
-              :alt="t('app_bar.user_avatar_alt')"
-              class="h-4 w-4 rounded-full"
-              loading="lazy"
-            />
-            <span class="text-surface-200 hidden text-sm font-medium sm:inline">
-              {{ userDisplayName }}
-            </span>
-            <UIcon name="i-mdi-logout" class="text-surface-400 h-3.5 w-3.5" />
-          </button>
+          <UDropdownMenu :items="accountMenuItems" :content="{ align: 'end', sideOffset: 8 }">
+            <button
+              type="button"
+              class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors"
+              :aria-label="t('navigation_drawer.account_menu')"
+            >
+              <img
+                :src="avatarSrc"
+                :alt="t('app_bar.user_avatar_alt')"
+                class="h-4 w-4 rounded-full"
+                loading="lazy"
+              />
+              <span class="text-surface-200 hidden text-sm font-medium sm:inline">
+                {{ userDisplayName }}
+              </span>
+              <UIcon name="i-mdi-chevron-down" class="text-surface-400 h-3.5 w-3.5" />
+            </button>
+          </UDropdownMenu>
         </template>
         <template v-else>
           <div class="bg-surface-700/50 mx-1 h-5 w-px" />
@@ -119,7 +120,6 @@
 <script setup lang="ts">
   import { useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import { useAppStore } from '@/stores/useApp';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -142,13 +142,43 @@
   });
   const userDisplayName = computed(() => {
     const fallbackLabel = t('app_bar.user_label');
-    if (preferencesStore.getStreamerMode) return fallbackLabel;
+    const hiddenLabel = t('app_bar.hidden_label');
+    if (preferencesStore.getStreamerMode) return hiddenLabel;
     const displayName = tarkovStore.getDisplayName();
     if (displayName && displayName.trim() !== '') {
       return displayName;
     }
     return $supabase.user.displayName || $supabase.user.username || fallbackLabel;
   });
+  const accountMenuItems = computed(() => [
+    [
+      {
+        icon: 'i-mdi-account-outline',
+        label: t('navigation_drawer.profile'),
+        to: '/profile',
+      },
+      {
+        icon: 'i-mdi-account-cog-outline',
+        label: t('settings.tabs.account'),
+        to: '/account',
+      },
+      {
+        icon: 'i-mdi-cog-outline',
+        label: t('navigation_drawer.settings'),
+        to: '/settings',
+      },
+    ],
+    [
+      {
+        color: 'error',
+        icon: 'i-mdi-logout',
+        label: t('navigation_drawer.logout'),
+        onSelect: () => {
+          void logout();
+        },
+      },
+    ],
+  ]);
   async function logout() {
     try {
       await $supabase.signOut();
@@ -171,8 +201,80 @@
   const NAV_BAR_ICON = 'i-mdi-menu-open';
   const { loading: dataLoading, hideoutLoading } = storeToRefs(metadataStore);
   const dataError = ref(false);
+  const normalizeRouteParam = (value: unknown): string | null => {
+    if (Array.isArray(value)) {
+      return normalizeRouteParam(value[0]);
+    }
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+  const profileRouteName = computed(() => {
+    const rawRouteName = String(route.name || 'index');
+    const normalizedRouteName = rawRouteName.split('___')[0] || rawRouteName;
+    return normalizedRouteName.replaceAll('-', '_');
+  });
+  const profileRouteMode = computed(() => {
+    const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
+    const mode = normalizeRouteParam(routeParams.mode)?.toLowerCase();
+    if (mode === 'pve') {
+      return 'pve';
+    }
+    if (mode === 'pvp') {
+      return 'pvp';
+    }
+    return tarkovStore.getCurrentGameMode();
+  });
+  const profileRouteTitle = computed(() => {
+    if (profileRouteName.value !== 'profile_userId_mode') {
+      return null;
+    }
+    const modeLabel = profileRouteMode.value === 'pve' ? 'PVE' : 'PVP';
+    const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
+    const routeUserId = normalizeRouteParam(routeParams.userId);
+    const currentUserId = normalizeRouteParam($supabase.user?.id ?? null);
+    const isOwnProfileRoute =
+      typeof routeUserId === 'string' &&
+      typeof currentUserId === 'string' &&
+      routeUserId === currentUserId;
+    if (isOwnProfileRoute) {
+      if (preferencesStore.getStreamerMode) {
+        return t('profile.title_with_mode', { name: t('app_bar.hidden_label'), mode: modeLabel });
+      }
+      const modeData =
+        profileRouteMode.value === 'pve'
+          ? tarkovStore.getPvEProgressData()
+          : tarkovStore.getPvPProgressData();
+      const modeDisplayName =
+        typeof modeData.displayName === 'string' ? modeData.displayName.trim() : '';
+      if (modeDisplayName) {
+        return t('profile.title_with_mode', { name: modeDisplayName, mode: modeLabel });
+      }
+      const ownDisplayName = tarkovStore.getDisplayName()?.trim();
+      if (ownDisplayName) {
+        return t('profile.title_with_mode', { name: ownDisplayName, mode: modeLabel });
+      }
+      const accountName = ($supabase.user.displayName || $supabase.user.username || '').trim();
+      if (accountName) {
+        return t('profile.title_with_mode', { name: accountName, mode: modeLabel });
+      }
+      return t('profile.title_with_mode', { name: t('app_bar.user_label'), mode: modeLabel });
+    }
+    if (routeUserId) {
+      return t('profile.title_with_mode', { name: routeUserId, mode: modeLabel });
+    }
+    return t('profile.title_with_mode', {
+      name: t('page.profile.shared_player'),
+      mode: modeLabel,
+    });
+  });
   const pageTitle = computed(() => {
-    const routeName = String(route.name || 'index').replaceAll('-', '_');
+    if (profileRouteTitle.value) {
+      return profileRouteTitle.value;
+    }
+    const routeName = profileRouteName.value;
     const titleKeys = [
       routeName === 'neededitems' ? 'page.needed_items.title' : `page.${routeName}.title`,
       `page.${routeName}.meta.title`,

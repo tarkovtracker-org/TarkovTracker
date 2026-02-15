@@ -1,3 +1,33 @@
+## [1.2.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.2.0...v1.2.1) (2026-02-15)
+
+
+### Bug Fixes
+
+* **tasks:** address PR review — revert objective.item, truncate instead of drop, rename constant ([bdc2b5e](https://github.com/tarkovtracker-org/TarkovTracker/commit/bdc2b5e8733043fdf1c7f9f3bc37ad85a6ae80d8))
+* **tasks:** cap any/sell objective item rendering ([23ba8b0](https://github.com/tarkovtracker-org/TarkovTracker/commit/23ba8b081f957fb464d9e0b68a16eeab781bef62))
+* **tasks:** include objective.item in equipment aggregation ([210188c](https://github.com/tarkovtracker-org/TarkovTracker/commit/210188c5c299a458ed4e9c1738184839c16912ae))
+
+# [1.2.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.1.0...v1.2.0) (2026-02-15)
+
+
+### Bug Fixes
+
+* add cycle detection to critical path walker and fix relative import ([c1a524d](https://github.com/tarkovtracker-org/TarkovTracker/commit/c1a524deba114371617d4c35ca6f748f93f3a5fd))
+* **tests:** restore originalFetch assignment in kappa.test.ts ([3d72a29](https://github.com/tarkovtracker-org/TarkovTracker/commit/3d72a2938c388705cfb6ae95b9ba330134e6b176))
+
+
+### Features
+
+* add profile sharing, streamer overlay enhancements, and security hardening ([b745d63](https://github.com/tarkovtracker-org/TarkovTracker/commit/b745d6333bd41b24675b1e7ab98c273953b16f30))
+* **settings:** create TaskDisplayCard, MapSettingsCard, and PrivacyCard components ([fc17b0b](https://github.com/tarkovtracker-org/TarkovTracker/commit/fc17b0b988df104af1eeb77c1c511d8a8230689a))
+* implement confidence rating and pace dampening helpers ([4ac632e](https://github.com/tarkovtracker-org/TarkovTracker/commit/4ac632eac6ddbba174d6b7f8d3c432cd32c4835e))
+* implement critical path floor calculation for kappa tasks ([7e2cb3b](https://github.com/tarkovtracker-org/TarkovTracker/commit/7e2cb3b4809c02211d6093428e0a3f946b17cbbe))
+* **settings:** move API tokens to account page, add redirect notice ([02af671](https://github.com/tarkovtracker-org/TarkovTracker/commit/02af6710ebe399853d986e625413e71296e26ac8))
+* **streamer:** polish overlay widget CSS — spacing, typography, animations ([f872177](https://github.com/tarkovtracker-org/TarkovTracker/commit/f87217769675a03baacf931ab3e0817a40d1379f))
+* **ui:** restructure streamer tools config page into focused card sections ([c7f10ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/c7f10ef4100f8b65dcda0d6801ab936cd4eb7679))
+* **settings:** rewrite page as vertical card flow ([4f93d53](https://github.com/tarkovtracker-org/TarkovTracker/commit/4f93d53e1129e259165c0ac14a4378b366f8dc7f))
+* wire critical path floor, dampening, and confidence into kappa projection ([1938dec](https://github.com/tarkovtracker-org/TarkovTracker/commit/1938dec8f97d0fe1c0d7d1002b6d252609938614))
+
 # [1.1.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.0.4...v1.1.0) (2026-02-13)
 
 

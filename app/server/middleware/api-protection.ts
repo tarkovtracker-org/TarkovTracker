@@ -23,11 +23,11 @@ import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('ApiProtection');
 // Type for runtime config API protection settings
 interface ApiProtectionConfig {
-  allowedHosts: string;
-  trustedIpRanges: string;
-  requireAuth: boolean;
-  publicRoutes: string;
-  trustProxy: boolean;
+  allowedHosts?: string;
+  trustedIpRanges?: string;
+  requireAuth?: boolean;
+  publicRoutes?: string;
+  trustProxy?: boolean;
 }
 /**
  * Parse a comma-separated string into an array of trimmed, non-empty values
@@ -244,7 +244,17 @@ export default defineEventHandler(async (event) => {
   const allowedHosts = parseCommaSeparated(apiProtection.allowedHosts || '');
   const trustedIpRanges = parseCommaSeparated(apiProtection.trustedIpRanges || '');
   const requireAuth = apiProtection.requireAuth !== false; // Default to true
-  const publicRoutes = parseCommaSeparated(apiProtection.publicRoutes || '');
+  const defaultPublicRoutes = [
+    '/api/tarkov/*',
+    '/api/changelog',
+    '/api/profile/*',
+    '/api/streamer/*',
+  ];
+  const configuredPublicRoutesRaw = apiProtection.publicRoutes?.trim();
+  const publicRoutes =
+    configuredPublicRoutesRaw && configuredPublicRoutesRaw.length > 0
+      ? parseCommaSeparated(configuredPublicRoutesRaw)
+      : defaultPublicRoutes;
   // Add default allowed hosts for production
   const effectiveAllowedHosts = [...allowedHosts];
   if (effectiveAllowedHosts.length === 0 && !isDevelopment) {

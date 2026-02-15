@@ -1,4 +1,5 @@
 import { getTasks, getHideoutStations } from '../services/tarkov';
+import { logger } from '../utils/logger';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
 import type {
@@ -94,7 +95,8 @@ async function getUserDisplayName(env: Env, userId: string): Promise<string | nu
       setMemoryCache(cacheKey, resolved, DISPLAY_NAME_CACHE_TTL_SECONDS);
     }
     return resolved;
-  } catch {
+  } catch (error) {
+    logger.error('[getUserDisplayName] Failed to resolve display name:', error);
     return null;
   }
 }
@@ -176,7 +178,8 @@ const updateDependentTasks = (
   tasks: TarkovTask[],
   taskCompletions: Record<string, TaskCompletion>,
   updateTime: number,
-  updates?: Map<string, TaskState>
+  updates?: Map<string, TaskState>,
+  protectedTaskIds?: Set<string>
 ): void => {
   for (const dependentTask of tasks) {
     const requirements = dependentTask.taskRequirements ?? [];
@@ -199,6 +202,7 @@ const updateDependentTasks = (
       }
     }
     if (shouldUnlock || shouldLock) {
+      if (protectedTaskIds?.has(dependentTask.id)) continue;
       setTaskCompletion(taskCompletions, dependentTask.id, false, false, updateTime, updates);
     }
   }
@@ -208,12 +212,14 @@ const updateAlternativeTasks = (
   newState: TaskState,
   taskCompletions: Record<string, TaskCompletion>,
   updateTime: number,
-  updates?: Map<string, TaskState>
+  updates?: Map<string, TaskState>,
+  protectedTaskIds?: Set<string>
 ): void => {
   const alternatives = changedTask.alternatives ?? [];
   if (!alternatives.length) return;
   for (const altTaskId of alternatives) {
     if (!altTaskId) continue;
+    if (protectedTaskIds?.has(altTaskId)) continue;
     if (newState === 'completed') {
       setTaskCompletion(taskCompletions, altTaskId, true, true, updateTime, updates);
     } else if (newState !== 'failed') {
@@ -284,13 +290,14 @@ export async function handleUpdateLevel(
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
     },
   });
+  if (!getRes.ok) {
+    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
+  }
   const rows = (await getRes.json()) as Array<Record<string, unknown>>;
   const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
-  // Update level
   currentData.level = level;
-  // Save back
   const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  await fetch(patchUrl, {
+  const patchRes = await fetch(patchUrl, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -300,6 +307,9 @@ export async function handleUpdateLevel(
     },
     body: JSON.stringify({ [dataField]: currentData }),
   });
+  if (!patchRes.ok) {
+    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
+  }
   return { level, message: 'Level updated successfully' };
 }
 /**
@@ -322,11 +332,13 @@ export async function handleUpdateObjective(
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
     },
   });
+  if (!getRes.ok) {
+    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
+  }
   const rows = (await getRes.json()) as Array<Record<string, unknown>>;
   const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
   const taskObjectives =
     (currentData.taskObjectives as Record<string, Record<string, unknown>>) || {};
-  // Get or create objective data
   const objectiveData = taskObjectives[objectiveId] || {};
   // Update state if provided
   if (update.state !== undefined) {
@@ -342,9 +354,8 @@ export async function handleUpdateObjective(
   }
   taskObjectives[objectiveId] = objectiveData;
   currentData.taskObjectives = taskObjectives;
-  // Save back
   const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  await fetch(patchUrl, {
+  const patchRes = await fetch(patchUrl, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -354,6 +365,9 @@ export async function handleUpdateObjective(
     },
     body: JSON.stringify({ [dataField]: currentData }),
   });
+  if (!patchRes.ok) {
+    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
+  }
   return {
     objectiveId,
     ...(update.state !== undefined && { state: update.state }),
@@ -380,6 +394,9 @@ export async function handleUpdateTask(
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
     },
   });
+  if (!getRes.ok) {
+    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
+  }
   const rows = (await getRes.json()) as Array<Record<string, unknown>>;
   const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
@@ -408,7 +425,7 @@ export async function handleUpdateTask(
     );
   }
   const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  await fetch(patchUrl, {
+  const patchRes = await fetch(patchUrl, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -418,6 +435,9 @@ export async function handleUpdateTask(
     },
     body: JSON.stringify({ [dataField]: currentData }),
   });
+  if (!patchRes.ok) {
+    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
+  }
   return { taskId, state, message: 'Task updated successfully' };
 }
 /**
@@ -439,11 +459,15 @@ export async function handleUpdateTasks(
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
     },
   });
+  if (!getRes.ok) {
+    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
+  }
   const rows = (await getRes.json()) as Array<Record<string, unknown>>;
   const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
   const updateMap = new Map<string, TaskState>();
-  // Apply all updates
+  const explicitTaskIds = new Set(updates.map((update) => update.id));
+  const tasks = await getTasks();
   for (const update of updates) {
     setTaskCompletion(
       taskCompletions,
@@ -453,6 +477,28 @@ export async function handleUpdateTasks(
       updateTime,
       updateMap
     );
+    if (tasks.length > 0) {
+      updateDependentTasks(
+        update.id,
+        update.state,
+        tasks,
+        taskCompletions,
+        updateTime,
+        updateMap,
+        explicitTaskIds
+      );
+      const changedTask = tasks.find((task) => task.id === update.id);
+      if (changedTask) {
+        updateAlternativeTasks(
+          changedTask,
+          update.state,
+          taskCompletions,
+          updateTime,
+          updateMap,
+          explicitTaskIds
+        );
+      }
+    }
   }
   currentData.taskCompletions = taskCompletions;
   if (updateMap.size > 0) {
@@ -461,9 +507,8 @@ export async function handleUpdateTasks(
       updateTime
     );
   }
-  // Save back
   const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  await fetch(patchUrl, {
+  const patchRes = await fetch(patchUrl, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -473,5 +518,8 @@ export async function handleUpdateTasks(
     },
     body: JSON.stringify({ [dataField]: currentData }),
   });
+  if (!patchRes.ok) {
+    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
+  }
   return { updatedTasks: updates.map((u) => u.id), message: 'Tasks updated successfully' };
 }

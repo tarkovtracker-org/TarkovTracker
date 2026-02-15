@@ -46,6 +46,8 @@ export type TaskFilterPreset = {
 // Define the state structure
 export interface PreferencesState {
   streamerMode: boolean;
+  profileSharePvpPublic: boolean;
+  profileSharePvePublic: boolean;
   teamHide: Record<string, boolean>;
   taskTeamHideAll: boolean;
   itemsTeamHideAll: boolean;
@@ -123,6 +125,8 @@ export interface PreferencesState {
 // Export the default state with type annotation
 export const preferencesDefaultState: PreferencesState = {
   streamerMode: false,
+  profileSharePvpPublic: false,
+  profileSharePvePublic: false,
   teamHide: {},
   taskTeamHideAll: false,
   itemsTeamHideAll: false,
@@ -241,6 +245,12 @@ export const usePreferencesStore = defineStore('preferences', {
   getters: {
     getStreamerMode(state) {
       return state.streamerMode ?? false;
+    },
+    getProfileSharePvpPublic: (state) => {
+      return state.profileSharePvpPublic ?? false;
+    },
+    getProfileSharePvePublic: (state) => {
+      return state.profileSharePvePublic ?? false;
     },
     teamIsHidden: (state) => {
       return (teamId: string): boolean => {
@@ -450,6 +460,12 @@ export const usePreferencesStore = defineStore('preferences', {
   actions: {
     setStreamerMode(mode: boolean) {
       this.streamerMode = mode;
+    },
+    setProfileSharePvpPublic(value: boolean) {
+      this.profileSharePvpPublic = value;
+    },
+    setProfileSharePvePublic(value: boolean) {
+      this.profileSharePvePublic = value;
     },
     toggleHidden(teamId: string) {
       if (!this.teamHide) {
@@ -703,6 +719,8 @@ export const usePreferencesStore = defineStore('preferences', {
     // Pick specific properties to persist (excluding transient state)
     pick: [
       'streamerMode',
+      'profileSharePvpPublic',
+      'profileSharePvePublic',
       'teamHide',
       'taskTeamHideAll',
       'itemsTeamHideAll',

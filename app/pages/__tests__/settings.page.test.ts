@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import SettingsPage from '@/pages/settings.vue';
 // Module-level state that mocks can reference
@@ -10,12 +10,10 @@ const mockState = {
   isAdmin: false,
   gameEdition: 1,
   prestigeLevel: 0,
-  streamerMode: false,
 };
 const mockFns = {
   setGameEdition: vi.fn(),
   setPrestigeLevel: vi.fn(),
-  setStreamerMode: vi.fn(),
   resetPvPData: vi.fn(),
   resetPvEData: vi.fn(),
   resetAllData: vi.fn(),
@@ -59,14 +57,6 @@ vi.mock('@/stores/useMetadata', () => ({
       { value: 2, title: 'Left Behind' },
       { value: 3, title: 'Prepare for Escape' },
     ],
-  }),
-}));
-vi.mock('@/stores/usePreferences', () => ({
-  usePreferencesStore: () => ({
-    get getStreamerMode() {
-      return mockState.streamerMode;
-    },
-    setStreamerMode: mockFns.setStreamerMode,
   }),
 }));
 vi.mock('@/stores/useSystemStore', () => ({
@@ -113,10 +103,8 @@ const defaultGlobalStubs = {
   GenericCard: {
     template: '<div data-testid="generic-card"><slot /><slot name="content" /></div>',
   },
-  InterfaceSettingsCard: {
-    template:
-      '<div data-testid="interface-settings-card"><input type="checkbox" data-testid="interface-settings-card-switch" /></div>',
-  },
+  MapSettingsCard: true,
+  ProfileSharingCard: true,
   SkillsCard: true,
   UAlert: true,
   UBadge: true,
@@ -129,20 +117,12 @@ const defaultGlobalStubs = {
   UIcon: true,
   UInput: true,
   UModal: true,
-  UTabs: {
-    template: '<div><slot name="gameplay" /><slot name="interface" /><slot name="account" /></div>',
-  },
+  TaskDisplayCard: true,
   USelectMenu: {
     props: ['modelValue', 'items', 'options'],
     emits: ['update:modelValue'],
     template:
       '<select data-testid="u-select" @change="$emit(\'update:modelValue\', Number($event.target.value))"><option v-for="opt in (items || options || [])" :key="opt.value ?? opt" :value="opt.value ?? opt">{{ opt.label || opt.title || opt }}</option></select>',
-  },
-  USwitch: {
-    props: ['modelValue', 'disabled'],
-    emits: ['update:modelValue'],
-    template:
-      '<input type="checkbox" data-testid="u-switch" :checked="modelValue" :disabled="disabled" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
   },
   UTooltip: { template: '<span><slot /></span>' },
 };
@@ -153,14 +133,12 @@ const configureMockState = (
     isAdmin?: boolean;
     gameEdition?: number;
     prestigeLevel?: number;
-    streamerMode?: boolean;
   } = {}
 ) => {
   mockState.isLoggedIn = options.isLoggedIn ?? false;
   mockState.isAdmin = options.isAdmin ?? false;
   mockState.gameEdition = options.gameEdition ?? 1;
   mockState.prestigeLevel = options.prestigeLevel ?? 0;
-  mockState.streamerMode = options.streamerMode ?? false;
 };
 describe('settings page', () => {
   beforeEach(() => {
@@ -225,23 +203,6 @@ describe('settings page', () => {
       expect(selects.length).toBeGreaterThan(0);
       const editionSelect = selects[0];
       expect(editionSelect?.exists()).toBe(true);
-    });
-  });
-  describe('streamer mode', () => {
-    it('renders streamer mode toggle', () => {
-      configureMockState({ streamerMode: false });
-      const wrapper = mount(SettingsPage, {
-        global: globalConfig,
-      });
-      const toggle = wrapper.find('[data-testid="interface-settings-card-switch"]');
-      expect(toggle.exists()).toBe(true);
-    });
-    it('renders with streamer mode enabled', () => {
-      configureMockState({ streamerMode: true });
-      const wrapper = mount(SettingsPage, {
-        global: globalConfig,
-      });
-      expect(wrapper.find('[data-testid="generic-card"]').exists()).toBe(true);
     });
   });
 });
