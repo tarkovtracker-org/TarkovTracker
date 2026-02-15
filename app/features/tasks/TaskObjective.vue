@@ -117,13 +117,14 @@
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
+  import { getObjectiveEquipmentItems } from '@/features/tasks/task-objective-equipment';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import type { TarkovItem, TaskObjective } from '@/types/tarkov';
+  import type { TaskObjective } from '@/types/tarkov';
   const FALLBACK_IS_MAP_VIEW_REF = ref(false);
   const { t } = useI18n({ useScope: 'global' });
   const jumpToMapObjective = inject<((id: string) => void) | null>('jumpToMapObjective', null);
@@ -176,22 +177,7 @@
   });
   const objectiveEquipment = computed(() => {
     const obj = fullObjective.value ?? props.objective;
-    const items: TarkovItem[] = [];
-    if (obj.markerItem?.id) items.push(obj.markerItem);
-    if (obj.items?.length) items.push(...obj.items);
-    if (obj.questItem?.id) items.push(obj.questItem);
-    if (obj.useAny?.length) items.push(...obj.useAny);
-    if (obj.usingWeapon?.id) items.push(obj.usingWeapon);
-    if (obj.usingWeaponMods?.length) items.push(...obj.usingWeaponMods);
-    if (obj.wearing?.length) items.push(...obj.wearing);
-    const seenItemIds = new Set<TarkovItem['id']>();
-    const uniqueItems: TarkovItem[] = [];
-    for (const item of items) {
-      if (!item?.id || seenItemIds.has(item.id)) continue;
-      seenItemIds.add(item.id);
-      uniqueItems.push(item);
-    }
-    return uniqueItems;
+    return getObjectiveEquipmentItems(obj);
   });
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
