@@ -932,6 +932,14 @@
     game_profile: {
       game_edition: '游戏版本',
     },
+    profile_sharing: {
+      title: '个人资料分享',
+      description: '控制哪些游戏模式的个人资料可以通过分享链接查看。',
+      public: '公开',
+      private: '私密',
+      copy_link: '复制个人资料链接',
+      login_required: '登录以管理个人资料分享的可见性。',
+    },
     game_settings: {
       title: '游戏设置',
       switch_mode_failed: '切换游戏模式失败，请重试',

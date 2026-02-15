@@ -932,6 +932,14 @@
     game_profile: {
       game_edition: 'Game Edition',
     },
+    profile_sharing: {
+      title: 'Profile Sharing',
+      description: 'Control which game mode profiles can be viewed from a shared link.',
+      public: 'Public',
+      private: 'Private',
+      copy_link: 'Copy profile link',
+      login_required: 'Log in to manage profile sharing visibility.',
+    },
     game_settings: {
       title: 'Game Settings',
       switch_mode_failed: 'Failed to switch game mode, please retry',

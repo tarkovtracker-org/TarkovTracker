@@ -932,6 +932,14 @@
     game_profile: {
       game_edition: 'Édition du jeu',
     },
+    profile_sharing: {
+      title: 'Partage de profil',
+      description: 'Contrôlez quels profils de mode de jeu sont visibles via un lien partagé.',
+      public: 'Public',
+      private: 'Privé',
+      copy_link: 'Copier le lien du profil',
+      login_required: 'Connectez-vous pour gérer la visibilité du partage de profil.',
+    },
     game_settings: {
       title: 'Paramètres du jeu',
       switch_mode_failed: 'Échec du changement de mode de jeu, veuillez réessayer',

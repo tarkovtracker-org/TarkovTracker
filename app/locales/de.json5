@@ -932,6 +932,14 @@
     game_profile: {
       game_edition: 'Spieledition',
     },
+    profile_sharing: {
+      title: 'Profilfreigabe',
+      description: 'Lege fest, welche Spielmodus-Profile über einen geteilten Link sichtbar sind.',
+      public: 'Öffentlich',
+      private: 'Privat',
+      copy_link: 'Profillink kopieren',
+      login_required: 'Melde dich an, um die Profilfreigabe zu verwalten.',
+    },
     game_settings: {
       title: 'Spieleinstellungen',
       switch_mode_failed: 'Wechsel des Spielmodus fehlgeschlagen, bitte erneut versuchen',
