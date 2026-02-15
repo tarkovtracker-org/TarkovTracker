@@ -110,24 +110,24 @@ export function useTaskRouteSync({
       if (targetView === 'maps') {
         if (maps.value.length === 0) {
           logger.debug('[useTaskRouteSync] Delaying map sync until maps loaded.');
-          return;
-        }
-        const mapId = resolveMapIdFromRoute(maps.value, values.map);
-        if (mapId && mapId !== preferencesStore.getTaskMapView) {
-          preferencesStore.setTaskMapView(mapId);
+        } else {
+          const mapId = resolveMapIdFromRoute(maps.value, values.map);
+          if (mapId && mapId !== preferencesStore.getTaskMapView) {
+            preferencesStore.setTaskMapView(mapId);
+          }
         }
       }
       if (targetView === 'traders' || targetView === 'graph') {
         if (traders.value.length === 0) {
           logger.debug('[useTaskRouteSync] Delaying trader sync until traders loaded.');
-          return;
-        }
-        const firstTraderId = traders.value[0]?.id;
-        const traderId = traders.value.some((t) => t.id === values.trader)
-          ? values.trader
-          : firstTraderId;
-        if (traderId && traderId !== preferencesStore.getTaskTraderView) {
-          preferencesStore.setTaskTraderView(traderId);
+        } else {
+          const firstTraderId = traders.value[0]?.id;
+          const traderId = traders.value.some((t) => t.id === values.trader)
+            ? values.trader
+            : firstTraderId;
+          if (traderId && traderId !== preferencesStore.getTaskTraderView) {
+            preferencesStore.setTaskTraderView(traderId);
+          }
         }
       }
       if (values.sort !== preferencesStore.getTaskSortMode) {
