@@ -18,7 +18,7 @@ const LOG_LEVEL: LogLevel = configuredLevel ?? (isDevelopment ? 'info' : 'warn')
 /**
  * Checks if a message at the given level should be logged based on the configured LOG_LEVEL
  */
-function shouldLog(level: LogLevel): boolean {
+function shouldServerLog(level: LogLevel): boolean {
   return levelPriority[level] >= levelPriority[LOG_LEVEL];
 }
 /**
@@ -28,17 +28,17 @@ function shouldLog(level: LogLevel): boolean {
 export const createLogger = (tag: string) => {
   return {
     debug: (...args: unknown[]) => {
-      if (shouldLog('debug')) {
+      if (shouldServerLog('debug')) {
         console.debug(`[${tag}:debug]`, ...args);
       }
     },
     info: (...args: unknown[]) => {
-      if (shouldLog('info')) {
+      if (shouldServerLog('info')) {
         console.info(`[${tag}]`, ...args);
       }
     },
     warn: (...args: unknown[]) => {
-      if (shouldLog('warn')) {
+      if (shouldServerLog('warn')) {
         console.warn(`[${tag}]`, ...args);
       }
     },

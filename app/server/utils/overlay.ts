@@ -208,8 +208,9 @@ function applyEntityOverlay<T extends { id: string }>(
     });
   const logLabel = options.logLabel ? ` (${options.logLabel})` : '';
   // Log by default unless logEvenWhenZero is explicitly false and counts are zero
-  const shouldLog = appliedCount > 0 || disabledCount > 0 || options.logEvenWhenZero !== false;
-  if (shouldLog) {
+  const shouldReportOverlayChanges =
+    appliedCount > 0 || disabledCount > 0 || options.logEvenWhenZero !== false;
+  if (shouldReportOverlayChanges) {
     logger.info(
       `Applied ${appliedCount} corrections out of ${Object.keys(corrections).length} available${logLabel}`
     );
