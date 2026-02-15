@@ -1,3 +1,10 @@
+## [1.3.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.3...v1.3.4) (2026-02-15)
+
+
+### Bug Fixes
+
+* **profile:** exclude invalid/unreachable tasks from progression totals ([110807b](https://github.com/tarkovtracker-org/TarkovTracker/commit/110807b5e7857fa76a080e5d1d65c02a9ce24373))
+
 ## [1.3.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.2...v1.3.3) (2026-02-15)
 
 
