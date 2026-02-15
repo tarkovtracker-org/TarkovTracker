@@ -721,6 +721,7 @@
     tarkovmonitor: 'Tarkov Монитор',
     credits: 'Благодарности',
     settings: 'Настройки',
+    profile: 'Профиль',
     section_navigation: 'Навигация',
     section_external: 'Внешние ресурсы',
     account_menu: 'Меню аккаунта',
@@ -740,10 +741,6 @@
       gameplay: 'Геймплей',
       interface: 'Интерфейс',
       account: 'Аккаунт',
-    },
-    ui_notice: {
-      title: 'Обновление интерфейса в процессе',
-      description: 'UI/UX активно улучшается. Некоторые разделы пока могут выглядеть неаккуратно или сырыми.',
     },
     density: {
       compact: 'Компактная',

@@ -721,6 +721,7 @@
     tarkovmonitor: 'Tarkov 监视器',
     credits: '鸣谢',
     settings: '设置',
+    profile: '个人资料',
     section_navigation: '导航',
     section_external: '外部链接',
     account_menu: '账户菜单',
@@ -740,10 +741,6 @@
       gameplay: '游戏玩法',
       interface: '界面',
       account: '帐户',
-    },
-    ui_notice: {
-      title: '界面更新进行中',
-      description: 'UI/UX 正在积极改进。部分区域目前可能看起来有些凌乱或不够精致。',
     },
     density: {
       compact: '紧凑',

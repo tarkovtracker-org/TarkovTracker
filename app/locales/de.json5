@@ -721,6 +721,7 @@
     tarkovmonitor: 'Tarkov-Monitor',
     credits: 'Danksagungen',
     settings: 'Einstellungen',
+    profile: 'Profil',
     section_navigation: 'Navigation',
     section_external: 'Extern',
     account_menu: 'Kontomenü',
@@ -740,10 +741,6 @@
       gameplay: 'Gameplay',
       interface: 'Schnittstelle',
       account: 'Konto',
-    },
-    ui_notice: {
-      title: 'Interface-Update in Arbeit',
-      description: 'Die UI/UX wird aktiv verbessert. Einige Bereiche können momentan etwas unaufgeräumt oder unfertig wirken.',
     },
     density: {
       compact: 'Kompakt',

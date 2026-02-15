@@ -721,6 +721,7 @@
     tarkovmonitor: 'Tarkov Monitor',
     credits: 'Credits',
     settings: 'Settings',
+    profile: 'Profile',
     section_navigation: 'Navigation',
     section_external: 'External',
     account_menu: 'Account menu',
@@ -740,10 +741,6 @@
       gameplay: 'Gameplay',
       interface: 'Interface',
       account: 'Account',
-    },
-    ui_notice: {
-      title: 'Interface update in progress',
-      description: 'The UI/UX is being actively improved. Some areas may look messy or feel unpolished for now.',
     },
     density: {
       compact: 'Compact',
