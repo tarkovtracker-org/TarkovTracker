@@ -1290,6 +1290,25 @@ export async function initializeTarkovSync() {
         logger.warn('[TarkovStore] Could not show toast notification:', e);
       }
     };
+    const persistLocalOwnership = (
+      userId: string,
+      state: UserState,
+      timestamp: number | null = null
+    ) => {
+      if (typeof window === 'undefined') return;
+      try {
+        localStorage.setItem(
+          STORAGE_KEYS.progress,
+          JSON.stringify({
+            _userId: userId,
+            _timestamp: timestamp ?? Date.now(),
+            data: cloneStateSnapshot(state),
+          })
+        );
+      } catch (error) {
+        logger.warn('[TarkovStore] Could not persist local ownership metadata:', error);
+      }
+    };
     const resetStoreToDefault = () => {
       const freshState = structuredClone(defaultState);
       tarkovStore.$patch((state) => {
@@ -1304,6 +1323,7 @@ export async function initializeTarkovSync() {
       const storedUserId = localMeta?.storedUserId ?? null;
       const localTimestamp = localMeta?.timestamp ?? null;
       const hasLocalPersistence = Boolean(localMeta);
+      let resolvedLocalState: UserState | null = null;
       if (storedUserId && storedUserId !== currentUserId) {
         logger.warn('[TarkovStore] Local progress belongs to a different user; clearing');
         if (typeof window !== 'undefined') {
@@ -1415,12 +1435,15 @@ export async function initializeTarkovSync() {
             logger.error('[TarkovStore] Error syncing local progress to Supabase:', upsertError);
             return { ok: false, hadRemoteData };
           }
+          resolvedLocalState = localState;
         } else if (shouldPreferLocal && localScore === remoteScore) {
           // Local timestamp is newer but data is identical - no sync needed
           logger.debug('[TarkovStore] Local timestamp newer but data identical; skipping sync');
+          resolvedLocalState = localState;
         } else {
           logger.debug('[TarkovStore] Loading data from Supabase (user exists in DB)');
           tarkovStore.$patch(normalizedRemote!);
+          resolvedLocalState = normalizedRemote!;
         }
       } else if (hasLocalProgress && hasLocalPersistence) {
         // No Supabase record at all, but localStorage has progress - migrate it
@@ -1441,6 +1464,7 @@ export async function initializeTarkovSync() {
           return { ok: false, hadRemoteData };
         }
         logger.debug('[TarkovStore] Migration complete');
+        resolvedLocalState = localState;
       } else {
         // SAFETY CHECKS: Before treating as "new user", verify this isn't Issue #71 scenario
         // Issue #71: User links a second OAuth provider → race condition → false "no data" → overwrites
@@ -1477,6 +1501,9 @@ export async function initializeTarkovSync() {
           accountAgeMs,
           linkedProviders,
         });
+      }
+      if (currentUserId && storedUserId === null && hasLocalPersistence && resolvedLocalState) {
+        persistLocalOwnership(currentUserId, resolvedLocalState, localTimestamp);
       }
       logger.debug('[TarkovStore] Initial load complete');
       return { ok: true, hadRemoteData };
