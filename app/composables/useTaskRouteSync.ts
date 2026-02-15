@@ -8,6 +8,7 @@ import { getQueryString } from '@/utils/routeHelpers';
 import type { Ref } from '#imports';
 import type { TarkovMap, Trader } from '@/types/tarkov';
 import type { TaskPrimaryView } from '@/types/taskFilter';
+import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
 export type UseTaskRouteSyncOptions = {
   maps: Ref<TarkovMap[]>;
   traders: Ref<Trader[]>;
@@ -60,7 +61,7 @@ export function useTaskRouteSync({
         key: 'view',
         default: 'all',
         validate: isValidPrimaryView,
-        serialize: (v) => v,
+        serialize: (v) => (v === 'all' ? undefined : v),
         deserialize: (v) => v,
       },
       status: {
@@ -131,12 +132,10 @@ export function useTaskRouteSync({
         }
       }
       if (values.sort !== preferencesStore.getTaskSortMode) {
-        preferencesStore.setTaskSortMode(values.sort as import('@/types/taskSort').TaskSortMode);
+        preferencesStore.setTaskSortMode(values.sort as TaskSortMode);
       }
       if (values.sortDir !== preferencesStore.getTaskSortDirection) {
-        preferencesStore.setTaskSortDirection(
-          values.sortDir as import('@/types/taskSort').TaskSortDirection
-        );
+        preferencesStore.setTaskSortDirection(values.sortDir as TaskSortDirection);
       }
     },
     onStoreToRoute: () => {

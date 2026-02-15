@@ -31,7 +31,7 @@ export function useNeededItemsRouteSync({
         key: 'type',
         default: 'all',
         validate: isValidNeededItemsFilterType,
-        serialize: (v) => v,
+        serialize: (v) => (v === 'all' ? undefined : v),
         deserialize: (v) => v,
       },
       sort: {
