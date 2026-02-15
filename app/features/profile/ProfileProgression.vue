@@ -390,11 +390,15 @@
     computeCriticalPathFloor,
     dampenPace,
   } from '@/features/profile/kappaProjectionHelpers';
+  import {
+    buildHideoutModuleCompletionState,
+    getCountedTasks,
+  } from '@/features/profile/profileStats';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, SPECIAL_STATIONS, type GameMode } from '@/utils/constants';
+  import { GAME_MODES, type GameMode } from '@/utils/constants';
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
@@ -942,17 +946,12 @@
   );
   const isTaskInvalid = (taskId: string): boolean =>
     invalidProgress.value.invalidTasks[taskId] === true;
-  const isTaskIncludedInTotals = (task: Task): boolean => {
-    if (isTaskSuccessful(task.id)) {
-      return true;
-    }
-    if (isTaskFailed(task.id)) {
-      return false;
-    }
-    return !isTaskInvalid(task.id);
-  };
   const countedTasks = computed(() =>
-    relevantTasks.value.filter((task) => isTaskIncludedInTotals(task))
+    getCountedTasks(
+      relevantTasks.value,
+      normalizedTaskCompletions.value,
+      invalidProgress.value.invalidTasks
+    )
   );
   const totalTasks = computed(() => countedTasks.value.length);
   const completedTasks = computed(() =>
@@ -1019,33 +1018,14 @@
   });
   const totalHideoutModules = computed(() => hideoutModuleLabelById.value.size);
   const hideoutModuleCompletionState = computed<Record<string, boolean>>(() => {
-    const completionState: Record<string, boolean> = {};
     const editionData = metadataStore.editions.find(
       (edition) => edition.value === profileGameEdition.value
     );
-    for (const station of metadataStore.hideoutStations ?? []) {
-      const maxLevel = station.levels?.length ?? 0;
-      const defaultStashLevel =
-        station.normalizedName === SPECIAL_STATIONS.STASH
-          ? Math.min(editionData?.defaultStashLevel ?? 0, maxLevel)
-          : 0;
-      const defaultCultistCircleLevel =
-        station.normalizedName === SPECIAL_STATIONS.CULTIST_CIRCLE
-          ? Math.min(editionData?.defaultCultistCircleLevel ?? 0, maxLevel)
-          : 0;
-      for (const level of station.levels ?? []) {
-        if (!level?.id) {
-          continue;
-        }
-        const isManualComplete = hideoutModuleCompletions.value[level.id]?.complete === true;
-        const isAutoCompleteFromEdition =
-          (station.normalizedName === SPECIAL_STATIONS.STASH && level.level <= defaultStashLevel) ||
-          (station.normalizedName === SPECIAL_STATIONS.CULTIST_CIRCLE &&
-            level.level <= defaultCultistCircleLevel);
-        completionState[level.id] = isManualComplete || isAutoCompleteFromEdition;
-      }
-    }
-    return completionState;
+    return buildHideoutModuleCompletionState(
+      metadataStore.hideoutStations ?? [],
+      hideoutModuleCompletions.value,
+      editionData
+    );
   });
   const completedHideoutModules = computed(() => {
     let count = 0;
