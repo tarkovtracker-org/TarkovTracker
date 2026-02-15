@@ -1,3 +1,21 @@
+# [1.3.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.2.1...v1.3.0) (2026-02-15)
+
+
+### Bug Fixes
+
+* address remaining PR review issues ([ad0dc1c](https://github.com/tarkovtracker-org/TarkovTracker/commit/ad0dc1c81277b48879684282f03a9cbc36f55a0a))
+* **tasks:** prevent early returns from skipping sort/sortDir sync ([37355f8](https://github.com/tarkovtracker-org/TarkovTracker/commit/37355f86db49d6a140647d4d2f712692016ade59))
+* **tarkov-store:** stop repeated local ignored toast on refresh ([76ba925](https://github.com/tarkovtracker-org/TarkovTracker/commit/76ba9250c56229b260c37b98e04c69555e805fb7))
+
+
+### Features
+
+* **neededitems:** add filter type and sort validators ([5f8c138](https://github.com/tarkovtracker-org/TarkovTracker/commit/5f8c138742ae37df5e8ef2979d6431fefd27ba0c))
+* add generic useRouteFilters composable ([6b22386](https://github.com/tarkovtracker-org/TarkovTracker/commit/6b223865d178c406d166633c497420da8d430924))
+* **types:** add sort mode and direction validators ([2fe96d8](https://github.com/tarkovtracker-org/TarkovTracker/commit/2fe96d84dddfe0384d833ccafe54969bdad68fd1))
+* **hideout:** add useHideoutRouteSync for URL filter state ([34f1a31](https://github.com/tarkovtracker-org/TarkovTracker/commit/34f1a317b3b7e2fd7af374efe98d315a421e267d))
+* **hideout:** integrate URL filter sync into hideout page ([a995461](https://github.com/tarkovtracker-org/TarkovTracker/commit/a995461bc0679752e618bf717628f57799e5d84e))
+
 ## [1.2.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.2.0...v1.2.1) (2026-02-15)
 
 
