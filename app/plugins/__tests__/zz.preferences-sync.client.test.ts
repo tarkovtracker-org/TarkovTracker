@@ -30,7 +30,11 @@ describe('preferences sync plugin', () => {
   });
   it('does not start sync after non-PGRST116 bootstrap errors', async () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
+      isSyncing: ref(false),
+      isPaused: ref(false),
       cleanup: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
     });
     const preferencesStore = {
       $state: {},
