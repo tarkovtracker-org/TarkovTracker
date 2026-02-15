@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.0...v1.3.1) (2026-02-15)
+
+
+### Bug Fixes
+
+* **test:** add missing mock properties for useSupabaseSync return type ([0d56fc4](https://github.com/tarkovtracker-org/TarkovTracker/commit/0d56fc4ebf2d76fb12e6cfd7bc722c1dc47dca5b))
+
 # [1.3.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.2.1...v1.3.0) (2026-02-15)
 
 
