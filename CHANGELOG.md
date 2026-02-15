@@ -1,3 +1,11 @@
+## [1.3.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.2...v1.3.3) (2026-02-15)
+
+
+### Bug Fixes
+
+* **i18n:** add missing profile_sharing locale keys ([7a0b400](https://github.com/tarkovtracker-org/TarkovTracker/commit/7a0b4002d377a59162dd5346c5a8d1748bf90e1f))
+* resolve shouldLog redeclaration conflicts ([ef259a0](https://github.com/tarkovtracker-org/TarkovTracker/commit/ef259a06fe4f2d976951a1ac940c718f28f0645b))
+
 ## [1.3.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.1...v1.3.2) (2026-02-15)
 
 
