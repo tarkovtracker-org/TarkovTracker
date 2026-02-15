@@ -2,6 +2,7 @@ import type { TarkovItem, TaskObjective } from '@/types/tarkov';
 export const MAX_RENDERED_USE_ANY_ITEMS = 24;
 export const getObjectiveEquipmentItems = (objective: TaskObjective): TarkovItem[] => {
   const items: TarkovItem[] = [];
+  if (objective.item?.id) items.push(objective.item);
   if (objective.markerItem?.id) items.push(objective.markerItem);
   if (objective.items?.length) {
     const shouldRenderItems =

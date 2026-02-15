@@ -8,6 +8,7 @@ const createItem = (id: string): TarkovItem => ({ id, name: id, shortName: id })
 const createObjective = (input: Partial<TaskObjective>): TaskObjective =>
   ({
     id: 'objective-1',
+    type: 'mark',
     ...input,
   }) as TaskObjective;
 describe('task-objective-equipment', () => {
@@ -67,6 +68,14 @@ describe('task-objective-equipment', () => {
       })
     );
     expect(equipment.map((item) => item.id)).toEqual(['item-1', 'item-2']);
+  });
+  it('includes standalone primary item', () => {
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        item: createItem('primary-item'),
+      })
+    );
+    expect(equipment.map((item) => item.id)).toEqual(['primary-item']);
   });
   it('deduplicates overlapping items across all equipment sources', () => {
     const shared = createItem('shared');
