@@ -50,3 +50,20 @@ export type NeededItemsFilterType = 'all' | 'tasks' | 'hideout' | 'completed';
  * - 'non-fir': Show only items that do NOT require Found In Raid status
  */
 export type NeededItemsFirFilter = 'all' | 'fir' | 'non-fir';
+export const NEEDED_ITEMS_FILTER_TYPES = ['all', 'tasks', 'hideout', 'completed'] as const;
+export const NEEDED_ITEMS_SORT_BY = ['priority', 'name', 'category', 'count'] as const;
+export const NEEDED_ITEMS_SORT_DIRECTIONS = ['asc', 'desc'] as const;
+export type NeededItemsSortBy = (typeof NEEDED_ITEMS_SORT_BY)[number];
+export type NeededItemsSortDirection = (typeof NEEDED_ITEMS_SORT_DIRECTIONS)[number];
+export const isValidNeededItemsFilterType = (
+  value: string | undefined
+): value is NeededItemsFilterType =>
+  typeof value === 'string' && NEEDED_ITEMS_FILTER_TYPES.includes(value as NeededItemsFilterType);
+export const isValidNeededItemsSortBy = (value: string | undefined): value is NeededItemsSortBy =>
+  typeof value === 'string' &&
+  NEEDED_ITEMS_SORT_BY.includes(value as (typeof NEEDED_ITEMS_SORT_BY)[number]);
+export const isValidNeededItemsSortDirection = (
+  value: string | undefined
+): value is NeededItemsSortDirection =>
+  typeof value === 'string' &&
+  NEEDED_ITEMS_SORT_DIRECTIONS.includes(value as (typeof NEEDED_ITEMS_SORT_DIRECTIONS)[number]);

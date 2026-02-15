@@ -39,6 +39,9 @@ const storeState = reactive({
   taskMapView: 'all',
   taskPrimaryView: 'all',
   taskTraderView: 'all',
+  taskSecondaryView: 'available',
+  taskSortMode: 'impact',
+  taskSortDirection: 'desc',
 });
 const setTaskPrimaryView = vi.fn((view: string) => {
   storeState.taskPrimaryView = view;
@@ -48,6 +51,15 @@ const setTaskMapView = vi.fn((view: string) => {
 });
 const setTaskTraderView = vi.fn((view: string) => {
   storeState.taskTraderView = view;
+});
+const setTaskSecondaryView = vi.fn((view: string) => {
+  storeState.taskSecondaryView = view;
+});
+const setTaskSortMode = vi.fn((mode: string) => {
+  storeState.taskSortMode = mode;
+});
+const setTaskSortDirection = vi.fn((dir: string) => {
+  storeState.taskSortDirection = dir;
 });
 const loggerMock = {
   debug: vi.fn(),
@@ -66,6 +78,9 @@ describe('useTaskRouteSync', () => {
     storeState.taskPrimaryView = 'all';
     storeState.taskMapView = 'all';
     storeState.taskTraderView = 'all';
+    storeState.taskSecondaryView = 'available';
+    storeState.taskSortMode = 'impact';
+    storeState.taskSortDirection = 'desc';
     applyRouteQuery({
       map: '6733700029c367a3d40b02af',
       view: 'maps',
@@ -95,9 +110,21 @@ describe('useTaskRouteSync', () => {
         get getTaskTraderView() {
           return storeState.taskTraderView;
         },
+        get getTaskSecondaryView() {
+          return storeState.taskSecondaryView;
+        },
+        get getTaskSortMode() {
+          return storeState.taskSortMode;
+        },
+        get getTaskSortDirection() {
+          return storeState.taskSortDirection;
+        },
         setTaskMapView,
         setTaskPrimaryView,
         setTaskTraderView,
+        setTaskSecondaryView,
+        setTaskSortMode,
+        setTaskSortDirection,
       }),
     }));
     vi.doMock('@/utils/logger', () => ({
@@ -134,6 +161,22 @@ describe('useTaskRouteSync', () => {
     expect(setTaskMapView).toHaveBeenCalledWith('5704e5fc2459771a4e3b4ad8');
     expect(routeState.query.map).toBe('5704e5fc2459771a4e3b4ad8');
     expect(push.mock.calls.length + replace.mock.calls.length).toBeGreaterThan(0);
+    wrapper.unmount();
+  });
+  it('syncs status query param to store on init', async () => {
+    applyRouteQuery({ view: 'all', status: 'locked' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    expect(setTaskSecondaryView).toHaveBeenCalledWith('locked');
     wrapper.unmount();
   });
 });

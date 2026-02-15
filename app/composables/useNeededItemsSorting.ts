@@ -3,12 +3,18 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { TASK_STATE } from '@/utils/constants';
 import type {
+  NeededItemsSortBy,
+  NeededItemsSortDirection,
+} from '@/features/neededitems/neededitems-constants';
+import type {
   GroupedNeededItem,
   NeededItemHideoutModule,
   NeededItemTaskObjective,
 } from '@/types/tarkov';
-export type NeededItemsSortBy = 'priority' | 'name' | 'category' | 'count';
-export type NeededItemsSortDirection = 'asc' | 'desc';
+export type {
+  NeededItemsSortBy,
+  NeededItemsSortDirection,
+} from '@/features/neededitems/neededitems-constants';
 export interface SortValues {
   priority: number;
   count: number;
