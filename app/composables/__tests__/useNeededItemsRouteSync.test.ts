@@ -1,7 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, reactive, ref } from 'vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { computed, defineComponent, h, isRef, nextTick, reactive, ref } from 'vue';
 import type { NeededItemsFilterType } from '@/features/neededitems/neededitems-constants';
 import type { Ref } from 'vue';
 type QueryRecord = Record<string, string | undefined>;
@@ -36,8 +36,18 @@ mockNuxtImport('useRouter', () => () => ({
   onError: vi.fn(),
   afterEach: vi.fn(),
 }));
+const storeState = reactive({
+  neededItemsSortBy: 'priority',
+  neededItemsSortDirection: 'desc',
+});
+const setNeededItemsSortBy = vi.fn((sortBy: string) => {
+  storeState.neededItemsSortBy = sortBy;
+});
+const setNeededItemsSortDirection = vi.fn((direction: string) => {
+  storeState.neededItemsSortDirection = direction;
+});
 const flushRouteSync = async () => {
-  await nextTick();
+  await vi.advanceTimersByTimeAsync(250);
   await nextTick();
 };
 const mountHarness = async (activeFilter: Ref<NeededItemsFilterType>) => {
@@ -52,9 +62,44 @@ const mountHarness = async (activeFilter: Ref<NeededItemsFilterType>) => {
 };
 describe('useNeededItemsRouteSync', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.resetModules();
     vi.clearAllMocks();
+    storeState.neededItemsSortBy = 'priority';
+    storeState.neededItemsSortDirection = 'desc';
     applyRouteQuery({});
+    vi.doMock('pinia', async () => {
+      const actual = await vi.importActual<typeof import('pinia')>('pinia');
+      return {
+        ...actual,
+        storeToRefs: (store: Record<string, unknown>) => {
+          const refs: Record<string, unknown> = {};
+          Object.entries(store).forEach(([key, value]) => {
+            if (typeof value === 'function') return;
+            refs[key] = isRef(value) ? value : computed(() => store[key]);
+          });
+          return refs;
+        },
+      };
+    });
+    vi.doMock('@/stores/usePreferences', () => ({
+      usePreferencesStore: () => ({
+        get getNeededItemsSortBy() {
+          return storeState.neededItemsSortBy;
+        },
+        get getNeededItemsSortDirection() {
+          return storeState.neededItemsSortDirection;
+        },
+        setNeededItemsSortBy,
+        setNeededItemsSortDirection,
+      }),
+    }));
+    vi.doMock('@/utils/logger', () => ({
+      logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
+    }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
   it('hydrates active filter from route query', async () => {
     applyRouteQuery({ type: 'hideout' });
@@ -84,6 +129,14 @@ describe('useNeededItemsRouteSync', () => {
     await flushRouteSync();
     expect(push).toHaveBeenCalledTimes(1);
     expect(routeState.query.type).toBe('tasks');
+    wrapper.unmount();
+  });
+  it('syncs sort query param to store on init', async () => {
+    applyRouteQuery({ type: 'all', sort: 'name' });
+    const activeFilter = ref<NeededItemsFilterType>('all');
+    const wrapper = await mountHarness(activeFilter);
+    await flushRouteSync();
+    expect(setNeededItemsSortBy).toHaveBeenCalledWith('name');
     wrapper.unmount();
   });
 });
