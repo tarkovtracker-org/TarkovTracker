@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getObjectiveEquipmentItems,
-  MAX_RENDERED_USE_ANY_ITEMS,
+  MAX_RENDERED_OBJECTIVE_ITEMS,
 } from '@/features/tasks/task-objective-equipment';
 import type { TaskObjective, TarkovItem } from '@/types/tarkov';
 const createItem = (id: string): TarkovItem => ({ id, name: id, shortName: id });
@@ -13,7 +13,7 @@ const createObjective = (input: Partial<TaskObjective>): TaskObjective =>
   }) as TaskObjective;
 describe('task-objective-equipment', () => {
   it('includes useAny items when size is at or below the render cap', () => {
-    const useAny = Array.from({ length: MAX_RENDERED_USE_ANY_ITEMS }, (_, index) =>
+    const useAny = Array.from({ length: MAX_RENDERED_OBJECTIVE_ITEMS }, (_, index) =>
       createItem(`item-${index}`)
     );
     const equipment = getObjectiveEquipmentItems(
@@ -21,11 +21,11 @@ describe('task-objective-equipment', () => {
         useAny,
       })
     );
-    expect(equipment).toHaveLength(MAX_RENDERED_USE_ANY_ITEMS);
+    expect(equipment).toHaveLength(MAX_RENDERED_OBJECTIVE_ITEMS);
     expect(equipment[0]?.id).toBe('item-0');
   });
-  it('omits useAny items when size exceeds the render cap', () => {
-    const useAny = Array.from({ length: MAX_RENDERED_USE_ANY_ITEMS + 1 }, (_, index) =>
+  it('truncates useAny items to the render cap when size exceeds it', () => {
+    const useAny = Array.from({ length: MAX_RENDERED_OBJECTIVE_ITEMS + 10 }, (_, index) =>
       createItem(`item-${index}`)
     );
     const equipment = getObjectiveEquipmentItems(
@@ -33,10 +33,14 @@ describe('task-objective-equipment', () => {
         useAny,
       })
     );
-    expect(equipment).toEqual([]);
+    expect(equipment).toHaveLength(MAX_RENDERED_OBJECTIVE_ITEMS);
+    expect(equipment[0]?.id).toBe('item-0');
+    expect(equipment[MAX_RENDERED_OBJECTIVE_ITEMS - 1]?.id).toBe(
+      `item-${MAX_RENDERED_OBJECTIVE_ITEMS - 1}`
+    );
   });
   it('includes sellItem items when size is at or below the render cap', () => {
-    const sellItems = Array.from({ length: MAX_RENDERED_USE_ANY_ITEMS }, (_, index) =>
+    const sellItems = Array.from({ length: MAX_RENDERED_OBJECTIVE_ITEMS }, (_, index) =>
       createItem(`sell-item-${index}`)
     );
     const equipment = getObjectiveEquipmentItems(
@@ -45,11 +49,11 @@ describe('task-objective-equipment', () => {
         items: sellItems,
       })
     );
-    expect(equipment).toHaveLength(MAX_RENDERED_USE_ANY_ITEMS);
+    expect(equipment).toHaveLength(MAX_RENDERED_OBJECTIVE_ITEMS);
     expect(equipment[0]?.id).toBe('sell-item-0');
   });
-  it('omits sellItem items when size exceeds the render cap', () => {
-    const sellItems = Array.from({ length: MAX_RENDERED_USE_ANY_ITEMS + 1 }, (_, index) =>
+  it('truncates sellItem items to the render cap when size exceeds it', () => {
+    const sellItems = Array.from({ length: MAX_RENDERED_OBJECTIVE_ITEMS + 10 }, (_, index) =>
       createItem(`sell-item-${index}`)
     );
     const equipment = getObjectiveEquipmentItems(
@@ -58,9 +62,13 @@ describe('task-objective-equipment', () => {
         items: sellItems,
       })
     );
-    expect(equipment).toEqual([]);
+    expect(equipment).toHaveLength(MAX_RENDERED_OBJECTIVE_ITEMS);
+    expect(equipment[0]?.id).toBe('sell-item-0');
+    expect(equipment[MAX_RENDERED_OBJECTIVE_ITEMS - 1]?.id).toBe(
+      `sell-item-${MAX_RENDERED_OBJECTIVE_ITEMS - 1}`
+    );
   });
-  it('includes items for non-sell objectives', () => {
+  it('includes items for non-sell objectives without capping', () => {
     const equipment = getObjectiveEquipmentItems(
       createObjective({
         type: 'giveItem',
@@ -69,19 +77,10 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment.map((item) => item.id)).toEqual(['item-1', 'item-2']);
   });
-  it('includes standalone primary item', () => {
-    const equipment = getObjectiveEquipmentItems(
-      createObjective({
-        item: createItem('primary-item'),
-      })
-    );
-    expect(equipment.map((item) => item.id)).toEqual(['primary-item']);
-  });
   it('deduplicates overlapping items across all equipment sources', () => {
     const shared = createItem('shared');
     const equipment = getObjectiveEquipmentItems(
       createObjective({
-        item: shared,
         items: [shared],
         markerItem: shared,
         questItem: shared,

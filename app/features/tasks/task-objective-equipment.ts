@@ -1,19 +1,18 @@
 import type { TarkovItem, TaskObjective } from '@/types/tarkov';
-export const MAX_RENDERED_USE_ANY_ITEMS = 24;
+export const MAX_RENDERED_OBJECTIVE_ITEMS = 24;
 export const getObjectiveEquipmentItems = (objective: TaskObjective): TarkovItem[] => {
   const items: TarkovItem[] = [];
-  if (objective.item?.id) items.push(objective.item);
   if (objective.markerItem?.id) items.push(objective.markerItem);
   if (objective.items?.length) {
-    const shouldRenderItems =
-      objective.type !== 'sellItem' || objective.items.length <= MAX_RENDERED_USE_ANY_ITEMS;
-    if (shouldRenderItems) {
+    if (objective.type === 'sellItem') {
+      items.push(...objective.items.slice(0, MAX_RENDERED_OBJECTIVE_ITEMS));
+    } else {
       items.push(...objective.items);
     }
   }
   if (objective.questItem?.id) items.push(objective.questItem);
-  if (objective.useAny?.length && objective.useAny.length <= MAX_RENDERED_USE_ANY_ITEMS) {
-    items.push(...objective.useAny);
+  if (objective.useAny?.length) {
+    items.push(...objective.useAny.slice(0, MAX_RENDERED_OBJECTIVE_ITEMS));
   }
   if (objective.usingWeapon?.id) items.push(objective.usingWeapon);
   if (objective.usingWeaponMods?.length) items.push(...objective.usingWeaponMods);
