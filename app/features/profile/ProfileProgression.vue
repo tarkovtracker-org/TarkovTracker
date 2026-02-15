@@ -394,10 +394,11 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import { GAME_MODES, SPECIAL_STATIONS, type GameMode } from '@/utils/constants';
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
+  import { computeInvalidProgress } from '@/utils/progressInvalidation';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
   import type { ApiUpdateMeta, ApiTaskUpdate, UserProgressData } from '@/stores/progressState';
   import type { Task } from '@/types/tarkov';
@@ -919,9 +920,43 @@
     const completion = taskCompletions.value[taskId] as RawTaskCompletion;
     return getCompletionFlags(completion).failed;
   };
-  const totalTasks = computed(() => relevantTasks.value.length);
+  const normalizedTaskCompletions = computed<
+    Record<string, { complete?: boolean; failed?: boolean }>
+  >(() => {
+    const normalized: Record<string, { complete?: boolean; failed?: boolean }> = {};
+    for (const [taskId, completion] of Object.entries(taskCompletions.value)) {
+      const flags = getCompletionFlags(completion as RawTaskCompletion);
+      normalized[taskId] = {
+        complete: flags.complete,
+        failed: flags.failed,
+      };
+    }
+    return normalized;
+  });
+  const invalidProgress = computed(() =>
+    computeInvalidProgress({
+      tasks: metadataStore.tasks ?? [],
+      taskCompletions: normalizedTaskCompletions.value,
+      pmcFaction: modeFaction.value,
+    })
+  );
+  const isTaskInvalid = (taskId: string): boolean =>
+    invalidProgress.value.invalidTasks[taskId] === true;
+  const isTaskIncludedInTotals = (task: Task): boolean => {
+    if (isTaskSuccessful(task.id)) {
+      return true;
+    }
+    if (isTaskFailed(task.id)) {
+      return false;
+    }
+    return !isTaskInvalid(task.id);
+  };
+  const countedTasks = computed(() =>
+    relevantTasks.value.filter((task) => isTaskIncludedInTotals(task))
+  );
+  const totalTasks = computed(() => countedTasks.value.length);
   const completedTasks = computed(() =>
-    relevantTasks.value.reduce((count, task) => {
+    countedTasks.value.reduce((count, task) => {
       if (isTaskSuccessful(task.id)) {
         return count + 1;
       }
@@ -936,9 +971,7 @@
       return count;
     }, 0)
   );
-  const remainingTasks = computed(() =>
-    Math.max(totalTasks.value - completedTasks.value - failedTasks.value, 0)
-  );
+  const remainingTasks = computed(() => Math.max(totalTasks.value - completedTasks.value, 0));
   const objectiveMetaById = computed(() => {
     const lookup = new Map<
       string,
@@ -947,7 +980,7 @@
         taskName: string;
       }
     >();
-    for (const task of relevantTasks.value) {
+    for (const task of countedTasks.value) {
       const taskName = task.name || t('page.profile.task_fallback', 'Task');
       for (const objective of task.objectives ?? []) {
         if (!objective?.id) {
@@ -985,10 +1018,39 @@
     return lookup;
   });
   const totalHideoutModules = computed(() => hideoutModuleLabelById.value.size);
+  const hideoutModuleCompletionState = computed<Record<string, boolean>>(() => {
+    const completionState: Record<string, boolean> = {};
+    const editionData = metadataStore.editions.find(
+      (edition) => edition.value === profileGameEdition.value
+    );
+    for (const station of metadataStore.hideoutStations ?? []) {
+      const maxLevel = station.levels?.length ?? 0;
+      const defaultStashLevel =
+        station.normalizedName === SPECIAL_STATIONS.STASH
+          ? Math.min(editionData?.defaultStashLevel ?? 0, maxLevel)
+          : 0;
+      const defaultCultistCircleLevel =
+        station.normalizedName === SPECIAL_STATIONS.CULTIST_CIRCLE
+          ? Math.min(editionData?.defaultCultistCircleLevel ?? 0, maxLevel)
+          : 0;
+      for (const level of station.levels ?? []) {
+        if (!level?.id) {
+          continue;
+        }
+        const isManualComplete = hideoutModuleCompletions.value[level.id]?.complete === true;
+        const isAutoCompleteFromEdition =
+          (station.normalizedName === SPECIAL_STATIONS.STASH && level.level <= defaultStashLevel) ||
+          (station.normalizedName === SPECIAL_STATIONS.CULTIST_CIRCLE &&
+            level.level <= defaultCultistCircleLevel);
+        completionState[level.id] = isManualComplete || isAutoCompleteFromEdition;
+      }
+    }
+    return completionState;
+  });
   const completedHideoutModules = computed(() => {
     let count = 0;
     for (const moduleId of hideoutModuleLabelById.value.keys()) {
-      if (hideoutModuleCompletions.value[moduleId]?.complete === true) {
+      if (hideoutModuleCompletionState.value[moduleId] === true) {
         count++;
       }
     }
@@ -1030,10 +1092,10 @@
     () => objectiveProgressCount.value + hideoutProgressCount.value
   );
   const totalKappaTasks = computed(
-    () => relevantTasks.value.filter((task) => task.kappaRequired === true).length
+    () => countedTasks.value.filter((task) => task.kappaRequired === true).length
   );
   const completedKappaTasks = computed(() =>
-    relevantTasks.value.reduce((count, task) => {
+    countedTasks.value.reduce((count, task) => {
       if (task.kappaRequired === true && isTaskSuccessful(task.id)) {
         return count + 1;
       }
@@ -1050,10 +1112,10 @@
     return ids;
   });
   const totalLightkeeperTasks = computed(
-    () => relevantTasks.value.filter((task) => task.lightkeeperRequired === true).length
+    () => countedTasks.value.filter((task) => task.lightkeeperRequired === true).length
   );
   const completedLightkeeperTasks = computed(() =>
-    relevantTasks.value.reduce((count, task) => {
+    countedTasks.value.reduce((count, task) => {
       if (task.lightkeeperRequired === true && isTaskSuccessful(task.id)) {
         return count + 1;
       }
@@ -1324,7 +1386,7 @@
     }
     const pacePerDay = dampenPace(rawPacePerDay, sampleDays);
     const paceBasedDays = Math.max(1, Math.ceil(remaining / pacePerDay));
-    const remainingKappaTasks = relevantTasks.value.filter(
+    const remainingKappaTasks = countedTasks.value.filter(
       (task) => task.kappaRequired === true && !isTaskSuccessful(task.id)
     );
     const { floor: criticalPathFloor } = computeCriticalPathFloor(
