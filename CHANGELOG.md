@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.1...v1.3.2) (2026-02-15)
+
+
+### Bug Fixes
+
+* accept SB service key alias in runtime config ([c909493](https://github.com/tarkovtracker-org/TarkovTracker/commit/c909493a06b332250d13ad78709efedbd1a290ff))
+
 ## [1.3.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.0...v1.3.1) (2026-02-15)
 
 
