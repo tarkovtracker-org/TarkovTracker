@@ -16,7 +16,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only (private) runtime config
     supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
-    supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    supabaseServiceKey:
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_ROLE_KEY || '',
     supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
     githubToken: process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '',
     githubTimeoutMs: Number(process.env.GITHUB_TIMEOUT_MS || '8000') || 8000,
