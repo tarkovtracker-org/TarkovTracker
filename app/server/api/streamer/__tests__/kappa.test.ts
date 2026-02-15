@@ -15,7 +15,6 @@ const {
   mockSetResponseHeader: vi.fn(),
 }));
 const mockDollarFetch = vi.fn();
-const originalFetch = (globalThis as unknown as { $fetch?: typeof mockDollarFetch }).$fetch;
 vi.mock('h3', async () => {
   const actual = await vi.importActual('h3');
   return {
@@ -41,6 +40,7 @@ mockNuxtImport('useRouter', () => () => ({
 describe('Streamer Kappa API', () => {
   const USER_ID = '11111111-1111-4111-8111-111111111111';
   let mockEvent: Partial<H3Event>;
+  let originalFetch: typeof mockDollarFetch | undefined;
   const BASE_SITE_CONTEXT: Pick<H3EventContext, 'siteConfig' | 'siteConfigNitroOrigin'> = {
     siteConfig: {
       stack: [] as Partial<SiteConfigInput>[],
@@ -69,6 +69,7 @@ describe('Streamer Kappa API', () => {
       items: { collected: 10, percentage: 50, remaining: 10, total: 20 },
       tasks: { completed: 20, percentage: 40, remaining: 30, total: 50 },
     });
+    originalFetch = (globalThis as unknown as { $fetch?: typeof mockDollarFetch }).$fetch;
     (globalThis as unknown as { $fetch?: typeof mockDollarFetch }).$fetch = mockDollarFetch;
   });
   afterEach(() => {
