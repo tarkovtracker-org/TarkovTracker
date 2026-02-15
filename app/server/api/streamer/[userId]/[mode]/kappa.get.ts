@@ -1,4 +1,10 @@
-import { createError, defineEventHandler, getRouterParam, setResponseHeader } from 'h3';
+import {
+  createError,
+  defineEventHandler,
+  getRequestHeader,
+  getRouterParam,
+  setResponseHeader,
+} from 'h3';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { createLogger } from '@/server/utils/logger';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
@@ -238,9 +244,13 @@ export default defineEventHandler(async (event) => {
   if (!UUID_REGEX.test(userId)) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid profile id' });
   }
+  const host = getRequestHeader(event, 'host');
+  const internalHeaders: Record<string, string> = host ? { host } : {};
   let sharedProfile: SharedProfileResponse;
   try {
-    sharedProfile = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`);
+    sharedProfile = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`, {
+      headers: internalHeaders,
+    });
   } catch (error) {
     const statusCode = resolveStatusCode(error);
     throw createError({
@@ -258,9 +268,11 @@ export default defineEventHandler(async (event) => {
   try {
     const [tasksCoreResponse, tasksObjectivesResponse, editions] = await Promise.all([
       $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', {
+        headers: internalHeaders,
         query: { gameMode, lang: 'en' },
       }),
       $fetch<{ data: TarkovTaskObjectivesQueryResult }>('/api/tarkov/tasks-objectives', {
+        headers: internalHeaders,
         query: { gameMode, lang: 'en' },
       }),
       getEditions(),

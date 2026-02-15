@@ -5,11 +5,13 @@ import type { H3Event, H3EventContext } from 'h3';
 import type { SiteConfigInput } from 'site-config-stack';
 const {
   mockComputeStreamerKappaMetrics,
+  mockGetRequestHeader,
   mockGetRouterParam,
   mockProcessTaskData,
   mockSetResponseHeader,
 } = vi.hoisted(() => ({
   mockComputeStreamerKappaMetrics: vi.fn(),
+  mockGetRequestHeader: vi.fn(),
   mockGetRouterParam: vi.fn(),
   mockProcessTaskData: vi.fn(),
   mockSetResponseHeader: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock('h3', async () => {
   const actual = await vi.importActual('h3');
   return {
     ...actual,
+    getRequestHeader: mockGetRequestHeader,
     getRouterParam: mockGetRouterParam,
     setResponseHeader: mockSetResponseHeader,
   };
@@ -56,6 +59,7 @@ describe('Streamer Kappa API', () => {
         ...BASE_SITE_CONTEXT,
       },
     };
+    mockGetRequestHeader.mockReturnValue('tarkovtracker.org');
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return USER_ID;
       if (key === 'mode') return 'pvp';
