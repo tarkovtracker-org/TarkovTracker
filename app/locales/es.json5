@@ -71,6 +71,7 @@
   maps: {
     zoom_speed: 'Velocidad de zoom',
     pan_speed: 'Velocidad de desplazamiento',
+    zone_opacity: 'Opacidad de zona',
     map_settings: 'Ajustes del mapa',
     not_available_title: 'Mapa no disponible',
     not_available_description: 'El mapa interactivo de {mapName} aún no está disponible. Estamos esperando a que se cree un mapa compatible.',
@@ -107,6 +108,7 @@
     aria: {
       zoom_speed: 'Velocidad de zoom',
       pan_speed: 'Velocidad de desplazamiento',
+      zone_opacity: 'Opacidad de zona',
     },
     tooltip: {
       go_to: 'Ir al objetivo',
@@ -911,6 +913,7 @@
         show_extracts: 'Mostrar extracciones por defecto',
         zoom_speed: 'Velocidad de zoom',
         pan_speed: 'Velocidad de desplazamiento',
+        zone_opacity: 'Opacidad de zona',
         colors: {
           title: 'Colores del mapa',
           description: 'Ajusta los colores de los marcadores para mejorar legibilidad y accesibilidad.',

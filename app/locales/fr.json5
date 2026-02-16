@@ -71,6 +71,7 @@
   maps: {
     zoom_speed: 'Vitesse du zoom',
     pan_speed: 'Vitesse de déplacement',
+    zone_opacity: 'Opacité des zones',
     map_settings: 'Paramètres de la carte',
     not_available_title: 'Carte indisponible',
     not_available_description: "La carte interactive de {mapName} n'est pas encore disponible. Nous attendons la création d'une carte compatible.",
@@ -107,6 +108,7 @@
     aria: {
       zoom_speed: 'Vitesse du zoom',
       pan_speed: 'Vitesse de déplacement',
+      zone_opacity: 'Opacité des zones',
     },
     tooltip: {
       go_to: "Aller à l'objectif",
@@ -911,6 +913,7 @@
         show_extracts: 'Afficher les extractions par défaut',
         zoom_speed: 'Vitesse de zoom',
         pan_speed: 'Vitesse de déplacement',
+        zone_opacity: 'Opacité des zones',
         colors: {
           title: 'Couleurs de carte',
           description: 'Ajustez les couleurs des marqueurs pour améliorer lisibilité et accessibilité.',

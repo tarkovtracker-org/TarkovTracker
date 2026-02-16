@@ -200,6 +200,23 @@
                     :aria-label="t('maps.aria.pan_speed')"
                   />
                 </div>
+                <div class="space-y-1">
+                  <div
+                    class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                  >
+                    <span>{{ t('maps.zone_opacity') }}</span>
+                    <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
+                  </div>
+                  <input
+                    v-model.number="mapZoneOpacity"
+                    type="range"
+                    :min="ZONE_OPACITY_MIN"
+                    :max="ZONE_OPACITY_MAX"
+                    step="0.01"
+                    class="accent-surface-200 h-1.5 w-full cursor-pointer"
+                    :aria-label="t('maps.aria.zone_opacity')"
+                  />
+                </div>
               </div>
             </div>
           </template>
@@ -441,6 +458,10 @@
   const ZOOM_SPEED_MAX = 3;
   const PAN_SPEED_MIN = 0.5;
   const PAN_SPEED_MAX = 3;
+  const ZONE_OPACITY_MIN = 0.05;
+  const ZONE_OPACITY_MAX = 0.5;
+  const ZONE_HOVER_DELTA = 0.16;
+  const ZONE_HOVER_MAX = 0.6;
   const MAP_BUTTON_ACTIVE_CLASS = '!bg-surface-700/80 !text-surface-50 !ring-1 !ring-white/30';
   const MAP_BUTTON_INACTIVE_CLASS = 'text-surface-300 hover:text-surface-100';
   const SPAWN_CLUSTER_ZOOM_THRESHOLD = 3.5;
@@ -493,6 +514,14 @@
       preferencesStore.setMapPanSpeed(clamped);
     },
   });
+  const mapZoneOpacity = computed({
+    get: () => preferencesStore.getMapZoneOpacity,
+    set: (value) => {
+      const parsed = Number(value);
+      const clamped = Math.min(ZONE_OPACITY_MAX, Math.max(ZONE_OPACITY_MIN, parsed));
+      preferencesStore.setMapZoneOpacity(clamped);
+    },
+  });
   const mapColorOptions = computed(() => getMapColorOptions(t));
   const onMapColorInput = (key: MapMarkerColorKey, event: Event) => {
     const input = event.target as HTMLInputElement | null;
@@ -501,6 +530,7 @@
   };
   const zoomSpeedLabel = computed(() => `${mapZoomSpeed.value.toFixed(1)}x`);
   const panSpeedLabel = computed(() => `${mapPanSpeed.value.toFixed(1)}x`);
+  const zoneOpacityLabel = computed(() => `${Math.round(mapZoneOpacity.value * 100)}%`);
   const pressedMapKeys = new Set<'up' | 'down' | 'left' | 'right' | 'zoom-in' | 'zoom-out'>();
   let mapKeyboardFrameId: number | null = null;
   let mapKeyboardLastTick = 0;
@@ -1157,7 +1187,7 @@
         const polygon = L.polygon(polygonLatLngs, {
           color: zoneColor,
           fillColor: zoneColor,
-          fillOpacity: 0.24,
+          fillOpacity: mapZoneOpacity.value,
           weight: 2.25,
           opacity: 0.95,
         });
@@ -1185,8 +1215,15 @@
           attachHoverPinPopup(polygon, objectiveId, () => polygon.getBounds().getCenter());
           attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng());
         }
-        polygon.on('mouseover', () => polygon.setStyle({ fillOpacity: 0.4, weight: 3 }));
-        polygon.on('mouseout', () => polygon.setStyle({ fillOpacity: 0.24, weight: 2.25 }));
+        polygon.on('mouseover', () =>
+          polygon.setStyle({
+            fillOpacity: Math.min(mapZoneOpacity.value + ZONE_HOVER_DELTA, ZONE_HOVER_MAX),
+            weight: 3,
+          })
+        );
+        polygon.on('mouseout', () =>
+          polygon.setStyle({ fillOpacity: mapZoneOpacity.value, weight: 2.25 })
+        );
         objectiveLayer.value!.addLayer(polygon);
         objectiveLayer.value!.addLayer(centerMarker);
       });
@@ -1375,6 +1412,10 @@
     },
     { deep: true }
   );
+  watch(mapZoneOpacity, () => {
+    lastMarksHash.value = '';
+    updateMarkers();
+  });
   watch([showPmcExtracts, showScavExtracts], () => createExtractMarkers());
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
   watch(

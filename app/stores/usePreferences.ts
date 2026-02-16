@@ -110,6 +110,7 @@ export interface PreferencesState {
   mapMarkerColors: MapMarkerColors;
   mapZoomSpeed: number;
   mapPanSpeed: number;
+  mapZoneOpacity: number;
   pinnedTaskIds: string[];
   // Skills settings
   skillSortMode: SkillSortMode | null;
@@ -189,6 +190,7 @@ export const preferencesDefaultState: PreferencesState = {
   mapMarkerColors: { ...MAP_MARKER_COLORS },
   mapZoomSpeed: 1,
   mapPanSpeed: 1,
+  mapZoneOpacity: 0.24,
   pinnedTaskIds: [],
   // Skills settings
   skillSortMode: null,
@@ -380,6 +382,9 @@ export const usePreferencesStore = defineStore('preferences', {
     getMapPanSpeed: (state) => {
       return state.mapPanSpeed ?? 1;
     },
+    getMapZoneOpacity: (state) => {
+      return state.mapZoneOpacity ?? 0.24;
+    },
     getLocaleOverride: (state) => {
       return state.localeOverride ?? null;
     },
@@ -506,6 +511,14 @@ export const usePreferencesStore = defineStore('preferences', {
       }
       const clamped = Math.min(3, Math.max(0.5, speed));
       this.mapPanSpeed = clamped;
+    },
+    setMapZoneOpacity(opacity: number) {
+      if (!Number.isFinite(opacity)) {
+        this.mapZoneOpacity = 0.24;
+        return;
+      }
+      const clamped = Math.min(0.5, Math.max(0.05, opacity));
+      this.mapZoneOpacity = clamped;
     },
     setTaskMapView(view: string) {
       this.taskMapView = view;
@@ -781,6 +794,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapMarkerColors',
       'mapZoomSpeed',
       'mapPanSpeed',
+      'mapZoneOpacity',
       'pinnedTaskIds',
       'taskFilterPresets',
       'skillSortMode',

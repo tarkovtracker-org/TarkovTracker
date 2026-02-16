@@ -166,6 +166,7 @@ const buildPreferencesSyncPayload = (
     ),
     map_zoom_speed: preferencesState.mapZoomSpeed,
     map_pan_speed: preferencesState.mapPanSpeed,
+    map_zone_opacity: preferencesState.mapZoneOpacity,
     pinned_task_ids: Array.isArray(preferencesState.pinnedTaskIds)
       ? preferencesState.pinnedTaskIds.filter(
           (taskId): taskId is string => typeof taskId === 'string' && taskId.length > 0

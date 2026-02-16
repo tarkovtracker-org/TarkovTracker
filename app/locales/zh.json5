@@ -71,6 +71,7 @@
   maps: {
     zoom_speed: '缩放速度',
     pan_speed: '平移速度',
+    zone_opacity: '区域透明度',
     map_settings: '地图设置',
     not_available_title: '地图不可用',
     not_available_description: '"{mapName}"的互动地图尚不可用。我们正在等待兼容地图的制作。',
@@ -107,6 +108,7 @@
     aria: {
       zoom_speed: '缩放速度',
       pan_speed: '平移速度',
+      zone_opacity: '区域透明度',
     },
     tooltip: {
       go_to: '前往目标',
@@ -911,6 +913,7 @@
         show_extracts: '默认显示撤离点',
         zoom_speed: '缩放速度',
         pan_speed: '平移速度',
+        zone_opacity: '区域透明度',
         colors: {
           title: '地图颜色',
           description: '自定义标记颜色以提升可读性和无障碍体验。',

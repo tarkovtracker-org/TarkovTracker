@@ -46,6 +46,22 @@
               class="bg-surface-700 accent-surface-200 h-2 w-full cursor-pointer appearance-none rounded-lg"
             />
           </div>
+          <div class="space-y-1">
+            <div class="flex justify-between">
+              <span class="text-sm font-medium">
+                {{ $t('settings.interface.maps.zone_opacity') }}
+              </span>
+              <span class="text-surface-200 text-xs">{{ Math.round(mapZoneOpacity * 100) }}%</span>
+            </div>
+            <input
+              v-model.number="mapZoneOpacity"
+              type="range"
+              min="0.05"
+              max="0.5"
+              step="0.01"
+              class="bg-surface-700 accent-surface-200 h-2 w-full cursor-pointer appearance-none rounded-lg"
+            />
+          </div>
         </div>
         <div class="bg-surface-800/50 border-surface-700 space-y-3 rounded-lg border p-3">
           <div class="flex items-center justify-between gap-3">
@@ -113,6 +129,10 @@
   const mapPanSpeed = computed({
     get: () => preferencesStore.getMapPanSpeed,
     set: (val) => preferencesStore.setMapPanSpeed(val),
+  });
+  const mapZoneOpacity = computed({
+    get: () => preferencesStore.getMapZoneOpacity,
+    set: (val) => preferencesStore.setMapZoneOpacity(val),
   });
   const mapMarkerColors = computed(() => preferencesStore.getMapMarkerColors);
   const mapColorOptions = computed(() => getMapColorOptions(t));

@@ -71,6 +71,7 @@
   maps: {
     zoom_speed: 'Zoom speed',
     pan_speed: 'Pan speed',
+    zone_opacity: 'Zone opacity',
     map_settings: 'Map settings',
     not_available_title: 'Map Not Available',
     not_available_description: 'The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.',
@@ -107,6 +108,7 @@
     aria: {
       zoom_speed: 'Zoom speed',
       pan_speed: 'Pan speed',
+      zone_opacity: 'Zone opacity',
     },
     tooltip: {
       go_to: 'Go to objective',
@@ -911,6 +913,7 @@
         show_extracts: 'Show Extracts by Default',
         zoom_speed: 'Zoom Speed',
         pan_speed: 'Pan Speed',
+        zone_opacity: 'Zone Opacity',
         colors: {
           title: 'Map Colors',
           description: 'Set marker colors for better readability and accessibility.',
