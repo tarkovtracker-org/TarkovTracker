@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.6...v1.4.0) (2026-02-16)
+
+
+### Features
+
+* **maps:** add adjustable zone overlay opacity setting ([1c365e6](https://github.com/tarkovtracker-org/TarkovTracker/commit/1c365e6856bc8b25e5b5be397672d676786e410a))
+
 ## [1.3.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.5...v1.3.6) (2026-02-15)
 
 
