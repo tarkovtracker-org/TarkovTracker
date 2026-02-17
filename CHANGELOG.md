@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.5.0...v1.6.0) (2026-02-17)
+
+
+### Features
+
+* show collapsible instructions on linked profile import card ([3678d53](https://github.com/tarkovtracker-org/TarkovTracker/commit/3678d534068bde0ae381927b881589aa303048e3))
+
 # [1.5.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.4.0...v1.5.0) (2026-02-17)
 
 
