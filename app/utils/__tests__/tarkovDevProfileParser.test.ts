@@ -148,13 +148,28 @@ describe('parseTarkovDevProfile', () => {
     if (!result.ok) return;
     expect(result.data.gameEditionGuess).toBe(4);
   });
-  it('maps memberCategory 1024 to edition 6 (Unheard)', () => {
+  it('maps memberCategory 1024 to edition 5 (Unheard)', () => {
     const profile = buildValidProfile({
       info: {
         nickname: 'X',
         side: 'Usec',
         experience: 100,
         memberCategory: 1024,
+        prestigeLevel: 0,
+      },
+    });
+    const result = parseTarkovDevProfile(profile);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.gameEditionGuess).toBe(5);
+  });
+  it('maps memberCategory 1026 to edition 6 (EoD + Unheard)', () => {
+    const profile = buildValidProfile({
+      info: {
+        nickname: 'X',
+        side: 'Usec',
+        experience: 100,
+        memberCategory: 1026,
         prestigeLevel: 0,
       },
     });

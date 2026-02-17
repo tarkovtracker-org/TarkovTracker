@@ -49,8 +49,12 @@ export function validateTarkovDevProfile(data: unknown): data is {
 }
 function mapMemberCategoryToEdition(memberCategory: unknown): number | null {
   if (typeof memberCategory !== 'number') return null;
-  // BSG MemberCategory enum: 0 = Default (Standard), 2 = UniqueId (EoD), 1024 = Unheard.
-  switch (memberCategory) {
+  const normalizedMemberCategory = Math.trunc(memberCategory);
+  const hasUnheard = (normalizedMemberCategory & 1024) === 1024;
+  const hasEod = (normalizedMemberCategory & 2) === 2;
+  if (hasUnheard && hasEod) return 6;
+  if (hasUnheard) return 5;
+  switch (normalizedMemberCategory) {
     case 0:
       return 1;
     case 4:
@@ -59,8 +63,6 @@ function mapMemberCategoryToEdition(memberCategory: unknown): number | null {
       return 3;
     case 2:
       return 4;
-    case 1024:
-      return 6;
     default:
       logger.warn('[TarkovDevProfileParser] Unknown memberCategory', memberCategory);
       return null;
