@@ -37,6 +37,12 @@
             >
               {{ $t('settings.tarkov_dev_import.view_profile') }}
             </UButton>
+            <div class="space-y-1">
+              <label class="text-surface-200 text-sm font-semibold">
+                {{ $t('settings.tarkov_dev_import.game_mode_label') }}
+              </label>
+              <GameModeToggle v-model="targetMode" />
+            </div>
             <UButton
               icon="i-mdi-refresh"
               variant="soft"
@@ -46,6 +52,36 @@
             >
               {{ $t('settings.tarkov_dev_import.reimport') }}
             </UButton>
+            <UAccordion
+              :items="[
+                { label: $t('settings.tarkov_dev_import.how_to_import'), slot: 'instructions' },
+              ]"
+              class="w-full"
+              :ui="{ trigger: 'py-2', label: 'text-surface-400 text-sm' }"
+            >
+              <template #instructions>
+                <div class="space-y-3 pt-2">
+                  <p class="text-surface-400 text-sm">
+                    {{ $t('settings.tarkov_dev_import.upload_hint_before_link') }}
+                    <NuxtLink
+                      to="https://tarkov.dev/players"
+                      external
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary-400 hover:text-primary-300 underline"
+                    >
+                      {{ $t('settings.tarkov_dev_import.upload_hint_link') }}
+                    </NuxtLink>
+                    {{ $t('settings.tarkov_dev_import.upload_hint_after_link') }}
+                  </p>
+                  <img
+                    src="/img/tarkov-dev-save-profile.png"
+                    alt="Save Profile button on Tarkov.dev"
+                    class="w-full rounded-md border border-white/10"
+                  />
+                </div>
+              </template>
+            </UAccordion>
           </div>
         </template>
         <template v-if="importState === 'idle' && !isLinked">

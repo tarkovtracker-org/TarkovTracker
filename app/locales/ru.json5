@@ -1152,6 +1152,7 @@
       linked_uid: 'Tarkov UID',
       view_profile: 'View on Tarkov.dev',
       reimport: 'Re-import',
+      how_to_import: 'How to import',
       select_file: 'Select File',
       no_file: 'No file selected',
     },
