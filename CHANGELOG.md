@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.6.1...v1.7.0) (2026-02-17)
+
+
+### Features
+
+* **needed-items:** centralize settings and separate handover state ([4189ae2](https://github.com/tarkovtracker-org/TarkovTracker/commit/4189ae2dd8405d83c5b88074f43ca0e6c893d16f))
+
 ## [1.6.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.6.0...v1.6.1) (2026-02-17)
 
 
