@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.4.0...v1.5.0) (2026-02-17)
+
+
+### Features
+
+* add tarkov.dev profile import, profile tabs, and map TS hardening ([6636661](https://github.com/tarkovtracker-org/TarkovTracker/commit/66366618b49e6ee84927a21f05c9f3be38008466))
+
 # [1.4.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.3.6...v1.4.0) (2026-02-16)
 
 
