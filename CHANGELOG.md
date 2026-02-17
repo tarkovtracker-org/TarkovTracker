@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.6.0...v1.6.1) (2026-02-17)
+
+
+### Bug Fixes
+
+* **import:** map memberCategory 1024 to unheard only ([79ae93f](https://github.com/tarkovtracker-org/TarkovTracker/commit/79ae93fb33d7a3cf6cd2296c9393e07786b2585f))
+
 # [1.6.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.5.0...v1.6.0) (2026-02-17)
 
 
