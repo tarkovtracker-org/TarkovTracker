@@ -551,6 +551,9 @@
         combined: 'Комбінований перегляд',
       },
       teammates_needed: 'Товаришам по команді це потрібно',
+      settings: {
+        title: 'Налаштування потрібних предметів',
+      },
     },
     settings: {
       title: 'Налаштування',
@@ -700,6 +703,11 @@
       level_prefix: 'Рів.',
       no_tasks: 'Для цього профілю немає доступних завдань.',
       task_fallback: 'Завдання',
+      section_available: 'Доступні',
+      section_locked: 'Заблоковані',
+      section_completed: 'Виконані',
+      objective_fallback: 'Ціль',
+      no_objectives: 'Немає цілей',
       activity_timeline: 'Хронологія активності',
       timeline_subtitle: 'Останні події прогресу з часовими мітками',
       started: 'Початок',
@@ -1209,6 +1217,8 @@
     switch_to_compact: 'Перейти до компактного перегляду',
     collected: 'Зібрано',
     mark_collected: 'Позначити як зібране',
+    ready_to_hand_over: 'Готово до здачі',
+    handed_over: 'Здано',
     aria: {
       enter_count: 'Введіть кількість предметів',
       decrease_count: 'Зменшити кількість',

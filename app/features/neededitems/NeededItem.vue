@@ -58,10 +58,6 @@
       if (currentCount.value > 0) {
         const newCount = currentCount.value - 1;
         tarkovStore.setObjectiveCount(props.need.id, newCount);
-        // If we drop below needed count and objective was complete, uncomplete it
-        if (newCount < neededCount.value && tarkovStore.isTaskObjectiveComplete(props.need.id)) {
-          tarkovStore.setTaskObjectiveUncomplete(props.need.id);
-        }
       }
     } else if (props.need.needType == 'hideoutModule') {
       if (currentCount.value > 0) {
@@ -82,10 +78,6 @@
       if (currentCount.value < neededCount.value) {
         const newCount = currentCount.value + 1;
         tarkovStore.setObjectiveCount(props.need.id, newCount);
-        // If we reach needed count, mark objective as complete
-        if (newCount >= neededCount.value && !tarkovStore.isTaskObjectiveComplete(props.need.id)) {
-          tarkovStore.setTaskObjectiveComplete(props.need.id);
-        }
       }
     } else if (props.need.needType == 'hideoutModule') {
       if (currentCount.value < neededCount.value) {
@@ -102,13 +94,10 @@
     if (props.need.needType == 'taskObjective') {
       if (currentCount.value === 0) {
         tarkovStore.setObjectiveCount(props.need.id, neededCount.value);
-        tarkovStore.setTaskObjectiveComplete(props.need.id);
       } else if (currentCount.value === neededCount.value) {
         tarkovStore.setObjectiveCount(props.need.id, Math.max(0, neededCount.value - 1));
-        tarkovStore.setTaskObjectiveUncomplete(props.need.id);
       } else {
         tarkovStore.setObjectiveCount(props.need.id, neededCount.value);
-        tarkovStore.setTaskObjectiveComplete(props.need.id);
       }
     } else if (props.need.needType == 'hideoutModule') {
       if (currentCount.value === 0) {
@@ -126,16 +115,6 @@
   const setCount = (count: number) => {
     if (props.need.needType == 'taskObjective') {
       tarkovStore.setObjectiveCount(props.need.id, count);
-      // Update completion status based on new count
-      if (count >= neededCount.value) {
-        if (!tarkovStore.isTaskObjectiveComplete(props.need.id)) {
-          tarkovStore.setTaskObjectiveComplete(props.need.id);
-        }
-      } else {
-        if (tarkovStore.isTaskObjectiveComplete(props.need.id)) {
-          tarkovStore.setTaskObjectiveUncomplete(props.need.id);
-        }
-      }
     } else if (props.need.needType == 'hideoutModule') {
       tarkovStore.setHideoutPartCount(props.need.id, count);
       // Update completion status based on new count

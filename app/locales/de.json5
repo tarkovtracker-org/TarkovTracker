@@ -551,6 +551,9 @@
         combined: 'Kombinierte Ansicht',
       },
       teammates_needed: 'Teammitglieder benötigen dies',
+      settings: {
+        title: 'Einstellungen für benötigte Gegenstände',
+      },
     },
     settings: {
       title: 'Einstellungen',
@@ -700,6 +703,11 @@
       level_prefix: 'Lvl.',
       no_tasks: 'Keine Aufgaben für dieses Profil verfügbar.',
       task_fallback: 'Aufgabe',
+      section_available: 'Verfügbar',
+      section_locked: 'Gesperrt',
+      section_completed: 'Abgeschlossen',
+      objective_fallback: 'Ziel',
+      no_objectives: 'Keine Ziele',
       activity_timeline: 'Aktivitätsverlauf',
       timeline_subtitle: 'Letzte Fortschrittsereignisse mit Zeitstempeln',
       started: 'Gestartet',
@@ -1209,6 +1217,8 @@
     switch_to_compact: 'Wechseln Sie zur Kompaktansicht',
     collected: 'Gesammelt',
     mark_collected: 'Als abgeholt markieren',
+    ready_to_hand_over: 'Bereit zur Übergabe',
+    handed_over: 'Übergeben',
     aria: {
       enter_count: 'Gegenstandsanzahl eingeben',
       decrease_count: 'Anzahl verringern',

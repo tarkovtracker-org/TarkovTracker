@@ -551,6 +551,9 @@
         combined: 'Комбинированное отображение',
       },
       teammates_needed: 'Товарищам по команде это нужно',
+      settings: {
+        title: 'Настройки нужных предметов',
+      },
     },
     settings: {
       title: 'Настройки',
@@ -700,6 +703,11 @@
       level_prefix: 'Ур.',
       no_tasks: 'Для этого профиля нет доступных заданий.',
       task_fallback: 'Задание',
+      section_available: 'Доступные',
+      section_locked: 'Заблокированные',
+      section_completed: 'Выполненные',
+      objective_fallback: 'Цель',
+      no_objectives: 'Нет целей',
       activity_timeline: 'Хронология активности',
       timeline_subtitle: 'Последние события прогресса с отметками времени',
       started: 'Начало',
@@ -1209,6 +1217,8 @@
     switch_to_compact: 'Переключиться на компактный вид',
     collected: 'Найдено',
     mark_collected: 'Отметить как найденное',
+    ready_to_hand_over: 'Готово к сдаче',
+    handed_over: 'Сдано',
     aria: {
       enter_count: 'Введите количество предметов',
       decrease_count: 'Уменьшить количество',

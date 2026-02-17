@@ -551,6 +551,9 @@
         combined: 'Vue combinée',
       },
       teammates_needed: 'Les coéquipiers ont besoin de ceci',
+      settings: {
+        title: 'Paramètres des objets nécessaires',
+      },
     },
     settings: {
       title: 'Paramètres',
@@ -700,6 +703,11 @@
       level_prefix: 'Niv.',
       no_tasks: 'Aucune tâche disponible pour ce profil.',
       task_fallback: 'Tâche',
+      section_available: 'Disponibles',
+      section_locked: 'Verrouillées',
+      section_completed: 'Terminées',
+      objective_fallback: 'Objectif',
+      no_objectives: 'Aucun objectif',
       activity_timeline: "Chronologie d'activité",
       timeline_subtitle: 'Événements de progression récents avec horodatage',
       started: 'Début',
@@ -1209,6 +1217,8 @@
     switch_to_compact: 'Passer à la vue compacte',
     collected: 'Collecté',
     mark_collected: 'Marquer comme collecté',
+    ready_to_hand_over: 'Prêt à remettre',
+    handed_over: 'Remis',
     aria: {
       enter_count: "Saisir le nombre d'objets",
       decrease_count: 'Diminuer le nombre',

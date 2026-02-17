@@ -11,7 +11,7 @@ export interface UseTarkovDevImportReturn {
   previewData: Ref<TarkovDevImportResult | null>;
   importError: Ref<string | null>;
   parseFile: (file: File) => Promise<void>;
-  confirmImport: (targetMode: GameMode, editionOverride?: number | null) => void;
+  confirmImport: (targetMode: GameMode, editionOverride?: number | null) => Promise<void>;
   reset: () => void;
 }
 export function useTarkovDevImport(): UseTarkovDevImportReturn {
@@ -46,14 +46,17 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
       logger.error('[TarkovDevImport] Parse error:', e);
     }
   }
-  function confirmImport(targetMode: GameMode, editionOverride?: number | null): void {
+  async function confirmImport(
+    targetMode: GameMode,
+    editionOverride?: number | null
+  ): Promise<void> {
     if (!previewData.value) return;
     const data = previewData.value;
     try {
       const originalMode = tarkovStore.getCurrentGameMode();
       tarkovStore.setTarkovUid(data.tarkovUid);
       if (targetMode !== originalMode) {
-        tarkovStore.switchGameMode(targetMode);
+        await tarkovStore.switchGameMode(targetMode);
       }
       tarkovStore.setPMCFaction(data.pmcFaction);
       tarkovStore.setDisplayName(data.displayName);
@@ -77,9 +80,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
         tarkovStore.setGameEdition(edition);
       }
       tarkovStore.setTarkovDevProfile(data.rawProfile);
-      if (targetMode !== originalMode) {
-        tarkovStore.switchGameMode(originalMode);
-      }
+      await tarkovStore.switchGameMode(originalMode);
       importState.value = 'success';
     } catch (e) {
       importState.value = 'error';

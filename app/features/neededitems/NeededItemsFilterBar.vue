@@ -105,165 +105,33 @@
           </template>
           <template v-else>{{ totalCount }} {{ $t('page.needed_items.items') }}</template>
         </UBadge>
-        <!-- Divider (hidden on mobile) -->
         <div class="hidden h-6 w-px bg-white/10 sm:block" />
-        <!-- Sort Popover -->
-        <UPopover>
-          <UButton
-            icon="i-mdi-sort"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            class="shrink-0"
-            :title="$t('page.needed_items.sort.label')"
-            :aria-label="$t('page.needed_items.sort.label')"
-          />
-          <template #content>
-            <div class="w-64 space-y-3 p-3">
-              <div class="text-surface-400 text-xs font-medium">
-                {{ $t('page.needed_items.sort.by') }}
-              </div>
-              <div class="flex flex-col gap-2">
-                <UButton
-                  v-for="opt in sortOptions"
-                  :key="opt.value"
-                  :variant="sortBy === opt.value ? 'soft' : 'ghost'"
-                  :color="sortBy === opt.value ? 'primary' : 'neutral'"
-                  size="sm"
-                  class="justify-between"
-                  @click="setSort(opt.value)"
-                >
-                  <span class="flex items-center gap-2">
-                    <UIcon :name="opt.icon" class="h-4 w-4" />
-                    {{ opt.label }}
-                  </span>
-                  <UIcon
-                    v-if="sortBy === opt.value"
-                    :name="sortDirection === 'asc' ? 'i-mdi-arrow-up' : 'i-mdi-arrow-down'"
-                    class="h-4 w-4"
-                  />
-                </UButton>
-              </div>
+        <SelectMenuFixed
+          v-model="selectedSortBy"
+          :items="sortOptions"
+          value-key="value"
+          size="sm"
+          class="w-28 sm:w-40"
+          :aria-label="$t('page.needed_items.sort.label')"
+        >
+          <template #leading>
+            <UIcon name="i-mdi-sort" class="h-4 w-4" />
+          </template>
+          <template #item="{ item }">
+            <div class="flex items-center gap-2">
+              <UIcon :name="item.icon" class="h-4 w-4" />
+              <span>{{ item.label }}</span>
             </div>
           </template>
-        </UPopover>
-        <!-- Filters Popover -->
-        <UPopover>
-          <UButton
-            icon="i-mdi-filter-variant"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            class="shrink-0"
-            :title="$t('page.needed_items.filters.label')"
-            :aria-label="$t('page.needed_items.filters.label')"
-          >
-            <UBadge
-              v-if="activeFiltersCount > 0"
-              color="primary"
-              variant="soft"
-              size="sm"
-              class="ml-1 px-1.5 py-0.5"
-            >
-              {{ activeFiltersCount }}
-            </UBadge>
-          </UButton>
-          <template #content>
-            <div class="w-80 space-y-3 p-3">
-              <div class="text-surface-400 text-xs font-medium">
-                {{ $t('page.needed_items.filters.sections.items') }}
-              </div>
-              <div class="flex flex-wrap gap-2">
-                <UButton
-                  :variant="firFilter === 'fir' ? 'soft' : 'ghost'"
-                  :color="firFilter === 'fir' ? 'success' : 'neutral'"
-                  size="sm"
-                  @click="$emit('update:firFilter', firFilter === 'fir' ? 'all' : 'fir')"
-                >
-                  <UIcon name="i-mdi-checkbox-marked-circle" class="mr-1 h-4 w-4" />
-                  {{ $t('page.needed_items.filters.fir') }}
-                </UButton>
-                <UButton
-                  :variant="firFilter === 'non-fir' ? 'soft' : 'ghost'"
-                  :color="firFilter === 'non-fir' ? 'warning' : 'neutral'"
-                  size="sm"
-                  @click="$emit('update:firFilter', firFilter === 'non-fir' ? 'all' : 'non-fir')"
-                >
-                  <UIcon name="i-mdi-checkbox-blank-circle-outline" class="mr-1 h-4 w-4" />
-                  {{ $t('page.needed_items.filters.non_fir') }}
-                </UButton>
-                <!-- Hide Owned Toggle -->
-                <UButton
-                  :variant="hideOwned ? 'soft' : 'ghost'"
-                  :color="hideOwned ? 'primary' : 'neutral'"
-                  size="sm"
-                  @click="$emit('update:hideOwned', !hideOwned)"
-                >
-                  <UIcon name="i-mdi-check-circle-outline" class="mr-1 h-4 w-4" />
-                  {{
-                    hideOwned
-                      ? $t('page.needed_items.filters.show_owned')
-                      : $t('page.needed_items.filters.hide_owned')
-                  }}
-                </UButton>
-                <AppTooltip
-                  :text="$t('page.needed_items.filters.hide_non_fir_special_equipment_title')"
-                >
-                  <UButton
-                    :variant="hideNonFirSpecialEquipment ? 'soft' : 'ghost'"
-                    :color="hideNonFirSpecialEquipment ? 'primary' : 'neutral'"
-                    size="sm"
-                    @click="$emit('update:hideNonFirSpecialEquipment', !hideNonFirSpecialEquipment)"
-                  >
-                    <UIcon name="i-mdi-briefcase-outline" class="mr-1 h-4 w-4" />
-                    {{
-                      hideNonFirSpecialEquipment
-                        ? $t('page.needed_items.filters.no_special')
-                        : $t('page.needed_items.filters.special')
-                    }}
-                  </UButton>
-                </AppTooltip>
-                <AppTooltip
-                  :text="
-                    isKappaDisabled
-                      ? $t('page.needed_items.filters.kappa_only_disabled_tooltip')
-                      : $t('page.needed_items.filters.kappa_only_tooltip')
-                  "
-                >
-                  <UButton
-                    :variant="kappaOnly ? 'soft' : 'ghost'"
-                    :color="kappaOnly ? 'warning' : 'neutral'"
-                    size="sm"
-                    :disabled="isKappaDisabled"
-                    @click="$emit('update:kappaOnly', !kappaOnly)"
-                  >
-                    <UIcon name="i-mdi-trophy" class="mr-1 h-4 w-4" />
-                    {{ $t('page.needed_items.filters.kappa_only') }}
-                  </UButton>
-                </AppTooltip>
-              </div>
-              <div class="border-t border-white/10 pt-3">
-                <div class="text-surface-400 mb-2 text-xs font-medium">
-                  {{ $t('page.needed_items.filters.sections.team') }}
-                </div>
-                <UButton
-                  :variant="hideTeamItems ? 'soft' : 'ghost'"
-                  :color="hideTeamItems ? 'error' : 'neutral'"
-                  size="sm"
-                  class="w-full justify-start"
-                  @click="$emit('update:hideTeamItems', !hideTeamItems)"
-                >
-                  <UIcon name="i-mdi-account-group-outline" class="mr-1 h-4 w-4" />
-                  {{
-                    hideTeamItems
-                      ? $t('page.needed_items.filters.hide_team_needs')
-                      : $t('page.needed_items.filters.show_team_needs')
-                  }}
-                </UButton>
-              </div>
-            </div>
-          </template>
-        </UPopover>
+        </SelectMenuFixed>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          :icon="sortDirectionIcon"
+          :aria-label="sortDirectionLabel"
+          @click="toggleSortDirection"
+        />
         <!-- Divider (hidden on mobile) -->
         <div class="hidden h-6 w-px bg-white/10 sm:block" />
         <!-- View Mode Buttons -->
@@ -319,11 +187,28 @@
             />
           </div>
         </div>
+        <AppTooltip :text="t('page.needed_items.settings.title', 'Needed Items Settings')">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            icon="i-mdi-cog"
+            :aria-label="t('page.needed_items.settings.title', 'Needed Items Settings')"
+            :aria-pressed="isSettingsDrawerOpen"
+            :class="isSettingsDrawerOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+            @click="toggleSettingsDrawer"
+          >
+            <UBadge v-if="activeFiltersCount > 0" color="primary" variant="soft" size="sm">
+              {{ activeFiltersCount }}
+            </UBadge>
+          </UButton>
+        </AppTooltip>
       </div>
     </div>
   </div>
 </template>
 <script setup lang="ts">
+  import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
   import type { UInputInstance } from '@/types/ui';
   type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
   type ViewMode = 'list' | 'grid';
@@ -410,9 +295,8 @@
     }
     return count;
   });
-  const isKappaDisabled = computed(() => {
-    return props.modelValue === 'hideout';
-  });
+  const { isOpen: isSettingsDrawerOpen, toggle: toggleSettingsDrawer } =
+    useNeededItemsSettingsDrawer();
   const sortOptions = computed(() => [
     {
       label: t('page.needed_items.sort.priority'),
@@ -435,6 +319,20 @@
       icon: 'i-mdi-counter',
     },
   ]);
+  const selectedSortBy = computed({
+    get: () => props.sortBy,
+    set: (value: SortBy) => {
+      setSort(value);
+    },
+  });
+  const sortDirectionIcon = computed(() => {
+    return props.sortDirection === 'asc' ? 'i-mdi-arrow-up' : 'i-mdi-arrow-down';
+  });
+  const sortDirectionLabel = computed(() => {
+    return props.sortDirection === 'asc'
+      ? t('page.tasks.sort.ascending')
+      : t('page.tasks.sort.descending');
+  });
   const setViewMode = (mode: ViewMode) => {
     emit('update:groupByItem', false);
     emit('update:viewMode', mode);
@@ -464,5 +362,8 @@
       emit('update:sortBy', value);
       emit('update:sortDirection', value === 'priority' || value === 'count' ? 'desc' : 'asc');
     }
+  };
+  const toggleSortDirection = () => {
+    emit('update:sortDirection', props.sortDirection === 'asc' ? 'desc' : 'asc');
   };
 </script>

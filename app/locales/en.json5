@@ -551,6 +551,9 @@
         combined: 'Combined view',
       },
       teammates_needed: 'Teammates need this',
+      settings: {
+        title: 'Needed Items Settings',
+      },
     },
     settings: {
       title: 'Settings',
@@ -700,6 +703,11 @@
       level_prefix: 'Lv.',
       no_tasks: 'No tasks available for this profile.',
       task_fallback: 'Task',
+      section_available: 'Available',
+      section_locked: 'Locked',
+      section_completed: 'Completed',
+      objective_fallback: 'Objective',
+      no_objectives: 'No objectives',
       activity_timeline: 'Activity Timeline',
       timeline_subtitle: 'Recent progress events from timestamps',
       started: 'Started',
@@ -1209,6 +1217,8 @@
     switch_to_compact: 'Switch to Compact view',
     collected: 'Collected',
     mark_collected: 'Mark as collected',
+    ready_to_hand_over: 'Ready to hand over',
+    handed_over: 'Handed over',
     aria: {
       enter_count: 'Enter item count',
       decrease_count: 'Decrease count',

@@ -148,10 +148,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
   }
   function applyDistribution(result: DistributionResult): void {
     if (result.updates.length === 0) return;
-    const taskObjectiveUpdates: Record<
-      string,
-      { count: number; complete: boolean; timestamp?: number }
-    > = {};
+    const taskObjectiveUpdates: Record<string, { count: number }> = {};
     const hideoutPartUpdates: Record<
       string,
       { count: number; complete: boolean; timestamp?: number }
@@ -165,7 +162,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
         ...(isComplete && { timestamp: now }),
       };
       if (update.type === 'task') {
-        taskObjectiveUpdates[update.id] = entry;
+        taskObjectiveUpdates[update.id] = { count: Math.max(0, update.count) };
       } else {
         hideoutPartUpdates[update.id] = entry;
       }
@@ -214,8 +211,6 @@ export function useItemDistribution(): UseItemDistributionReturn {
         currentData.taskObjectives[obj.id] = {
           ...currentData.taskObjectives[obj.id],
           count: 0,
-          complete: false,
-          timestamp: undefined,
         };
       }
       for (const mod of hideoutModules) {

@@ -38,6 +38,14 @@
                   <span v-else class="text-surface-300 text-sm">
                     {{ $t('needed_items.unknown_task') }}
                   </span>
+                  <span class="mt-1 flex">
+                    <span
+                      class="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                      :class="itemStatusClasses"
+                    >
+                      {{ $t(itemStatusKey) }}
+                    </span>
+                  </span>
                 </template>
                 <template v-else-if="props.need.needType == 'hideoutModule'">
                   <StationLink
@@ -121,6 +129,14 @@
                           <TaskLink v-if="relatedTask" :task="relatedTask" />
                           <span v-else class="text-surface-300 text-sm">
                             {{ $t('needed_items.unknown_task') }}
+                          </span>
+                          <span class="mt-1 flex">
+                            <span
+                              class="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                              :class="itemStatusClasses"
+                            >
+                              {{ $t(itemStatusKey) }}
+                            </span>
                           </span>
                           <RequirementInfo
                             :need-type="props.need.needType"
@@ -378,6 +394,30 @@
   });
   const isSingleItem = computed(() => neededCount.value === 1);
   const isCollected = computed(() => currentCount.value >= neededCount.value);
+  const isTaskObjectiveNeed = computed(() => props.need.needType === 'taskObjective');
+  const isHandedOver = computed(() => {
+    if (!isTaskObjectiveNeed.value) return false;
+    if (selfCompletedNeed.value) return true;
+    return tarkovStore.isTaskObjectiveComplete(props.need.id);
+  });
+  const itemStatusKey = computed(() => {
+    if (isHandedOver.value) {
+      return 'needed_items.handed_over';
+    }
+    if (isCollected.value) {
+      return 'needed_items.ready_to_hand_over';
+    }
+    return 'needed_items.not_collected';
+  });
+  const itemStatusClasses = computed(() => {
+    if (isHandedOver.value) {
+      return 'bg-success-500/20 text-success-300';
+    }
+    if (isCollected.value) {
+      return 'bg-info-500/20 text-info-300';
+    }
+    return 'bg-surface-700 text-surface-300';
+  });
   defineEmits<{
     (event: 'decreaseCount' | 'increaseCount' | 'toggleCount'): void;
     (event: 'setCount', count: number): void;

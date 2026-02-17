@@ -58,7 +58,7 @@
     </div>
     <AppTooltip
       :text="
-        currentCount >= neededCount
+        resolvedIsComplete
           ? t('page.tasks.questcard.complete')
           : t('page.tasks.questcard.mark_complete')
       "
@@ -68,13 +68,13 @@
         :disabled="disabled"
         class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         :aria-label="
-          currentCount >= neededCount
+          resolvedIsComplete
             ? t('page.tasks.questcard.complete')
             : t('page.tasks.questcard.mark_complete')
         "
-        :aria-pressed="currentCount >= neededCount"
+        :aria-pressed="resolvedIsComplete"
         :class="
-          currentCount >= neededCount
+          resolvedIsComplete
             ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
             : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10'
         "
@@ -89,11 +89,18 @@
   import { useI18n } from 'vue-i18n';
   import { useCountEditController } from '@/composables/useCountEditController';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
-  const props = defineProps<{
-    currentCount: number;
-    neededCount: number;
-    disabled?: boolean;
-  }>();
+  const props = withDefaults(
+    defineProps<{
+      currentCount: number;
+      neededCount: number;
+      disabled?: boolean;
+      isComplete?: boolean | null;
+    }>(),
+    {
+      disabled: false,
+      isComplete: null,
+    }
+  );
   const emit = defineEmits<{
     decrease: [];
     increase: [];
@@ -103,6 +110,12 @@
   const { t } = useI18n({ useScope: 'global' });
   const formatNumber = useLocaleNumberFormatter();
   const toast = useToast();
+  const resolvedIsComplete = computed(() => {
+    if (props.isComplete !== null) {
+      return props.isComplete;
+    }
+    return props.currentCount >= props.neededCount;
+  });
   const { isEditing, editValue, inputRef, startEdit, commitEdit, cancelEdit } =
     useCountEditController({
       current: () => props.currentCount,

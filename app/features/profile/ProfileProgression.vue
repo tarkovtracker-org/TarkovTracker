@@ -200,6 +200,8 @@
           :counted-tasks="countedTasks"
           :is-task-successful="isTaskSuccessful"
           :is-task-failed="isTaskFailed"
+          :is-task-locked="isTaskLocked"
+          :objective-completions="objectiveCompletions"
         />
         <ProfileHideoutTab
           v-else-if="selectedTabIndex === 2"
@@ -747,6 +749,43 @@
     const completion = taskCompletions.value[taskId] as RawTaskCompletion;
     return getCompletionFlags(completion).failed;
   };
+  const isTaskLocked = (taskId: string): boolean => {
+    if (isTaskSuccessful(taskId) || isTaskFailed(taskId)) return false;
+    if (isViewingCurrentMode.value) {
+      return progressStore.unlockedTasks[taskId]?.self !== true;
+    }
+    const task = relevantTasks.value.find((t) => t.id === taskId);
+    if (!task) return true;
+    if (task.minPlayerLevel && profileLevel.value < task.minPlayerLevel) return true;
+    if (task.taskRequirements) {
+      const allMet = task.taskRequirements.every((req) => {
+        const reqStatuses = (req.status ?? []).map((s) => s.toLowerCase());
+        const requiresComplete =
+          reqStatuses.length === 0 ||
+          reqStatuses.some((s) => s === 'complete' || s === 'completed');
+        const requiresFailed = reqStatuses.some((s) => s === 'failed');
+        const requiresActive = reqStatuses.some(
+          (s) => s === 'active' || s === 'accept' || s === 'accepted'
+        );
+        const reqFlags = getCompletionFlags(
+          taskCompletions.value[req.task.id] as RawTaskCompletion
+        );
+        if (requiresComplete && reqFlags.complete) return true;
+        if (requiresFailed && reqFlags.failed) return true;
+        if (requiresActive) return true;
+        return false;
+      });
+      if (!allMet) return true;
+    }
+    if (task.failedRequirements) {
+      const hasFailed = task.failedRequirements.some((req) => {
+        if (!req?.task?.id) return false;
+        return getCompletionFlags(taskCompletions.value[req.task.id] as RawTaskCompletion).failed;
+      });
+      if (hasFailed) return true;
+    }
+    return false;
+  };
   const normalizedTaskCompletions = computed<
     Record<string, { complete?: boolean; failed?: boolean }>
   >(() => {
@@ -767,8 +806,6 @@
       pmcFaction: modeFaction.value,
     })
   );
-  const isTaskInvalid = (taskId: string): boolean =>
-    invalidProgress.value.invalidTasks[taskId] === true;
   const countedTasks = computed(() =>
     getCountedTasks(
       relevantTasks.value,

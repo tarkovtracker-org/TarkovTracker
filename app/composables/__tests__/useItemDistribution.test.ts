@@ -288,11 +288,10 @@ describe('useItemDistribution', () => {
         remainingNonFir: 0,
       });
       const state = mockStoreState.patchedState as {
-        pvp: { taskObjectives: Record<string, { count: number; complete: boolean }> };
+        pvp: { taskObjectives: Record<string, { count: number }> };
       };
       expect(state.pvp.taskObjectives['obj-1']).toEqual({
         count: 3,
-        complete: false,
       });
     });
     it('updates hideout parts in store', async () => {
@@ -310,7 +309,7 @@ describe('useItemDistribution', () => {
       expect(part.count).toBe(5);
       expect(part.complete).toBe(true);
     });
-    it('sets complete flag when count reaches needed', async () => {
+    it('does not set complete flag for task objectives when count reaches needed', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { applyDistribution } = useItemDistribution();
       applyDistribution({
@@ -320,12 +319,13 @@ describe('useItemDistribution', () => {
       });
       const state = mockStoreState.patchedState as {
         pvp: {
-          taskObjectives: Record<string, { count: number; complete: boolean; timestamp?: number }>;
+          taskObjectives: Record<string, { count: number; complete?: boolean; timestamp?: number }>;
         };
       };
       const objective = expectDefined(state.pvp.taskObjectives['obj-1']);
-      expect(objective.complete).toBe(true);
-      expect(objective.timestamp).toBeDefined();
+      expect(objective.count).toBe(5);
+      expect(objective.complete).toBeUndefined();
+      expect(objective.timestamp).toBeUndefined();
     });
     it('does not patch store when updates array is empty', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
@@ -348,17 +348,13 @@ describe('useItemDistribution', () => {
       ];
       resetObjectives(taskObjectives, []);
       const state = mockStoreState.patchedState as {
-        pvp: { taskObjectives: Record<string, { count: number; complete: boolean }> };
+        pvp: { taskObjectives: Record<string, { count: number }> };
       };
       expect(state.pvp.taskObjectives['obj-1']).toEqual({
         count: 0,
-        complete: false,
-        timestamp: undefined,
       });
       expect(state.pvp.taskObjectives['obj-2']).toEqual({
         count: 0,
-        complete: false,
-        timestamp: undefined,
       });
     });
     it('resets hideout part counts to zero', async () => {

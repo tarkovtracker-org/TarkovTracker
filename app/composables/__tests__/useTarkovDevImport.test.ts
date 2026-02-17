@@ -137,7 +137,7 @@ describe('useTarkovDevImport', () => {
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     const composable = await loadComposable();
     await composable.parseFile(createFile('{"aid":123}'));
-    composable.confirmImport('pve', 6);
+    await composable.confirmImport('pve', 6);
     expect(tarkovStore.setTarkovUid).toHaveBeenCalledWith(parsedData.tarkovUid);
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(1, 'pve');
     expect(tarkovStore.setPMCFaction).toHaveBeenCalledWith(parsedData.pmcFaction);
@@ -161,7 +161,7 @@ describe('useTarkovDevImport', () => {
     });
     const composable = await loadComposable();
     await composable.parseFile(createFile('{"aid":123}'));
-    composable.confirmImport('pvp');
+    await composable.confirmImport('pvp');
     expect(tarkovStore.setGameEdition).toHaveBeenCalledWith(4);
   });
   it('sets error state when applying import data throws', async () => {
@@ -175,7 +175,7 @@ describe('useTarkovDevImport', () => {
     });
     const composable = await loadComposable();
     await composable.parseFile(createFile('{"aid":123}'));
-    composable.confirmImport('pvp');
+    await composable.confirmImport('pvp');
     expect(composable.importState.value).toBe('error');
     expect(composable.importError.value).toBe('Failed to apply import data');
     expect(mockLogger.error).toHaveBeenCalledWith(

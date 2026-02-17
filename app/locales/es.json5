@@ -551,6 +551,9 @@
         combined: 'Vista combinada',
       },
       teammates_needed: 'Los compañeros de equipo necesitan esto',
+      settings: {
+        title: 'Configuración de objetos necesarios',
+      },
     },
     settings: {
       title: 'Configuración',
@@ -700,6 +703,11 @@
       level_prefix: 'Nv.',
       no_tasks: 'No hay tareas disponibles para este perfil.',
       task_fallback: 'Tarea',
+      section_available: 'Disponibles',
+      section_locked: 'Bloqueadas',
+      section_completed: 'Completadas',
+      objective_fallback: 'Objetivo',
+      no_objectives: 'Sin objetivos',
       activity_timeline: 'Cronología de actividad',
       timeline_subtitle: 'Eventos recientes de progreso con marcas de tiempo',
       started: 'Inicio',
@@ -1209,6 +1217,8 @@
     switch_to_compact: 'Cambiar a vista compacta',
     collected: 'Coleccionado',
     mark_collected: 'Marcar como recogido',
+    ready_to_hand_over: 'Listo para entregar',
+    handed_over: 'Entregado',
     aria: {
       enter_count: 'Introducir cantidad del objeto',
       decrease_count: 'Disminuir cantidad',

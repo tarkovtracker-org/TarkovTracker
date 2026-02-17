@@ -284,7 +284,7 @@
     await parseFile(file);
     input.value = '';
   }
-  function handleConfirm() {
-    confirmImport(targetMode.value);
+  async function handleConfirm() {
+    await confirmImport(targetMode.value);
   }
 </script>

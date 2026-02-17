@@ -551,6 +551,9 @@
         combined: '组合视图',
       },
       teammates_needed: '队友需要这个',
+      settings: {
+        title: '所需物品设置',
+      },
     },
     settings: {
       title: '设置',
@@ -700,6 +703,11 @@
       level_prefix: '等级',
       no_tasks: '此档案暂无可用任务。',
       task_fallback: '任务',
+      section_available: '可用',
+      section_locked: '已锁定',
+      section_completed: '已完成',
+      objective_fallback: '目标',
+      no_objectives: '暂无目标',
       activity_timeline: '活动时间线',
       timeline_subtitle: '带时间戳的近期进度事件',
       started: '开始时间',
@@ -1209,6 +1217,8 @@
     switch_to_compact: '切换到紧凑视图',
     collected: '集',
     mark_collected: '标记为已收集',
+    ready_to_hand_over: '可上交',
+    handed_over: '已上交',
     aria: {
       enter_count: '输入物品数量',
       decrease_count: '减少数量',

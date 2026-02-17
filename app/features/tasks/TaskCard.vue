@@ -260,12 +260,31 @@
             <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
               {{ t('page.tasks.questcard.objectives') }}
             </div>
-            <UIcon
-              name="i-mdi-chevron-down"
-              aria-hidden="true"
-              class="pointer-events-none h-4 w-4 transition-transform duration-200"
-              :class="{ 'rotate-180': objectivesVisible }"
-            />
+            <div class="flex items-center gap-2">
+              <UButton
+                v-if="taskItemObjectives.length > 0"
+                size="xs"
+                color="neutral"
+                variant="soft"
+                class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
+                :disabled="!hasResettableItemObjectiveProgress"
+                :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
+                @click.stop="confirmResetTaskItemCounts"
+                @keydown.enter.stop
+                @keydown.space.stop
+              >
+                <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
+                <span class="hidden sm:inline">
+                  {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
+                </span>
+              </UButton>
+              <UIcon
+                name="i-mdi-chevron-down"
+                aria-hidden="true"
+                class="pointer-events-none h-4 w-4 transition-transform duration-200"
+                :class="{ 'rotate-180': objectivesVisible }"
+              />
+            </div>
           </div>
           <Transition
             :css="false"
@@ -931,6 +950,21 @@
     const storeTask = metadataStore.getTaskById(props.task.id);
     return storeTask?.objectives ?? [];
   });
+  const taskItemObjectives = computed(() => {
+    return taskObjectives.value.filter((objective) => {
+      return Boolean(
+        objective.item?.id ||
+        objective.items?.[0]?.id ||
+        objective.markerItem?.id ||
+        objective.questItem?.id
+      );
+    });
+  });
+  const hasResettableItemObjectiveProgress = computed(() => {
+    return taskItemObjectives.value.some((objective) => {
+      return tarkovStore.getObjectiveCount(objective.id) > 0;
+    });
+  });
   const nonOptionalTaskObjectives = computed(() =>
     taskObjectives.value.filter((objective) => !objective.optional)
   );
@@ -1010,5 +1044,17 @@
     );
     if (!confirmed) return;
     markTaskFailed();
+  };
+  const confirmResetTaskItemCounts = () => {
+    if (!hasResettableItemObjectiveProgress.value) return;
+    const confirmed = window.confirm(
+      t('page.tasks.questcard.reset_item_counts_confirm', 'Reset all item counts for this task?')
+    );
+    if (!confirmed) return;
+    taskItemObjectives.value.forEach((objective) => {
+      if (tarkovStore.getObjectiveCount(objective.id) > 0) {
+        tarkovStore.setObjectiveCount(objective.id, 0);
+      }
+    });
   };
 </script>
