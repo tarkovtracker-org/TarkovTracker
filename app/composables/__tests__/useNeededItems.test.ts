@@ -494,12 +494,19 @@ describe('useNeededItems', () => {
       const { neededItems } = await setup();
       expect(neededItems.itemsReady.value).toBe(true);
     });
+    it('keeps items ready during background loading when items are already present', async () => {
+      const { metadataStore, neededItems } = await setup();
+      metadataStore.itemsLoading = true;
+      expect(neededItems.itemsReady.value).toBe(true);
+      expect(neededItems.itemsError.value).toBeNull();
+    });
     it('reports no error when items load successfully', async () => {
       const { neededItems } = await setup();
       expect(neededItems.itemsError.value).toBeNull();
     });
-    it('reports items not ready while loading', async () => {
+    it('reports items not ready while loading initial data', async () => {
       const { metadataStore, neededItems } = await setup();
+      metadataStore.items = [];
       metadataStore.itemsLoading = true;
       expect(neededItems.itemsReady.value).toBe(false);
       expect(neededItems.itemsError.value).toBeNull();
@@ -513,6 +520,7 @@ describe('useNeededItems', () => {
     });
     it('transitions through loading, success, and error states', async () => {
       const { metadataStore, neededItems } = await setup();
+      metadataStore.items = [];
       metadataStore.itemsLoading = true;
       expect(neededItems.itemsReady.value).toBe(false);
       expect(neededItems.itemsError.value).toBeNull();

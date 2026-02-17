@@ -160,9 +160,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   });
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
-  const itemsReady = computed(
-    () => itemsLoaded.value && !metadataStore.itemsLoading && !itemsError.value
-  );
+  const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
   const fullItemsQueued = ref(false);
   const { sortNeededItems, sortGroupedItems } = useNeededItemsSorting({
     sortBy,

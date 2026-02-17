@@ -342,7 +342,6 @@
   import 'leaflet/dist/leaflet.css';
   import { createApp } from 'vue';
   import { useI18n } from 'vue-i18n';
-  import { useRouter } from 'vue-router';
   import { useLeafletMap } from '@/composables/useLeafletMap';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';

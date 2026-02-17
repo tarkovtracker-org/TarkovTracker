@@ -5,9 +5,9 @@
         <div class="text-surface-400 mb-1 text-[0.7em]">
           {{ t('navigation_drawer.level') }}
         </div>
-        <h1 class="text-center text-2xl leading-tight font-bold">
+        <span class="text-center text-2xl leading-tight font-bold">
           {{ displayedLevel }}
-        </h1>
+        </span>
       </div>
     </template>
     <template v-else>
@@ -60,7 +60,7 @@
                 v-if="!editingLevel || useAutomaticLevel"
                 :text="useAutomaticLevel ? t('navigation_drawer.auto_level_enabled') : ''"
               >
-                <h1
+                <span
                   :class="
                     useAutomaticLevel
                       ? 'mx-auto block h-8 w-12 text-center text-3xl leading-8 font-bold'
@@ -87,7 +87,7 @@
                   @keydown.space.prevent="!useAutomaticLevel && startEditingLevel()"
                 >
                   {{ displayedLevel }}
-                </h1>
+                </span>
               </AppTooltip>
               <input
                 v-else
@@ -125,10 +125,11 @@
             </button>
           </span>
         </div>
-        <div
+        <NuxtLink
           v-if="useAutomaticLevel"
-          class="hover:border-surface-600 mt-1.5 cursor-pointer rounded border border-white/5 bg-white/2 px-2 py-1 transition-all hover:bg-white/4"
-          @click="navigateToSettings"
+          to="/settings"
+          class="hover:border-surface-600 mt-1.5 block cursor-pointer rounded border border-white/5 bg-white/5 px-2 py-1 no-underline transition-all hover:bg-white/10"
+          :aria-label="t('navigation_drawer.xp_settings_link')"
         >
           <div class="mb-0.5 flex items-center justify-between text-[0.6rem]">
             <span class="text-surface-400">{{ formatNumber(xpCalculation.totalXP.value) }} XP</span>
@@ -140,9 +141,14 @@
             <div
               class="bg-primary-500/60 h-full rounded-full transition-[width] duration-300 ease-out"
               :style="{ width: `${xpCalculation.xpProgress.value}%` }"
+              role="progressbar"
+              :aria-valuenow="Math.round(xpCalculation.xpProgress.value)"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="t('navigation_drawer.xp_progress')"
             ></div>
           </div>
-        </div>
+        </NuxtLink>
       </div>
     </template>
   </div>
@@ -156,7 +162,6 @@
   import { logger } from '@/utils/logger';
   import type { PlayerLevel } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
-  const router = useRouter();
   const formatNumber = useLocaleNumberFormatter();
   interface DrawerLevelProps {
     isCollapsed: boolean;
@@ -218,9 +223,6 @@
     if (tarkovStore.playerLevel() > minPlayerLevel.value) {
       tarkovStore.setLevel(tarkovStore.playerLevel() - 1);
     }
-  }
-  function navigateToSettings(): void {
-    void router.push('/settings');
   }
   watch(groupIcon, () => {
     groupImageLoadFailed.value = false;

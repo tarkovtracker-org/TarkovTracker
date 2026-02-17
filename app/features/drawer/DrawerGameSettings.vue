@@ -10,6 +10,7 @@
         class="focus:ring-pvp-400 flex flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
         :class="pvpClasses"
         :disabled="dataLoading"
+        :aria-pressed="currentGameMode === GAME_MODES.PVP"
         @click="switchMode(GAME_MODES.PVP)"
       >
         <UIcon name="i-mdi-sword-cross" class="h-3.5 w-3.5" />
@@ -20,6 +21,7 @@
         class="focus:ring-pve-400 flex flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
         :class="pveClasses"
         :disabled="dataLoading"
+        :aria-pressed="currentGameMode === GAME_MODES.PVE"
         @click="switchMode(GAME_MODES.PVE)"
       >
         <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5" />
@@ -47,6 +49,7 @@
           dataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         ]"
         :disabled="dataLoading"
+        :aria-pressed="faction === currentFaction"
         @click="setFaction(faction)"
       >
         {{ faction }}

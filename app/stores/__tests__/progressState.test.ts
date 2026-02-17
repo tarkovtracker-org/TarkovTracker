@@ -4,6 +4,7 @@ const createStateWithTaskCompletion = (completion: unknown): UserState =>
   ({
     currentGameMode: 'pvp',
     gameEdition: 1,
+    tarkovUid: null,
     pvp: {
       level: 1,
       pmcFaction: 'USEC',

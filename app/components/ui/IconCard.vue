@@ -1,5 +1,5 @@
 <template>
-  <div class="relative mt-2 rounded-lg bg-[rgba(33,33,33,1)] shadow-md">
+  <div class="bg-surface-850 relative mt-2 rounded-lg shadow-md">
     <div
       class="absolute -top-4 left-4 flex h-16 w-16 items-center justify-center rounded-full shadow-md"
       :class="`bg-${props.iconBackground}`"
@@ -18,22 +18,16 @@
     </div>
   </div>
 </template>
-<script setup>
-  const props = defineProps({
-    icon: {
-      type: String,
-      default: 'mdi-check-all',
-      required: false,
-    },
-    iconBackground: {
-      type: String,
-      default: 'accent',
-      required: false,
-    },
-    iconColor: {
-      type: String,
-      default: 'secondary',
-      required: false,
-    },
+<script setup lang="ts">
+  import type { SemanticColor } from '@/types/theme';
+  interface IconCardProps {
+    icon?: string;
+    iconBackground?: SemanticColor;
+    iconColor?: SemanticColor;
+  }
+  const props = withDefaults(defineProps<IconCardProps>(), {
+    icon: 'mdi-check-all',
+    iconBackground: 'accent',
+    iconColor: 'secondary',
   });
 </script>

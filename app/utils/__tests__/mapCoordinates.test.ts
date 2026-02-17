@@ -6,8 +6,20 @@ import {
   getMapSvgCdnUrl,
   getMapSvgFallbackUrl,
   isValidMapSvgConfig,
+  rotateGameCoordinates,
 } from '@/utils/mapCoordinates';
 describe('mapCoordinates', () => {
+  describe('rotateGameCoordinates', () => {
+    it('normalizes negative rotations', () => {
+      expect(rotateGameCoordinates(10, 20, -90)).toEqual({ x: 20, z: -10 });
+    });
+    it('normalizes rotations greater than 360', () => {
+      expect(rotateGameCoordinates(10, 20, 450)).toEqual({ x: -20, z: 10 });
+    });
+    it('returns original coordinates for non-right-angle rotations', () => {
+      expect(rotateGameCoordinates(10, 20, 405)).toEqual({ x: 10, z: 20 });
+    });
+  });
   it('rotates coordinates when rotation is applied', () => {
     // Matches tarkov.dev formula: treats (lng, lat) as (x, y)
     // At 90°: lat = x*sin(90) + y*cos(90) = 0*1 + 10*0 = 0

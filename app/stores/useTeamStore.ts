@@ -509,13 +509,18 @@ export function useTeammateStores() {
           typeof data.game_edition === 'number' && Number.isFinite(data.game_edition)
             ? Math.max(1, Math.trunc(data.game_edition))
             : defaultState.gameEdition;
+        const tarkovUid =
+          typeof data.tarkov_uid === 'number' && Number.isFinite(data.tarkov_uid)
+            ? Math.trunc(data.tarkov_uid)
+            : null;
         const pvpData = sanitizeTeammateProgressData(data.pvp_data);
         const pveData = sanitizeTeammateProgressData(data.pve_data);
-        storeInstance.$patch({
-          currentGameMode: gameMode,
-          gameEdition,
-          pvp: { ...defaultState.pvp, ...pvpData },
-          pve: { ...defaultState.pve, ...pveData },
+        storeInstance.$patch((state) => {
+          state.currentGameMode = gameMode;
+          state.gameEdition = gameEdition;
+          state.tarkovUid = tarkovUid;
+          state.pvp = { ...defaultState.pvp, ...pvpData };
+          state.pve = { ...defaultState.pve, ...pveData };
         });
       };
       const { cleanup } = useSupabaseListener({

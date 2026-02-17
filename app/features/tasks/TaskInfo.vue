@@ -133,7 +133,6 @@
 </template>
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { useRouter } from 'vue-router';
   import InfoRow from '@/features/tasks/InfoRow.vue';
   import TaskLink from '@/features/tasks/TaskLink.vue';
   import { useMetadataStore } from '@/stores/useMetadata';

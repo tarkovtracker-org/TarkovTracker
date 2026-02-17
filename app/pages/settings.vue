@@ -48,6 +48,7 @@
           </div>
         </template>
       </GenericCard>
+      <TarkovDevImportCard />
       <TaskDisplayCard />
       <MapSettingsCard />
       <SkillsCard />
@@ -68,6 +69,7 @@
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
+  import TarkovDevImportCard from '@/features/settings/TarkovDevImportCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';

@@ -41,7 +41,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useRoute } from 'vue-router';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import { useAppStore } from '@/stores/useApp';
   const DRAWER_EXPANDED_WIDTH = '224px';

@@ -51,6 +51,7 @@
 <script setup lang="ts">
   import { select, xml } from 'd3';
   import { logger } from '@/utils/logger';
+  import type { MapBoundsArray } from '@/features/maps/types';
   import type { TarkovMap } from '@/types/tarkov';
   interface Props {
     map: TarkovMap;
@@ -58,14 +59,23 @@
   }
   type MapZoneOutline = { x: number; z: number }[];
   type MapZone = { map: { id: string }; outline: MapZoneOutline };
-  type MapMarkLocation = { map: { id: string }; [key: string]: unknown };
-  type MapMark = { zones: MapZone[]; possibleLocations?: MapMarkLocation[] };
+  type MapMarkLocation = {
+    map: { id: string };
+    positions?: Array<{ x: number; y?: number; z: number }>;
+    [key: string]: unknown;
+  };
+  type MapMark = {
+    id?: string;
+    users?: string[];
+    zones: MapZone[];
+    possibleLocations?: MapMarkLocation[];
+  };
   const randomMapId = ref(crypto.randomUUID());
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
   });
-  const MapMarker = defineAsyncComponent(() => import('~/features/maps/MapMarker.vue'));
-  const MapZone = defineAsyncComponent(() => import('~/features/maps/MapZone.vue'));
+  const MapMarker = defineAsyncComponent(() => import('@/features/maps/MapMarker.vue'));
+  const MapZone = defineAsyncComponent(() => import('@/features/maps/MapZone.vue'));
   // Type guard to check if svg is an object with floors property
   const isSvgObject = (
     svg: unknown
@@ -74,7 +84,7 @@
     floors: string[];
     defaultFloor: string;
     coordinateRotation: number;
-    bounds: number[][];
+    bounds: MapBoundsArray;
   } => {
     return svg !== null && svg !== undefined && typeof svg === 'object' && 'floors' in svg;
   };

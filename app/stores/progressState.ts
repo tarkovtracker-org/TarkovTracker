@@ -56,6 +56,14 @@ export interface TraderProgress {
   level: number;
   reputation: number;
 }
+export interface TarkovDevProfileData {
+  pmcStats: Record<string, unknown> | null;
+  scavStats: Record<string, unknown> | null;
+  achievements: Record<string, number>;
+  mastering: Array<{ Id: string; Progress: number; Kills?: number }>;
+  importedAt: number;
+  profileUpdatedAt: number;
+}
 export interface UserProgressData {
   level: number;
   pmcFaction: 'USEC' | 'BEAR';
@@ -70,10 +78,12 @@ export interface UserProgressData {
   prestigeLevel: number; // 0-6, default 0
   skillOffsets: { [skillName: string]: number }; // manual adjustments per skill
   lastApiUpdate?: ApiUpdateMeta;
+  tarkovDevProfile?: TarkovDevProfileData;
 }
 export interface UserState {
   currentGameMode: GameMode;
   gameEdition: number;
+  tarkovUid: number | null;
   pvp: UserProgressData;
   pve: UserProgressData;
 }
@@ -94,6 +104,7 @@ const defaultProgressData: UserProgressData = {
 export const defaultState: UserState = {
   currentGameMode: GAME_MODES.PVP,
   gameEdition: 1,
+  tarkovUid: null,
   pvp: structuredClone(defaultProgressData),
   pve: structuredClone(defaultProgressData),
 };
@@ -120,6 +131,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     return {
       currentGameMode: (data.currentGameMode as GameMode) || GAME_MODES.PVP,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
+      tarkovUid: (data.tarkovUid as number | null) ?? null,
       pvp: pvpData,
       pve: pveData,
     };
@@ -150,6 +162,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     return {
       currentGameMode: data.currentGameMode as GameMode,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
+      tarkovUid: (data.tarkovUid as number | null) ?? null,
       pvp: migratedProgressData,
       pve: structuredClone(defaultProgressData),
     };
@@ -173,6 +186,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
   return {
     currentGameMode: GAME_MODES.PVP, // Default to PvP for existing users
     gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
+    tarkovUid: null,
     pvp: migratedProgressData,
     pve: structuredClone(defaultProgressData),
   };
@@ -246,6 +260,8 @@ export const getters = {
   getSkillOffset: (state: UserState) => (skillName: string) =>
     getCurrentData(state)?.skillOffsets?.[skillName] ?? 0,
   getAllSkillOffsets: (state: UserState) => () => getCurrentData(state)?.skillOffsets ?? {},
+  getTarkovUid: (state: UserState) => () => state.tarkovUid ?? null,
+  getTarkovDevProfile: (state: UserState) => () => getCurrentData(state)?.tarkovDevProfile ?? null,
 } as const satisfies _GettersTree<UserState>;
 // Helper functions for common operations
 const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
@@ -429,6 +445,13 @@ export const actions = {
       currentData.skills = {};
     }
     currentData.skills[skillName] = Number.isFinite(level) ? level : 0;
+  },
+  setTarkovUid(this: UserState, uid: number | null) {
+    this.tarkovUid = uid;
+  },
+  setTarkovDevProfile(this: UserState, profile: UserProgressData['tarkovDevProfile']) {
+    const currentData = getCurrentData(this);
+    currentData.tarkovDevProfile = profile;
   },
 } as const;
 export type UserActions = typeof actions;

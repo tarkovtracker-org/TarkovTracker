@@ -1,9 +1,34 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import { createI18n } from 'vue-i18n';
 import type { ProgressCardColor } from '@/features/dashboard/progressCard';
 vi.mock('@/utils/formatters', () => ({
   useLocaleNumberFormatter: () => (value: number) => value.toLocaleString('en-US'),
 }));
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  missingWarn: false,
+  fallbackWarn: false,
+  messages: {
+    en: {
+      page: {
+        dashboard: {
+          progress_card: {
+            view_details: 'View details for {label}',
+            progress_label: '{label} progress',
+          },
+        },
+      },
+    },
+    de: {},
+    es: {},
+    fr: {},
+    ru: {},
+    uk: {},
+    zh: {},
+  },
+});
 const colorVariants: Array<{ color: ProgressCardColor; barClass: string }> = [
   { color: 'primary', barClass: 'bg-primary-500/60' },
   { color: 'neutral', barClass: 'bg-surface-400/60' },
@@ -39,6 +64,7 @@ const mountWithProps = async (props: MountProps = {}) => {
   return mount(DashboardProgressCard, {
     props: { ...defaultProps, ...props },
     global: {
+      plugins: [i18n],
       stubs: {
         UIcon: true,
       },

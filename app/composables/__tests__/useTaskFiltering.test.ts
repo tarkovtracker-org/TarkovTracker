@@ -164,7 +164,7 @@ const createPreferencesStore = () => ({
   getHideCompletedMapObjectives: false,
   getTaskUserView: 'self',
   getTaskSecondaryView: 'available',
-  getPinnedTaskIds: [],
+  getPinnedTaskIds: [] as string[],
 });
 const createTarkovStore = () => ({
   getPrestigeLevel: () => 0,
@@ -448,6 +448,77 @@ describe('useTaskFiltering', () => {
     expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
       'task-map',
       'task-global',
+    ]);
+  });
+  it('groups trader all-view tasks by availability before locked, completed, and failed', async () => {
+    const { taskFiltering, tasks } = await setup();
+    const completedTask = tasks.find((task) => task.id === 'task-trader');
+    const failedTask = tasks.find((task) => task.id === 'task-failed');
+    if (completedTask?.trader) {
+      completedTask.trader.id = 'trader-1';
+      completedTask.trader.name = 'Trader One';
+    }
+    if (failedTask) {
+      failedTask.trader = {
+        id: 'trader-1',
+        name: 'Trader One',
+      };
+    }
+    await taskFiltering.updateVisibleTasks(
+      {
+        primaryView: 'traders',
+        secondaryView: 'all',
+        userView: 'self',
+        mapView: 'all',
+        traderView: 'trader-1',
+        mergedMaps: [],
+        sortMode: 'alphabetical',
+        sortDirection: 'asc',
+      },
+      false
+    );
+    expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
+      'task-kappa',
+      'task-map',
+      'task-locked',
+      'task-trader',
+      'task-failed',
+    ]);
+  });
+  it('keeps pinned tasks first while preserving status rank within pinned and unpinned groups', async () => {
+    const { taskFiltering, tasks, preferencesStore } = await setup();
+    preferencesStore.getPinnedTaskIds = ['task-failed', 'task-trader'];
+    const completedTask = tasks.find((task) => task.id === 'task-trader');
+    const failedTask = tasks.find((task) => task.id === 'task-failed');
+    if (completedTask?.trader) {
+      completedTask.trader.id = 'trader-1';
+      completedTask.trader.name = 'Trader One';
+    }
+    if (failedTask) {
+      failedTask.trader = {
+        id: 'trader-1',
+        name: 'Trader One',
+      };
+    }
+    await taskFiltering.updateVisibleTasks(
+      {
+        primaryView: 'traders',
+        secondaryView: 'all',
+        userView: 'self',
+        mapView: 'all',
+        traderView: 'trader-1',
+        mergedMaps: [],
+        sortMode: 'alphabetical',
+        sortDirection: 'asc',
+      },
+      false
+    );
+    expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
+      'task-trader',
+      'task-failed',
+      'task-kappa',
+      'task-map',
+      'task-locked',
     ]);
   });
   describe('isRaidRelevantObjective', () => {

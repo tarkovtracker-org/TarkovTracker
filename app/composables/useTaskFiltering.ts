@@ -571,6 +571,73 @@ export function useTaskFiltering() {
       return nameA.localeCompare(nameB) * directionFactor;
     });
   };
+  const getTraderStatusSortRank = (task: Task, userView: string): number => {
+    if (isAllUsersView(userView)) {
+      const teamIds = Object.keys(progressStore.visibleTeamStores || {});
+      const relevantTeamIds = getRelevantTeamIds(task, teamIds);
+      if (relevantTeamIds.length === 0) return 4;
+      const taskStatuses = relevantTeamIds.map((teamId) => getTaskStatus(task.id, teamId));
+      const isAvailableForAny = taskStatuses.some(
+        ({ isUnlocked, isCompleted, isFailed }) => isUnlocked && !isCompleted && !isFailed
+      );
+      const isCompletedByAll = taskStatuses.every(
+        ({ isCompleted, isFailed }) => isCompleted && !isFailed
+      );
+      const isFailedForAny = taskStatuses.some(({ isFailed }) => isFailed);
+      if (isAvailableForAny && !isTaskInvalid(task.id, 'all')) {
+        return 0;
+      }
+      if (!isCompletedByAll && !isFailedForAny) {
+        return 1;
+      }
+      if (isCompletedByAll) {
+        return 2;
+      }
+      if (isFailedForAny) {
+        return 3;
+      }
+      return 4;
+    }
+    const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
+    const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
+    if (isUnlocked && !isCompleted && !isFailed && !isTaskInvalid(task.id, userView)) {
+      return 0;
+    }
+    if (isCompleted && !isFailed) {
+      return 2;
+    }
+    if (isFailed) {
+      return 3;
+    }
+    return 1;
+  };
+  const groupTraderTasksByStatus = (taskList: Task[], userView: string): Task[] => {
+    const sortByStatusRank = (tasks: Task[]): Task[] =>
+      tasks
+        .map((task, index) => ({
+          index,
+          rank: getTraderStatusSortRank(task, userView),
+          task,
+        }))
+        .sort((a, b) => {
+          if (a.rank !== b.rank) {
+            return a.rank - b.rank;
+          }
+          return a.index - b.index;
+        })
+        .map(({ task }) => task);
+    const pinnedIdSet = new Set(preferencesStore.getPinnedTaskIds);
+    const pinnedTasks: Task[] = [];
+    const unpinnedTasks: Task[] = [];
+    taskList.forEach((task) => {
+      if (pinnedIdSet.has(task.id)) {
+        pinnedTasks.push(task);
+        return;
+      }
+      unpinnedTasks.push(task);
+    });
+    return [...sortByStatusRank(pinnedTasks), ...sortByStatusRank(unpinnedTasks)];
+  };
   const reorderMapViewTasks = (taskList: Task[]): Task[] => {
     const pinnedIdSet = new Set(preferencesStore.getPinnedTaskIds);
     const pinned: Task[] = [];
@@ -762,9 +829,16 @@ export function useTaskFiltering() {
         () => sortTasks(visibleTaskList, userView, sortMode, sortDirection),
         perfOn
       );
+      const shouldGroupTraderByStatus = primaryView === 'traders' && secondaryView === 'all';
+      const [statusGrouped, statusGroupMs] = timed(
+        () => (shouldGroupTraderByStatus ? groupTraderTasksByStatus(sorted, userView) : sorted),
+        perfOn
+      );
       const shouldPrioritizeMapSpecificTasks =
         primaryView === 'maps' && mapView !== 'all' && !preferencesStore.getHideGlobalTasks;
-      visibleTasks.value = shouldPrioritizeMapSpecificTasks ? reorderMapViewTasks(sorted) : sorted;
+      visibleTasks.value = shouldPrioritizeMapSpecificTasks
+        ? reorderMapViewTasks(statusGrouped)
+        : statusGrouped;
       perfEnd(perfTimer, {
         tasksIn,
         tasksOut: visibleTasks.value.length,
@@ -775,6 +849,7 @@ export function useTaskFiltering() {
         filterRequiredKeysMs: perfOn ? roundMs(filterRequiredKeysMs) : undefined,
         sharedFilterMs: perfOn ? roundMs(sharedFilterMs) : undefined,
         sortMs: perfOn ? roundMs(sortMs) : undefined,
+        statusGroupMs: perfOn ? roundMs(statusGroupMs) : undefined,
       });
     } finally {
       reloadingTasks.value = false;

@@ -45,6 +45,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useI18n } from 'vue-i18n';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { ProgressCardColor } from '@/features/dashboard/progressCard';
   const props = defineProps<{
@@ -65,8 +66,13 @@
     return trimmed || 'unlabeled progress';
   });
   // Computed aria-labels for accessibility
-  const buttonAriaLabel = computed(() => `View details for ${normalizedLabel.value}`);
-  const progressAriaLabel = computed(() => `${normalizedLabel.value} progress`);
+  const { t } = useI18n({ useScope: 'global' });
+  const buttonAriaLabel = computed(() =>
+    t('page.dashboard.progress_card.view_details', { label: normalizedLabel.value })
+  );
+  const progressAriaLabel = computed(() =>
+    t('page.dashboard.progress_card.progress_label', { label: normalizedLabel.value })
+  );
   const colorClasses: Record<
     ProgressCardColor,
     { hover: string; iconBg: string; icon: string; percentage: string; bar: string }

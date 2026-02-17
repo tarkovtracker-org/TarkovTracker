@@ -33,6 +33,23 @@ export interface MapTileConfig {
   maxZoom?: number;
 }
 export type MapRenderConfig = MapSvgConfig | MapTileConfig;
+export function rotateGameCoordinates(
+  x: number,
+  z: number,
+  rotation: number
+): { x: number; z: number } {
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+  switch (normalizedRotation) {
+    case 90:
+      return { x: -z, z: x };
+    case 180:
+      return { x: -x, z: -z };
+    case 270:
+      return { x: z, z: -x };
+    default:
+      return { x, z };
+  }
+}
 /**
  * Applies coordinate rotation using trigonometric functions.
  * Matches tarkov.dev's rotation: treats (lng, lat) as (x, y) for rotation.

@@ -5,13 +5,13 @@
     enter-from-class="opacity-0"
     leave-to-class="opacity-0"
   >
-    <div
+    <button
       v-if="belowMd && mobileExpanded"
-      role="button"
-      tabindex="-1"
+      type="button"
       :aria-label="t('navigation_drawer.close_menu')"
       class="fixed inset-0 z-40 bg-black/60"
       @click="closeMobileDrawer"
+      @keydown.esc="closeMobileDrawer"
     />
   </Transition>
   <nav

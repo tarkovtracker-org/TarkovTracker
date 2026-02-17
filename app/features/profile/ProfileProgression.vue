@@ -25,6 +25,17 @@
                 <UBadge color="neutral" variant="soft" size="sm">
                   {{ modeFaction }}
                 </UBadge>
+                <NuxtLink
+                  v-if="tarkovDevProfileUrl"
+                  :to="tarkovDevProfileUrl"
+                  external
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
+                >
+                  <UIcon name="i-mdi-open-in-new" class="h-3 w-3" />
+                  {{ t('page.profile.view_tarkov_dev') }}
+                </NuxtLink>
               </div>
               <p class="text-surface-300 text-sm sm:text-base">
                 {{ storyHeadline }}
@@ -157,229 +168,43 @@
             </div>
           </article>
         </section>
-        <div class="grid gap-4 xl:grid-cols-3">
-          <div class="space-y-4 xl:col-span-2">
-            <GenericCard
-              icon="i-mdi-timeline-clock"
-              :highlight-color="modeTheme.timelineHighlight"
-              :title="t('page.profile.activity_timeline', 'Activity Timeline')"
-              :subtitle="
-                t('page.profile.timeline_subtitle', 'Recent progress events from timestamps')
-              "
-              :fill-height="false"
-            >
-              <template #content>
-                <div class="space-y-3 p-4">
-                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div class="bg-surface-900/80 rounded-md border border-white/10 p-2.5">
-                      <div
-                        class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase"
-                      >
-                        {{ t('page.profile.started', 'Started') }}
-                      </div>
-                      <div class="text-surface-100 mt-1 text-sm font-medium">
-                        {{ firstProgressLabel }}
-                      </div>
-                    </div>
-                    <div class="bg-surface-900/80 rounded-md border border-white/10 p-2.5">
-                      <div
-                        class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase"
-                      >
-                        {{ t('page.profile.latest_activity', 'Latest Activity') }}
-                      </div>
-                      <div class="text-surface-100 mt-1 text-sm font-medium">
-                        {{ latestProgressLabel }}
-                      </div>
-                    </div>
-                    <div class="bg-surface-900/80 rounded-md border border-white/10 p-2.5">
-                      <div
-                        class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase"
-                      >
-                        {{ t('page.profile.recent_momentum', '7-Day Momentum') }}
-                      </div>
-                      <div class="text-surface-100 mt-1 text-sm font-medium">
-                        {{
-                          t(
-                            'page.profile.recent_momentum_value',
-                            `${formatNumber(recentCompletedTasks)} tasks completed`
-                          )
-                        }}
-                      </div>
-                    </div>
-                  </div>
-                  <div v-if="timelineEvents.length" class="space-y-2">
-                    <article
-                      v-for="event in timelineEvents"
-                      :key="event.key"
-                      class="bg-surface-900/70 flex items-start gap-3 rounded-md border border-white/8 p-3"
-                    >
-                      <div
-                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
-                        :class="timelineToneClasses[event.tone].chip"
-                      >
-                        <UIcon
-                          :name="event.icon"
-                          class="h-4 w-4"
-                          :class="timelineToneClasses[event.tone].icon"
-                        />
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <div class="text-surface-100 truncate text-sm font-medium">
-                          {{ event.title }}
-                        </div>
-                        <div class="text-surface-400 truncate text-xs">
-                          {{ event.subtitle }}
-                        </div>
-                      </div>
-                      <div class="text-surface-500 shrink-0 text-[11px]">
-                        {{ formatDateTime(event.timestamp) }}
-                      </div>
-                    </article>
-                  </div>
-                  <UAlert
-                    v-else
-                    icon="i-mdi-map-marker-question"
-                    color="neutral"
-                    variant="soft"
-                    :title="
-                      t('page.profile.no_timeline', 'No timestamped activity yet for this mode.')
-                    "
-                  />
-                </div>
-              </template>
-            </GenericCard>
-          </div>
-          <div class="space-y-4">
-            <GenericCard
-              icon="i-mdi-book-open-variant"
-              :highlight-color="modeTheme.storyHighlight"
-              :title="t('page.profile.progress_overview', 'Progress Overview')"
-              :subtitle="t('page.profile.progress_overview_subtitle', 'Journey summary and pacing')"
-              :fill-height="false"
-            >
-              <template #content>
-                <div class="space-y-3 p-4 text-sm">
-                  <p class="text-surface-200 leading-relaxed">
-                    {{ storyParagraph }}
-                  </p>
-                  <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
-                    <div
-                      class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase"
-                    >
-                      {{ t('page.profile.next_milestone', 'Next milestone') }}
-                    </div>
-                    <p class="text-surface-200 mt-1">
-                      {{ nextMilestoneCopy }}
-                    </p>
-                  </div>
-                  <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
-                    <div
-                      class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase"
-                    >
-                      {{ t('page.profile.total_actions', 'Tracked Actions') }}
-                    </div>
-                    <p class="text-surface-200 mt-1">
-                      {{
-                        t(
-                          'page.profile.total_actions_value',
-                          `${formatNumber(totalTrackedActions)} objective/item increments logged`
-                        )
-                      }}
-                    </p>
-                  </div>
-                </div>
-              </template>
-            </GenericCard>
-            <GenericCard
-              icon="i-mdi-trophy-outline"
-              highlight-color="kappa"
-              :title="t('page.profile.achievements', 'Achievements')"
-              :subtitle="t('page.profile.achievements_subtitle', 'Major progression checkpoints')"
-              :fill-height="false"
-            >
-              <template #content>
-                <div class="space-y-3 p-4">
-                  <article
-                    v-for="achievement in achievementRows"
-                    :key="achievement.id"
-                    class="bg-surface-900/80 rounded-md border border-white/10 p-3"
-                  >
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                      <div class="flex items-center gap-2">
-                        <UIcon
-                          :name="achievement.icon"
-                          class="h-4.5 w-4.5"
-                          :class="achievement.iconClass"
-                        />
-                        <span class="text-surface-100 text-sm font-medium">
-                          {{ achievement.title }}
-                        </span>
-                      </div>
-                      <span class="text-surface-400 text-xs">
-                        {{ formatNumber(achievement.completed) }}/{{
-                          formatNumber(achievement.total)
-                        }}
-                      </span>
-                    </div>
-                    <div class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full">
-                      <div
-                        class="h-full rounded-full transition-[width] duration-300"
-                        :class="achievement.barClass"
-                        :style="{ width: `${achievement.percentage.toFixed(2)}%` }"
-                      ></div>
-                    </div>
-                  </article>
-                </div>
-              </template>
-            </GenericCard>
-            <GenericCard
-              icon="i-mdi-timeline-check-outline"
-              highlight-color="primary"
-              :title="t('page.profile.kappa_projection', 'Kappa Timeline')"
-              :subtitle="
-                t('page.profile.kappa_projection_subtitle', 'Finished duration or estimated ETA')
-              "
-              :fill-height="false"
-            >
-              <template #content>
-                <div class="space-y-3 p-4 text-sm">
-                  <p class="text-surface-100 font-semibold">{{ kappaProjection.headline }}</p>
-                  <p class="text-surface-300">{{ kappaProjection.detail }}</p>
-                  <div
-                    v-if="kappaProjection.etaTimestamp"
-                    class="bg-surface-900/80 rounded-md border border-white/10 p-3"
-                  >
-                    <div
-                      class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase"
-                    >
-                      {{ t('page.profile.estimated_finish', 'Estimated finish') }}
-                    </div>
-                    <p class="text-surface-100 mt-1 text-sm font-medium">
-                      {{ formatDate(kappaProjection.etaTimestamp) }}
-                    </p>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <UBadge
-                      v-if="kappaProjection.confidence"
-                      variant="soft"
-                      :class="kappaConfidenceClass"
-                    >
-                      {{ kappaConfidenceLabel }}
-                    </UBadge>
-                    <UBadge color="neutral" variant="soft">
-                      {{
-                        t(
-                          'page.profile.kappa_remaining',
-                          `${formatNumber(Math.max(totalKappaTasks - completedKappaTasks, 0))} remaining`
-                        )
-                      }}
-                    </UBadge>
-                  </div>
-                </div>
-              </template>
-            </GenericCard>
-          </div>
-        </div>
+        <UTabs
+          :items="profileTabItems"
+          :model-value="selectedTabIndex"
+          class="w-full"
+          @update:model-value="onTabChange"
+        />
+        <ProfileOverviewTab
+          v-if="selectedTabIndex === 0"
+          :timeline-highlight="modeTheme.timelineHighlight"
+          :story-highlight="modeTheme.storyHighlight"
+          :first-progress-label="firstProgressLabel"
+          :latest-progress-label="latestProgressLabel"
+          :recent-completed-tasks="recentCompletedTasks"
+          :timeline-events="timelineEvents"
+          :timeline-tone-classes="timelineToneClasses"
+          :story-paragraph="storyParagraph"
+          :next-milestone-copy="nextMilestoneCopy"
+          :total-tracked-actions="totalTrackedActions"
+          :achievement-rows="achievementRows"
+          :kappa-projection="kappaProjection"
+          :kappa-confidence-class="kappaConfidenceClass"
+          :kappa-confidence-label="kappaConfidenceLabel"
+          :completed-kappa-tasks="completedKappaTasks"
+          :total-kappa-tasks="totalKappaTasks"
+          :format-date="formatDate"
+          :format-date-time="formatDateTime"
+        />
+        <ProfileTasksTab
+          v-else-if="selectedTabIndex === 1"
+          :counted-tasks="countedTasks"
+          :is-task-successful="isTaskSuccessful"
+          :is-task-failed="isTaskFailed"
+        />
+        <ProfileHideoutTab
+          v-else-if="selectedTabIndex === 2"
+          :hideout-module-completion-state="hideoutModuleCompletionState"
+        />
       </template>
     </div>
   </div>
@@ -390,10 +215,13 @@
     computeCriticalPathFloor,
     dampenPace,
   } from '@/features/profile/kappaProjectionHelpers';
+  import ProfileHideoutTab from '@/features/profile/ProfileHideoutTab.vue';
+  import ProfileOverviewTab from '@/features/profile/ProfileOverviewTab.vue';
   import {
     buildHideoutModuleCompletionState,
     getCountedTasks,
   } from '@/features/profile/profileStats';
+  import ProfileTasksTab from '@/features/profile/ProfileTasksTab.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -404,6 +232,13 @@
   import { logger } from '@/utils/logger';
   import { computeInvalidProgress } from '@/utils/progressInvalidation';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
+  import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
+  import type {
+    AchievementRow,
+    KappaProjection,
+    TimelineEvent,
+    TimelineTone,
+  } from '@/features/profile/profileTypes';
   import type { ApiUpdateMeta, ApiTaskUpdate, UserProgressData } from '@/stores/progressState';
   import type { Task } from '@/types/tarkov';
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -426,8 +261,6 @@
     xpOffset: 0,
   };
   type StatTone = 'info' | 'primary' | 'success' | 'warning';
-  type TimelineTone = 'error' | 'info' | 'primary' | 'success';
-  type ProjectionConfidence = 'high' | 'low' | 'medium' | null;
   interface SharedProfileResponse {
     data: unknown;
     gameEdition: number | null;
@@ -443,32 +276,6 @@
     percentage: number;
     tone: StatTone;
     value: string;
-  }
-  interface TimelineEvent {
-    key: string;
-    icon: string;
-    subtitle: string;
-    timestamp: number;
-    title: string;
-    tone: TimelineTone;
-  }
-  interface AchievementRow {
-    barClass: string;
-    completed: number;
-    icon: string;
-    iconClass: string;
-    id: string;
-    percentage: number;
-    title: string;
-    total: number;
-  }
-  interface KappaProjection {
-    confidence: ProjectionConfidence;
-    daysRemaining: number | null;
-    detail: string;
-    etaTimestamp: number | null;
-    headline: string;
-    state: 'completed' | 'projected' | 'unknown';
   }
   interface ModeTheme {
     heroBackdrop: string;
@@ -876,6 +683,13 @@
     return t('app_bar.user_label', 'User');
   });
   const modeFaction = computed(() => modeData.value.pmcFaction ?? 'USEC');
+  const tarkovDevProfileUrl = computed(() => {
+    if (isViewingSharedProfile.value) return null;
+    const uid = tarkovStore.getTarkovUid();
+    if (!uid) return null;
+    const modeSlug = selectedMode.value === GAME_MODES.PVE ? 'pve' : 'regular';
+    return `https://tarkov.dev/players/${modeSlug}/${uid}`;
+  });
   const profileLevel = computed(() => {
     if (isViewingCurrentMode.value && preferencesStore.getUseAutomaticLevelCalculation) {
       return progressStore.getLevel('self');
@@ -884,7 +698,7 @@
   });
   const relevantTasks = computed<Task[]>(() => {
     const faction = modeFaction.value;
-    return (metadataStore.tasks ?? []).filter((task) => {
+    const factionFiltered = (metadataStore.tasks ?? []).filter((task) => {
       if (!task?.id) {
         return false;
       }
@@ -894,6 +708,15 @@
       }
       return checkTaskEdition(task.id, profileGameEdition.value, metadataStore.editions);
     });
+    const options: TaskTypeFilterOptions = {
+      showKappa: true,
+      showLightkeeper: true,
+      showNonSpecial: true,
+      userPrestigeLevel: modeData.value.prestigeLevel ?? 0,
+      prestigeTaskMap: metadataStore.prestigeTaskMap,
+      excludedTaskIds: new Set(),
+    };
+    return filterTasksByTypeSettings(factionFiltered, options);
   });
   const allTasksById = computed(() => {
     const lookup = new Map<string, Task>();
@@ -1006,7 +829,7 @@
   const hideoutModuleLabelById = computed(() => {
     const lookup = new Map<string, string>();
     for (const station of metadataStore.hideoutStations ?? []) {
-      const stationName = station.name || t('page.profile.hideout_fallback', 'Hideout');
+      const stationName = station.name || t('page.profile.hideout_fallback');
       for (const level of station.levels ?? []) {
         if (!level?.id) {
           continue;
@@ -1650,6 +1473,26 @@
   const showMetadataHint = computed(
     () => canRenderProfileContent.value && metadataStore.loading && metadataStore.tasks.length === 0
   );
+  const selectedTabIndex = ref(0);
+  const profileTabItems = computed(() => [
+    {
+      label: t('page.profile.tab_overview'),
+      icon: 'i-mdi-view-dashboard-outline',
+    },
+    {
+      label: t('page.profile.tab_tasks'),
+      icon: 'i-mdi-clipboard-check-outline',
+      badge: `${formatNumber(completedTasks.value)}/${formatNumber(totalTasks.value)}`,
+    },
+    {
+      label: t('page.profile.tab_hideout'),
+      icon: 'i-mdi-home-city-outline',
+      badge: `${formatNumber(completedHideoutModules.value)}/${formatNumber(totalHideoutModules.value)}`,
+    },
+  ]);
+  const onTabChange = (val: string | number) => {
+    selectedTabIndex.value = Number(val);
+  };
   useSeoMeta({
     title: () => `${t('page.profile.title', 'User Profile')} | ${modeLabel.value}`,
     description: () =>

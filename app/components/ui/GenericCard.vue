@@ -26,6 +26,7 @@
                   <img
                     v-if="props.avatar"
                     :src="props.avatar"
+                    :alt="props.title || ''"
                     :height="avatarHeight"
                     :style="{ height: `${avatarHeight}px` }"
                     class="block pt-0"

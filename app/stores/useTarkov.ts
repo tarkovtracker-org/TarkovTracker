@@ -55,6 +55,7 @@ type UserProgressRow = {
   user_id: string;
   current_game_mode: string | null;
   game_edition: number | null;
+  tarkov_uid: number | null;
   pvp_data: UserProgressData | null;
   pve_data: UserProgressData | null;
   created_at: string | null;
@@ -107,6 +108,7 @@ const buildUpsertPayload = (
   user_id: userId,
   current_game_mode: state.currentGameMode || GAME_MODES.PVP,
   game_edition: state.gameEdition || defaultState.gameEdition,
+  tarkov_uid: state.tarkovUid ?? null,
   pvp_data: partial?.pvp_data ?? state.pvp ?? defaultState.pvp,
   pve_data: partial?.pve_data ?? state.pve ?? defaultState.pve,
 });
@@ -489,6 +491,7 @@ const performReset = async (
     if (mode === 'all') {
       state.currentGameMode = freshState.currentGameMode;
       state.gameEdition = freshState.gameEdition;
+      state.tarkovUid = freshState.tarkovUid;
     }
   });
 };
@@ -550,6 +553,7 @@ const tarkovActions = {
           user_id: $supabase.user.id,
           current_game_mode: mode,
           game_edition: this.gameEdition,
+          tarkov_uid: this.tarkovUid ?? null,
           pvp_data: this.pvp,
           pve_data: this.pve,
         };
@@ -582,6 +586,7 @@ const tarkovActions = {
             user_id: $supabase.user.id,
             current_game_mode: this.currentGameMode,
             game_edition: this.gameEdition,
+            tarkov_uid: this.tarkovUid ?? null,
             pvp_data: this.pvp,
             pve_data: this.pve,
           });
@@ -598,6 +603,7 @@ const tarkovActions = {
             user_id: $supabase.user.id,
             current_game_mode: this.currentGameMode,
             game_edition: this.gameEdition,
+            tarkov_uid: this.tarkovUid ?? null,
             pvp_data: this.pvp,
             pve_data: this.pve,
           });
@@ -632,6 +638,7 @@ const tarkovActions = {
       this.$patch((state) => {
         state.currentGameMode = freshState.currentGameMode;
         state.gameEdition = freshState.gameEdition;
+        state.tarkovUid = freshState.tarkovUid;
         state.pvp = freshState.pvp;
         state.pve = freshState.pve;
       });
@@ -1320,6 +1327,7 @@ export async function initializeTarkovSync() {
       tarkovStore.$patch((state) => {
         state.currentGameMode = freshState.currentGameMode;
         state.gameEdition = freshState.gameEdition;
+        state.tarkovUid = freshState.tarkovUid;
         state.pvp = freshState.pvp;
         state.pve = freshState.pve;
       });
@@ -1402,6 +1410,7 @@ export async function initializeTarkovSync() {
         ? ({
             currentGameMode: coerceGameMode(data.current_game_mode),
             gameEdition: data.game_edition || defaultState.gameEdition,
+            tarkovUid: data.tarkov_uid ?? null,
             pvp: { ...defaultState.pvp, ...(data.pvp_data || {}) },
             pve: { ...defaultState.pve, ...(data.pve_data || {}) },
           } as UserState)
@@ -1434,6 +1443,7 @@ export async function initializeTarkovSync() {
             user_id: $supabase.user.id,
             current_game_mode: localState.currentGameMode || GAME_MODES.PVP,
             game_edition: localState.gameEdition || defaultState.gameEdition,
+            tarkov_uid: localState.tarkovUid ?? null,
             pvp_data: localState.pvp || defaultState.pvp,
             pve_data: localState.pve || defaultState.pve,
           });
@@ -1448,7 +1458,22 @@ export async function initializeTarkovSync() {
           resolvedLocalState = localState;
         } else {
           logger.debug('[TarkovStore] Loading data from Supabase (user exists in DB)');
-          tarkovStore.$patch(normalizedRemote!);
+          tarkovStore.$patch((state) => {
+            state.currentGameMode = normalizedRemote?.currentGameMode ?? state.currentGameMode;
+            state.gameEdition = normalizedRemote?.gameEdition ?? state.gameEdition;
+            if (
+              normalizedRemote &&
+              Object.prototype.hasOwnProperty.call(normalizedRemote, 'tarkovUid')
+            ) {
+              state.tarkovUid = normalizedRemote.tarkovUid;
+            }
+            state.pvp = normalizedRemote?.pvp
+              ? { ...state.pvp, ...normalizedRemote.pvp }
+              : state.pvp;
+            state.pve = normalizedRemote?.pve
+              ? { ...state.pve, ...normalizedRemote.pve }
+              : state.pve;
+          });
           resolvedLocalState = normalizedRemote!;
         }
       } else if (hasLocalProgress && hasLocalPersistence) {
@@ -1458,6 +1483,7 @@ export async function initializeTarkovSync() {
           user_id: $supabase.user.id,
           current_game_mode: localState.currentGameMode || GAME_MODES.PVP,
           game_edition: localState.gameEdition || defaultState.gameEdition,
+          tarkov_uid: localState.tarkovUid ?? null,
           pvp_data: localState.pvp || defaultState.pvp,
           pve_data: localState.pve || defaultState.pve,
         };
@@ -1540,6 +1566,7 @@ export async function initializeTarkovSync() {
           user_id: $supabase.user.id,
           current_game_mode: tarkovStore.currentGameMode,
           game_edition: tarkovStore.gameEdition,
+          tarkov_uid: tarkovStore.tarkovUid ?? null,
           pvp_data: tarkovStore.pvp,
           pve_data: tarkovStore.pve,
         });
@@ -1585,6 +1612,7 @@ export async function initializeTarkovSync() {
               typeof userState.gameEdition === 'string'
                 ? parseInt(userState.gameEdition)
                 : userState.gameEdition,
+            tarkov_uid: userState.tarkovUid ?? null,
             pvp_data: userState.pvp || {},
             pve_data: userState.pve || {},
           };
@@ -1800,6 +1828,7 @@ function setupRealtimeListener() {
         const remoteData = payload.new as {
           current_game_mode?: string;
           game_edition?: number;
+          tarkov_uid?: number | null;
           pvp_data?: UserProgressData;
           pve_data?: UserProgressData;
           updated_at?: string;
@@ -1821,6 +1850,9 @@ function setupRealtimeListener() {
         const nextState: UserState = {
           currentGameMode: merged.currentGameMode ?? localState.currentGameMode,
           gameEdition: merged.gameEdition ?? localState.gameEdition,
+          tarkovUid: Object.prototype.hasOwnProperty.call(remoteData, 'tarkov_uid')
+            ? (remoteData.tarkov_uid ?? null)
+            : (localState.tarkovUid ?? null),
           pvp: merged.pvp ?? localState.pvp,
           pve: merged.pve ?? localState.pve,
         };
@@ -1856,7 +1888,13 @@ function setupRealtimeListener() {
           controller.pause();
         }
         // Apply merged state
-        tarkovStore.$patch(nextState);
+        tarkovStore.$patch((state) => {
+          state.currentGameMode = nextState.currentGameMode;
+          state.gameEdition = nextState.gameEdition;
+          state.tarkovUid = nextState.tarkovUid;
+          state.pvp = { ...state.pvp, ...nextState.pvp };
+          state.pve = { ...state.pve, ...nextState.pve };
+        });
         setTimeout(() => {
           const currentController = getSyncController();
           if (currentController && currentController === controller) {
@@ -1930,13 +1968,28 @@ function mergeProgressData(
     const remoteAt = typeof remoteUpdate.at === 'number' ? remoteUpdate.at : 0;
     return remoteAt >= localAt ? remoteUpdate : localUpdate;
   };
+  const resolveTarkovDevProfile = (
+    localProfile?: UserProgressData['tarkovDevProfile'],
+    remoteProfile?: UserProgressData['tarkovDevProfile']
+  ): UserProgressData['tarkovDevProfile'] => {
+    if (!localProfile) return remoteProfile;
+    if (!remoteProfile) return localProfile;
+    const localImportedAt =
+      typeof localProfile.importedAt === 'number' ? localProfile.importedAt : 0;
+    const remoteImportedAt =
+      typeof remoteProfile.importedAt === 'number' ? remoteProfile.importedAt : 0;
+    return remoteImportedAt >= localImportedAt ? remoteProfile : localProfile;
+  };
   return {
+    ...local,
+    ...remote,
     level: Math.max(local.level || 1, remote.level || 1),
     prestigeLevel: Math.max(local.prestigeLevel || 0, remote.prestigeLevel || 0),
     displayName: remote.displayName || local.displayName,
     pmcFaction: remote.pmcFaction || local.pmcFaction,
     xpOffset: remote.xpOffset !== undefined ? remote.xpOffset : local.xpOffset,
     lastApiUpdate: resolveApiUpdate(local.lastApiUpdate, remote.lastApiUpdate),
+    tarkovDevProfile: resolveTarkovDevProfile(local.tarkovDevProfile, remote.tarkovDevProfile),
     // Merge task completions - preserve completed status to prevent progress regression
     taskCompletions: (() => {
       const allKeys = new Set([

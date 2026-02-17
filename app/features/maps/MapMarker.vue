@@ -19,60 +19,31 @@
   </div>
 </template>
 <script setup lang="ts">
-  import TaskLink from '@/features/tasks/TaskLink.vue';
-  import TaskObjective from '@/features/tasks/TaskObjective.vue';
-  import { useMetadataStore } from '@/stores/useMetadata';
+  import { useMapTooltip } from '@/composables/useMapTooltip';
   import { logger } from '@/utils/logger';
+  import { rotateGameCoordinates } from '@/utils/mapCoordinates';
+  import type { MapBoundsArray, MapProp, MarkLocationProp, MarkProp } from '@/features/maps/types';
   import type { CSSProperties } from 'vue';
-  const metadataStore = useMetadataStore();
-  const objectives = computed(() => metadataStore.objectives);
-  const tasks = computed(() => metadataStore.tasks);
-  const props = defineProps({
-    mark: {
-      type: Object,
-      required: true,
-    },
-    markLocation: {
-      type: Object,
-      required: true,
-    },
-    selectedFloor: {
-      type: String,
-      required: false,
-      default: '',
-    },
-    map: {
-      type: Object,
-      required: true,
-    },
-  });
-  const forceTooltip = ref(false);
-  const hoverTooltip = ref(false);
-  const forceTooltipToggle = () => {
-    forceTooltip.value = !forceTooltip.value;
-  };
-  const showTooltip = () => {
-    hoverTooltip.value = true;
-  };
-  const hideTooltip = () => {
-    hoverTooltip.value = false;
-  };
-  const tooltipVisible = computed(() => {
-    //if (props.mark.floor !== props.selectedFloor) return false;
-    return forceTooltip.value || hoverTooltip.value;
-  });
-  const relatedObjective = computed(() => {
-    return objectives.value.find((obj) => obj.id == props.mark.id);
-  });
-  const relatedTask = computed(() => {
-    return tasks.value.find((task) => task.id == relatedObjective.value?.taskId);
-  });
+  const props = defineProps<{
+    mark: MarkProp;
+    markLocation: MarkLocationProp;
+    selectedFloor?: string;
+    map: MapProp;
+  }>();
+  const {
+    forceTooltipToggle,
+    showTooltip,
+    hideTooltip,
+    tooltipVisible,
+    relatedObjective,
+    relatedTask,
+  } = useMapTooltip(() => props.mark.id);
   const markerColor = computed(() => {
-    return props.mark.users.includes('self') ? 'text-extract-pmc' : 'text-extract-scav';
+    return (props.mark.users ?? []).includes('self') ? 'text-extract-pmc' : 'text-extract-scav';
   });
   const relativeLocation = computed(() => {
-    // Add safety check for bounds
-    const bounds = props.map?.svg?.bounds;
+    const mapSvg = props.map?.svg && typeof props.map.svg === 'object' ? props.map.svg : undefined;
+    const bounds: MapBoundsArray | undefined = mapSvg?.bounds;
     if (
       !bounds ||
       !Array.isArray(bounds) ||
@@ -81,40 +52,38 @@
       !Array.isArray(bounds[1])
     ) {
       logger.warn('MapMarker: Invalid or missing map bounds for map:', props.map?.name);
-      return { leftPercent: 0, topPercent: 0 }; // Return default if bounds are invalid
+      return { leftPercent: 0, topPercent: 0 };
     }
-    // Get original coordinates
-    const originalX = props.markLocation.positions[0].x;
-    const originalZ = props.markLocation.positions[0].z;
-    // Apply coordinate rotation if specified (but keep original bounds)
-    const coordinateRotation = props.map?.svg?.coordinateRotation || 0;
-    let x = originalX;
-    let z = originalZ;
-    if (coordinateRotation === 90) {
-      // Rotate 90 degrees: (x, z) -> (-z, x)
-      x = -originalZ;
-      z = originalX;
-    } else if (coordinateRotation === 180) {
-      // Rotate 180 degrees: (x, z) -> (-x, -z)
-      x = -originalX;
-      z = -originalZ;
-    } else if (coordinateRotation === 270) {
-      // Rotate 270 degrees: (x, z) -> (z, -x)
-      x = originalZ;
-      z = -originalX;
+    const firstPosition = props.markLocation.positions?.[0];
+    if (!firstPosition) {
+      logger.warn('MapMarker: Missing marker position for mark:', props.mark.id ?? 'unknown');
+      return { leftPercent: 0, topPercent: 0 };
     }
-    // Use original bounds (not rotated)
-    const mapLeft = bounds[0][0];
-    const mapTop = bounds[0][1];
-    const mapWidth = Math.max(bounds[0][0], bounds[1][0]) - Math.min(bounds[0][0], bounds[1][0]);
-    const mapHeight = Math.max(bounds[0][1], bounds[1][1]) - Math.min(bounds[0][1], bounds[1][1]);
-    // Prevent division by zero if width or height is 0
+    const firstBounds = bounds[0];
+    const secondBounds = bounds[1];
+    if (!firstBounds || !secondBounds) {
+      logger.warn('MapMarker: Invalid bounds array for map:', props.map?.name);
+      return { leftPercent: 0, topPercent: 0 };
+    }
+    const { x, z } = rotateGameCoordinates(
+      firstPosition.x,
+      firstPosition.z,
+      mapSvg?.coordinateRotation ?? 0
+    );
+    const mapLeft = Math.min(firstBounds[0], secondBounds[0]);
+    const mapTop = Math.min(firstBounds[1], secondBounds[1]);
+    const mapWidth =
+      Math.max(firstBounds[0], secondBounds[0]) - Math.min(firstBounds[0], secondBounds[0]);
+    const mapHeight =
+      Math.max(firstBounds[1], secondBounds[1]) - Math.min(firstBounds[1], secondBounds[1]);
     if (mapWidth === 0 || mapHeight === 0) {
       logger.warn('MapMarker: Map width or height is zero for map:', props.map?.name);
       return { leftPercent: 0, topPercent: 0 };
     }
-    const relativeLeft = Math.abs(x - mapLeft);
-    const relativeTop = Math.abs(z - mapTop);
+    const clampedX = Math.max(mapLeft, Math.min(x, mapLeft + mapWidth));
+    const clampedZ = Math.max(mapTop, Math.min(z, mapTop + mapHeight));
+    const relativeLeft = clampedX - mapLeft;
+    const relativeTop = clampedZ - mapTop;
     const relativeLeftPercent = (relativeLeft / mapWidth) * 100;
     const relativeTopPercent = (relativeTop / mapHeight) * 100;
     return {
@@ -130,8 +99,6 @@
       width: '20px',
       height: '20px',
       transform: 'translate(-50%, -50%)',
-      // cursor: props.mark.floor === props.selectedFloor ? "pointer" : "inherit",
-      // opacity: props.mark.floor === props.selectedFloor ? 1 : 0.2,
       cursor: 'pointer',
       opacity: 1,
     };

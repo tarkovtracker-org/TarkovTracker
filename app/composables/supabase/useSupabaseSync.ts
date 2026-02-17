@@ -63,31 +63,24 @@ function isAbortRequestError(error: SupabaseErrorLike): boolean {
     combined.includes('request was aborted')
   );
 }
-function getFallbackPreferencesPayload(
+function getFallbackPayload(
   payload: Record<string, unknown>,
   missingColumn: string
 ): Record<string, unknown> | null {
-  if (missingColumn in payload) {
-    const missingValue = payload[missingColumn];
-    const fallbackPayload = Object.fromEntries(
-      Object.entries(payload).filter(([key]) => key !== missingColumn)
-    );
-    if (
-      missingColumn === 'only_tasks_with_required_keys' &&
-      !('only_tasks_with_suggested_keys' in fallbackPayload)
-    ) {
-      fallbackPayload.only_tasks_with_suggested_keys = missingValue;
-    }
-    return fallbackPayload;
+  if (!(missingColumn in payload)) {
+    return null;
   }
-  if (missingColumn === 'only_tasks_with_required_keys') {
-    const { only_tasks_with_required_keys: missingValue, ...fallbackPayload } = payload;
-    if (typeof missingValue === 'boolean') {
-      fallbackPayload.only_tasks_with_suggested_keys = missingValue;
-      return fallbackPayload;
-    }
+  const missingValue = payload[missingColumn];
+  const fallbackPayload = Object.fromEntries(
+    Object.entries(payload).filter(([key]) => key !== missingColumn)
+  );
+  if (
+    missingColumn === 'only_tasks_with_required_keys' &&
+    !('only_tasks_with_suggested_keys' in fallbackPayload)
+  ) {
+    fallbackPayload.only_tasks_with_suggested_keys = missingValue;
   }
-  return null;
+  return fallbackPayload;
 }
 function formatSupabaseError(error: SupabaseErrorLike) {
   return {
@@ -174,14 +167,14 @@ export function useSupabaseSync({
             break;
           }
           error = syncError;
-          if (table !== 'user_preferences' || !isMissingColumnError(syncError)) {
+          if (!isMissingColumnError(syncError)) {
             break;
           }
           const missingColumn = getMissingColumnName(syncError);
           if (!missingColumn || removedMissingColumns.has(missingColumn)) {
             break;
           }
-          const fallbackPayload = getFallbackPreferencesPayload(payloadToSync, missingColumn);
+          const fallbackPayload = getFallbackPayload(payloadToSync, missingColumn);
           if (!fallbackPayload) {
             break;
           }
