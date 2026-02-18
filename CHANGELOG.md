@@ -1,3 +1,19 @@
+# [1.8.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.7.0...v1.8.0) (2026-02-18)
+
+
+### Bug Fixes
+
+* **api:** harden shared profile and team endpoint caching ([6659dcd](https://github.com/tarkovtracker-org/TarkovTracker/commit/6659dcdf7832ac569eb632aecc95b0442124b688))
+* **app:** harden supabase sync and oauth login flows ([6a5cd53](https://github.com/tarkovtracker-org/TarkovTracker/commit/6a5cd53af1a265828963b79dbd2382ad137ee3b8))
+* **maps:** link objective tooltip title to wiki ([28ee9f1](https://github.com/tarkovtracker-org/TarkovTracker/commit/28ee9f15a7304938a5d7136b6ea2d65765b4a4be))
+* **tasks:** override Duck Hunt duck pate objective icon ([f7a305d](https://github.com/tarkovtracker-org/TarkovTracker/commit/f7a305dcc5ebf4f65ee7ce2c343a37a10a37ae2e))
+
+
+### Features
+
+* **app:** add client and server error monitoring pipeline ([9d5637b](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d5637ba4e26f16bd1119f0c50bc0c0c6aae1fce))
+* **app:** add storyline chapter tracking and chapter card refactor ([c2ff064](https://github.com/tarkovtracker-org/TarkovTracker/commit/c2ff064fbd8960bbb2c9b5e263ec17aa076aa67d))
+
 # [1.7.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.6.1...v1.7.0) (2026-02-17)
 
 
