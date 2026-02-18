@@ -77,6 +77,13 @@ export interface UserProgressData {
   skills: { [skillName: string]: number };
   prestigeLevel: number; // 0-6, default 0
   skillOffsets: { [skillName: string]: number }; // manual adjustments per skill
+  storyChapters: {
+    [chapterId: string]: {
+      complete?: boolean;
+      timestamp?: number;
+      objectives?: { [objectiveId: string]: { complete?: boolean; timestamp?: number } };
+    };
+  };
   lastApiUpdate?: ApiUpdateMeta;
   tarkovDevProfile?: TarkovDevProfileData;
 }
@@ -100,6 +107,7 @@ const defaultProgressData: UserProgressData = {
   skills: {},
   prestigeLevel: 0,
   skillOffsets: {},
+  storyChapters: {},
 };
 export const defaultState: UserState = {
   currentGameMode: GAME_MODES.PVP,
@@ -158,6 +166,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
       skills: (data.skills as UserProgressData['skills']) || {},
       prestigeLevel: (data.prestigeLevel as number) || defaultProgressData.prestigeLevel,
       skillOffsets: (data.skillOffsets as UserProgressData['skillOffsets']) || {},
+      storyChapters: (data.storyChapters as UserProgressData['storyChapters']) || {},
     };
     return {
       currentGameMode: data.currentGameMode as GameMode,
@@ -182,6 +191,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     skills: (data.skills as UserProgressData['skills']) || {},
     prestigeLevel: (data.prestigeLevel as number) || defaultProgressData.prestigeLevel,
     skillOffsets: (data.skillOffsets as UserProgressData['skillOffsets']) || {},
+    storyChapters: (data.storyChapters as UserProgressData['storyChapters']) || {},
   };
   return {
     currentGameMode: GAME_MODES.PVP, // Default to PvP for existing users
@@ -218,6 +228,7 @@ const getCurrentData = (state: UserState): UserProgressData => {
       skills: {},
       prestigeLevel: 0,
       skillOffsets: {},
+      storyChapters: {},
     };
   }
   return state[state.currentGameMode];
@@ -262,6 +273,10 @@ export const getters = {
   getAllSkillOffsets: (state: UserState) => () => getCurrentData(state)?.skillOffsets ?? {},
   getTarkovUid: (state: UserState) => () => state.tarkovUid ?? null,
   getTarkovDevProfile: (state: UserState) => () => getCurrentData(state)?.tarkovDevProfile ?? null,
+  isStoryChapterComplete: (state: UserState) => (chapterId: string) =>
+    getCurrentData(state)?.storyChapters?.[chapterId]?.complete ?? false,
+  isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
+    getCurrentData(state)?.storyChapters?.[chapterId]?.objectives?.[objectiveId]?.complete ?? false,
 } as const satisfies _GettersTree<UserState>;
 // Helper functions for common operations
 const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
@@ -452,6 +467,56 @@ export const actions = {
   setTarkovDevProfile(this: UserState, profile: UserProgressData['tarkovDevProfile']) {
     const currentData = getCurrentData(this);
     currentData.tarkovDevProfile = profile;
+  },
+  setStoryChapterComplete(this: UserState, chapterId: string) {
+    updateObjective(this, 'storyChapters', chapterId, {
+      complete: true,
+      timestamp: Date.now(),
+    });
+  },
+  setStoryChapterUncomplete(this: UserState, chapterId: string) {
+    updateObjective(this, 'storyChapters', chapterId, { complete: false });
+  },
+  toggleStoryChapterComplete(this: UserState, chapterId: string) {
+    const isComplete = getters.isStoryChapterComplete(this)(chapterId);
+    if (isComplete) {
+      actions.setStoryChapterUncomplete.call(this, chapterId);
+    } else {
+      actions.setStoryChapterComplete.call(this, chapterId);
+    }
+  },
+  setStoryObjectiveComplete(this: UserState, chapterId: string, objectiveId: string) {
+    const data = getCurrentData(this);
+    if (!data.storyChapters[chapterId]) {
+      data.storyChapters[chapterId] = {};
+    }
+    if (!data.storyChapters[chapterId].objectives) {
+      data.storyChapters[chapterId].objectives = {};
+    }
+    data.storyChapters[chapterId].objectives![objectiveId] = {
+      complete: true,
+      timestamp: Date.now(),
+    };
+  },
+  setStoryObjectiveUncomplete(this: UserState, chapterId: string, objectiveId: string) {
+    const data = getCurrentData(this);
+    if (!data.storyChapters[chapterId]) {
+      data.storyChapters[chapterId] = {};
+    }
+    if (!data.storyChapters[chapterId].objectives) {
+      data.storyChapters[chapterId].objectives = {};
+    }
+    data.storyChapters[chapterId].objectives![objectiveId] = {
+      complete: false,
+    };
+  },
+  toggleStoryObjectiveComplete(this: UserState, chapterId: string, objectiveId: string) {
+    const isComplete = getters.isStoryObjectiveComplete(this)(chapterId, objectiveId);
+    if (isComplete) {
+      actions.setStoryObjectiveUncomplete.call(this, chapterId, objectiveId);
+    } else {
+      actions.setStoryObjectiveComplete.call(this, chapterId, objectiveId);
+    }
   },
 } as const;
 export type UserActions = typeof actions;

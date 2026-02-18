@@ -18,6 +18,7 @@ const createStateWithTaskCompletion = (completion: unknown): UserState =>
       skills: {},
       prestigeLevel: 0,
       skillOffsets: {},
+      storyChapters: {},
     },
     pve: {
       level: 1,
@@ -32,6 +33,7 @@ const createStateWithTaskCompletion = (completion: unknown): UserState =>
       skills: {},
       prestigeLevel: 0,
       skillOffsets: {},
+      storyChapters: {},
     },
   }) as UserState;
 describe('progressState getters task completion compatibility', () => {

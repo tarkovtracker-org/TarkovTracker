@@ -13,6 +13,13 @@
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
+        icon="i-mdi-book-open-variant"
+        locale-key="storyline"
+        to="/storyline"
+        :is-collapsed="props.isCollapsed"
+        :badge="t('page.storyline.wip_badge')"
+      ></DrawerItem>
+      <DrawerItem
         icon="i-heroicons-clipboard-document-list"
         locale-key="tasks"
         to="/tasks"

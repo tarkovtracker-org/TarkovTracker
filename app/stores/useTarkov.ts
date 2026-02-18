@@ -97,7 +97,8 @@ const hasProgress = (data: unknown): boolean => {
     mode &&
     (mode.level > 1 ||
       Object.keys(mode.taskCompletions || {}).length > 0 ||
-      Object.keys(mode.hideoutModules || {}).length > 0);
+      Object.keys(mode.hideoutModules || {}).length > 0 ||
+      Object.keys(mode.storyChapters || {}).length > 0);
   return Boolean(modeHasData(state.pvp) || modeHasData(state.pve));
 };
 const buildUpsertPayload = (
@@ -121,6 +122,67 @@ const cloneStateSnapshot = <T>(value: T): T => {
   }
 };
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
+type StoryChapterEntry = UserProgressData['storyChapters'][string];
+type StoryObjectiveEntry = NonNullable<StoryChapterEntry['objectives']>[string];
+type TimestampedCompletionEntry = { complete?: boolean; timestamp?: number };
+const mergeTimestampedCompletion = <T extends TimestampedCompletionEntry>(
+  local: T | undefined,
+  remote: T | undefined
+): T | undefined => {
+  if (!local && !remote) return undefined;
+  if (!local) return { ...remote } as T;
+  if (!remote) return { ...local } as T;
+  const localTs = local.timestamp ?? 0;
+  const remoteTs = remote.timestamp ?? 0;
+  const newer = remoteTs >= localTs ? remote : local;
+  const older = newer === remote ? local : remote;
+  const merged: TimestampedCompletionEntry = {};
+  if (typeof newer.complete === 'boolean') {
+    merged.complete = newer.complete;
+  } else if (typeof older.complete === 'boolean') {
+    merged.complete = older.complete;
+  }
+  const latestTimestamp = Math.max(localTs, remoteTs);
+  if (latestTimestamp > 0) {
+    merged.timestamp = latestTimestamp;
+  }
+  return merged as T;
+};
+const mergeStoryChapterProgress = (
+  local: UserProgressData['storyChapters'] | undefined,
+  remote: UserProgressData['storyChapters'] | undefined
+): UserProgressData['storyChapters'] => {
+  const allChapterIds = new Set([...Object.keys(local || {}), ...Object.keys(remote || {})]);
+  const merged: UserProgressData['storyChapters'] = {};
+  for (const chapterId of allChapterIds) {
+    const localChapter = local?.[chapterId];
+    const remoteChapter = remote?.[chapterId];
+    const mergedChapter = mergeTimestampedCompletion<StoryChapterEntry>(
+      localChapter,
+      remoteChapter
+    );
+    if (!mergedChapter) continue;
+    const allObjectiveIds = new Set([
+      ...Object.keys(localChapter?.objectives || {}),
+      ...Object.keys(remoteChapter?.objectives || {}),
+    ]);
+    if (allObjectiveIds.size > 0) {
+      const mergedObjectives: NonNullable<StoryChapterEntry['objectives']> = {};
+      for (const objectiveId of allObjectiveIds) {
+        const mergedObjective = mergeTimestampedCompletion<StoryObjectiveEntry>(
+          localChapter?.objectives?.[objectiveId],
+          remoteChapter?.objectives?.[objectiveId]
+        );
+        if (mergedObjective) {
+          mergedObjectives[objectiveId] = mergedObjective;
+        }
+      }
+      mergedChapter.objectives = mergedObjectives;
+    }
+    merged[chapterId] = mergedChapter;
+  }
+  return merged;
+};
 const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
   local: T | undefined,
   remote: T | undefined
@@ -1921,7 +1983,7 @@ function setupRealtimeListener() {
  * Merge two progress data objects, preserving maximum progress from both
  * Strategy: Prefer latest timestamps for task completions, max values for levels/counts
  */
-function mergeProgressData(
+export function mergeProgressData(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined
 ): UserProgressData {
@@ -2011,6 +2073,7 @@ function mergeProgressData(
     taskObjectives: mergeCountableObjects(local.taskObjectives, remote.taskObjectives),
     hideoutModules: { ...local.hideoutModules, ...remote.hideoutModules },
     hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts),
+    storyChapters: mergeStoryChapterProgress(local.storyChapters, remote.storyChapters),
     // Merge traders - max level and reputation
     traders: {
       ...local.traders,

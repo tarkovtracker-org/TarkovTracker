@@ -16,6 +16,7 @@ import type {
   PlayerLevel,
   PrestigeLevel,
   StaticMapData,
+  StoryChapter,
   TarkovBootstrapQueryResult,
   TarkovDataQueryResult,
   TarkovHideoutQueryResult,
@@ -49,6 +50,7 @@ import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { normalizeStoryChapter } from '@/utils/storylineObjectives';
 import {
   CACHE_CONFIG,
   type CacheType,
@@ -276,6 +278,7 @@ interface MetadataState {
   // Raw data from API
   tasks: Task[];
   editions: GameEdition[];
+  storyChapters: StoryChapter[];
   hideoutStations: HideoutStation[];
   maps: TarkovMap[];
   traders: Trader[];
@@ -349,6 +352,7 @@ export const useMetadataStore = defineStore('metadata', {
     editionsError: null,
     tasks: markRaw([]),
     editions: markRaw([]),
+    storyChapters: markRaw([]),
     hideoutStations: markRaw([]),
     maps: markRaw([]),
     traders: markRaw([]),
@@ -660,7 +664,7 @@ export const useMetadataStore = defineStore('metadata', {
       tasksCore: TarkovTasksCoreQueryResult;
       hideout: TarkovHideoutQueryResult;
       prestige: TarkovPrestigeQueryResult;
-      editions: { editions: GameEdition[] };
+      editions: { editions: GameEdition[]; storyChapters?: StoryChapter[] };
     } | null> {
       try {
         const apiGameMode =
@@ -683,7 +687,11 @@ export const useMetadataStore = defineStore('metadata', {
             'all',
             this.languageCode
           ),
-          getCachedData<{ editions: GameEdition[] }>('editions' as CacheType, 'all', 'en'),
+          getCachedData<{ editions: GameEdition[]; storyChapters?: StoryChapter[] }>(
+            'editions' as CacheType,
+            'all',
+            'en'
+          ),
         ]);
         if (tasksCore && hideout && prestige && editions) {
           logger.debug('[MetadataStore] Critical cache: ALL PRESENT');
@@ -971,7 +979,7 @@ export const useMetadataStore = defineStore('metadata', {
           tasksCore: TarkovTasksCoreQueryResult;
           hideout: TarkovHideoutQueryResult;
           prestige: TarkovPrestigeQueryResult;
-          editions: { editions: GameEdition[] };
+          editions: { editions: GameEdition[]; storyChapters?: StoryChapter[] };
         } | null;
       } = {}
     ) {
@@ -999,6 +1007,14 @@ export const useMetadataStore = defineStore('metadata', {
         hideoutPromise = Promise.resolve();
         this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
         this.editions = markRaw(cachedData.editions.editions || []);
+        if (cachedData.editions.storyChapters && cachedData.editions.storyChapters.length > 0) {
+          const sorted = cachedData.editions.storyChapters
+            .map((chapter) => normalizeStoryChapter(chapter))
+            .sort((a, b) => a.order - b.order);
+          this.storyChapters = markRaw(sorted);
+        } else {
+          editionsPromise = this.fetchEditionsData(false);
+        }
         this.processTasksCoreData(cachedData.tasksCore);
         tasksCorePromise = Promise.resolve();
       } else {
@@ -1294,17 +1310,24 @@ export const useMetadataStore = defineStore('metadata', {
      */
     async fetchEditionsData(forceRefresh = false) {
       this.editionsError = null;
+      const existingEditions = this.editions;
+      const existingStoryChapters = this.storyChapters;
       // Check cache first
       if (!forceRefresh && typeof window !== 'undefined') {
         try {
-          const cached = await getCachedData<{ editions: GameEdition[] }>(
-            'editions' as CacheType,
-            'all',
-            'en'
-          );
+          const cached = await getCachedData<{
+            editions: GameEdition[];
+            storyChapters?: StoryChapter[];
+          }>('editions' as CacheType, 'all', 'en');
           if (cached?.editions) {
-            logger.debug('[MetadataStore] Editions loaded from cache');
             this.editions = markRaw(cached.editions);
+          }
+          if (cached?.editions && cached.storyChapters && cached.storyChapters.length > 0) {
+            logger.debug('[MetadataStore] Editions loaded from cache');
+            const sorted = cached.storyChapters
+              .map((chapter) => normalizeStoryChapter(chapter))
+              .sort((a, b) => a.order - b.order);
+            this.storyChapters = markRaw(sorted);
             return;
           }
         } catch (cacheErr) {
@@ -1315,29 +1338,49 @@ export const useMetadataStore = defineStore('metadata', {
       try {
         const OVERLAY_URL =
           'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
-        const overlay = await $fetch<{ editions?: Record<string, GameEdition> }>(OVERLAY_URL, {
+        const overlay = await $fetch<{
+          editions?: Record<string, GameEdition>;
+          storyChapters?: Record<string, StoryChapter>;
+        }>(OVERLAY_URL, {
           parseResponse: JSON.parse,
         });
         if (overlay?.editions) {
           const editionsArray = Object.values(overlay.editions);
           this.editions = markRaw(editionsArray);
-          if (typeof window !== 'undefined') {
-            setCachedData(
-              'editions' as CacheType,
-              'all',
-              'en',
-              { editions: editionsArray },
-              CACHE_CONFIG.MAX_TTL
-            ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
-          }
         } else {
           logger.warn('[MetadataStore] No editions found in overlay response');
           this.editions = markRaw([]);
         }
+        if (overlay?.storyChapters) {
+          const chaptersArray = Object.values(overlay.storyChapters).map((chapter) =>
+            normalizeStoryChapter(chapter)
+          );
+          chaptersArray.sort((a, b) => a.order - b.order);
+          this.storyChapters = markRaw(chaptersArray);
+        } else {
+          this.storyChapters = markRaw([]);
+        }
+        if (typeof window !== 'undefined') {
+          setCachedData(
+            'editions' as CacheType,
+            'all',
+            'en',
+            { editions: this.editions, storyChapters: this.storyChapters },
+            CACHE_CONFIG.MAX_TTL
+          ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
+        }
       } catch (err) {
         logger.error('[MetadataStore] Error fetching editions data:', err);
         this.editionsError = err as Error;
-        this.editions = markRaw([]);
+        if (!this.editions.length && existingEditions.length) {
+          this.editions = markRaw(existingEditions);
+        }
+        if (!this.storyChapters.length && existingStoryChapters.length) {
+          this.storyChapters = markRaw(existingStoryChapters);
+        }
+        if (!this.editions.length) {
+          this.editions = markRaw([]);
+        }
       } finally {
         this.editionsLoading = false;
       }

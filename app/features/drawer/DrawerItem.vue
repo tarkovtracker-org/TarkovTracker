@@ -9,6 +9,7 @@
         :avatar="props.avatar"
         :color-class="iconClasses"
         :label-text="labelText"
+        :badge="props.badge"
       />
     </UTooltip>
     <template v-else>
@@ -20,6 +21,7 @@
         :avatar="props.avatar"
         :color-class="iconClasses"
         :label-text="labelText"
+        :badge="props.badge"
         has-margin
       />
     </template>
@@ -37,6 +39,7 @@
     to?: string | null;
     href?: string | null;
     isCollapsed: boolean;
+    badge?: string | null;
   }>();
   const isActive = computed(() => {
     if (props.to) {

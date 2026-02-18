@@ -18,6 +18,7 @@ const createProgressData = (
   skills: {},
   prestigeLevel: 0,
   skillOffsets: {},
+  storyChapters: {},
 });
 const createTask = (id: string, overrides: Partial<Task> = {}): Task => ({
   id,

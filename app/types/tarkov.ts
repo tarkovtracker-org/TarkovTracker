@@ -358,6 +358,32 @@ export interface PrestigeLevel {
 export interface TarkovPrestigeQueryResult {
   prestige: PrestigeLevel[];
 }
+export interface StoryObjective {
+  id: string;
+  order: number;
+  type: 'main' | 'optional';
+  description: string;
+  notes?: string | null;
+  mutuallyExclusiveWith?: string[];
+}
+export interface StoryRewards {
+  description: string;
+}
+export interface StoryChapter {
+  id: string;
+  name: string;
+  normalizedName: string;
+  wikiLink: string;
+  order: number;
+  autoStart?: boolean;
+  chapterRequirements?: Array<{ id: string; name: string }>;
+  mapUnlocks?: Array<{ id: string; name: string }>;
+  traderUnlocks?: Array<{ id: string; name: string }>;
+  description?: string | null;
+  notes?: string | null;
+  objectives?: { [objectiveId: string]: StoryObjective };
+  rewards?: StoryRewards | null;
+}
 export interface MemberProfile {
   displayName: string | null;
   level: number | null;

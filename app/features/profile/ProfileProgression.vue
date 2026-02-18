@@ -207,6 +207,13 @@
           v-else-if="selectedTabIndex === 2"
           :hideout-module-completion-state="hideoutModuleCompletionState"
         />
+        <ProfileStorylineTab
+          v-else-if="selectedTabIndex === 3"
+          :story-chapter-completion-state="storyChapterCompletionState"
+          :story-objective-completion-state="storyObjectiveCompletionState"
+          :read-only="isViewingSharedProfile"
+          @toggle-objective="handleStoryObjectiveToggle"
+        />
       </template>
     </div>
   </div>
@@ -223,6 +230,7 @@
     buildHideoutModuleCompletionState,
     getCountedTasks,
   } from '@/features/profile/profileStats';
+  import ProfileStorylineTab from '@/features/profile/ProfileStorylineTab.vue';
   import ProfileTasksTab from '@/features/profile/ProfileTasksTab.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -233,6 +241,7 @@
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { computeInvalidProgress } from '@/utils/progressInvalidation';
+  import { orderedStoryObjectives } from '@/utils/storylineObjectives';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
@@ -260,6 +269,7 @@
     taskCompletions: {},
     taskObjectives: {},
     traders: {},
+    storyChapters: {},
     xpOffset: 0,
   };
   type StatTone = 'info' | 'primary' | 'success' | 'warning';
@@ -466,6 +476,9 @@
     const skillOffsets = isRecord(value.skillOffsets)
       ? (value.skillOffsets as UserProgressData['skillOffsets'])
       : DEFAULT_PROGRESS_DATA.skillOffsets;
+    const storyChapters = isRecord(value.storyChapters)
+      ? (value.storyChapters as UserProgressData['storyChapters'])
+      : DEFAULT_PROGRESS_DATA.storyChapters;
     return {
       displayName:
         typeof value.displayName === 'string' && value.displayName.trim().length > 0
@@ -482,6 +495,7 @@
           : 0,
       skillOffsets,
       skills,
+      storyChapters,
       taskCompletions,
       taskObjectives,
       traders,
@@ -892,6 +906,84 @@
     for (const moduleId of hideoutModuleLabelById.value.keys()) {
       if (hideoutModuleCompletionState.value[moduleId] === true) {
         count++;
+      }
+    }
+    return count;
+  });
+  const storyChapterCompletionState = computed<Record<string, boolean>>(() => {
+    const storyProgress = modeData.value.storyChapters ?? {};
+    const state: Record<string, boolean> = {};
+    for (const chapter of metadataStore.storyChapters ?? []) {
+      state[chapter.id] = storyProgress[chapter.id]?.complete === true;
+    }
+    return state;
+  });
+  const storyObjectiveCompletionState = computed<Record<string, Record<string, boolean>>>(() => {
+    const storyProgress = modeData.value.storyChapters ?? {};
+    const state: Record<string, Record<string, boolean>> = {};
+    for (const chapter of metadataStore.storyChapters ?? []) {
+      const chapterProgress = storyProgress[chapter.id];
+      const objState: Record<string, boolean> = {};
+      for (const obj of orderedStoryObjectives(chapter.objectives)) {
+        objState[obj.id] = chapterProgress?.objectives?.[obj.id]?.complete === true;
+      }
+      state[chapter.id] = objState;
+    }
+    return state;
+  });
+  const handleStoryObjectiveToggle = (chapterId: string, objectiveId: string) => {
+    if (isViewingSharedProfile.value) {
+      return;
+    }
+    const objectiveState = storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true;
+    if (objectiveState) {
+      tarkovStore.setStoryObjectiveUncomplete(chapterId, objectiveId);
+      return;
+    }
+    const chapter = metadataStore.storyChapters.find((value) => value.id === chapterId);
+    if (chapter) {
+      const objective = orderedStoryObjectives(chapter.objectives).find(
+        (value) => value.id === objectiveId
+      );
+      const linkedIds = objective?.mutuallyExclusiveWith ?? [];
+      for (const linkedId of linkedIds) {
+        if (storyObjectiveCompletionState.value[chapterId]?.[linkedId] === true) {
+          tarkovStore.setStoryObjectiveUncomplete(chapterId, linkedId);
+        }
+      }
+    }
+    tarkovStore.setStoryObjectiveComplete(chapterId, objectiveId);
+  };
+  const totalStoryChapters = computed(() => metadataStore.storyChapters?.length ?? 0);
+  const completedStoryChapters = computed(() => {
+    let count = 0;
+    for (const chapterId of Object.keys(storyChapterCompletionState.value)) {
+      if (storyChapterCompletionState.value[chapterId] === true) {
+        count++;
+      }
+    }
+    return count;
+  });
+  const totalStoryMainObjectives = computed(() => {
+    let count = 0;
+    for (const chapter of metadataStore.storyChapters ?? []) {
+      count += orderedStoryObjectives(chapter.objectives).filter(
+        (objective) => objective.type === 'main'
+      ).length;
+    }
+    return count;
+  });
+  const completedStoryMainObjectives = computed(() => {
+    const storyProgress = modeData.value.storyChapters ?? {};
+    let count = 0;
+    for (const chapter of metadataStore.storyChapters ?? []) {
+      const chapterProgress = storyProgress[chapter.id];
+      for (const obj of orderedStoryObjectives(chapter.objectives).filter(
+        (o) => o.type === 'main'
+      )) {
+        if (chapterProgress?.objectives?.[obj.id]?.complete === true) {
+          count++;
+        }
       }
     }
     return count;
@@ -1525,6 +1617,14 @@
       label: t('page.profile.tab_hideout'),
       icon: 'i-mdi-home-city-outline',
       badge: `${formatNumber(completedHideoutModules.value)}/${formatNumber(totalHideoutModules.value)}`,
+    },
+    {
+      label: t('page.profile.tab_storyline'),
+      icon: 'i-mdi-book-open-variant',
+      badge:
+        totalStoryMainObjectives.value > 0
+          ? `${formatNumber(completedStoryMainObjectives.value)}/${formatNumber(totalStoryMainObjectives.value)}`
+          : undefined,
     },
   ]);
   const onTabChange = (val: string | number) => {
