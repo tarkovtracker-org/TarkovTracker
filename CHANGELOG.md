@@ -1,3 +1,10 @@
+## [1.8.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.8.1...v1.8.2) (2026-02-18)
+
+
+### Bug Fixes
+
+* **api:** forward streamer internal fetch headers in production ([b7182cd](https://github.com/tarkovtracker-org/TarkovTracker/commit/b7182cd24dc5e0fc3fe2411eda74b96702e984dc))
+
 ## [1.8.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.8.0...v1.8.1) (2026-02-18)
 
 
