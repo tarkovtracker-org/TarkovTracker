@@ -21,6 +21,13 @@ export default defineNuxtConfig({
     supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
     githubToken: process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '',
     githubTimeoutMs: Number(process.env.GITHUB_TIMEOUT_MS || '8000') || 8000,
+    logSinkUrl: process.env.LOG_SINK_URL || '',
+    teamMembersCacheTtlMs: Number(process.env.TEAM_MEMBERS_CACHE_TTL_MS || '5000') || 5000,
+    teamMembersRateLimitPerMinute:
+      Number(process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE || '120') || 120,
+    sharedProfileCacheTtlMs: Number(process.env.SHARED_PROFILE_CACHE_TTL_MS || '5000') || 5000,
+    sharedProfileRateLimitPerMinute:
+      Number(process.env.SHARED_PROFILE_RATE_LIMIT_PER_MINUTE || '120') || 120,
     // API protection configuration (server-only)
     apiProtection: {
       // Comma-separated list of allowed hosts (e.g., "tarkovtracker.org,www.tarkovtracker.org")
@@ -34,7 +41,7 @@ export default defineNuxtConfig({
       // e.g., "/api/tarkov/*" for public data endpoints
       publicRoutes:
         process.env.API_PUBLIC_ROUTES?.trim() ||
-        '/api/tarkov/*,/api/changelog,/api/profile/*,/api/streamer/*',
+        '/api/tarkov/*,/api/changelog,/api/logs/client,/api/profile/*,/api/streamer/*',
       // Whether to trust proxy headers (X-Forwarded-For, etc.)
       // ONLY enable this if the server is behind a trusted proxy like Cloudflare
       trustProxy: process.env.API_TRUST_PROXY === 'true',
@@ -44,6 +51,7 @@ export default defineNuxtConfig({
       VITE_LOG_LEVEL: process.env.VITE_LOG_LEVEL || '',
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
       appVersion: process.env.NUXT_PUBLIC_APP_VERSION || appVersion,
+      clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
       tarkovVersion: process.env.NUXT_PUBLIC_TARKOV_VERSION || '1.0.2.0',
       teamGatewayUrl: process.env.NUXT_PUBLIC_TEAM_GATEWAY_URL || '',
       tokenGatewayUrl: process.env.NUXT_PUBLIC_TOKEN_GATEWAY_URL || '',
@@ -208,14 +216,17 @@ export default defineNuxtConfig({
     {
       path: '~/components',
       pathPrefix: false,
+      extensions: ['vue'],
     },
     {
       path: '~/features',
       pathPrefix: false,
+      extensions: ['vue'],
     },
     {
       path: '~/shell',
       pathPrefix: false,
+      extensions: ['vue'],
     },
   ],
   typescript: {

@@ -30,6 +30,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 
 - **Security**: Origin-check middleware (`tarkovtracker.org`) + Gateway rate limiting (IP+User). HMAC signing for critical endpoints.
 - **Commands**: `npm run dev` (dev), `npm run build` (prod), `npx vitest` (test), `npm run lint` (lint).
+- **Runbook**: [`docs/runbook.md`](./runbook.md) contains required env vars, deploy checks, and incident recovery.
 - **Deployment**:
   - Frontend: Automated via Cloudflare Pages on push.
   - Functions: `supabase functions deploy [name]`.
