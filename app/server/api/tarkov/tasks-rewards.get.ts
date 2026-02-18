@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     validateAndThrow<TarkovTaskRewardsQueryResult>(rawResponse, logger, true);
     const sanitizedResponse = sanitizeTaskRewards(rawResponse);
     try {
-      return await applyOverlay(sanitizedResponse, { bypassCache });
+      return await applyOverlay(sanitizedResponse, { bypassCache, gameMode });
     } catch (overlayError) {
       logger.error('Failed to apply overlay:', overlayError);
       throw overlayError;

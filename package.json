@@ -8,7 +8,6 @@
     "@iconify-json/mdi": "^1.2.3",
     "@intlify/unplugin-vue-i18n": "^11.0.3",
     "@mdi/font": "^7.4.47",
-    "@nuxt/eslint": "^1.15.1",
     "@nuxt/image": "^2.0.0",
     "@nuxt/ui": "^4.4.0",
     "@nuxtjs/i18n": "^10.2.3",
@@ -22,7 +21,6 @@
     "@vue-leaflet/vue-leaflet": "^0.10.1",
     "@vueuse/core": "^14.2.1",
     "d3": "^7.9.0",
-    "eslint": "^9.39.2",
     "graphology": "^0.26.0",
     "graphology-types": "^0.24.8",
     "ipaddr.js": "^2.3.0",
@@ -41,6 +39,7 @@
     "@cloudflare/workers-types": "^4.20260214.0",
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
+    "@nuxt/eslint": "^1.15.1",
     "@nuxt/test-utils": "^4.0.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
@@ -52,6 +51,7 @@
     "@vitest/ui": "^4.0.18",
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.24",
+    "eslint": "^9.39.2",
     "eslint-plugin-import-x": "^4.16.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "fake-indexeddb": "^6.2.5",
@@ -78,7 +78,8 @@
   "overrides": {
     "fast-xml-parser": "^5.3.6",
     "@tiptap/core": "3.14.0",
-    "@tiptap/pm": "3.14.0"
+    "@tiptap/pm": "3.14.0",
+    "tar": "^7.5.8"
   },
   "packageManager": "npm@11.10.0",
   "private": true,

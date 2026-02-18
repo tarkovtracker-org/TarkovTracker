@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     const rawResponse = await baseFetcher();
     validateAndThrow<TarkovTasksCoreQueryResult>(rawResponse, logger, true);
     try {
-      return await applyOverlay(rawResponse, { bypassCache: bypassOverlayCache });
+      return await applyOverlay(rawResponse, { bypassCache: bypassOverlayCache, gameMode });
     } catch (overlayError) {
       logger.error('Failed to apply overlay:', overlayError);
       throw overlayError;

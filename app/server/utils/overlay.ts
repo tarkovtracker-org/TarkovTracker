@@ -16,6 +16,10 @@ import {
 } from './objectiveTypeInferrer';
 const logger = createLogger('Overlay');
 // Overlay data structure
+interface ModeOverlayData {
+  tasks?: Record<string, Record<string, unknown>>;
+  tasksAdd?: Record<string, Record<string, unknown>>;
+}
 interface OverlayData {
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
@@ -23,6 +27,7 @@ interface OverlayData {
   traders?: Record<string, Record<string, unknown>>;
   hideout?: Record<string, Record<string, unknown>>;
   editions?: Record<string, unknown>;
+  modes?: Record<string, ModeOverlayData>;
   $meta?: {
     version: string;
     generated: string;
@@ -87,6 +92,19 @@ function isValidOverlayData(data: unknown): data is OverlayData {
     ) {
       logger.warn(`Invalid overlay: ${collection} is not an object`);
       return false;
+    }
+  }
+  // Validate optional modes field
+  if (overlay.modes !== undefined) {
+    if (typeof overlay.modes !== 'object' || overlay.modes === null) {
+      logger.warn('Invalid overlay: modes is not an object');
+      return false;
+    }
+    for (const [mode, modeData] of Object.entries(overlay.modes)) {
+      if (typeof modeData !== 'object' || modeData === null) {
+        logger.warn(`Invalid overlay: modes.${mode} is not an object`);
+        return false;
+      }
     }
   }
   return true;
@@ -308,6 +326,18 @@ function normalizeTaskAdditions(
       return { ...entry, factionName, objectives, failConditions };
     });
 }
+function mergeModeCorrections(
+  shared: Record<string, Record<string, unknown>> | undefined,
+  modeSpecific: Record<string, Record<string, unknown>> | undefined
+): Record<string, Record<string, unknown>> | undefined {
+  if (!modeSpecific) return shared;
+  if (!shared) return modeSpecific;
+  const merged = { ...shared };
+  for (const [id, patch] of Object.entries(modeSpecific)) {
+    merged[id] = merged[id] ? deepMerge(merged[id], patch) : patch;
+  }
+  return merged;
+}
 /**
  * Apply overlay corrections to tarkov.dev API response
  *
@@ -322,7 +352,7 @@ type OverlayTargetData = {
 };
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
-  options: { bypassCache?: boolean } = {}
+  options: { bypassCache?: boolean; gameMode?: string } = {}
 ): Promise<T> {
   const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
@@ -332,15 +362,19 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   result.data = { ...data.data };
   // Apply task corrections and inject overlay task additions
   if (Array.isArray(result.data.tasks)) {
+    // Merge mode-specific task corrections on top of shared corrections
+    const modeOverlay = options.gameMode ? overlay.modes?.[options.gameMode] : undefined;
+    const mergedTasks = mergeModeCorrections(overlay.tasks, modeOverlay?.tasks);
+    const mergedTasksAdd = mergeModeCorrections(overlay.tasksAdd, modeOverlay?.tasksAdd);
     const correctedTasks = applyEntityOverlay(
       result.data.tasks as Array<{ id: string }>,
-      overlay.tasks
+      mergedTasks
     ).map((task) => applyTaskObjectiveAdditions(task));
-    const normalizedAdditions = normalizeTaskAdditions(overlay.tasksAdd);
+    const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd);
     logger.info(
       `Overlay tasksAdd: ${normalizedAdditions.length} additions after filtering disabled`
     );
-    const addedTasks = applyEntityOverlay(normalizedAdditions, overlay.tasks, {
+    const addedTasks = applyEntityOverlay(normalizedAdditions, mergedTasks, {
       logLabel: 'tasksAdd',
       logEvenWhenZero: false,
     }).map((task) => applyTaskObjectiveAdditions(task));

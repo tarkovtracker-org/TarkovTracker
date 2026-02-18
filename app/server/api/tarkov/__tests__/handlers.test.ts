@@ -167,7 +167,10 @@ describe('Tarkov API handlers', () => {
     await handler(event);
     expect(mockShouldBypassCache).toHaveBeenCalledWith(event);
     expect(mockValidateAndThrow).toHaveBeenCalled();
-    expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), { bypassCache: false });
+    expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
+      bypassCache: false,
+      gameMode: 'pvp',
+    });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
       'tasks-core-en-pvp',
@@ -179,7 +182,10 @@ describe('Tarkov API handlers', () => {
   it('applies overlay for tasks-objectives with versioned cache key', async () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
     await handler(event);
-    expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), { bypassCache: false });
+    expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
+      bypassCache: false,
+      gameMode: 'pvp',
+    });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
       'tasks-objectives-v2-en-pvp',
@@ -192,7 +198,10 @@ describe('Tarkov API handlers', () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-rewards.get');
     await handler(event);
     expect(mockSanitizeTaskRewards).toHaveBeenCalled();
-    expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), { bypassCache: false });
+    expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
+      bypassCache: false,
+      gameMode: 'pvp',
+    });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
       'tasks-rewards-en-pvp',
