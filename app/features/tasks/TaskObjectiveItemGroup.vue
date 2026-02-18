@@ -100,6 +100,7 @@
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
+  import { resolveObjectiveItemIcon } from '@/features/tasks/task-objective-item-overrides';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -191,13 +192,22 @@
         objective.questItem;
       // Prefer defaultPreset image for weapons (shows full gun instead of bare receiver)
       const imageItem = item?.properties?.defaultPreset || item;
-      const image8xLink = imageItem?.image8xLink;
+      const image8xLink = imageItem?.image8xLink || item?.image8xLink;
+      const itemId = imageItem?.id || item?.id;
+      const overrideItemIcon = resolveObjectiveItemIcon(itemId);
       map[objective.id] = {
         neededCount,
         currentCount,
         itemName:
           item?.shortName || item?.name || objective.description || t('page.tasks.questcard.item'),
-        itemIcon: imageItem?.iconLink || imageItem?.image512pxLink || image8xLink,
+        itemIcon:
+          overrideItemIcon ||
+          imageItem?.iconLink ||
+          imageItem?.image512pxLink ||
+          image8xLink ||
+          item?.iconLink ||
+          item?.image512pxLink ||
+          undefined,
         foundInRaid: full?.foundInRaid === true || objective.foundInRaid === true,
       };
     });
