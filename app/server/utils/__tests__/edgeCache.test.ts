@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { edgeCache } from '@/server/utils/edgeCache';
 import type { H3Event } from 'h3';
 let appUrl: string | undefined;
 vi.mock('#imports', () => ({
@@ -47,20 +46,22 @@ describe('edgeCache', () => {
     vi.unstubAllGlobals();
     appUrl = undefined;
   });
-  it('falls back to request host when appUrl is localhost', async () => {
+  it('falls back to default cache host when appUrl is localhost', async () => {
     appUrl = 'http://localhost:3000';
     const event = createEvent('maps.example.com', 'https');
+    const { edgeCache } = await import('@/server/utils/edgeCache');
     await edgeCache(event, 'items-en', async () => ({ ok: true }), 60, {
       cacheKeyPrefix: 'tarkov',
     });
-    expect(lastMatchUrl).toBe('https://maps.example.com/__edge-cache/tarkov/items-en');
+    expect(lastMatchUrl).toBe('https://tarkovtracker.org/__edge-cache/tarkov/items-en');
   });
   it('treats 127.0.0.0/8 as localhost for cache host selection', async () => {
     appUrl = 'http://127.0.0.2:3000';
     const event = createEvent('edge.example.com', 'http');
+    const { edgeCache } = await import('@/server/utils/edgeCache');
     await edgeCache(event, 'items-en', async () => ({ ok: true }), 60, {
       cacheKeyPrefix: 'tarkov',
     });
-    expect(lastMatchUrl).toBe('http://edge.example.com/__edge-cache/tarkov/items-en');
+    expect(lastMatchUrl).toBe('https://tarkovtracker.org/__edge-cache/tarkov/items-en');
   });
 });

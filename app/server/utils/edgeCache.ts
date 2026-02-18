@@ -86,11 +86,11 @@ export async function edgeCache<T>(
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cache = (globalThis.caches as any).default as Cache;
-      // Create a normalized cache key URL using the current host (avoids hardcoding a cache subdomain)
+      // Create a normalized cache key URL from configured app URL.
       const runtimeConfig = useRuntimeConfig();
       const appUrl = runtimeConfig?.public?.appUrl;
-      let configuredHost: string | null = null;
-      let configuredProtocol: string | null = null;
+      let cacheHost = 'tarkovtracker.org';
+      let protocol = 'https:';
       if (appUrl) {
         try {
           const parsedAppUrl = new URL(appUrl);
@@ -101,26 +101,13 @@ export async function edgeCache<T>(
             hostname === '::1' ||
             /^127\./.test(hostname);
           if (!isLocalhost) {
-            configuredHost = parsedAppUrl.host;
-            configuredProtocol = parsedAppUrl.protocol;
+            cacheHost = parsedAppUrl.host;
+            protocol = parsedAppUrl.protocol || 'https:';
           }
         } catch (error) {
-          logger.warn('[EdgeCache] Invalid appUrl, falling back to request host', error);
+          logger.warn('[EdgeCache] Invalid appUrl, falling back to default cache host', error);
         }
       }
-      const requestHost = event.node?.req?.headers?.host;
-      const forwardedProto = event.node?.req?.headers?.['x-forwarded-proto'];
-      const forwardedProtoValue = Array.isArray(forwardedProto)
-        ? forwardedProto[0]
-        : forwardedProto;
-      let protocol = 'https:';
-      if (configuredProtocol) {
-        protocol = configuredProtocol;
-      } else if (forwardedProtoValue) {
-        const forwardedProtoToken = String(forwardedProtoValue).split(',')[0]?.trim();
-        protocol = `${forwardedProtoToken || 'https'}:`;
-      }
-      const cacheHost = configuredHost || requestHost || 'tarkovtracker.org';
       const cacheUrl = new URL(`${protocol}//${cacheHost}/__edge-cache/${cacheKeyPrefix}/${key}`);
       const cacheKeyRequest = new Request(cacheUrl.toString());
       // Check cache first

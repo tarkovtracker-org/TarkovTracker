@@ -4,6 +4,7 @@ import {
   getRequestHeader,
   getRouterParam,
   setResponseHeader,
+  type H3Event,
 } from 'h3';
 import { createLogger } from '@/server/utils/logger';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
@@ -21,6 +22,11 @@ import {
 const logger = createLogger('SharedProfileApi');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REST_FETCH_TIMEOUT_MS = 8000;
+const RATE_LIMIT_WINDOW_MS = 60000;
+const DEFAULT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE = 120;
+const DEFAULT_SHARED_PROFILE_CACHE_TTL_MS = 5000;
+const MAX_SHARED_PROFILE_CACHE_ENTRIES = 2000;
+const isTestEnvironment = process.env.NODE_ENV === 'test';
 type PreferencesRow = {
   streamer_mode?: boolean | null;
   profile_share_pve_public?: boolean | null;
@@ -76,6 +82,23 @@ type SanitizedProgressData = Partial<{
   traders: Record<string, SanitizedTrader>;
   xpOffset: number;
 }>;
+type SharedProfilePayload = {
+  data: SanitizedProgressData | null;
+  gameEdition: number;
+  mode: GameMode;
+  userId: string;
+  visibility: 'owner' | 'public';
+};
+type RateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+type CachedSharedProfileEntry = {
+  expiresAt: number;
+  payload: SharedProfilePayload;
+};
+const sharedProfileRateLimiter = new Map<string, RateLimitEntry>();
+const sharedProfileCache = new Map<string, CachedSharedProfileEntry>();
 const normalizeMode = (value: string | undefined): GameMode | null => {
   if (value === GAME_MODES.PVE) {
     return GAME_MODES.PVE;
@@ -200,6 +223,114 @@ const isAbortError = (error: unknown): boolean => {
       (error as { name?: unknown }).name === 'AbortError')
   );
 };
+const toPositiveInteger = (value: unknown, fallback: number): number => {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  const integer = Math.trunc(numeric);
+  return integer > 0 ? integer : fallback;
+};
+const cleanupRateLimitEntries = (now: number): void => {
+  for (const [key, entry] of sharedProfileRateLimiter.entries()) {
+    if (now >= entry.resetAt) {
+      sharedProfileRateLimiter.delete(key);
+    }
+  }
+};
+const consumeRateLimit = (key: string, limit: number): boolean => {
+  const now = Date.now();
+  cleanupRateLimitEntries(now);
+  const existing = sharedProfileRateLimiter.get(key);
+  if (!existing || now >= existing.resetAt) {
+    sharedProfileRateLimiter.set(key, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+    });
+    return true;
+  }
+  if (existing.count >= limit) {
+    return false;
+  }
+  existing.count += 1;
+  sharedProfileRateLimiter.set(key, existing);
+  return true;
+};
+const cleanupCacheEntries = (now: number): void => {
+  for (const [key, entry] of sharedProfileCache.entries()) {
+    if (now >= entry.expiresAt) {
+      sharedProfileCache.delete(key);
+    }
+  }
+};
+const getCachedProfile = (key: string): SharedProfilePayload | null => {
+  const now = Date.now();
+  cleanupCacheEntries(now);
+  const cached = sharedProfileCache.get(key);
+  if (!cached || now >= cached.expiresAt) {
+    sharedProfileCache.delete(key);
+    return null;
+  }
+  return cached.payload;
+};
+const setCachedProfile = (key: string, payload: SharedProfilePayload, ttlMs: number): void => {
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    return;
+  }
+  const now = Date.now();
+  cleanupCacheEntries(now);
+  if (sharedProfileCache.size >= MAX_SHARED_PROFILE_CACHE_ENTRIES && !sharedProfileCache.has(key)) {
+    let oldestKey: string | undefined;
+    for (const cacheKey of sharedProfileCache.keys()) {
+      oldestKey = cacheKey;
+      break;
+    }
+    if (oldestKey) {
+      sharedProfileCache.delete(oldestKey);
+    }
+  }
+  sharedProfileCache.set(key, {
+    expiresAt: now + ttlMs,
+    payload,
+  });
+};
+const getClientIdentifier = (event: H3Event): string => {
+  const forwardedFor = getRequestHeader(event, 'x-forwarded-for');
+  if (typeof forwardedFor === 'string' && forwardedFor.trim().length > 0) {
+    const token = forwardedFor.split(',')[0]?.trim();
+    if (token) {
+      return token.slice(0, 128);
+    }
+  }
+  const cfConnectingIp = getRequestHeader(event, 'cf-connecting-ip');
+  if (typeof cfConnectingIp === 'string' && cfConnectingIp.trim().length > 0) {
+    return cfConnectingIp.trim().slice(0, 128);
+  }
+  const remoteAddress = event.node?.req?.socket?.remoteAddress;
+  if (typeof remoteAddress === 'string' && remoteAddress.trim().length > 0) {
+    return remoteAddress.trim().slice(0, 128);
+  }
+  return 'unknown';
+};
+const fetchWithTimeout = async (
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw createError({ statusCode: 504, statusMessage: timeoutMessage });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 const resolveRequesterUserId = async (
   authHeader: string | undefined,
   supabaseAnonKey: string,
@@ -214,12 +345,17 @@ const resolveRequesterUserId = async (
     return null;
   }
   try {
-    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        Authorization: authHeader,
-        apikey: supabaseAnonKey,
+    const authResponse = await fetchWithTimeout(
+      `${supabaseUrl}/auth/v1/user`,
+      {
+        headers: {
+          Authorization: authHeader,
+          apikey: supabaseAnonKey,
+        },
       },
-    });
+      REST_FETCH_TIMEOUT_MS,
+      'Timed out while validating shared profile access'
+    );
     if (!authResponse.ok) {
       logger.warn('Auth validation returned non-OK status', { status: authResponse.status });
       return null;
@@ -227,6 +363,14 @@ const resolveRequesterUserId = async (
     const user = (await authResponse.json()) as { id?: string };
     return typeof user.id === 'string' && UUID_REGEX.test(user.id) ? user.id : null;
   } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      (error as { statusCode?: unknown }).statusCode === 504
+    ) {
+      throw error;
+    }
     logger.warn('Failed to resolve requester auth context', error);
     return null;
   }
@@ -251,8 +395,37 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Missing Supabase configuration for shared profiles',
     });
   }
+  const sharedProfileRateLimitPerMinute = toPositiveInteger(
+    config.sharedProfileRateLimitPerMinute,
+    DEFAULT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE
+  );
+  const sharedProfileCacheTtlMs = toPositiveInteger(
+    config.sharedProfileCacheTtlMs,
+    DEFAULT_SHARED_PROFILE_CACHE_TTL_MS
+  );
+  const clientIdentifier = getClientIdentifier(event);
+  if (!isTestEnvironment) {
+    const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}:${userId}:${mode}`;
+    if (!consumeRateLimit(preAuthRateLimitKey, sharedProfileRateLimitPerMinute)) {
+      throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
+    }
+  }
   const authHeader = getRequestHeader(event, 'authorization');
   const requesterUserId = await resolveRequesterUserId(authHeader, supabaseAnonKey, supabaseUrl);
+  const requesterKey = requesterUserId ?? clientIdentifier;
+  if (!isTestEnvironment) {
+    const requesterRateLimitKey = `shared-profile:requester:${requesterKey}:${userId}:${mode}`;
+    if (!consumeRateLimit(requesterRateLimitKey, sharedProfileRateLimitPerMinute)) {
+      throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
+    }
+  }
+  const sharedProfileCacheKey = `${userId}:${mode}:${requesterKey}`;
+  if (!isTestEnvironment) {
+    const cached = getCachedProfile(sharedProfileCacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
   const hasServiceKey = supabaseServiceKey.length > 0;
   if (!hasServiceKey && requesterUserId !== userId) {
     throw createError({
@@ -345,11 +518,15 @@ export default defineEventHandler(async (event) => {
   const profileData =
     mode === GAME_MODES.PVE ? (progressRow.pve_data ?? null) : (progressRow.pvp_data ?? null);
   const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;
-  return {
+  const payload: SharedProfilePayload = {
     data: sanitizeProgressPayload(profileData, { includeDisplayName: !hideDisplayName }),
     gameEdition: typeof progressRow.game_edition === 'number' ? progressRow.game_edition : 1,
     mode,
     userId,
     visibility: isOwner ? 'owner' : 'public',
   };
+  if (!isTestEnvironment) {
+    setCachedProfile(sharedProfileCacheKey, payload, sharedProfileCacheTtlMs);
+  }
+  return payload;
 });

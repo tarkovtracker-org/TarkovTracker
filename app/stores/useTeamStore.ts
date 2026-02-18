@@ -93,12 +93,15 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const teamChannel = ref<RealtimeChannel | null>(null);
   let lastMembersRefreshAt = 0;
   let refreshInFlight: Promise<void> | null = null;
+  let refreshInFlightTeamId: string | null = null;
+  let latestMembersRequestVersion = 0;
   let lastProgressSnapshot: {
     mode: 'pvp' | 'pve';
     displayName: string | null;
     level: number | null;
     tasksCompleted: number;
   } | null = null;
+  let prevTaskCompletions: Record<string, { complete?: boolean; failed?: boolean }> = {};
   let taskBroadcastInitialized = false;
   const pendingTaskUpdates = new Map<
     string,
@@ -150,6 +153,14 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       $supabase.client.removeChannel(teamChannel.value as unknown as RealtimeChannel);
       teamChannel.value = null;
     }
+    if (taskBroadcastTimer) {
+      clearTimeout(taskBroadcastTimer);
+      taskBroadcastTimer = null;
+    }
+    pendingTaskUpdates.clear();
+    prevTaskCompletions = {};
+    taskBroadcastInitialized = false;
+    lastProgressSnapshot = null;
   };
   const refreshMembers = async (force = false) => {
     if (!$supabase.user?.loggedIn || !$supabase.user?.id) {
@@ -160,19 +171,25 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       return;
     }
     if (refreshInFlight) {
-      try {
-        await refreshInFlight;
-      } catch (error) {
-        const status = getErrorStatus(error);
-        if (status === 401 || status === 403) {
-          logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
-            status,
-          });
-          return;
+      const currentTeamId = getTeamIdFromSystemStore(systemStore);
+      if (!currentTeamId || refreshInFlightTeamId !== currentTeamId) {
+        refreshInFlight = null;
+        refreshInFlightTeamId = null;
+      } else {
+        try {
+          await refreshInFlight;
+        } catch (error) {
+          const status = getErrorStatus(error);
+          if (status === 401 || status === 403) {
+            logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
+              status,
+            });
+            return;
+          }
+          logger.warn('[TeamStore] Failed to load team members:', error);
         }
-        logger.warn('[TeamStore] Failed to load team members:', error);
+        return;
       }
-      return;
     }
     const now = Date.now();
     if (!force && now - lastMembersRefreshAt < 2000) {
@@ -187,16 +204,25 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       cleanupMembership();
       return;
     }
+    const requestVersion = ++latestMembersRequestVersion;
+    const inFlightRequest = (async () => {
+      const { getTeamMembers } = useEdgeFunctions();
+      const result = await getTeamMembers(currentTeamId);
+      if (requestVersion !== latestMembersRequestVersion) {
+        return;
+      }
+      if (getTeamIdFromSystemStore(systemStore) !== currentTeamId) {
+        return;
+      }
+      teamStore.$patch((state) => {
+        state.members = result?.members || [];
+        state.memberProfiles = result?.profiles || {};
+      });
+    })();
+    refreshInFlight = inFlightRequest;
+    refreshInFlightTeamId = currentTeamId;
     try {
-      refreshInFlight = (async () => {
-        const { getTeamMembers } = useEdgeFunctions();
-        const result = await getTeamMembers(currentTeamId);
-        teamStore.$patch((state) => {
-          state.members = result?.members || [];
-          state.memberProfiles = result?.profiles || {};
-        });
-      })();
-      await refreshInFlight;
+      await inFlightRequest;
     } catch (error) {
       const status = getErrorStatus(error);
       if (status === 401 || status === 403) {
@@ -207,8 +233,11 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       }
       logger.warn('[TeamStore] Failed to load team members:', error);
     } finally {
-      lastMembersRefreshAt = Date.now();
-      refreshInFlight = null;
+      if (refreshInFlight === inFlightRequest) {
+        lastMembersRefreshAt = Date.now();
+        refreshInFlight = null;
+        refreshInFlightTeamId = null;
+      }
     }
   };
   const setupMembershipSubscription = () => {
@@ -280,6 +309,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   watch(
     teamFilter,
     async () => {
+      cleanupMembership();
       await refreshMembers(true);
       setupMembershipSubscription();
     },
@@ -348,9 +378,6 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     },
     { deep: true }
   );
-  // Track previous task completions to detect changes
-  let prevTaskCompletions: Record<string, { complete?: boolean; failed?: boolean }> = {};
-  // Watch for task completion changes and broadcast immediately
   watch(
     () => {
       const mode =
