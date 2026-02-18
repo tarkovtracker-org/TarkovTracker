@@ -183,6 +183,7 @@
 </template>
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
+  import { useOAuthLogin } from '@/composables/useOAuthLogin';
   import { logger } from '@/utils/logger';
   import { sanitizeInternalRedirect } from '@/utils/redirect';
   useSeoMeta({
@@ -198,6 +199,8 @@
     google: false,
     github: false,
   });
+  const activePopupCleanups = new Set<() => void>();
+  let loginPageUnmounted = false;
   const route = useRoute();
   const buildCallbackUrl = () => {
     const config = useRuntimeConfig();
@@ -215,6 +218,9 @@
     url: string,
     provider: 'twitch' | 'discord' | 'google' | 'github'
   ) => {
+    if (loginPageUnmounted) {
+      return;
+    }
     logger.warn('[Login] Popup was blocked or failed, falling back to redirect');
     toast.add({
       title: t('page.login.popup_blocked_title'),
@@ -223,6 +229,9 @@
       duration: 3000,
     });
     setTimeout(() => {
+      if (loginPageUnmounted) {
+        return;
+      }
       loading.value[provider] = false;
       window.location.href = url;
     }, 1500);
@@ -231,6 +240,9 @@
     url: string,
     provider: 'twitch' | 'discord' | 'google' | 'github'
   ) => {
+    if (loginPageUnmounted) {
+      return;
+    }
     const width = 600;
     const height = 700;
     const left = window.screenX + (window.outerWidth - width) / 2;
@@ -276,6 +288,10 @@
       return (data as { type?: unknown }).type === 'OAUTH_ERROR';
     };
     const messageHandler = (event: MessageEvent) => {
+      if (loginPageUnmounted) {
+        cleanup();
+        return;
+      }
       if (isOAuthErrorMessage(event)) {
         loading.value[provider] = false;
         cleanup();
@@ -294,6 +310,10 @@
       navigateTo(redirect, { replace: true });
     };
     const pollTimer = window.setInterval(() => {
+      if (loginPageUnmounted) {
+        cleanup();
+        return;
+      }
       if (isPopupClosed()) {
         loading.value[provider] = false;
         cleanup();
@@ -301,11 +321,19 @@
     }, 500);
     const abandonedTimer = window.setTimeout(() => {
       if (didCleanup) return;
+      if (loginPageUnmounted) {
+        cleanup();
+        return;
+      }
       loading.value[provider] = false;
       cleanup();
     }, 300000);
     const fallbackTimer = window.setTimeout(() => {
       if (didCleanup) return;
+      if (loginPageUnmounted) {
+        cleanup();
+        return;
+      }
       if (isPopupClosed()) {
         cleanup();
         fallbackToRedirect(url, provider);
@@ -318,6 +346,7 @@
       window.clearTimeout(fallbackTimer);
       window.clearTimeout(abandonedTimer);
       window.removeEventListener('message', messageHandler);
+      activePopupCleanups.delete(cleanup);
       try {
         if (popup && !popup.closed) {
           popup.close();
@@ -327,70 +356,27 @@
         popup = null;
       }
     };
+    activePopupCleanups.add(cleanup);
     window.addEventListener('message', messageHandler);
   };
-  const signInWithTwitch = async () => {
-    try {
-      loading.value.twitch = true;
-      const callbackUrl = buildCallbackUrl();
-      const data = await $supabase.signInWithOAuth('twitch', {
-        skipBrowserRedirect: true,
-        redirectTo: callbackUrl,
-      });
-      if (data?.url) {
-        openPopupOrRedirect(data.url, 'twitch');
-      }
-    } catch (error) {
-      logger.error('[Login] Twitch sign in error:', error);
-      loading.value.twitch = false;
+  const { signInWithProvider } = useOAuthLogin({
+    buildCallbackUrl,
+    loading,
+    openPopupOrRedirect,
+  });
+  onBeforeUnmount(() => {
+    loginPageUnmounted = true;
+    loading.value.twitch = false;
+    loading.value.discord = false;
+    loading.value.google = false;
+    loading.value.github = false;
+    for (const cleanup of Array.from(activePopupCleanups)) {
+      cleanup();
     }
-  };
-  const signInWithDiscord = async () => {
-    try {
-      loading.value.discord = true;
-      const callbackUrl = buildCallbackUrl();
-      const data = await $supabase.signInWithOAuth('discord', {
-        skipBrowserRedirect: true,
-        redirectTo: callbackUrl,
-      });
-      if (data?.url) {
-        openPopupOrRedirect(data.url, 'discord');
-      }
-    } catch (error) {
-      logger.error('[Login] Discord sign in error:', error);
-      loading.value.discord = false;
-    }
-  };
-  const signInWithGoogle = async () => {
-    try {
-      loading.value.google = true;
-      const callbackUrl = buildCallbackUrl();
-      const data = await $supabase.signInWithOAuth('google', {
-        skipBrowserRedirect: true,
-        redirectTo: callbackUrl,
-      });
-      if (data?.url) {
-        openPopupOrRedirect(data.url, 'google');
-      }
-    } catch (error) {
-      logger.error('[Login] Google sign in error:', error);
-      loading.value.google = false;
-    }
-  };
-  const signInWithGitHub = async () => {
-    try {
-      loading.value.github = true;
-      const callbackUrl = buildCallbackUrl();
-      const data = await $supabase.signInWithOAuth('github', {
-        skipBrowserRedirect: true,
-        redirectTo: callbackUrl,
-      });
-      if (data?.url) {
-        openPopupOrRedirect(data.url, 'github');
-      }
-    } catch (error) {
-      logger.error('[Login] GitHub sign in error:', error);
-      loading.value.github = false;
-    }
-  };
+    activePopupCleanups.clear();
+  });
+  const signInWithTwitch = () => signInWithProvider('twitch');
+  const signInWithDiscord = () => signInWithProvider('discord');
+  const signInWithGoogle = () => signInWithProvider('google');
+  const signInWithGitHub = () => signInWithProvider('github');
 </script>

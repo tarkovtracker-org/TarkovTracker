@@ -102,8 +102,8 @@ export function useSupabaseSync({
   const isSyncing = ref(false);
   const isPaused = ref(false);
   let lastSyncedHash: string | null = null;
-  const syncToSupabase = async (inputState: unknown) => {
-    const state = inputState as Record<string, unknown>;
+  const syncToSupabase = async () => {
+    const state = store.$state as Record<string, unknown>;
     logger.debug('[Sync] syncToSupabase called', {
       loggedIn: $supabase.user.loggedIn,
       isPaused: isPaused.value,
@@ -118,13 +118,14 @@ export function useSupabaseSync({
     }
     isSyncing.value = true;
     try {
-      const dataToSave = transform ? transform(state) : state;
+      const transformedState = transform ? transform(state) : state;
       // Skip if transform returned null (e.g., during initial load)
-      if (!dataToSave) {
+      if (!transformedState) {
         logger.debug('[Sync] Skipping - transform returned null');
         isSyncing.value = false;
         return;
       }
+      const dataToSave = { ...transformedState };
       // Ensure user_id is present if not already
       if (!dataToSave.user_id) {
         dataToSave.user_id = $supabase.user.id;
@@ -221,33 +222,12 @@ export function useSupabaseSync({
       isSyncing.value = false;
     }
   };
-  const snapshotState = (state: unknown) => {
-    try {
-      // Avoid cloning Vue proxies directly
-      const raw = typeof state === 'object' ? toRaw(state) : state;
-      if (typeof structuredClone === 'function') {
-        return structuredClone(raw);
-      }
-      if (Array.isArray(raw)) return raw.slice();
-      if (raw && typeof raw === 'object') return { ...(raw as Record<string, unknown>) };
-      return raw;
-    } catch (e) {
-      logger.warn('[Sync] structuredClone failed, trying JSON clone', e);
-      try {
-        return JSON.parse(JSON.stringify(state));
-      } catch (jsonErr) {
-        logger.error('[Sync] All cloning methods failed, using original state', jsonErr);
-        return state;
-      }
-    }
-  };
   const debouncedSync = debounce(syncToSupabase, debounceMs);
   const unwatch = watch(
     () => store.$state,
-    (newState) => {
+    () => {
       logger.debug(`[Sync] Store state changed for ${table}, triggering debounced sync`);
-      const clonedState = snapshotState(newState);
-      void debouncedSync(clonedState).catch((error) => {
+      void debouncedSync().catch((error) => {
         if (isDebounceRejection(error)) return;
         logger.error(`[Sync] Debounced sync failed for ${table}:`, error);
       });

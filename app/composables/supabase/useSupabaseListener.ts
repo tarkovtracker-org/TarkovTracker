@@ -28,6 +28,20 @@ interface SupabaseListenerReturn {
   fetchData: () => Promise<void>;
 }
 const VUE_REACTIVITY_SETTLE_MS = 100;
+const isAbortError = (error: unknown): boolean => {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true;
+  }
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return error.name === 'AbortError' || error.name === 'TimeoutError';
+  }
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
+};
 /**
  * Creates a Supabase realtime listener that automatically manages subscriptions
  * and syncs data with a Pinia store. Supports reactive filter refs for auth changes.
@@ -47,14 +61,22 @@ export function useSupabaseListener({
   const hasInitiallyLoaded = ref(false);
   const loadError = ref<PostgrestError | null>(null);
   const storeIdForLogging = storeId || store.$id;
+  let activeFetchController: AbortController | null = null;
+  let latestFetchVersion = 0;
   // Helper to get current filter value (supports both string and ref)
   const getFilterValue = (): string | undefined => unref(filter);
   // Initial fetch
   const fetchData = async () => {
+    const fetchVersion = ++latestFetchVersion;
+    activeFetchController?.abort();
+    const fetchController = new AbortController();
+    activeFetchController = fetchController;
     loadError.value = null;
     const currentFilter = getFilterValue();
     if (!currentFilter) {
-      hasInitiallyLoaded.value = true;
+      if (fetchVersion === latestFetchVersion) {
+        hasInitiallyLoaded.value = true;
+      }
       return;
     }
     // Parse filter to get column and value
@@ -62,35 +84,60 @@ export function useSupabaseListener({
     const [column, rest] = currentFilter.split('=eq.');
     if (!column || !rest) {
       logger.error(`[${storeIdForLogging}] Invalid filter format. Expected 'col=eq.val'`);
-      hasInitiallyLoaded.value = true;
+      if (fetchVersion === latestFetchVersion) {
+        hasInitiallyLoaded.value = true;
+      }
       return;
     }
-    const { data, error } = await $supabase.client
-      .from(table)
-      .select('*')
-      .eq(column, rest)
-      .single();
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 is "The result contains 0 rows"
+    try {
+      const queryBuilder = $supabase.client.from(table).select('*').eq(column, rest).single() as {
+        abortSignal?: (signal: AbortSignal) => PromiseLike<{
+          data: Record<string, unknown> | null;
+          error: PostgrestError | null;
+        }>;
+        then: PromiseLike<{
+          data: Record<string, unknown> | null;
+          error: PostgrestError | null;
+        }>['then'];
+      };
+      const result =
+        typeof queryBuilder.abortSignal === 'function'
+          ? await queryBuilder.abortSignal(fetchController.signal)
+          : await queryBuilder;
+      if (fetchVersion !== latestFetchVersion) {
+        return;
+      }
+      const { data, error } = result;
+      if (error && error.code !== 'PGRST116') {
+        logger.error(`[${storeIdForLogging}] Error fetching initial data:`, error);
+        loadError.value = error;
+        hasInitiallyLoaded.value = true;
+        return;
+      }
+      if (data) {
+        if (patchStore) {
+          safePatchStore(store, data);
+          clearStaleState(store, data);
+        }
+        if (onData) onData(data);
+      } else {
+        if (patchStore) {
+          resetStore(store);
+        }
+        if (onData) onData(null);
+      }
+      hasInitiallyLoaded.value = true;
+    } catch (error) {
+      if (fetchController.signal.aborted || isAbortError(error)) {
+        return;
+      }
       logger.error(`[${storeIdForLogging}] Error fetching initial data:`, error);
-      loadError.value = error;
       hasInitiallyLoaded.value = true;
-      return;
-    }
-    if (data) {
-      if (patchStore) {
-        safePatchStore(store, data);
-        clearStaleState(store, data);
+    } finally {
+      if (activeFetchController === fetchController) {
+        activeFetchController = null;
       }
-      if (onData) onData(data);
-    } else {
-      if (patchStore) {
-        resetStore(store);
-      }
-      if (onData) onData(null);
     }
-    // Mark initial load as complete
-    hasInitiallyLoaded.value = true;
   };
   const setupSubscription = () => {
     const currentFilter = getFilterValue();
@@ -135,6 +182,9 @@ export function useSupabaseListener({
       });
   };
   const cleanup = () => {
+    latestFetchVersion += 1;
+    activeFetchController?.abort();
+    activeFetchController = null;
     if (channel.value) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       $supabase.client.removeChannel(channel.value as any);
