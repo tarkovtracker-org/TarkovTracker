@@ -134,6 +134,20 @@ describe('Streamer Kappa API', () => {
         'x-forwarded-for': '203.0.113.5',
       },
     });
+    expect(mockDollarFetch).toHaveBeenCalledWith('/api/tarkov/tasks-core', {
+      headers: {
+        host: 'tarkovtracker.org',
+        'x-forwarded-for': '203.0.113.5',
+      },
+      query: { gameMode: 'regular', lang: 'en' },
+    });
+    expect(mockDollarFetch).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
+      headers: {
+        host: 'tarkovtracker.org',
+        'x-forwarded-for': '203.0.113.5',
+      },
+      query: { gameMode: 'regular', lang: 'en' },
+    });
     expect(mockSetResponseHeader).toHaveBeenCalledWith(
       mockEvent,
       'Cache-Control',

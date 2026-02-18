@@ -262,6 +262,7 @@ const getEditions = async (): Promise<GameEdition[]> => {
 };
 export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0');
+  const forwardedHeaders = buildSharedProfileRequestHeaders(event);
   const userId = (getRouterParam(event, 'userId') || '').trim();
   const mode = normalizeMode(getRouterParam(event, 'mode'));
   if (!mode) {
@@ -273,7 +274,7 @@ export default defineEventHandler(async (event) => {
   let sharedProfile: SharedProfileResponse;
   try {
     sharedProfile = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`, {
-      headers: buildSharedProfileRequestHeaders(event),
+      headers: forwardedHeaders,
     });
   } catch (error) {
     const statusCode = resolveStatusCode(error);
@@ -297,9 +298,11 @@ export default defineEventHandler(async (event) => {
   try {
     const [tasksCoreResponse, tasksObjectivesResponse, editions] = await Promise.all([
       $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', {
+        headers: forwardedHeaders,
         query: { gameMode, lang: 'en' },
       }),
       $fetch<{ data: TarkovTaskObjectivesQueryResult }>('/api/tarkov/tasks-objectives', {
+        headers: forwardedHeaders,
         query: { gameMode, lang: 'en' },
       }),
       getEditions(),
