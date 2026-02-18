@@ -31,9 +31,6 @@ jobs:
       - name: Format check
         run: npm run format:check
 
-      # --dangerouslyIgnoreUnhandledErrors: Works around @nuxt/test-utils worker timeout
-      # during cleanup that causes false CI failures. Tracked upstream:
-      # https://github.com/nuxt/test-utils/issues/888
       - name: Test
         run: npm run test
 
@@ -70,6 +67,9 @@ jobs:
             package-lock.json
             workers/*/package-lock.json
 
+      - name: Install root dependencies
+        run: npm ci
+
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         working-directory: workers/api-gateway
@@ -78,9 +78,10 @@ jobs:
           npm run typecheck
           npm run validate:openapi
 
+      - name: Test api-gateway
+        if: hashFiles('workers/api-gateway/package.json') != ''
+        run: npm run test:api-gateway
+
       - name: Validate team-gateway
-        if: hashFiles('workers/team-gateway/package.json') != ''
-        working-directory: workers/team-gateway
-        run: |
-          npm ci
-          npm run typecheck
+        if: hashFiles('workers/team-gateway/src/**/*.ts', 'workers/team-gateway/tsconfig.json', 'workers/team-gateway/wrangler.toml') != ''
+        run: npx tsc --project workers/team-gateway/tsconfig.json --noEmit

@@ -1,6 +1,7 @@
 {
   "__pinnedNotes": {
-    "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui."
+    "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
+    "fast-xml-parser": "Pinned fast-xml-parser to ^5.3.6 on 2026-02-18 to stay on the patched v5 line and avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
   "version": "1.7.0",
   "dependencies": {
@@ -75,6 +76,7 @@
   },
   "name": "tarkovtracker-nuxt",
   "overrides": {
+    "fast-xml-parser": "^5.3.6",
     "@tiptap/core": "3.14.0",
     "@tiptap/pm": "3.14.0"
   },
@@ -98,7 +100,7 @@
     "preview": "nuxt preview",
     "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
-    "test": "vitest run --dangerouslyIgnoreUnhandledErrors --reporter=default --maxWorkers=2",
+    "test": "vitest run --reporter=default --maxWorkers=2",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts"
   },

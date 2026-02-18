@@ -27,6 +27,6 @@ export default defineVitestConfig({
     testTimeout: 30000,
     watch: false,
     reporters: ['default'],
-    passWithNoTests: true,
+    passWithNoTests: false,
   },
 });

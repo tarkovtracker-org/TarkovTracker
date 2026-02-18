@@ -88,11 +88,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy team-gateway
-        if: hashFiles('workers/team-gateway/package.json') != ''
-        working-directory: workers/team-gateway
-        run: |
-          npm ci
-          npx wrangler deploy
+        if: hashFiles('workers/team-gateway/src/**/*.ts', 'workers/team-gateway/tsconfig.json', 'workers/team-gateway/wrangler.toml') != ''
+        run: npx wrangler deploy --config workers/team-gateway/wrangler.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
