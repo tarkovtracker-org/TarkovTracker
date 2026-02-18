@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.8.0...v1.8.1) (2026-02-18)
+
+
+### Bug Fixes
+
+* **streamer:** avoid false private overlay on protected internal fetch ([0c761c3](https://github.com/tarkovtracker-org/TarkovTracker/commit/0c761c3b7a759d80df4c86a8ca091dbb72b1c664))
+
 # [1.8.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.7.0...v1.8.0) (2026-02-18)
 
 
