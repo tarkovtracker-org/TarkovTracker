@@ -2,7 +2,20 @@
   <div class="min-w-55">
     <div class="flex items-center justify-between gap-2">
       <div class="min-w-0 flex-1">
-        <div class="text-sm leading-snug font-semibold text-gray-100">{{ taskName }}</div>
+        <component
+          :is="taskTitleComponent"
+          v-bind="taskTitleProps"
+          :class="taskTitleClass"
+          @click.stop
+        >
+          <span class="truncate">{{ taskName }}</span>
+          <UIcon
+            v-if="task?.wikiLink"
+            name="i-mdi-open-in-new"
+            class="h-3.5 w-3.5 shrink-0"
+            aria-hidden="true"
+          />
+        </component>
       </div>
       <div class="flex shrink-0 gap-1">
         <button
@@ -118,6 +131,24 @@
     return metadataStore.tasks.find((t) => t.id === taskId) ?? null;
   });
   const taskName = computed(() => task.value?.name ?? translate('maps.tooltip.task_fallback'));
+  const taskTitleComponent = computed(() => (task.value?.wikiLink ? 'a' : 'div'));
+  const taskTitleProps = computed(() => {
+    if (task.value?.wikiLink) {
+      return {
+        href: task.value.wikiLink,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      };
+    }
+    return {};
+  });
+  const taskTitleClass = computed(() => {
+    const base = 'flex min-w-0 items-center gap-1 text-sm leading-snug font-semibold';
+    if (task.value?.wikiLink) {
+      return `${base} text-link hover:text-link-hover no-underline`;
+    }
+    return `${base} text-gray-100`;
+  });
   const isComplete = computed(() => tarkovStore.isTaskObjectiveComplete(props.objectiveId));
   const requiredCount = computed(() => objective.value?.count ?? 1);
   const currentCount = computed(() => tarkovStore.getObjectiveCount(props.objectiveId));
