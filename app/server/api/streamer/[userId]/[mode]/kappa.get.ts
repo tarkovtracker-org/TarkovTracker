@@ -1,4 +1,11 @@
-import { createError, defineEventHandler, getRouterParam, setResponseHeader } from 'h3';
+import {
+  createError,
+  defineEventHandler,
+  getRequestHeader,
+  getRouterParam,
+  setResponseHeader,
+  type H3Event,
+} from 'h3';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { createLogger } from '@/server/utils/logger';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
@@ -86,6 +93,31 @@ const resolveStatusCode = (error: unknown): number => {
     (error as { status?: number }).status ??
     (error as { response?: { status?: number } }).response?.status;
   return typeof statusCode === 'number' ? statusCode : 500;
+};
+const resolveStatusMessage = (error: unknown): string => {
+  const statusMessage =
+    (error as { statusMessage?: string }).statusMessage ??
+    (error as { statusText?: string }).statusText ??
+    (error as { data?: { statusMessage?: string } }).data?.statusMessage ??
+    '';
+  return typeof statusMessage === 'string' ? statusMessage : '';
+};
+const buildSharedProfileRequestHeaders = (event: H3Event): Record<string, string> | undefined => {
+  const headerNames = [
+    'authorization',
+    'cf-connecting-ip',
+    'host',
+    'x-forwarded-for',
+    'x-real-ip',
+  ] as const;
+  const headers: Record<string, string> = {};
+  for (const headerName of headerNames) {
+    const headerValue = getRequestHeader(event, headerName);
+    if (typeof headerValue === 'string' && headerValue.trim().length > 0) {
+      headers[headerName] = headerValue;
+    }
+  }
+  return Object.keys(headers).length > 0 ? headers : undefined;
 };
 const isFreshTimestamp = (timestamp: number): boolean => {
   return Date.now() - timestamp < EDITIONS_CACHE_TTL_MS;
@@ -240,16 +272,23 @@ export default defineEventHandler(async (event) => {
   }
   let sharedProfile: SharedProfileResponse;
   try {
-    sharedProfile = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`);
+    sharedProfile = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`, {
+      headers: buildSharedProfileRequestHeaders(event),
+    });
   } catch (error) {
     const statusCode = resolveStatusCode(error);
+    const statusMessage = resolveStatusMessage(error);
+    const isPrivateProfileError =
+      statusCode === 403 && statusMessage === 'Profile is private for this mode';
+    const mappedStatusCode = statusCode === 403 && !isPrivateProfileError ? 503 : statusCode;
     throw createError({
-      statusCode,
-      statusMessage:
-        statusCode === 403
-          ? 'Profile is private for this mode'
-          : statusCode === 404
-            ? 'Profile not found'
+      statusCode: mappedStatusCode,
+      statusMessage: isPrivateProfileError
+        ? 'Profile is private for this mode'
+        : mappedStatusCode === 404
+          ? 'Profile not found'
+          : mappedStatusCode === 503
+            ? 'Shared profiles unavailable'
             : 'Failed to load shared profile',
     });
   }

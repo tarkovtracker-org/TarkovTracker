@@ -5,11 +5,13 @@ import type { H3Event, H3EventContext } from 'h3';
 import type { SiteConfigInput } from 'site-config-stack';
 const {
   mockComputeStreamerKappaMetrics,
+  mockGetRequestHeader,
   mockGetRouterParam,
   mockProcessTaskData,
   mockSetResponseHeader,
 } = vi.hoisted(() => ({
   mockComputeStreamerKappaMetrics: vi.fn(),
+  mockGetRequestHeader: vi.fn(),
   mockGetRouterParam: vi.fn(),
   mockProcessTaskData: vi.fn(),
   mockSetResponseHeader: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock('h3', async () => {
   const actual = await vi.importActual('h3');
   return {
     ...actual,
+    getRequestHeader: mockGetRequestHeader,
     getRouterParam: mockGetRouterParam,
     setResponseHeader: mockSetResponseHeader,
   };
@@ -59,6 +62,11 @@ describe('Streamer Kappa API', () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return USER_ID;
       if (key === 'mode') return 'pvp';
+      return undefined;
+    });
+    mockGetRequestHeader.mockImplementation((_, key: string) => {
+      if (key === 'host') return 'tarkovtracker.org';
+      if (key === 'x-forwarded-for') return '203.0.113.5';
       return undefined;
     });
     mockProcessTaskData.mockReturnValue({
@@ -120,6 +128,12 @@ describe('Streamer Kappa API', () => {
     });
     const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
     const result = await handler(mockEvent as H3Event);
+    expect(mockDollarFetch).toHaveBeenCalledWith(`/api/profile/${USER_ID}/pvp`, {
+      headers: {
+        host: 'tarkovtracker.org',
+        'x-forwarded-for': '203.0.113.5',
+      },
+    });
     expect(mockSetResponseHeader).toHaveBeenCalledWith(
       mockEvent,
       'Cache-Control',
@@ -136,8 +150,16 @@ describe('Streamer Kappa API', () => {
     });
   });
   it('maps private shared profiles to a 403 response', async () => {
-    mockDollarFetch.mockRejectedValueOnce({ statusCode: 403 });
+    mockDollarFetch.mockRejectedValueOnce({
+      statusCode: 403,
+      statusMessage: 'Profile is private for this mode',
+    });
     const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+  });
+  it('maps non-private 403 shared profile errors to service unavailable', async () => {
+    mockDollarFetch.mockRejectedValueOnce({ statusCode: 403, statusMessage: 'Forbidden' });
+    const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
+    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Shared profiles unavailable');
   });
 });
