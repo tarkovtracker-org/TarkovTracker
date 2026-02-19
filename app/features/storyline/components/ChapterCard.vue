@@ -181,7 +181,7 @@
     chapter: StorylineNormalizedChapterView;
   }
   const props = defineProps<Props>();
-  const chapter = computed(() => props.chapter);
+  const { chapter } = toRefs(props);
   const emit = defineEmits<{
     toggleChapter: [chapterId: string];
     toggleObjective: [chapterId: string, objectiveId: string];

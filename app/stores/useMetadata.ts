@@ -301,6 +301,8 @@ interface MetadataState {
   mapTasks: { [mapId: string]: string[] };
   neededItemTaskObjectives: NeededItemTaskObjective[];
   neededItemHideoutModules: NeededItemHideoutModule[];
+  objectiveModeCountDifferences: Record<string, { pvp: number; pve: number }>;
+  objectiveModeCountDifferencesHydrated: boolean;
   // Language and game mode
   languageCode: string;
   currentGameMode: string;
@@ -373,6 +375,8 @@ export const useMetadataStore = defineStore('metadata', {
     mapTasks: markRaw({}),
     neededItemTaskObjectives: markRaw([]),
     neededItemHideoutModules: markRaw([]),
+    objectiveModeCountDifferences: markRaw({}),
+    objectiveModeCountDifferencesHydrated: false,
     languageCode: 'en',
     currentGameMode: GAME_MODES.PVP,
     lastCachePurgeCheckAt: 0,
@@ -431,6 +435,10 @@ export const useMetadataStore = defineStore('metadata', {
       (state) =>
       (taskId: string): GameEdition[] =>
         getTaskExclusiveEditions(taskId, state.editions),
+    getObjectiveModeCountDifference:
+      (state) =>
+      (objectiveId: string): { pvp: number; pve: number } | undefined =>
+        state.objectiveModeCountDifferences[objectiveId],
     // Computed properties for maps with merged static data
     mapsWithSvg: (state): TarkovMap[] => {
       if (!state.maps.length || !state.staticMapData) {
@@ -1135,7 +1143,12 @@ export const useMetadataStore = defineStore('metadata', {
      * Fetch task objectives and fail conditions data
      */
     async fetchTaskObjectivesData(forceRefresh = false) {
-      if (this.tasksObjectivesHydrated && !forceRefresh) return;
+      if (this.tasksObjectivesHydrated && !forceRefresh) {
+        this.fetchObjectiveModeCountDifferences(false).catch((err) =>
+          logger.warn('[MetadataStore] Failed to refresh objective mode count differences:', err)
+        );
+        return;
+      }
       const apiGameMode = this.getApiGameMode();
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
@@ -1152,11 +1165,101 @@ export const useMetadataStore = defineStore('metadata', {
           this.hydrateTaskItems({ rebuildDerivedData: false });
           this.rebuildTaskDerivedData();
           useTarkovStore().repairFailedTaskStates();
+          this.fetchObjectiveModeCountDifferences(forceRefresh).catch((err) =>
+            logger.warn('[MetadataStore] Failed to fetch objective mode count differences:', err)
+          );
         },
         logName: 'Task objectives',
         forceRefresh,
         promiseKey: 'taskObjectivesPromise',
       });
+    },
+    async fetchObjectiveModeCountDifferences(forceRefresh = false) {
+      if (!this.tasks.length) {
+        this.objectiveModeCountDifferences = markRaw({});
+        this.objectiveModeCountDifferencesHydrated = false;
+        return;
+      }
+      if (this.objectiveModeCountDifferencesHydrated && !forceRefresh) {
+        return;
+      }
+      const requestApiMode = this.getApiGameMode();
+      const requestLanguageCode = this.languageCode;
+      const requestTasks = this.tasks;
+      const currentCounts = this.buildObjectiveCountMap(requestTasks);
+      const otherApiMode =
+        requestApiMode === API_GAME_MODES[GAME_MODES.PVE]
+          ? API_GAME_MODES[GAME_MODES.PVP]
+          : API_GAME_MODES[GAME_MODES.PVE];
+      try {
+        const response = await $fetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
+          '/api/tarkov/tasks-objectives',
+          {
+            query: { lang: requestLanguageCode, gameMode: otherApiMode },
+          }
+        );
+        if (isFetchError(response)) {
+          const errorMessage =
+            typeof response.error === 'string' ? response.error : JSON.stringify(response.error);
+          throw new Error(`API error: ${errorMessage}`);
+        }
+        if (!isFetchSuccess<TarkovTaskObjectivesQueryResult>(response)) {
+          throw new Error('Invalid response: expected { data }');
+        }
+        if (
+          this.getApiGameMode() !== requestApiMode ||
+          this.languageCode !== requestLanguageCode ||
+          this.tasks !== requestTasks
+        ) {
+          return;
+        }
+        const otherModeTasks = (response.data.tasks || []).map((task) => ({
+          id: task.id,
+          objectives: this.normalizeObjectiveItems(
+            normalizeTaskObjectives<TaskObjective>(task.objectives)
+          ),
+        }));
+        const dedupedOtherModeTasks = this.dedupeObjectiveIds(otherModeTasks as Task[]).tasks;
+        const otherCounts = this.buildObjectiveCountMap(dedupedOtherModeTasks);
+        const allObjectiveIds = new Set([...currentCounts.keys(), ...otherCounts.keys()]);
+        const differences: Record<string, { pvp: number; pve: number }> = {};
+        allObjectiveIds.forEach((objectiveId) => {
+          const currentModeCount = currentCounts.get(objectiveId);
+          const otherModeCount = otherCounts.get(objectiveId);
+          if (
+            typeof currentModeCount !== 'number' ||
+            typeof otherModeCount !== 'number' ||
+            currentModeCount === otherModeCount
+          ) {
+            return;
+          }
+          const pvpCount =
+            requestApiMode === API_GAME_MODES[GAME_MODES.PVP] ? currentModeCount : otherModeCount;
+          const pveCount =
+            requestApiMode === API_GAME_MODES[GAME_MODES.PVE] ? currentModeCount : otherModeCount;
+          differences[objectiveId] = { pvp: pvpCount, pve: pveCount };
+        });
+        if (
+          this.getApiGameMode() !== requestApiMode ||
+          this.languageCode !== requestLanguageCode ||
+          this.tasks !== requestTasks
+        ) {
+          return;
+        }
+        this.objectiveModeCountDifferences = markRaw(differences);
+        this.objectiveModeCountDifferencesHydrated = true;
+      } catch (err) {
+        if (
+          this.getApiGameMode() !== requestApiMode ||
+          this.languageCode !== requestLanguageCode ||
+          this.tasks !== requestTasks
+        ) {
+          return;
+        }
+        this.objectiveModeCountDifferences = markRaw({});
+        this.objectiveModeCountDifferencesHydrated = false;
+        logger.warn('[MetadataStore] Error building objective mode count differences:', err);
+      }
     },
     /**
      * Fetch task rewards data
@@ -1403,6 +1506,8 @@ export const useMetadataStore = defineStore('metadata', {
       });
       this.tasksObjectivesPending = (data.tasks?.length ?? 0) > 0;
       this.tasksObjectivesHydrated = false;
+      this.objectiveModeCountDifferences = markRaw({});
+      this.objectiveModeCountDifferencesHydrated = false;
       this.processTasksData({
         tasks: data.tasks || [],
         maps: data.maps || [],
@@ -1463,6 +1568,23 @@ export const useMetadataStore = defineStore('metadata', {
         return changed ? { ...task, objectives } : task;
       });
       return { tasks: updatedTasks, duplicateObjectiveIds };
+    },
+    buildObjectiveCountMap(tasks: Array<Pick<Task, 'id' | 'objectives'>>): Map<string, number> {
+      const counts = new Map<string, number>();
+      tasks.forEach((task) => {
+        normalizeTaskObjectives<TaskObjective>(task.objectives).forEach((objective) => {
+          if (!objective?.id || typeof objective.count !== 'number') return;
+          counts.set(objective.id, objective.count);
+          const dedupSuffix = `:${task.id}`;
+          if (objective.id.endsWith(dedupSuffix)) {
+            const baseObjectiveId = objective.id.slice(0, -dedupSuffix.length);
+            if (baseObjectiveId && !counts.has(baseObjectiveId)) {
+              counts.set(baseObjectiveId, objective.count);
+            }
+          }
+        });
+      });
+      return counts;
     },
     /**
      * Merge objective payloads into existing tasks
@@ -1927,6 +2049,8 @@ export const useMetadataStore = defineStore('metadata', {
       this.objectiveGPS = markRaw({});
       this.mapTasks = markRaw({});
       this.neededItemTaskObjectives = markRaw([]);
+      this.objectiveModeCountDifferences = markRaw({});
+      this.objectiveModeCountDifferencesHydrated = false;
       this.tasksObjectivesPending = false;
       this.tasksObjectivesHydrated = false;
       this.mapSpawnsLoaded = false;

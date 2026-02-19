@@ -261,23 +261,30 @@
               {{ t('page.tasks.questcard.objectives') }}
             </div>
             <div class="flex items-center gap-2">
-              <UButton
+              <AppTooltip
                 v-if="taskItemObjectives.length > 0"
-                size="xs"
-                color="neutral"
-                variant="soft"
-                class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
-                :disabled="!hasResettableItemObjectiveProgress"
-                :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
-                @click.stop="confirmResetTaskItemCounts"
-                @keydown.enter.stop
-                @keydown.space.stop
+                :text="resetItemCountsDisabledReason"
+                :disabled="!resetItemCountsDisabledReason"
               >
-                <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
-                <span class="hidden sm:inline">
-                  {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
+                <span class="inline-flex" @click.stop>
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="soft"
+                    class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
+                    :disabled="!canResetTaskItemCounts"
+                    :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
+                    @click.stop="confirmResetTaskItemCounts"
+                    @keydown.enter.stop
+                    @keydown.space.stop
+                  >
+                    <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
+                    <span class="hidden sm:inline">
+                      {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
+                    </span>
+                  </UButton>
                 </span>
-              </UButton>
+              </AppTooltip>
               <UIcon
                 name="i-mdi-chevron-down"
                 aria-hidden="true"
@@ -483,11 +490,20 @@
     });
   const { isComplete, isFailed, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
+  const shouldAutoCollapseObjectives = computed(() => {
+    return isComplete.value && preferencesStore.getHideCompletedTaskObjectives;
+  });
+  watch(
+    shouldAutoCollapseObjectives,
+    (shouldAutoCollapse) => {
+      if (shouldAutoCollapse) {
+        objectivesExpanded.value = false;
+      }
+    },
+    { immediate: true }
+  );
   const objectivesVisible = computed(() => {
-    return (
-      objectivesExpanded.value &&
-      !(isComplete.value && preferencesStore.getHideCompletedTaskObjectives)
-    );
+    return objectivesExpanded.value;
   });
   const toggleObjectivesVisibility = () => {
     objectivesExpanded.value = !objectivesExpanded.value;
@@ -965,6 +981,30 @@
       return tarkovStore.getObjectiveCount(objective.id) > 0;
     });
   });
+  const canResetTaskItemCounts = computed(() => {
+    return hasResettableItemObjectiveProgress.value && !isComplete.value && !isFailed.value;
+  });
+  const resetItemCountsDisabledReason = computed(() => {
+    if (isComplete.value && !isFailed.value) {
+      return t(
+        'page.tasks.questcard.reset_item_counts_disabled_complete',
+        'Uncomplete this task to reset item counts'
+      );
+    }
+    if (isFailed.value) {
+      return t(
+        'page.tasks.questcard.reset_item_counts_disabled_failed',
+        'Mark this task as available to reset item counts'
+      );
+    }
+    if (!hasResettableItemObjectiveProgress.value) {
+      return t(
+        'page.tasks.questcard.reset_item_counts_disabled_nothing_to_reset',
+        'There are no item counts to reset'
+      );
+    }
+    return '';
+  });
   const nonOptionalTaskObjectives = computed(() =>
     taskObjectives.value.filter((objective) => !objective.optional)
   );
@@ -1046,7 +1086,7 @@
     markTaskFailed();
   };
   const confirmResetTaskItemCounts = () => {
-    if (!hasResettableItemObjectiveProgress.value) return;
+    if (!canResetTaskItemCounts.value) return;
     const confirmed = window.confirm(
       t('page.tasks.questcard.reset_item_counts_confirm', 'Reset all item counts for this task?')
     );

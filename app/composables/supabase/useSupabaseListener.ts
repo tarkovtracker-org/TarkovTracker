@@ -27,6 +27,16 @@ interface SupabaseListenerReturn {
   cleanup: () => void;
   fetchData: () => Promise<void>;
 }
+interface QueryBuilderWithAbortSignal {
+  abortSignal?: (signal: AbortSignal) => PromiseLike<{
+    data: Record<string, unknown> | null;
+    error: PostgrestError | null;
+  }>;
+  then: PromiseLike<{
+    data: Record<string, unknown> | null;
+    error: PostgrestError | null;
+  }>['then'];
+}
 const VUE_REACTIVITY_SETTLE_MS = 100;
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof Error && error.name === 'AbortError') {
@@ -90,16 +100,11 @@ export function useSupabaseListener({
       return;
     }
     try {
-      const queryBuilder = $supabase.client.from(table).select('*').eq(column, rest).single() as {
-        abortSignal?: (signal: AbortSignal) => PromiseLike<{
-          data: Record<string, unknown> | null;
-          error: PostgrestError | null;
-        }>;
-        then: PromiseLike<{
-          data: Record<string, unknown> | null;
-          error: PostgrestError | null;
-        }>['then'];
-      };
+      const queryBuilder = $supabase.client
+        .from(table)
+        .select('*')
+        .eq(column, rest)
+        .single() as QueryBuilderWithAbortSignal;
       const result =
         typeof queryBuilder.abortSignal === 'function'
           ? await queryBuilder.abortSignal(fetchController.signal)

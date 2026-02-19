@@ -56,6 +56,14 @@ The project uses two Cloudflare Workers, each with a Durable Object binding for 
 - `workers/team-gateway` — Team feature gateway
   - `TEAM_GATEWAY_LIMITER` (Durable Object)
 
+## Server API Runtime Notes
+
+- `app/server/api/team/members.ts` uses in-memory Maps for response caching and rate limiting.
+- `app/server/api/profile/[userId]/[mode].get.ts` uses in-memory Maps `sharedProfileRateLimiter` and `sharedProfileCache`.
+- In-memory Maps are local to each running instance and are not shared across serverless/horizontal deployments.
+- For production-wide consistency across both endpoints, use a distributed backend (for example Redis or Cloudflare KV)
+  for rate limiting and caching.
+
 ## Development
 
 Start the development server:

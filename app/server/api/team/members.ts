@@ -52,6 +52,8 @@ type CachedTeamMembersEntry = {
   expiresAt: number;
   payload: TeamMembersPayload;
 };
+// Instance-local only: these maps are not shared across serverless or horizontally scaled instances.
+// Use a distributed backend (for example Redis/KV) for global rate limiting and cache consistency.
 const teamMembersRateLimiter = new Map<string, RateLimitEntry>();
 const teamMembersCache = new Map<string, CachedTeamMembersEntry>();
 const toFiniteProfileNumber = (value: unknown): number | null =>

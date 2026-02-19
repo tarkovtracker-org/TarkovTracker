@@ -8,11 +8,6 @@ const mockState = {
   isAdmin: false,
   isLoggedIn: false,
 };
-const mockFns = {
-  resetAllData: vi.fn(),
-  resetPvEData: vi.fn(),
-  resetPvPData: vi.fn(),
-};
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: {
     user: {
@@ -32,9 +27,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
   runWithContext: (fn: () => unknown) => fn(),
 }));
 mockNuxtImport('useSeoMeta', () => () => {});
-mockNuxtImport('useToast', () => () => ({
-  add: vi.fn(),
-}));
+mockNuxtImport('definePageMeta', () => () => {});
 vi.mock('@/stores/useSystemStore', () => ({
   useSystemStore: () => ({
     get isAdmin() {
@@ -43,13 +36,6 @@ vi.mock('@/stores/useSystemStore', () => ({
   }),
   useSystemStoreWithSupabase: () => ({
     hasInitiallyLoaded: ref(true),
-  }),
-}));
-vi.mock('@/stores/useTarkov', () => ({
-  useTarkovStore: () => ({
-    resetAllData: mockFns.resetAllData,
-    resetPvEData: mockFns.resetPvEData,
-    resetPvPData: mockFns.resetPvPData,
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -64,7 +50,7 @@ describe('account page', () => {
     mockState.isLoggedIn = false;
     vi.clearAllMocks();
   });
-  it('renders streamer mode card', () => {
+  it('renders privacy card', () => {
     const wrapper = mount(AccountPage, {
       global: {
         mocks: { $t: (key: string) => key },
@@ -72,18 +58,54 @@ describe('account page', () => {
           AccountDeletionCard: true,
           ApiTokens: true,
           GenericCard: true,
-          'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
           NuxtLink: { template: '<a><slot /></a>' },
           PrivacyCard: { template: '<div data-testid="privacy-card" />' },
           ProfileSharingCard: true,
           UAlert: true,
-          UButton: true,
           UIcon: true,
-          UInput: true,
-          UModal: true,
         },
       },
     });
     expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+  });
+  it('shows admin link when user is admin', () => {
+    mockState.isAdmin = true;
+    mockState.isLoggedIn = true;
+    const wrapper = mount(AccountPage, {
+      global: {
+        mocks: { $t: (key: string) => key },
+        stubs: {
+          AccountDeletionCard: true,
+          ApiTokens: true,
+          GenericCard: true,
+          NuxtLink: { template: '<a><slot /></a>', props: ['to'] },
+          PrivacyCard: true,
+          ProfileSharingCard: true,
+          UAlert: true,
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.text()).toContain('settings.general.admin_panel');
+  });
+  it('hides admin link when user is not admin', () => {
+    mockState.isAdmin = false;
+    mockState.isLoggedIn = true;
+    const wrapper = mount(AccountPage, {
+      global: {
+        mocks: { $t: (key: string) => key },
+        stubs: {
+          AccountDeletionCard: true,
+          ApiTokens: true,
+          GenericCard: true,
+          NuxtLink: { template: '<a><slot /></a>' },
+          PrivacyCard: true,
+          ProfileSharingCard: true,
+          UAlert: true,
+          UIcon: true,
+        },
+      },
+    });
+    expect(wrapper.text()).not.toContain('settings.general.admin_panel');
   });
 });

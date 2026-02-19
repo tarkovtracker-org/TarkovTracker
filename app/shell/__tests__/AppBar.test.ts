@@ -293,6 +293,17 @@ describe('AppBar account menu', () => {
     wrapper.unmount();
   });
 });
+describe('AppBar logged out actions', () => {
+  beforeEach(() => {
+    mockSupabase.user.loggedIn = false;
+  });
+  it('shows settings icon and login link when not logged in', async () => {
+    const wrapper = await mountAppBar();
+    expect(wrapper.find('[aria-label="navigation_drawer.settings"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('navigation_drawer.login');
+    wrapper.unmount();
+  });
+});
 describe('AppBar page title', () => {
   beforeEach(() => {
     routeState.name = 'tasks';

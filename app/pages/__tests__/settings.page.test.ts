@@ -81,9 +81,6 @@ vi.mock('@/stores/useTarkov', () => ({
     resetAllData: mockFns.resetAllData,
   }),
 }));
-vi.mock('@/features/settings/TarkovDevImportCard.vue', () => ({
-  default: { template: '<div />' },
-}));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
@@ -91,9 +88,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
-  AccountDeletionCard: true,
-  ApiTokens: true,
+  DataManagementCard: true,
   DisplayNameCard: true,
+  ApiTokens: true,
   NuxtLink: { template: '<a><slot /></a>' },
   SelectMenuFixed: {
     props: ['modelValue', 'items'],
@@ -109,7 +106,6 @@ const defaultGlobalStubs = {
   MapSettingsCard: true,
   ProfileSharingCard: true,
   SkillsCard: true,
-  TarkovDevImportCard: true,
   UAlert: true,
   UBadge: true,
   UButton: {

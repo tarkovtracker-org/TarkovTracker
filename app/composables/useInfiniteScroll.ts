@@ -13,11 +13,17 @@ export interface UseInfiniteScrollOptions {
   debug?: boolean | Ref<boolean> | ComputedRef<boolean>;
   debugLabel?: string;
 }
+export interface UseInfiniteScrollReturn {
+  isLoading: Ref<boolean>;
+  stop: () => void;
+  start: () => void;
+  checkAndLoadMore: (scrollTriggered?: boolean) => Promise<void>;
+}
 export function useInfiniteScroll(
   sentinelRef: Ref<HTMLElement | null> | ComputedRef<HTMLElement | null>,
   onLoadMore: () => void | Promise<void>,
   options: UseInfiniteScrollOptions = {}
-) {
+): UseInfiniteScrollReturn {
   const {
     rootMargin = '1500px',
     threshold = 0,
@@ -38,6 +44,7 @@ export function useInfiniteScroll(
     observer: null as IntersectionObserver | null,
     isStopped: true,
     autoLoadCount: 0,
+    maxAutoLoadWarned: false,
     scrollTimeout: null as ReturnType<typeof setTimeout> | null,
   };
   let warnedObserverUnavailable = false;
@@ -45,7 +52,15 @@ export function useInfiniteScroll(
     if (!debug.value) return;
     logger.info(`[useInfiniteScroll:${debugLabel}] ${event}`, payload);
   };
-  const checkAndLoadMore = async (scrollTriggered = false) => {
+  const resetAutoLoadState = (reason: string) => {
+    const shouldLogReset = state.autoLoadCount > 0 || state.maxAutoLoadWarned;
+    state.autoLoadCount = 0;
+    state.maxAutoLoadWarned = false;
+    if (shouldLogReset) {
+      logDebug('auto-load-reset', { reason });
+    }
+  };
+  const checkAndLoadMoreInternal = async (scrollTriggered = false, resetAutoLoadCycle = false) => {
     if (state.isStopped) {
       logDebug('skip', { reason: 'stopped', scrollTriggered });
       return;
@@ -66,11 +81,14 @@ export function useInfiniteScroll(
       logDebug('skip', { reason: 'missing-window', scrollTriggered });
       return;
     }
+    if (autoFill && resetAutoLoadCycle) {
+      resetAutoLoadState('manual-check');
+    }
     const startedAt = debug.value ? perfNow() : 0;
     const rect = sentinelRef.value.getBoundingClientRect();
     const marginPx = parseInt(rootMargin) || 1500;
     if (rect.top >= window.innerHeight + marginPx) {
-      state.autoLoadCount = 0;
+      resetAutoLoadState('sentinel-out-of-range');
       logDebug('defer', {
         autoLoadCount: state.autoLoadCount,
         marginPx,
@@ -81,7 +99,10 @@ export function useInfiniteScroll(
       return;
     }
     if (autoFill && state.autoLoadCount >= maxAutoLoads) {
-      logger.warn('[useInfiniteScroll] Max auto-load cycles reached, pausing');
+      if (!state.maxAutoLoadWarned) {
+        state.maxAutoLoadWarned = true;
+        logger.warn('[useInfiniteScroll] Max auto-load cycles reached, pausing');
+      }
       logDebug('max-auto-loads', {
         autoLoadCount: state.autoLoadCount,
         maxAutoLoads,
@@ -90,7 +111,10 @@ export function useInfiniteScroll(
       });
       return;
     }
-    if (autoFill) state.autoLoadCount += 1;
+    if (autoFill) {
+      state.autoLoadCount += 1;
+      state.maxAutoLoadWarned = false;
+    }
     isLoading.value = true;
     const loadStartedAt = debug.value ? perfNow() : 0;
     try {
@@ -125,10 +149,13 @@ export function useInfiniteScroll(
         logDebug('queue-next', { autoLoadCount: state.autoLoadCount, scrollTriggered });
         await nextTick();
         if (!state.isStopped && enabled.value && sentinelRef.value) {
-          void checkAndLoadMore(scrollTriggered);
+          void checkAndLoadMoreInternal(scrollTriggered);
         }
       }
     }
+  };
+  const checkAndLoadMore = async (scrollTriggered = false) => {
+    await checkAndLoadMoreInternal(scrollTriggered, !scrollTriggered);
   };
   const handleIntersection = (entries: IntersectionObserverEntry[]) => {
     if (state.isStopped) return;
@@ -139,7 +166,7 @@ export function useInfiniteScroll(
         intersectionRatio: target.intersectionRatio,
         rectTop: Math.round(target.boundingClientRect.top),
       });
-      state.autoLoadCount = 0;
+      resetAutoLoadState('intersection');
       void checkAndLoadMore(true);
     }
   };
@@ -176,7 +203,7 @@ export function useInfiniteScroll(
       return;
     }
     state.isStopped = false;
-    state.autoLoadCount = 0;
+    resetAutoLoadState('start');
     logDebug('start', { autoFill, autoLoadOnReady, maxAutoLoads, rootMargin, threshold });
     const observerReady = createObserver();
     if (typeof window !== 'undefined' && useScrollFallback) {
@@ -200,7 +227,7 @@ export function useInfiniteScroll(
     state.isStopped = true;
     state.observer?.disconnect();
     state.observer = null;
-    state.autoLoadCount = 0;
+    resetAutoLoadState('stop');
     if (typeof window !== 'undefined' && useScrollFallback) {
       window.removeEventListener('scroll', handleScroll);
       logDebug('scroll-fallback-stop');

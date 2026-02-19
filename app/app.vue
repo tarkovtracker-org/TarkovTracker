@@ -21,7 +21,6 @@
   </UApp>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useAppInitialization } from '@/composables/useAppInitialization';
   import { logger } from '@/utils/logger';
   useAppInitialization();

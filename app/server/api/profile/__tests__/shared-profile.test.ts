@@ -9,6 +9,8 @@ const { mockGetRequestHeader, mockGetRouterParam, mockFetch } = vi.hoisted(() =>
   mockFetch: vi.fn(),
 }));
 const runtimeConfig = {
+  sharedProfileCacheTtlMs: 5000,
+  sharedProfileRateLimitPerMinute: 120,
   supabaseAnonKey: 'anon-key',
   supabaseServiceKey: 'service-key',
   supabaseUrl: 'https://test.supabase.co',
@@ -44,6 +46,8 @@ describe('Shared Profile API', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch as typeof fetch);
     vi.clearAllMocks();
+    runtimeConfig.sharedProfileCacheTtlMs = 5000;
+    runtimeConfig.sharedProfileRateLimitPerMinute = 120;
     runtimeConfig.supabaseAnonKey = 'anon-key';
     runtimeConfig.supabaseServiceKey = 'service-key';
     runtimeConfig.supabaseUrl = 'https://test.supabase.co';
@@ -277,5 +281,72 @@ describe('Shared Profile API', () => {
     await expect(handler(mockEvent as H3Event)).rejects.toThrow(
       'Shared profiles unavailable on this environment'
     );
+  });
+  it('refreshes cache after fixed ttl even when profile is read repeatedly', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'development';
+      runtimeConfig.sharedProfileCacheTtlMs = 50;
+      runtimeConfig.sharedProfileRateLimitPerMinute = 1000;
+      vi.resetModules();
+      let now = 0;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              game_edition: 4,
+              pve_data: { level: 1 },
+              pvp_data: { displayName: 'PublicPlayer', level: 24 },
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              profile_share_pvp_public: true,
+              profile_share_pve_public: false,
+              streamer_mode: false,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              game_edition: 4,
+              pve_data: { level: 1 },
+              pvp_data: { displayName: 'RefreshedPlayer', level: 30 },
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              profile_share_pvp_public: true,
+              profile_share_pve_public: false,
+              streamer_mode: false,
+            },
+          ],
+        });
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      const first = await handler(mockEvent as H3Event);
+      now = 30;
+      const second = await handler(mockEvent as H3Event);
+      now = 60;
+      const third = await handler(mockEvent as H3Event);
+      expect(first.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
+      expect(second.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
+      expect(third.data).toEqual({ displayName: 'RefreshedPlayer', level: 30 });
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      vi.resetModules();
+    }
   });
 });

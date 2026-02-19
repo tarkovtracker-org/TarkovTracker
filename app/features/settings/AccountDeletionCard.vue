@@ -3,19 +3,10 @@
   import { useSystemStore } from '@/stores/useSystemStore';
   import { resetTarkovSync, useTarkovStore } from '@/stores/useTarkov';
   import { useTeamStore } from '@/stores/useTeamStore';
-  import { LIMITS } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   defineOptions({
     inheritAttrs: false,
   });
-  const { showResetActions = false } = defineProps<{
-    showResetActions?: boolean;
-  }>();
-  const emit = defineEmits<{
-    resetPvp: [];
-    resetPve: [];
-    resetAll: [];
-  }>();
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -34,20 +25,6 @@
   const showUsername = ref(false);
   const showEmail = ref(false);
   const showAccountId = ref(false);
-  const DISPLAY_NAME_MAX_LENGTH = LIMITS.DISPLAY_NAME_MAX_LENGTH;
-  const localDisplayName = ref(tarkovStore.getDisplayName() || '');
-  const displayName = computed(() => tarkovStore.getDisplayName());
-  const currentModeLabel = computed(() =>
-    (tarkovStore.getCurrentGameMode() || 'pvp').toUpperCase()
-  );
-  const hasDisplayNameChanges = computed(() => {
-    const trimmed = localDisplayName.value.trim();
-    const initial = displayName.value || '';
-    return trimmed !== initial && trimmed.length > 0;
-  });
-  watch(displayName, (newName) => {
-    localDisplayName.value = newName || '';
-  });
   const maskedUsername = computed(() => {
     const username = $supabase?.user?.username;
     if (!username) return 'N/A';
@@ -76,43 +53,6 @@
   const isLoggedIn = computed(() => {
     return Boolean($supabase?.user?.loggedIn);
   });
-  const saveDisplayName = () => {
-    const trimmed = localDisplayName.value.trim();
-    if (!trimmed) {
-      toast.add({
-        title: t('settings.display_name.validation_error'),
-        description: t('settings.display_name.empty_error'),
-        color: 'error',
-      });
-      return;
-    }
-    if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) {
-      toast.add({
-        title: t('settings.display_name.validation_error'),
-        description: t('settings.display_name.max_error', { max: DISPLAY_NAME_MAX_LENGTH }),
-        color: 'error',
-      });
-      return;
-    }
-    try {
-      tarkovStore.setDisplayName(trimmed);
-      localDisplayName.value = trimmed;
-      toast.add({
-        title: t('settings.display_name.saved_title'),
-        description: t('settings.display_name.saved_description', {
-          mode: currentModeLabel.value,
-        }),
-        color: 'success',
-      });
-    } catch (error) {
-      logger.error('[Settings] Error saving display name:', error);
-      toast.add({
-        title: t('settings.display_name.save_failed_title'),
-        description: t('settings.display_name.save_failed_description'),
-        color: 'error',
-      });
-    }
-  };
   type AuthProvider = 'discord' | 'twitch' | 'google' | 'github';
   interface UserWithProviders {
     providers?: string[] | null;
@@ -338,46 +278,6 @@
     >
       <template #content>
         <div class="p-4">
-          <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
-            <div class="mb-3 text-base font-bold">
-              {{ $t('settings.display_name.title') }}
-            </div>
-            <div class="space-y-2">
-              <div class="flex items-center gap-2">
-                <p class="text-surface-200 text-sm font-semibold">
-                  {{ $t('settings.display_name.label') }}
-                </p>
-                <UTooltip :text="$t('settings.display_name.explanation')">
-                  <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
-                </UTooltip>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <UInput
-                  v-model="localDisplayName"
-                  :maxlength="DISPLAY_NAME_MAX_LENGTH"
-                  :placeholder="$t('settings.display_name.placeholder')"
-                  class="min-w-48 flex-1"
-                  @keyup.enter="saveDisplayName"
-                />
-                <UButton
-                  icon="i-mdi-check"
-                  color="primary"
-                  variant="soft"
-                  size="sm"
-                  :disabled="!hasDisplayNameChanges"
-                  :aria-label="$t('settings.display_name.save')"
-                  @click="saveDisplayName"
-                />
-              </div>
-              <p class="text-surface-400 text-xs">
-                {{
-                  $t('settings.display_name.mode_hint', {
-                    mode: currentModeLabel,
-                  })
-                }}
-              </p>
-            </div>
-          </div>
           <template v-if="isLoggedIn">
             <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
               <div class="mb-3 text-base font-bold">
@@ -534,46 +434,10 @@
               </div>
             </div>
           </template>
-          <div v-if="showResetActions" :class="{ 'mb-6': isLoggedIn }">
-            <div class="text-surface-300 mb-3 text-sm font-semibold">
-              {{ $t('settings.account_data.data_reset_title') }}
-            </div>
-            <div class="grid gap-3 md:grid-cols-3">
-              <UButton
-                icon="i-mdi-shield-sword"
-                block
-                :ui="{
-                  base: 'bg-pvp-900 hover:bg-pvp-800 active:bg-pvp-700 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
-                }"
-                @click="emit('resetPvp')"
-              >
-                {{ $t('settings.data_management.reset_pvp_data') }}
-              </UButton>
-              <UButton
-                icon="i-mdi-account-group"
-                block
-                :ui="{
-                  base: 'bg-pve-900 hover:bg-pve-800 active:bg-pve-700 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
-                }"
-                @click="emit('resetPve')"
-              >
-                {{ $t('settings.data_management.reset_pve_data') }}
-              </UButton>
-              <UButton
-                color="error"
-                variant="soft"
-                icon="i-mdi-delete-sweep"
-                block
-                @click="emit('resetAll')"
-              >
-                {{ $t('settings.data_management.reset_all_data') }}
-              </UButton>
-            </div>
-          </div>
           <div
             :class="{
-              'border-surface-700 border-t pt-6': isLoggedIn || showResetActions,
-              'pt-0': !isLoggedIn && !showResetActions,
+              'border-surface-700 border-t pt-6': isLoggedIn,
+              'pt-0': !isLoggedIn,
             }"
           >
             <div class="text-surface-300 mb-3 text-sm font-semibold">

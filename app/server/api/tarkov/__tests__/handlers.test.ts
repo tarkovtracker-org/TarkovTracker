@@ -258,28 +258,33 @@ describe('Tarkov API handlers', () => {
       },
     });
   });
-  it('returns null lastPurgeAt when audit log has no successful purge entries', async () => {
+  it('returns null lastPurgeAt when audit log is empty', async () => {
     runtimeConfig.supabaseUrl = 'https://test.supabase.co';
     runtimeConfig.supabaseServiceKey = 'service-key';
-    const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     mockFetch.mockResolvedValueOnce({
       json: async () => [],
       ok: true,
     });
-    const emptyLogResult = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenLastCalledWith(event, { 'Cache-Control': 'no-store' });
-    expect(emptyLogResult).toEqual({
+    const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
+    const result = await handler(event);
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(result).toEqual({
       data: {
         lastPurgeAt: null,
       },
     });
+  });
+  it('returns null lastPurgeAt when audit log has only unsuccessful entries', async () => {
+    runtimeConfig.supabaseUrl = 'https://test.supabase.co';
+    runtimeConfig.supabaseServiceKey = 'service-key';
     mockFetch.mockResolvedValueOnce({
       json: async () => [{ details: { success: false } }],
       ok: true,
     });
-    const unsuccessfulLogResult = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenLastCalledWith(event, { 'Cache-Control': 'no-store' });
-    expect(unsuccessfulLogResult).toEqual({
+    const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
+    const result = await handler(event);
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(result).toEqual({
       data: {
         lastPurgeAt: null,
       },

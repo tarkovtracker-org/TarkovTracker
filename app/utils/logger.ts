@@ -49,11 +49,8 @@ function normalizeLogArg(arg: unknown): unknown {
     if (typeof serialized !== 'string') {
       return String(arg);
     }
-    const truncated =
-      serialized.length > MAX_LOG_ARG_LENGTH
-        ? `${serialized.slice(0, MAX_LOG_ARG_LENGTH)}...`
-        : serialized;
     if (serialized.length > MAX_LOG_ARG_LENGTH) {
+      const truncated = `${serialized.slice(0, MAX_LOG_ARG_LENGTH)}...`;
       return truncated;
     }
     return JSON.parse(serialized);

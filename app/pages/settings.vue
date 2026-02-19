@@ -1,6 +1,7 @@
 <template>
   <div class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-5xl space-y-4">
+      <DisplayNameCard />
       <ExperienceCard />
       <GenericCard
         icon="mdi-gamepad-variant"
@@ -48,28 +49,19 @@
           </div>
         </template>
       </GenericCard>
-      <TarkovDevImportCard />
       <TaskDisplayCard />
       <MapSettingsCard />
       <SkillsCard />
-      <div class="text-surface-400 flex items-center justify-center gap-1.5 pt-2 text-sm">
-        <UIcon name="i-mdi-information-outline" class="h-4 w-4 shrink-0" />
-        <span>
-          {{ $t('settings.account_moved.message') }}
-          <NuxtLink to="/account" class="text-primary-400 hover:text-primary-300 underline">
-            {{ $t('settings.account_moved.link') }}
-          </NuxtLink>
-        </span>
-      </div>
+      <DataManagementCard />
     </div>
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
+  import DataManagementCard from '@/features/settings/DataManagementCard.vue';
+  import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
-  import TarkovDevImportCard from '@/features/settings/TarkovDevImportCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';

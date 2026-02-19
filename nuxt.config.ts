@@ -52,7 +52,7 @@ export default defineNuxtConfig({
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
       appVersion: process.env.NUXT_PUBLIC_APP_VERSION || appVersion,
       clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
-      tarkovVersion: process.env.NUXT_PUBLIC_TARKOV_VERSION || '1.0.2.0',
+      tarkovVersion: process.env.NUXT_PUBLIC_TARKOV_VERSION || '1.0.2.0.42996',
       teamGatewayUrl: process.env.NUXT_PUBLIC_TEAM_GATEWAY_URL || '',
       tokenGatewayUrl: process.env.NUXT_PUBLIC_TOKEN_GATEWAY_URL || '',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,

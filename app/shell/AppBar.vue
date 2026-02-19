@@ -99,6 +99,18 @@
         </template>
         <template v-else>
           <div class="bg-surface-700/50 mx-1 h-5 w-px" />
+          <AppTooltip :text="t('navigation_drawer.settings')">
+            <NuxtLink
+              to="/settings"
+              class="hover:bg-surface-700 flex h-7 w-7 items-center justify-center rounded transition-colors"
+              :aria-label="t('navigation_drawer.settings')"
+            >
+              <UIcon
+                name="i-mdi-cog-outline"
+                class="text-surface-300 h-4.5 w-4.5 hover:text-white"
+              />
+            </NuxtLink>
+          </AppTooltip>
           <NuxtLink
             to="/login"
             class="hover:bg-surface-700 hidden rounded px-2 py-1 text-sm text-white sm:inline-flex"

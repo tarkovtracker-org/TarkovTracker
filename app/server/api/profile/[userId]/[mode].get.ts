@@ -271,6 +271,8 @@ const getCachedProfile = (key: string): SharedProfilePayload | null => {
     sharedProfileCache.delete(key);
     return null;
   }
+  sharedProfileCache.delete(key);
+  sharedProfileCache.set(key, cached);
   return cached.payload;
 };
 const setCachedProfile = (key: string, payload: SharedProfilePayload, ttlMs: number): void => {

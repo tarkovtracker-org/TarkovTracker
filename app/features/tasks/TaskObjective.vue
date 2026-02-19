@@ -32,6 +32,16 @@
       <div class="min-w-0">
         <div class="text-surface-100 text-sm leading-5">
           {{ props.objective?.description }}
+          <AppTooltip v-if="objectiveModeCountDifference" :text="objectiveModeCountDifferenceText">
+            <UBadge
+              variant="soft"
+              size="xs"
+              class="ml-1 text-[10px] font-semibold uppercase"
+              :class="currentModeBadgeClass"
+            >
+              {{ currentModeBadgeLabel }}
+            </UBadge>
+          </AppTooltip>
           <span
             v-if="props.objective.optional"
             class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
@@ -124,6 +134,7 @@
   import { useProgressStore } from '@/stores/useProgress';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { GAME_MODES } from '@/utils/constants';
   import type { TaskObjective } from '@/types/tarkov';
   const FALLBACK_IS_MAP_VIEW_REF = ref(false);
   const { t } = useI18n({ useScope: 'global' });
@@ -237,6 +248,25 @@
       return OBJECTIVE_ICON_MAP[type as keyof typeof OBJECTIVE_ICON_MAP];
     }
     return 'mdi-help-circle';
+  });
+  const objectiveModeCountDifference = computed(() =>
+    metadataStore.getObjectiveModeCountDifference(props.objective.id)
+  );
+  const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
+  const currentModeBadgeLabel = computed(() =>
+    currentGameMode.value === GAME_MODES.PVE
+      ? t('settings.game_settings.pve')
+      : t('settings.game_settings.pvp')
+  );
+  const currentModeBadgeClass = computed(() =>
+    currentGameMode.value === GAME_MODES.PVE
+      ? 'border border-pve-500/30 bg-pve-700/25 text-pve-200'
+      : 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200'
+  );
+  const objectiveModeCountDifferenceText = computed(() => {
+    const difference = objectiveModeCountDifference.value;
+    if (!difference) return '';
+    return `${t('settings.game_settings.pvp')} ${difference.pvp} • ${t('settings.game_settings.pve')} ${difference.pve}`;
   });
   const neededCount = computed(() => fullObjective.value?.count ?? props.objective.count ?? 1);
   const hasMapLocation = computed(() => {

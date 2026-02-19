@@ -128,16 +128,15 @@ export const computeInvalidProgress = ({
       invalidateTaskRecursive(task.id);
     }
   });
-  // Invalidate task successors when an alternative task is completed.
+  // Invalidate alternative branches when this task is completed.
   tasks.forEach((task) => {
     if (!task.alternatives?.length) return;
-    const alternativeCompleted = task.alternatives.some((alternativeId) => {
-      const completion = taskCompletions[alternativeId];
-      return completion?.complete === true && completion?.failed !== true;
+    const completion = taskCompletions[task.id];
+    const isCompleted = completion?.complete === true && completion?.failed !== true;
+    if (!isCompleted) return;
+    task.alternatives.forEach((alternativeId) => {
+      invalidateTaskRecursive(alternativeId);
     });
-    if (alternativeCompleted) {
-      invalidateTaskRecursive(task.id, true);
-    }
   });
   return { invalidTasks, invalidObjectives };
 };

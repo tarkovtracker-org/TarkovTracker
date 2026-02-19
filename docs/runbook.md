@@ -21,9 +21,11 @@
 ## Pre-Deploy Validation
 
 1. `npm run format`
-2. `npm run test`
-3. `npm run build`
-4. `npm audit --omit=dev`
+2. `npm run lint`
+3. `npm run typecheck`
+4. `npm run test`
+5. `npm run build`
+6. `npm audit --omit=dev`
 
 ## Deployment
 

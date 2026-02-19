@@ -70,6 +70,47 @@ describe('computeInvalidProgress', () => {
     // Dragnet should NOT be invalid - it accepts failed status for its prerequisite
     expect(result.invalidTasks.dragnet).toBeFalsy();
   });
+  it('respects one-way alternative direction for fail-condition branches', () => {
+    const tasks: Task[] = [
+      {
+        id: 'protectSky',
+        name: 'Protect the Sky',
+        objectives: [{ id: 'protectObj' }],
+        alternatives: ['simpleSideJob'],
+      } as Task,
+      {
+        id: 'simpleSideJob',
+        name: 'Simple Side Job',
+        objectives: [{ id: 'simpleObj' }],
+      } as Task,
+      {
+        id: 'batteryFollowUp',
+        name: 'Battery Follow Up',
+        objectives: [{ id: 'batteryObj' }],
+        taskRequirements: [
+          { task: { id: 'protectSky' }, status: ['complete'] },
+        ] as Task['taskRequirements'],
+      } as Task,
+    ];
+    const simpleCompleteResult = computeInvalidProgress({
+      tasks,
+      taskCompletions: {
+        simpleSideJob: { complete: true, failed: false },
+      },
+      pmcFaction: 'USEC',
+    });
+    expect(simpleCompleteResult.invalidTasks.protectSky).toBeFalsy();
+    expect(simpleCompleteResult.invalidTasks.batteryFollowUp).toBeFalsy();
+    const protectCompleteResult = computeInvalidProgress({
+      tasks,
+      taskCompletions: {
+        protectSky: { complete: true, failed: false },
+      },
+      pmcFaction: 'USEC',
+    });
+    expect(protectCompleteResult.invalidTasks.simpleSideJob).toBe(true);
+    expect(protectCompleteResult.invalidObjectives.simpleObj).toBe(true);
+  });
   it('invalidates task when requirement only accepts complete but prereq is failed', () => {
     const tasks: Task[] = [
       {
