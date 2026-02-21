@@ -7,6 +7,13 @@ import {
   type H3Event,
 } from 'h3';
 import { createLogger } from '@/server/utils/logger';
+import {
+  consumeSharedRateLimit,
+  createSharedCacheHandle,
+  readSharedCache,
+  writeSharedCache,
+  type SharedCacheHandle,
+} from '@/server/utils/sharedEdgeStore';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import {
   isRecord,
@@ -25,8 +32,10 @@ const REST_FETCH_TIMEOUT_MS = 8000;
 const RATE_LIMIT_WINDOW_MS = 60000;
 const DEFAULT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE = 120;
 const DEFAULT_SHARED_PROFILE_CACHE_TTL_MS = 5000;
-const MAX_SHARED_PROFILE_CACHE_ENTRIES = 2000;
+const SHARED_PROFILE_CACHE_PREFIX = 'shared-profile';
+const SHARED_PROFILE_RATE_LIMIT_PREFIX = 'shared-profile-rate';
 const isTestEnvironment = process.env.NODE_ENV === 'test';
+const isProductionEnvironment = process.env.NODE_ENV === 'production';
 type PreferencesRow = {
   streamer_mode?: boolean | null;
   profile_share_pve_public?: boolean | null;
@@ -89,16 +98,6 @@ type SharedProfilePayload = {
   userId: string;
   visibility: 'owner' | 'public';
 };
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-type CachedSharedProfileEntry = {
-  expiresAt: number;
-  payload: SharedProfilePayload;
-};
-const sharedProfileRateLimiter = new Map<string, RateLimitEntry>();
-const sharedProfileCache = new Map<string, CachedSharedProfileEntry>();
 const normalizeMode = (value: string | undefined): GameMode | null => {
   if (value === GAME_MODES.PVE) {
     return GAME_MODES.PVE;
@@ -231,70 +230,76 @@ const toPositiveInteger = (value: unknown, fallback: number): number => {
   const integer = Math.trunc(numeric);
   return integer > 0 ? integer : fallback;
 };
-const cleanupRateLimitEntries = (now: number): void => {
-  for (const [key, entry] of sharedProfileRateLimiter.entries()) {
-    if (now >= entry.resetAt) {
-      sharedProfileRateLimiter.delete(key);
-    }
-  }
-};
-const consumeRateLimit = (key: string, limit: number): boolean => {
-  const now = Date.now();
-  cleanupRateLimitEntries(now);
-  const existing = sharedProfileRateLimiter.get(key);
-  if (!existing || now >= existing.resetAt) {
-    sharedProfileRateLimiter.set(key, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return true;
-  }
-  if (existing.count >= limit) {
+const isSharedProfilePayload = (value: unknown): value is SharedProfilePayload => {
+  if (!value || typeof value !== 'object') {
     return false;
   }
-  existing.count += 1;
-  sharedProfileRateLimiter.set(key, existing);
-  return true;
+  const candidate = value as SharedProfilePayload;
+  return (
+    typeof candidate.userId === 'string' &&
+    (candidate.mode === GAME_MODES.PVP || candidate.mode === GAME_MODES.PVE) &&
+    (candidate.visibility === 'owner' || candidate.visibility === 'public') &&
+    typeof candidate.gameEdition === 'number'
+  );
 };
-const cleanupCacheEntries = (now: number): void => {
-  for (const [key, entry] of sharedProfileCache.entries()) {
-    if (now >= entry.expiresAt) {
-      sharedProfileCache.delete(key);
+const consumeRateLimit = async (
+  handle: SharedCacheHandle,
+  key: string,
+  limit: number
+): Promise<boolean> => {
+  return consumeSharedRateLimit(
+    handle,
+    SHARED_PROFILE_RATE_LIMIT_PREFIX,
+    key,
+    limit,
+    RATE_LIMIT_WINDOW_MS,
+    ({ action, error, key: failedKey }) => {
+      logger.warn('Shared profile rate-limit cache operation failed', {
+        action,
+        error: error instanceof Error ? error.message : String(error),
+        key: failedKey,
+      });
     }
-  }
+  );
 };
-const getCachedProfile = (key: string): SharedProfilePayload | null => {
-  const now = Date.now();
-  cleanupCacheEntries(now);
-  const cached = sharedProfileCache.get(key);
-  if (!cached || now >= cached.expiresAt) {
-    sharedProfileCache.delete(key);
-    return null;
-  }
-  sharedProfileCache.delete(key);
-  sharedProfileCache.set(key, cached);
-  return cached.payload;
+const getCachedProfile = async (
+  handle: SharedCacheHandle,
+  key: string
+): Promise<SharedProfilePayload | null> => {
+  const payload = await readSharedCache<unknown>(
+    handle,
+    SHARED_PROFILE_CACHE_PREFIX,
+    key,
+    ({ action, error, key: failedKey }) => {
+      logger.warn('Shared profile cache operation failed', {
+        action,
+        error: error instanceof Error ? error.message : String(error),
+        key: failedKey,
+      });
+    }
+  );
+  return isSharedProfilePayload(payload) ? payload : null;
 };
-const setCachedProfile = (key: string, payload: SharedProfilePayload, ttlMs: number): void => {
-  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
-    return;
-  }
-  const now = Date.now();
-  cleanupCacheEntries(now);
-  if (sharedProfileCache.size >= MAX_SHARED_PROFILE_CACHE_ENTRIES && !sharedProfileCache.has(key)) {
-    let oldestKey: string | undefined;
-    for (const cacheKey of sharedProfileCache.keys()) {
-      oldestKey = cacheKey;
-      break;
-    }
-    if (oldestKey) {
-      sharedProfileCache.delete(oldestKey);
-    }
-  }
-  sharedProfileCache.set(key, {
-    expiresAt: now + ttlMs,
+const setCachedProfile = async (
+  handle: SharedCacheHandle,
+  key: string,
+  payload: SharedProfilePayload,
+  ttlMs: number
+): Promise<void> => {
+  await writeSharedCache(
+    handle,
+    SHARED_PROFILE_CACHE_PREFIX,
+    key,
     payload,
-  });
+    ttlMs,
+    ({ action, error, key: failedKey }) => {
+      logger.warn('Shared profile cache operation failed', {
+        action,
+        error: error instanceof Error ? error.message : String(error),
+        key: failedKey,
+      });
+    }
+  );
 };
 const getClientIdentifier = (event: H3Event): string => {
   const forwardedFor = getRequestHeader(event, 'x-forwarded-for');
@@ -405,10 +410,25 @@ export default defineEventHandler(async (event) => {
     config.sharedProfileCacheTtlMs,
     DEFAULT_SHARED_PROFILE_CACHE_TTL_MS
   );
+  const sharedCacheHandle = createSharedCacheHandle(
+    (config as { public?: { appUrl?: string } }).public?.appUrl
+  );
+  if (!isTestEnvironment && isProductionEnvironment && !sharedCacheHandle.cache) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Shared profile cache is unavailable in this environment',
+    });
+  }
   const clientIdentifier = getClientIdentifier(event);
   if (!isTestEnvironment) {
     const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}:${userId}:${mode}`;
-    if (!consumeRateLimit(preAuthRateLimitKey, sharedProfileRateLimitPerMinute)) {
+    if (
+      !(await consumeRateLimit(
+        sharedCacheHandle,
+        preAuthRateLimitKey,
+        sharedProfileRateLimitPerMinute
+      ))
+    ) {
       throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
     }
   }
@@ -417,13 +437,19 @@ export default defineEventHandler(async (event) => {
   const requesterKey = requesterUserId ?? clientIdentifier;
   if (!isTestEnvironment) {
     const requesterRateLimitKey = `shared-profile:requester:${requesterKey}:${userId}:${mode}`;
-    if (!consumeRateLimit(requesterRateLimitKey, sharedProfileRateLimitPerMinute)) {
+    if (
+      !(await consumeRateLimit(
+        sharedCacheHandle,
+        requesterRateLimitKey,
+        sharedProfileRateLimitPerMinute
+      ))
+    ) {
       throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
     }
   }
   const sharedProfileCacheKey = `${userId}:${mode}:${requesterKey}`;
   if (!isTestEnvironment) {
-    const cached = getCachedProfile(sharedProfileCacheKey);
+    const cached = await getCachedProfile(sharedCacheHandle, sharedProfileCacheKey);
     if (cached) {
       return cached;
     }
@@ -528,7 +554,12 @@ export default defineEventHandler(async (event) => {
     visibility: isOwner ? 'owner' : 'public',
   };
   if (!isTestEnvironment) {
-    setCachedProfile(sharedProfileCacheKey, payload, sharedProfileCacheTtlMs);
+    await setCachedProfile(
+      sharedCacheHandle,
+      sharedProfileCacheKey,
+      payload,
+      sharedProfileCacheTtlMs
+    );
   }
   return payload;
 });

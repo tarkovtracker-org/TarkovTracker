@@ -1072,7 +1072,7 @@
       import_success_title: 'Sicherung importiert',
       import_success_description: 'Deine Fortschrittsdaten wurden erfolgreich wiederhergestellt.',
       import_error_title: 'Import fehlgeschlagen',
-      export_error_title: 'Export Failed',
+      export_error_title: 'Export fehlgeschlagen',
       reset_title: 'Fortschritt zurücksetzen',
     },
     data_migration: {

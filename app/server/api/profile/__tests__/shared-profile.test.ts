@@ -289,6 +289,19 @@ describe('Shared Profile API', () => {
       runtimeConfig.sharedProfileCacheTtlMs = 50;
       runtimeConfig.sharedProfileRateLimitPerMinute = 1000;
       vi.resetModules();
+      const sharedCacheEntries = new Map<string, string>();
+      const cacheApi = {
+        match: vi.fn(async (request: Request) => {
+          const payload = sharedCacheEntries.get(request.url);
+          return payload
+            ? new Response(payload, { headers: { 'Content-Type': 'application/json' } })
+            : undefined;
+        }),
+        put: vi.fn(async (request: Request, response: Response) => {
+          sharedCacheEntries.set(request.url, await response.clone().text());
+        }),
+      };
+      vi.stubGlobal('caches', { default: cacheApi });
       let now = 0;
       vi.spyOn(Date, 'now').mockImplementation(() => now);
       mockFetch
@@ -346,6 +359,8 @@ describe('Shared Profile API', () => {
       expect(mockFetch).toHaveBeenCalledTimes(4);
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
+      vi.unstubAllGlobals();
+      vi.stubGlobal('fetch', mockFetch as typeof fetch);
       vi.resetModules();
     }
   });

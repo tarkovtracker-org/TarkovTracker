@@ -63,6 +63,86 @@ describe('useDataBackup', () => {
     vi.clearAllMocks();
     vi.resetModules();
   });
+  describe('exportProgress', () => {
+    it('creates backup JSON with expected app and progress data', async () => {
+      let backupBlob: Blob | null = null;
+      const hadCreateObjectURL = typeof URL.createObjectURL === 'function';
+      const hadRevokeObjectURL = typeof URL.revokeObjectURL === 'function';
+      if (!hadCreateObjectURL) {
+        Object.defineProperty(URL, 'createObjectURL', {
+          configurable: true,
+          value: () => '',
+          writable: true,
+        });
+      }
+      if (!hadRevokeObjectURL) {
+        Object.defineProperty(URL, 'revokeObjectURL', {
+          configurable: true,
+          value: () => undefined,
+          writable: true,
+        });
+      }
+      const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((object) => {
+        if (object instanceof Blob) {
+          backupBlob = object;
+        }
+        return 'blob:test-backup-url';
+      });
+      const revokeObjectURLSpy = vi
+        .spyOn(URL, 'revokeObjectURL')
+        .mockImplementation(() => undefined);
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      try {
+        const { exportProgress, exportError } = await loadComposable();
+        await exportProgress();
+        expect(exportError.value).toBeNull();
+        expect(tarkovStore.getPvPProgressData).toHaveBeenCalledOnce();
+        expect(tarkovStore.getPvEProgressData).toHaveBeenCalledOnce();
+        expect(createObjectURLSpy).toHaveBeenCalledOnce();
+        expect(createObjectURLSpy).toHaveBeenCalledWith(expect.any(Blob));
+        expect(backupBlob).toBeInstanceOf(Blob);
+        const backupText = await backupBlob!.text();
+        const backupJson = JSON.parse(backupText) as Record<string, unknown>;
+        expect(backupJson).toEqual(
+          expect.objectContaining({
+            _format: 'tarkovtracker-backup',
+            _version: 1,
+            appVersion: '1.8.2',
+            currentGameMode: 'pvp',
+            gameEdition: 1,
+            tarkovUid: null,
+            pvp: expect.objectContaining({
+              displayName: 'TestPlayer',
+              level: 5,
+              pmcFaction: 'USEC',
+              skills: { Endurance: 10 },
+            }),
+            pve: expect.objectContaining({
+              displayName: null,
+              level: 1,
+              pmcFaction: 'BEAR',
+            }),
+          })
+        );
+        expect(backupJson.exportedAt).toEqual(expect.any(Number));
+        expect(revokeObjectURLSpy).toHaveBeenCalledOnce();
+        expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-backup-url');
+        expect(clickSpy).toHaveBeenCalledOnce();
+      } finally {
+        createObjectURLSpy.mockRestore();
+        revokeObjectURLSpy.mockRestore();
+        clickSpy.mockRestore();
+        if (!hadCreateObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).createObjectURL;
+        }
+        if (!hadRevokeObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+        }
+      }
+    });
+  });
   describe('parseBackupFile', () => {
     it('rejects non-JSON files', async () => {
       const { parseBackupFile, importState, importError } = await loadComposable();

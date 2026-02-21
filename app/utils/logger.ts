@@ -5,6 +5,12 @@ type ClientLogPayload = {
   level: LogLevel;
   timestamp: string;
 };
+type Logger = {
+  debug: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+};
 const levelPriority: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
@@ -50,8 +56,7 @@ function normalizeLogArg(arg: unknown): unknown {
       return String(arg);
     }
     if (serialized.length > MAX_LOG_ARG_LENGTH) {
-      const truncated = `${serialized.slice(0, MAX_LOG_ARG_LENGTH)}...`;
-      return truncated;
+      return `${serialized.slice(0, MAX_LOG_ARG_LENGTH)}...`;
     }
     return JSON.parse(serialized);
   } catch {
@@ -115,7 +120,7 @@ export const resetCachedLogLevel = (): void => {
   cachedLogLevel = null;
   cachedClientLogSinkUrl = null;
 };
-export const logger = {
+export const logger: Logger = {
   debug: (...args: unknown[]) => {
     if (shouldClientLog('debug')) console.debug(...args);
   },

@@ -6,6 +6,13 @@ import {
   setResponseHeader,
   type H3Event,
 } from 'h3';
+import {
+  consumeSharedRateLimit,
+  createSharedCacheHandle,
+  readSharedCache,
+  writeSharedCache,
+  type SharedCacheHandle,
+} from '@/server/utils/sharedEdgeStore';
 import { createLogger } from '~/server/utils/logger';
 const logger = createLogger('TeamMembers');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -14,8 +21,10 @@ const REST_FETCH_TIMEOUT_MS = 8000;
 const RATE_LIMIT_WINDOW_MS = 60000;
 const DEFAULT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE = 120;
 const DEFAULT_TEAM_MEMBERS_CACHE_TTL_MS = 5000;
-const MAX_CACHE_ENTRIES = 2000;
+const TEAM_MEMBERS_CACHE_PREFIX = 'team-members';
+const TEAM_MEMBERS_RATE_LIMIT_PREFIX = 'team-members-rate';
 const isTestEnvironment = process.env.NODE_ENV === 'test';
+const isProductionEnvironment = process.env.NODE_ENV === 'production';
 const isValidUuid = (value: string): boolean => UUID_REGEX.test(value);
 const isValidTeamId = (value: string): boolean => TEAM_ID_REGEX.test(value);
 const buildRestPath = (resource: string, params: Record<string, string | number>): string => {
@@ -44,18 +53,6 @@ type TeamMembersPayload = {
   members: string[];
   profiles: Record<string, MemberProfile>;
 };
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-type CachedTeamMembersEntry = {
-  expiresAt: number;
-  payload: TeamMembersPayload;
-};
-// Instance-local only: these maps are not shared across serverless or horizontally scaled instances.
-// Use a distributed backend (for example Redis/KV) for global rate limiting and cache consistency.
-const teamMembersRateLimiter = new Map<string, RateLimitEntry>();
-const teamMembersCache = new Map<string, CachedTeamMembersEntry>();
 const toFiniteProfileNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 const sanitizeProfileDisplayName = (value: unknown): string | null => {
@@ -85,68 +82,75 @@ const toPositiveInteger = (value: unknown, fallback: number): number => {
   const integer = Math.trunc(numeric);
   return integer > 0 ? integer : fallback;
 };
-const cleanupRateLimitEntries = (now: number): void => {
-  for (const [key, entry] of teamMembersRateLimiter.entries()) {
-    if (now >= entry.resetAt) {
-      teamMembersRateLimiter.delete(key);
-    }
-  }
-};
-const consumeRateLimit = (key: string, limit: number): boolean => {
-  const now = Date.now();
-  cleanupRateLimitEntries(now);
-  const existing = teamMembersRateLimiter.get(key);
-  if (!existing || now >= existing.resetAt) {
-    teamMembersRateLimiter.set(key, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return true;
-  }
-  if (existing.count >= limit) {
+const isTeamMembersPayload = (value: unknown): value is TeamMembersPayload => {
+  if (!value || typeof value !== 'object') {
     return false;
   }
-  existing.count += 1;
-  return true;
+  const candidate = value as TeamMembersPayload;
+  return (
+    Array.isArray(candidate.members) &&
+    candidate.profiles !== null &&
+    typeof candidate.profiles === 'object'
+  );
 };
-const cleanupCacheEntries = (now: number): void => {
-  for (const [key, entry] of teamMembersCache.entries()) {
-    if (now >= entry.expiresAt) {
-      teamMembersCache.delete(key);
+const consumeRateLimit = async (
+  handle: SharedCacheHandle,
+  key: string,
+  limit: number
+): Promise<boolean> => {
+  return consumeSharedRateLimit(
+    handle,
+    TEAM_MEMBERS_RATE_LIMIT_PREFIX,
+    key,
+    limit,
+    RATE_LIMIT_WINDOW_MS,
+    ({ action, error, key: failedKey }) => {
+      logger.warn('Team members rate-limit cache operation failed', {
+        action,
+        error: error instanceof Error ? error.message : String(error),
+        key: failedKey,
+      });
     }
-  }
+  );
 };
-const getCachedTeamMembers = (key: string): TeamMembersPayload | null => {
-  const now = Date.now();
-  cleanupCacheEntries(now);
-  const cached = teamMembersCache.get(key);
-  if (!cached || now >= cached.expiresAt) {
-    teamMembersCache.delete(key);
-    return null;
-  }
-  teamMembersCache.delete(key);
-  teamMembersCache.set(key, cached);
-  return cached.payload;
-};
-const setCachedTeamMembers = (key: string, payload: TeamMembersPayload, ttlMs: number): void => {
-  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
-    return;
-  }
-  const now = Date.now();
-  cleanupCacheEntries(now);
-  if (teamMembersCache.size >= MAX_CACHE_ENTRIES && !teamMembersCache.has(key)) {
-    const oldestKey = teamMembersCache.keys().next().value;
-    if (oldestKey) {
-      teamMembersCache.delete(oldestKey);
+const getCachedTeamMembers = async (
+  handle: SharedCacheHandle,
+  key: string
+): Promise<TeamMembersPayload | null> => {
+  const payload = await readSharedCache<unknown>(
+    handle,
+    TEAM_MEMBERS_CACHE_PREFIX,
+    key,
+    ({ action, error, key: failedKey }) => {
+      logger.warn('Team members cache operation failed', {
+        action,
+        error: error instanceof Error ? error.message : String(error),
+        key: failedKey,
+      });
     }
-  }
-  if (teamMembersCache.has(key)) {
-    teamMembersCache.delete(key);
-  }
-  teamMembersCache.set(key, {
-    expiresAt: now + ttlMs,
+  );
+  return isTeamMembersPayload(payload) ? payload : null;
+};
+const setCachedTeamMembers = async (
+  handle: SharedCacheHandle,
+  key: string,
+  payload: TeamMembersPayload,
+  ttlMs: number
+): Promise<void> => {
+  await writeSharedCache(
+    handle,
+    TEAM_MEMBERS_CACHE_PREFIX,
+    key,
     payload,
-  });
+    ttlMs,
+    ({ action, error, key: failedKey }) => {
+      logger.warn('Team members cache operation failed', {
+        action,
+        error: error instanceof Error ? error.message : String(error),
+        key: failedKey,
+      });
+    }
+  );
 };
 const getClientIdentifier = (event: H3Event): string => {
   const forwardedForRaw = getRequestHeader(event, 'x-forwarded-for');
@@ -225,9 +229,24 @@ export default defineEventHandler(async (event) => {
     config.teamMembersCacheTtlMs,
     DEFAULT_TEAM_MEMBERS_CACHE_TTL_MS
   );
+  const sharedCacheHandle = createSharedCacheHandle(
+    (config as { public?: { appUrl?: string } }).public?.appUrl
+  );
+  if (!isTestEnvironment && isProductionEnvironment && !sharedCacheHandle.cache) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Team members cache is unavailable in this environment',
+    });
+  }
   if (!isTestEnvironment) {
     const preAuthRateLimitKey = `team-members:ip:${teamId}:${getClientIdentifier(event)}`;
-    if (!consumeRateLimit(preAuthRateLimitKey, teamMembersRateLimitPerMinute)) {
+    if (
+      !(await consumeRateLimit(
+        sharedCacheHandle,
+        preAuthRateLimitKey,
+        teamMembersRateLimitPerMinute
+      ))
+    ) {
       throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
     }
   }
@@ -263,13 +282,15 @@ export default defineEventHandler(async (event) => {
   }
   if (!isTestEnvironment) {
     const userRateLimitKey = `team-members:user:${teamId}:${userId}`;
-    if (!consumeRateLimit(userRateLimitKey, teamMembersRateLimitPerMinute)) {
+    if (
+      !(await consumeRateLimit(sharedCacheHandle, userRateLimitKey, teamMembersRateLimitPerMinute))
+    ) {
       throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
     }
   }
   const teamMembersCacheKey = `${teamId}:${userId}`;
   if (!isTestEnvironment) {
-    const cached = getCachedTeamMembers(teamMembersCacheKey);
+    const cached = await getCachedTeamMembers(sharedCacheHandle, teamMembersCacheKey);
     if (cached) {
       return cached;
     }
@@ -358,7 +379,12 @@ export default defineEventHandler(async (event) => {
   }
   const payload: TeamMembersPayload = { members: validMemberIds, profiles: profileMap };
   if (!isTestEnvironment) {
-    setCachedTeamMembers(teamMembersCacheKey, payload, teamMembersCacheTtlMs);
+    await setCachedTeamMembers(
+      sharedCacheHandle,
+      teamMembersCacheKey,
+      payload,
+      teamMembersCacheTtlMs
+    );
   }
   return payload;
 });

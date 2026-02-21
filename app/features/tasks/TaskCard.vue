@@ -503,7 +503,7 @@
     { immediate: true }
   );
   const objectivesVisible = computed(() => {
-    return objectivesExpanded.value;
+    return objectivesExpanded.value && !shouldAutoCollapseObjectives.value;
   });
   const toggleObjectivesVisibility = () => {
     objectivesExpanded.value = !objectivesExpanded.value;
