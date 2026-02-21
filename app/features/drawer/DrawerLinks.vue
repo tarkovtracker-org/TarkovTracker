@@ -44,6 +44,12 @@
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
+        icon="i-mdi-cog-outline"
+        locale-key="settings"
+        to="/settings"
+        :is-collapsed="props.isCollapsed"
+      ></DrawerItem>
+      <DrawerItem
         icon="i-heroicons-video-camera"
         locale-key="streamer_tools"
         to="/streamer-tools"
