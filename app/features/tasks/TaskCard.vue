@@ -496,14 +496,12 @@
   watch(
     shouldAutoCollapseObjectives,
     (shouldAutoCollapse) => {
-      if (shouldAutoCollapse) {
-        objectivesExpanded.value = false;
-      }
+      objectivesExpanded.value = !shouldAutoCollapse;
     },
     { immediate: true }
   );
   const objectivesVisible = computed(() => {
-    return objectivesExpanded.value && !shouldAutoCollapseObjectives.value;
+    return objectivesExpanded.value;
   });
   const toggleObjectivesVisibility = () => {
     objectivesExpanded.value = !objectivesExpanded.value;

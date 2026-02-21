@@ -20,14 +20,12 @@ const createObjectivesVisibilityState = (options: {
   watch(
     shouldAutoCollapseObjectives,
     (shouldAutoCollapse) => {
-      if (shouldAutoCollapse) {
-        objectivesExpanded.value = false;
-      }
+      objectivesExpanded.value = !shouldAutoCollapse;
     },
     { immediate: true }
   );
   const objectivesVisible = computed(() => {
-    return objectivesExpanded.value && !shouldAutoCollapseObjectives.value;
+    return objectivesExpanded.value;
   });
   const toggleObjectivesVisibility = () => {
     objectivesExpanded.value = !objectivesExpanded.value;
@@ -41,13 +39,16 @@ const createObjectivesVisibilityState = (options: {
   };
 };
 describe('TaskCard objectives visibility behavior', () => {
-  it('keeps completed objectives hidden when hide preference is enabled', async () => {
+  it('starts hidden then allows manual toggle when hide preference is enabled', async () => {
     const state = createObjectivesVisibilityState({
       hideCompletedObjectives: true,
       isComplete: true,
     });
     await nextTick();
     expect(state.objectivesVisible.value).toBe(false);
+    state.toggleObjectivesVisibility();
+    await nextTick();
+    expect(state.objectivesVisible.value).toBe(true);
     state.toggleObjectivesVisibility();
     await nextTick();
     expect(state.objectivesVisible.value).toBe(false);
