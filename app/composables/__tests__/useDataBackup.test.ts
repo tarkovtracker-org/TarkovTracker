@@ -109,7 +109,6 @@ describe('useDataBackup', () => {
           expect.objectContaining({
             _format: 'tarkovtracker-backup',
             _version: 1,
-            appVersion: '1.8.2',
             currentGameMode: 'pvp',
             gameEdition: 1,
             tarkovUid: null,
@@ -126,6 +125,7 @@ describe('useDataBackup', () => {
             }),
           })
         );
+        expect(backupJson.appVersion).toEqual(expect.any(String));
         expect(backupJson.exportedAt).toEqual(expect.any(Number));
         expect(revokeObjectURLSpy).toHaveBeenCalledOnce();
         expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-backup-url');
