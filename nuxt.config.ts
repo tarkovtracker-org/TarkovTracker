@@ -8,6 +8,7 @@ const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
 const appVersion = packageJson.version ?? 'dev';
+const isNonProduction = process.env.NODE_ENV !== 'production';
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   ssr: false,
@@ -139,11 +140,8 @@ export default defineNuxtConfig({
     '~': appDir,
   },
   modules: [
-    '@nuxt/eslint',
-    // Only load test utils during local dev/test so production builds don't try to resolve devDependency
-    process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
-      ? '@nuxt/test-utils/module'
-      : undefined,
+    isNonProduction ? '@nuxt/eslint' : undefined,
+    isNonProduction ? '@nuxt/test-utils/module' : undefined,
     '@pinia/nuxt',
     '@nuxt/ui',
     '@nuxt/image',
