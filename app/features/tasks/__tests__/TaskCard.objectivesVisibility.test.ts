@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, type ComputedRef, watch } from 'vue';
 type ObjectivesVisibilityState = {
   isComplete: ReturnType<typeof ref<boolean>>;
   hideCompletedObjectives: ReturnType<typeof ref<boolean>>;
   objectivesExpanded: ReturnType<typeof ref<boolean>>;
-  objectivesVisible: ReturnType<typeof computed<boolean>>;
+  objectivesVisible: ComputedRef<boolean>;
   toggleObjectivesVisibility: () => void;
 };
 const createObjectivesVisibilityState = (options: {

@@ -40,11 +40,15 @@ const UModal = {
     '<div v-if="open"><slot name="header" /><slot name="body" /><slot name="footer" :close="close" /></div>',
   props: ['open'],
   emits: ['update:open', 'close'],
-  methods: {
-    close() {
-      this.$emit('update:open', false);
-      this.$emit('close');
-    },
+  setup(
+    _props: unknown,
+    { emit }: { emit: (event: 'update:open' | 'close', value?: false) => void }
+  ) {
+    const close = () => {
+      emit('update:open', false);
+      emit('close');
+    };
+    return { close };
   },
 };
 const findButtonByText = (wrapper: ReturnType<typeof mount>, text: string) => {

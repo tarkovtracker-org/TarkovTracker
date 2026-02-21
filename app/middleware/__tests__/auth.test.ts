@@ -23,18 +23,23 @@ mockNuxtImport(
   () => (handler: (...args: unknown[]) => unknown) => handler
 );
 describe('auth middleware', () => {
+  const runMiddleware = () =>
+    authMiddleware(
+      {} as Parameters<typeof authMiddleware>[0],
+      {} as Parameters<typeof authMiddleware>[1]
+    );
   beforeEach(() => {
     mockState.isLoggedIn = false;
     navigateToMock.mockClear();
   });
   it('redirects unauthenticated users to /login', () => {
-    const result = authMiddleware();
+    const result = runMiddleware();
     expect(navigateToMock).toHaveBeenCalledWith('/login');
     expect(result).toBe('/login');
   });
   it('allows authenticated users', () => {
     mockState.isLoggedIn = true;
-    const result = authMiddleware();
+    const result = runMiddleware();
     expect(navigateToMock).not.toHaveBeenCalled();
     expect(result).toBeUndefined();
   });

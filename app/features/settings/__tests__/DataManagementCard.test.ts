@@ -93,6 +93,7 @@ const UButton = {
 const findButtonByText = (wrapper: ReturnType<typeof mount>, text: string) => {
   return wrapper.findAll('button').find((button) => button.text().includes(text));
 };
+const asVm = <T>(vm: unknown) => vm as T;
 describe('DataManagementCard', () => {
   beforeEach(() => {
     backupFns.confirmBackupImport.mockReset();
@@ -161,7 +162,7 @@ describe('DataManagementCard', () => {
       backupState.importState.value = 'success';
     });
     const wrapper = createWrapper();
-    await (wrapper.vm as { handleBackupConfirm: () => Promise<void> }).handleBackupConfirm();
+    await asVm<{ handleBackupConfirm: () => Promise<void> }>(wrapper.vm).handleBackupConfirm();
     expect(backupFns.confirmBackupImport).toHaveBeenCalledWith({ pve: true, pvp: true });
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -173,9 +174,11 @@ describe('DataManagementCard', () => {
   it('forwards tarkov.dev confirmation using current target mode', async () => {
     tarkovStoreState.currentMode = 'pve';
     const wrapper = createWrapper();
-    await (wrapper.vm as { handleTarkovDevConfirm: () => Promise<void> }).handleTarkovDevConfirm();
+    await asVm<{ handleTarkovDevConfirm: () => Promise<void> }>(
+      wrapper.vm
+    ).handleTarkovDevConfirm();
     expect(tarkovDevFns.confirmImport).toHaveBeenCalledWith('pve');
-    (wrapper.vm as { resetTarkovDevImport: () => void }).resetTarkovDevImport();
+    asVm<{ resetTarkovDevImport: () => void }>(wrapper.vm).resetTarkovDevImport();
     expect(tarkovDevFns.reset).toHaveBeenCalledTimes(1);
   });
 });
