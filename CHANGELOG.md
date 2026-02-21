@@ -1,3 +1,15 @@
+# [1.10.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.9.0...v1.10.0) (2026-02-21)
+
+
+### Bug Fixes
+
+* **tasks:** allow expanding completed quest objectives when collapse pref is on ([ef8e18f](https://github.com/tarkovtracker-org/TarkovTracker/commit/ef8e18f1a067cc20f4ad742bd4adbfe01ea56c36)), closes [#181](https://github.com/tarkovtracker-org/TarkovTracker/issues/181)
+
+
+### Features
+
+* **drawer:** add settings link to navigation drawer ([56d7fb9](https://github.com/tarkovtracker-org/TarkovTracker/commit/56d7fb9e7a2c46e1f6546fc6b31bb1ad19ab4284))
+
 # [1.9.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.8.2...v1.9.0) (2026-02-21)
 
 
