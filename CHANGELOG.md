@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.10.0...v1.10.1) (2026-02-21)
+
+
+### Bug Fixes
+
+* gate nuxt dev-only modules outside production ([8898f58](https://github.com/tarkovtracker-org/TarkovTracker/commit/8898f5806fa1025f6ea958ec45af4ab2deda20bc))
+
 # [1.10.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.9.0...v1.10.0) (2026-02-21)
 
 
