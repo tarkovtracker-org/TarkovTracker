@@ -1,3 +1,15 @@
+# [1.9.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.8.2...v1.9.0) (2026-02-21)
+
+
+### Bug Fixes
+
+* **app:** apply pending auth profile team and test updates ([60821de](https://github.com/tarkovtracker-org/TarkovTracker/commit/60821de1076d8d4b10dd9386b38567940e3ebcc6))
+
+
+### Features
+
+* production readiness improvements with data management and review fixes ([c5e67ab](https://github.com/tarkovtracker-org/TarkovTracker/commit/c5e67ab4570646d04fb73d4788313169d2607fca))
+
 ## [1.8.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.8.1...v1.8.2) (2026-02-18)
 
 
