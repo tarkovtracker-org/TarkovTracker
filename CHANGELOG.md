@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.1...v1.12.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* preserve storyline progress in user_progress sanitizer ([#193](https://github.com/tarkovtracker-org/TarkovTracker/issues/193)) ([6bee534](https://github.com/tarkovtracker-org/TarkovTracker/commit/6bee5342e9faf022fa57c232b76be2fde21355a8))
+
 ## [1.12.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.0...v1.12.1) (2026-02-22)
 
 
