@@ -24,11 +24,50 @@ const mockLogger = {
   info: vi.fn(),
   warn: vi.fn(),
 };
+const i18nMessages: Record<string, string> = {
+  'settings.log_import.selected_files': 'Selected files',
+  'settings.log_import.selected_files_count': '{count} selected files',
+  'settings.log_import.errors.apply_import_failed':
+    'Failed to apply imported task completion data.',
+  'settings.log_import.errors.archive_log_file_too_large':
+    'Log file is too large in archive: {path}',
+  'settings.log_import.errors.archive_logs_too_large':
+    'Archive contains too much log content (max {max_mb} MB).',
+  'settings.log_import.errors.import_file_too_large': 'Import file is too large (max {max_mb} MB).',
+  'settings.log_import.errors.log_file_too_large': 'Log file is too large (max {max_mb} MB).',
+  'settings.log_import.errors.log_file_too_large_path': 'Log file is too large: {path}',
+  'settings.log_import.errors.no_files_selected': 'No files were selected.',
+  'settings.log_import.errors.no_logs_in_archive': 'No EFT logs were found in the archive.',
+  'settings.log_import.errors.no_matching_tasks_found':
+    'Quest events were found, but none match current TarkovTracker tasks.',
+  'settings.log_import.errors.no_notification_logs_found':
+    'No notification logs were found in the selected files.',
+  'settings.log_import.errors.no_quest_events_found':
+    'No quest start/completion events were found in the selected logs.',
+  'settings.log_import.errors.parse_failed': 'Failed to parse EFT logs.',
+  'settings.log_import.errors.selected_logs_too_large':
+    'Selected logs contain too much content (max {max_mb} MB).',
+  'settings.log_import.errors.task_metadata_not_loaded':
+    'Task metadata is not loaded yet. Please refresh and try again.',
+};
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => metadataStore,
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStore,
+}));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      let value = i18nMessages[key] ?? key;
+      if (!params) return value;
+      for (const [paramKey, paramValue] of Object.entries(params)) {
+        value = value.replaceAll(`{${paramKey}}`, String(paramValue));
+      }
+      return value;
+    },
+  }),
 }));
 vi.mock('@/utils/logger', () => ({
   logger: mockLogger,

@@ -700,9 +700,10 @@
     confirmImport: confirmEftLogsImport,
     reset: resetEftLogsImport,
   } = useEftLogsImport();
-  const eftDefaultLogsPath = 'C:\\Battlestate Games\\Escape from Tarkov\\Logs';
-  const eftSessionFolderExamplePath =
-    'C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037';
+  const eftDefaultLogsPath = computed(() => t('settings.log_import.default_path_value'));
+  const eftSessionFolderExamplePath = computed(() =>
+    t('settings.log_import.session_folder_example_path')
+  );
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
   const eftLogsTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
   const tarkovUid = computed(() => tarkovStore.getTarkovUid());

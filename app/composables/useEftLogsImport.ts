@@ -37,11 +37,31 @@ export interface UseEftLogsImportReturn {
   confirmImport: (targetMode: GameMode) => Promise<void>;
   reset: () => void;
 }
-function normalizeErrorMessage(error: unknown): string {
+interface EftLogsImportErrorValues {
+  [key: string]: string | number;
+}
+class EftLogsImportError extends Error {
+  key: string;
+  values?: EftLogsImportErrorValues;
+  constructor(key: string, values?: EftLogsImportErrorValues) {
+    super(key);
+    this.key = key;
+    this.values = values;
+    this.name = 'EftLogsImportError';
+  }
+}
+type TranslationFn = (key: string, values?: Record<string, unknown>) => string;
+function createImportError(key: string, values?: EftLogsImportErrorValues): EftLogsImportError {
+  return new EftLogsImportError(key, values);
+}
+function normalizeErrorMessage(error: unknown, t: TranslationFn): string {
+  if (error instanceof EftLogsImportError) {
+    return t(error.key, error.values);
+  }
   if (error instanceof Error && typeof error.message === 'string' && error.message.trim().length) {
     return error.message;
   }
-  return 'Failed to parse EFT logs';
+  return t('settings.log_import.errors.parse_failed');
 }
 function isZipFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.zip');
@@ -76,13 +96,17 @@ function selectDefaultIncludedVersions(availableVersions: string[]): string[] {
 }
 function ensureImportFileSize(file: File): void {
   if (file.size <= MAX_IMPORT_FILE_SIZE_BYTES) return;
-  throw new Error('Import file is too large (max 512 MB).');
+  throw createImportError('settings.log_import.errors.import_file_too_large', {
+    max_mb: 512,
+  });
 }
 async function readSingleLogFile(
   file: File
 ): Promise<{ files: EftLogInputFile[]; scanned: number }> {
   if (file.size > MAX_SINGLE_LOG_SIZE_BYTES) {
-    throw new Error('Log file is too large (max 32 MB).');
+    throw createImportError('settings.log_import.errors.log_file_too_large', {
+      max_mb: 32,
+    });
   }
   const text = await file.text();
   return {
@@ -100,11 +124,15 @@ async function readRawImportLogFiles(
     const filePath = relativePath && relativePath.length > 0 ? relativePath : file.name;
     if (!isEftNotificationLogFileName(filePath) && !isEftBackendLogFileName(filePath)) continue;
     if (file.size > MAX_SINGLE_LOG_SIZE_BYTES) {
-      throw new Error(`Log file is too large: ${filePath}`);
+      throw createImportError('settings.log_import.errors.log_file_too_large_path', {
+        path: filePath,
+      });
     }
     totalLogBytes += file.size;
     if (totalLogBytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
-      throw new Error('Selected logs contain too much content (max 256 MB).');
+      throw createImportError('settings.log_import.errors.selected_logs_too_large', {
+        max_mb: 256,
+      });
     }
     extracted.push({
       name: filePath,
@@ -129,17 +157,21 @@ async function readZipLogs(file: File): Promise<{ files: EftLogInputFile[]; scan
       }
       notificationEntries += 1;
       if (entry.originalSize > MAX_SINGLE_LOG_SIZE_BYTES) {
-        throw new Error(`Log file is too large in archive: ${entry.name}`);
+        throw createImportError('settings.log_import.errors.archive_log_file_too_large', {
+          path: entry.name,
+        });
       }
       totalLogBytes += entry.originalSize;
       if (totalLogBytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
-        throw new Error('Archive contains too much log content (max 256 MB).');
+        throw createImportError('settings.log_import.errors.archive_logs_too_large', {
+          max_mb: 256,
+        });
       }
       return true;
     },
   });
   if (notificationEntries === 0) {
-    throw new Error('No EFT logs were found in the archive.');
+    throw createImportError('settings.log_import.errors.no_logs_in_archive');
   }
   const files = Object.entries(extracted).map(([name, content]) => ({
     name,
@@ -151,6 +183,7 @@ async function readZipLogs(file: File): Promise<{ files: EftLogInputFile[]; scan
   };
 }
 export function useEftLogsImport(): UseEftLogsImportReturn {
+  const { t } = useI18n({ useScope: 'global' });
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const importState = ref<EftLogsImportState>('idle');
@@ -158,7 +191,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const importError = ref<string | null>(null);
   const sourceFiles = ref<EftLogInputFile[]>([]);
   const selectedVersions = ref<string[]>([]);
-  const sourceFileName = ref('Selected files');
+  const sourceFileName = ref(t('settings.log_import.selected_files'));
   const scannedEntriesCount = ref(0);
   function getTaskIds(): string[] {
     return metadataStore.tasks.map((task) => task.id);
@@ -189,7 +222,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     importError.value = null;
     sourceFiles.value = [];
     selectedVersions.value = [];
-    sourceFileName.value = 'Selected files';
+    sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
   }
   async function parseFiles(files: File[]): Promise<void> {
@@ -198,11 +231,11 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     importError.value = null;
     sourceFiles.value = [];
     selectedVersions.value = [];
-    sourceFileName.value = 'Selected files';
+    sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
     if (!Array.isArray(files) || files.length === 0) {
       importState.value = 'error';
-      importError.value = 'No files were selected.';
+      importError.value = t('settings.log_import.errors.no_files_selected');
       return;
     }
     try {
@@ -232,33 +265,33 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       }
       if (importFiles.length === 0) {
         importState.value = 'error';
-        importError.value = 'No notifications logs were found in the selected files.';
+        importError.value = t('settings.log_import.errors.no_notification_logs_found');
         return;
       }
       const tasks = metadataStore.tasks;
       if (!Array.isArray(tasks) || tasks.length === 0) {
         importState.value = 'error';
-        importError.value = 'Task metadata is not loaded yet. Please refresh and try again.';
+        importError.value = t('settings.log_import.errors.task_metadata_not_loaded');
         return;
       }
       const taskIds = tasks.map((task) => task.id);
       const parsed = parseEftLogsForQuestImport(importFiles, taskIds);
       if (parsed.dedupedCompletionEventCount === 0 && parsed.dedupedStartedEventCount === 0) {
         importState.value = 'error';
-        importError.value = 'No quest start/completion events were found in the selected logs.';
+        importError.value = t('settings.log_import.errors.no_quest_events_found');
         return;
       }
       if (parsed.matchedTaskIds.length === 0 && parsed.matchedStartedTaskIds.length === 0) {
         importState.value = 'error';
-        importError.value = 'Quest events were found, but none match current TarkovTracker tasks.';
+        importError.value = t('settings.log_import.errors.no_matching_tasks_found');
         return;
       }
       sourceFiles.value = importFiles;
       scannedEntriesCount.value = scannedEntries;
       sourceFileName.value =
         files.length === 1
-          ? (files[0]?.name ?? 'Selected files')
-          : `${files.length} selected files`;
+          ? (files[0]?.name ?? t('settings.log_import.selected_files'))
+          : t('settings.log_import.selected_files_count', { count: files.length });
       selectedVersions.value = selectDefaultIncludedVersions(parsed.availableVersions);
       if (selectedVersions.value.length === 0) {
         selectedVersions.value = parsed.availableVersions;
@@ -267,7 +300,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       importState.value = 'preview';
     } catch (error) {
       importState.value = 'error';
-      importError.value = normalizeErrorMessage(error);
+      importError.value = normalizeErrorMessage(error, t);
       logger.error('[EftLogsImport] Parse error:', error);
     }
   }
@@ -362,7 +395,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     }
     if (importFailure) {
       importState.value = 'error';
-      importError.value = 'Failed to apply imported task completion data.';
+      importError.value = t('settings.log_import.errors.apply_import_failed');
       logger.error('[EftLogsImport] Import error:', importFailure);
       return;
     }
