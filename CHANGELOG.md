@@ -1,3 +1,10 @@
+## [1.12.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.3...v1.12.4) (2026-02-22)
+
+
+### Bug Fixes
+
+* **tasks:** correct map objective ownership and harden issue [#126](https://github.com/tarkovtracker-org/TarkovTracker/issues/126) regressions ([af5df94](https://github.com/tarkovtracker-org/TarkovTracker/commit/af5df9479d26fe32645d2a48c21cf27c567f5ad6))
+
 ## [1.12.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.2...v1.12.3) (2026-02-22)
 
 
