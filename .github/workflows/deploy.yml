@@ -64,7 +64,6 @@ jobs:
         env:
           NODE_ENV: production
           NUXT_PUBLIC_APP_URL: https://tarkovtracker.org
-          NUXT_PUBLIC_APP_VERSION: ${{ github.sha }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
