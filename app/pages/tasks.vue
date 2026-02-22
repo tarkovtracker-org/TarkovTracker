@@ -105,6 +105,11 @@
                       variant="soft"
                       :title="t('alerts.no_map_data')"
                     />
+                    <MapRequiredItemsSummary
+                      v-if="selectedMapData"
+                      :map-id="selectedMapData.id"
+                      :tasks="filteredTasks"
+                    />
                   </div>
                 </Transition>
               </div>

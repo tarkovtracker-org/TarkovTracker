@@ -334,6 +334,8 @@
       map: {
         resize_handle: '调整地图高度',
         toggle_panel: '显示或隐藏地图面板',
+        required_items_summary: '活跃任务所需物品',
+        required_keys_summary: '活跃任务所需钥匙',
         time_period: {
           dawn: '黎明',
           day: '白天',

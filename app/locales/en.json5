@@ -334,6 +334,8 @@
       map: {
         resize_handle: 'Resize map height',
         toggle_panel: 'Toggle map panel',
+        required_items_summary: 'Required items for active tasks',
+        required_keys_summary: 'Required keys for active tasks',
         time_period: {
           dawn: 'Dawn',
           day: 'Day',

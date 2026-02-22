@@ -334,6 +334,8 @@
       map: {
         resize_handle: 'Изменить высоту карты',
         toggle_panel: 'Показать или скрыть панель карты',
+        required_items_summary: 'Необходимые предметы для активных заданий',
+        required_keys_summary: 'Необходимые ключи для активных заданий',
         time_period: {
           dawn: 'Рассвет',
           day: 'День',
