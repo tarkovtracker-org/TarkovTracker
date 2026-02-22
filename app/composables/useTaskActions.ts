@@ -2,6 +2,11 @@ import { useI18n } from 'vue-i18n';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
+import {
+  applyTaskAvailabilityRequirements,
+  completeTaskForProgress,
+  failTaskForProgress,
+} from '@/utils/taskProgress';
 import type { Task, TaskObjective } from '@/types/tarkov';
 export type TaskActionPayload = {
   taskId: string;
@@ -65,34 +70,19 @@ export function useTaskActions(
       }
     });
   };
-  const normalizeStatuses = (statuses?: string[]) =>
-    (statuses ?? []).map((status) => status.toLowerCase());
-  const hasAnyStatus = (statuses: string[], values: string[]) =>
-    values.some((value) => statuses.includes(value));
-  const isFailedOnlyRequirement = (statuses?: string[]) => {
-    const normalized = normalizeStatuses(statuses);
-    if (normalized.length === 0) return false;
-    return (
-      normalized.includes('failed') &&
-      !hasAnyStatus(normalized, ['complete', 'completed', 'active', 'accept', 'accepted'])
-    );
-  };
   const completeTaskForAvailability = (taskId: string) => {
-    tarkovStore.setTaskComplete(taskId);
-    const requiredTask = tasksMap.value.get(taskId);
-    if (requiredTask?.objectives) {
-      handleTaskObjectives(requiredTask.objectives, 'setTaskObjectiveComplete');
-    }
-    if (requiredTask?.alternatives) {
-      handleAlternatives(requiredTask.alternatives, 'setTaskFailed', 'setTaskObjectiveComplete');
-    }
+    completeTaskForProgress({
+      store: tarkovStore,
+      taskId,
+      tasksMap: tasksMap.value,
+    });
   };
   const failTaskForAvailability = (taskId: string) => {
-    tarkovStore.setTaskFailed(taskId);
-    const requiredTask = tasksMap.value.get(taskId);
-    if (requiredTask?.objectives) {
-      clearTaskObjectives(requiredTask.objectives);
-    }
+    failTaskForProgress({
+      store: tarkovStore,
+      taskId,
+      tasksMap: tasksMap.value,
+    });
   };
   const handleAlternatives = (
     alternatives: string[] | undefined,
@@ -202,24 +192,10 @@ export function useTaskActions(
   const markTaskAvailable = () => {
     const currentTask = task();
     const taskName = currentTask.name ?? t('page.tasks.questcard.task');
-    const handledRequirementTaskIds = new Set<string>();
-    const failedRequirementTaskIds = new Set<string>();
-    currentTask.taskRequirements?.forEach((req) => {
-      if (req.task?.id) {
-        const requirementTaskId = req.task.id;
-        if (isFailedOnlyRequirement(req.status)) {
-          failTaskForAvailability(requirementTaskId);
-          failedRequirementTaskIds.add(requirementTaskId);
-        } else {
-          completeTaskForAvailability(requirementTaskId);
-        }
-        handledRequirementTaskIds.add(requirementTaskId);
-      }
-    });
-    currentTask.predecessors?.forEach((predecessorId) => {
-      if (handledRequirementTaskIds.has(predecessorId)) return;
-      if (failedRequirementTaskIds.has(predecessorId)) return;
-      completeTaskForAvailability(predecessorId);
+    applyTaskAvailabilityRequirements({
+      onCompleteRequirement: completeTaskForAvailability,
+      onFailRequirement: failTaskForAvailability,
+      task: currentTask,
     });
     ensureMinLevel();
     emitAction({

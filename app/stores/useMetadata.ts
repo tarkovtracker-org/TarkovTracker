@@ -164,6 +164,10 @@ const queueIdleTask = (
 };
 // Exported type for craft sources used by components
 export type CraftSource = { stationId: string; stationName: string; stationLevel: number };
+export interface MetadataStoreTaskLookup {
+  getTaskById?: (id: string) => { name?: string } | undefined;
+  tasks?: Array<{ id: string; name?: string }>;
+}
 // Per-instance promise storage to avoid cross-request/state leakage in SSR/testing
 // Using a WeakMap keyed by store instance maintains per-instance deduplication
 // Includes initPromise and isInitializing to avoid module-level leakage
@@ -2166,4 +2170,4 @@ export const useMetadataStore = defineStore('metadata', {
   },
 });
 // Export type for use in components
-export type MetadataStore = ReturnType<typeof useMetadataStore>;
+export type MetadataStore = ReturnType<typeof useMetadataStore> & MetadataStoreTaskLookup;

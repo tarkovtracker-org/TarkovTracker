@@ -47,9 +47,18 @@
             class="hidden"
             @change="handleTarkovDevFileChange"
           />
+          <input
+            ref="eftLogsFolderInputRef"
+            type="file"
+            webkitdirectory
+            directory
+            multiple
+            class="hidden"
+            @change="handleEftLogsFolderChange"
+          />
           <!-- Import buttons (shown when no import flow is active) -->
           <template v-if="!isAnyImportActive">
-            <div class="grid gap-3 md:grid-cols-2">
+            <div class="grid gap-3 md:grid-cols-3">
               <UButton
                 icon="i-mdi-file-upload-outline"
                 block
@@ -70,6 +79,35 @@
               >
                 {{ $t('settings.data_management.import_tarkovdev_button') }}
               </UButton>
+              <UButton
+                icon="i-mdi-folder-upload-outline"
+                block
+                :ui="{
+                  base: 'bg-info-900 hover:bg-info-800 active:bg-info-700 text-info-200 focus-visible:ring focus-visible:ring-info-500',
+                }"
+                @click="showEftLogsFolderInput"
+              >
+                {{ $t('settings.data_management.import_eft_logs_folder_button') }}
+              </UButton>
+            </div>
+            <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
+              <p class="text-surface-300 text-xs font-semibold">
+                {{ $t('settings.log_import.upload_hint') }}
+              </p>
+              <ul class="text-surface-400 mt-2 list-disc space-y-1 pl-4 text-xs">
+                <li>{{ $t('settings.log_import.logs_folder_required') }}</li>
+                <li>
+                  <span>{{ $t('settings.log_import.default_path_label') }}</span>
+                  <code class="text-surface-200 ml-1 font-mono">{{ eftDefaultLogsPath }}</code>
+                </li>
+                <li>{{ $t('settings.log_import.find_in_launcher_hint') }}</li>
+                <li>
+                  <span>{{ $t('settings.log_import.avoid_session_folder_label') }}</span>
+                  <code class="text-surface-200 ml-1 font-mono break-all">
+                    {{ eftSessionFolderExamplePath }}
+                  </code>
+                </li>
+              </ul>
             </div>
             <!-- Tarkov.dev linked profile info -->
             <template v-if="isLinked">
@@ -277,6 +315,208 @@
               </UButton>
             </div>
           </template>
+          <template v-if="eftLogsImportState === 'preview' && eftLogsPreview">
+            <div class="space-y-1">
+              <div class="flex items-center gap-1">
+                <label class="text-surface-200 text-sm font-semibold">
+                  {{ $t('settings.log_import.version_filter_label') }}
+                </label>
+                <UTooltip :text="$t('settings.log_import.version_filter_tooltip')">
+                  <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                </UTooltip>
+              </div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <UCheckbox
+                  v-for="version in eftLogsAvailableVersions"
+                  :key="version"
+                  :model-value="eftLogsIncludedVersions.includes(version)"
+                  :disabled="
+                    eftLogsIncludedVersions.length === 1 &&
+                    eftLogsIncludedVersions.includes(version)
+                  "
+                  :label="formatEftLogsVersionLabel(version)"
+                  @update:model-value="
+                    (enabled) => handleEftLogsVersionToggle(version, Boolean(enabled))
+                  "
+                />
+              </div>
+              <p class="text-surface-400 text-xs">
+                {{ $t('settings.log_import.version_filter_hint') }}
+              </p>
+            </div>
+            <div
+              class="bg-surface-900/80 divide-surface-700 divide-y rounded-md border border-white/10"
+            >
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 text-xs">
+                  {{ $t('settings.log_import.source_file') }}
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsPreview.sourceFileName }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.logs_scanned') }}
+                  <UTooltip :text="$t('settings.log_import.logs_scanned_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsPreview.filesParsed }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.entries_scanned') }}
+                  <UTooltip :text="$t('settings.log_import.entries_scanned_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsPreview.scannedEntries }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.chat_messages') }}
+                  <UTooltip :text="$t('settings.log_import.chat_messages_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsPreview.chatMessageCount }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.completion_events') }}
+                  <UTooltip :text="$t('settings.log_import.completion_events_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsPreview.dedupedCompletionEventCount }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.started_events') }}
+                  <UTooltip :text="$t('settings.log_import.started_events_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsPreview.dedupedStartedEventCount }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.matched_tasks') }}
+                  <UTooltip :text="$t('settings.log_import.matched_tasks_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsCompletedCount }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.matched_started_tasks') }}
+                  <UTooltip :text="$t('settings.log_import.matched_started_tasks_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsActiveCount }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.detected_mode') }}
+                  <UTooltip :text="$t('settings.log_import.detected_mode_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsModeSummaryLabel }}
+                </span>
+              </div>
+              <div
+                v-if="eftLogsUnknownCount > 0"
+                class="flex items-center justify-between px-3 py-2"
+              >
+                <span class="text-surface-400 inline-flex items-center gap-1 text-xs">
+                  {{ $t('settings.log_import.unknown_mode_events') }}
+                  <UTooltip :text="$t('settings.log_import.unknown_mode_events_tooltip')">
+                    <UIcon name="i-mdi-information" class="text-surface-500 h-3.5 w-3.5" />
+                  </UTooltip>
+                </span>
+                <span class="text-surface-100 text-sm font-semibold">
+                  {{ eftLogsUnknownCount }}
+                </span>
+              </div>
+            </div>
+            <div v-if="eftLogsUnknownCount > 0" class="space-y-1">
+              <p class="text-surface-200 text-sm font-semibold">
+                {{ $t('settings.log_import.unknown_mode_event_details') }}
+              </p>
+              <div class="bg-surface-900/80 rounded-md border border-white/10 px-3 py-2">
+                <div v-if="eftLogsUnknownCompletedTaskIds.length > 0" class="mb-2 last:mb-0">
+                  <p class="text-surface-400 mb-1 text-xs">
+                    {{ $t('settings.log_import.unknown_completion_events') }}
+                  </p>
+                  <ul class="text-surface-100 space-y-1 text-xs">
+                    <li
+                      v-for="taskId in eftLogsUnknownCompletedTaskIds"
+                      :key="`unknown-completed-${taskId}`"
+                    >
+                      {{ formatEftLogsUnknownTask(taskId) }}
+                    </li>
+                  </ul>
+                </div>
+                <div v-if="eftLogsUnknownStartedTaskIds.length > 0">
+                  <p class="text-surface-400 mb-1 text-xs">
+                    {{ $t('settings.log_import.unknown_started_events') }}
+                  </p>
+                  <ul class="text-surface-100 space-y-1 text-xs">
+                    <li
+                      v-for="taskId in eftLogsUnknownStartedTaskIds"
+                      :key="`unknown-started-${taskId}`"
+                    >
+                      {{ formatEftLogsUnknownTask(taskId) }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div v-if="eftLogsRequiresManualModeSelection" class="space-y-1">
+              <label class="text-surface-200 text-sm font-semibold">
+                {{ $t('settings.log_import.import_unknown_to_mode') }}
+              </label>
+              <GameModeToggle v-model="eftLogsTargetMode" />
+              <p class="text-surface-400 text-xs">
+                {{ $t('settings.log_import.import_unknown_to_mode_hint') }}
+              </p>
+            </div>
+            <p v-else class="text-surface-400 text-xs">
+              {{ $t('settings.log_import.auto_mode_hint') }}
+            </p>
+            <div class="flex gap-2">
+              <UButton
+                icon="i-mdi-check"
+                color="primary"
+                class="flex-1"
+                @click="handleEftLogsConfirm"
+              >
+                {{ $t('settings.log_import.confirm') }}
+              </UButton>
+              <UButton variant="soft" color="neutral" class="flex-1" @click="resetEftLogsImport()">
+                {{ $t('settings.log_import.cancel') }}
+              </UButton>
+            </div>
+          </template>
           <!-- Success/Error alerts for backup import -->
           <div
             v-if="backupImportState === 'success'"
@@ -335,6 +575,39 @@
               :description="tarkovDevImportError"
             />
           </div>
+          <div
+            v-if="eftLogsImportState === 'success'"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <UAlert
+              icon="i-mdi-check-circle"
+              color="success"
+              variant="soft"
+              :title="$t('settings.log_import.success_title')"
+              :description="
+                $t('settings.log_import.success_description', {
+                  active_count: eftLogsActiveCount,
+                  complete_count: eftLogsCompletedCount,
+                })
+              "
+            />
+          </div>
+          <div
+            v-if="eftLogsImportState === 'error' && eftLogsImportError"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <UAlert
+              icon="i-mdi-alert-circle"
+              color="error"
+              variant="soft"
+              :title="$t('settings.log_import.error_title')"
+              :description="eftLogsImportError"
+            />
+          </div>
         </div>
         <USeparator />
         <ResetProgressSection />
@@ -345,17 +618,22 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useDataBackup } from '@/composables/useDataBackup';
+  import { useEftLogsImport } from '@/composables/useEftLogsImport';
   import { useTarkovDevImport } from '@/composables/useTarkovDevImport';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
   import ResetProgressSection from '@/features/settings/ResetProgressSection.vue';
-  import { useMetadataStore } from '@/stores/useMetadata';
+  import {
+    useMetadataStore,
+    type MetadataStore,
+    type MetadataStoreTaskLookup,
+  } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const tarkovStore = useTarkovStore();
-  const metadataStore = useMetadataStore();
+  const metadataStore: MetadataStore = useMetadataStore();
   // --- Backup Export/Import ---
   const {
     exportProgress,
@@ -413,6 +691,20 @@
   } = useTarkovDevImport();
   const tarkovDevFileInputRef = ref<HTMLInputElement | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
+  const {
+    importState: eftLogsImportState,
+    previewData: eftLogsPreview,
+    importError: eftLogsImportError,
+    parseFiles: parseEftLogsFiles,
+    setIncludedVersions: setEftLogsIncludedVersions,
+    confirmImport: confirmEftLogsImport,
+    reset: resetEftLogsImport,
+  } = useEftLogsImport();
+  const eftDefaultLogsPath = 'C:\\Battlestate Games\\Escape from Tarkov\\Logs';
+  const eftSessionFolderExamplePath =
+    'C:\\Battlestate Games\\Escape from Tarkov\\Logs\\log_2026.02.19_13-14-36_1.0.2.0.43037';
+  const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
+  const eftLogsTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
   const tarkovUid = computed(() => tarkovStore.getTarkovUid());
   const isLinked = computed(() => tarkovUid.value !== null);
   const linkedProfileMode = computed<GameMode | null>(() => {
@@ -461,6 +753,9 @@
   function showTarkovDevFileInput() {
     tarkovDevFileInputRef.value?.click();
   }
+  function showEftLogsFolderInput() {
+    eftLogsFolderInputRef.value?.click();
+  }
   async function handleTarkovDevFileChange(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -471,10 +766,131 @@
   async function handleTarkovDevConfirm() {
     await confirmTarkovDevImport(tarkovDevTargetMode.value);
   }
+  async function handleEftLogsFolderChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    try {
+      const files = input.files ? Array.from(input.files) : [];
+      if (files.length === 0) return;
+      await parseEftLogsFiles(files);
+      input.value = '';
+    } catch (err) {
+      logger.error('DataManagementCard: parseEftLogsFiles failed', err, eftLogsImportError.value);
+      return;
+    }
+  }
+  function handleEftLogsVersionToggle(version: string, enabled: boolean) {
+    try {
+      const nextVersions = new Set(eftLogsIncludedVersions.value);
+      if (enabled) {
+        nextVersions.add(version);
+      } else {
+        nextVersions.delete(version);
+      }
+      if (nextVersions.size === 0) return;
+      setEftLogsIncludedVersions(Array.from(nextVersions));
+    } catch (err) {
+      logger.error(
+        'DataManagementCard: setEftLogsIncludedVersions failed',
+        err,
+        eftLogsImportError.value
+      );
+    }
+  }
+  async function handleEftLogsConfirm() {
+    try {
+      await confirmEftLogsImport(eftLogsTargetMode.value);
+    } catch (err) {
+      logger.error(
+        'DataManagementCard: confirmEftLogsImport failed',
+        err,
+        eftLogsImportError.value
+      );
+      return;
+    }
+  }
+  const eftUnknownVersionKey = 'unknown';
+  function formatEftLogsVersionLabel(version: string): string {
+    const versionLabel =
+      version === eftUnknownVersionKey ? t('settings.log_import.version_unknown') : version;
+    const sessionCount = eftLogsVersionSessionCounts.value[version] ?? 0;
+    return `${versionLabel} (${sessionCount})`;
+  }
+  function formatEftLogsUnknownTask(
+    taskId: string,
+    metadataSource: MetadataStoreTaskLookup = metadataStore
+  ): string {
+    const task =
+      typeof metadataSource.getTaskById === 'function'
+        ? metadataSource.getTaskById(taskId)
+        : metadataSource.tasks?.find((candidate) => candidate.id === taskId);
+    const taskName = typeof task?.name === 'string' ? task.name.trim() : '';
+    if (!taskName) return taskId;
+    return `${taskName} (${taskId})`;
+  }
+  const eftLogsCompletedCount = computed(() => eftLogsPreview.value?.matchedTaskIds.length ?? 0);
+  const eftLogsActiveTaskIds = computed(() => {
+    const matchedTaskIds = eftLogsPreview.value?.matchedTaskIds ?? [];
+    const matchedStartedTaskIds = eftLogsPreview.value?.matchedStartedTaskIds ?? [];
+    if (matchedStartedTaskIds.length === 0) return [];
+    if (matchedTaskIds.length === 0) return matchedStartedTaskIds;
+    const completedTaskIdSet = new Set(matchedTaskIds);
+    return matchedStartedTaskIds.filter((taskId) => !completedTaskIdSet.has(taskId));
+  });
+  const eftLogsActiveCount = computed(() => eftLogsActiveTaskIds.value.length);
+  const eftLogsAvailableVersions = computed(() => eftLogsPreview.value?.availableVersions ?? []);
+  const eftLogsIncludedVersions = computed(() => eftLogsPreview.value?.includedVersions ?? []);
+  const eftLogsVersionSessionCounts = computed(
+    () => eftLogsPreview.value?.versionSessionCounts ?? {}
+  );
+  const eftLogsPvpCount = computed(() => {
+    const matchedTaskIdsByMode = eftLogsPreview.value?.matchedTaskIdsByMode;
+    const matchedStartedTaskIdsByMode = eftLogsPreview.value?.matchedStartedTaskIdsByMode;
+    if (!matchedTaskIdsByMode || !matchedStartedTaskIdsByMode) return 0;
+    return matchedTaskIdsByMode.pvp.length + matchedStartedTaskIdsByMode.pvp.length;
+  });
+  const eftLogsPveCount = computed(() => {
+    const matchedTaskIdsByMode = eftLogsPreview.value?.matchedTaskIdsByMode;
+    const matchedStartedTaskIdsByMode = eftLogsPreview.value?.matchedStartedTaskIdsByMode;
+    if (!matchedTaskIdsByMode || !matchedStartedTaskIdsByMode) return 0;
+    return matchedTaskIdsByMode.pve.length + matchedStartedTaskIdsByMode.pve.length;
+  });
+  const eftLogsUnknownCount = computed(() => {
+    const matchedTaskIdsByMode = eftLogsPreview.value?.matchedTaskIdsByMode;
+    const matchedStartedTaskIdsByMode = eftLogsPreview.value?.matchedStartedTaskIdsByMode;
+    if (!matchedTaskIdsByMode || !matchedStartedTaskIdsByMode) return 0;
+    return matchedTaskIdsByMode.unknown.length + matchedStartedTaskIdsByMode.unknown.length;
+  });
+  const eftLogsUnknownCompletedTaskIds = computed(
+    () => eftLogsPreview.value?.matchedTaskIdsByMode.unknown ?? []
+  );
+  const eftLogsUnknownStartedTaskIds = computed(
+    () => eftLogsPreview.value?.matchedStartedTaskIdsByMode.unknown ?? []
+  );
+  const eftLogsHasPvpMatches = computed(() => eftLogsPvpCount.value > 0);
+  const eftLogsHasPveMatches = computed(() => eftLogsPveCount.value > 0);
+  const eftLogsRequiresManualModeSelection = computed(
+    () =>
+      eftLogsUnknownCount.value > 0 || (!eftLogsHasPvpMatches.value && !eftLogsHasPveMatches.value)
+  );
+  const eftLogsModeSummaryLabel = computed(() => {
+    if (eftLogsHasPvpMatches.value && eftLogsHasPveMatches.value) {
+      return t('settings.log_import.mode_summary_both');
+    }
+    if (eftLogsHasPveMatches.value) {
+      return t('settings.log_import.mode_summary_pve');
+    }
+    if (eftLogsHasPvpMatches.value) {
+      return t('settings.log_import.mode_summary_pvp');
+    }
+    return t('settings.log_import.mode_summary_unknown');
+  });
   const editionLabelFromBackup = computed(() => getEditionLabel(backupPreview.value?.gameEdition));
   // --- Any import active? ---
   const isAnyImportActive = computed(
-    () => backupImportState.value === 'preview' || tarkovDevImportState.value === 'preview'
+    () =>
+      backupImportState.value === 'preview' ||
+      tarkovDevImportState.value === 'preview' ||
+      eftLogsImportState.value === 'preview'
   );
   // --- Date formatting ---
   function formatDate(ts: number): string {
