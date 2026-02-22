@@ -33,7 +33,15 @@ AS $$
       'level',
       CASE
         WHEN jsonb_typeof(payload->'level') = 'number'
-        THEN to_jsonb(greatest(1, trunc((payload->>'level')::numeric)::int))
+        THEN to_jsonb(
+          greatest(
+            1,
+            least(
+              2147483647,
+              greatest(-2147483648, trunc((payload->>'level')::numeric))
+            )::int
+          )
+        )
         ELSE NULL
       END,
       'pmcFaction',
@@ -45,7 +53,18 @@ AS $$
       'prestigeLevel',
       CASE
         WHEN jsonb_typeof(payload->'prestigeLevel') = 'number'
-        THEN to_jsonb(least(6, greatest(0, trunc((payload->>'prestigeLevel')::numeric)::int)))
+        THEN to_jsonb(
+          least(
+            6,
+            greatest(
+              0,
+              least(
+                2147483647,
+                greatest(-2147483648, trunc((payload->>'prestigeLevel')::numeric))
+              )::int
+            )
+          )
+        )
         ELSE NULL
       END,
       'skillOffsets',
@@ -93,7 +112,12 @@ AS $$
       'xpOffset',
       CASE
         WHEN jsonb_typeof(payload->'xpOffset') = 'number'
-        THEN to_jsonb(trunc((payload->>'xpOffset')::numeric)::int)
+        THEN to_jsonb(
+          least(
+            2147483647,
+            greatest(-2147483648, trunc((payload->>'xpOffset')::numeric))
+          )::int
+        )
         ELSE NULL
       END
     )
@@ -103,7 +127,17 @@ $$;
 DO $$
 DECLARE
   sanitized jsonb;
+  expected_story_chapters jsonb;
 BEGIN
+  expected_story_chapters := jsonb_build_object(
+    'chapter-tour',
+    jsonb_build_object(
+      'complete',
+      true,
+      'objectives',
+      jsonb_build_object('objective-tour', jsonb_build_object('complete', true))
+    )
+  );
   sanitized := public.sanitize_user_progress_mode_data(
     jsonb_build_object(
       'displayName',
@@ -123,15 +157,7 @@ BEGIN
       'skills',
       jsonb_build_object('Endurance', 10),
       'storyChapters',
-      jsonb_build_object(
-        'chapter-tour',
-        jsonb_build_object(
-          'complete',
-          true,
-          'objectives',
-          jsonb_build_object('objective-tour', jsonb_build_object('complete', true))
-        )
-      ),
+      expected_story_chapters,
       'tarkovDevProfile',
       jsonb_build_object('aid', 12345, 'importedAt', 1730000000),
       'taskCompletions',
@@ -155,6 +181,11 @@ BEGIN
   IF jsonb_typeof(sanitized->'storyChapters') <> 'object' THEN
     RAISE EXCEPTION
       'sanitize_user_progress_mode_data regression: storyChapters object was not preserved';
+  END IF;
+
+  IF sanitized->'storyChapters' <> expected_story_chapters THEN
+    RAISE EXCEPTION
+      'sanitize_user_progress_mode_data regression: storyChapters content was mutated';
   END IF;
 
   IF sanitized ? 'unexpected' THEN
