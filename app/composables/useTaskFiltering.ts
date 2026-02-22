@@ -891,13 +891,12 @@ export function useTaskFiltering() {
       const isKappaRequired = task.kappaRequired === true;
       const isLightkeeperRequired = task.lightkeeperRequired === true;
       const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
-      if (
-        hasTypeSelection &&
-        ((isKappaRequired && !showKappa) ||
-          (isLightkeeperRequired && !showLightkeeper) ||
-          (isNonSpecial && !showNonSpecial))
-      ) {
-        continue;
+      if (hasTypeSelection) {
+        const matchesTaskType =
+          (isKappaRequired && showKappa) ||
+          (isLightkeeperRequired && showLightkeeper) ||
+          (isNonSpecial && showNonSpecial);
+        if (!matchesTaskType) continue;
       }
       if (onlyTasksWithRequiredKeys && !taskHasRequiredKeys(task)) {
         continue;
@@ -997,13 +996,12 @@ export function useTaskFiltering() {
       const isKappaRequired = task.kappaRequired === true;
       const isLightkeeperRequired = task.lightkeeperRequired === true;
       const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
-      if (
-        hasTypeSelection &&
-        ((isKappaRequired && !showKappa) ||
-          (isLightkeeperRequired && !showLightkeeper) ||
-          (isNonSpecial && !showNonSpecial))
-      ) {
-        continue;
+      if (hasTypeSelection) {
+        const matchesTaskType =
+          (isKappaRequired && showKappa) ||
+          (isLightkeeperRequired && showLightkeeper) ||
+          (isNonSpecial && showNonSpecial);
+        if (!matchesTaskType) continue;
       }
       if (onlyTasksWithRequiredKeys && !taskHasRequiredKeys(task)) {
         continue;
