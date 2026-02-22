@@ -10,7 +10,7 @@
       "
     >
       <div
-        class="flex h-full flex-col rounded-lg"
+        class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-full flex-col rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         :class="[
           itemCardClasses,
           {

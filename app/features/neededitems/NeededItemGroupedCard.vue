@@ -3,7 +3,7 @@
     role="button"
     tabindex="0"
     :aria-label="$t('needed_items.view_details_for', { name: groupedItem.item.name })"
-    class="bg-surface-800 hover:bg-surface-700 flex h-full cursor-pointer flex-col rounded-lg transition-colors"
+    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800 hover:bg-surface-700 flex h-full cursor-pointer flex-col rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     @click="handleCardClick"
     @keydown.enter="handleCardClick"
     @keydown.space.prevent="handleCardClick"

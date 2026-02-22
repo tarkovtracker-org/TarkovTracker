@@ -141,6 +141,9 @@ export default defineAppConfig({
     },
     // Button configuration - neutral default, tan only for CTAs
     button: {
+      slots: {
+        base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 focus-visible:ring-2 focus-visible:ring-offset-2 focus:outline-none',
+      },
       defaultVariants: {
         color: 'neutral',
         variant: 'soft',

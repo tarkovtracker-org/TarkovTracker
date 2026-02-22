@@ -56,14 +56,14 @@
           </a>
         </AppTooltip>
         <label
-          class="bg-surface-800/60 border-surface-700 flex items-center gap-1 rounded border px-2"
+          class="focus-within:ring-primary-500 focus-within:ring-offset-surface-900 bg-surface-800/60 border-surface-700 flex items-center gap-1 rounded border px-2 focus-within:ring-2 focus-within:ring-offset-2"
         >
           <UIcon name="i-mdi-translate" class="text-surface-300 h-4 w-4" />
           <span class="sr-only">{{ t('settings.locale') }}</span>
           <select
             v-model="selectedLocale"
             :aria-label="t('settings.locale')"
-            class="text-surface-200 bg-transparent py-1 text-xs font-medium outline-none"
+            class="text-surface-200 bg-transparent py-1 text-xs font-medium focus:outline-none"
           >
             <option
               v-for="item in localeItems"

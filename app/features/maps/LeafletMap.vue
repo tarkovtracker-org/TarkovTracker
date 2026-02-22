@@ -2,7 +2,7 @@
   <div
     ref="mapSurfaceRef"
     tabindex="0"
-    class="relative isolate w-full focus-visible:outline-none"
+    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 relative isolate w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     @pointerdown.capture="focusMapSurface"
   >
     <div

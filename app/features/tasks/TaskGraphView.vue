@@ -604,7 +604,7 @@
       :aria-valuemax="graphHeightMax"
       :aria-valuenow="graphHeight"
       tabindex="0"
-      class="bg-surface-900/60 border-surface-700 text-surface-400 hover:text-surface-200 focus-visible:ring-primary-500 mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition"
+      class="bg-surface-900/60 border-surface-700 text-surface-400 hover:text-surface-200 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       :class="{ 'ring-primary-500 text-surface-200 ring-1': isResizing }"
       @pointerdown="startResize"
       @keydown="onResizeKeydown"
