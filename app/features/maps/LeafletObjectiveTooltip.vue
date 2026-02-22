@@ -1,7 +1,7 @@
 <template>
   <div class="min-w-55">
     <div class="flex items-center justify-between gap-2">
-      <div class="min-w-0 flex-1">
+      <div class="flex min-w-0 flex-1 items-center gap-1">
         <component
           :is="taskTitleComponent"
           v-bind="taskTitleProps"
@@ -16,6 +16,23 @@
             aria-hidden="true"
           />
         </component>
+        <a
+          v-if="taskTarkovDevUrl"
+          :href="taskTarkovDevUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          :class="linkButtonClass"
+          :title="translate('page.tasks.questcard.view_on_tarkov_dev')"
+          :aria-label="translate('page.tasks.questcard.view_on_tarkov_dev')"
+          @click.stop
+        >
+          <img
+            src="/img/logos/tarkovdevlogo.webp"
+            alt="tarkov.dev"
+            aria-hidden="true"
+            class="h-4 w-4"
+          />
+        </a>
       </div>
       <div class="flex shrink-0 gap-1">
         <button
@@ -131,6 +148,10 @@
     return metadataStore.tasks.find((t) => t.id === taskId) ?? null;
   });
   const taskName = computed(() => task.value?.name ?? translate('maps.tooltip.task_fallback'));
+  const taskTarkovDevUrl = computed(() => {
+    if (!task.value?.id) return '';
+    return `https://tarkov.dev/task/${task.value.id}`;
+  });
   const taskTitleComponent = computed(() => (task.value?.wikiLink ? 'a' : 'div'));
   const taskTitleProps = computed(() => {
     if (task.value?.wikiLink) {
@@ -143,12 +164,18 @@
     return {};
   });
   const taskTitleClass = computed(() => {
-    const base = 'flex min-w-0 items-center gap-1 text-sm leading-snug font-semibold';
+    const base = 'flex min-w-0 max-w-full items-center gap-1 text-sm leading-snug font-semibold';
     if (task.value?.wikiLink) {
       return `${base} text-link hover:text-link-hover no-underline`;
     }
     return `${base} text-gray-100`;
   });
+  const linkButtonClass = [
+    'inline-flex items-center justify-center rounded p-1 transition-colors',
+    'text-surface-400 hover:text-surface-200 hover:bg-white/10',
+    'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900',
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+  ];
   const isComplete = computed(() => tarkovStore.isTaskObjectiveComplete(props.objectiveId));
   const requiredCount = computed(() => objective.value?.count ?? 1);
   const currentCount = computed(() => tarkovStore.getObjectiveCount(props.objectiveId));
