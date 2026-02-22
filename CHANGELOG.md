@@ -1,3 +1,15 @@
+# [1.11.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.10.1...v1.11.0) (2026-02-22)
+
+
+### Bug Fixes
+
+* localize EFT logs import messaging ([da4e4df](https://github.com/tarkovtracker-org/TarkovTracker/commit/da4e4dfc64c87d5e7347a60387b288d44e8ac7d4))
+
+
+### Features
+
+* add EFT logs import support ([483dc51](https://github.com/tarkovtracker-org/TarkovTracker/commit/483dc515e5135253bc380047cc89df138b0546dd))
+
 ## [1.10.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.10.0...v1.10.1) (2026-02-21)
 
 
