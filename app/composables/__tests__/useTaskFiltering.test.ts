@@ -290,6 +290,25 @@ describe('useTaskFiltering', () => {
     const counts = taskFiltering.calculateStatusCounts('self');
     expect(counts.all).toBe(2);
   });
+  it('calculateStatusCounts includes dual-tag tasks when filtering by Lightkeeper only', async () => {
+    const { taskFiltering, preferencesStore, metadataStore, progressStore } = await setup();
+    metadataStore.tasks.push({
+      id: 'task-kappa-lightkeeper',
+      name: 'Kappa Lightkeeper Task',
+      factionName: 'Any',
+      kappaRequired: true,
+      lightkeeperRequired: true,
+      trader: { id: 'trader-1', name: 'Trader One' },
+    });
+    progressStore.unlockedTasks['task-kappa-lightkeeper'] = { self: true };
+    progressStore.tasksCompletions['task-kappa-lightkeeper'] = { self: false };
+    preferencesStore.getHideNonKappaTasks = true;
+    preferencesStore.getShowLightkeeperTasks = true;
+    preferencesStore.getShowNonSpecialTasks = false;
+    const counts = taskFiltering.calculateStatusCounts('self');
+    expect(counts.all).toBe(2);
+    expect(counts.available).toBe(2);
+  });
   it('calculateTraderCounts respects task type settings', async () => {
     const { taskFiltering, preferencesStore } = await setup();
     const allCounts = taskFiltering.calculateTraderCounts('self', 'all');
@@ -301,6 +320,25 @@ describe('useTaskFiltering', () => {
     const kappaCounts = taskFiltering.calculateTraderCounts('self', 'all');
     expect(kappaCounts['trader-1']).toBe(1);
     expect(kappaCounts['trader-2']).toBeUndefined();
+  });
+  it('calculateTraderCounts includes dual-tag tasks when filtering by Lightkeeper only', async () => {
+    const { taskFiltering, preferencesStore, metadataStore, progressStore } = await setup();
+    metadataStore.tasks.push({
+      id: 'task-kappa-lightkeeper',
+      name: 'Kappa Lightkeeper Task',
+      factionName: 'Any',
+      kappaRequired: true,
+      lightkeeperRequired: true,
+      trader: { id: 'trader-1', name: 'Trader One' },
+    });
+    progressStore.unlockedTasks['task-kappa-lightkeeper'] = { self: true };
+    progressStore.tasksCompletions['task-kappa-lightkeeper'] = { self: false };
+    preferencesStore.getHideNonKappaTasks = true;
+    preferencesStore.getShowLightkeeperTasks = true;
+    preferencesStore.getShowNonSpecialTasks = false;
+    const counts = taskFiltering.calculateTraderCounts('self', 'all');
+    expect(counts['trader-1']).toBe(1);
+    expect(counts['trader-2']).toBe(1);
   });
   it('sorts impact using filtered successors when enforcement is enabled', async () => {
     const { taskFiltering, preferencesStore } = await setup();
