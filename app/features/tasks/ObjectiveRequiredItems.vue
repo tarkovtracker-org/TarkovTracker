@@ -40,6 +40,12 @@
           <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
         </a>
       </AppTooltip>
+      <span
+        v-if="counts && item.id && counts[item.id]"
+        class="bg-surface-700 text-surface-200/90 ml-1 inline-block min-w-5 rounded px-1 text-center text-[10px] leading-relaxed font-bold tabular-nums"
+      >
+        x{{ counts[item.id] }}
+      </span>
       <AppTooltip :text="t('page.tasks.questcard.view_on_tarkov_dev')">
         <a
           :href="getKeyDevUrl(item)"
@@ -129,6 +135,7 @@
     variant: 'keys' | 'equipment';
     requiredKeys?: TarkovItem[][];
     equipment?: TarkovItem[];
+    counts?: Record<string, number>;
   }>();
   const { copyToClipboard } = useCopyToClipboard();
   const contextMenu = ref<InstanceType<typeof ContextMenu>>();

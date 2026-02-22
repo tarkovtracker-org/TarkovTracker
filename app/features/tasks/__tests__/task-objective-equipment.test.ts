@@ -92,4 +92,24 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([shared]);
   });
+  it('filters only "bring" items when mode is set to "bring"', () => {
+    const item1 = createItem('item-1');
+    const item2 = createItem('item-2');
+    const equipment1 = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'plantItem',
+        items: [item1],
+      }),
+      'bring'
+    );
+    expect(equipment1).toEqual([item1]);
+    const equipment2 = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'giveItem',
+        items: [item2],
+      }),
+      'bring'
+    );
+    expect(equipment2).toEqual([]);
+  });
 });

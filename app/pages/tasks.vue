@@ -108,6 +108,11 @@
                   </div>
                 </Transition>
               </div>
+              <MapRequiredItemsSummary
+                v-if="selectedMapData"
+                :map-id="selectedMapData.id"
+                :tasks="filteredTasks"
+              />
             </div>
             <div v-if="filteredTasks.length === 0" class="py-6">
               <TaskEmptyState />
