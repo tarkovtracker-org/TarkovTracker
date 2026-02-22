@@ -1,7 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
-import type { Task } from '@/types/tarkov';
+import type { Task, TaskObjective } from '@/types/tarkov';
 /**
  * Factory to create a default Task with all required properties.
  * Use this instead of type assertions to ensure compile-time safety.
@@ -22,6 +22,26 @@ function createDefaultTask(overrides: Partial<Task> = {}): Task {
 const defaultTask: Task = createDefaultTask();
 const mapTask: Task = createDefaultTask({ id: 'task-map', name: 'Map Task' });
 const globalTask: Task = createDefaultTask({ id: 'task-global', name: 'Global Task' });
+function createMapObjective(overrides: Partial<TaskObjective> = {}): TaskObjective {
+  return {
+    id: 'obj-1',
+    type: 'visit',
+    taskId: 'task-map-objective',
+    possibleLocations: [{ map: { id: 'map-1' }, positions: [{ x: 10, y: 0, z: 20 }] }],
+    ...overrides,
+  };
+}
+type MapObjectiveZone = { map: { id: string }; outline: { x: number; z: number }[] };
+type MapObjectiveLocation = {
+  map: { id: string };
+  positions?: Array<{ x: number; y?: number; z: number }>;
+};
+type MapObjectiveMark = {
+  id?: string;
+  zones: MapObjectiveZone[];
+  possibleLocations?: MapObjectiveLocation[];
+  users?: string[];
+};
 const TASK_SEARCH_DEBOUNCE_MS = 180;
 const preferencesStoreMock = {
   getTaskPrimaryView: 'all',
@@ -63,6 +83,16 @@ const mapTaskCountsMock = {
 const visibleTasksRef = ref<Task[]>([defaultTask]);
 const updateVisibleTasksMock = vi.fn();
 const isGlobalTaskMock = vi.fn((_task: Task) => false);
+const progressStoreMock = {
+  visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
+  tasksCompletions: {} as Record<string, Record<string, boolean>>,
+  tasksFailed: {} as Record<string, Record<string, boolean>>,
+  unlockedTasks: {} as Record<string, Record<string, boolean>>,
+  objectiveCompletions: {} as Record<string, Record<string, boolean>>,
+};
+const selfCompletedObjectiveIds = new Set<string>();
+const selfCompletedTaskIds = new Set<string>();
+const selfFailedTaskIds = new Set<string>();
 vi.mock('pinia', async () => {
   const actual = await vi.importActual<typeof import('pinia')>('pinia');
   return {
@@ -111,18 +141,14 @@ vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => preferencesStoreMock,
 }));
 vi.mock('@/stores/useProgress', () => ({
-  useProgressStore: () => ({
-    visibleTeamStores: { self: {} },
-    tasksCompletions: {},
-    tasksFailed: {},
-    unlockedTasks: {},
-    objectiveCompletions: {},
-  }),
+  useProgressStore: () => progressStoreMock,
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getGameEdition: () => 1,
-    isTaskObjectiveComplete: () => false,
+    isTaskObjectiveComplete: (objectiveId: string) => selfCompletedObjectiveIds.has(objectiveId),
+    isTaskComplete: (taskId: string) => selfCompletedTaskIds.has(taskId),
+    isTaskFailed: (taskId: string) => selfFailedTaskIds.has(taskId),
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -142,14 +168,20 @@ vi.mock('vue-router', async (importOriginal) => ({
 vi.mock('@/features/maps/LeafletMap.vue', () => ({
   __esModule: true,
   default: defineComponent({
-    setup(_props, { expose }) {
+    props: {
+      marks: {
+        type: Array,
+        default: () => [],
+      },
+    },
+    setup(props, { expose }) {
       expose({
         activateObjectivePopup: () => true,
         closeActivePopup: () => undefined,
       });
-      return {};
+      return { props };
     },
-    template: '<div data-testid="leaflet-map" />',
+    template: '<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" />',
   }),
 }));
 const UButtonStub = {
@@ -183,17 +215,31 @@ describe('tasks page', () => {
       global: { stubs: defaultGlobalStubs },
     });
   };
+  const getLeafletMarks = (): MapObjectiveMark[] => {
+    const raw = wrapper.find('[data-testid="leaflet-map"]').attributes('data-marks') ?? '[]';
+    return JSON.parse(raw) as MapObjectiveMark[];
+  };
   beforeEach(async () => {
     visibleTasksRef.value = [defaultTask];
     updateVisibleTasksMock.mockReset();
     isGlobalTaskMock.mockReset();
     isGlobalTaskMock.mockImplementation((_task: Task) => false);
     preferencesStoreMock.getTaskPrimaryView = 'all';
+    preferencesStoreMock.getTaskSecondaryView = 'available';
     preferencesStoreMock.getTaskMapView = 'all';
     preferencesStoreMock.getHideGlobalTasks = false;
     preferencesStoreMock.getPinnedTaskIds = [];
     preferencesStoreMock.getHideCompletedMapObjectives = false;
+    preferencesStoreMock.mapTeamAllHidden = false;
     preferencesStoreMock.setHideCompletedMapObjectives.mockReset();
+    progressStoreMock.visibleTeamStores = { self: {} };
+    progressStoreMock.tasksCompletions = {};
+    progressStoreMock.tasksFailed = {};
+    progressStoreMock.unlockedTasks = {};
+    progressStoreMock.objectiveCompletions = {};
+    selfCompletedObjectiveIds.clear();
+    selfCompletedTaskIds.clear();
+    selfFailedTaskIds.clear();
     metadataStoreMock.mapsWithSvg = [];
     metadataStoreMock.fetchMapSpawnsData.mockClear();
     mapTaskCountsMock.withHide = 0;
@@ -350,5 +396,103 @@ describe('tasks page', () => {
     isGlobalTaskMock.mockImplementation((task: Task) => task.id === 'task-global');
     await mountPage();
     expect(wrapper.find('[data-testid="task-card"]').attributes('data-accent')).toBe('global');
+  });
+  it('keeps teammate objective markers when self already completed the same task objective', async () => {
+    const task = createDefaultTask({
+      id: 'task-map-objective',
+      name: 'Map Objective Task',
+      objectives: [createMapObjective()],
+    });
+    visibleTasksRef.value = [task];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getTaskSecondaryView = 'all';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.visibleTeamStores = { self: {}, 'teammate-1': {} };
+    progressStoreMock.tasksCompletions = {
+      [task.id]: { self: true, 'teammate-1': false },
+    };
+    progressStoreMock.tasksFailed = {
+      [task.id]: { self: false, 'teammate-1': false },
+    };
+    progressStoreMock.unlockedTasks = {
+      [task.id]: { self: false, 'teammate-1': true },
+    };
+    progressStoreMock.objectiveCompletions = {
+      'obj-1': { self: true, 'teammate-1': false },
+    };
+    selfCompletedObjectiveIds.add('obj-1');
+    selfCompletedTaskIds.add(task.id);
+    await mountPage();
+    expect(getLeafletMarks()).toEqual([
+      expect.objectContaining({
+        id: 'obj-1',
+        users: ['teammate-1'],
+      }),
+    ]);
+  });
+  it('treats locked self tasks as teammate objectives on map markers', async () => {
+    const task = createDefaultTask({
+      id: 'task-map-objective',
+      name: 'Map Objective Task',
+      objectives: [createMapObjective()],
+    });
+    visibleTasksRef.value = [task];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getTaskSecondaryView = 'all';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.visibleTeamStores = { self: {}, 'teammate-1': {} };
+    progressStoreMock.tasksCompletions = {
+      [task.id]: { self: false, 'teammate-1': false },
+    };
+    progressStoreMock.tasksFailed = {
+      [task.id]: { self: false, 'teammate-1': false },
+    };
+    progressStoreMock.unlockedTasks = {
+      [task.id]: { self: false, 'teammate-1': true },
+    };
+    progressStoreMock.objectiveCompletions = {
+      'obj-1': { self: false, 'teammate-1': false },
+    };
+    await mountPage();
+    expect(getLeafletMarks()).toEqual([
+      expect.objectContaining({
+        id: 'obj-1',
+        users: ['teammate-1'],
+      }),
+    ]);
+  });
+  it('keeps self marker ownership when objective is active for self and teammate', async () => {
+    const task = createDefaultTask({
+      id: 'task-map-objective',
+      name: 'Map Objective Task',
+      objectives: [createMapObjective()],
+    });
+    visibleTasksRef.value = [task];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getTaskSecondaryView = 'all';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.visibleTeamStores = { self: {}, 'teammate-1': {} };
+    progressStoreMock.tasksCompletions = {
+      [task.id]: { self: false, 'teammate-1': false },
+    };
+    progressStoreMock.tasksFailed = {
+      [task.id]: { self: false, 'teammate-1': false },
+    };
+    progressStoreMock.unlockedTasks = {
+      [task.id]: { self: true, 'teammate-1': true },
+    };
+    progressStoreMock.objectiveCompletions = {
+      'obj-1': { self: false, 'teammate-1': false },
+    };
+    await mountPage();
+    expect(getLeafletMarks()).toEqual([
+      expect.objectContaining({
+        id: 'obj-1',
+        users: ['self', 'teammate-1'],
+      }),
+    ]);
   });
 });

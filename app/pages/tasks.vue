@@ -530,8 +530,8 @@
     if (!selectedMapData.value) return [];
     const mapId = selectedMapData.value.id;
     const marks: MapObjectiveMark[] = [];
-    const objCompletions = progressStore.objectiveCompletions;
-    const taskCompletions = progressStore.tasksCompletions;
+    const objCompletions = objectiveCompletions.value;
+    const taskCompletions = tasksCompletions.value;
     const includeTeammates = !preferencesStore.mapTeamAllHidden;
     const teammateIds = includeTeammates
       ? Object.keys(progressStore.visibleTeamStores).filter((id) => id !== 'self')
@@ -542,16 +542,33 @@
       const objectiveGps = metadataStore.objectiveGPS?.[task.id] ?? [];
       task.objectives.forEach((obj) => {
         const selfComplete = tarkovStore.isTaskObjectiveComplete(obj.id);
+        const selfTaskComplete = tarkovStore.isTaskComplete(task.id);
+        const selfTaskFailed = tarkovStore.isTaskFailed(task.id);
+        const selfTaskUnlocked = unlockedTasks.value[task.id]?.self === true;
+        const selfNeedsObjective =
+          selfTaskUnlocked && !selfTaskComplete && !selfTaskFailed && !selfComplete;
         const users: string[] = [];
-        if (!selfComplete || shouldShowCompletedObjectives.value) {
+        const teammateUsers: string[] = [];
+        if (selfNeedsObjective) {
           users.push('self');
         }
         for (const tmId of teammateIds) {
-          const objDone = objCompletions[obj.id]?.[tmId];
-          const taskDone = taskCompletions[task.id]?.[tmId];
-          if (!objDone && !taskDone) {
-            users.push(tmId);
+          const objDone = objCompletions[obj.id]?.[tmId] === true;
+          const taskDone = taskCompletions[task.id]?.[tmId] === true;
+          const taskFailed = tasksFailed.value[task.id]?.[tmId] === true;
+          if (!objDone && !taskDone && !taskFailed) {
+            teammateUsers.push(tmId);
           }
+        }
+        if (teammateUsers.length > 0) {
+          users.push(...teammateUsers);
+        } else if (
+          selfComplete &&
+          selfTaskComplete &&
+          !selfTaskFailed &&
+          shouldShowCompletedObjectives.value
+        ) {
+          users.push('self');
         }
         if (users.length === 0) return;
         const zones: MapObjectiveZone[] = [];
