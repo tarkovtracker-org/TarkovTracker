@@ -1,3 +1,10 @@
+## [1.12.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.2...v1.12.3) (2026-02-22)
+
+
+### Bug Fixes
+
+* **maps:** restore map tooltip links for wiki and tarkov.dev ([c6634a9](https://github.com/tarkovtracker-org/TarkovTracker/commit/c6634a9a1638e10614fadf471c617185b3353bd6))
+
 ## [1.12.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.1...v1.12.2) (2026-02-22)
 
 
