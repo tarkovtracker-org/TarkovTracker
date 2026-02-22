@@ -1,3 +1,17 @@
+# [1.12.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.11.0...v1.12.0) (2026-02-22)
+
+
+### Bug Fixes
+
+* address map summary PR review blockers ([4704381](https://github.com/tarkovtracker-org/TarkovTracker/commit/4704381c887cdfb58348715a3e0fea96aa099c0c))
+* prepare nuxt eslint config in lint scripts ([4423b82](https://github.com/tarkovtracker-org/TarkovTracker/commit/4423b822ea60340777c8089a52921ed0ddf93704))
+* sync api-gateway lockfile with package deps ([052ed0f](https://github.com/tarkovtracker-org/TarkovTracker/commit/052ed0fa1ac03c97902a604f88b8cba0908904d4))
+
+
+### Features
+
+* Adds a required equipment summary tracking per map ([e185baa](https://github.com/tarkovtracker-org/TarkovTracker/commit/e185baaa417d73b7b1793c7fcbcde45efe65d696))
+
 # [1.11.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.10.1...v1.11.0) (2026-02-22)
 
 
