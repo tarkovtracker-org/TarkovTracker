@@ -334,6 +334,8 @@
       map: {
         resize_handle: 'Ajuster la hauteur de la carte',
         toggle_panel: 'Afficher ou masquer le panneau de carte',
+        required_items_summary: 'Objets requis pour les tâches actives',
+        required_keys_summary: 'Clés requises pour les tâches actives',
         time_period: {
           dawn: 'Aube',
           day: 'Jour',

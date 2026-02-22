@@ -334,6 +334,8 @@
       map: {
         resize_handle: 'Змінити висоту карти',
         toggle_panel: 'Показати або приховати панель мапи',
+        required_items_summary: 'Необхідні предмети для активних завдань',
+        required_keys_summary: 'Необхідні ключі для активних завдань',
         time_period: {
           dawn: 'Світанок',
           day: 'День',

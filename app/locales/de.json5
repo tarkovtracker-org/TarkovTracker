@@ -334,6 +334,8 @@
       map: {
         resize_handle: 'Kartenhöhe anpassen',
         toggle_panel: 'Kartenbereich ein-/ausblenden',
+        required_items_summary: 'Benötigte Gegenstände für aktive Aufgaben',
+        required_keys_summary: 'Benötigte Schlüssel für aktive Aufgaben',
         time_period: {
           dawn: 'Morgendämmerung',
           day: 'Tag',

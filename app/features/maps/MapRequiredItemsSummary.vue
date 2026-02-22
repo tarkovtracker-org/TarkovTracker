@@ -11,21 +11,15 @@
           <UIcon name="i-mdi-briefcase-variant-outline" class="text-primary-300 h-4 w-4" />
         </div>
         <h3 class="text-surface-100 truncate text-[15px] font-semibold">
-          {{ $t('page.tasks.map.required_items_summary', 'Required items for active tasks') }}
+          {{ $t('page.tasks.map.required_items_summary') }}
         </h3>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <ObjectiveRequiredItems
-          v-for="item in summaryEquipment"
-          :key="item.id"
-          class="mt-0!"
-          variant="equipment"
-          :equipment="[item]"
-          :counts="{ [item.id!]: summaryEquipmentCounts[item.id!] || 0 }"
-          hide-icon
-          hide-disclaimer
-        />
-      </div>
+      <ObjectiveRequiredItems
+        class="mt-0!"
+        variant="equipment"
+        :equipment="summaryEquipment"
+        :counts="summaryEquipmentCounts"
+      />
     </div>
     <div v-if="aggregatedKeys.length > 0" :class="{ 'mt-6': aggregatedItems.length > 0 }">
       <div class="mb-3 flex items-center gap-2">
@@ -35,7 +29,7 @@
           <UIcon name="i-mdi-key-variant" class="text-primary-300 h-4 w-4" />
         </div>
         <h3 class="text-surface-100 truncate text-[15px] font-semibold">
-          {{ $t('page.tasks.map.required_keys_summary', 'Required keys for active tasks') }}
+          {{ $t('page.tasks.map.required_keys_summary') }}
         </h3>
       </div>
       <ObjectiveRequiredItems variant="keys" :required-keys="summaryKeys" />
@@ -52,25 +46,27 @@
     tasks: Task[];
   }>();
   const progressStore = useProgressStore();
+  const eligibleObjectives = computed(() =>
+    props.tasks.flatMap((task) =>
+      (task.objectives ?? []).filter(
+        (objective) =>
+          objective.maps?.some((map) => map.id === props.mapId) &&
+          !progressStore.objectiveCompletions[objective.id]?.['self']
+      )
+    )
+  );
   const aggregatedItems = computed(() => {
     const itemCounts = new Map<string, { item: TarkovItem; count: number }>();
-    for (const task of props.tasks) {
-      if (!task.objectives) continue;
-      for (const obj of task.objectives) {
-        const isForMap = obj.maps?.some((m: { id: string }) => m.id === props.mapId);
-        if (!isForMap) continue;
-        const isComplete = progressStore.objectiveCompletions[obj.id]?.['self'];
-        if (isComplete) continue;
-        const equipItems = getObjectiveEquipmentItems(obj, 'bring');
-        for (const item of equipItems) {
-          if (!item.id) continue;
-          const addCount = obj.count || 1;
-          const existing = itemCounts.get(item.id);
-          if (existing) {
-            existing.count += addCount;
-          } else {
-            itemCounts.set(item.id, { item, count: addCount });
-          }
+    for (const objective of eligibleObjectives.value) {
+      const equipItems = getObjectiveEquipmentItems(objective, 'bring');
+      for (const item of equipItems) {
+        if (!item.id) continue;
+        const addCount = objective.count ?? 1;
+        const existing = itemCounts.get(item.id);
+        if (existing) {
+          existing.count += addCount;
+        } else {
+          itemCounts.set(item.id, { item, count: addCount });
         }
       }
     }
@@ -79,26 +75,28 @@
     );
   });
   const aggregatedKeys = computed(() => {
-    const keys = new Map<string, TarkovItem>();
-    for (const task of props.tasks) {
-      if (!task.objectives) continue;
-      for (const obj of task.objectives) {
-        const isForMap = obj.maps?.some((m: { id: string }) => m.id === props.mapId);
-        if (!isForMap) continue;
-        const isComplete = progressStore.objectiveCompletions[obj.id]?.['self'];
-        if (isComplete) continue;
-        const reqKeys = obj.requiredKeys ?? [];
-        for (const group of reqKeys) {
-          for (const key of group) {
-            if (key.id && !keys.has(key.id)) {
-              keys.set(key.id, key);
-            }
-          }
+    const keyGroups = new Map<string, TarkovItem[]>();
+    for (const objective of eligibleObjectives.value) {
+      for (const group of objective.requiredKeys ?? []) {
+        const uniqueGroup = group.filter((key, index, groupItems) => {
+          if (!key.id) return false;
+          return groupItems.findIndex((candidate) => candidate.id === key.id) === index;
+        });
+        if (!uniqueGroup.length) continue;
+        uniqueGroup.sort((a, b) =>
+          (a.shortName || a.name || '').localeCompare(b.shortName || b.name || '')
+        );
+        const groupId = uniqueGroup
+          .map((key) => key.id)
+          .sort()
+          .join('|');
+        if (!keyGroups.has(groupId)) {
+          keyGroups.set(groupId, uniqueGroup);
         }
       }
     }
-    return Array.from(keys.values()).sort((a, b) =>
-      (a.shortName || '').localeCompare(b.shortName || '')
+    return Array.from(keyGroups.values()).sort((a, b) =>
+      (a[0]?.shortName || a[0]?.name || '').localeCompare(b[0]?.shortName || b[0]?.name || '')
     );
   });
   const summaryEquipment = computed(() => aggregatedItems.value.map((i) => i.item));
@@ -111,5 +109,5 @@
     }
     return counts;
   });
-  const summaryKeys = computed(() => aggregatedKeys.value.map((k) => [k]));
+  const summaryKeys = computed(() => aggregatedKeys.value);
 </script>

@@ -105,14 +105,14 @@
                       variant="soft"
                       :title="t('alerts.no_map_data')"
                     />
+                    <MapRequiredItemsSummary
+                      v-if="selectedMapData"
+                      :map-id="selectedMapData.id"
+                      :tasks="filteredTasks"
+                    />
                   </div>
                 </Transition>
               </div>
-              <MapRequiredItemsSummary
-                v-if="selectedMapData"
-                :map-id="selectedMapData.id"
-                :tasks="filteredTasks"
-              />
             </div>
             <div v-if="filteredTasks.length === 0" class="py-6">
               <TaskEmptyState />

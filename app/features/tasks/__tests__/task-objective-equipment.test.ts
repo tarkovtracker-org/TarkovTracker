@@ -92,24 +92,40 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([shared]);
   });
-  it('filters only "bring" items when mode is set to "bring"', () => {
+  it('includes items for bring-type objectives when mode is set to "bring"', () => {
     const item1 = createItem('item-1');
-    const item2 = createItem('item-2');
-    const equipment1 = getObjectiveEquipmentItems(
+    const equipment = getObjectiveEquipmentItems(
       createObjective({
         type: 'plantItem',
         items: [item1],
       }),
       'bring'
     );
-    expect(equipment1).toEqual([item1]);
-    const equipment2 = getObjectiveEquipmentItems(
+    expect(equipment).toEqual([item1]);
+  });
+  it('excludes items for non-bring objectives when mode is set to "bring"', () => {
+    const item2 = createItem('item-2');
+    const equipment = getObjectiveEquipmentItems(
       createObjective({
         type: 'giveItem',
         items: [item2],
       }),
       'bring'
     );
-    expect(equipment2).toEqual([]);
+    expect(equipment).toEqual([]);
+  });
+  it('excludes all-mode-only equipment fields when mode is set to "bring"', () => {
+    const item = createItem('item-3');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'giveItem',
+        useAny: [item],
+        usingWeapon: item,
+        usingWeaponMods: [item],
+        wearing: [item],
+      }),
+      'bring'
+    );
+    expect(equipment).toEqual([]);
   });
 });

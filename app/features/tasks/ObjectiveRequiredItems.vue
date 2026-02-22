@@ -41,10 +41,10 @@
         </a>
       </AppTooltip>
       <span
-        v-if="counts && item.id && counts[item.id]"
+        v-if="getItemCount(item.id) > 1"
         class="bg-surface-700 text-surface-200/90 ml-1 inline-block min-w-5 rounded px-1 text-center text-[10px] leading-relaxed font-bold tabular-nums"
       >
-        x{{ counts[item.id] }}
+        x{{ getItemCount(item.id) }}
       </span>
       <AppTooltip :text="t('page.tasks.questcard.view_on_tarkov_dev')">
         <a
@@ -177,6 +177,8 @@
       props.requiredKeys?.length === 1 &&
       (props.requiredKeys[0]?.length ?? 0) > 1
   );
+  const getItemCount = (itemId?: string) =>
+    itemId && props.counts ? (props.counts[itemId] ?? 0) : 0;
   const getPrimaryTooltip = (item: TarkovItem) =>
     item.wikiLink
       ? t('page.tasks.questcard.view_on_wiki')

@@ -334,6 +334,8 @@
       map: {
         resize_handle: 'Ajustar altura del mapa',
         toggle_panel: 'Mostrar u ocultar panel del mapa',
+        required_items_summary: 'Objetos necesarios para tareas activas',
+        required_keys_summary: 'Llaves necesarias para tareas activas',
         time_period: {
           dawn: 'Amanecer',
           day: 'Día',
