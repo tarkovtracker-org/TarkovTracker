@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.0...v1.12.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* **tasks:** align Lightkeeper filter counts with task list logic ([#192](https://github.com/tarkovtracker-org/TarkovTracker/issues/192)) ([2487591](https://github.com/tarkovtracker-org/TarkovTracker/commit/2487591c325430297bd28a6947c208bcd5300b8f))
+
 # [1.12.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.11.0...v1.12.0) (2026-02-22)
 
 
