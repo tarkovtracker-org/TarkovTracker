@@ -1,3 +1,10 @@
+## [1.12.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.4...v1.12.5) (2026-02-22)
+
+
+### Bug Fixes
+
+* **a11y:** complete keyboard focus coverage for issue [#103](https://github.com/tarkovtracker-org/TarkovTracker/issues/103) ([e6fcbd7](https://github.com/tarkovtracker-org/TarkovTracker/commit/e6fcbd714a101d86ea64b4f48b761c9632f4e7d6))
+
 ## [1.12.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.12.3...v1.12.4) (2026-02-22)
 
 
