@@ -954,6 +954,17 @@
     return 'available';
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
+  const selectedMapIds = computed(() => {
+    const selectedMapId = preferencesStore.getTaskMapView;
+    if (!selectedMapId || selectedMapId === 'all') return [];
+    const mergedMap = metadataStore.mapsWithSvg.find((map) => {
+      const mergedIds = (map as { mergedIds?: string[] }).mergedIds || [];
+      return map.id === selectedMapId || mergedIds.includes(selectedMapId);
+    });
+    if (!mergedMap) return [selectedMapId];
+    const mergedIds = (mergedMap as { mergedIds?: string[] }).mergedIds || [];
+    return mergedIds.includes(mergedMap.id) ? mergedIds : [mergedMap.id, ...mergedIds];
+  });
   // Get objectives from props or fall back to store when props are stale
   // This handles the case where visibleTasks holds old task objects after objectives merge
   const taskObjectives = computed(() => {
@@ -1019,7 +1030,7 @@
    */
   const categorizedObjectives = computed(() => {
     const objectives = taskObjectives.value;
-    const selectedMapId = preferencesStore.getTaskMapView;
+    const mapIds = selectedMapIds.value;
     const isMapView = onMapView.value;
     // If not in map view, all objectives are relevant
     if (!isMapView) {
@@ -1034,7 +1045,7 @@
     const uncompletedIrrelevant: TaskObjective[] = [];
     for (const objective of objectives) {
       const hasMaps = Array.isArray(objective.maps) && objective.maps.length > 0;
-      const onSelectedMap = hasMaps && objective.maps!.some((map) => map.id === selectedMapId);
+      const onSelectedMap = hasMaps && objective.maps!.some((map) => mapIds.includes(map.id));
       const isMapType = isMapObjectiveType(objective.type);
       // Objective is relevant if it has no maps, or is on selected map AND is a map type
       const isRelevant = !hasMaps || (onSelectedMap && isMapType);

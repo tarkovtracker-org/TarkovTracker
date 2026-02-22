@@ -18,13 +18,15 @@ interface CategorizedObjectivesOptions {
   objectives: TaskObjective[];
   onMapView: boolean;
   selectedMapId: string | null;
+  selectedMapIds?: string[];
   completedObjectiveIds: Set<string>;
 }
 /**
  * Recreates the categorizedObjectives logic for testing
  */
 const computeCategorizedObjectives = (options: CategorizedObjectivesOptions) => {
-  const { objectives, onMapView, selectedMapId, completedObjectiveIds } = options;
+  const { objectives, onMapView, selectedMapId, selectedMapIds, completedObjectiveIds } = options;
+  const effectiveSelectedMapIds = selectedMapIds ?? (selectedMapId != null ? [selectedMapId] : []);
   // If not in map view, all objectives are relevant
   if (!onMapView) {
     return {
@@ -39,7 +41,7 @@ const computeCategorizedObjectives = (options: CategorizedObjectivesOptions) => 
   for (const objective of objectives) {
     const hasMaps = Array.isArray(objective.maps) && objective.maps.length > 0;
     const onSelectedMap =
-      hasMaps && selectedMapId && objective.maps!.some((map) => map.id === selectedMapId);
+      hasMaps && objective.maps!.some((map) => effectiveSelectedMapIds.includes(map.id));
     const isMapType = isMapObjectiveType(objective.type);
     // Objective is relevant if it has no maps, or is on selected map AND is a map type
     const isRelevant = !hasMaps || (onSelectedMap && isMapType);
@@ -139,6 +141,23 @@ describe('TaskCard categorizedObjectives', () => {
         objectives,
         onMapView: true,
         selectedMapId: 'map-customs',
+        completedObjectiveIds: new Set(),
+      });
+      expect(result.relevant).toHaveLength(1);
+      expect(result.relevant[0]!.id).toBe('obj-1');
+      expect(result.irrelevant).toHaveLength(1);
+      expect(result.irrelevant[0]!.id).toBe('obj-2');
+    });
+    it('treats objectives on merged map ids as relevant', () => {
+      const objectives = [
+        createObjective('obj-1', 'shoot', [{ id: 'map-ground-zero-21' }]),
+        createObjective('obj-2', 'visit', [{ id: 'map-streets' }]),
+      ];
+      const result = computeCategorizedObjectives({
+        objectives,
+        onMapView: true,
+        selectedMapId: 'map-ground-zero',
+        selectedMapIds: ['map-ground-zero', 'map-ground-zero-21', 'map-ground-zero-tutorial'],
         completedObjectiveIds: new Set(),
       });
       expect(result.relevant).toHaveLength(1);
