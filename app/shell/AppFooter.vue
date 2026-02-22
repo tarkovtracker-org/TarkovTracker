@@ -31,7 +31,7 @@
         <div class="text-surface-400 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
           <span>TarkovTracker &copy; 2020–{{ new Date().getFullYear() }}</span>
           <span class="text-surface-500">·</span>
-          <span class="text-surface-400 font-mono">v{{ tarkovVersion }}</span>
+          <span class="text-surface-400 font-mono">v{{ appVersion }}</span>
         </div>
         <p class="text-surface-400 mt-1">{{ t('footer.game_attribution') }}</p>
       </div>
@@ -41,5 +41,5 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   const { t } = useI18n({ useScope: 'global' });
-  const tarkovVersion = useRuntimeConfig().public.tarkovVersion || 'dev';
+  const appVersion = useRuntimeConfig().public.appVersion || 'dev';
 </script>
