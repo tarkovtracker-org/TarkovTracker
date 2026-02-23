@@ -52,10 +52,11 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   ): Promise<void> {
     if (!previewData.value) return;
     const data = previewData.value;
+    const originalMode = tarkovStore.getCurrentGameMode();
+    const shouldRestoreMode = targetMode !== originalMode;
     try {
-      const originalMode = tarkovStore.getCurrentGameMode();
       tarkovStore.setTarkovUid(data.tarkovUid);
-      if (targetMode !== originalMode) {
+      if (shouldRestoreMode) {
         await tarkovStore.switchGameMode(targetMode);
       }
       tarkovStore.setPMCFaction(data.pmcFaction);
@@ -80,12 +81,15 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
         tarkovStore.setGameEdition(edition);
       }
       tarkovStore.setTarkovDevProfile(data.rawProfile);
-      await tarkovStore.switchGameMode(originalMode);
       importState.value = 'success';
     } catch (e) {
       importState.value = 'error';
       importError.value = 'Failed to apply import data';
       logger.error('[TarkovDevImport] Import error:', e);
+    } finally {
+      if (shouldRestoreMode) {
+        await tarkovStore.switchGameMode(originalMode);
+      }
     }
   }
   return {
