@@ -201,6 +201,26 @@ describe('useTarkovDevImport', () => {
     expect(composable.importState.value).toBe('error');
     expect(composable.importError.value).toBe('Failed to apply import data');
   });
+  it('keeps success state when mode restoration fails', async () => {
+    const parsedData = createImportData();
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: parsedData,
+      ok: true,
+    });
+    tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
+    tarkovStore.switchGameMode
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('restore failure'));
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{"aid":123}'));
+    await composable.confirmImport('pve');
+    expect(composable.importState.value).toBe('success');
+    expect(composable.importError.value).toBeNull();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      '[TarkovDevImport] Failed to restore original game mode:',
+      expect.any(Error)
+    );
+  });
   it('resets preview and errors back to idle', async () => {
     mockParseTarkovDevProfile.mockReturnValue({
       error: 'Invalid tarkov.dev profile format',

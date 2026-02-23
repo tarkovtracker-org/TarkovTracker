@@ -88,7 +88,11 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
       logger.error('[TarkovDevImport] Import error:', e);
     } finally {
       if (shouldRestoreMode) {
-        await tarkovStore.switchGameMode(originalMode);
+        try {
+          await tarkovStore.switchGameMode(originalMode);
+        } catch (e) {
+          logger.error('[TarkovDevImport] Failed to restore original game mode:', e);
+        }
       }
     }
   }
