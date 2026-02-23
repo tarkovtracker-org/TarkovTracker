@@ -51,6 +51,7 @@
   const rows = computed<Row[]>(() => {
     // Types that should be grouped together with item display
     const itemGroupTypes = new Set(['giveItem', 'findItem', 'findQuestItem', 'giveQuestItem']);
+    const questItemTypes = new Set(['findQuestItem', 'giveQuestItem']);
     const findTypes = new Set(['findItem', 'findQuestItem']);
     const giveTypes = new Set(['giveItem', 'giveQuestItem']);
     // Helper to get the item ID from an objective (handles item, markerItem, and questItem)
@@ -93,7 +94,13 @@
     // Key: itemId:foundInRaid, Value: { types, objectives }
     const itemAnalysis = new Map<
       string,
-      { types: Set<string>; objectives: TaskObjectiveType[]; foundInRaid: boolean }
+      {
+        itemId: string;
+        isQuestItem: boolean;
+        types: Set<string>;
+        objectives: TaskObjectiveType[];
+        foundInRaid: boolean;
+      }
     >();
     props.objectives.forEach((objective) => {
       const type = objective.type ?? '';
@@ -101,24 +108,33 @@
       const itemId = getItemId(objective);
       if (!itemId) return;
       const foundInRaid = objective.foundInRaid === true;
+      const isQuestItem = questItemTypes.has(type);
       const key = `${itemId}:${foundInRaid ? 1 : 0}`;
       if (!itemAnalysis.has(key)) {
         itemAnalysis.set(key, {
+          itemId,
+          isQuestItem,
           types: new Set(),
           objectives: [],
           foundInRaid,
         });
       }
       const analysis = itemAnalysis.get(key)!;
+      analysis.isQuestItem = analysis.isQuestItem || isQuestItem;
       analysis.types.add(type);
       analysis.objectives.push(objective);
     });
     // Second pass: categorize items and build groups
-    // Key: category:foundInRaid, Value: { objectives, category, foundInRaid }
+    // Quest items group by item ID; normal items group by category + foundInRaid.
+    // Key: [quest:{itemId}:]category:foundInRaid
     type Category = 'both' | 'findOnly' | 'giveOnly';
     const categoryGroups = new Map<
       string,
-      { objectives: TaskObjectiveType[]; category: Category; foundInRaid: boolean }
+      {
+        objectives: TaskObjectiveType[];
+        category: Category;
+        foundInRaid: boolean;
+      }
     >();
     const firstIndexByGroup = new Map<string, number>();
     // Track which objectives belong to which group
@@ -134,7 +150,9 @@
       } else {
         category = 'findOnly';
       }
-      const groupKey = `${category}:${analysis.foundInRaid ? 1 : 0}`;
+      const groupKey = analysis.isQuestItem
+        ? `quest:${analysis.itemId}:${category}:${analysis.foundInRaid ? 1 : 0}`
+        : `${category}:${analysis.foundInRaid ? 1 : 0}`;
       if (!categoryGroups.has(groupKey)) {
         categoryGroups.set(groupKey, {
           objectives: [],
