@@ -34,11 +34,29 @@
       title: 'Hideout updated',
       description: 'Removed {count} station upgrades that no longer meet prerequisites.',
     },
+    api_updated: {
+      title: 'Update from API',
+      description_fallback: 'Your progress was updated via API.',
+      label: {
+        single: 'Task updated',
+        plural: 'Tasks updated',
+      },
+      state: {
+        completed: 'completed',
+        failed: 'failed',
+        uncompleted: 'uncompleted',
+      },
+      more: ', +{count} more',
+    },
     local_ignored: {
-      title: 'Local progress ignored',
-      other_account: 'Local progress belongs to another account and was not applied to protect your cloud data.',
-      unsaved: 'Found temporary local progress that was not saved to your device; cloud progress was kept.',
-      guest: 'Found local guest progress on this device; your cloud progress was kept.',
+      title: 'Local browser progress skipped',
+      other_account: 'This browser has saved progress from a different account, so it was skipped to avoid overwriting your cloud progress.',
+      unsaved: 'This tab had temporary progress in memory but no saved browser copy (usually after refresh/crash), so cloud progress was kept.',
+      guest: 'This browser still had guest-mode progress from before sign-in, so your cloud progress was kept.',
+    },
+    progress_merged: {
+      title: 'Cloud progress synced',
+      description: 'Synced progress from another tab/device and merged {count} local differences.',
     },
     load_failed: {
       title: 'Unable to load progress',

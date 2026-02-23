@@ -4,9 +4,11 @@ export type LocalIgnoredReason = 'other_account' | 'unsaved' | 'guest';
 export type ToastTranslate = (key: string, params?: Record<string, unknown>) => string;
 const LOAD_FAILED_TOAST_DURATION = 10000;
 export interface UseToastI18nReturn {
+  showApiUpdated: (description: string) => void;
   showHideoutUpdated: (removedCount: number) => void;
   showLocalIgnored: (reason: LocalIgnoredReason) => void;
   showLoadFailed: () => void;
+  showProgressMerged: (count: number) => void;
 }
 export const useToastI18n = (translate?: ToastTranslate): UseToastI18nReturn => {
   const toast = useSafeToast();
@@ -30,6 +32,14 @@ export const useToastI18n = (translate?: ToastTranslate): UseToastI18nReturn => 
       color: 'warning',
     });
   };
+  const showApiUpdated = (description: string) => {
+    toast?.add({
+      title: t('toast.api_updated.title'),
+      description,
+      color: 'primary',
+      duration: 6000,
+    });
+  };
   const showLocalIgnored = (reason: LocalIgnoredReason) => {
     toast?.add({
       title: t('toast.local_ignored.title'),
@@ -45,5 +55,19 @@ export const useToastI18n = (translate?: ToastTranslate): UseToastI18nReturn => 
       duration: LOAD_FAILED_TOAST_DURATION,
     });
   };
-  return { showHideoutUpdated, showLocalIgnored, showLoadFailed };
+  const showProgressMerged = (count: number) => {
+    toast?.add({
+      title: t('toast.progress_merged.title'),
+      description: t('toast.progress_merged.description', { count }),
+      color: 'warning',
+      duration: 5000,
+    });
+  };
+  return {
+    showApiUpdated,
+    showHideoutUpdated,
+    showLocalIgnored,
+    showLoadFailed,
+    showProgressMerged,
+  };
 };

@@ -1,7 +1,10 @@
 import { type _GettersTree, defineStore, type StateTree } from 'pinia';
 import { useSupabaseSync } from '@/composables/supabase/useSupabaseSync';
-import { useSafeToast } from '@/composables/useSafeToast';
-import { useToastI18n } from '@/composables/useToastI18n';
+import {
+  type LocalIgnoredReason,
+  type ToastTranslate,
+  useToastI18n,
+} from '@/composables/useToastI18n';
 import {
   actions,
   defaultState,
@@ -1301,7 +1304,7 @@ export type TarkovStore = ReturnType<typeof useTarkovStore>;
 let syncController: ReturnType<typeof useSupabaseSync> | null = null;
 let syncUserId: string | null = null;
 let pendingSyncWatchStop: (() => void) | null = null;
-let hasShownLocalIgnoreToast = false;
+const shownLocalIgnoreReasons = new Set<LocalIgnoredReason>();
 export function getSyncController() {
   return syncController;
 }
@@ -1317,7 +1320,11 @@ export function resetTarkovSync(reason?: string) {
   }
   cleanupRealtimeListener();
   syncUserId = null;
-  hasShownLocalIgnoreToast = false;
+  shownLocalIgnoreReasons.clear();
+  lastLocalSyncTime = 0;
+  recentLocalSyncTimes.length = 0;
+  lastApiUpdateIds.pvp = null;
+  lastApiUpdateIds.pve = null;
 }
 export async function initializeTarkovSync() {
   const tarkovStore = useTarkovStore();
@@ -1356,11 +1363,11 @@ export async function initializeTarkovSync() {
         return null;
       }
     };
-    const notifyLocalIgnored = (reason: 'other_account' | 'unsaved' | 'guest') => {
-      if (!import.meta.client || hasShownLocalIgnoreToast) return;
+    const notifyLocalIgnored = (reason: LocalIgnoredReason) => {
+      if (!import.meta.client || shownLocalIgnoreReasons.has(reason)) return;
       try {
         toastI18n.showLocalIgnored(reason);
-        hasShownLocalIgnoreToast = true;
+        shownLocalIgnoreReasons.add(reason);
       } catch (e) {
         logger.warn('[TarkovStore] Could not show toast notification:', e);
       }
@@ -1732,19 +1739,46 @@ const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate
       Boolean(update) && typeof update.id === 'string' && isApiTaskState(update.state)
   );
 };
+const getToastTranslator = (): ToastTranslate => {
+  try {
+    const { $i18n } = useNuxtApp();
+    if (typeof $i18n?.t === 'function') {
+      return $i18n.t.bind($i18n) as ToastTranslate;
+    }
+  } catch (e) {
+    logger.warn('[TarkovStore] Could not resolve i18n translator for API update toast:', e);
+  }
+  return (key: string, params?: Record<string, unknown>) => {
+    if (key === 'toast.api_updated.label.single') return 'Task updated';
+    if (key === 'toast.api_updated.label.plural') return 'Tasks updated';
+    if (key === 'toast.api_updated.state.completed') return 'completed';
+    if (key === 'toast.api_updated.state.failed') return 'failed';
+    if (key === 'toast.api_updated.state.uncompleted') return 'uncompleted';
+    if (key === 'toast.api_updated.more' && typeof params?.count === 'number') {
+      return `, +${params.count} more`;
+    }
+    if (key === 'toast.api_updated.description_fallback')
+      return 'Your progress was updated via API.';
+    return key;
+  };
+};
 const formatApiUpdateDescription = (
   updates: ApiTaskUpdate[],
-  metadataStore: ReturnType<typeof useMetadataStore>
+  metadataStore: ReturnType<typeof useMetadataStore>,
+  translate: ToastTranslate
 ): string => {
-  if (!updates.length) return 'Your progress was updated via API.';
+  if (!updates.length) return translate('toast.api_updated.description_fallback');
   const previewLimit = 3;
-  const label = updates.length === 1 ? 'Task updated' : 'Tasks updated';
+  const label = translate(
+    updates.length === 1 ? 'toast.api_updated.label.single' : 'toast.api_updated.label.plural'
+  );
   const formatted = updates.slice(0, previewLimit).map((update) => {
     const taskName = metadataStore.getTaskById(update.id)?.name ?? update.id;
-    return `${taskName} → ${update.state}`;
+    const state = translate(`toast.api_updated.state.${update.state}`);
+    return `${taskName} -> ${state}`;
   });
   const remaining = updates.length - previewLimit;
-  const suffix = remaining > 0 ? `, +${remaining} more` : '';
+  const suffix = remaining > 0 ? translate('toast.api_updated.more', { count: remaining }) : '';
   return `${label}: ${formatted.join(', ')}${suffix}.`;
 };
 const getApiUpdateMeta = (data: UserProgressData | undefined): ApiUpdateMeta | null => {
@@ -1764,19 +1798,27 @@ const maybeNotifyApiUpdate = (
   data: UserProgressData | undefined,
   metadataStore: ReturnType<typeof useMetadataStore>,
   updateTime: number,
-  toast: ReturnType<typeof useToast> | null
+  toastI18n: ReturnType<typeof useToastI18n>
 ): boolean => {
   const meta = getApiUpdateMeta(data);
   if (!meta || lastApiUpdateIds[mode] === meta.id) return false;
   if (Math.abs(updateTime - meta.at) > API_UPDATE_FRESHNESS_MS) return false;
   lastApiUpdateIds[mode] = meta.id;
-  toast?.add({
-    title: 'Update from API',
-    description: formatApiUpdateDescription(normalizeApiTaskUpdates(meta.tasks), metadataStore),
-    color: 'primary',
-    duration: 6000,
-  });
+  const translate = getToastTranslator();
+  const description = formatApiUpdateDescription(
+    normalizeApiTaskUpdates(meta.tasks),
+    metadataStore,
+    translate
+  );
+  toastI18n.showApiUpdated(description);
   return true;
+};
+export const runApiUpdateHandlers = (handlers: Array<() => boolean>): boolean => {
+  let handled = false;
+  for (const handler of handlers) {
+    handled = handler() || handled;
+  }
+  return handled;
 };
 /**
  * Detect if there are actual data conflicts between local and remote state.
@@ -1866,7 +1908,7 @@ function setupRealtimeListener() {
   const { $supabase } = useNuxtApp();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
-  const toast = useSafeToast();
+  const toastI18n = useToastI18n();
   if (!$supabase.user.loggedIn || !$supabase.user.id) return;
   // Clean up existing channel if any
   if (realtimeChannel) {
@@ -1936,9 +1978,12 @@ function setupRealtimeListener() {
         const pveConflicts = detectDataConflicts(localState.pve, remoteData.pve_data);
         const hasRealConflict = pvpConflicts.hasConflict || pveConflicts.hasConflict;
         const totalConflicts = pvpConflicts.conflictCount + pveConflicts.conflictCount;
-        const apiUpdateHandled =
-          maybeNotifyApiUpdate('pvp', remoteData.pvp_data, metadataStore, updateTime, toast) ||
-          maybeNotifyApiUpdate('pve', remoteData.pve_data, metadataStore, updateTime, toast);
+        const apiUpdateHandled = runApiUpdateHandlers([
+          () =>
+            maybeNotifyApiUpdate('pvp', remoteData.pvp_data, metadataStore, updateTime, toastI18n),
+          () =>
+            maybeNotifyApiUpdate('pve', remoteData.pve_data, metadataStore, updateTime, toastI18n),
+        ]);
         logger.debug('[TarkovStore] Remote update detected, applying changes', {
           hasRealConflict,
           totalConflicts,
@@ -1966,12 +2011,7 @@ function setupRealtimeListener() {
         // Only notify user if there was an actual data conflict that required merging
         // Silent sync for API updates or other-device updates that don't conflict
         if (hasRealConflict && !apiUpdateHandled && !isLikelySelfOrigin) {
-          toast?.add({
-            title: 'Progress merged',
-            description: `${totalConflicts} conflicting change${totalConflicts > 1 ? 's were' : ' was'} resolved from another source.`,
-            color: 'warning',
-            duration: 5000,
-          });
+          toastI18n.showProgressMerged(totalConflicts);
         }
       }
     )

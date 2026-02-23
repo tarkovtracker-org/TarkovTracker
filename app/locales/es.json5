@@ -34,11 +34,29 @@
       title: 'Escondite actualizado',
       description: 'Tu escondite se actualizó correctamente.',
     },
+    api_updated: {
+      title: 'Actualización desde la API',
+      description_fallback: 'Tu progreso se actualizó mediante la API.',
+      label: {
+        single: 'Tarea actualizada',
+        plural: 'Tareas actualizadas',
+      },
+      state: {
+        completed: 'completada',
+        failed: 'fallida',
+        uncompleted: 'sin completar',
+      },
+      more: ', +{count} más',
+    },
     local_ignored: {
-      title: 'Ignorado localmente',
-      other_account: 'Ignorado por otra cuenta',
-      unsaved: 'Ignorado porque no se guardaron los cambios',
-      guest: 'Ignorado para usuarios invitados',
+      title: 'Progreso local del navegador omitido',
+      other_account: 'Este navegador tenía progreso guardado de otra cuenta; se omitió para no sobrescribir tu progreso en la nube.',
+      unsaved: 'Esta pestaña tenía progreso temporal en memoria pero no una copia guardada en el navegador (normalmente tras recargar/cierre inesperado), así que se mantuvo el progreso en la nube.',
+      guest: 'Este navegador aún tenía progreso de invitado de antes de iniciar sesión, así que se mantuvo tu progreso en la nube.',
+    },
+    progress_merged: {
+      title: 'Progreso en la nube sincronizado',
+      description: 'Se sincronizó progreso desde otra pestaña/dispositivo y se fusionaron {count} diferencias locales.',
     },
     load_failed: {
       title: 'Error al cargar',

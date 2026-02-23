@@ -34,11 +34,29 @@
       title: '藏身处已更新',
       description: '已移除 {count} 个不再满足前置条件的设施升级。',
     },
+    api_updated: {
+      title: '来自 API 的更新',
+      description_fallback: '你的进度已通过 API 更新。',
+      label: {
+        single: '任务已更新',
+        plural: '任务已更新',
+      },
+      state: {
+        completed: '已完成',
+        failed: '失败',
+        uncompleted: '未完成',
+      },
+      more: '，另有 {count} 项',
+    },
     local_ignored: {
-      title: '本地进度已忽略',
-      other_account: '本地进度属于其他账号，为保护你的云端数据未予应用。',
-      unsaved: '发现未保存的临时本地进度；已保留云端进度。',
-      guest: '在此设备上发现本地访客进度；已保留你的云端进度。',
+      title: '已跳过本地浏览器进度',
+      other_account: '此浏览器中有另一个账号保存的进度；为避免覆盖你的云端进度，已跳过该数据。',
+      unsaved: '此标签页中有临时内存进度，但没有已保存的浏览器副本（通常发生在刷新/崩溃后），因此保留了云端进度。',
+      guest: '此浏览器中仍有登录前的访客进度，因此保留了你的云端进度。',
+    },
+    progress_merged: {
+      title: '云端进度已同步',
+      description: '已从其他标签页/设备同步进度，并合并了 {count} 处本地差异。',
     },
     load_failed: {
       title: '无法加载进度',

@@ -34,11 +34,29 @@
       title: 'Versteck aktualisiert',
       description: '{count} Stationsupgrades entfernt, die die Voraussetzungen nicht mehr erfüllen.',
     },
+    api_updated: {
+      title: 'Update von der API',
+      description_fallback: 'Dein Fortschritt wurde über die API aktualisiert.',
+      label: {
+        single: 'Aufgabe aktualisiert',
+        plural: 'Aufgaben aktualisiert',
+      },
+      state: {
+        completed: 'abgeschlossen',
+        failed: 'fehlgeschlagen',
+        uncompleted: 'nicht abgeschlossen',
+      },
+      more: ', +{count} weitere',
+    },
     local_ignored: {
-      title: 'Lokaler Fortschritt ignoriert',
-      other_account: 'Lokaler Fortschritt gehört zu einem anderen Konto und wurde nicht übernommen, um deine Cloud-Daten zu schützen.',
-      unsaved: 'Temporärer lokaler Fortschritt gefunden, der nicht gespeichert wurde; Cloud-Fortschritt wurde beibehalten.',
-      guest: 'Lokaler Gast-Fortschritt auf diesem Gerät gefunden; dein Cloud-Fortschritt wurde beibehalten.',
+      title: 'Lokaler Browser-Fortschritt übersprungen',
+      other_account: 'In diesem Browser war gespeicherter Fortschritt eines anderen Kontos vorhanden. Er wurde übersprungen, damit dein Cloud-Fortschritt nicht überschrieben wird.',
+      unsaved: 'Dieser Tab hatte temporären Fortschritt im Speicher, aber keine gespeicherte Browser-Kopie (oft nach Aktualisierung/Absturz). Daher wurde der Cloud-Fortschritt beibehalten.',
+      guest: 'In diesem Browser war noch Gast-Fortschritt von vor der Anmeldung vorhanden. Daher wurde dein Cloud-Fortschritt beibehalten.',
+    },
+    progress_merged: {
+      title: 'Cloud-Fortschritt synchronisiert',
+      description: 'Fortschritt aus einem anderen Tab/Gerät synchronisiert und {count} lokale Unterschiede zusammengeführt.',
     },
     load_failed: {
       title: 'Fortschritt konnte nicht geladen werden',

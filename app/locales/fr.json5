@@ -34,11 +34,29 @@
       title: 'Planque mise à jour',
       description: '{count} améliorations de station supprimées car elles ne remplissent plus les prérequis.',
     },
+    api_updated: {
+      title: "Mise à jour depuis l'API",
+      description_fallback: "Votre progression a été mise à jour via l'API.",
+      label: {
+        single: 'Tâche mise à jour',
+        plural: 'Tâches mises à jour',
+      },
+      state: {
+        completed: 'terminée',
+        failed: 'échouée',
+        uncompleted: 'non terminée',
+      },
+      more: ', +{count} de plus',
+    },
     local_ignored: {
-      title: 'Progression locale ignorée',
-      other_account: "La progression locale appartient à un autre compte et n'a pas été appliquée pour protéger vos données cloud.",
-      unsaved: 'Progression locale temporaire trouvée mais non sauvegardée ; la progression cloud a été conservée.',
-      guest: 'Progression locale invité trouvée sur cet appareil ; votre progression cloud a été conservée.',
+      title: 'Progression locale du navigateur ignorée',
+      other_account: "Ce navigateur contenait une progression enregistrée d'un autre compte ; elle a été ignorée pour éviter d'écraser votre progression cloud.",
+      unsaved: 'Cet onglet avait une progression temporaire en mémoire mais aucune copie enregistrée dans le navigateur (souvent après actualisation/plantage) ; la progression cloud a été conservée.',
+      guest: "Ce navigateur avait encore une progression invité datant d'avant la connexion ; votre progression cloud a été conservée.",
+    },
+    progress_merged: {
+      title: 'Progression cloud synchronisée',
+      description: 'Progression synchronisée depuis un autre onglet/appareil et {count} différences locales fusionnées.',
     },
     load_failed: {
       title: 'Impossible de charger la progression',
