@@ -71,15 +71,21 @@ const {
   const cleanupSync = vi.fn();
   const pauseSync = vi.fn();
   const resumeSync = vi.fn();
-  const useSupabaseSyncMock = vi.fn(() => ({
+  const useSupabaseSyncMock = vi.fn((_options?: unknown) => ({
     cleanup: cleanupSync,
     pause: pauseSync,
     resume: resumeSync,
   }));
-  const single = vi.fn(async () => ({ data: createRemoteRow(), error: null }));
+  type RemoteRow = ReturnType<typeof createRemoteRow>;
+  type SupabaseErrorLike = { code?: string; message: string } | null;
+  type SingleResult = { data: RemoteRow | null; error: SupabaseErrorLike };
+  type UpsertResult = { error: SupabaseErrorLike };
+  const single = vi.fn(
+    async (): Promise<SingleResult> => ({ data: createRemoteRow(), error: null })
+  );
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
-  const upsert = vi.fn(async () => ({ error: null }));
+  const upsert = vi.fn(async (): Promise<UpsertResult> => ({ error: null }));
   const from = vi.fn(() => ({
     eq,
     select,
@@ -156,7 +162,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: supabaseContext,
 }));
 vi.mock('@/composables/supabase/useSupabaseSync', () => ({
-  useSupabaseSync: (options: unknown) => useSupabaseSyncMock(options),
+  useSupabaseSync: () => useSupabaseSyncMock(),
 }));
 vi.mock('@/composables/useToastI18n', () => ({
   useToastI18n: () => ({
