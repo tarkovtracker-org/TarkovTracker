@@ -227,6 +227,14 @@
   import ProfileHideoutTab from '@/features/profile/ProfileHideoutTab.vue';
   import ProfileOverviewTab from '@/features/profile/ProfileOverviewTab.vue';
   import {
+    DAY_MS,
+    countDaysInclusive,
+    normalizeMode,
+    normalizeSharedProgressData,
+    normalizeTimestamp,
+    normalizeUserId,
+  } from '@/features/profile/profileProgressionHelpers';
+  import {
     buildHideoutModuleCompletionState,
     getCountedTasks,
   } from '@/features/profile/profileStats';
@@ -250,13 +258,11 @@
     TimelineEvent,
     TimelineTone,
   } from '@/features/profile/profileTypes';
-  import type { ApiUpdateMeta, ApiTaskUpdate, UserProgressData } from '@/stores/progressState';
+  import type { UserProgressData } from '@/stores/progressState';
   import type { Task } from '@/types/tarkov';
-  const DAY_MS = 24 * 60 * 60 * 1000;
   const MAX_LEVEL = 79;
   const MIN_ESTIMATE_SAMPLE = 3;
   const TIMELINE_LIMIT = 12;
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const DEFAULT_PROGRESS_DATA: UserProgressData = {
     displayName: null,
     hideoutModules: {},
@@ -371,138 +377,6 @@
       icon: string;
     }
   >;
-  const normalizeMode = (value: unknown): GameMode | null => {
-    if (Array.isArray(value)) {
-      return normalizeMode(value[0]);
-    }
-    if (value === GAME_MODES.PVE) {
-      return GAME_MODES.PVE;
-    }
-    if (value === GAME_MODES.PVP) {
-      return GAME_MODES.PVP;
-    }
-    return null;
-  };
-  const normalizeUserId = (value: unknown): string | null => {
-    if (Array.isArray(value)) {
-      return normalizeUserId(value[0]);
-    }
-    if (typeof value !== 'string') {
-      return null;
-    }
-    const trimmed = value.trim();
-    if (!UUID_REGEX.test(trimmed)) {
-      return null;
-    }
-    return trimmed;
-  };
-  const normalizeTimestamp = (value: number | undefined): number | null => {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-      return null;
-    }
-    if (value < 1_000_000_000_000) {
-      return Math.round(value * 1000);
-    }
-    return Math.round(value);
-  };
-  const countDaysInclusive = (start: number, end: number): number => {
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-      return 1;
-    }
-    return Math.max(1, Math.ceil((end - start) / DAY_MS));
-  };
-  const isRecord = (value: unknown): value is Record<string, unknown> =>
-    Boolean(value && typeof value === 'object');
-  const isApiTaskUpdate = (value: unknown): value is ApiTaskUpdate => {
-    if (!isRecord(value)) {
-      return false;
-    }
-    return (
-      typeof value.id === 'string' &&
-      (value.state === 'completed' || value.state === 'failed' || value.state === 'uncompleted')
-    );
-  };
-  const normalizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
-    if (!isRecord(value)) {
-      return undefined;
-    }
-    if (
-      typeof value.id !== 'string' ||
-      typeof value.at !== 'number' ||
-      !Number.isFinite(value.at)
-    ) {
-      return undefined;
-    }
-    if (value.source !== 'api') {
-      return undefined;
-    }
-    const tasks = Array.isArray(value.tasks)
-      ? value.tasks.filter((task): task is ApiTaskUpdate => isApiTaskUpdate(task))
-      : undefined;
-    return {
-      at: value.at,
-      id: value.id,
-      source: 'api',
-      tasks,
-    };
-  };
-  const normalizeSharedProgressData = (value: unknown): UserProgressData => {
-    if (!isRecord(value)) {
-      return structuredClone(DEFAULT_PROGRESS_DATA);
-    }
-    const level =
-      typeof value.level === 'number' && Number.isFinite(value.level)
-        ? Math.max(1, Math.round(value.level))
-        : 1;
-    const pmcFaction = value.pmcFaction === 'BEAR' ? 'BEAR' : 'USEC';
-    const traders = isRecord(value.traders)
-      ? (value.traders as UserProgressData['traders'])
-      : DEFAULT_PROGRESS_DATA.traders;
-    const skills = isRecord(value.skills)
-      ? (value.skills as UserProgressData['skills'])
-      : DEFAULT_PROGRESS_DATA.skills;
-    const taskObjectives = isRecord(value.taskObjectives)
-      ? (value.taskObjectives as UserProgressData['taskObjectives'])
-      : DEFAULT_PROGRESS_DATA.taskObjectives;
-    const taskCompletions = isRecord(value.taskCompletions)
-      ? (value.taskCompletions as UserProgressData['taskCompletions'])
-      : DEFAULT_PROGRESS_DATA.taskCompletions;
-    const hideoutParts = isRecord(value.hideoutParts)
-      ? (value.hideoutParts as UserProgressData['hideoutParts'])
-      : DEFAULT_PROGRESS_DATA.hideoutParts;
-    const hideoutModules = isRecord(value.hideoutModules)
-      ? (value.hideoutModules as UserProgressData['hideoutModules'])
-      : DEFAULT_PROGRESS_DATA.hideoutModules;
-    const skillOffsets = isRecord(value.skillOffsets)
-      ? (value.skillOffsets as UserProgressData['skillOffsets'])
-      : DEFAULT_PROGRESS_DATA.skillOffsets;
-    const storyChapters = isRecord(value.storyChapters)
-      ? (value.storyChapters as UserProgressData['storyChapters'])
-      : DEFAULT_PROGRESS_DATA.storyChapters;
-    return {
-      displayName:
-        typeof value.displayName === 'string' && value.displayName.trim().length > 0
-          ? value.displayName
-          : null,
-      hideoutModules,
-      hideoutParts,
-      lastApiUpdate: normalizeApiUpdateMeta(value.lastApiUpdate),
-      level,
-      pmcFaction,
-      prestigeLevel:
-        typeof value.prestigeLevel === 'number' && Number.isFinite(value.prestigeLevel)
-          ? Math.max(0, Math.round(value.prestigeLevel))
-          : 0,
-      skillOffsets,
-      skills,
-      storyChapters,
-      taskCompletions,
-      taskObjectives,
-      traders,
-      xpOffset:
-        typeof value.xpOffset === 'number' && Number.isFinite(value.xpOffset) ? value.xpOffset : 0,
-    };
-  };
   const route = useRoute();
   const router = useRouter();
   const { t, locale } = useI18n({ useScope: 'global' });
@@ -590,7 +464,7 @@
       if (requestId !== sharedProfileRequestId) {
         return;
       }
-      sharedProfileData.value = normalizeSharedProgressData(response.data);
+      sharedProfileData.value = normalizeSharedProgressData(response.data, DEFAULT_PROGRESS_DATA);
       sharedProfileEdition.value =
         typeof response.gameEdition === 'number' ? response.gameEdition : 1;
     } catch (error) {

@@ -308,6 +308,8 @@
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
   import { useTaskSettingsDrawer } from '@/composables/useTaskSettingsDrawer';
+  import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
+  import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
   import TaskCard from '@/features/tasks/TaskCard.vue';
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
@@ -317,7 +319,6 @@
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
-  import { fuzzyMatchScore } from '@/utils/fuzzySearch';
   import { logger } from '@/utils/logger';
   import { STATIC_TIME_MAPS, resolveStaticDisplayTime } from '@/utils/mapTime';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
@@ -493,16 +494,6 @@
         return { value, period, icon: MAP_TIME_ICONS[period], ...MAP_TIME_STYLES[period] };
       });
   });
-  watch(
-    [showMapDisplay, selectedMapData],
-    ([showMap, selectedMap]) => {
-      if (!showMap || !selectedMap) return;
-      metadataStore.fetchMapSpawnsData().catch((error) => {
-        logger.error('[Tasks] Failed to load map spawn data:', error);
-      });
-    },
-    { immediate: true }
-  );
   const {
     mapHeight,
     mapHeightMax,
@@ -520,12 +511,6 @@
     }
     isMapPanelExpanded.value = !isMapPanelExpanded.value;
   };
-  watch(showMapDisplay, (isVisible) => {
-    if (!isVisible) {
-      isMapPanelExpanded.value = true;
-      stopResize();
-    }
-  });
   const mapObjectiveMarks = computed(() => {
     if (!selectedMapData.value) return [];
     const mapId = selectedMapData.value.id;
@@ -681,6 +666,7 @@
   const toggleMapTaskVisibilityFilter = () => {
     preferencesStore.setHideCompletedMapObjectives(!getHideCompletedMapObjectives.value);
   };
+  const route = useRoute();
   useTaskRouteSync({ maps, traders: sortedTraders });
   const refreshVisibleTasks = () => {
     try {
@@ -736,59 +722,23 @@
     { immediate: true, flush: 'post' }
   );
   const isLoading = computed(() => !metadataStore.hasInitialized || tasksLoading.value);
-  const searchQuery = ref('');
-  const debouncedSearch = ref('');
-  const updateDebouncedSearch = debounce((value: string) => {
-    debouncedSearch.value = value;
-  }, 180);
-  watch(searchQuery, (value) => {
-    if (!value) {
-      updateDebouncedSearch.cancel();
-      debouncedSearch.value = '';
-      return;
-    }
-    void updateDebouncedSearch(value).catch((error) => {
-      if (isDebounceRejection(error)) return;
-      logger.error('[Tasks] Debounced search update failed:', error);
-    });
-  });
-  const normalizedSearch = computed(() => debouncedSearch.value.toLowerCase().trim());
-  const isSearchActive = computed(() => normalizedSearch.value.length > 0);
-  const applySearchToTaskList = (taskList: Task[], query: string): Task[] => {
-    if (!query) return taskList;
-    return taskList
-      .map((task) => ({
-        task,
-        score: fuzzyMatchScore(task.name ?? '', query),
-      }))
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(({ task }) => task);
-  };
-  const filteredTasks = computed((): Task[] => {
-    return applySearchToTaskList(visibleTasks.value, normalizedSearch.value);
-  });
-  const mapCompleteTasksCountOnMap = computed(() => {
-    if (!showMapDisplay.value) return 0;
-    if (!tasks.value.length || !mergedMaps.value.length) return 0;
-    const selectedMapId = getTaskMapView.value;
-    if (!selectedMapId || selectedMapId === 'all') return 0;
-    const query = normalizedSearch.value;
-    const tasksWithoutHiding = applySearchToTaskList(
-      calculateFilteredTasksForOptions(tasks.value, mapTaskVisibilityFilterOptions.value, false),
-      query
-    );
-    const tasksWithHiding = applySearchToTaskList(
-      calculateFilteredTasksForOptions(tasks.value, mapTaskVisibilityFilterOptions.value, true),
-      query
-    );
-    return Math.max(tasksWithoutHiding.length - tasksWithHiding.length, 0);
-  });
-  const showMapTaskVisibilityNotice = computed(() => {
-    return showMapDisplay.value && mapCompleteTasksCountOnMap.value > 0;
+  const {
+    activeSearchCount,
+    cleanup: cleanupTaskFilters,
+    filteredTasks,
+    isSearchActive,
+    mapCompleteTasksCountOnMap,
+    searchQuery,
+    showMapTaskVisibilityNotice,
+  } = useTaskFilters({
+    calculateFilteredTasksForOptions,
+    getTaskMapView,
+    mapTaskVisibilityFilterOptions,
+    showMapDisplay,
+    tasks,
+    visibleTasks,
   });
   const graphVisibleTaskIds = computed(() => new Set(visibleTasks.value.map((task) => task.id)));
-  const activeSearchCount = computed(() => filteredTasks.value.length);
   const {
     pinnedTask,
     clearPinnedTask,
@@ -850,30 +800,23 @@
     maxAutoLoads: 8,
     rootMargin: '700px',
   });
-  watch(filteredTasks, (newTasks, oldTasks) => {
-    const listChanged =
-      !oldTasks ||
-      newTasks.length !== oldTasks.length ||
-      newTasks.some((task, i) => task.id !== oldTasks[i]!.id);
-    if (listChanged) {
-      visibleTaskCount.value = Math.min(BATCH_SIZE, newTasks.length);
-    }
-    void nextTick(() => {
-      checkAndLoadMore();
-    });
+  useTasksPageEffects({
+    batchSize: BATCH_SIZE,
+    checkAndLoadMore,
+    filteredTasks,
+    handleTaskQueryParam,
+    isMapPanelExpanded,
+    metadataStore,
+    route,
+    selectedMapData,
+    showMapDisplay,
+    stopResize,
+    tasksLoading,
+    visibleTaskCount,
   });
-  watch(
-    [() => useRoute().query.task, () => useRoute().query.highlightObjective, tasksLoading],
-    ([taskQueryParam, , loading]) => {
-      if (taskQueryParam && !loading) {
-        handleTaskQueryParam();
-      }
-    },
-    { immediate: true }
-  );
   onBeforeUnmount(() => {
     debouncedRefreshVisibleTasks.cancel();
-    updateDebouncedSearch.cancel();
+    cleanupTaskFilters();
     stopResize();
     cleanupMapPopup();
     cleanupNotification();

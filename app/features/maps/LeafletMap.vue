@@ -343,6 +343,18 @@
   import { createApp } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { useLeafletMap } from '@/composables/useLeafletMap';
+  import {
+    MAP_BUTTON_ACTIVE_CLASS,
+    MAP_BUTTON_INACTIVE_CLASS,
+    PAN_SPEED_MAX,
+    PAN_SPEED_MIN,
+    ZONE_OPACITY_MAX,
+    ZONE_OPACITY_MIN,
+    ZOOM_SPEED_MAX,
+    ZOOM_SPEED_MIN,
+    isCoopExtract,
+    useLeafletMapControls,
+  } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
@@ -353,8 +365,7 @@
     isValidMapSvgConfig,
     isValidMapTileConfig,
   } from '@/utils/mapCoordinates';
-  import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
-  import type { MapExtract, MapSpawn, TarkovMap } from '@/types/tarkov';
+  import type { TarkovMap } from '@/types/tarkov';
   import type L from 'leaflet';
   interface MapZone {
     map: { id: string };
@@ -396,7 +407,6 @@
   const preferencesStore = usePreferencesStore();
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
-  const mapColors = computed(() => preferencesStore.getMapMarkerColors);
   const clearPinnedTask = inject<(() => void) | null>('clearPinnedTask', null);
   const mapHeightStyle = computed(() => {
     if (typeof props.height !== 'number' || Number.isNaN(props.height)) return undefined;
@@ -406,9 +416,6 @@
     return props.map?.unavailable === true;
   });
   const mapContainer = ref<HTMLElement | null>(null);
-  const showPmcExtracts = ref(props.showPmcExtracts ?? props.showExtracts);
-  const showScavExtracts = ref(props.showScavExtracts ?? props.showExtracts);
-  const showPmcSpawns = ref(props.showPmcSpawns ?? false);
   const {
     mapInstance,
     leaflet,
@@ -426,43 +433,8 @@
     containerRef: mapContainer,
     map: toRef(props, 'map'),
   });
-  const mapExtracts = computed<MapExtract[]>(() => {
-    if (!props.map?.extracts) return [];
-    return props.map.extracts;
-  });
-  const mapPmcSpawns = computed<MapSpawn[]>(() => {
-    if (!props.map?.spawns) return [];
-    return props.map.spawns.filter((spawn) => {
-      const hasPmcAccess = spawn.sides?.includes('pmc') || spawn.sides?.includes('all');
-      const isPlayerSpawn =
-        spawn.categories?.includes('player') || spawn.categories?.includes('all');
-      return Boolean(spawn.position) && Boolean(hasPmcAccess) && Boolean(isPlayerSpawn);
-    });
-  });
-  const hasPmcSpawns = computed(() => mapPmcSpawns.value.length > 0);
-  const isCoopExtract = (extract: MapExtract): boolean => {
-    return /\bco-?op\b/i.test(extract.name || '');
-  };
-  const hasSharedExtracts = computed(() => {
-    return mapExtracts.value.some(
-      (extract) => extract.faction === 'shared' && !isCoopExtract(extract)
-    );
-  });
-  const hasCoopExtracts = computed(() => {
-    return mapExtracts.value.some(
-      (extract) => extract.faction === 'shared' && isCoopExtract(extract)
-    );
-  });
-  const ZOOM_SPEED_MIN = 0.5;
-  const ZOOM_SPEED_MAX = 3;
-  const PAN_SPEED_MIN = 0.5;
-  const PAN_SPEED_MAX = 3;
-  const ZONE_OPACITY_MIN = 0.05;
-  const ZONE_OPACITY_MAX = 0.5;
   const ZONE_HOVER_DELTA = 0.16;
   const ZONE_HOVER_MAX = 0.6;
-  const MAP_BUTTON_ACTIVE_CLASS = '!bg-surface-700/80 !text-surface-50 !ring-1 !ring-white/30';
-  const MAP_BUTTON_INACTIVE_CLASS = 'text-surface-300 hover:text-surface-100';
   const SPAWN_CLUSTER_ZOOM_THRESHOLD = 3.5;
   const SPAWN_CLUSTER_GRID_SIZE = 50;
   const SPAWN_CLUSTER_MIN_RADIUS = 6;
@@ -497,39 +469,33 @@
     }
     return locationHash;
   };
-  const mapZoomSpeed = computed({
-    get: () => preferencesStore.getMapZoomSpeed,
-    set: (value) => {
-      const parsed = Number(value);
-      const clamped = Math.min(ZOOM_SPEED_MAX, Math.max(ZOOM_SPEED_MIN, parsed));
-      preferencesStore.setMapZoomSpeed(clamped);
-    },
+  const {
+    hasCoopExtracts,
+    hasPmcSpawns,
+    hasSharedExtracts,
+    mapColors,
+    mapColorOptions,
+    mapExtracts,
+    mapPanSpeed,
+    mapPmcSpawns,
+    mapZoneOpacity,
+    mapZoomSpeed,
+    onMapColorInput,
+    panSpeedLabel,
+    showPmcExtracts,
+    showPmcSpawns,
+    showScavExtracts,
+    zoomSpeedLabel,
+    zoneOpacityLabel,
+  } = useLeafletMapControls({
+    map: toRef(props, 'map'),
+    preferencesStore,
+    showExtracts: props.showExtracts,
+    showPmcExtracts: props.showPmcExtracts,
+    showPmcSpawns: props.showPmcSpawns,
+    showScavExtracts: props.showScavExtracts,
+    t,
   });
-  const mapPanSpeed = computed({
-    get: () => preferencesStore.mapPanSpeed ?? 1,
-    set: (value) => {
-      const parsed = Number(value);
-      const clamped = Math.min(PAN_SPEED_MAX, Math.max(PAN_SPEED_MIN, parsed));
-      preferencesStore.setMapPanSpeed(clamped);
-    },
-  });
-  const mapZoneOpacity = computed({
-    get: () => preferencesStore.getMapZoneOpacity,
-    set: (value) => {
-      const parsed = Number(value);
-      const clamped = Math.min(ZONE_OPACITY_MAX, Math.max(ZONE_OPACITY_MIN, parsed));
-      preferencesStore.setMapZoneOpacity(clamped);
-    },
-  });
-  const mapColorOptions = computed(() => getMapColorOptions(t));
-  const onMapColorInput = (key: MapMarkerColorKey, event: Event) => {
-    const input = event.target as HTMLInputElement | null;
-    if (!input) return;
-    preferencesStore.setMapMarkerColor(key, input.value);
-  };
-  const zoomSpeedLabel = computed(() => `${mapZoomSpeed.value.toFixed(1)}x`);
-  const panSpeedLabel = computed(() => `${mapPanSpeed.value.toFixed(1)}x`);
-  const zoneOpacityLabel = computed(() => `${Math.round(mapZoneOpacity.value * 100)}%`);
   const pressedMapKeys = new Set<'up' | 'down' | 'left' | 'right' | 'zoom-in' | 'zoom-out'>();
   let mapKeyboardFrameId: number | null = null;
   let mapKeyboardLastTick = 0;

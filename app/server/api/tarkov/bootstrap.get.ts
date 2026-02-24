@@ -1,9 +1,10 @@
 import type { TarkovBootstrapQueryResult } from '~/types/tarkov';
-import { createTarkovFetcher, edgeCache } from '~/server/utils/edgeCache';
+import { edgeCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { CACHE_TTL_DEFAULT } from '~/server/utils/tarkov-cache-config';
 import { TARKOV_BOOTSTRAP_QUERY } from '~/server/utils/tarkov-queries';
+import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
 const logger = createLogger('TarkovBootstrap');
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);

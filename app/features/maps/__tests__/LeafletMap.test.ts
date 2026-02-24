@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLeafletMapOptions, type MapRenderConfig } from '@/utils/mapCoordinates';
 vi.mock('@/utils/logger', () => ({
   logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
     debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 describe('LeafletMap utilities', () => {

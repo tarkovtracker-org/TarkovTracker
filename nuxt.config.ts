@@ -16,10 +16,10 @@ export default defineNuxtConfig({
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
     // Server-only (private) runtime config
-    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+    supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
     supabaseServiceKey:
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_ROLE_KEY || '',
-    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
     githubToken: process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '',
     githubTimeoutMs: Number(process.env.GITHUB_TIMEOUT_MS || '8000') || 8000,
     logSinkUrl: process.env.LOG_SINK_URL || '',
@@ -52,6 +52,16 @@ export default defineNuxtConfig({
       VITE_LOG_LEVEL: process.env.VITE_LOG_LEVEL || '',
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
       appVersion,
+      supabaseAnonKey:
+        process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        '',
+      supabaseUrl:
+        process.env.NUXT_PUBLIC_SUPABASE_URL ||
+        process.env.SUPABASE_URL ||
+        process.env.VITE_SUPABASE_URL ||
+        '',
       clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
       teamGatewayUrl: process.env.NUXT_PUBLIC_TEAM_GATEWAY_URL || '',
       tokenGatewayUrl: process.env.NUXT_PUBLIC_TOKEN_GATEWAY_URL || '',

@@ -86,10 +86,10 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "deps": "npx taze --r --I",
+    "deps": "taze --r --I",
     "dev": "nuxt dev",
-    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
+    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:sync": "node scripts/sync-i18n.mjs",
@@ -104,11 +104,12 @@
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "test": "vitest run --reporter=default --maxWorkers=2",
     "test:watch": "vitest --watch",
-    "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts"
+    "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
+    "validate:openapi": "npm --prefix workers/api-gateway run validate:openapi"
   },
   "type": "module",
   "lint-staged": {
-    "app/**/*.{js,ts,tsx,vue,scss}": [
+    "app/**/*.{js,ts,tsx,vue}": [
       "prettier --write",
       "eslint --fix"
     ],

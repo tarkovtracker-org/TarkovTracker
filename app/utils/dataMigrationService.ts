@@ -7,7 +7,13 @@ import {
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import type { UserProgressData } from '@/stores/progressState';
+import type {
+  HideoutModule,
+  HideoutPart,
+  TaskCompletion,
+  TaskObjective,
+  UserProgressData,
+} from '@/types/progress';
 import type { GameMode } from '@/utils/constants';
 // Compute default edition index once at module scope (constant value)
 const DEFAULT_EDITION_INDEX = Math.max(
@@ -21,24 +27,10 @@ export interface ProgressData {
   gameEdition?: string;
   pmcFaction?: string;
   displayName?: string;
-  taskCompletions?: {
-    [key: string]: { complete: boolean; timestamp?: number; failed?: boolean };
-  };
-  taskObjectives?: {
-    [key: string]: {
-      complete: boolean;
-      count?: number;
-      timestamp?: number | null;
-    };
-  };
-  hideoutModules?: { [key: string]: { complete: boolean; timestamp?: number } };
-  hideoutParts?: {
-    [key: string]: {
-      complete: boolean;
-      count?: number;
-      timestamp?: number | null;
-    };
-  };
+  taskCompletions?: { [key: string]: TaskCompletion };
+  taskObjectives?: { [key: string]: TaskObjective };
+  hideoutModules?: { [key: string]: HideoutModule };
+  hideoutParts?: { [key: string]: HideoutPart };
   lastUpdated?: string;
   migratedFromLocalStorage?: boolean;
   migrationDate?: string;

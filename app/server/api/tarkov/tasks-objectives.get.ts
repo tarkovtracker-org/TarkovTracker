@@ -1,11 +1,12 @@
 import type { TarkovTaskObjectivesQueryResult } from '~/types/tarkov';
-import { createTarkovFetcher, edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
+import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
 import { validateAndThrow } from '~/server/utils/graphql-validation';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { applyOverlay } from '~/server/utils/overlay';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
 import { TARKOV_TASKS_OBJECTIVES_QUERY } from '~/server/utils/tarkov-queries';
+import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
 const logger = createLogger('TarkovTaskObjectives');
 const TASK_OBJECTIVES_CACHE_VERSION = 'v2';
 export default defineEventHandler(async (event) => {

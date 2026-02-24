@@ -6,7 +6,6 @@ import {
   setResponseHeader,
   type H3Event,
 } from 'h3';
-import { createTarkovFetcher } from '@/server/utils/edgeCache';
 import { createLogger } from '@/server/utils/logger';
 import {
   consumeSharedRateLimit,
@@ -15,6 +14,7 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
+import { createTarkovFetcher } from '@/server/utils/tarkovFetcher';
 import { API_GAME_MODES, GAME_MODES, type GameMode } from '@/utils/constants';
 import {
   isRecord,

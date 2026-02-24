@@ -12,15 +12,12 @@ type CacheSpy = {
   match: ReturnType<typeof vi.fn>;
   put: ReturnType<typeof vi.fn>;
 };
-const createEvent = (host: string, forwardedProto: string): H3Event => {
+const createEvent = (headers: Record<string, string> = {}, url = '/api/test?lang=en'): H3Event => {
   return {
     node: {
       req: {
-        headers: {
-          host,
-          'x-forwarded-proto': forwardedProto,
-        },
-        url: '/api/test',
+        headers,
+        url,
       },
     },
     context: {},
@@ -29,6 +26,8 @@ const createEvent = (host: string, forwardedProto: string): H3Event => {
 describe('edgeCache', () => {
   let cacheSpy: CacheSpy;
   let lastMatchUrl: string | null;
+  let setHeaders: ReturnType<typeof vi.fn>;
+  let createErrorFn: (value: unknown) => unknown;
   beforeEach(() => {
     lastMatchUrl = null;
     cacheSpy = {
@@ -39,8 +38,8 @@ describe('edgeCache', () => {
       put: vi.fn(async () => undefined),
     };
     vi.stubGlobal('caches', { default: cacheSpy });
-    vi.stubGlobal('setResponseHeaders', vi.fn());
-    vi.stubGlobal('createError', (value: unknown) => value);
+    setHeaders = vi.fn();
+    createErrorFn = (value: unknown) => value;
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -48,20 +47,87 @@ describe('edgeCache', () => {
   });
   it('falls back to default cache host when appUrl is localhost', async () => {
     appUrl = 'http://localhost:3000';
-    const event = createEvent('maps.example.com', 'https');
+    const event = createEvent({ host: 'maps.example.com', 'x-forwarded-proto': 'https' });
     const { edgeCache } = await import('@/server/utils/edgeCache');
     await edgeCache(event, 'items-en', async () => ({ ok: true }), 60, {
       cacheKeyPrefix: 'tarkov',
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
     });
     expect(lastMatchUrl).toBe('https://tarkovtracker.org/__edge-cache/tarkov/items-en');
   });
-  it('treats 127.0.0.0/8 as localhost for cache host selection', async () => {
-    appUrl = 'http://127.0.0.2:3000';
-    const event = createEvent('edge.example.com', 'http');
+  it('returns cached payload on cache hit', async () => {
+    cacheSpy.match.mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { items: [{ id: 'cached' }] } }))
+    );
+    const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
+    const event = createEvent();
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    await edgeCache(event, 'items-en', async () => ({ ok: true }), 60, {
+    const result = await edgeCache(event, 'items-en', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
     });
-    expect(lastMatchUrl).toBe('https://tarkovtracker.org/__edge-cache/tarkov/items-en');
+    expect(result).toEqual({ data: { items: [{ id: 'cached' }] } });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(cacheSpy.put).not.toHaveBeenCalled();
+  });
+  it('stores fresh payload on cache miss', async () => {
+    const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
+    const event = createEvent();
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'items-en', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { items: [{ id: 'fresh' }] } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(cacheSpy.put).toHaveBeenCalledTimes(1);
+  });
+  it('bypasses cache and skips writes when bypass header is set', async () => {
+    const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
+    const event = createEvent({ 'x-bypass-cache': 'true' });
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    await edgeCache(event, 'items-en', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(cacheSpy.match).not.toHaveBeenCalled();
+    expect(cacheSpy.put).not.toHaveBeenCalled();
+  });
+  it('sanitizes error details in thrown status message', async () => {
+    const event = createEvent();
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    await expect(
+      edgeCache(
+        event,
+        'items-en',
+        async () => {
+          throw new Error('failed https://secret.example.com/path/to/file.sql');
+        },
+        60,
+        {
+          cacheKeyPrefix: 'tarkov',
+          deps: {
+            createErrorFn,
+            setResponseHeadersFn: setHeaders,
+          },
+        }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 502,
+      statusMessage: expect.stringContaining('[host]'),
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { enableAutoUnmount } from '@vue/test-utils';
 import 'fake-indexeddb/auto';
-import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import { afterAll, afterEach, vi } from 'vitest';
+
 type FetchInput = string | Request | URL;
 type MockFetchResponse =
   | { data: { playerLevels: unknown[] } }
@@ -9,6 +10,11 @@ type MockFetchResponse =
   | { data: { items: unknown[] } }
   | { data: { tasks: unknown[]; maps: unknown[]; traders: unknown[] } }
   | { data: { tasks: unknown[] } }
+  | { data: { chapters: unknown[] } }
+  | { data: { members: unknown[] } }
+  | { data: { changelog: unknown[] } }
+  | { data: { kappa: { completed: number; total: number } } }
+  | null
   | { data: { lastPurgeAt: null } }
   | { editions: Record<string, unknown> }
   | {
@@ -49,8 +55,23 @@ const mockFetch = vi.fn(
     if (url.includes('/api/tarkov/tasks-rewards')) {
       return { data: { tasks: [] } };
     }
+    if (url.includes('/api/storyline')) {
+      return { data: { chapters: [] } };
+    }
     if (url.includes('/api/tarkov/cache-meta')) {
       return { data: { lastPurgeAt: null } };
+    }
+    if (url.includes('/api/team/members')) {
+      return { data: { members: [] } };
+    }
+    if (url.includes('/api/changelog')) {
+      return { data: { changelog: [] } };
+    }
+    if (url.includes('/api/streamer/')) {
+      return { data: { kappa: { completed: 0, total: 0 } } };
+    }
+    if (url.includes('/api/logs/client')) {
+      return null;
     }
     if (url.includes('tarkov-data-overlay') || url.includes('/overlay.json')) {
       return { editions: {} };
@@ -72,6 +93,7 @@ const mockFetch = vi.fn(
   }
 );
 vi.stubGlobal('$fetch', mockFetch);
+
 // Auto-unmount VTU wrappers after each test
 try {
   enableAutoUnmount(afterEach);
@@ -80,9 +102,7 @@ try {
     throw error;
   }
 }
-beforeAll(() => {
-  const originalWarn = console.warn.bind(console);
-});
+
 afterAll(() => {
   vi.restoreAllMocks();
 });

@@ -416,8 +416,12 @@
   import TaskCardBackground from '@/features/tasks/TaskCardBackground.vue';
   import TaskCardBadges from '@/features/tasks/TaskCardBadges.vue';
   import TaskCardHeader from '@/features/tasks/TaskCardHeader.vue';
+  import {
+    categorizeObjectivesForMapView,
+    resolveSelectedMapIds,
+    resolveTaskObjectives,
+  } from '@/features/tasks/taskCardHelpers';
   import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
-  import { isMapObjectiveType } from '@/features/tasks/taskObjectiveTypes';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -427,7 +431,7 @@
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { ActionButtonState } from '@/features/tasks/types';
-  import type { GameEdition, Task, TaskObjective } from '@/types/tarkov';
+  import type { GameEdition, Task } from '@/types/tarkov';
   type ContextMenuRef = { open: (event: MouseEvent) => void };
   type FailureSource = {
     id: string;
@@ -956,25 +960,15 @@
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
   const selectedMapIds = computed(() => {
-    const selectedMapId = preferencesStore.getTaskMapView;
-    if (!selectedMapId || selectedMapId === 'all') return [];
-    const mergedMap = metadataStore.mapsWithSvg.find((map) => {
-      const mergedIds = (map as { mergedIds?: string[] }).mergedIds || [];
-      return map.id === selectedMapId || mergedIds.includes(selectedMapId);
-    });
-    if (!mergedMap) return [selectedMapId];
-    const mergedIds = (mergedMap as { mergedIds?: string[] }).mergedIds || [];
-    return mergedIds.includes(mergedMap.id) ? mergedIds : [mergedMap.id, ...mergedIds];
+    return resolveSelectedMapIds(
+      preferencesStore.getTaskMapView,
+      metadataStore.mapsWithSvg as Array<{ id: string; mergedIds?: string[] }>
+    );
   });
   // Get objectives from props or fall back to store when props are stale
   // This handles the case where visibleTasks holds old task objects after objectives merge
   const taskObjectives = computed(() => {
-    if ((props.task.objectives?.length ?? 0) > 0) {
-      return props.task.objectives!;
-    }
-    // Props empty - check store for latest data
-    const storeTask = metadataStore.getTaskById(props.task.id);
-    return storeTask?.objectives ?? [];
+    return resolveTaskObjectives(props.task, metadataStore.getTaskById(props.task.id));
   });
   const taskItemObjectives = computed(() => {
     return taskObjectives.value.filter((objective) => {
@@ -1030,37 +1024,12 @@
    * Categorizes objectives into relevant, irrelevant, and uncompleted irrelevant.
    */
   const categorizedObjectives = computed(() => {
-    const objectives = taskObjectives.value;
-    const mapIds = selectedMapIds.value;
-    const isMapView = onMapView.value;
-    // If not in map view, all objectives are relevant
-    if (!isMapView) {
-      return {
-        relevant: objectives,
-        irrelevant: [] as TaskObjective[],
-        uncompletedIrrelevant: [] as TaskObjective[],
-      };
-    }
-    const relevant: TaskObjective[] = [];
-    const irrelevant: TaskObjective[] = [];
-    const uncompletedIrrelevant: TaskObjective[] = [];
-    for (const objective of objectives) {
-      const hasMaps = Array.isArray(objective.maps) && objective.maps.length > 0;
-      const onSelectedMap = hasMaps && objective.maps!.some((map) => mapIds.includes(map.id));
-      const isMapType = isMapObjectiveType(objective.type);
-      // Objective is relevant if it has no maps, or is on selected map AND is a map type
-      const isRelevant = !hasMaps || (onSelectedMap && isMapType);
-      if (isRelevant) {
-        relevant.push(objective);
-      } else {
-        irrelevant.push(objective);
-        // Check if this irrelevant objective is also uncompleted
-        if (!tarkovStore.isTaskObjectiveComplete(objective.id)) {
-          uncompletedIrrelevant.push(objective);
-        }
-      }
-    }
-    return { relevant, irrelevant, uncompletedIrrelevant };
+    return categorizeObjectivesForMapView({
+      isMapView: onMapView.value,
+      isObjectiveComplete: (objectiveId) => tarkovStore.isTaskObjectiveComplete(objectiveId),
+      mapIds: selectedMapIds.value,
+      objectives: taskObjectives.value,
+    });
   });
   // Derived values from consolidated categorization
   const relevantViewObjectives = computed(() => categorizedObjectives.value.relevant);

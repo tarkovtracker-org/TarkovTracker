@@ -40,7 +40,6 @@ vi.mock('h3', async () => {
   };
 });
 vi.mock('~/server/utils/edgeCache', () => ({
-  createTarkovFetcher: mockCreateTarkovFetcher,
   edgeCache: mockEdgeCache,
   shouldBypassCache: mockShouldBypassCache,
 }));
@@ -79,6 +78,9 @@ vi.mock('~/server/utils/tarkov-queries', () => ({
 }));
 vi.mock('~/server/utils/tarkov-sanitization', () => ({
   sanitizeTaskRewards: mockSanitizeTaskRewards,
+}));
+vi.mock('~/server/utils/tarkovFetcher', () => ({
+  createTarkovFetcher: mockCreateTarkovFetcher,
 }));
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 describe('Tarkov API handlers', () => {
@@ -130,6 +132,7 @@ describe('Tarkov API handlers', () => {
     const { default: handler } = await import('@/server/api/tarkov/items-lite.get');
     await handler(event);
     expect(mockCreateTarkovFetcher).toHaveBeenCalledWith('ITEMS_LITE_QUERY', { lang: 'en' });
+    expect(mockValidateAndThrow).toHaveBeenCalled();
     expect(mockEdgeCache).toHaveBeenCalledWith(event, 'items-lite-en', expect.any(Function), 222, {
       cacheKeyPrefix: 'tarkov',
     });
@@ -138,9 +141,24 @@ describe('Tarkov API handlers', () => {
     const { default: handler } = await import('@/server/api/tarkov/items.get');
     await handler(event);
     expect(mockCreateTarkovFetcher).toHaveBeenCalledWith('ITEMS_QUERY', { lang: 'en' });
+    expect(mockValidateAndThrow).toHaveBeenCalled();
     expect(mockEdgeCache).toHaveBeenCalledWith(event, 'items-en', expect.any(Function), 222, {
       cacheKeyPrefix: 'tarkov',
     });
+  });
+  it('throws for malformed upstream payloads on items-lite', async () => {
+    mockValidateAndThrow.mockImplementationOnce(() => {
+      throw new Error('Invalid GraphQL response structure');
+    });
+    const { default: handler } = await import('@/server/api/tarkov/items-lite.get');
+    await expect(handler(event)).rejects.toThrow('Invalid GraphQL response structure');
+  });
+  it('throws for malformed upstream payloads on items', async () => {
+    mockValidateAndThrow.mockImplementationOnce(() => {
+      throw new Error('Invalid GraphQL response structure');
+    });
+    const { default: handler } = await import('@/server/api/tarkov/items.get');
+    await expect(handler(event)).rejects.toThrow('Invalid GraphQL response structure');
   });
   it('builds expected cache key for prestige', async () => {
     const { default: handler } = await import('@/server/api/tarkov/prestige.get');

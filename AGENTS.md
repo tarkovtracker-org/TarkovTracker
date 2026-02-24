@@ -43,7 +43,7 @@
 - `npm run lint` runs ESLint on `app/` with zero warnings.
 - `npm run lint:fix` auto-fixes lint issues in `app/`.
 - `npm run format` runs Prettier then ESLint fixes.
-- Prettier targets `app/**/*.{js,ts,tsx,vue,json,json5,css,scss,md}`.
+- Prettier targets `app/**/*.{js,ts,tsx,vue,json,json5,css,md}`.
 - Prettier also formats `docs/**/*.{md,markdown}` and top-level configs.
 - Formatting uses `prettier-plugin-tailwindcss` for class sorting.
 - `printWidth` 100, `tabWidth` 2, `singleQuote` true, `semi` true.

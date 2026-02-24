@@ -17,8 +17,11 @@ type SupabaseUser = {
   providers: string[] | null; // All linked OAuth providers
 };
 export default defineNuxtPlugin(() => {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const runtimeConfig = useRuntimeConfig();
+  const supabaseUrl = String(runtimeConfig.public.supabaseUrl || '').trim();
+  const supabaseKey = String(runtimeConfig.public.supabaseAnonKey || '').trim();
+  const missingConfigMessage =
+    '[Supabase] Missing runtimeConfig.public.supabaseUrl or runtimeConfig.public.supabaseAnonKey';
   const buildStubBuilder = () => {
     const result = Promise.resolve({ data: null, error: null });
     const proxy = new Proxy(
@@ -128,12 +131,14 @@ export default defineNuxtPlugin(() => {
     };
   };
   if (!supabaseUrl || !supabaseKey) {
-    if (process.env.NODE_ENV === 'production') {
-      logger.error('[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY');
-      throw new Error('Supabase configuration missing');
+    if (import.meta.env.PROD) {
+      logger.error(
+        `${missingConfigMessage}. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY.`
+      );
+      throw new Error(missingConfigMessage);
     }
     logger.info(
-      '[Supabase] Running in offline mode - login/sync disabled. ' +
+      `${missingConfigMessage}. Running in offline mode for development. ` +
         'See .env.example to enable Supabase features.'
     );
     const stub = buildStub();

@@ -1,8 +1,9 @@
-import { createTarkovFetcher, edgeCache } from '~/server/utils/edgeCache';
+import { edgeCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
 import { TARKOV_HIDEOUT_QUERY } from '~/server/utils/tarkov-queries';
+import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
 const logger = createLogger('TarkovHideout');
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);

@@ -28,5 +28,17 @@ export default defineVitestConfig({
     watch: false,
     reporters: ['default'],
     passWithNoTests: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'lcov'],
+      include: ['app/**/*.{ts,vue}'],
+      exclude: ['app/**/*.d.ts', 'app/**/__tests__/**'],
+      thresholds: {
+        branches: 15,
+        functions: 20,
+        lines: 20,
+        statements: 20,
+      },
+    },
   },
 });
