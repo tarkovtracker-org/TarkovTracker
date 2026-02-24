@@ -64,7 +64,7 @@ describe('useTaskFilters', () => {
       () =>
         ({
           mapView: 'woods',
-          mergedMaps: [{ id: 'woods', mergedIds: ['woods'], name: 'Woods' }],
+          mergedMaps: [{ id: 'woods', mergedIds: ['woods'] }],
           primaryView: 'maps',
           secondaryView: 'available',
           sortDirection: 'asc',

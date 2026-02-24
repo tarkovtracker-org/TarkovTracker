@@ -731,7 +731,13 @@
     searchQuery,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
-    calculateFilteredTasksForOptions,
+    calculateFilteredTasksForOptions: (taskList, options, hideCompletedMapObjectives, overrides) =>
+      calculateFilteredTasksForOptions(
+        taskList,
+        options,
+        hideCompletedMapObjectives ?? false,
+        overrides
+      ),
     getTaskMapView,
     mapTaskVisibilityFilterOptions,
     showMapDisplay,

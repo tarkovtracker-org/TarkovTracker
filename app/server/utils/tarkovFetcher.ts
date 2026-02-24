@@ -2,8 +2,21 @@ import { $fetch } from 'ofetch';
 import { sanitizeGraphQLErrors, sanitizeVariables } from '@/server/utils/edgeCacheSanitizers';
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('TarkovFetcher');
+type TarkovGraphqlRequest = {
+  method: 'POST';
+  headers: {
+    'Content-Type': string;
+  };
+  body: {
+    query: string;
+    variables: Record<string, unknown>;
+  };
+  timeout: number;
+  retry: number;
+};
+type TarkovFetcherRequest = <T = unknown>(url: string, request: TarkovGraphqlRequest) => Promise<T>;
 type TarkovFetcherDependencies = {
-  fetcher?: typeof $fetch;
+  fetcher?: TarkovFetcherRequest;
   logger?: Pick<typeof logger, 'error' | 'warn'>;
   sleep?: (ms: number) => Promise<void>;
 };
@@ -18,7 +31,7 @@ export function createTarkovFetcher<T = unknown>(
   options: TarkovFetcherOptions = {}
 ): () => Promise<T> {
   const { maxRetries = 3, timeoutMs = 30000, deps } = options;
-  const fetcher = deps?.fetcher ?? $fetch;
+  const fetcher = deps?.fetcher ?? ($fetch as TarkovFetcherRequest);
   const fetcherLogger = deps?.logger ?? logger;
   const sleep = deps?.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const safeMaxRetries = Number.isFinite(maxRetries) ? Math.max(1, Math.floor(maxRetries)) : 3;

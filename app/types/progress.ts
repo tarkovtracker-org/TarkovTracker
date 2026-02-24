@@ -1,7 +1,7 @@
 export interface TaskObjective {
   count?: number;
   complete?: boolean;
-  timestamp?: number | null;
+  timestamp?: number;
 }
 export interface TaskCompletion {
   complete?: boolean;
@@ -12,7 +12,7 @@ export interface TaskCompletion {
 export interface HideoutPart {
   count?: number;
   complete?: boolean;
-  timestamp?: number | null;
+  timestamp?: number;
 }
 export interface HideoutModule {
   complete?: boolean;

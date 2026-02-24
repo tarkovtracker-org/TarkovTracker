@@ -9,7 +9,10 @@ type TaskFilterInputs = {
   calculateFilteredTasksForOptions: (
     tasks: Task[],
     options: TaskFilterAndSortOptions,
-    hideCompletedMapObjectives?: boolean
+    hideCompletedMapObjectives?: boolean,
+    overrides?: {
+      hideGlobalTasks?: boolean;
+    }
   ) => Task[];
   getTaskMapView: RefLike<string>;
   mapTaskVisibilityFilterOptions: ComputedRefLike<TaskFilterAndSortOptions>;

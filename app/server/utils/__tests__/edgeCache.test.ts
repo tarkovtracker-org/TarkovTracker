@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { H3Event } from 'h3';
+import type { H3Event, createError, setResponseHeaders } from 'h3';
 let appUrl: string | undefined;
 vi.mock('#imports', () => ({
   useRuntimeConfig: () => ({
@@ -26,8 +26,8 @@ const createEvent = (headers: Record<string, string> = {}, url = '/api/test?lang
 describe('edgeCache', () => {
   let cacheSpy: CacheSpy;
   let lastMatchUrl: string | null;
-  let setHeaders: ReturnType<typeof vi.fn>;
-  let createErrorFn: (value: unknown) => unknown;
+  let setHeaders: typeof setResponseHeaders;
+  let createErrorFn: typeof createError;
   beforeEach(() => {
     lastMatchUrl = null;
     cacheSpy = {
@@ -38,8 +38,8 @@ describe('edgeCache', () => {
       put: vi.fn(async () => undefined),
     };
     vi.stubGlobal('caches', { default: cacheSpy });
-    setHeaders = vi.fn();
-    createErrorFn = (value: unknown) => value;
+    setHeaders = vi.fn() as unknown as typeof setResponseHeaders;
+    createErrorFn = ((value) => value) as typeof createError;
   });
   afterEach(() => {
     vi.unstubAllGlobals();

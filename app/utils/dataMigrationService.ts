@@ -552,7 +552,7 @@ export default class DataMigrationService {
             // Non-null assertion
             complete: part.complete || false,
             count: part.count || 0,
-            timestamp: part.complete ? Date.now() : null,
+            timestamp: part.complete ? Date.now() : undefined,
           };
         });
       }
@@ -563,7 +563,7 @@ export default class DataMigrationService {
             // Non-null assertion
             complete: objective.complete || false,
             count: objective.count || 0,
-            timestamp: objective.complete ? Date.now() : null,
+            timestamp: objective.complete ? Date.now() : undefined,
           };
         });
       }

@@ -50,18 +50,21 @@ export function useTasksPageEffects({
       stopResize();
     }
   });
-  watch(filteredTasks, (newTasks, oldTasks) => {
-    const listChanged =
-      !oldTasks ||
-      newTasks.length !== oldTasks.length ||
-      newTasks.some((task, index) => task.id !== oldTasks[index]?.id);
-    if (listChanged) {
-      visibleTaskCount.value = Math.min(batchSize, newTasks.length);
+  watch(
+    () => filteredTasks.value,
+    (newTasks, oldTasks) => {
+      const listChanged =
+        !oldTasks ||
+        newTasks.length !== oldTasks.length ||
+        newTasks.some((task, index) => task.id !== oldTasks[index]?.id);
+      if (listChanged) {
+        visibleTaskCount.value = Math.min(batchSize, newTasks.length);
+      }
+      void nextTick(() => {
+        void checkAndLoadMore();
+      });
     }
-    void nextTick(() => {
-      void checkAndLoadMore();
-    });
-  });
+  );
   watch(
     [() => route.query.task, () => route.query.highlightObjective, tasksLoading],
     ([taskQueryParam, , loading]) => {

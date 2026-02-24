@@ -27,6 +27,10 @@ jobs:
             --verbose
             --no-progress
             --accept 200,204,206,301,302,308
+            --max-concurrency 4
+            --max-retries 3
+            --retry-wait-time 2
+            --exclude-path '^\\./CHANGELOG\\.md$'
             --exclude 'localhost'
             --exclude '127\.0\.0\.1'
             --exclude 'tarkovtracker\.org'
