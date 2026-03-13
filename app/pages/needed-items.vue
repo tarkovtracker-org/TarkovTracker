@@ -116,36 +116,42 @@
         </UCard>
       </div>
     </div>
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="translate-x-full opacity-0"
-      enter-to-class="translate-x-0 opacity-100"
-      leave-active-class="transition-all duration-200 ease-in"
-      leave-from-class="translate-x-0 opacity-100"
-      leave-to-class="translate-x-full opacity-0"
+    <USlideover
+      :open="isSettingsDrawerOpen"
+      side="right"
+      :ui="{
+        content: 'w-full max-w-sm bg-transparent shadow-none ring-0 sm:max-w-sm',
+        body: 'p-4',
+      }"
+      @update:open="
+        (open) => {
+          if (!open) closeSettingsDrawer();
+        }
+      "
     >
-      <NeededItemsSettingsDrawer
-        v-if="isSettingsDrawerOpen"
-        mode="overlay"
-        :active-filter="activeFilter"
-        :fir-filter="firFilter"
-        :hide-owned="hideOwned"
-        :hide-non-fir-special-equipment="hideNonFirSpecialEquipment"
-        :hide-team-items="hideTeamItems"
-        :kappa-only="kappaOnly"
-        :view-mode="viewMode"
-        :group-by-item="groupByItem"
-        :card-style="cardStyle"
-        @update:fir-filter="firFilter = $event"
-        @update:hide-owned="hideOwned = $event"
-        @update:hide-non-fir-special-equipment="hideNonFirSpecialEquipment = $event"
-        @update:hide-team-items="hideTeamItems = $event"
-        @update:kappa-only="kappaOnly = $event"
-        @update:view-mode="viewMode = $event"
-        @update:group-by-item="groupByItem = $event"
-        @update:card-style="cardStyle = $event"
-      />
-    </Transition>
+      <template #body>
+        <NeededItemsSettingsDrawer
+          mode="docked"
+          :active-filter="activeFilter"
+          :fir-filter="firFilter"
+          :hide-owned="hideOwned"
+          :hide-non-fir-special-equipment="hideNonFirSpecialEquipment"
+          :hide-team-items="hideTeamItems"
+          :kappa-only="kappaOnly"
+          :view-mode="viewMode"
+          :group-by-item="groupByItem"
+          :card-style="cardStyle"
+          @update:fir-filter="firFilter = $event"
+          @update:hide-owned="hideOwned = $event"
+          @update:hide-non-fir-special-equipment="hideNonFirSpecialEquipment = $event"
+          @update:hide-team-items="hideTeamItems = $event"
+          @update:kappa-only="kappaOnly = $event"
+          @update:view-mode="viewMode = $event"
+          @update:group-by-item="groupByItem = $event"
+          @update:card-style="cardStyle = $event"
+        />
+      </template>
+    </USlideover>
   </div>
 </template>
 <script setup lang="ts">
@@ -170,7 +176,8 @@
     usesWindowScroll: true,
   });
   const { t } = useI18n({ useScope: 'global' });
-  const { isOpen: isSettingsDrawerOpen } = useNeededItemsSettingsDrawer();
+  const { close: closeSettingsDrawer, isOpen: isSettingsDrawerOpen } =
+    useNeededItemsSettingsDrawer();
   useSeoMeta({
     title: () => t('page.needed_items.title'),
     description: () => t('page.needed_items.meta_description'),

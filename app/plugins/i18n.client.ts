@@ -1,6 +1,6 @@
 import { markI18nReady } from '@/composables/i18nHelpers';
 import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
-import { isSupportedLocale } from '@/utils/locales';
+import { resolveAppLocale } from '@/utils/locales';
 import { logger } from '@/utils/logger';
 import { parseBootstrapPreferencesState } from '@/utils/preferencesStorage';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -12,6 +12,7 @@ type BootstrapSupabaseContext = {
   };
 };
 function getInitialLocale(supabase?: BootstrapSupabaseContext): SupportedLocale {
+  let localeOverride: string | null = null;
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       const savedPrefs = window.localStorage.getItem(STORAGE_KEYS.preferences);
@@ -22,19 +23,14 @@ function getInitialLocale(supabase?: BootstrapSupabaseContext): SupportedLocale 
             expectedUserId === null && hasSupabaseAuthSessionHint(),
           expectedUserId,
         });
-        const localeOverride =
-          typeof prefs?.localeOverride === 'string' ? prefs.localeOverride : null;
-        if (localeOverride && isSupportedLocale(localeOverride)) {
-          return localeOverride;
-        }
+        localeOverride = typeof prefs?.localeOverride === 'string' ? prefs.localeOverride : null;
       }
     } catch (error) {
       logger.warn('[i18n] Failed to read locale from localStorage:', error);
     }
   }
   const navLang = typeof navigator !== 'undefined' ? navigator.language : 'en';
-  const resolved = (navLang || 'en').split(/[-_]/)[0] || 'en';
-  return isSupportedLocale(resolved) ? resolved : 'en';
+  return resolveAppLocale(localeOverride, navLang);
 }
 type ComposerWithSetLocale = Composer & {
   setLocale?: (locale: SupportedLocale) => Promise<void> | void;
@@ -59,7 +55,9 @@ async function setI18nLocale(i18n: I18n | Composer, locale: SupportedLocale): Pr
 }
 export default defineNuxtPlugin({
   name: 'i18n-ready',
+  dependsOn: ['supabase'],
   enforce: 'post',
+  parallel: true,
   async setup(nuxtApp) {
     const i18n = (nuxtApp as { $i18n?: I18n | Composer }).$i18n;
     const supabase = (nuxtApp as { $supabase?: BootstrapSupabaseContext }).$supabase;

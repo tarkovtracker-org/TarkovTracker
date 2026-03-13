@@ -111,6 +111,9 @@ const createWrapper = async () => {
           template:
             '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:model-value\', $event.target.checked)" />',
         },
+        UFormField: {
+          template: '<div><slot /></div>',
+        },
         UIcon: true,
         UInput: {
           props: ['modelValue'],
@@ -123,6 +126,12 @@ const createWrapper = async () => {
           emits: ['update:open'],
           template:
             '<div v-if="open"><slot name="header" /><slot name="body" /><slot name="footer" :close="() => $emit(\'update:open\', false)" /></div>',
+        },
+        URadioGroup: {
+          props: ['items', 'modelValue', 'valueKey'],
+          emits: ['update:modelValue'],
+          template:
+            '<div><input v-for="item in items" :key="item[valueKey || \'value\']" type="radio" :checked="modelValue === item[valueKey || \'value\']" @change="$emit(\'update:modelValue\', item[valueKey || \'value\'])" /></div>',
         },
         UTooltip: {
           template: '<div><slot /></div>',

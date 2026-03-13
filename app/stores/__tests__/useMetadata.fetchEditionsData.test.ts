@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
+import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMetadataStore } from '@/stores/useMetadata';
 import * as cacheUtils from '@/utils/tarkovCache';
-import type { GameEdition } from '@/types/tarkov';
+import { createDeferred } from '@/utils/test-helpers';
+import type { GameEdition, StoryChapter } from '@/types/tarkov';
 const loggerMock = vi.hoisted(() => ({
   debug: vi.fn(),
   error: vi.fn(),
@@ -20,6 +22,14 @@ const createEdition = (id: string, value: number, title: string): GameEdition =>
   defaultStashLevel: 1,
   defaultCultistCircleLevel: 0,
   traderRepBonus: {},
+});
+const createStoryChapter = (id: string, order: number, name: string): StoryChapter => ({
+  id,
+  name,
+  normalizedName: name.toLowerCase(),
+  objectives: {},
+  order,
+  wikiLink: `https://example.com/${id}`,
 });
 describe('useMetadataStore fetchEditionsData', () => {
   beforeEach(() => {
@@ -51,5 +61,37 @@ describe('useMetadataStore fetchEditionsData', () => {
     await store.fetchEditionsData(false);
     expect(store.editions).toEqual([existingEdition]);
     expect(store.editionsError).toBeInstanceOf(Error);
+  });
+  it('reuses the in-flight background editions revalidation while serving cached data', async () => {
+    const store = useMetadataStore();
+    const cachedEdition = createEdition('cached-edition', 1, 'Cached Edition');
+    const cachedChapter = createStoryChapter('cached-chapter', 1, 'Cached Chapter');
+    const refreshedEdition = createEdition('refreshed-edition', 2, 'Refreshed Edition');
+    const refreshedChapter = createStoryChapter('refreshed-chapter', 2, 'Refreshed Chapter');
+    const overlayResponse = createDeferred<{
+      editions: Record<string, GameEdition>;
+      storyChapters: Record<string, StoryChapter>;
+    }>();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({
+      editions: [cachedEdition],
+      storyChapters: [cachedChapter],
+    });
+    const fetchMock = vi.fn().mockImplementation(() => overlayResponse.promise);
+    vi.stubGlobal('$fetch', fetchMock);
+    const firstRequest = store.fetchEditionsData(false);
+    const secondRequest = store.fetchEditionsData(false);
+    await flushPromises();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    overlayResponse.resolve({
+      editions: {
+        [refreshedEdition.id]: refreshedEdition,
+      },
+      storyChapters: {
+        [refreshedChapter.id]: refreshedChapter,
+      },
+    });
+    await Promise.all([firstRequest, secondRequest]);
+    expect(store.editions).toEqual([refreshedEdition]);
+    expect(store.storyChapters).toEqual([refreshedChapter]);
   });
 });

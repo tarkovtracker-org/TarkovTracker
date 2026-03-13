@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defineComponent, nextTick, ref, type Ref } from 'vue';
 import { logger } from '@/utils/logger';
+import { createDeferred } from '@/utils/test-helpers';
 import type { TarkovMap } from '@/types/tarkov';
 type UseLeafletMapFn = typeof import('@/composables/useLeafletMap').useLeafletMap;
 const mockMapInstance = {
@@ -94,6 +95,7 @@ vi.mock('@vueuse/core', async (importOriginal) => ({
 }));
 vi.mock('@/utils/logger', () => ({
   logger: {
+    info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
@@ -128,15 +130,6 @@ const waitFor = async (predicate: () => boolean, maxIterations = 10) => {
     await nextTick();
   }
   throw new Error(`Condition not met after ${maxIterations} iterations`);
-};
-const createDeferred = <T>() => {
-  let resolve: (value: T) => void = () => {};
-  let reject: (reason?: unknown) => void = () => {};
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
 };
 let useLeafletMapForTest: UseLeafletMapFn;
 let containerRefForTest: Ref<HTMLElement | null>;

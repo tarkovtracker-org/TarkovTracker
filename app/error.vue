@@ -21,10 +21,12 @@
           class="px-6"
           @click="handleError"
         >
-          Return Home
+          {{ t('error.return_home', 'Return Home') }}
         </UButton>
       </div>
-      <p class="text-surface-500 mt-6 text-xs">Error {{ statusCode }}</p>
+      <p class="text-surface-500 mt-6 text-xs">
+        {{ t('error.status_prefix', 'Error') }} {{ statusCode }}
+      </p>
     </div>
   </div>
 </template>
@@ -38,16 +40,22 @@
     },
   });
   const statusCode = computed(() => props.error.statusCode ?? 500);
+  const { t } = useI18n({ useScope: 'global' });
   onMounted(() => {
     logger.error(props.error, { context: 'ErrorComponent' });
   });
   const handleError = () => clearError({ redirect: '/' });
   const errorTitle = computed(() =>
-    statusCode.value === 404 ? 'Page Not Found' : 'Something Went Wrong'
+    statusCode.value === 404
+      ? t('error.page_not_found', 'Page Not Found')
+      : t('error.something_went_wrong', 'Something Went Wrong')
   );
   const errorDescription = computed(() =>
     statusCode.value === 404
-      ? 'The page you are looking for does not exist.'
-      : 'An unexpected error occurred while processing your request.'
+      ? t('error.page_not_found_description', 'The page you are looking for does not exist.')
+      : t(
+          'error.unexpected_description',
+          'An unexpected error occurred while processing your request.'
+        )
   );
 </script>

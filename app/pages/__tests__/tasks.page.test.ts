@@ -1,6 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
+import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
 import type { Task, TaskObjective } from '@/types/tarkov';
 /**
  * Factory to create a default Task with all required properties.
@@ -348,10 +349,7 @@ describe('tasks page', () => {
   it('expands the map panel when jumping to a map objective from a collapsed state', async () => {
     const TaskCardJumpStub = defineComponent({
       setup() {
-        const jumpToMapObjective = inject<((id: string) => void) | null>(
-          'jumpToMapObjective',
-          null
-        );
+        const jumpToMapObjective = inject(jumpToMapObjectiveKey, null);
         return {
           jumpToMapObjective,
         };

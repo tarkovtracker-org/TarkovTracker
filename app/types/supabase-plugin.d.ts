@@ -33,6 +33,7 @@ export interface SupabasePlugin {
     options?: { skipBrowserRedirect?: boolean; redirectTo?: string }
   ) => Promise<{ url?: string }>;
   signOut: () => Promise<void>;
+  ready: () => Promise<void>;
 }
 declare module '#app' {
   interface NuxtApp {

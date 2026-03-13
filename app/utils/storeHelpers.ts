@@ -1,10 +1,13 @@
 import { logger } from '@/utils/logger';
-import type { Store } from 'pinia';
+import type { StateTree, Store } from 'pinia';
 /**
  * Clears store properties that are not present in the new state
  * This ensures the store doesn't retain stale data when remote documents are updated
  */
-export function clearStaleState(store: Store, newState?: Record<string, unknown>): void {
+export function clearStaleState<TState extends StateTree>(
+  store: Store<string, TState>,
+  newState?: Record<string, unknown>
+): void {
   try {
     const currentState = store.$state;
     const missingProperties = Object.keys(currentState).filter((key) => {
@@ -17,13 +20,12 @@ export function clearStaleState(store: Store, newState?: Record<string, unknown>
       }
     });
     if (missingProperties.length > 0) {
-      const missingPropertiesObject = missingProperties.reduce(
-        (acc, key) => {
-          acc[key] = null;
-          return acc;
-        },
-        {} as Record<string, null>
-      );
+      const missingPropertiesObject = missingProperties.reduce<
+        Partial<{ [K in keyof TState]: TState[K] | undefined }>
+      >((acc, key) => {
+        acc[key as keyof TState] = undefined;
+        return acc;
+      }, {});
       store.$patch(missingPropertiesObject);
     }
   } catch (error) {
@@ -33,7 +35,10 @@ export function clearStaleState(store: Store, newState?: Record<string, unknown>
 /**
  * Safely patches a store with new data
  */
-export function safePatchStore(store: Store, data: Record<string, unknown>): void {
+export function safePatchStore<TState extends StateTree>(
+  store: Store<string, TState>,
+  data: Partial<TState>
+): void {
   try {
     if (data && typeof data === 'object') {
       store.$patch(data);
@@ -49,7 +54,7 @@ export function safePatchStore(store: Store, data: Record<string, unknown>): voi
 /**
  * Resets a store to empty state by clearing all properties
  */
-export function resetStore(store: Store): void {
+export function resetStore<TState extends StateTree>(store: Store<string, TState>): void {
   try {
     clearStaleState(store, {});
   } catch (error) {

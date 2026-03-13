@@ -23,12 +23,12 @@
                   :class="highlightClasses"
                   class="inline-block rounded-br-lg px-3 py-1 shadow-lg"
                 >
-                  <img
+                  <NuxtImg
                     v-if="props.avatar"
                     :src="props.avatar"
                     :alt="props.title || ''"
+                    :width="avatarHeight"
                     :height="avatarHeight"
-                    :style="{ height: `${avatarHeight}px` }"
                     class="block pt-0"
                     :class="avatarClass"
                   />
@@ -68,9 +68,9 @@
           ></div>
         </header>
         <!-- Content Section -->
-        <main v-if="hasContent" class="mt-2 w-full grow" :class="contentClasses">
+        <section v-if="hasContent" class="mt-2 w-full grow" :class="contentClasses">
           <slot name="content"></slot>
-        </main>
+        </section>
         <!-- Footer Section -->
         <footer v-if="hasFooter" class="mt-auto w-full pb-1" :class="footerClasses">
           <slot name="footer"></slot>

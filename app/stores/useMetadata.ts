@@ -172,11 +172,17 @@ export interface MetadataStoreTaskLookup {
 // Using a WeakMap keyed by store instance maintains per-instance deduplication
 // Includes initPromise and isInitializing to avoid module-level leakage
 interface PromiseStore {
+  readonly bootstrapPromise: Promise<void> | null;
+  readonly tasksCorePromise: Promise<void> | null;
+  readonly hideoutPromise: Promise<void> | null;
   readonly itemsFullPromise: Promise<void> | null;
   readonly itemsLitePromise: Promise<void> | null;
   readonly mapSpawnsPromise: Promise<void> | null;
+  readonly objectiveModeCountDifferencesPromise: Promise<void> | null;
   readonly taskObjectivesPromise: Promise<void> | null;
   readonly taskRewardsPromise: Promise<void> | null;
+  readonly prestigePromise: Promise<void> | null;
+  readonly editionsPromise: Promise<void> | null;
   readonly initPromise: Promise<void> | null;
   readonly isInitializing: boolean;
 }
@@ -191,11 +197,17 @@ function getPromiseStore(storeInstance: object): MutablePromiseStore {
   let promises = storePromises.get(storeInstance);
   if (!promises) {
     promises = {
+      bootstrapPromise: null,
+      tasksCorePromise: null,
+      hideoutPromise: null,
       itemsFullPromise: null,
       itemsLitePromise: null,
       mapSpawnsPromise: null,
+      objectiveModeCountDifferencesPromise: null,
       taskObjectivesPromise: null,
       taskRewardsPromise: null,
+      prestigePromise: null,
+      editionsPromise: null,
       initPromise: null,
       isInitializing: false,
     };
@@ -216,6 +228,11 @@ type ObjectiveWithItems = TaskObjective & {
   usingWeaponMods?: TarkovItem[];
   wearing?: TarkovItem[];
   notWearing?: TarkovItem[];
+};
+const hasRenderableCriticalMetadata = (
+  state: Pick<MetadataState, 'hideoutStations' | 'tasks'>
+): boolean => {
+  return state.tasks.length > 0 && state.hideoutStations.length > 0;
 };
 type FetchSuccess<T> = { data: T };
 type FetchError = { error: string | Record<string, unknown> };
@@ -621,10 +638,12 @@ export const useMetadataStore = defineStore('metadata', {
             }
           }
           await this.fetchAllData(false, { deferHeavy: true, cachedData });
+          this.assertCriticalMetadataReady();
           this.initialized = true;
           this.initializationFailed = false;
         } catch (err) {
           logger.error('[MetadataStore] Failed to initialize metadata:', err);
+          this.initialized = hasRenderableCriticalMetadata(this);
           this.initializationFailed = true;
           // Rethrow to allow caller (e.g. metadata plugin) to handle retries or critical failure
           throw err;
@@ -747,6 +766,7 @@ export const useMetadataStore = defineStore('metadata', {
       logName: string;
       forceRefresh?: boolean;
       promiseKey?: PromiseKey;
+      throwOnError?: boolean;
     }): Promise<void> {
       const { promiseKey, forceRefresh = false } = config;
       if (promiseKey) {
@@ -791,6 +811,7 @@ export const useMetadataStore = defineStore('metadata', {
       logName: string;
       forceRefresh?: boolean;
       promiseKey?: PromiseKey;
+      throwOnError?: boolean;
     }): Promise<void> {
       const perfTimer = perfStart(`[Metadata] fetch ${config.logName}`, {
         cacheKey: config.cacheKey,
@@ -819,6 +840,7 @@ export const useMetadataStore = defineStore('metadata', {
         onEmpty,
         logName,
         forceRefresh = false,
+        throwOnError = false,
       } = config;
       // Reset error state if tracking errors
       if (errorKey) {
@@ -910,6 +932,9 @@ export const useMetadataStore = defineStore('metadata', {
           onEmpty();
         }
         hadError = true;
+        if (throwOnError) {
+          throw err;
+        }
       } finally {
         if (loadingKey) {
           this.$patch({ [loadingKey]: false });
@@ -1006,6 +1031,9 @@ export const useMetadataStore = defineStore('metadata', {
           logger.error('[MetadataStore] Error during cache cleanup:', err)
         );
       }
+      if (cachedData && !forceRefresh) {
+        this.applyCriticalCachedData(cachedData);
+      }
       await this.fetchBootstrapData(forceRefresh);
       // Use pre-loaded cache data if available, otherwise fetch
       let hideoutPromise: Promise<void>;
@@ -1013,21 +1041,10 @@ export const useMetadataStore = defineStore('metadata', {
       let editionsPromise: Promise<void> = Promise.resolve();
       let tasksCorePromise: Promise<void>;
       if (cachedData && !forceRefresh) {
-        // Process pre-loaded cache data directly (skip redundant fetches)
-        this.processHideoutData(cachedData.hideout);
-        this.hydrateHideoutItems();
         hideoutPromise = Promise.resolve();
-        this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
-        this.editions = markRaw(cachedData.editions.editions || []);
-        if (cachedData.editions.storyChapters && cachedData.editions.storyChapters.length > 0) {
-          const sorted = cachedData.editions.storyChapters
-            .map((chapter) => normalizeStoryChapter(chapter))
-            .sort((a, b) => a.order - b.order);
-          this.storyChapters = markRaw(sorted);
-        } else {
+        if (!this.storyChapters.length) {
           editionsPromise = this.fetchEditionsData(false);
         }
-        this.processTasksCoreData(cachedData.tasksCore);
         tasksCorePromise = Promise.resolve();
       } else {
         hideoutPromise = this.fetchHideoutData(forceRefresh);
@@ -1053,10 +1070,6 @@ export const useMetadataStore = defineStore('metadata', {
         tasksCorePromise = this.fetchTasksCoreData(forceRefresh);
       }
       await tasksCorePromise;
-      if (!this.initialized && this.tasks.length > 0) {
-        this.initialized = true;
-        this.initializationFailed = false;
-      }
       // Fetch critical data directly (not deferred) - needed for UI to render
       const itemsLitePromise = this.fetchItemsLiteData(forceRefresh);
       let taskObjectivesPromise: Promise<void> = Promise.resolve();
@@ -1086,6 +1099,11 @@ export const useMetadataStore = defineStore('metadata', {
       // Full items are heavy; load on-demand via ensureItemsFullLoaded.
       await Promise.all([hideoutPromise, itemsLitePromise, taskObjectivesPromise]);
       await Promise.all([prestigePromise, editionsPromise]);
+      if (!this.initialized && hasRenderableCriticalMetadata(this)) {
+        this.initialized = true;
+        this.initializationFailed = false;
+      }
+      this.assertCriticalMetadataReady();
       perfEnd(perfTimer, {
         tasks: this.tasks.length,
         items: this.items.length,
@@ -1105,6 +1123,7 @@ export const useMetadataStore = defineStore('metadata', {
         processData: (data) => this.processBootstrapData(data),
         logName: 'Bootstrap',
         forceRefresh,
+        promiseKey: 'bootstrapPromise',
       });
     },
     /**
@@ -1124,6 +1143,8 @@ export const useMetadataStore = defineStore('metadata', {
         onEmpty: () => this.resetTasksData(),
         logName: 'Task core',
         forceRefresh,
+        promiseKey: 'tasksCorePromise',
+        throwOnError: true,
       });
     },
     async fetchMapSpawnsData(forceRefresh = false) {
@@ -1183,94 +1204,107 @@ export const useMetadataStore = defineStore('metadata', {
       });
     },
     async fetchObjectiveModeCountDifferences(forceRefresh = false) {
-      if (!this.tasks.length) {
-        this.objectiveModeCountDifferences = markRaw({});
-        this.objectiveModeCountDifferencesHydrated = false;
-        return;
+      const promiseStore = getPromiseStore(this);
+      const existingPromise = promiseStore.objectiveModeCountDifferencesPromise;
+      if (existingPromise && !forceRefresh) {
+        return existingPromise;
       }
-      if (this.objectiveModeCountDifferencesHydrated && !forceRefresh) {
-        return;
-      }
-      const requestApiMode = this.getApiGameMode();
-      const requestLanguageCode = this.languageCode;
-      const requestTasks = this.tasks;
-      const currentCounts = this.buildObjectiveCountMap(requestTasks);
-      const otherApiMode =
-        requestApiMode === API_GAME_MODES[GAME_MODES.PVE]
-          ? API_GAME_MODES[GAME_MODES.PVP]
-          : API_GAME_MODES[GAME_MODES.PVE];
-      try {
-        const response = await $fetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
-          '/api/tarkov/tasks-objectives',
-          {
-            query: {
-              gameMode: otherApiMode,
-              lang: requestLanguageCode,
-              version: TASK_OBJECTIVES_CACHE_VERSION,
-            },
-          }
-        );
-        if (isFetchError(response)) {
-          const errorMessage =
-            typeof response.error === 'string' ? response.error : JSON.stringify(response.error);
-          throw new Error(`API error: ${errorMessage}`);
-        }
-        if (!isFetchSuccess<TarkovTaskObjectivesQueryResult>(response)) {
-          throw new Error('Invalid response: expected { data }');
-        }
-        if (
-          this.getApiGameMode() !== requestApiMode ||
-          this.languageCode !== requestLanguageCode ||
-          this.tasks !== requestTasks
-        ) {
+      const promise = (async () => {
+        if (!this.tasks.length) {
+          this.objectiveModeCountDifferences = markRaw({});
+          this.objectiveModeCountDifferencesHydrated = false;
           return;
         }
-        const otherModeTasks = (response.data.tasks || []).map((task) => ({
-          id: task.id,
-          objectives: this.normalizeObjectiveItems(
-            normalizeTaskObjectives<TaskObjective>(task.objectives)
-          ),
-        }));
-        const dedupedOtherModeTasks = this.dedupeObjectiveIds(otherModeTasks as Task[]).tasks;
-        const otherCounts = this.buildObjectiveCountMap(dedupedOtherModeTasks);
-        const allObjectiveIds = new Set([...currentCounts.keys(), ...otherCounts.keys()]);
-        const differences: Record<string, { pvp: number; pve: number }> = {};
-        allObjectiveIds.forEach((objectiveId) => {
-          const currentModeCount = currentCounts.get(objectiveId);
-          const otherModeCount = otherCounts.get(objectiveId);
+        if (this.objectiveModeCountDifferencesHydrated && !forceRefresh) {
+          return;
+        }
+        const requestApiMode = this.getApiGameMode();
+        const requestLanguageCode = this.languageCode;
+        const requestTasks = this.tasks;
+        const currentCounts = this.buildObjectiveCountMap(requestTasks);
+        const otherApiMode =
+          requestApiMode === API_GAME_MODES[GAME_MODES.PVE]
+            ? API_GAME_MODES[GAME_MODES.PVP]
+            : API_GAME_MODES[GAME_MODES.PVE];
+        try {
+          const response = await $fetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
+            '/api/tarkov/tasks-objectives',
+            {
+              query: {
+                gameMode: otherApiMode,
+                lang: requestLanguageCode,
+                version: TASK_OBJECTIVES_CACHE_VERSION,
+              },
+            }
+          );
+          if (isFetchError(response)) {
+            const errorMessage =
+              typeof response.error === 'string' ? response.error : JSON.stringify(response.error);
+            throw new Error(`API error: ${errorMessage}`);
+          }
+          if (!isFetchSuccess<TarkovTaskObjectivesQueryResult>(response)) {
+            throw new Error('Invalid response: expected { data }');
+          }
           if (
-            typeof currentModeCount !== 'number' ||
-            typeof otherModeCount !== 'number' ||
-            currentModeCount === otherModeCount
+            this.getApiGameMode() !== requestApiMode ||
+            this.languageCode !== requestLanguageCode ||
+            this.tasks !== requestTasks
           ) {
             return;
           }
-          const pvpCount =
-            requestApiMode === API_GAME_MODES[GAME_MODES.PVP] ? currentModeCount : otherModeCount;
-          const pveCount =
-            requestApiMode === API_GAME_MODES[GAME_MODES.PVE] ? currentModeCount : otherModeCount;
-          differences[objectiveId] = { pvp: pvpCount, pve: pveCount };
-        });
-        if (
-          this.getApiGameMode() !== requestApiMode ||
-          this.languageCode !== requestLanguageCode ||
-          this.tasks !== requestTasks
-        ) {
-          return;
+          const otherModeTasks = (response.data.tasks || []).map((task) => ({
+            id: task.id,
+            objectives: this.normalizeObjectiveItems(
+              normalizeTaskObjectives<TaskObjective>(task.objectives)
+            ),
+          }));
+          const dedupedOtherModeTasks = this.dedupeObjectiveIds(otherModeTasks as Task[]).tasks;
+          const otherCounts = this.buildObjectiveCountMap(dedupedOtherModeTasks);
+          const allObjectiveIds = new Set([...currentCounts.keys(), ...otherCounts.keys()]);
+          const differences: Record<string, { pvp: number; pve: number }> = {};
+          allObjectiveIds.forEach((objectiveId) => {
+            const currentModeCount = currentCounts.get(objectiveId);
+            const otherModeCount = otherCounts.get(objectiveId);
+            if (
+              typeof currentModeCount !== 'number' ||
+              typeof otherModeCount !== 'number' ||
+              currentModeCount === otherModeCount
+            ) {
+              return;
+            }
+            const pvpCount =
+              requestApiMode === API_GAME_MODES[GAME_MODES.PVP] ? currentModeCount : otherModeCount;
+            const pveCount =
+              requestApiMode === API_GAME_MODES[GAME_MODES.PVE] ? currentModeCount : otherModeCount;
+            differences[objectiveId] = { pvp: pvpCount, pve: pveCount };
+          });
+          if (
+            this.getApiGameMode() !== requestApiMode ||
+            this.languageCode !== requestLanguageCode ||
+            this.tasks !== requestTasks
+          ) {
+            return;
+          }
+          this.objectiveModeCountDifferences = markRaw(differences);
+          this.objectiveModeCountDifferencesHydrated = true;
+        } catch (err) {
+          if (
+            this.getApiGameMode() !== requestApiMode ||
+            this.languageCode !== requestLanguageCode ||
+            this.tasks !== requestTasks
+          ) {
+            return;
+          }
+          this.objectiveModeCountDifferences = markRaw({});
+          this.objectiveModeCountDifferencesHydrated = false;
+          logger.warn('[MetadataStore] Error building objective mode count differences:', err);
         }
-        this.objectiveModeCountDifferences = markRaw(differences);
-        this.objectiveModeCountDifferencesHydrated = true;
-      } catch (err) {
-        if (
-          this.getApiGameMode() !== requestApiMode ||
-          this.languageCode !== requestLanguageCode ||
-          this.tasks !== requestTasks
-        ) {
-          return;
-        }
-        this.objectiveModeCountDifferences = markRaw({});
-        this.objectiveModeCountDifferencesHydrated = false;
-        logger.warn('[MetadataStore] Error building objective mode count differences:', err);
+      })();
+      promiseStore.objectiveModeCountDifferencesPromise = promise;
+      try {
+        await promise;
+      } finally {
+        promiseStore.objectiveModeCountDifferencesPromise = null;
       }
     },
     /**
@@ -1313,6 +1347,8 @@ export const useMetadataStore = defineStore('metadata', {
         onEmpty: () => this.resetHideoutData(),
         logName: 'Hideout',
         forceRefresh,
+        promiseKey: 'hideoutPromise',
+        throwOnError: true,
       });
     },
     /**
@@ -1416,6 +1452,7 @@ export const useMetadataStore = defineStore('metadata', {
         },
         logName: 'Prestige',
         forceRefresh,
+        promiseKey: 'prestigePromise',
       });
     },
     /**
@@ -1424,83 +1461,134 @@ export const useMetadataStore = defineStore('metadata', {
      * Note: Uses external URL, so cannot use generic fetchWithCache helper.
      */
     async fetchEditionsData(forceRefresh = false) {
-      this.editionsError = null;
-      const existingEditions = this.editions;
-      const existingStoryChapters = this.storyChapters;
-      // Check cache first
-      if (!forceRefresh && typeof window !== 'undefined') {
-        try {
-          const cached = await getCachedData<{
-            editions: GameEdition[];
-            storyChapters?: StoryChapter[];
-          }>('editions' as CacheType, 'all', 'en');
-          if (cached?.editions) {
-            this.editions = markRaw(cached.editions);
-          }
-          if (cached?.editions && cached.storyChapters && cached.storyChapters.length > 0) {
-            logger.debug('[MetadataStore] Editions loaded from cache');
-            const sorted = cached.storyChapters
-              .map((chapter) => normalizeStoryChapter(chapter))
-              .sort((a, b) => a.order - b.order);
-            this.storyChapters = markRaw(sorted);
-            void this.fetchEditionsData(true).catch((err) =>
-              logger.warn('[MetadataStore] Background editions revalidation failed:', err)
-            );
-            return;
-          }
-        } catch (cacheErr) {
-          logger.warn('[MetadataStore] Editions cache read failed:', cacheErr);
-        }
+      const promiseStore = getPromiseStore(this);
+      const existingPromise = promiseStore.editionsPromise;
+      if (existingPromise && !forceRefresh) {
+        return existingPromise;
       }
-      this.editionsLoading = true;
+      const promise = (async () => {
+        this.editionsError = null;
+        const existingEditions = this.editions;
+        const existingStoryChapters = this.storyChapters;
+        if (!forceRefresh && typeof window !== 'undefined') {
+          try {
+            const cached = await getCachedData<{
+              editions: GameEdition[];
+              storyChapters?: StoryChapter[];
+            }>('editions' as CacheType, 'all', 'en');
+            if (cached?.editions) {
+              this.editions = markRaw(cached.editions);
+            }
+            if (cached?.editions && cached.storyChapters && cached.storyChapters.length > 0) {
+              logger.debug('[MetadataStore] Editions loaded from cache');
+              const sorted = cached.storyChapters
+                .map((chapter) => normalizeStoryChapter(chapter))
+                .sort((a, b) => a.order - b.order);
+              this.storyChapters = markRaw(sorted);
+              void this.fetchEditionsData(true).catch((err) =>
+                logger.warn('[MetadataStore] Background editions revalidation failed:', err)
+              );
+              return;
+            }
+          } catch (cacheErr) {
+            logger.warn('[MetadataStore] Editions cache read failed:', cacheErr);
+          }
+        }
+        this.editionsLoading = true;
+        try {
+          const OVERLAY_URL =
+            'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
+          const overlay = await $fetch<{
+            editions?: Record<string, GameEdition>;
+            storyChapters?: Record<string, StoryChapter>;
+          }>(OVERLAY_URL, {
+            parseResponse: JSON.parse,
+          });
+          if (overlay?.editions) {
+            this.editions = markRaw(Object.values(overlay.editions));
+          } else {
+            logger.warn('[MetadataStore] No editions found in overlay response');
+            this.editions = markRaw([]);
+          }
+          if (overlay?.storyChapters) {
+            const chaptersArray = Object.values(overlay.storyChapters).map((chapter) =>
+              normalizeStoryChapter(chapter)
+            );
+            chaptersArray.sort((a, b) => a.order - b.order);
+            this.storyChapters = markRaw(chaptersArray);
+          } else {
+            this.storyChapters = markRaw([]);
+          }
+          if (typeof window !== 'undefined') {
+            setCachedData(
+              'editions' as CacheType,
+              'all',
+              'en',
+              { editions: this.editions, storyChapters: this.storyChapters },
+              CACHE_CONFIG.MAX_TTL
+            ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
+          }
+        } catch (err) {
+          logger.error('[MetadataStore] Error fetching editions data:', err);
+          this.editionsError = err as Error;
+          if (!this.editions.length && existingEditions.length) {
+            this.editions = markRaw(existingEditions);
+          }
+          if (!this.storyChapters.length && existingStoryChapters.length) {
+            this.storyChapters = markRaw(existingStoryChapters);
+          }
+          if (!this.editions.length) {
+            this.editions = markRaw([]);
+          }
+        } finally {
+          this.editionsLoading = false;
+        }
+      })();
+      promiseStore.editionsPromise = promise;
       try {
-        const OVERLAY_URL =
-          'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
-        const overlay = await $fetch<{
-          editions?: Record<string, GameEdition>;
-          storyChapters?: Record<string, StoryChapter>;
-        }>(OVERLAY_URL, {
-          parseResponse: JSON.parse,
-        });
-        if (overlay?.editions) {
-          const editionsArray = Object.values(overlay.editions);
-          this.editions = markRaw(editionsArray);
-        } else {
-          logger.warn('[MetadataStore] No editions found in overlay response');
-          this.editions = markRaw([]);
-        }
-        if (overlay?.storyChapters) {
-          const chaptersArray = Object.values(overlay.storyChapters).map((chapter) =>
-            normalizeStoryChapter(chapter)
-          );
-          chaptersArray.sort((a, b) => a.order - b.order);
-          this.storyChapters = markRaw(chaptersArray);
-        } else {
-          this.storyChapters = markRaw([]);
-        }
-        if (typeof window !== 'undefined') {
-          setCachedData(
-            'editions' as CacheType,
-            'all',
-            'en',
-            { editions: this.editions, storyChapters: this.storyChapters },
-            CACHE_CONFIG.MAX_TTL
-          ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
-        }
-      } catch (err) {
-        logger.error('[MetadataStore] Error fetching editions data:', err);
-        this.editionsError = err as Error;
-        if (!this.editions.length && existingEditions.length) {
-          this.editions = markRaw(existingEditions);
-        }
-        if (!this.storyChapters.length && existingStoryChapters.length) {
-          this.storyChapters = markRaw(existingStoryChapters);
-        }
-        if (!this.editions.length) {
-          this.editions = markRaw([]);
-        }
+        await promise;
       } finally {
-        this.editionsLoading = false;
+        promiseStore.editionsPromise = null;
+      }
+    },
+    applyCriticalCachedData(cachedData: {
+      tasksCore: TarkovTasksCoreQueryResult;
+      hideout: TarkovHideoutQueryResult;
+      prestige: TarkovPrestigeQueryResult;
+      editions: { editions: GameEdition[]; storyChapters?: StoryChapter[] };
+    }) {
+      if (!this.tasks.length) {
+        this.processTasksCoreData(cachedData.tasksCore);
+        this.error = null;
+      }
+      if (!this.hideoutStations.length) {
+        this.processHideoutData(cachedData.hideout);
+        this.hydrateHideoutItems();
+        this.hideoutError = null;
+      }
+      if (!this.prestigeLevels.length) {
+        this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
+      }
+      if (!this.editions.length) {
+        this.editions = markRaw(cachedData.editions.editions || []);
+      }
+      if (!this.storyChapters.length && cachedData.editions.storyChapters?.length) {
+        const sorted = cachedData.editions.storyChapters
+          .map((chapter) => normalizeStoryChapter(chapter))
+          .sort((a, b) => a.order - b.order);
+        this.storyChapters = markRaw(sorted);
+      }
+    },
+    assertCriticalMetadataReady() {
+      const missing: string[] = [];
+      if (this.error || this.tasks.length === 0) {
+        missing.push('tasks');
+      }
+      if (this.hideoutError || this.hideoutStations.length === 0) {
+        missing.push('hideout');
+      }
+      if (missing.length > 0) {
+        throw new Error(`[MetadataStore] Critical metadata unavailable: ${missing.join(', ')}`);
       }
     },
     /**

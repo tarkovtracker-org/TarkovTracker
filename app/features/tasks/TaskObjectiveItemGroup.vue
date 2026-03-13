@@ -143,19 +143,21 @@
   import { useI18n } from 'vue-i18n';
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
+  import {
+    isMapViewKey,
+    jumpToMapObjectiveKey,
+    trackTaskProgressInteractionKey,
+  } from '@/features/tasks/task-context';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { resolveObjectiveItemIcon } from '@/features/tasks/task-objective-item-overrides';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
-  import type { DashboardFocusProgressInteraction } from '@/composables/useDashboardFocusAnalytics';
   import type { TaskObjective, TarkovItem } from '@/types/tarkov';
-  const jumpToMapObjective = inject<((id: string) => void) | null>('jumpToMapObjective', null);
-  const isMapView = inject<Ref<boolean>>('isMapView', ref(false));
-  const trackTaskProgressInteraction = inject<
-    ((taskId: string, interaction: DashboardFocusProgressInteraction) => void) | null
-  >('trackTaskProgressInteraction', null);
+  const jumpToMapObjective = inject(jumpToMapObjectiveKey, null);
+  const isMapView = inject(isMapViewKey, ref(false));
+  const trackTaskProgressInteraction = inject(trackTaskProgressInteractionKey, null);
   const props = defineProps<{
     title: string;
     iconName: string;

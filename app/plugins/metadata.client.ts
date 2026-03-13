@@ -15,10 +15,27 @@ export default defineNuxtPlugin(() => {
     };
   }
   const toast = useToast();
+  const route = useRoute();
+  const SKIP_METADATA_PATH_PREFIXES = [
+    '/auth/',
+    '/changelog',
+    '/credits',
+    '/login',
+    '/not-found',
+    '/oauth/',
+    '/privacy',
+    '/terms-of-service',
+  ];
   // Initialize the metadata store and fetch data (non-blocking)
   // This allows the app to render immediately while data loads in the background
   const MAX_ATTEMPTS = 3;
   const INITIAL_DELAY = 1000;
+  const shouldInitializeForPath = (path: string): boolean => {
+    return !SKIP_METADATA_PATH_PREFIXES.some(
+      (prefix) => path === prefix || path.startsWith(prefix)
+    );
+  };
+  let initPromise: Promise<void> | null = null;
   async function initializeWithRetry(attempt = 1): Promise<void> {
     try {
       await metadataStore.initialize();
@@ -45,7 +62,27 @@ export default defineNuxtPlugin(() => {
       });
     }
   }
-  void initializeWithRetry();
+  const ensureMetadataInitialized = async (path: string): Promise<void> => {
+    if (
+      metadataStore.initializationFailed ||
+      !shouldInitializeForPath(path) ||
+      metadataStore.hasInitialized ||
+      initPromise
+    ) {
+      return initPromise ?? Promise.resolve();
+    }
+    initPromise = initializeWithRetry().finally(() => {
+      initPromise = null;
+    });
+    return initPromise;
+  };
+  watch(
+    () => route.path,
+    (path) => {
+      void ensureMetadataInitialized(path);
+    },
+    { immediate: true }
+  );
   return {
     provide: {
       metadata: metadataStore,

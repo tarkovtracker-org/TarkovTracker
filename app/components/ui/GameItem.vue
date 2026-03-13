@@ -15,10 +15,13 @@
         fill ? 'flex items-center justify-center p-2 sm:p-3' : '',
       ]"
     >
-      <img
+      <NuxtImg
         v-if="isVisible && computedImageSrc"
         :src="computedImageSrc"
         :alt="props.itemName || 'Item'"
+        :width="imageSize"
+        :height="imageSize"
+        :sizes="fill ? '100vw' : `${imageSize}px`"
         :class="[
           fill ? 'max-h-full max-w-full object-contain' : 'h-full w-full object-contain',
           imageElementClasses,
@@ -39,11 +42,12 @@
     <!-- Full item display mode (for TarkovItem compatibility) -->
     <div v-else class="relative flex h-full w-full items-center justify-start">
       <div class="mr-2 flex shrink-0 items-center justify-center">
-        <img
+        <NuxtImg
           :width="imageSize"
           :height="imageSize"
           :src="computedImageSrc"
           :alt="props.itemName || 'Item'"
+          :sizes="`${imageSize}px`"
           :class="imageClasses"
           class="rounded"
           @error="handleImgError"
@@ -72,9 +76,9 @@
       <!-- Hover action buttons - covers entire row -->
       <div
         v-if="showActions && (props.devLink || props.wikiLink)"
-        class="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/80 opacity-0 transition-opacity group-hover:opacity-100"
+        class="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/80 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
-        <AppTooltip v-if="props.devLink" text="View on tarkov.dev">
+        <AppTooltip v-if="props.devLink" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
           <a
             :href="props.devLink"
             target="_blank"
@@ -82,10 +86,17 @@
             class="text-surface-200 inline-flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
             @click.stop
           >
-            <img src="/img/logos/tarkovdevlogo.webp" alt="tarkov.dev" class="h-5 w-5" />
+            <NuxtImg
+              src="/img/logos/tarkovdevlogo.webp"
+              alt="tarkov.dev"
+              width="20"
+              height="20"
+              sizes="20px"
+              class="h-5 w-5"
+            />
           </a>
         </AppTooltip>
-        <AppTooltip v-if="props.wikiLink" text="View on Wiki">
+        <AppTooltip v-if="props.wikiLink" :text="t('page.tasks.questcard.view_on_wiki')">
           <a
             :href="props.wikiLink"
             target="_blank"
@@ -93,10 +104,20 @@
             class="text-surface-200 inline-flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
             @click.stop
           >
-            <img src="/img/logos/wikilogo.webp" alt="Wiki" class="h-5 w-5" />
+            <NuxtImg
+              src="/img/logos/wikilogo.webp"
+              alt="Wiki"
+              width="20"
+              height="20"
+              sizes="20px"
+              class="h-5 w-5"
+            />
           </a>
         </AppTooltip>
-        <AppTooltip v-if="props.itemName" text="Copy Name">
+        <AppTooltip
+          v-if="props.itemName"
+          :text="t('page.tasks.questcard.copy_item_name', 'Copy Item Name')"
+        >
           <button
             type="button"
             class="text-surface-200 inline-flex cursor-pointer items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
@@ -114,7 +135,7 @@
         <template v-if="props.taskWikiLink">
           <ContextMenuItem
             icon="/img/logos/wikilogo.webp"
-            :label="`View Task on Wiki`"
+            :label="t('page.tasks.questcard.view_on_wiki')"
             @click="
               openTaskWiki();
               close();
@@ -129,7 +150,7 @@
         <ContextMenuItem
           v-if="props.itemName && props.wikiLink"
           icon="/img/logos/wikilogo.webp"
-          :label="`View ${props.itemName} on Wiki`"
+          :label="t('page.tasks.questcard.view_on_wiki')"
           @click="
             openWikiLink();
             close();
@@ -138,7 +159,7 @@
         <ContextMenuItem
           v-if="props.itemName && props.devLink"
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="`View ${props.itemName} on Tarkov.dev`"
+          :label="t('page.tasks.questcard.view_on_tarkov_dev')"
           @click="
             openTarkovDevLink();
             close();
@@ -148,7 +169,7 @@
           <ContextMenuItem
             v-if="props.wikiLink"
             icon="/img/logos/wikilogo.webp"
-            label="View on Wiki"
+            :label="t('page.tasks.questcard.view_on_wiki')"
             @click="
               openWikiLink();
               close();
@@ -157,7 +178,7 @@
           <ContextMenuItem
             v-if="props.devLink"
             icon="/img/logos/tarkovdevlogo.webp"
-            label="View on Tarkov.dev"
+            :label="t('page.tasks.questcard.view_on_tarkov_dev')"
             @click="
               openTarkovDevLink();
               close();
@@ -171,7 +192,7 @@
         <ContextMenuItem
           v-if="props.itemName"
           icon="i-mdi-content-copy"
-          label="Copy Item Name"
+          :label="t('page.tasks.questcard.copy_item_name', 'Copy Item Name')"
           @click="
             copyItemName();
             close();
@@ -257,7 +278,7 @@
     decrease: [];
     toggle: [];
   }>();
-  useI18n({ useScope: 'global' });
+  const { t } = useI18n({ useScope: 'global' });
   const { copyToClipboard } = useCopyToClipboard();
   const formatNumber = useLocaleNumberFormatter();
   const BACKGROUND_CLASS_MAP = {

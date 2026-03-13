@@ -56,6 +56,7 @@
 </template>
 <script setup lang="ts">
   import { useMetadataStore } from '@/stores/useMetadata';
+  import { logger } from '@/utils/logger';
   type InertElementState = {
     ariaHidden: string | null;
     element: Element;
@@ -189,6 +190,8 @@
     isRetrying.value = true;
     try {
       await metadataStore.fetchAllData(true);
+    } catch (error) {
+      logger.error('[LoadingScreen] Metadata retry failed:', error);
     } finally {
       isRetrying.value = false;
     }

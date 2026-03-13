@@ -61,6 +61,12 @@ const createDefaultGlobal = () => ({
     UButton: UButtonStub,
     UIcon: true,
     UInput: UInputStub,
+    UTabs: {
+      props: ['items', 'modelValue'],
+      emits: ['update:modelValue'],
+      template:
+        '<div><button v-for="item in items" :key="item.value" @click="$emit(\'update:modelValue\', item.value)"><slot :item="item">{{ item.label }}</slot></button></div>',
+    },
     UPopover: { template: '<div><slot /><slot name="content" /></div>' },
   },
 });

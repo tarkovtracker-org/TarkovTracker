@@ -32,15 +32,14 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const UButton = {
-  template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
-  props: ['disabled'],
-  emits: ['click'],
+  template: '<button :disabled="disabled" :type="type"><slot /></button>',
+  props: ['disabled', 'type'],
 };
 const UInput = {
   template:
-    '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" @keyup="$emit(\'keyup\', $event)" />',
+    '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
   props: ['modelValue'],
-  emits: ['update:modelValue', 'keyup'],
+  emits: ['update:modelValue'],
 };
 describe('DisplayNameCard', () => {
   beforeEach(() => {
@@ -60,6 +59,9 @@ describe('DisplayNameCard', () => {
             template: '<div><slot name="content" /></div>',
           },
           UButton,
+          UFormField: {
+            template: '<div><slot /></div>',
+          },
           UIcon: true,
           UInput,
           UTooltip: {
@@ -72,7 +74,7 @@ describe('DisplayNameCard', () => {
     const wrapper = createWrapper();
     const input = wrapper.find('input');
     await input.setValue('NewName');
-    await wrapper.find('button').trigger('click');
+    await wrapper.find('form').trigger('submit.prevent');
     expect(setDisplayNameMock).toHaveBeenCalledWith('NewName');
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -81,11 +83,11 @@ describe('DisplayNameCard', () => {
       })
     );
   });
-  it('shows validation toast when entering blank name via Enter key', async () => {
+  it('shows validation toast when submitting a blank name', async () => {
     const wrapper = createWrapper();
     const input = wrapper.find('input');
     await input.setValue('   ');
-    await input.trigger('keyup', { key: 'Enter' });
+    await wrapper.find('form').trigger('submit.prevent');
     expect(setDisplayNameMock).not.toHaveBeenCalled();
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -98,7 +100,7 @@ describe('DisplayNameCard', () => {
     const wrapper = createWrapper();
     const input = wrapper.find('input');
     await input.setValue('x'.repeat(100));
-    await wrapper.find('button').trigger('click');
+    await wrapper.find('form').trigger('submit.prevent');
     expect(setDisplayNameMock).not.toHaveBeenCalled();
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -115,7 +117,7 @@ describe('DisplayNameCard', () => {
     const wrapper = createWrapper();
     const input = wrapper.find('input');
     await input.setValue('BrokenName');
-    await wrapper.find('button').trigger('click');
+    await wrapper.find('form').trigger('submit.prevent');
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'error',

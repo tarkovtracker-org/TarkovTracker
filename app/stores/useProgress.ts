@@ -65,16 +65,13 @@ export const useProgressStore = defineStore('progress', () => {
   const teamStore = useTeamStore();
   // Get the tarkov store to source "self" data directly from it
   const tarkovStore = useTarkovStore();
-  const teamStores = computed(() => {
-    const stores: TeamStoresMap = {};
-    // Source the "self" key directly from useTarkovStore() instead of maintaining local state
-    stores['self'] = tarkovStore as Store<string, UserState>;
-    for (const teammate of Object.keys(teammateStores.value)) {
-      if (teammateStores.value[teammate]) {
-        stores[teammate] = teammateStores.value[teammate];
-      }
-    }
-    logger.debug('[ProgressStore] All team stores:', Object.keys(stores));
+  const selfStore = tarkovStore as Store<string, UserState>;
+  const teamStores = computed<TeamStoresMap>(() => {
+    const stores = {
+      self: selfStore,
+      ...teammateStores.value,
+    };
+    if (import.meta.env.DEV) logger.debug('[ProgressStore] All team stores:', Object.keys(stores));
     return stores;
   });
   const visibleTeamStores = computed(() => {

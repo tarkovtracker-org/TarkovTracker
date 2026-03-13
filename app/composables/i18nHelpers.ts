@@ -1,4 +1,5 @@
 import { useI18n } from 'vue-i18n';
+import { resolveAppLocale } from '@/utils/locales';
 import { logger } from '@/utils/logger';
 import { parseBootstrapPreferencesState } from '@/utils/preferencesStorage';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -13,7 +14,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
     if (event.key === STORAGE_KEYS.preferences && cachedFallbackLocale) {
       const savedLocale = getSavedLocale();
-      const newValue = savedLocale || getBrowserLanguage();
+      const newValue = resolveAppLocale(savedLocale, getBrowserLanguage());
       logger.debug('[i18nHelpers] Storage event detected, updating cached locale:', newValue);
       cachedFallbackLocale.value = newValue;
     }
@@ -81,7 +82,7 @@ export function useSafeLocale(): Ref<string> | Readonly<Ref<string>> {
   // Use cached ref to ensure all callers share the same reactive state
   if (!cachedFallbackLocale) {
     const savedLocale = getSavedLocale();
-    const fallbackValue = savedLocale || getBrowserLanguage();
+    const fallbackValue = resolveAppLocale(savedLocale, getBrowserLanguage());
     logger.debug('[useSafeLocale] Initializing cached fallback locale:', fallbackValue);
     cachedFallbackLocale = ref(fallbackValue);
   }

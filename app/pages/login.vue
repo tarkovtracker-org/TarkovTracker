@@ -32,12 +32,18 @@
               class="mt-0.5 h-5 w-5 shrink-0 text-amber-400"
             />
             <div>
-              <p class="font-medium text-amber-200">Running in Offline Mode</p>
+              <p class="font-medium text-amber-200">
+                {{ $t('page.login.offline_mode_title', 'Running in Offline Mode') }}
+              </p>
               <p class="mt-1 text-sm text-amber-300/80">
-                Supabase is not configured. Login and sync features are disabled, but you can still
-                use all tracking features locally. See
+                {{
+                  $t(
+                    'page.login.offline_mode_description',
+                    'Supabase is not configured. Login and sync features are disabled, but you can still use all tracking features locally. See'
+                  )
+                }}
                 <code class="rounded bg-amber-500/20 px-1 text-amber-200">.env.example</code>
-                to enable login.
+                {{ $t('page.login.offline_mode_suffix', 'to enable login.') }}
               </p>
             </div>
           </div>
@@ -182,7 +188,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useOAuthLogin } from '@/composables/useOAuthLogin';
   import { logger } from '@/utils/logger';
   import { sanitizeInternalRedirect } from '@/utils/redirect';
@@ -213,7 +218,6 @@
     return callbackUrl.toString();
   };
   const toast = useToast();
-  const { t } = useI18n({ useScope: 'global' });
   const fallbackToRedirect = (
     url: string,
     provider: 'twitch' | 'discord' | 'google' | 'github'
@@ -223,8 +227,8 @@
     }
     logger.warn('[Login] Popup was blocked or failed, falling back to redirect');
     toast.add({
-      title: t('page.login.popup_blocked_title'),
-      description: t('page.login.popup_blocked_description'),
+      title: $t('page.login.popup_blocked_title'),
+      description: $t('page.login.popup_blocked_description'),
       icon: 'i-heroicons-information-circle',
       duration: 3000,
     });
@@ -296,8 +300,8 @@
         loading.value[provider] = false;
         cleanup();
         toast.add({
-          title: t('page.login.error_title'),
-          description: t('page.login.error_description'),
+          title: $t('page.login.error_title'),
+          description: $t('page.login.error_description'),
           icon: 'i-heroicons-exclamation-circle',
           color: 'error',
         });

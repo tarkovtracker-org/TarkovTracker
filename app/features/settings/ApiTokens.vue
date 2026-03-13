@@ -169,42 +169,23 @@
       </template>
       <template #body>
         <div class="space-y-4">
-          <div class="space-y-2">
-            <p class="text-surface-200 text-sm font-semibold">
-              {{ t('page.settings.card.apitokens.form.gamemode_title') }}
-              <span class="text-error-400">*</span>
-            </p>
-            <div class="flex gap-3">
-              <div
-                v-for="mode in gameModes"
-                :key="mode.value"
-                class="flex-1 cursor-pointer rounded-lg border p-3 transition-all"
-                :class="
-                  selectedGameMode === mode.value
-                    ? 'border-primary-500 bg-primary-500/10'
-                    : 'border-surface-700 bg-surface-800/50 hover:border-surface-600'
-                "
-                @click="selectedGameMode = mode.value"
-              >
-                <div class="flex items-center gap-2">
-                  <div
-                    class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
-                    :class="
-                      selectedGameMode === mode.value
-                        ? 'border-primary-500 bg-primary-500'
-                        : 'border-surface-600'
-                    "
-                  >
-                    <div
-                      v-if="selectedGameMode === mode.value"
-                      class="h-1.5 w-1.5 rounded-full bg-white"
-                    />
-                  </div>
-                  <div class="text-sm font-medium text-white">{{ mode.label }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <UFormField
+            name="gameMode"
+            :label="t('page.settings.card.apitokens.form.gamemode_title')"
+            required
+          >
+            <URadioGroup
+              v-model="selectedGameMode"
+              :items="gameModes"
+              value-key="value"
+              class="w-full"
+              :ui="{
+                fieldset: 'w-full',
+                item: 'rounded-lg border border-surface-700 bg-surface-800/50 px-3 py-3 data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500/10',
+                label: 'text-sm font-medium text-white',
+              }"
+            />
+          </UFormField>
           <div class="space-y-2">
             <p class="text-surface-200 text-sm font-semibold">
               {{ t('page.settings.card.apitokens.form.permissions_title') }}
@@ -294,15 +275,29 @@
   import { API_PERMISSIONS, GAME_MODE_OPTIONS, GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   import type { RawTokenRow, TokenPermission, TokenRow } from '@/types/api';
+  type ApiTokenInsertPayload = {
+    game_mode: GameMode;
+    note: string | null;
+    permissions: TokenPermission[];
+    token_hash: string;
+    token_value?: string;
+    user_id: string;
+  };
+  type SupabaseTokenError = {
+    code?: string;
+    message?: string;
+  } | null;
   interface SupabaseTable {
     select: (query: string) => SupabaseTable;
-    insert: (data: Record<string, unknown>) => SupabaseTable;
+    insert: (data: ApiTokenInsertPayload) => SupabaseTable;
     delete: () => SupabaseTable;
-    eq: (column: string, value: unknown) => SupabaseTable;
+    eq: (column: string, value: string) => SupabaseTable;
     order: (column: string, options?: { ascending: boolean }) => SupabaseTable;
-    single: () => Promise<{ data: unknown; error: unknown }>;
+    single: () => Promise<{ data: { token_id: string } | null; error: SupabaseTokenError }>;
     then: (
-      onfulfilled?: ((value: { data: unknown; error: unknown }) => unknown) | null
+      onfulfilled?:
+        | ((value: { data: RawTokenRow[] | null; error: SupabaseTokenError }) => unknown)
+        | null
     ) => Promise<unknown>;
   }
   const { t } = useI18n({ useScope: 'global' });
@@ -486,7 +481,7 @@
       if (!isCurrentTokenCreate(requestId, userId)) return null;
       const hashedToken = await hashToken(rawToken);
       if (!isCurrentTokenCreate(requestId, userId)) return null;
-      const insertPayload: Record<string, unknown> = {
+      const insertPayload: ApiTokenInsertPayload = {
         user_id: userId,
         token_hash: hashedToken,
         permissions: selectedPermissions.value,

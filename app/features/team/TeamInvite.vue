@@ -40,6 +40,7 @@
   const tarkovStore = useTarkovStore();
   const route = useRoute();
   const toast = useToast();
+  const { t } = useI18n({ useScope: 'global' });
   const { joinTeam } = useEdgeFunctions();
   function getCurrentGameMode(): 'pvp' | 'pve' {
     return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
@@ -65,7 +66,7 @@
       const result = await joinTeam(teamId, code);
       if (result?.success) {
         toast.add({
-          title: 'Joined team successfully!',
+          title: t('page.team.card.teaminvite.join_success', 'Joined team successfully!'),
           color: 'success',
         });
         const gameMode = getCurrentGameMode();
@@ -73,7 +74,10 @@
         systemStore.$patch({ [teamIdColumn]: teamId } as Partial<SystemState>);
         declined.value = false;
       } else {
-        throw new Error((result as { message?: string })?.message || 'Failed to join team');
+        throw new Error(
+          (result as { message?: string })?.message ||
+            t('page.team.card.teaminvite.join_error', 'Failed to join team')
+        );
       }
     } catch (err) {
       const error = err as Error & { data?: { message?: string } };

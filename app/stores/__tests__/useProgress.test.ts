@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { TASK_ID_REGISTRY } from '@/utils/constants';
 const createProgressData = (taskCompletions: Record<string, unknown>) => ({
   level: 1,
@@ -53,7 +53,9 @@ const setupMocks = ({
   const teammateStore = {
     $state: teammateState ?? createStoreState({ pvpCompletions: teammateCompletions }),
   };
-  const teammateStores = ref({ 'teammate-1': teammateStore });
+  const teammateStores = ref<Record<string, typeof teammateStore>>({
+    'teammate-1': teammateStore,
+  });
   vi.doMock('@/stores/useTeamStore', () => ({
     useTeamStore: () => ({ memberProfiles: {} }),
     useTeammateStores: () => ({ teammateStores }),
@@ -77,6 +79,10 @@ const setupMocks = ({
   vi.doMock('@/stores/useTarkov', () => ({
     useTarkovStore: () => selfStore,
   }));
+  return {
+    teammateStore,
+    teammateStores,
+  };
 };
 describe('useProgressStore', () => {
   it('treats boolean teammate completions as completed', async () => {
@@ -96,6 +102,23 @@ describe('useProgressStore', () => {
     const { useProgressStore } = await import('@/stores/useProgress');
     const store = useProgressStore();
     expect(store.tasksFailed['task-1']).toEqual({ self: true, 'teammate-1': false });
+  });
+  it('reacts when teammate stores are added after progress store initialization', async () => {
+    const { teammateStore, teammateStores } = setupMocks({
+      selfCompletions: { 'task-1': { complete: false, failed: false } },
+      teammateCompletions: { 'task-1': true },
+    });
+    teammateStores.value = {};
+    const { useProgressStore } = await import('@/stores/useProgress');
+    const store = useProgressStore();
+    expect(store.tasksCompletions['task-1']).toEqual({ self: false });
+    teammateStores.value['teammate-1'] = teammateStore;
+    await nextTick();
+    expect(store.teamStores).toMatchObject({
+      self: expect.any(Object),
+      'teammate-1': teammateStore,
+    });
+    expect(store.tasksCompletions['task-1']).toEqual({ self: false, 'teammate-1': true });
   });
   it('unlocks Ref tasks in PvE using Easy Money - Part 1 PvE completion', async () => {
     const refTask = {

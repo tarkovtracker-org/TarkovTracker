@@ -81,24 +81,60 @@ export default defineNuxtConfig({
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
     // Server-only (private) runtime config
-    supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+    supabaseUrl:
+      process.env.NUXT_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      '',
     supabaseServiceKey:
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_ROLE_KEY || '',
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
-    githubToken: process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '',
+      process.env.NUXT_SUPABASE_SERVICE_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SB_SERVICE_ROLE_KEY ||
+      '',
+    supabaseAnonKey:
+      process.env.NUXT_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      '',
+    githubToken:
+      process.env.NUXT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '',
     githubContributorsExclude:
+      process.env.NUXT_GITHUB_CONTRIBUTORS_EXCLUDE ||
       process.env.GITHUB_CONTRIBUTORS_EXCLUDE ||
       'claude,claude[bot],semantic-release-bot,semantic-release[bot]',
     githubContributorsCacheTtlMs:
-      Number(process.env.GITHUB_CONTRIBUTORS_CACHE_TTL_MS || '1800000') || 1800000,
-    githubTimeoutMs: Number(process.env.GITHUB_TIMEOUT_MS || '8000') || 8000,
-    logSinkUrl: process.env.LOG_SINK_URL || '',
-    teamMembersCacheTtlMs: Number(process.env.TEAM_MEMBERS_CACHE_TTL_MS || '5000') || 5000,
+      Number(
+        process.env.NUXT_GITHUB_CONTRIBUTORS_CACHE_TTL_MS ||
+          process.env.GITHUB_CONTRIBUTORS_CACHE_TTL_MS ||
+          '1800000'
+      ) || 1800000,
+    githubTimeoutMs:
+      Number(process.env.NUXT_GITHUB_TIMEOUT_MS || process.env.GITHUB_TIMEOUT_MS || '8000') || 8000,
+    logSinkUrl: process.env.NUXT_LOG_SINK_URL || process.env.LOG_SINK_URL || '',
+    teamMembersCacheTtlMs:
+      Number(
+        process.env.NUXT_TEAM_MEMBERS_CACHE_TTL_MS ||
+          process.env.TEAM_MEMBERS_CACHE_TTL_MS ||
+          '5000'
+      ) || 5000,
     teamMembersRateLimitPerMinute:
-      Number(process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE || '120') || 120,
-    sharedProfileCacheTtlMs: Number(process.env.SHARED_PROFILE_CACHE_TTL_MS || '5000') || 5000,
+      Number(
+        process.env.NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
+          process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
+          '120'
+      ) || 120,
+    sharedProfileCacheTtlMs:
+      Number(
+        process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS ||
+          process.env.SHARED_PROFILE_CACHE_TTL_MS ||
+          '5000'
+      ) || 5000,
     sharedProfileRateLimitPerMinute:
-      Number(process.env.SHARED_PROFILE_RATE_LIMIT_PER_MINUTE || '120') || 120,
+      Number(
+        process.env.NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
+          process.env.SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
+          '120'
+      ) || 120,
     // API protection configuration (server-only)
     apiProtection: {
       // Comma-separated list of allowed hosts (e.g., "tarkovtracker.org,www.tarkovtracker.org")
@@ -122,7 +158,7 @@ export default defineNuxtConfig({
     },
     public: {
       NODE_ENV: process.env.NODE_ENV || 'production',
-      VITE_LOG_LEVEL: process.env.VITE_LOG_LEVEL || '',
+      VITE_LOG_LEVEL: process.env.NUXT_PUBLIC_LOG_LEVEL || process.env.VITE_LOG_LEVEL || '',
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
       appVersion,
       googleAnalyticsMeasurementId:

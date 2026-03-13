@@ -1,5 +1,5 @@
 import { type _GettersTree, defineStore, type StateTree } from 'pinia';
-import { useSupabaseSync } from '@/composables/supabase/useSupabaseSync';
+import { useSupabaseSync, type SupabaseSyncReturn } from '@/composables/supabase/useSupabaseSync';
 import {
   type LocalIgnoredReason,
   type ToastTranslate,
@@ -70,6 +70,14 @@ type UserProgressRow = {
   pve_data: UserProgressData | null;
   created_at: string | null;
   updated_at: string | null;
+};
+type UserProgressSyncPayload = {
+  user_id: string | null;
+  current_game_mode: GameMode;
+  game_edition: number;
+  tarkov_uid: number | null;
+  pvp_data: UserProgressData;
+  pve_data: UserProgressData;
 };
 export type PrestigeRunSummary = {
   completedHideoutModules: number;
@@ -1704,7 +1712,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
 // Export type for future typing
 export type TarkovStore = ReturnType<typeof useTarkovStore>;
 // Store reference to sync controller for pause/resume during resets
-let syncController: ReturnType<typeof useSupabaseSync> | null = null;
+let syncController: SupabaseSyncReturn<UserState, UserProgressSyncPayload> | null = null;
 let syncUserId: string | null = null;
 let pendingSyncWatchStop: (() => void) | null = null;
 let pendingResetProgressSnapshot: {
@@ -2184,8 +2192,7 @@ export async function initializeTarkovSync() {
             bc.close();
           }
         },
-        transform: (state: unknown) => {
-          const userState = state as UserState;
+        transform: (userState: UserState) => {
           // SAFETY CHECK: Prevent syncing completely empty state for existing accounts
           // This protects against accidental data overwrites during edge cases
           const stateHasProgress = hasProgress(userState);
@@ -2217,13 +2224,13 @@ export async function initializeTarkovSync() {
     } else {
       logger.debug('[TarkovStore] Delaying sync until progress exists');
       const stopWatch = watch(
-        () => tarkovStore.$state,
-        (state) => {
-          if (hasProgress(state)) {
+        () => hasProgress(tarkovStore.$state),
+        (hasTrackedProgress) => {
+          if (hasTrackedProgress) {
             startSync();
           }
         },
-        { deep: true }
+        { flush: 'post' }
       );
       pendingSyncWatchStop = stopWatch;
     }

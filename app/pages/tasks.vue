@@ -285,16 +285,23 @@
         <TaskSettingsDrawer mode="docked" />
       </div>
     </Transition>
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="translate-x-full opacity-0"
-      enter-to-class="translate-x-0 opacity-100"
-      leave-active-class="transition-all duration-200 ease-in"
-      leave-from-class="translate-x-0 opacity-100"
-      leave-to-class="translate-x-full opacity-0"
+    <USlideover
+      :open="isOverlaySettingsDrawerOpen"
+      side="right"
+      :ui="{
+        content: 'w-full max-w-sm bg-transparent shadow-none ring-0 sm:max-w-sm',
+        body: 'p-4',
+      }"
+      @update:open="
+        (open) => {
+          if (!open) closeSettingsDrawer();
+        }
+      "
     >
-      <TaskSettingsDrawer v-if="isOverlaySettingsDrawerOpen" mode="overlay" />
-    </Transition>
+      <template #body>
+        <TaskSettingsDrawer mode="docked" />
+      </template>
+    </USlideover>
     <Teleport to="body">
       <Transition
         enter-active-class="transition ease-out duration-200"
@@ -360,6 +367,12 @@
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
+  import {
+    impactEligibleTaskIdsKey,
+    isMapViewKey,
+    jumpToMapObjectiveKey,
+    trackTaskProgressInteractionKey,
+  } from '@/features/tasks/task-context';
   import TaskCard from '@/features/tasks/TaskCard.vue';
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
   import TaskLoadingState from '@/features/tasks/TaskLoadingState.vue';
@@ -427,7 +440,7 @@
   );
   const userGameEdition = computed(() => tarkovStore.getGameEdition());
   const { tarkovTime } = useTarkovTime();
-  const { isOpen: isSettingsDrawerOpen } = useTaskSettingsDrawer();
+  const { close: closeSettingsDrawer, isOpen: isSettingsDrawerOpen } = useTaskSettingsDrawer();
   const breakpoints = useBreakpoints(breakpointsTailwind);
   const isLgAndUp = breakpoints.greaterOrEqual('lg');
   type MapObjectiveZone = { map: { id: string }; outline: { x: number; z: number }[] };
@@ -815,10 +828,10 @@
   ) => {
     trackFocusedTaskProgress(taskId, interaction);
   };
-  provide('jumpToMapObjective', handleJumpToMapObjective);
-  provide('isMapView', showMapDisplay);
-  provide('impactEligibleTaskIds', impactEligibleTaskIds);
-  provide('trackTaskProgressInteraction', handleTrackedTaskProgressInteraction);
+  provide(jumpToMapObjectiveKey, handleJumpToMapObjective);
+  provide(isMapViewKey, showMapDisplay);
+  provide(impactEligibleTaskIdsKey, impactEligibleTaskIds);
+  provide(trackTaskProgressInteractionKey, handleTrackedTaskProgressInteraction);
   const BATCH_SIZE = 8;
   const visibleTaskCount = ref(BATCH_SIZE);
   const loadMoreSentinel = ref<HTMLElement | null>(null);

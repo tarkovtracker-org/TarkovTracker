@@ -1,4 +1,4 @@
-import { useSupabaseSync } from '@/composables/supabase/useSupabaseSync';
+import { useSupabaseSync, type SupabaseSyncReturn } from '@/composables/supabase/useSupabaseSync';
 import {
   clearPendingResetPreferencesSnapshot,
   getPersistedPreferencesState,
@@ -20,7 +20,7 @@ function normalizeEnum<T>(value: T, allowed: readonly T[]): T | null {
   return value && allowed.includes(value) ? value : null;
 }
 let stopUserWatch: (() => void) | null = null;
-let preferencesSyncController: ReturnType<typeof useSupabaseSync> | null = null;
+let preferencesSyncController: SupabaseSyncReturn<PreferencesState> | null = null;
 function getRowLocaleOverride(row: Record<string, unknown>): string | null {
   const localeOverride = row.locale_override;
   if (typeof localeOverride !== 'string') return null;
@@ -59,10 +59,7 @@ const startPreferencesSync = (
     store: preferencesStore,
     table: 'user_preferences',
     debounceMs: 500,
-    transform: (state: unknown) => {
-      const preferencesState = state as PreferencesState;
-      return buildPreferencesSyncPayload(preferencesState, userId);
-    },
+    transform: (state) => buildPreferencesSyncPayload(state, userId),
   });
 };
 const applyPersistedPreferencesState = (

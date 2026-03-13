@@ -9,10 +9,13 @@
         :aria-label="$t('page.dashboard.traders.view_tasks', { name: trader.name })"
         @click="navigateToTraderTasks"
       >
-        <img
+        <NuxtImg
           v-if="trader.imageLink"
           :src="trader.imageLink"
           :alt="trader.name"
+          width="40"
+          height="40"
+          sizes="40px"
           class="bg-surface-800 border-surface-700 h-10 w-10 shrink-0 rounded-full border"
         />
         <div class="min-w-0 flex-1">

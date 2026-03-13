@@ -20,6 +20,7 @@ import ipaddr from 'ipaddr.js';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { getClientAddress } from '@/server/utils/requestIdentity';
+import type { H3Event } from 'h3';
 const logger = createLogger('ApiProtection');
 interface ApiProtectionSettings {
   allowedHosts?: string;
@@ -206,6 +207,43 @@ function logSecurityEvent(
     logger.info(message, logData);
   }
 }
+function applyCorsHeaders(
+  event: H3Event,
+  effectiveAllowedHosts: string[],
+  isDevelopment: boolean,
+  pathname: string,
+  clientIp: string | null
+): void {
+  const origin = getRequestHeader(event, 'origin');
+  if (!origin) {
+    return;
+  }
+  try {
+    const originUrl = new URL(origin);
+    const originHost = originUrl.hostname;
+    const isOriginAllowed =
+      effectiveAllowedHosts.some((allowed) => {
+        const allowedLower = allowed.toLowerCase();
+        return originHost === allowedLower || originHost.endsWith('.' + allowedLower);
+      }) ||
+      (isDevelopment && (originHost === 'localhost' || originHost === '127.0.0.1'));
+    if (!isOriginAllowed) {
+      return;
+    }
+    setResponseHeader(event, 'Access-Control-Allow-Origin', origin);
+    setResponseHeader(event, 'Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    setResponseHeader(event, 'Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    setResponseHeader(event, 'Access-Control-Allow-Credentials', 'true');
+    setResponseHeader(event, 'Access-Control-Max-Age', 86400);
+  } catch (error) {
+    logSecurityEvent('warn', 'Invalid CORS origin header', {
+      pathname,
+      origin,
+      clientIp: clientIp || 'unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 export default defineEventHandler(async (event) => {
   const url = getRequestURL(event);
   const pathname = url.pathname;
@@ -267,6 +305,11 @@ export default defineEventHandler(async (event) => {
       message: 'Access denied - untrusted source',
     });
   }
+  applyCorsHeaders(event, effectiveAllowedHosts, isDevelopment, pathname, clientIp);
+  if (event.method === 'OPTIONS') {
+    setResponseStatus(event, 204);
+    return '';
+  }
   // === SECURITY CHECK 3: Authentication (for non-public routes) ===
   const isPublic = isPublicRoute(pathname, publicRoutes);
   if (requireAuth && !isPublic) {
@@ -288,39 +331,5 @@ export default defineEventHandler(async (event) => {
     }
     // Attach user info to event context for downstream handlers
     event.context.auth = { user };
-  }
-  // === CORS Headers for legitimate requests ===
-  const origin = getRequestHeader(event, 'origin');
-  if (origin) {
-    // Validate origin against allowed hosts
-    try {
-      const originUrl = new URL(origin);
-      const originHost = originUrl.hostname;
-      const isOriginAllowed =
-        effectiveAllowedHosts.some((allowed) => {
-          const allowedLower = allowed.toLowerCase();
-          return originHost === allowedLower || originHost.endsWith('.' + allowedLower);
-        }) ||
-        (isDevelopment && (originHost === 'localhost' || originHost === '127.0.0.1'));
-      if (isOriginAllowed) {
-        setResponseHeader(event, 'Access-Control-Allow-Origin', origin);
-        setResponseHeader(event, 'Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        setResponseHeader(event, 'Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        setResponseHeader(event, 'Access-Control-Allow-Credentials', 'true');
-        setResponseHeader(event, 'Access-Control-Max-Age', 86400); // 24 hours
-      }
-    } catch (error) {
-      logSecurityEvent('warn', 'Invalid CORS origin header', {
-        pathname,
-        origin,
-        clientIp: clientIp || 'unknown',
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-  // Handle preflight OPTIONS requests
-  if (event.method === 'OPTIONS') {
-    setResponseStatus(event, 204);
-    return '';
   }
 });

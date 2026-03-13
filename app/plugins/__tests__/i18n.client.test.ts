@@ -22,10 +22,8 @@ describe('i18n-ready plugin', () => {
     );
     localStorage.setItem('sb-test-auth-token', 'token');
     const setLocale = vi.fn();
-    const plugin = (await import('@/plugins/i18n.client')).default as (
-      nuxtApp: unknown
-    ) => Promise<void>;
-    await plugin({
+    const plugin = (await import('@/plugins/i18n.client')).default;
+    await plugin.setup?.({
       $i18n: {
         global: {
           setLocale,
@@ -36,7 +34,7 @@ describe('i18n-ready plugin', () => {
           id: null,
         },
       },
-    });
+    } as unknown as Parameters<NonNullable<typeof plugin.setup>>[0]);
     expect(setLocale).toHaveBeenCalledWith('en');
   });
   it('applies an anonymous scoped locale while auth hydration is in progress', async () => {
@@ -46,10 +44,8 @@ describe('i18n-ready plugin', () => {
     );
     localStorage.setItem('sb-test-auth-token', 'token');
     const setLocale = vi.fn();
-    const plugin = (await import('@/plugins/i18n.client')).default as (
-      nuxtApp: unknown
-    ) => Promise<void>;
-    await plugin({
+    const plugin = (await import('@/plugins/i18n.client')).default;
+    await plugin.setup?.({
       $i18n: {
         global: {
           setLocale,
@@ -60,7 +56,7 @@ describe('i18n-ready plugin', () => {
           id: null,
         },
       },
-    });
+    } as unknown as Parameters<NonNullable<typeof plugin.setup>>[0]);
     expect(setLocale).toHaveBeenCalledWith('de');
   });
   it('does not apply a prior user-scoped locale when no session is hydrating', async () => {
@@ -69,10 +65,8 @@ describe('i18n-ready plugin', () => {
       serializeUserScopedStorage({ localeOverride: 'de' }, 'user-1')
     );
     const setLocale = vi.fn();
-    const plugin = (await import('@/plugins/i18n.client')).default as (
-      nuxtApp: unknown
-    ) => Promise<void>;
-    await plugin({
+    const plugin = (await import('@/plugins/i18n.client')).default;
+    await plugin.setup?.({
       $i18n: {
         global: {
           setLocale,
@@ -83,7 +77,7 @@ describe('i18n-ready plugin', () => {
           id: null,
         },
       },
-    });
+    } as unknown as Parameters<NonNullable<typeof plugin.setup>>[0]);
     expect(setLocale).toHaveBeenCalledWith('en');
   });
   it('applies a prior user-scoped locale once the matching user is known', async () => {
@@ -92,10 +86,8 @@ describe('i18n-ready plugin', () => {
       serializeUserScopedStorage({ localeOverride: 'de' }, 'user-1')
     );
     const setLocale = vi.fn();
-    const plugin = (await import('@/plugins/i18n.client')).default as (
-      nuxtApp: unknown
-    ) => Promise<void>;
-    await plugin({
+    const plugin = (await import('@/plugins/i18n.client')).default;
+    await plugin.setup?.({
       $i18n: {
         global: {
           setLocale,
@@ -106,7 +98,28 @@ describe('i18n-ready plugin', () => {
           id: 'user-1',
         },
       },
-    });
+    } as unknown as Parameters<NonNullable<typeof plugin.setup>>[0]);
     expect(setLocale).toHaveBeenCalledWith('de');
+  });
+  it('falls back to english when the browser locale is not supported by the UI', async () => {
+    Object.defineProperty(window.navigator, 'language', {
+      configurable: true,
+      value: 'it-IT',
+    });
+    const setLocale = vi.fn();
+    const plugin = (await import('@/plugins/i18n.client')).default;
+    await plugin.setup?.({
+      $i18n: {
+        global: {
+          setLocale,
+        },
+      },
+      $supabase: {
+        user: {
+          id: null,
+        },
+      },
+    } as unknown as Parameters<NonNullable<typeof plugin.setup>>[0]);
+    expect(setLocale).toHaveBeenCalledWith('en');
   });
 });

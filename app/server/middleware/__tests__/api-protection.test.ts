@@ -273,4 +273,28 @@ describe('API Protection Middleware', () => {
       process.env.NODE_ENV = originalEnv;
     });
   });
+  describe('CORS preflight', () => {
+    it('returns 204 for protected OPTIONS requests before auth validation', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      runtimeConfig.apiProtection.requireAuth = true;
+      (mockEvent as { method: string }).method = 'OPTIONS';
+      mockGetRequestURL.mockReturnValue(new URL('http://localhost:3000/api/protected'));
+      mockGetRequestHeader.mockImplementation((_: unknown, header: string) => {
+        if (header === 'host') return 'localhost:3000';
+        if (header === 'origin') return 'http://localhost:3000';
+        return undefined;
+      });
+      const { default: middleware } = await import('../api-protection');
+      await expect(middleware(mockEvent as H3Event)).resolves.toBe('');
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 204);
+      expect(mockSetResponseHeader).toHaveBeenCalledWith(
+        mockEvent,
+        'Access-Control-Allow-Origin',
+        'http://localhost:3000'
+      );
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
 });

@@ -3,18 +3,24 @@
     <AppTooltip :text="titleTooltip">
       <component :is="titleComponent" v-bind="titleProps" :class="titleClass">
         <div class="bg-surface-800 h-9 w-9 shrink-0 overflow-hidden rounded-full">
-          <img
+          <NuxtImg
             v-if="task?.trader?.imageLink"
             :src="task.trader.imageLink"
             :alt="task?.trader?.name || 'Trader'"
+            width="36"
+            height="36"
+            sizes="36px"
             class="h-full w-full object-cover"
           />
           <UIcon v-else name="i-mdi-account-circle" class="text-surface-400 h-full w-full" />
         </div>
-        <img
+        <NuxtImg
           v-if="factionImage"
           :src="factionImage"
           :alt="task?.factionName"
+          width="24"
+          height="24"
+          sizes="24px"
           class="h-6 w-6 shrink-0 object-contain invert"
         />
         <span class="min-w-0 text-sm font-semibold sm:truncate sm:text-base">
@@ -41,7 +47,15 @@
           :aria-label="t('page.tasks.questcard.view_on_wiki')"
           @click.stop
         >
-          <img src="/img/logos/wikilogo.webp" alt="Wiki" aria-hidden="true" class="h-5 w-5" />
+          <NuxtImg
+            src="/img/logos/wikilogo.webp"
+            alt="Wiki"
+            aria-hidden="true"
+            width="20"
+            height="20"
+            sizes="20px"
+            class="h-5 w-5"
+          />
         </a>
       </AppTooltip>
       <AppTooltip v-if="task?.id" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
@@ -53,10 +67,13 @@
           :aria-label="t('page.tasks.questcard.view_on_tarkov_dev')"
           @click.stop
         >
-          <img
+          <NuxtImg
             src="/img/logos/tarkovdevlogo.webp"
             alt="tarkov.dev"
             aria-hidden="true"
+            width="20"
+            height="20"
+            sizes="20px"
             class="h-5 w-5"
           />
         </a>

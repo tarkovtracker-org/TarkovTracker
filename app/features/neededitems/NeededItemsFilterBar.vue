@@ -1,73 +1,36 @@
 <template>
   <div class="mb-6 space-y-3">
     <!-- Primary Filter: ALL / TASKS / HIDEOUT (Centered) -->
-    <div
-      role="tablist"
-      :aria-label="$t('needed_items.filter_type_label')"
-      class="bg-surface-900 flex flex-wrap items-center justify-center gap-1 overflow-x-auto rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:gap-2 sm:px-4 sm:py-3"
+    <UTabs
+      v-model="activeFilter"
+      :items="filterTabItems"
+      :content="false"
+      color="neutral"
+      class="bg-surface-900 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4 sm:py-3"
+      :ui="{
+        root: 'w-full',
+        list: 'flex flex-wrap items-center justify-center gap-1 sm:gap-2',
+        trigger:
+          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white rounded-none border-b-2 border-transparent px-2 sm:px-3',
+      }"
     >
-      <UButton
-        v-if="allTab"
-        role="tab"
-        :aria-selected="modelValue === allTab.value"
-        :tabindex="modelValue === allTab.value ? 0 : -1"
-        :variant="'ghost'"
-        :color="'neutral'"
-        size="sm"
-        class="shrink-0 px-2 sm:px-3"
-        :class="{
-          'border-surface-200 rounded-none border-b-2': modelValue === allTab.value,
-        }"
-        @click="$emit('update:modelValue', allTab.value)"
-      >
-        <UIcon :name="allTab.icon" class="h-4 w-4 sm:mr-1 sm:h-5 sm:w-5" />
-        <span class="hidden text-[clamp(0.625rem,2vw,0.875rem)] sm:inline">
-          {{ allTab.label.toUpperCase() }}
-        </span>
-        <span
-          :class="[
-            'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
-            getTabBadgeColor(allTab),
-          ]"
-        >
-          {{ allTab.count }}
-        </span>
-      </UButton>
-      <span
-        v-if="showAllDivider"
-        aria-hidden="true"
-        class="bg-surface-700/60 h-6 w-px self-center"
-      ></span>
-      <!-- Remaining tabs -->
-      <UButton
-        v-for="tab in otherTabs"
-        :key="tab.value"
-        role="tab"
-        :aria-selected="modelValue === tab.value"
-        :tabindex="modelValue === tab.value ? 0 : -1"
-        :variant="'ghost'"
-        :color="'neutral'"
-        size="sm"
-        class="shrink-0 px-2 sm:px-3"
-        :class="{
-          'border-surface-200 rounded-none border-b-2': modelValue === tab.value,
-        }"
-        @click="$emit('update:modelValue', tab.value)"
-      >
-        <UIcon :name="tab.icon" class="h-4 w-4 sm:mr-1 sm:h-5 sm:w-5" />
-        <span class="hidden text-[clamp(0.625rem,2vw,0.875rem)] sm:inline">
-          {{ tab.label.toUpperCase() }}
-        </span>
-        <span
-          :class="[
-            'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
-            getTabBadgeColor(tab),
-          ]"
-        >
-          {{ tab.count }}
-        </span>
-      </UButton>
-    </div>
+      <template #default="{ item }">
+        <div class="flex items-center">
+          <UIcon :name="item.icon" class="h-4 w-4 sm:mr-1 sm:h-5 sm:w-5" />
+          <span class="hidden text-[clamp(0.625rem,2vw,0.875rem)] uppercase sm:inline">
+            {{ item.label }}
+          </span>
+          <span
+            :class="[
+              'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+              item.badgeClass,
+            ]"
+          >
+            {{ item.count }}
+          </span>
+        </div>
+      </template>
+    </UTabs>
     <!-- Unified Filter Bar: Search + Filters + Views -->
     <div
       class="bg-surface-900 flex flex-col gap-3 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:px-4 sm:py-3"
@@ -261,14 +224,12 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const searchInputId = `needed-items-search-${useId()}`;
-  const allTab = computed(() => props.filterTabs.find((tab) => tab.value === 'all'));
-  const otherTabs = computed(() =>
-    props.filterTabs.filter((tab) => {
-      if (tab.value === 'all') return false;
-      if (tab.value === 'completed' && tab.count <= 0) return false;
-      return true;
-    })
-  );
+  const activeFilter = computed({
+    get: () => props.modelValue,
+    set: (value: string | number) => {
+      emit('update:modelValue', value as FilterType);
+    },
+  });
   const getTabBadgeColor = (tab: FilterTab): string => {
     switch (tab.value) {
       case 'completed':
@@ -281,7 +242,17 @@
         return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600';
     }
   };
-  const showAllDivider = computed(() => allTab.value && otherTabs.value.length > 0);
+  const filterTabItems = computed(() => {
+    return props.filterTabs
+      .filter((tab) => {
+        if (tab.value === 'completed' && tab.count <= 0) return false;
+        return true;
+      })
+      .map((tab) => ({
+        ...tab,
+        badgeClass: getTabBadgeColor(tab),
+      }));
+  });
   const activeFiltersCount = computed(() => {
     let count = 0;
     if (props.firFilter !== 'all') {

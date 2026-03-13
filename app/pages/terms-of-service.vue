@@ -109,7 +109,7 @@
           </nav>
         </UCard>
       </aside>
-      <main class="w-full min-w-0 xl:flex-1">
+      <section class="w-full min-w-0 xl:flex-1">
         <UCard
           class="prose prose-lg prose-invert prose-headings:text-primary-100 prose-a:text-link prose-strong:text-primary-200 max-w-none"
         >
@@ -864,7 +864,7 @@
             </section>
           </div>
         </UCard>
-      </main>
+      </section>
     </div>
     <!-- Mobile floating index -->
     <ClientOnly>

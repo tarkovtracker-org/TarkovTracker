@@ -11,6 +11,16 @@ const setLocale = vi.fn(async (value: string) => {
 const mockPreferencesStore = reactive({
   localeOverride: 'de' as string | null,
 });
+const mockMetadataStore = reactive({
+  fetchAllData: vi.fn(async () => {}),
+  hasInitialized: true,
+  languageCode: 'en',
+  updateLanguageAndGameMode: vi.fn((localeOverride?: string) => {
+    if (localeOverride) {
+      mockMetadataStore.languageCode = localeOverride === 'uk' ? 'en' : localeOverride;
+    }
+  }),
+});
 const mockShowLoadFailed = vi.fn();
 const mockSupabaseUser = reactive({
   loggedIn: false,
@@ -39,6 +49,9 @@ vi.mock('@/utils/logger', () => ({
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
+}));
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => mockMetadataStore,
 }));
 vi.mock('@/composables/useToastI18n', () => ({
   useToastI18n: () => ({
@@ -73,6 +86,15 @@ describe('useAppInitialization locale setup', () => {
       localeRef.value = value;
     });
     mockPreferencesStore.localeOverride = 'de';
+    mockMetadataStore.fetchAllData.mockClear();
+    mockMetadataStore.hasInitialized = true;
+    mockMetadataStore.languageCode = 'en';
+    mockMetadataStore.updateLanguageAndGameMode.mockClear();
+    mockMetadataStore.updateLanguageAndGameMode.mockImplementation((localeOverride?: string) => {
+      if (localeOverride) {
+        mockMetadataStore.languageCode = localeOverride === 'uk' ? 'en' : localeOverride;
+      }
+    });
     mockInitializeTarkovSync.mockClear();
     mockInitializeTarkovSync.mockResolvedValue(undefined);
     mockResetTarkovStoreForSessionTransition.mockClear();
@@ -124,12 +146,19 @@ describe('useAppInitialization locale setup', () => {
     wrapper.unmount();
   });
   it('reapplies locale when localeOverride changes after mount', async () => {
+    localeRef.value = 'de';
+    mockPreferencesStore.localeOverride = 'de';
+    mockMetadataStore.languageCode = 'de';
     const wrapper = await mountWithComposable();
     await flushPromises();
     setLocale.mockClear();
+    mockMetadataStore.updateLanguageAndGameMode.mockClear();
+    mockMetadataStore.fetchAllData.mockClear();
     mockPreferencesStore.localeOverride = 'fr';
     await flushPromises();
     expect(setLocale).toHaveBeenCalledWith('fr');
+    expect(mockMetadataStore.updateLanguageAndGameMode).toHaveBeenCalledWith('fr');
+    expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false);
     wrapper.unmount();
   });
   it('waits for a hydrated user id before starting sync and migration', async () => {

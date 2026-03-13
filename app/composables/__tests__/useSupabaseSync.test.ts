@@ -31,6 +31,25 @@ mockNuxtImport('useNuxtApp', () => () => ({
 vi.mock('@/utils/logger', () => ({
   logger: loggerMock,
 }));
+type MockStore<TState extends object> = Store<string, TState> & {
+  notifySubscriber: () => void;
+};
+const createMockStore = <TState extends object>(storeState: TState): MockStore<TState> => {
+  let subscriber: ((mutation: unknown, state: TState) => void) | null = null;
+  return {
+    $id: 'mock-store',
+    $state: storeState,
+    $subscribe: vi.fn((callback: (mutation: unknown, state: TState) => void) => {
+      subscriber = callback;
+      return () => {
+        subscriber = null;
+      };
+    }),
+    notifySubscriber: () => {
+      subscriber?.({}, storeState);
+    },
+  } as unknown as MockStore<TState>;
+};
 const flushSync = async (debounceMs: number) => {
   await Promise.resolve();
   await vi.advanceTimersByTimeAsync(debounceMs + 1);
@@ -52,7 +71,7 @@ describe('useSupabaseSync', () => {
       safeValue: 1,
       unsafeRef: window,
     });
-    const store = { $state: storeState } as unknown as Store;
+    const store = createMockStore(storeState);
     const sync = useSupabaseSync({
       store,
       table: 'user_progress',
@@ -62,6 +81,7 @@ describe('useSupabaseSync', () => {
       }),
     });
     storeState.safeValue = 2;
+    store.notifySubscriber();
     await flushSync(5);
     expect(from).toHaveBeenCalledWith('user_progress');
     expect(upsert).toHaveBeenCalledWith({
@@ -76,13 +96,14 @@ describe('useSupabaseSync', () => {
     const storeState = reactive<{ count: number; user_id?: string }>({
       count: 0,
     });
-    const store = { $state: storeState } as unknown as Store;
+    const store = createMockStore(storeState);
     const sync = useSupabaseSync({
       store,
       table: 'user_preferences',
       debounceMs: 5,
     });
     storeState.count = 3;
+    store.notifySubscriber();
     await flushSync(5);
     expect(storeState.user_id).toBeUndefined();
     expect(from).toHaveBeenCalledWith('user_preferences');

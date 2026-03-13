@@ -49,6 +49,7 @@ describe('preferences sync plugin', () => {
       cleanup: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
+      syncToSupabase: vi.fn().mockResolvedValue(null),
     });
     const preferencesStore = {
       $state: {},
@@ -96,6 +97,7 @@ describe('preferences sync plugin', () => {
       cleanup: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
+      syncToSupabase: vi.fn().mockResolvedValue(null),
     });
     vi.stubGlobal('localStorage', { 'sb-test-auth-token': 'token' });
     const preferencesStore = {
@@ -169,6 +171,7 @@ describe('preferences sync plugin', () => {
       cleanup,
       pause: vi.fn(),
       resume: vi.fn(),
+      syncToSupabase: vi.fn().mockResolvedValue(null),
     });
     const maybeSingle = vi.fn().mockResolvedValue({
       data: null,
@@ -223,6 +226,7 @@ describe('preferences sync plugin', () => {
       cleanup,
       pause: vi.fn(),
       resume: vi.fn(),
+      syncToSupabase: vi.fn().mockResolvedValue(null),
     });
     const maybeSingle = vi.fn().mockResolvedValue({
       data: null,

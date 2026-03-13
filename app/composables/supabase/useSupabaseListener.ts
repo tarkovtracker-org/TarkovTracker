@@ -7,15 +7,18 @@ import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
 } from '@supabase/supabase-js';
-import type { Store } from 'pinia';
+import type { StateTree, Store } from 'pinia';
 // Local imports
-export interface SupabaseListenerConfig {
-  store: Store;
+export interface SupabaseListenerConfig<
+  TStoreState extends StateTree = StateTree,
+  TData extends Record<string, unknown> = Record<string, unknown>,
+> {
+  store: Store<string, TStoreState>;
   table: string;
   filter?: string | Ref<string | undefined> | ComputedRef<string | undefined>;
   primaryKey?: string; // Defaults to 'id' or 'user_id'
   storeId?: string;
-  onData?: (data: Record<string, unknown> | null) => void;
+  onData?: (data: TData | null) => void;
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
   syncController?: { pause: () => void; resume: () => void };
@@ -27,13 +30,13 @@ interface SupabaseListenerReturn {
   cleanup: () => void;
   fetchData: () => Promise<void>;
 }
-interface QueryBuilderWithAbortSignal {
+interface QueryBuilderWithAbortSignal<TData extends Record<string, unknown>> {
   abortSignal?: (signal: AbortSignal) => PromiseLike<{
-    data: Record<string, unknown> | null;
+    data: TData | null;
     error: PostgrestError | null;
   }>;
   then: PromiseLike<{
-    data: Record<string, unknown> | null;
+    data: TData | null;
     error: PostgrestError | null;
   }>['then'];
 }
@@ -56,7 +59,10 @@ const isAbortError = (error: unknown): boolean => {
  * Creates a Supabase realtime listener that automatically manages subscriptions
  * and syncs data with a Pinia store. Supports reactive filter refs for auth changes.
  */
-export function useSupabaseListener({
+export function useSupabaseListener<
+  TStoreState extends StateTree = StateTree,
+  TData extends Record<string, unknown> = Record<string, unknown>,
+>({
   store,
   table,
   filter,
@@ -64,7 +70,7 @@ export function useSupabaseListener({
   onData,
   patchStore = true,
   syncController,
-}: SupabaseListenerConfig): SupabaseListenerReturn {
+}: SupabaseListenerConfig<TStoreState, TData>): SupabaseListenerReturn {
   const { $supabase } = useNuxtApp();
   const channel = ref<RealtimeChannel | null>(null);
   const isSubscribed = ref(false);
@@ -104,7 +110,7 @@ export function useSupabaseListener({
         .from(table)
         .select('*')
         .eq(column, rest)
-        .single() as QueryBuilderWithAbortSignal;
+        .single() as QueryBuilderWithAbortSignal<TData>;
       const result =
         typeof queryBuilder.abortSignal === 'function'
           ? await queryBuilder.abortSignal(fetchController.signal)
@@ -121,7 +127,7 @@ export function useSupabaseListener({
       }
       if (data) {
         if (patchStore) {
-          safePatchStore(store, data);
+          safePatchStore(store, data as Partial<TStoreState>);
           clearStaleState(store, data);
         }
         if (onData) onData(data);
@@ -169,9 +175,9 @@ export function useSupabaseListener({
               if (onData) onData(null);
             } else {
               // INSERT or UPDATE
-              const newData = payload.new as Record<string, unknown>;
+              const newData = payload.new as TData;
               if (patchStore) {
-                safePatchStore(store, newData);
+                safePatchStore(store, newData as Partial<TStoreState>);
                 clearStaleState(store, newData);
               }
               if (onData) onData(newData);

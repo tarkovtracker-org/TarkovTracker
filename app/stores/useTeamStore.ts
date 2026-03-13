@@ -375,8 +375,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           },
         } as Record<string, MemberProfile>;
       });
-    },
-    { deep: true }
+    }
   );
   watch(
     () => {
@@ -457,13 +456,12 @@ export function useTeammateStores() {
   const pendingRetryTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   // Watch team state changes to manage teammate stores
   watch(
-    () => teamStore.$state,
-    async (newState, _oldState) => {
+    () => teamStore.members,
+    async (members) => {
       await nextTick();
       const { $supabase } = useNuxtApp();
       const currentUID = $supabase.user?.id;
-      const newTeammatesArray =
-        newState.members?.filter((member: string) => member !== currentUID) || [];
+      const newTeammatesArray = members?.filter((member: string) => member !== currentUID) || [];
       // Remove stores for teammates no longer in the team
       for (const teammate of Object.keys(teammateStores.value)) {
         if (!newTeammatesArray.includes(teammate)) {
@@ -509,7 +507,6 @@ export function useTeammateStores() {
     },
     {
       immediate: true,
-      deep: true,
     }
   );
   // Create a store for a specific teammate

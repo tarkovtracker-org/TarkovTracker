@@ -1,5 +1,4 @@
 declare module '*.json5' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const value: any;
+  const value: unknown;
   export default value;
 }

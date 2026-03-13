@@ -1,7 +1,7 @@
 import { delay } from '@/utils/async';
 import { debounce, isDebounceRejection } from '@/utils/debounce';
 import { logger } from '@/utils/logger';
-import type { Store } from 'pinia';
+import type { StateTree, Store } from 'pinia';
 import type { UserProgressData } from '~/stores/progressState';
 type SupabaseErrorLike = {
   code?: string | null;
@@ -9,13 +9,30 @@ type SupabaseErrorLike = {
   details?: string | null;
   hint?: string | null;
 };
+type SupabaseSyncPayload = Record<string, unknown> & {
+  user_id?: string | null;
+};
 const ABORT_RETRY_DELAY_MS = 150;
-export interface SupabaseSyncConfig {
-  store: Store;
+export interface SupabaseSyncConfig<
+  TState extends StateTree = StateTree,
+  TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
+> {
+  store: Store<string, TState>;
   table: string;
-  transform?: (state: Record<string, unknown>) => Record<string, unknown> | null;
+  transform?: (state: TState) => TPayload | null;
   debounceMs?: number;
   onSynced?: () => void;
+}
+export interface SupabaseSyncReturn<
+  TState extends StateTree = StateTree,
+  TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
+> {
+  isSyncing: Ref<boolean>;
+  isPaused: Ref<boolean>;
+  cleanup: () => void;
+  pause: () => void;
+  resume: () => void;
+  syncToSupabase: (state?: TState) => Promise<TPayload | null>;
 }
 // Type for the transformed data that gets sent to Supabase
 interface SupabaseUserData {
@@ -90,42 +107,44 @@ function formatSupabaseError(error: SupabaseErrorLike) {
     message: error.message ?? null,
   };
 }
-export function useSupabaseSync({
+export function useSupabaseSync<
+  TState extends StateTree = StateTree,
+  TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
+>({
   store,
   table,
   transform,
   debounceMs = 1000,
   onSynced,
-}: SupabaseSyncConfig) {
+}: SupabaseSyncConfig<TState, TPayload>): SupabaseSyncReturn<TState, TPayload> {
   logger.debug(`[Sync] useSupabaseSync initialized for table: ${table}, debounce: ${debounceMs}ms`);
   const { $supabase } = useNuxtApp();
   const isSyncing = ref(false);
   const isPaused = ref(false);
   let lastSyncedHash: string | null = null;
-  const syncToSupabase = async () => {
-    const state = store.$state as Record<string, unknown>;
+  const syncToSupabase = async (state = store.$state as TState): Promise<TPayload | null> => {
     logger.debug('[Sync] syncToSupabase called', {
       loggedIn: $supabase.user.loggedIn,
       isPaused: isPaused.value,
     });
     if (isPaused.value) {
       logger.debug('[Sync] Skipping - sync is paused');
-      return;
+      return null;
     }
     if (!$supabase.user.loggedIn || !$supabase.user.id) {
       logger.debug('[Sync] Skipping - user not logged in');
-      return;
+      return null;
     }
     isSyncing.value = true;
     try {
-      const transformedState = transform ? transform(state) : state;
+      const transformedState = transform ? transform(state) : (state as unknown as TPayload);
       // Skip if transform returned null (e.g., during initial load)
       if (!transformedState) {
         logger.debug('[Sync] Skipping - transform returned null');
         isSyncing.value = false;
-        return;
+        return null;
       }
-      const dataToSave = { ...transformedState };
+      const dataToSave: TPayload = { ...transformedState };
       // Ensure user_id is present if not already
       if (!dataToSave.user_id) {
         dataToSave.user_id = $supabase.user.id;
@@ -135,7 +154,7 @@ export function useSupabaseSync({
       if (currentHash === lastSyncedHash) {
         logger.debug('[Sync] Skipping - data unchanged');
         isSyncing.value = false;
-        return;
+        return null;
       }
       // Log detailed info about what we're syncing (dev only)
       if (import.meta.env.DEV) {
@@ -216,27 +235,25 @@ export function useSupabaseSync({
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
         onSynced?.();
       }
+      return transformedState;
     } catch (err) {
       logger.error('[Sync] Unexpected error:', err);
+      return null;
     } finally {
       isSyncing.value = false;
     }
   };
   const debouncedSync = debounce(syncToSupabase, debounceMs);
-  const unwatch = watch(
-    () => store.$state,
-    () => {
-      logger.debug(`[Sync] Store state changed for ${table}, triggering debounced sync`);
-      void debouncedSync().catch((error) => {
-        if (isDebounceRejection(error)) return;
-        logger.error(`[Sync] Debounced sync failed for ${table}:`, error);
-      });
-    },
-    { deep: true }
-  );
+  const unsubscribe = store.$subscribe((_mutation, state) => {
+    logger.debug(`[Sync] Store state changed for ${table}, triggering debounced sync`);
+    void debouncedSync(state as TState).catch((error) => {
+      if (isDebounceRejection(error)) return;
+      logger.error(`[Sync] Debounced sync failed for ${table}:`, error);
+    });
+  });
   const cleanup = () => {
     debouncedSync.cancel();
-    unwatch();
+    unsubscribe();
   };
   if (getCurrentInstance()) {
     onUnmounted(cleanup);
@@ -256,5 +273,6 @@ export function useSupabaseSync({
     cleanup,
     pause,
     resume,
+    syncToSupabase,
   };
 }

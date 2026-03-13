@@ -1,5 +1,6 @@
 import { useI18n } from 'vue-i18n';
 import { useToastI18n } from '@/composables/useToastI18n';
+import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import {
   initializeTarkovSync,
@@ -15,17 +16,32 @@ import { logger } from '@/utils/logger';
  */
 export function useAppInitialization() {
   const { $supabase } = useNuxtApp();
+  const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const { availableLocales, locale, setLocale } = useI18n({ useScope: 'global' });
   const { showLoadFailed } = useToastI18n();
   const isAvailableLocale = (value: string): value is typeof locale.value =>
     (availableLocales as readonly string[]).includes(value);
+  const syncMetadataLocale = async (nextLocale: string) => {
+    const previousLanguageCode = metadataStore.languageCode;
+    metadataStore.updateLanguageAndGameMode(nextLocale);
+    if (!metadataStore.hasInitialized || metadataStore.languageCode === previousLanguageCode) {
+      return;
+    }
+    try {
+      await metadataStore.fetchAllData(false);
+    } catch (error) {
+      logger.error('[useAppInitialization] Failed to refresh metadata after locale change:', error);
+      showLoadFailed();
+    }
+  };
   const applyLocaleOverride = async (localeOverride: string | null) => {
     if (!localeOverride || !isAvailableLocale(localeOverride) || localeOverride === locale.value) {
       return;
     }
     try {
       await setLocale(localeOverride);
+      await syncMetadataLocale(localeOverride);
     } catch (error) {
       logger.error('[useAppInitialization] Failed to apply locale override:', error);
     }

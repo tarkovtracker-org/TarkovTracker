@@ -1,6 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
+const loggerMock = {
+  error: vi.fn(),
+};
 type MetadataStoreMock = {
   editionsError: Error | null;
   editionsLoading: boolean;
@@ -29,9 +32,13 @@ const createMetadataStore = (overrides: Partial<MetadataStoreMock> = {}) =>
   });
 const setup = async (overrides: Partial<MetadataStoreMock> = {}, attachTo?: HTMLElement) => {
   vi.resetModules();
+  loggerMock.error.mockReset();
   const metadataStore = createMetadataStore(overrides);
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => metadataStore,
+  }));
+  vi.doMock('@/utils/logger', () => ({
+    logger: loggerMock,
   }));
   const { default: LoadingScreen } = await import('@/shell/LoadingScreen.vue');
   const wrapper = mount(LoadingScreen, {
@@ -100,6 +107,24 @@ describe('LoadingScreen', () => {
     resolveRetry!();
     await flushPromises();
     expect(wrapper.findAll('button')[0]?.attributes('disabled')).toBeUndefined();
+  });
+  it('logs retry failures without throwing out of the overlay', async () => {
+    const retryError = new Error('retry failed');
+    const fetchAllData = vi.fn().mockRejectedValue(retryError);
+    const { wrapper } = await setup({
+      error: new Error('Failed to load metadata'),
+      fetchAllData,
+    });
+    const retryButton = wrapper.findAll('button')[0]!;
+    await retryButton.trigger('click');
+    await flushPromises();
+    expect(fetchAllData).toHaveBeenCalledWith(true);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[LoadingScreen] Metadata retry failed:',
+      retryError
+    );
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+    expect(retryButton.attributes('disabled')).toBeUndefined();
   });
   it('restores sibling inert and aria-hidden attributes when overlay closes', async () => {
     const { metadataStore, wrapper } = await setup({ loading: true });

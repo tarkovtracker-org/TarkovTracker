@@ -406,6 +406,7 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
+  import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
   import {
     getCurrentTaskStatusForRequirement,
     getRequiredTaskStatuses,
@@ -480,10 +481,7 @@
   const preferencesStore = usePreferencesStore();
   const progressStore = useProgressStore();
   const metadataStore = useMetadataStore();
-  const injectedImpactEligibleTaskIds = inject<{ value: Set<string> | undefined } | undefined>(
-    'impactEligibleTaskIds',
-    undefined
-  );
+  const injectedImpactEligibleTaskIds = inject(impactEligibleTaskIdsKey, undefined);
   const { isGlobalTask: isGlobalTaskFn } = useTaskFiltering();
   const isGlobalTask = computed(() => isGlobalTaskFn(props.task));
   const taskContextMenu = ref<ContextMenuRef | null>(null);

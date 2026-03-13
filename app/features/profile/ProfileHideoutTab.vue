@@ -14,10 +14,13 @@
         class="bg-surface-900 rounded-lg border border-white/10 p-3"
       >
         <div class="mb-2 flex items-center gap-2">
-          <img
+          <NuxtImg
             v-if="station.imageLink"
             :src="station.imageLink"
             :alt="station.name"
+            width="32"
+            height="32"
+            sizes="32px"
             class="h-8 w-8 rounded-md"
           />
           <div v-else class="bg-surface-800 flex h-8 w-8 items-center justify-center rounded-md">

@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, ref } from 'vue';
+import { isMapViewKey, trackTaskProgressInteractionKey } from '@/features/tasks/task-context';
 import TaskObjectiveItemGroup from '@/features/tasks/TaskObjectiveItemGroup.vue';
 import type { TaskObjective } from '@/types/tarkov';
 let currentCount = 1;
@@ -61,8 +62,8 @@ const mountComponent = (trackTaskProgressInteraction = vi.fn()) => {
     },
     global: {
       provide: {
-        isMapView: ref(false),
-        trackTaskProgressInteraction,
+        [isMapViewKey as symbol]: ref(false),
+        [trackTaskProgressInteractionKey as symbol]: trackTaskProgressInteraction,
       },
       stubs: {
         AppTooltip: { template: '<span><slot /><slot name="content" /></span>' },
