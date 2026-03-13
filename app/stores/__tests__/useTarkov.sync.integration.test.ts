@@ -236,6 +236,23 @@ const progressWithLevel = (level: number): UserProgressData => ({
   skillOffsets: {},
   storyChapters: {},
 });
+const progressWithItemCounts = (
+  overrides: Partial<Pick<UserProgressData, 'taskObjectives' | 'hideoutParts'>> = {}
+): UserProgressData => ({
+  ...progressWithLevel(1),
+  taskObjectives: overrides.taskObjectives ?? {
+    'objective-1': {
+      complete: false,
+      count: 2,
+    },
+  },
+  hideoutParts: overrides.hideoutParts ?? {
+    'part-1': {
+      complete: false,
+      count: 1,
+    },
+  },
+});
 const cloneProgress = (value: UserProgressData): UserProgressData => {
   return JSON.parse(JSON.stringify(value)) as UserProgressData;
 };
@@ -735,6 +752,55 @@ describe('useTarkov sync integration', () => {
       })
     );
   });
+  it('preserves item-only local progress over older remote data on refresh', async () => {
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: Date.now(),
+        _userId: 'user-1',
+        data: {
+          ...defaultState,
+          pvp: progressWithItemCounts(),
+        },
+      })
+    );
+    single.mockResolvedValue({
+      data: createRemoteRow({
+        pvp_data: progressWithLevel(1),
+        updated_at: '2026-02-01T00:00:00.000Z',
+      }),
+      error: null,
+    });
+    const store = useTarkovStore();
+    await initializeTarkovSync();
+    expect(store.pvp.taskObjectives['objective-1']).toEqual({
+      complete: false,
+      count: 2,
+    });
+    expect(store.pvp.hideoutParts['part-1']).toEqual({
+      complete: false,
+      count: 1,
+    });
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        pvp_data: expect.objectContaining({
+          taskObjectives: {
+            'objective-1': {
+              complete: false,
+              count: 2,
+            },
+          },
+          hideoutParts: {
+            'part-1': {
+              complete: false,
+              count: 1,
+            },
+          },
+        }),
+      })
+    );
+  });
   it('merges local startup progress with remote higher-epoch resets before syncing', async () => {
     const store = useTarkovStore();
     store.$patch((state) => {
@@ -912,6 +978,54 @@ describe('useTarkov sync integration', () => {
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
     expect(showLoadFailed).not.toHaveBeenCalled();
+  });
+  it('migrates persisted item-only progress when remote row is missing', async () => {
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: Date.now(),
+        _userId: 'user-1',
+        data: {
+          ...defaultState,
+          pvp: progressWithItemCounts(),
+        },
+      })
+    );
+    single.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST116', message: 'No rows found' },
+    });
+    const store = useTarkovStore();
+    await initializeTarkovSync();
+    expect(store.pvp.taskObjectives['objective-1']).toEqual({
+      complete: false,
+      count: 2,
+    });
+    expect(store.pvp.hideoutParts['part-1']).toEqual({
+      complete: false,
+      count: 1,
+    });
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        pvp_data: expect.objectContaining({
+          taskObjectives: {
+            'objective-1': {
+              complete: false,
+              count: 2,
+            },
+          },
+          hideoutParts: {
+            'part-1': {
+              complete: false,
+              count: 1,
+            },
+          },
+        }),
+      })
+    );
+    expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
   });
   it('delays sync startup for empty new users until progress exists', async () => {
     single.mockResolvedValue({

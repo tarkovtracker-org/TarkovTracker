@@ -148,6 +148,8 @@ const hasProgress = (data: unknown): boolean => {
     mode &&
     (mode.level > 1 ||
       Object.keys(mode.taskCompletions || {}).length > 0 ||
+      Object.keys(mode.taskObjectives || {}).length > 0 ||
+      Object.keys(mode.hideoutParts || {}).length > 0 ||
       Object.keys(mode.hideoutModules || {}).length > 0 ||
       Object.keys(mode.storyChapters || {}).length > 0);
   return Boolean(modeHasData(state.pvp) || modeHasData(state.pve));
