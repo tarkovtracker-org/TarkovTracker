@@ -185,8 +185,12 @@ describe('supabase plugin', () => {
       },
     });
     await flushPlugin();
-    expect(authStateChangeCallback).toBeTypeOf('function');
-    authStateChangeCallback?.('SIGNED_IN', createSession('user-2'));
+    const callback = authStateChangeCallback as MockAuthStateChangeCallback | null;
+    expect(typeof callback).toBe('function');
+    if (typeof callback !== 'function') {
+      throw new Error('Expected auth state change callback');
+    }
+    callback('SIGNED_IN', createSession('user-2'));
     await flushPlugin();
     expect(result?.provide.supabase.user.id).toBe('user-2');
     expect(result?.provide.supabase.user.loggedIn).toBe(true);
@@ -202,10 +206,14 @@ describe('supabase plugin', () => {
     await result?.provide.supabase.signInWithOAuth('github', {
       skipBrowserRedirect: true,
     });
-    const authStateChangeCallback = getAuthStateChangeCallback();
-    expect(authStateChangeCallback).toBeTypeOf('function');
+    const authStateChangeCallback =
+      getAuthStateChangeCallback() as MockAuthStateChangeCallback | null;
+    expect(typeof authStateChangeCallback).toBe('function');
     expect(signInWithOAuth).toHaveBeenCalledTimes(1);
-    authStateChangeCallback?.('SIGNED_IN', createSession('user-2'));
+    if (typeof authStateChangeCallback !== 'function') {
+      throw new Error('Expected auth state change callback');
+    }
+    authStateChangeCallback('SIGNED_IN', createSession('user-2'));
     await flushPlugin();
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('progress-state');
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe('preferences-state');
