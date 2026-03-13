@@ -30,12 +30,12 @@ const i18n = createI18n({
   },
 });
 const colorVariants: Array<{ color: ProgressCardColor; barClass: string }> = [
-  { color: 'primary', barClass: 'bg-primary-500/60' },
-  { color: 'neutral', barClass: 'bg-surface-400/60' },
-  { color: 'info', barClass: 'bg-info-500/60' },
-  { color: 'success', barClass: 'bg-success-500/60' },
-  { color: 'kappa', barClass: 'bg-kappa-500/60' },
-  { color: 'lightkeeper', barClass: 'bg-lightkeeper-500/60' },
+  { color: 'primary', barClass: 'bg-primary-500' },
+  { color: 'neutral', barClass: 'bg-surface-400' },
+  { color: 'info', barClass: 'bg-info-500' },
+  { color: 'success', barClass: 'bg-success-500' },
+  { color: 'kappa', barClass: 'bg-kappa-500' },
+  { color: 'lightkeeper', barClass: 'bg-lightkeeper-500' },
 ];
 const setup = async () => {
   vi.resetModules();

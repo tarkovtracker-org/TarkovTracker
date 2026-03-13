@@ -6,6 +6,8 @@ vi.mock('@/composables/useSafeToast', () => ({
 }));
 vi.mock('@/utils/logger', () => ({
   logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
     warn: vi.fn(),
   },
 }));
