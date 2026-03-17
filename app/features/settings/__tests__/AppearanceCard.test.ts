@@ -1,35 +1,28 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createI18n } from 'vue-i18n';
 import AppearanceCard from '@/features/settings/AppearanceCard.vue';
 const mockPreferencesStore = {
   getThemeMode: 'dark' as 'dark' | 'light',
   setThemeMode: vi.fn(),
 };
-const i18n = createI18n({
-  legacy: false,
-  locale: 'en',
-  missingWarn: false,
-  fallbackWarn: false,
-  messages: {
-    en: {
-      settings: {
-        theme: 'Theme',
-        interface: {
-          appearance: {
-            title: 'Appearance',
-            description: 'Choose your preferred interface theme.',
-            mode: 'Theme mode',
-            light: 'Light',
-            dark: 'Dark',
-          },
-        },
-      },
-    },
-  },
-});
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
+}));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({
+    t: (key: string) =>
+      (
+        ({
+          'settings.interface.appearance.dark': 'Dark',
+          'settings.interface.appearance.description': 'Choose your preferred interface theme.',
+          'settings.interface.appearance.light': 'Light',
+          'settings.interface.appearance.mode': 'Theme mode',
+          'settings.interface.appearance.title': 'Appearance',
+          'settings.theme': 'Theme',
+        }) as const
+      )[key] ?? key,
+  }),
 }));
 describe('AppearanceCard', () => {
   beforeEach(() => {
@@ -39,7 +32,6 @@ describe('AppearanceCard', () => {
   it('renders the current theme mode', () => {
     const wrapper = mount(AppearanceCard, {
       global: {
-        plugins: [i18n],
         stubs: {
           GenericCard: {
             template: '<div><slot name="content" /></div>',
@@ -60,7 +52,6 @@ describe('AppearanceCard', () => {
   it('updates theme mode through preferences store', async () => {
     const wrapper = mount(AppearanceCard, {
       global: {
-        plugins: [i18n],
         stubs: {
           GenericCard: {
             template: '<div><slot name="content" /></div>',
