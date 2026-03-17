@@ -1126,13 +1126,15 @@ export const usePreferencesStore = defineStore('preferences', {
           ) {
             return {};
           }
-          return wrapped.data;
+          return sanitizePersistedPreferencesState(
+            wrapped.data as PersistedPreferencesStateWithLegacy
+          );
         }
         const legacyState = parseLegacyPersistedPreferencesState(value);
         if (!legacyState) {
           return {};
         }
-        return legacyState;
+        return sanitizePersistedPreferencesState(legacyState);
       },
     },
     // Pick specific properties to persist (excluding transient state)

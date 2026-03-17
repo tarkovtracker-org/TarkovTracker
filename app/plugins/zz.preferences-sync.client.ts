@@ -105,8 +105,11 @@ const applyPreferencesRow = (
         continue;
       }
       if (camelKey === 'themeMode') {
-        (preferencesStore.$state as unknown as Record<string, unknown>)[camelKey] =
-          normalizeThemeMode(value) ?? 'dark';
+        const normalizedThemeMode = normalizeThemeMode(value);
+        if (normalizedThemeMode) {
+          (preferencesStore.$state as unknown as Record<string, unknown>)[camelKey] =
+            normalizedThemeMode;
+        }
         continue;
       }
       (preferencesStore.$state as unknown as Record<string, unknown>)[camelKey] = value;

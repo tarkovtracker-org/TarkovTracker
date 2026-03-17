@@ -85,7 +85,7 @@
     @blur="onBlur"
     @keydown="onKeydown"
   >
-    <Handle type="target" :position="Position.Top" class="!bg-foreground-disabled !h-2 !w-2" />
+    <Handle type="target" :position="Position.Top" class="bg-foreground-disabled! h-2! w-2!" />
     <div
       v-if="positionIndicator === 'root' || positionIndicator === 'standalone'"
       class="absolute -top-6 left-1/2 -translate-x-1/2"
@@ -135,6 +135,6 @@
         {{ data.traderName }}
       </span>
     </div>
-    <Handle type="source" :position="Position.Bottom" class="!bg-foreground-disabled !h-2 !w-2" />
+    <Handle type="source" :position="Position.Bottom" class="bg-foreground-disabled! h-2! w-2!" />
   </div>
 </template>

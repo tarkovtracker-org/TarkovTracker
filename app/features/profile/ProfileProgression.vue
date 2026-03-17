@@ -306,7 +306,7 @@
   }
   const MODE_THEMES: Record<GameMode, ModeTheme> = {
     pvp: {
-      heroBackdrop: 'bg-gradient-to-r from-pvp-900 via-primary-900/35 to-surface-900',
+      heroBackdrop: 'bg-linear-to-r from-pvp-900 via-primary-900/35 to-surface-900',
       icon: 'i-mdi-sword-cross',
       iconTint: 'text-pvp-300',
       label: 'PvP',
@@ -315,7 +315,7 @@
       timelineHighlight: 'pvp',
     },
     pve: {
-      heroBackdrop: 'bg-gradient-to-r from-pve-900 via-secondary-900/35 to-surface-900',
+      heroBackdrop: 'bg-linear-to-r from-pve-900 via-secondary-900/35 to-surface-900',
       icon: 'i-mdi-account-group',
       iconTint: 'text-pve-300',
       label: 'PvE',

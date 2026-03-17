@@ -11,7 +11,7 @@
       ]"
     ></div>
     <div
-      class="via-border-strong/80 pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent"
+      class="via-border-strong/80 pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent to-transparent"
     ></div>
     <div
       class="relative grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:p-6"

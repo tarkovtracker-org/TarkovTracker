@@ -74,7 +74,7 @@
       <!-- Hover action buttons - covers entire row -->
       <div
         v-if="showActions && (props.devLink || props.wikiLink)"
-        class="bg-panel/95 shadow-card absolute inset-0 flex items-center justify-center gap-2 rounded opacity-0 backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+        class="bg-panel/95 shadow-card pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded opacity-0 backdrop-blur-sm transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
       >
         <AppTooltip v-if="props.devLink" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
           <a
