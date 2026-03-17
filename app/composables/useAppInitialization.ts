@@ -1,4 +1,3 @@
-import { useI18n } from 'vue-i18n';
 import { useToastI18n } from '@/composables/useToastI18n';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -18,6 +17,7 @@ export function useAppInitialization() {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  useThemeMode();
   const { availableLocales, locale, setLocale } = useI18n({ useScope: 'global' });
   const { showLoadFailed } = useToastI18n();
   const isAvailableLocale = (value: string): value is typeof locale.value =>

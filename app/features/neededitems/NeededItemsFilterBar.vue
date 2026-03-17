@@ -7,14 +7,14 @@
       :content="false"
       color="neutral"
       variant="link"
-      class="bg-surface-900 rounded-lg border border-white/12 px-3 py-2.5 shadow-sm sm:px-4 sm:py-3"
+      class="bg-panel border-border shadow-card rounded-lg border px-3 py-2.5 sm:px-4 sm:py-3"
       :ui="{
         root: 'w-full',
         list: 'flex flex-wrap items-center justify-center gap-1 border-b-0 p-0 sm:gap-2',
         indicator: 'hidden',
         leadingIcon: 'h-4 w-4 sm:h-5 sm:w-5',
         trigger:
-          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white rounded-none border-b-2 border-transparent px-2 sm:px-3',
+          'data-[state=active]:border-border-strong data-[state=active]:bg-selected-surface data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-2 sm:px-3',
       }"
     >
       <template #default="{ item }">
@@ -24,7 +24,7 @@
           </span>
           <span
             :class="[
-              'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+              'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
               item.badgeClass,
             ]"
           >
@@ -35,7 +35,7 @@
     </UTabs>
     <!-- Unified Filter Bar: Search + Filters + Views -->
     <div
-      class="bg-surface-900 flex flex-col gap-3 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:px-4 sm:py-3"
+      class="bg-panel border-border shadow-card flex flex-col gap-3 rounded-lg border px-3 py-3 sm:flex-row sm:items-center sm:px-4 sm:py-3"
     >
       <!-- Search (grows to fill space) -->
       <div class="flex-1">
@@ -75,7 +75,7 @@
           </template>
           <template v-else>{{ totalCount }} {{ $t('page.needed_items.items') }}</template>
         </UBadge>
-        <div class="hidden h-6 w-px bg-white/10 sm:block" />
+        <div class="bg-border-muted hidden h-6 w-px sm:block" />
         <SelectMenuFixed
           v-model="selectedSortBy"
           :items="sortOptions"
@@ -103,7 +103,7 @@
           @click="toggleSortDirection"
         />
         <!-- Divider (hidden on mobile) -->
-        <div class="hidden h-6 w-px bg-white/10 sm:block" />
+        <div class="bg-border-muted hidden h-6 w-px sm:block" />
         <!-- View Mode Buttons -->
         <div class="flex items-center gap-1">
           <UButton
@@ -136,7 +136,7 @@
           <!-- Card Style Toggle (Only visible in Grid View and not Grouped) -->
           <div
             v-if="!groupByItem && viewMode === 'grid'"
-            class="ml-1 border-l border-white/10 pl-1"
+            class="border-border-muted ml-1 border-l pl-1"
           >
             <UButton
               :icon="cardStyle === 'compact' ? 'i-mdi-image' : 'i-mdi-image-text'"
@@ -165,7 +165,11 @@
             icon="i-mdi-cog"
             :aria-label="t('page.needed_items.settings.title', 'Needed Items Settings')"
             :aria-pressed="isSettingsDrawerOpen"
-            :class="isSettingsDrawerOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              isSettingsDrawerOpen
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="toggleSettingsDrawer"
           >
             <UBadge v-if="activeFiltersCount > 0" color="primary" variant="soft" size="sm">
@@ -238,10 +242,12 @@
         return 'bg-success-500';
       case 'tasks':
       case 'hideout':
-        return tab.count > 0 ? 'bg-info-500' : 'bg-surface-600';
+        return tab.count > 0 ? 'bg-info-500 text-white' : 'bg-field text-foreground-muted';
       case 'all':
       default:
-        return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600';
+        return tab.count > 0
+          ? 'bg-selected-surface text-foreground'
+          : 'bg-field text-foreground-muted';
     }
   };
   const filterTabItems = computed(() => {

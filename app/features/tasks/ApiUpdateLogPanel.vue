@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-surface-800/50 mb-4 rounded-lg p-4">
+  <div class="bg-panel border-border shadow-card mb-4 rounded-lg border p-4">
     <div class="mb-3 flex items-start justify-between gap-3">
       <div class="min-w-0">
         <div class="flex items-center gap-2">
@@ -8,11 +8,11 @@
           >
             <UIcon name="i-mdi-sync" class="text-info-300 h-4 w-4" />
           </span>
-          <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
+          <h3 class="text-foreground truncate text-lg leading-tight font-semibold">
             {{ translateApiUpdateLog('title', 'Recent Sync History') }}
           </h3>
         </div>
-        <p class="text-surface-400 mt-1 text-xs sm:text-sm">
+        <p class="text-foreground-subtle mt-1 text-xs sm:text-sm">
           {{
             translateApiUpdateLog(
               'subtitle',
@@ -47,7 +47,7 @@
       leave-to-class="opacity-0 -translate-y-1"
     >
       <div v-show="isExpanded" :id="panelContentId">
-        <div v-if="historyEntries.length === 0" class="text-surface-400 text-xs sm:text-sm">
+        <div v-if="historyEntries.length === 0" class="text-foreground-subtle text-xs sm:text-sm">
           {{
             translateApiUpdateLog(
               'empty',
@@ -59,17 +59,20 @@
           <div
             v-for="entry in historyEntries"
             :key="entry.id"
-            class="border-surface-700/70 bg-surface-800/55 rounded-md border p-3"
+            class="bg-field border-border-muted rounded-md border p-3"
           >
             <div class="flex items-center justify-between gap-2">
-              <span class="text-surface-200 text-xs font-medium">
+              <span class="text-foreground text-xs font-medium">
                 {{ formatTimestamp(entry.at) }}
               </span>
               <UBadge color="info" variant="soft" size="xs">
                 {{ getEntryCountLabel(entry) }}
               </UBadge>
             </div>
-            <p v-if="getTaskCount(entry) === 0" class="text-surface-400 mt-2 text-xs sm:text-sm">
+            <p
+              v-if="getTaskCount(entry) === 0"
+              class="text-foreground-subtle mt-2 text-xs sm:text-sm"
+            >
               {{ translateApiUpdateLog('no_task_details', 'Progress synced successfully.') }}
             </p>
             <div
@@ -79,13 +82,13 @@
               <button
                 v-for="task in getEntryTasks(entry).slice(0, 3)"
                 :key="task.id"
-                class="text-surface-300 hover:text-primary-400 underline decoration-dotted underline-offset-2 transition-colors"
+                class="text-foreground-muted hover:text-primary-500 underline decoration-dotted underline-offset-2 transition-colors"
                 @click="navigateToTask(task.id)"
               >
                 {{ metadataStore.getTaskById(task.id)?.name ?? task.id }}
-                <span class="text-surface-400">{{ getStateLabel(task.state) }}</span>
+                <span class="text-foreground-subtle">{{ getStateLabel(task.state) }}</span>
               </button>
-              <span v-if="getRemainingTaskCount(entry) > 0" class="text-surface-400 text-xs">
+              <span v-if="getRemainingTaskCount(entry) > 0" class="text-foreground-subtle text-xs">
                 {{
                   translateApiUpdateLog('more_tasks', `+${getRemainingTaskCount(entry)} more`, {
                     count: getRemainingTaskCount(entry),

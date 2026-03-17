@@ -27,7 +27,7 @@
     </template>
     <template #content>
       <div class="space-y-4 px-4 py-4">
-        <p class="text-surface-400 text-xs">
+        <p class="text-foreground-muted text-xs">
           {{
             $t(
               'settings.skills.explanation',
@@ -42,7 +42,7 @@
           <div
             v-for="skill in visibleSkills"
             :key="skill.key"
-            class="border-surface-700 rounded-lg border p-3"
+            class="border-border bg-panel rounded-lg border p-3"
           >
             <div class="mb-2 flex items-center gap-2">
               <div class="group relative shrink-0">
@@ -55,14 +55,14 @@
                 />
                 <div
                   v-else
-                  class="bg-surface-700 flex h-10 w-10 items-center justify-center rounded text-xs"
+                  class="bg-shell text-foreground-muted flex h-10 w-10 items-center justify-center rounded text-xs"
                 >
                   ?
                 </div>
               </div>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1">
-                  <span class="text-surface-100 truncate text-sm font-semibold">
+                  <span class="text-foreground truncate text-sm font-semibold">
                     {{ formatSkillName(skill.name) }}
                   </span>
                   <UTooltip
@@ -82,7 +82,7 @@
                     </UBadge>
                   </UTooltip>
                 </div>
-                <div class="text-surface-400 truncate text-xs">
+                <div class="text-foreground-muted truncate text-xs">
                   <span v-if="skill.requiredByTasks.length > 0">
                     {{ $t('settings.skills.req_count') }} {{ skill.requiredByTasks.length }}
                   </span>
@@ -102,23 +102,23 @@
                 class="shrink-0 text-lg font-bold"
                 :class="
                   getSkillLevel(skill.key) >= MAX_SKILL_LEVEL
-                    ? 'text-warning-500'
-                    : 'text-primary-400'
+                    ? 'text-warning-700'
+                    : 'text-primary-600'
                 "
               >
                 {{ getDisplayLevel(skill.key) }}
               </span>
             </div>
             <div class="mb-2 flex gap-3 text-xs">
-              <div class="text-surface-400 flex-1">
+              <div class="text-foreground-muted flex-1">
                 {{ $t('settings.skills.quest') }}
-                <span class="text-surface-200 font-medium">
+                <span class="text-foreground font-medium">
                   {{ getQuestSkillLevel(skill.key) }}
                 </span>
               </div>
-              <div class="text-surface-400 flex-1">
+              <div class="text-foreground-muted flex-1">
                 {{ $t('settings.skills.offset') }}
-                <span class="text-surface-200 font-medium">{{ getSkillOffset(skill.key) }}</span>
+                <span class="text-foreground font-medium">{{ getSkillOffset(skill.key) }}</span>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -165,7 +165,10 @@
             @click="showAllSkills = !showAllSkills"
           />
         </div>
-        <div v-if="allGameSkills.length === 0" class="text-surface-400 py-6 text-center text-sm">
+        <div
+          v-if="allGameSkills.length === 0"
+          class="text-foreground-muted py-6 text-center text-sm"
+        >
           {{ $t('settings.skills.no_skills') }}
         </div>
       </div>
@@ -174,7 +177,6 @@
 </template>
 <script setup lang="ts">
   import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
-  import { useI18n } from 'vue-i18n';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useSkillCalculation } from '@/composables/useSkillCalculation';
   import { usePreferencesStore } from '@/stores/usePreferences';

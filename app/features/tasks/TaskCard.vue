@@ -13,17 +13,14 @@
       :is-locked="isLocked"
       :is-invalid="isInvalid"
     />
-    <div
-      class="relative z-10 flex h-full flex-col"
-      :class="{ 'opacity-80': isComplete && !isFailed }"
-    >
+    <div class="relative z-10 flex h-full flex-col" :style="completeContentStyle">
       <!-- 1) Identity + Header (Padded) -->
       <div
-        class="hover:bg-surface-700/20 flex flex-col"
+        class="hover:bg-interactive flex flex-col"
         :class="[
           compactClasses.header,
           onMapView
-            ? 'focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
+            ? 'focus-visible:ring-primary-500/40 focus-visible:ring-offset-panel cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             : '',
         ]"
         :aria-expanded="taskExpanded"
@@ -92,11 +89,11 @@
           </div>
         </div>
         <!-- Extra Info Strips (padded area) -->
-        <div v-if="lockedBefore > 0" class="text-surface-400 text-xs">
-          <span class="text-surface-500">{{ t('page.tasks.questcard.requires') }}:</span>
+        <div v-if="lockedBefore > 0" class="text-foreground-subtle text-xs">
+          <span class="text-foreground-disabled">{{ t('page.tasks.questcard.requires') }}:</span>
           <template v-if="useCompactRequires">
             <AppTooltip :text="compactRequiresTooltip">
-              <span class="text-surface-300 ml-2">
+              <span class="text-foreground-muted ml-2">
                 {{
                   t(
                     'page.tasks.questcard.requires_progress',
@@ -117,11 +114,11 @@
                 <span class="inline-flex items-center gap-1.5">
                   <router-link
                     :to="`/tasks?task=${parent.id}`"
-                    class="text-surface-200 text-[11px] underline decoration-white/30 underline-offset-2 hover:decoration-white/60"
+                    class="text-foreground decoration-border-strong hover:decoration-primary-500/60 text-[11px] underline underline-offset-2"
                   >
                     <span class="truncate">{{ parent.name }}</span>
                   </router-link>
-                  <span class="text-surface-500 text-[11px]">
+                  <span class="text-foreground-disabled text-[11px]">
                     {{
                       t(
                         'page.tasks.questcard.requires_must_be',
@@ -146,21 +143,27 @@
                   </span>
                 </span>
               </AppTooltip>
-              <span v-if="extraPendingParentsCount > 0" class="text-surface-500">
+              <span v-if="extraPendingParentsCount > 0" class="text-foreground-disabled">
                 +{{ extraPendingParentsCount }}
               </span>
             </span>
           </template>
           <template v-else>
-            <span class="text-surface-300 ml-2">{{ lockedBefore }}</span>
+            <span class="text-foreground-muted ml-2">{{ lockedBefore }}</span>
           </template>
         </div>
         <div
           v-if="isFailed || isInvalid"
           class="text-xs"
-          :class="isFailed ? 'text-error-300' : 'text-surface-300'"
+          :class="
+            isFailed ? 'text-[color:var(--color-failed-text-muted)]' : 'text-foreground-muted'
+          "
         >
-          <span :class="isFailed ? 'text-error-200/70' : 'text-surface-500'">
+          <span
+            :class="
+              isFailed ? 'text-[color:var(--color-failed-text-muted)]' : 'text-foreground-disabled'
+            "
+          >
             {{
               isFailed
                 ? t('page.tasks.questcard.failed_because')
@@ -179,15 +182,19 @@
                     :to="`/tasks?task=${source.id}`"
                     :class="
                       isFailed
-                        ? 'text-error-200 decoration-error-400/40 hover:decoration-error-400/70'
-                        : 'text-surface-200 decoration-white/30 hover:decoration-white/60'
+                        ? 'decoration-error-500/35 hover:decoration-error-500/60 text-[color:var(--color-failed-link)]'
+                        : 'text-foreground decoration-border-strong hover:decoration-primary-500/60'
                     "
                     class="text-[11px] underline underline-offset-2"
                   >
                     {{ source.name }}
                   </router-link>
                   <span
-                    :class="isFailed ? 'text-error-300' : 'text-surface-400'"
+                    :class="
+                      isFailed
+                        ? 'text-[color:var(--color-failed-text-muted)]'
+                        : 'text-foreground-subtle'
+                    "
                     class="text-[11px]"
                   >
                     {{
@@ -212,7 +219,13 @@
               </AppTooltip>
             </span>
           </template>
-          <span v-else class="ml-2" :class="isFailed ? 'text-error-200/80' : 'text-surface-400'">
+          <span
+            v-else
+            class="ml-2"
+            :class="
+              isFailed ? 'text-[color:var(--color-failed-text-muted)]' : 'text-foreground-subtle'
+            "
+          >
             {{
               isFailed
                 ? t('page.tasks.questcard.failed_because_unknown')
@@ -220,8 +233,8 @@
             }}
           </span>
         </div>
-        <div v-if="showNeededBy" class="text-surface-400 text-xs">
-          <span class="text-surface-500">
+        <div v-if="showNeededBy" class="text-foreground-subtle text-xs">
+          <span class="text-foreground-disabled">
             <UIcon name="i-mdi-account-multiple-outline" class="mr-1 inline h-4 w-4" />
             {{
               t(
@@ -245,10 +258,10 @@
         <div
           v-if="taskExpanded"
           :id="`task-content-${task.id}`"
-          class="border-surface-700/50 border-t"
+          class="border-border-muted border-t"
         >
           <div
-            class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex cursor-pointer items-center justify-between rounded-sm transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            class="hover:bg-interactive focus-visible:ring-primary-500/40 focus-visible:ring-offset-panel flex cursor-pointer items-center justify-between rounded-sm transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             :class="compactClasses.objectivesToggle"
             role="button"
             tabindex="0"
@@ -258,7 +271,7 @@
             @keydown.enter.prevent="toggleObjectivesVisibility"
             @keydown.space.prevent="toggleObjectivesVisibility"
           >
-            <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
+            <div class="text-foreground-subtle text-[10px] font-bold tracking-wider uppercase">
               {{ t('page.tasks.questcard.objectives') }}
             </div>
             <div class="flex items-center gap-2">
@@ -272,7 +285,7 @@
                     size="xs"
                     color="neutral"
                     variant="soft"
-                    class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
+                    class="text-foreground-muted hover:text-foreground cursor-pointer text-[10px] tracking-normal normal-case"
                     :disabled="!canResetTaskItemCounts"
                     :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
                     @click.stop="confirmResetTaskItemCounts"
@@ -397,7 +410,6 @@
   </UCard>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import ContextMenu from '@/components/ui/ContextMenu.vue';
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
@@ -717,12 +729,20 @@
     return EDITION_SHORT_NAMES[minExclusiveEdition.value.title] || minExclusiveEdition.value.title;
   });
   const taskClasses = computed(() => {
-    if (isComplete.value && !isFailed.value) return 'border-completed-600/25 bg-surface-900';
-    if (isFailed.value) return 'border-error-600/50 bg-error-950';
-    if (isInvalid.value) return 'border-surface-700/40 bg-surface-900 opacity-60';
-    if (isLocked.value) return 'border-surface-700/40 bg-surface-900';
-    return 'border-surface-700/40 bg-surface-900';
+    if (isComplete.value && !isFailed.value) {
+      return 'border-[color:var(--color-completed-border)] bg-[var(--color-completed-surface)]';
+    }
+    if (isFailed.value)
+      return 'border-[color:var(--color-failed-border)] bg-[var(--color-failed-surface)]';
+    if (isInvalid.value) return 'border-border-muted bg-panel opacity-60';
+    if (isLocked.value) return 'border-border-muted bg-panel';
+    return 'border-border bg-panel';
   });
+  const completeContentStyle = computed(() =>
+    isComplete.value && !isFailed.value
+      ? { opacity: 'var(--theme-completed-content-opacity)' }
+      : undefined
+  );
   const accentClasses = computed(() => {
     if (props.accentVariant === 'global') {
       const border = 'border-l-4 border-l-info-400';

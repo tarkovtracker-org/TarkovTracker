@@ -10,7 +10,7 @@
     <template #content>
       <div class="px-4 py-4">
         <div class="flex items-center justify-between gap-3">
-          <p class="text-surface-400 text-sm">
+          <p class="text-foreground-muted text-sm">
             {{ $t('settings.general.privacy_mode_hint') }}
           </p>
           <USwitch

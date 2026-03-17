@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col divide-y divide-white/5">
+  <div class="divide-border-muted flex flex-col divide-y">
     <div v-for="row in rows" :key="row.key" class="py-2">
       <TaskObjectiveItemGroup
         v-if="row.kind === 'itemGroup'"
@@ -24,7 +24,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import TaskObjective from '@/features/tasks/TaskObjective.vue';
   import TaskObjectiveItemGroup from '@/features/tasks/TaskObjectiveItemGroup.vue';
   import type { TaskObjective as TaskObjectiveType } from '@/types/tarkov';

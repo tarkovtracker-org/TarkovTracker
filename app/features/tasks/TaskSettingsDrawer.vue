@@ -5,7 +5,7 @@
     :role="isOverlayMode ? 'dialog' : 'complementary'"
     :aria-modal="isOverlayMode ? 'true' : undefined"
     aria-labelledby="task-settings-drawer-title"
-    class="bg-surface-800/95 w-72 overflow-y-auto rounded-lg border border-white/10 p-4 shadow-xl backdrop-blur-sm"
+    class="bg-panel border-border shadow-elevated w-72 overflow-y-auto rounded-lg border p-4 backdrop-blur-sm"
     :class="
       isOverlayMode
         ? 'fixed top-1/2 right-4 z-40 h-fit max-h-[calc(100vh-6rem)] -translate-y-1/2'
@@ -14,7 +14,7 @@
     @keydown="handleKeydown"
   >
     <div class="mb-3 flex items-center justify-between">
-      <h2 id="task-settings-drawer-title" class="text-sm font-semibold text-white">
+      <h2 id="task-settings-drawer-title" class="text-foreground text-sm font-semibold">
         {{ t('page.tasks.settings.title') }}
       </h2>
       <UButton
@@ -84,11 +84,11 @@
             <div class="bg-warning-500/15 rounded-full p-2">
               <UIcon name="i-mdi-alert" class="text-warning-400 h-5 w-5" />
             </div>
-            <h3 class="text-surface-100 text-base font-semibold">
+            <h3 class="text-foreground text-base font-semibold">
               {{ t('page.tasks.settings.advanced.repair_failed') }}
             </h3>
           </div>
-          <p class="text-surface-300 mb-5 text-sm">
+          <p class="text-foreground-muted mb-5 text-sm">
             {{ t('page.tasks.settings.advanced.repair_failed_confirm') }}
           </p>
           <div class="flex justify-end gap-2">
@@ -105,7 +105,6 @@
   </aside>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useTaskRepair } from '@/composables/useTaskRepair';
   import { useTaskSettingsDrawer } from '@/composables/useTaskSettingsDrawer';
   import AdvancedTasksSection from '@/features/tasks/AdvancedTasksSection.vue';

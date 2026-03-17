@@ -135,6 +135,7 @@ describe('usePreferencesStore', () => {
     it('should initialize other settings with correct defaults', () => {
       const store = usePreferencesStore();
       expect(store.localeOverride).toBeNull();
+      expect(store.themeMode).toBe('dark');
       expect(store.useAutomaticLevelCalculation).toBe(false);
       expect(store.dashboardNoticeDismissed).toBe(false);
       expect(store.skillSortMode).toBeNull();
@@ -159,6 +160,7 @@ describe('usePreferencesStore', () => {
     it('serializes reactive store state without throwing', () => {
       const store = usePreferencesStore();
       store.localeOverride = 'de';
+      store.themeMode = 'light';
       store.saving.streamerMode = true;
       let persistedState: ReturnType<typeof getPersistedPreferencesState> | null = null;
       expect(() => {
@@ -167,9 +169,17 @@ describe('usePreferencesStore', () => {
       expect(persistedState).toEqual(
         expect.objectContaining({
           localeOverride: 'de',
+          themeMode: 'light',
         })
       );
       expect(persistedState).not.toHaveProperty('saving');
+    });
+    it('sanitizes invalid persisted theme mode values', () => {
+      localStorageMock.getItem.mockReturnValue(JSON.stringify({ themeMode: 'sepia' }));
+      const newPinia = createPinia();
+      setActivePinia(newPinia);
+      const store = usePreferencesStore();
+      expect(store.themeMode).toBe('dark');
     });
     it('should migrate onlyTasksWithSuggestedKeys to onlyTasksWithRequiredKeys', () => {
       const persistedState = {
@@ -272,7 +282,9 @@ describe('usePreferencesStore', () => {
     });
     it('hydrates legacy preferences for authenticated users and re-scopes them', () => {
       currentUserId.value = 'user-1';
-      localStorageMock.getItem.mockReturnValue(JSON.stringify({ localeOverride: 'de' }));
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify({ localeOverride: 'de', themeMode: 'light' })
+      );
       const newPinia = createPinia();
       setActivePinia(newPinia);
       const store = usePreferencesStore();
@@ -281,11 +293,13 @@ describe('usePreferencesStore', () => {
         .map(([, value]) => JSON.parse(value))
         .find((value) => value?._userId === 'user-1');
       expect(store.localeOverride).toBe('de');
+      expect(store.themeMode).toBe('light');
       expect(persistedValue).toBeTruthy();
       expect(persistedValue).toMatchObject({
         _userId: 'user-1',
         data: {
           localeOverride: 'de',
+          themeMode: 'light',
         },
       });
     });
@@ -388,12 +402,14 @@ describe('usePreferencesStore', () => {
       (store.mapMarkerColors as Record<string, string>).LEGACY = '#000000';
       store.replacePersistedState({
         localeOverride: 'de',
+        themeMode: 'light',
         mapMarkerColors: {
           ...MAP_MARKER_COLORS,
           SELF_OBJECTIVE: '#123456',
         },
       });
       expect(store.localeOverride).toBe('de');
+      expect(store.themeMode).toBe('light');
       expect(store.teamHide).toEqual({});
       expect(store.mapMarkerColors).toEqual({
         ...MAP_MARKER_COLORS,
@@ -815,6 +831,12 @@ describe('usePreferencesStore', () => {
       store.localeOverride = 'de';
       expect(store.getLocaleOverride).toBe('de');
     });
+    it('should return themeMode state with dark fallback', () => {
+      const store = usePreferencesStore();
+      expect(store.getThemeMode).toBe('dark');
+      store.themeMode = 'light';
+      expect(store.getThemeMode).toBe('light');
+    });
     it('should return useAutomaticLevelCalculation state', () => {
       const store = usePreferencesStore();
       expect(store.getUseAutomaticLevelCalculation).toBe(false);
@@ -1070,6 +1092,11 @@ describe('usePreferencesStore', () => {
       store.localeOverride = 'de';
       store.setLocaleOverride(null);
       expect(store.localeOverride).toBeNull();
+    });
+    it('should set theme mode', () => {
+      const store = usePreferencesStore();
+      store.setThemeMode('light');
+      expect(store.themeMode).toBe('light');
     });
   });
   describe('Actions - Task Filters', () => {
@@ -1424,6 +1451,7 @@ describe('usePreferencesStore', () => {
       expect(preferencesDefaultState.taskTeamHideAll).toBe(false);
       expect(preferencesDefaultState.showNonSpecialTasks).toBe(true);
       expect(preferencesDefaultState.taskCardDensity).toBe('compact');
+      expect(preferencesDefaultState.themeMode).toBe('dark');
     });
     it('should have saving state in default state', () => {
       expect(preferencesDefaultState.saving).toBeDefined();

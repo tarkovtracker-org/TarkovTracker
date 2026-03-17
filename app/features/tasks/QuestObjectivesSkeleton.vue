@@ -1,13 +1,13 @@
 <template>
-  <div class="flex flex-col divide-y divide-white/5" aria-hidden="true">
+  <div class="divide-border-muted flex flex-col divide-y" aria-hidden="true">
     <div v-for="row in rows" :key="row" class="py-2">
       <div class="flex items-start gap-4 rounded-md px-2 py-2">
-        <div class="mt-0.5 h-4 w-4 animate-pulse rounded bg-white/10" />
+        <div class="bg-shell mt-0.5 h-4 w-4 animate-pulse rounded" />
         <div class="flex-1 space-y-2">
-          <div class="h-3 w-3/4 animate-pulse rounded bg-white/10" />
-          <div class="h-3 w-1/2 animate-pulse rounded bg-white/10" />
+          <div class="bg-shell h-3 w-3/4 animate-pulse rounded" />
+          <div class="bg-shell h-3 w-1/2 animate-pulse rounded" />
         </div>
-        <div class="h-7 w-7 rounded-md border border-white/10 bg-white/5" />
+        <div class="bg-shell border-border-muted h-7 w-7 rounded-md border" />
       </div>
     </div>
   </div>

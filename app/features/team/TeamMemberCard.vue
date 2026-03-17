@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-surface-850 rounded-lg border border-white/10 p-4 shadow-md sm:p-6">
+  <div class="bg-panel border-border shadow-card rounded-lg border p-4 sm:p-6">
     <div class="space-y-4">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
@@ -24,7 +24,7 @@
             alt="Level badge"
           />
           <div class="text-center">
-            <div class="text-surface-400 text-xs tracking-wide uppercase">
+            <div class="text-foreground-subtle text-xs tracking-wide uppercase">
               {{ $t('navigation_drawer.level') }}
             </div>
             <div class="mt-1 text-3xl leading-none font-bold sm:text-4xl">
@@ -33,7 +33,7 @@
           </div>
         </div>
       </div>
-      <div class="border-surface-700 flex items-center justify-between border-t pt-2">
+      <div class="border-border flex items-center justify-between border-t pt-2">
         <div class="text-sm">
           <i18n-t
             v-if="!preferencesStore.teamIsHidden(props.teammember)"

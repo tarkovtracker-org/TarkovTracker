@@ -11,7 +11,7 @@
       <div
         v-for="station in stationProgress"
         :key="station.id"
-        class="bg-surface-900 rounded-lg border border-white/10 p-3"
+        class="bg-panel border-border rounded-lg border p-3"
       >
         <div class="mb-2 flex items-center gap-2">
           <NuxtImg
@@ -23,14 +23,14 @@
             sizes="32px"
             class="h-8 w-8 rounded-md"
           />
-          <div v-else class="bg-surface-800 flex h-8 w-8 items-center justify-center rounded-md">
-            <UIcon name="i-mdi-home-city-outline" class="text-surface-400 h-5 w-5" />
+          <div v-else class="bg-shell flex h-8 w-8 items-center justify-center rounded-md">
+            <UIcon name="i-mdi-home-city-outline" class="text-foreground-muted h-5 w-5" />
           </div>
           <div class="min-w-0 flex-1">
-            <div class="text-surface-100 truncate text-sm font-semibold">
+            <div class="text-foreground truncate text-sm font-semibold">
               {{ station.name }}
             </div>
-            <div class="text-surface-400 text-xs">
+            <div class="text-foreground-muted text-xs">
               {{ t('page.profile.hideout_level') }} {{ station.completed }}/{{ station.total }}
             </div>
           </div>
@@ -40,7 +40,7 @@
             class="text-success-400 h-5 w-5 shrink-0"
           />
         </div>
-        <div class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full">
+        <div class="bg-field h-1.5 overflow-hidden rounded-full">
           <div
             class="h-full rounded-full transition-[width] duration-300"
             :class="

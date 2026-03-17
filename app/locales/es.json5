@@ -1179,6 +1179,7 @@
   settings: {
     title: 'Configuración',
     locale: 'Idioma',
+    theme: 'Theme',
     tabs: {
       gameplay: 'Jugabilidad',
       interface: 'Interfaz',
@@ -1202,6 +1203,13 @@
     },
     interface: {
       title: 'Personalización de interfaz',
+      appearance: {
+        title: 'Apariencia',
+        description: 'Elige tu tema de interfaz preferido.',
+        mode: 'Modo de tema',
+        light: 'Claro',
+        dark: 'Oscuro',
+      },
       tasks: {
         title: 'Tarjetas de tareas',
         show_required: 'Mostrar etiquetas requeridas',
@@ -1688,4 +1696,3 @@
     close_button: 'Cerrar',
   },
 }
-

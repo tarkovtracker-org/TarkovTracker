@@ -53,6 +53,8 @@ export type TaskFilterPreset = {
   name: string;
   settings: TaskFilterSettings;
 };
+export type ThemeMode = 'dark' | 'light';
+const THEME_MODES = ['dark', 'light'] as const;
 // Define the state structure
 export interface PreferencesState {
   streamerMode: boolean;
@@ -94,6 +96,7 @@ export interface PreferencesState {
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
   localeOverride: string | null;
+  themeMode: ThemeMode;
   // Task filter settings
   showNonSpecialTasks: boolean;
   showLightkeeperTasks: boolean;
@@ -174,6 +177,7 @@ export const preferencesDefaultState: PreferencesState = {
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
   localeOverride: null,
+  themeMode: 'dark',
   // Task filter settings (all shown by default)
   showNonSpecialTasks: true,
   showLightkeeperTasks: true,
@@ -244,6 +248,12 @@ const sanitizePersistedPreferencesState = (
   const sanitizedState = clonePreferencesSnapshot(
     persistedState
   ) as PersistedPreferencesStateWithLegacy;
+  if (
+    typeof sanitizedState.themeMode !== 'string' ||
+    !THEME_MODES.includes(sanitizedState.themeMode as ThemeMode)
+  ) {
+    delete sanitizedState.themeMode;
+  }
   const legacyHideCollected = (sanitizedState as Record<string, unknown>)
     .neededItemsHideCollected as boolean | undefined;
   if (
@@ -549,6 +559,9 @@ export const usePreferencesStore = defineStore('preferences', {
     getLocaleOverride: (state) => {
       return state.localeOverride ?? null;
     },
+    getThemeMode: (state) => {
+      return state.themeMode ?? 'dark';
+    },
     // Task filter getters
     getShowNonSpecialTasks: (state) => {
       return state.showNonSpecialTasks ?? true;
@@ -790,6 +803,9 @@ export const usePreferencesStore = defineStore('preferences', {
     setLocaleOverride(locale: string | null) {
       this.localeOverride = locale;
     },
+    setThemeMode(themeMode: ThemeMode) {
+      this.themeMode = themeMode;
+    },
     // Task filter actions
     setShowNonSpecialTasks(show: boolean) {
       this.showNonSpecialTasks = show;
@@ -953,6 +969,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'neededitemsStyle',
       'hideoutPrimaryView',
       'localeOverride',
+      'themeMode',
       // Task filter settings
       'showNonSpecialTasks',
       'showLightkeeperTasks',

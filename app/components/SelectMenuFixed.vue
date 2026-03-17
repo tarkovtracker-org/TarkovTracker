@@ -51,17 +51,17 @@
     }, '');
   };
   const defaultUi = {
-    base: 'bg-surface-900 border border-surface-700 rounded-md px-3 py-2 cursor-pointer ring-0 outline-none',
-    leading: 'shrink-0 text-surface-300',
-    trailing: 'shrink-0 text-surface-400',
-    value: 'text-surface-100',
-    placeholder: 'text-surface-500',
+    base: 'cursor-pointer rounded-md border border-border bg-field px-3 py-2 ring-0 outline-none',
+    leading: 'shrink-0 text-foreground-muted',
+    trailing: 'shrink-0 text-foreground-subtle',
+    value: 'text-foreground',
+    placeholder: 'text-foreground-subtle',
     content:
-      'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] !w-[var(--reka-combobox-trigger-width)]',
+      'z-[9999] !w-[var(--reka-combobox-trigger-width)] rounded-lg border border-border bg-panel shadow-elevated',
     viewport: 'p-1 max-h-60 overflow-y-auto',
-    item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
+    item: 'cursor-pointer rounded px-3 py-2 text-sm text-foreground-muted transition-colors data-[highlighted]:bg-interactive data-[highlighted]:text-foreground data-[state=checked]:bg-selected-surface data-[state=checked]:font-medium data-[state=checked]:text-foreground',
     itemLabel: 'whitespace-nowrap',
-    itemTrailingIcon: 'text-surface-400 shrink-0',
+    itemTrailingIcon: 'shrink-0 text-foreground-subtle',
   };
   const mergedUi = computed(() => {
     const attrsUi = (attrs.ui as Record<string, string>) || {};

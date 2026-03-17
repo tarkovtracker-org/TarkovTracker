@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-surface-850 overflow-hidden rounded-lg border border-white/10 shadow-md"
+    class="border-border bg-panel shadow-card overflow-hidden rounded-lg border"
     :class="{ 'h-full': props.fillHeight, [props.cardClass]: true }"
   >
     <div class="m-0 h-full p-0">
@@ -54,7 +54,7 @@
                 class="flex items-center gap-2 pr-4 text-right"
               >
                 <slot name="title-right">
-                  <span v-if="props.subtitle" class="text-surface-300 text-xs">
+                  <span v-if="props.subtitle" class="text-foreground-muted text-xs">
                     {{ props.subtitle }}
                   </span>
                 </slot>
@@ -64,7 +64,7 @@
           <!-- Divider (only if there's content below) -->
           <div
             v-if="showDivider && (hasContent || hasFooter)"
-            class="border-surface-700 mx-4 border-b"
+            class="border-border mx-4 border-b"
           ></div>
         </header>
         <!-- Content Section -->

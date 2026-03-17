@@ -87,7 +87,7 @@
       <div class="hidden w-75 shrink-0 xl:block"></div>
       <!-- Fixed sidebar (stays in viewport, accounts for drawer + container) -->
       <aside class="fixed left-[calc(max(15rem,(100vw-100rem)/2+15rem))] hidden w-75 xl:block">
-        <UCard class="border-surface-700/50 bg-surface-900/90 border backdrop-blur">
+        <UCard class="bg-panel border-border border backdrop-blur">
           <nav aria-label="Table of contents">
             <ol class="space-y-2 text-sm leading-relaxed">
               <li v-for="item in toc" :key="item.id">
@@ -111,15 +111,15 @@
       </aside>
       <section class="w-full min-w-0 xl:flex-1">
         <UCard
-          class="prose prose-lg prose-invert prose-headings:text-primary-100 prose-a:text-link prose-strong:text-primary-200 max-w-none"
+          class="prose prose-lg prose-headings:text-foreground prose-p:text-foreground-muted prose-li:text-foreground-muted prose-a:text-link prose-strong:text-foreground max-w-none"
         >
           <div class="terms-content space-y-12 [&>section]:scroll-mt-28">
             <div
               id="top"
-              class="border-surface-700/50 mb-8 flex items-center justify-between border-b pb-4"
+              class="border-border mb-8 flex items-center justify-between border-b pb-4"
             >
               <p class="text-primary-400 mb-0 text-sm tracking-[0.2em] uppercase">Legal Document</p>
-              <p class="text-surface-400 mb-0 text-sm">Last Updated: {{ lastUpdated }}</p>
+              <p class="text-foreground-muted mb-0 text-sm">Last Updated: {{ lastUpdated }}</p>
             </div>
             <!-- 1. ACCEPTANCE OF TERMS -->
             <section id="acceptance">

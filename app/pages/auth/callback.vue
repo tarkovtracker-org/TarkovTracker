@@ -1,13 +1,10 @@
 <template>
-  <div class="bg-surface-900 flex min-h-screen items-center justify-center px-4">
-    <UCard
-      class="bg-surface-900 w-full max-w-md border border-white/10 shadow-2xl"
-      :ui="{ body: 'p-8' }"
-    >
+  <div class="bg-canvas flex min-h-screen items-center justify-center px-4">
+    <UCard class="bg-panel border-border shadow-card w-full max-w-md border" :ui="{ body: 'p-8' }">
       <div class="flex flex-col items-center space-y-3 text-center">
         <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-10 w-10 animate-spin" />
-        <h2 class="text-surface-50 text-lg font-semibold">Authenticating...</h2>
-        <p class="text-surface-300 text-sm">Please wait while we complete your sign in.</p>
+        <h2 class="text-foreground text-lg font-semibold">Authenticating...</h2>
+        <p class="text-foreground-muted text-sm">Please wait while we complete your sign in.</p>
       </div>
     </UCard>
   </div>

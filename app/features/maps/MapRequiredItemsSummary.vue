@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="aggregatedItems.length > 0 || aggregatedKeys.length > 0"
-    class="bg-surface-800/50 mt-4 mb-4 shrink-0 rounded-lg p-4"
+    class="bg-shell border-border mt-4 mb-4 shrink-0 rounded-lg border p-4"
   >
     <div v-if="aggregatedItems.length > 0">
       <div class="mb-3 flex items-center gap-2">
@@ -10,7 +10,7 @@
         >
           <UIcon name="i-mdi-briefcase-variant-outline" class="text-primary-300 h-4 w-4" />
         </div>
-        <h3 class="text-surface-100 truncate text-[15px] font-semibold">
+        <h3 class="text-foreground truncate text-[15px] font-semibold">
           {{ $t('page.tasks.map.required_items_summary') }}
         </h3>
       </div>
@@ -28,7 +28,7 @@
         >
           <UIcon name="i-mdi-key-variant" class="text-primary-300 h-4 w-4" />
         </div>
-        <h3 class="text-surface-100 truncate text-[15px] font-semibold">
+        <h3 class="text-foreground truncate text-[15px] font-semibold">
           {{ $t('page.tasks.map.required_keys_summary') }}
         </h3>
       </div>

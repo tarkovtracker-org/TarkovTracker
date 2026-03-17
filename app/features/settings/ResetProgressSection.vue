@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-2">
-    <p class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
+    <p class="text-foreground-muted text-xs font-semibold tracking-wider uppercase">
       {{ $t('settings.data_management.reset_title') }}
     </p>
     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -9,7 +9,7 @@
         block
         :disabled="!canPrestige"
         :ui="{
-          base: 'bg-warning-900 hover:bg-warning-800 active:bg-warning-700 text-warning-200 focus-visible:ring focus-visible:ring-warning-500 disabled:bg-surface-800 disabled:text-surface-500 disabled:hover:bg-surface-800',
+          base: 'bg-warning-900 hover:bg-warning-800 active:bg-warning-700 text-warning-200 focus-visible:ring focus-visible:ring-warning-500 disabled:bg-field disabled:text-foreground-disabled disabled:hover:bg-field',
         }"
         @click="showPrestigePvPDialog = true"
       >
@@ -45,16 +45,16 @@
         {{ $t('settings.data_management.reset_all_data') }}
       </UButton>
     </div>
-    <p v-if="!canPrestige" class="text-surface-500 text-xs">
+    <p v-if="!canPrestige" class="text-foreground-muted text-xs">
       {{ prestigeDisabledDescription }}
     </p>
   </div>
   <div class="space-y-2">
-    <p class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
+    <p class="text-foreground-muted text-xs font-semibold tracking-wider uppercase">
       {{ $t('settings.data_management.prestige_history_title') }}
     </p>
-    <div class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3">
-      <p class="text-surface-400 text-xs">
+    <div class="bg-panel border-border space-y-3 rounded-md border p-3">
+      <p class="text-foreground-muted text-xs">
         {{ $t('settings.data_management.prestige_history_description') }}
       </p>
       <UAlert
@@ -71,12 +71,12 @@
         variant="soft"
         :title="$t('settings.data_management.prestige_history_loading')"
       />
-      <p v-else-if="prestigeRuns.length === 0" class="text-surface-500 text-sm">
+      <p v-else-if="prestigeRuns.length === 0" class="text-foreground-muted text-sm">
         {{ prestigeHistoryEmptyDescription }}
       </p>
       <template v-else>
         <div class="space-y-1">
-          <p class="text-surface-300 text-xs font-semibold uppercase">
+          <p class="text-foreground text-xs font-semibold uppercase">
             {{ $t('settings.data_management.prestige_history_select') }}
           </p>
           <SelectMenuFixed
@@ -85,7 +85,7 @@
             value-key="value"
           >
             <template #leading>
-              <UIcon name="i-mdi-history" class="text-surface-300 h-4 w-4" />
+              <UIcon name="i-mdi-history" class="text-foreground-muted h-4 w-4" />
             </template>
           </SelectMenuFixed>
         </div>
@@ -93,24 +93,24 @@
           <div
             v-for="row in selectedRunSummaryRows"
             :key="row.id"
-            class="bg-surface-900 rounded-md border border-white/10 p-2.5"
+            class="bg-shell border-border-muted rounded-md border p-2.5"
           >
-            <p class="text-surface-400 text-[11px] font-semibold uppercase">
+            <p class="text-foreground-muted text-[11px] font-semibold uppercase">
               {{ row.label }}
             </p>
-            <p class="text-surface-100 mt-0.5 text-sm font-semibold">
+            <p class="text-foreground mt-0.5 text-sm font-semibold">
               {{ row.value }}
             </p>
           </div>
         </div>
         <div
           v-if="comparisonRows.length > 0"
-          class="bg-surface-900 space-y-2 rounded-md border border-white/10 p-3"
+          class="bg-shell border-border-muted space-y-2 rounded-md border p-3"
         >
-          <p class="text-surface-300 text-xs font-semibold uppercase">
+          <p class="text-foreground text-xs font-semibold uppercase">
             {{ $t('settings.data_management.prestige_history_compare_title') }}
           </p>
-          <p class="text-surface-400 text-xs">
+          <p class="text-foreground-muted text-xs">
             {{
               $t('settings.data_management.prestige_history_compare_subtitle', {
                 from: selectedPrestigeRun?.prestigeTo ?? 0,
@@ -122,12 +122,12 @@
             <div
               v-for="row in comparisonRows"
               :key="row.id"
-              class="bg-surface-900 flex items-center justify-between rounded-md border border-white/10 px-2.5 py-2"
+              class="bg-panel border-border flex items-center justify-between rounded-md border px-2.5 py-2"
             >
-              <span class="text-surface-300 text-xs">{{ row.label }}</span>
+              <span class="text-foreground text-xs">{{ row.label }}</span>
               <span
                 class="text-xs font-semibold"
-                :class="row.delta >= 0 ? 'text-success-300' : 'text-warning-300'"
+                :class="row.delta >= 0 ? 'text-success-600' : 'text-warning-700'"
               >
                 {{ formatSignedDelta(row.delta) }}
               </span>
@@ -152,16 +152,17 @@
           icon="i-mdi-alert"
           color="warning"
           variant="subtle"
+          class="text-warning-800 [&_[data-slot=description]]:text-warning-700 [&_[data-slot=icon]]:text-warning-600 [&_[data-slot=title]]:text-warning-800"
           :title="$t('settings.data_management.prestige_pvp_confirmation')"
         />
-        <p class="text-surface-200 text-sm">
+        <p class="text-foreground text-sm">
           {{ $t('settings.data_management.prestige_pvp_warning') }}
         </p>
         <div class="space-y-2">
-          <p class="text-surface-100 text-sm font-medium">
+          <p class="text-foreground text-sm font-medium">
             <i18n-t keypath="settings.prestige.confirm_instruction" tag="span">
               <template #word>
-                <strong class="text-warning-300">
+                <strong class="text-warning-700">
                   {{ $t('settings.prestige.confirm_word') }}
                 </strong>
               </template>
@@ -214,9 +215,10 @@
           icon="i-mdi-alert"
           color="pvp"
           variant="subtle"
+          class="text-pvp-800 [&_[data-slot=description]]:text-pvp-700 [&_[data-slot=icon]]:text-pvp-600 [&_[data-slot=title]]:text-pvp-800"
           :title="$t('settings.data_management.reset_pvp_confirmation')"
         />
-        <p class="text-surface-200 text-sm">
+        <p class="text-foreground text-sm">
           {{ $t('settings.data_management.reset_pvp_warning') }}
         </p>
       </div>
@@ -259,9 +261,10 @@
           icon="i-mdi-alert"
           color="pve"
           variant="subtle"
+          class="text-pve-800 [&_[data-slot=description]]:text-pve-700 [&_[data-slot=icon]]:text-pve-600 [&_[data-slot=title]]:text-pve-800"
           :title="$t('settings.data_management.reset_pve_confirmation')"
         />
-        <p class="text-surface-200 text-sm">
+        <p class="text-foreground text-sm">
           {{ $t('settings.data_management.reset_pve_warning') }}
         </p>
       </div>
@@ -304,16 +307,17 @@
           icon="i-mdi-alert-octagon"
           color="error"
           variant="subtle"
+          class="text-error-800 [&_[data-slot=description]]:text-error-700 [&_[data-slot=icon]]:text-error-600 [&_[data-slot=title]]:text-error-800"
           :title="$t('settings.data_management.reset_all_confirmation')"
         />
-        <p class="text-surface-200 text-sm">
+        <p class="text-foreground text-sm">
           {{ $t('settings.data_management.reset_all_warning') }}
         </p>
         <div class="space-y-2">
-          <p class="text-surface-100 text-sm font-medium">
+          <p class="text-foreground text-sm font-medium">
             <i18n-t keypath="settings.danger_zone.confirm_delete_instruction" tag="span">
               <template #word>
-                <strong class="text-error-400">
+                <strong class="text-error-700">
                   {{ $t('settings.danger_zone.confirm_word') }}
                 </strong>
               </template>

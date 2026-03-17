@@ -15,6 +15,7 @@ Nuxt 4 SPA (`ssr:false`), Vue 3 `<script setup>`, Tailwind v4 only (no `<style>`
 
 - **Features**: `app/features/` domain slices (admin, dashboard, drawer, hideout, maps, neededitems, settings, tasks, team)
 - **State**: useMetadata + useProgress + usePreferences stores, coordinated via useTarkov
+- **Theme System**: light/dark mode is driven by persisted `usePreferences.themeMode`, applied on `document.documentElement` via `data-theme`, with semantic tokens defined in `app/assets/css/tailwind.css`
 - **Style**: 2-space, 100-char, single quotes, semicolons, `@/` aliases, PascalCase components
 
 ## Rules

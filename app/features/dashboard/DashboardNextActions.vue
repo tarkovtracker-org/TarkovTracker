@@ -2,7 +2,7 @@
   <section
     v-if="primaryRecommendation"
     data-testid="dashboard-focus-card"
-    :class="['relative mb-8 overflow-hidden rounded-2xl border shadow-2xl', toneClasses.shell]"
+    :class="['shadow-card relative mb-8 overflow-hidden rounded-2xl border', toneClasses.shell]"
   >
     <div
       :class="[
@@ -11,7 +11,7 @@
       ]"
     ></div>
     <div
-      class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+      class="via-border-strong/80 pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent"
     ></div>
     <div
       class="relative grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:p-6"
@@ -38,7 +38,7 @@
               </span>
               <span
                 v-if="filtersActive"
-                class="text-surface-300 inline-flex min-h-6 items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] leading-none"
+                class="border-border-muted bg-raised/80 text-foreground-muted inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
               >
                 <span class="leading-none">
                   {{ t('page.dashboard.focus.badge.based_on_filters') }}
@@ -46,16 +46,16 @@
               </span>
               <span
                 v-if="hiddenAvailableCount > 0"
-                class="border-warning-400/20 bg-warning-500/10 text-warning-100 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
+                class="border-warning-500/25 bg-warning-500/12 text-warning-700 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
               >
                 <span class="leading-none">{{ hiddenTasksBadge }}</span>
               </span>
             </div>
             <div class="space-y-2">
-              <h2 class="max-w-3xl text-2xl font-semibold text-white sm:text-3xl">
+              <h2 class="text-foreground max-w-3xl text-2xl font-semibold sm:text-3xl">
                 {{ primaryHeading }}
               </h2>
-              <p class="text-surface-200 max-w-3xl text-sm leading-6 sm:text-base">
+              <p class="text-foreground-muted max-w-3xl text-sm leading-6 sm:text-base">
                 {{ primarySummary }}
               </p>
             </div>
@@ -75,26 +75,26 @@
         </div>
         <div class="grid gap-3 md:grid-cols-[minmax(0,1.12fr)_minmax(0,0.94fr)_minmax(0,0.94fr)]">
           <div :class="['rounded-xl p-4 shadow-lg', toneClasses.proofCard]">
-            <div class="text-surface-300 text-[11px] tracking-[0.2em] uppercase">
+            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
               {{ t('page.dashboard.focus.stat.why') }}
             </div>
-            <div class="mt-2 text-sm leading-6 font-medium text-white">
+            <div class="text-foreground mt-2 text-sm leading-6 font-medium">
               {{ primaryWhy }}
             </div>
           </div>
-          <div class="bg-surface-950/48 rounded-xl border border-white/8 p-4">
-            <div class="text-surface-400 text-[11px] tracking-[0.2em] uppercase">
+          <div class="border-border bg-raised/90 rounded-xl border p-4">
+            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
               {{ t('page.dashboard.focus.stat.progress') }}
             </div>
-            <div class="text-surface-100 mt-2 text-sm leading-6">
+            <div class="text-foreground mt-2 text-sm leading-6">
               {{ primaryContribution }}
             </div>
           </div>
-          <div class="bg-surface-950/48 rounded-xl border border-white/8 p-4">
-            <div class="text-surface-400 text-[11px] tracking-[0.2em] uppercase">
+          <div class="border-border bg-raised/90 rounded-xl border p-4">
+            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
               {{ t('page.dashboard.focus.stat.status') }}
             </div>
-            <div class="text-surface-100 mt-2 text-sm leading-6">
+            <div class="text-foreground mt-2 text-sm leading-6">
               {{ primaryStatus }}
             </div>
           </div>
@@ -114,18 +114,18 @@
           </UButton>
         </div>
       </div>
-      <div class="bg-surface-950/60 rounded-2xl border border-white/10 p-4">
+      <div class="border-border bg-shell/82 shadow-card rounded-2xl border p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div class="text-surface-400 text-[11px] tracking-[0.2em] uppercase">
+            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
               {{ t('page.dashboard.focus.stat.secondary') }}
             </div>
-            <div class="text-surface-200 mt-1 text-sm">
+            <div class="text-foreground-muted mt-1 text-sm">
               {{ secondarySummary }}
             </div>
           </div>
           <div
-            class="text-surface-200 inline-flex min-h-7 items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs leading-none font-medium"
+            class="border-border-muted bg-raised/80 text-foreground-muted inline-flex min-h-7 items-center rounded-full border px-3 py-1 text-xs leading-none font-medium"
           >
             <span class="leading-none">{{ secondaryRecommendations.length }}</span>
           </div>
@@ -135,7 +135,7 @@
             v-for="recommendation in secondaryRecommendations"
             :key="recommendation.id"
             :to="recommendation.action"
-            class="group bg-surface-900/70 hover:bg-surface-900 flex items-start gap-3 rounded-xl border border-white/10 px-3 py-3 transition-colors hover:border-white/18"
+            class="border-border bg-panel hover:bg-raised group hover:border-border-strong flex items-start gap-3 rounded-xl border px-3 py-3 transition-colors"
             @click="handleRecommendationClick(recommendation, 'secondary')"
           >
             <div
@@ -150,22 +150,22 @@
               />
             </div>
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-semibold text-white">
+              <div class="text-foreground truncate text-sm font-semibold">
                 {{ getSecondaryHeading(recommendation) }}
               </div>
-              <div class="text-surface-300 mt-1 text-xs leading-5">
+              <div class="text-foreground-muted mt-1 text-xs leading-5">
                 {{ getSecondaryDescription(recommendation) }}
               </div>
             </div>
             <UIcon
               name="i-mdi-arrow-right"
-              class="text-surface-400 group-hover:text-surface-300 mt-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+              class="text-foreground-subtle group-hover:text-foreground-muted mt-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
             />
           </NuxtLink>
         </div>
         <div
           v-else
-          class="bg-surface-900/40 text-surface-300 rounded-xl border border-dashed border-white/10 px-4 py-5 text-sm"
+          class="border-border-muted bg-raised/70 text-foreground-muted rounded-xl border border-dashed px-4 py-5 text-sm"
         >
           {{ t('page.dashboard.focus.stat.secondary_empty') }}
         </div>
@@ -174,7 +174,6 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import {
     useDashboardFocusAnalytics,
     type DashboardRecommendationClickVariant,
@@ -208,74 +207,68 @@
     }
   > = {
     primary: {
-      badge: 'border-primary-400/20 bg-primary-500/10 text-primary-50',
-      eyebrow: 'text-primary-200',
+      badge: 'border-primary-500/18 bg-primary-500/10 text-primary-600',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-primary-500/18',
-      icon: 'text-primary-200',
-      iconBg: 'border-primary-400/20 bg-primary-500/10',
-      proofCard: 'border-primary-400/30 bg-surface-900/88 ring-primary-400/10 ring-1',
-      shell:
-        'border-primary-500/20 bg-gradient-to-br from-surface-900 via-primary-950/55 to-accent-950/45',
+      icon: 'text-primary-500',
+      iconBg: 'border-primary-500/15 bg-primary-500/10',
+      proofCard: 'border-primary-500/18 bg-raised/95 ring-primary-500/10 ring-1',
+      shell: 'border-primary-500/18 bg-gradient-to-br from-primary-500/10 via-panel to-shell',
     },
     accent: {
-      badge: 'border-accent-400/20 bg-accent-500/10 text-accent-50',
-      eyebrow: 'text-accent-200',
+      badge: 'border-accent-500/18 bg-accent-500/10 text-accent-600',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-accent-500/18',
-      icon: 'text-accent-200',
-      iconBg: 'border-accent-400/20 bg-accent-500/10',
-      proofCard: 'border-accent-400/30 bg-surface-900/88 ring-accent-400/10 ring-1',
-      shell:
-        'border-accent-500/20 bg-gradient-to-br from-surface-900 via-accent-950/55 to-secondary-950/45',
+      icon: 'text-accent-500',
+      iconBg: 'border-accent-500/15 bg-accent-500/10',
+      proofCard: 'border-accent-500/18 bg-raised/95 ring-accent-500/10 ring-1',
+      shell: 'border-accent-500/18 bg-gradient-to-br from-accent-500/10 via-panel to-shell',
     },
     info: {
-      badge: 'border-info-400/20 bg-info-500/10 text-info-50',
-      eyebrow: 'text-info-200',
+      badge: 'border-info-500/18 bg-info-500/10 text-info-600',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-info-500/18',
-      icon: 'text-info-200',
-      iconBg: 'border-info-400/20 bg-info-500/10',
-      proofCard: 'border-info-400/30 bg-surface-900/88 ring-info-400/10 ring-1',
-      shell:
-        'border-info-500/20 bg-gradient-to-br from-surface-900 via-info-950/55 to-secondary-950/45',
+      icon: 'text-info-500',
+      iconBg: 'border-info-500/15 bg-info-500/10',
+      proofCard: 'border-info-500/18 bg-raised/95 ring-info-500/10 ring-1',
+      shell: 'border-info-500/18 bg-gradient-to-br from-info-500/10 via-panel to-shell',
     },
     warning: {
-      badge: 'border-warning-400/20 bg-warning-500/10 text-warning-50',
-      eyebrow: 'text-warning-200',
+      badge: 'border-warning-500/18 bg-warning-500/10 text-warning-700',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-warning-500/18',
-      icon: 'text-warning-200',
-      iconBg: 'border-warning-400/20 bg-warning-500/10',
-      proofCard: 'border-warning-400/30 bg-surface-900/88 ring-warning-400/10 ring-1',
-      shell:
-        'border-warning-500/20 bg-gradient-to-br from-surface-900 via-warning-950/55 to-surface-950',
+      icon: 'text-warning-500',
+      iconBg: 'border-warning-500/15 bg-warning-500/10',
+      proofCard: 'border-warning-500/18 bg-raised/95 ring-warning-500/10 ring-1',
+      shell: 'border-warning-500/18 bg-gradient-to-br from-warning-500/10 via-panel to-shell',
     },
     success: {
-      badge: 'border-success-400/20 bg-success-500/10 text-success-50',
-      eyebrow: 'text-success-200',
+      badge: 'border-success-500/18 bg-success-500/10 text-success-600',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-success-500/18',
-      icon: 'text-success-200',
-      iconBg: 'border-success-400/20 bg-success-500/10',
-      proofCard: 'border-success-400/30 bg-surface-900/88 ring-success-400/10 ring-1',
-      shell:
-        'border-success-500/20 bg-gradient-to-br from-surface-900 via-success-950/55 to-accent-950/35',
+      icon: 'text-success-500',
+      iconBg: 'border-success-500/15 bg-success-500/10',
+      proofCard: 'border-success-500/18 bg-raised/95 ring-success-500/10 ring-1',
+      shell: 'border-success-500/18 bg-gradient-to-br from-success-500/10 via-panel to-shell',
     },
     kappa: {
-      badge: 'border-kappa-400/20 bg-kappa-500/10 text-kappa-50',
-      eyebrow: 'text-kappa-200',
+      badge: 'border-kappa-500/18 bg-kappa-500/10 text-kappa-600',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-kappa-500/18',
-      icon: 'text-kappa-200',
-      iconBg: 'border-kappa-400/20 bg-kappa-500/10',
-      proofCard: 'border-kappa-400/30 bg-surface-900/88 ring-kappa-400/10 ring-1',
-      shell:
-        'border-kappa-500/20 bg-gradient-to-br from-surface-900 via-kappa-950/55 to-surface-950',
+      icon: 'text-kappa-500',
+      iconBg: 'border-kappa-500/15 bg-kappa-500/10',
+      proofCard: 'border-kappa-500/18 bg-raised/95 ring-kappa-500/10 ring-1',
+      shell: 'border-kappa-500/18 bg-gradient-to-br from-kappa-500/10 via-panel to-shell',
     },
     lightkeeper: {
-      badge: 'border-lightkeeper-400/20 bg-lightkeeper-500/10 text-lightkeeper-50',
-      eyebrow: 'text-lightkeeper-200',
+      badge: 'border-lightkeeper-500/18 bg-lightkeeper-500/10 text-lightkeeper-700',
+      eyebrow: 'text-foreground-subtle',
       halo: 'bg-lightkeeper-500/18',
-      icon: 'text-lightkeeper-200',
-      iconBg: 'border-lightkeeper-400/20 bg-lightkeeper-500/10',
-      proofCard: 'border-lightkeeper-400/30 bg-surface-900/88 ring-lightkeeper-400/10 ring-1',
+      icon: 'text-lightkeeper-500',
+      iconBg: 'border-lightkeeper-500/15 bg-lightkeeper-500/10',
+      proofCard: 'border-lightkeeper-500/18 bg-raised/95 ring-lightkeeper-500/10 ring-1',
       shell:
-        'border-lightkeeper-500/20 bg-gradient-to-br from-surface-900 via-lightkeeper-950/55 to-surface-950',
+        'border-lightkeeper-500/18 bg-gradient-to-br from-lightkeeper-500/10 via-panel to-shell',
     },
   };
   const getToneClasses = (recommendation: DashboardRecommendation) => toneMap[recommendation.tone];
@@ -672,7 +665,7 @@
     return recommendation.taskName || '';
   };
   const getSecondaryDescription = (recommendation: DashboardRecommendation) =>
-    `${getCompactReasonText(recommendation)} · ${getStatusText(recommendation)}`;
+    `${getCompactReasonText(recommendation)} - ${getStatusText(recommendation)}`;
   const handleRecommendationClick = (
     recommendation: DashboardRecommendation,
     variant: DashboardRecommendationClickVariant

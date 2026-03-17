@@ -1,17 +1,29 @@
 <template>
   <div
     :class="[
-      'relative overflow-hidden rounded-md border px-4 py-3 transition-all',
-      isAchieved ? achievedClasses : 'bg-surface-900/50 border-white/12 opacity-50',
+      'shadow-card relative overflow-hidden rounded-md border px-4 py-3 transition-all',
+      isAchieved ? achievedClasses : 'bg-panel border-border-muted opacity-65',
     ]"
   >
     <div class="relative z-10">
+      <div
+        v-if="showsProgressRing"
+        class="bg-shell/90 mb-3 flex h-12 w-12 items-center justify-center rounded-full"
+      >
+        <div
+          class="flex h-12 w-12 items-center justify-center rounded-full"
+          :style="progressRingStyle"
+        >
+          <div class="bg-panel h-8 w-8 rounded-full" />
+        </div>
+      </div>
       <UIcon
+        v-else
         :name="isAchieved ? achievedIcon : unachievedIcon"
-        :class="['mb-3 h-12 w-12', isAchieved ? iconColorClass : 'text-surface-600']"
+        :class="['mb-3 h-12 w-12', isAchieved ? iconColorClass : 'text-foreground-subtle']"
       />
-      <div class="mb-1 text-3xl font-bold text-white">{{ title }}</div>
-      <div class="text-surface-300 text-xs font-medium tracking-wider uppercase">
+      <div class="text-foreground mb-1 text-3xl font-bold">{{ title }}</div>
+      <div class="text-foreground-muted text-xs font-medium tracking-wider uppercase">
         {{ subtitle }}
       </div>
     </div>
@@ -26,49 +38,68 @@
       isAchieved: boolean;
       achievedIcon: string;
       unachievedIcon: string;
+      progressValue?: number | null;
       color?: MilestoneColor;
     }>(),
     {
       color: 'primary',
+      progressValue: null,
     }
   );
-  const colorClasses: Record<MilestoneColor, { achieved: string; icon: string }> = {
-    primary: {
-      achieved: [
-        'from-primary-900/40 to-surface-900 border-primary-600/50',
-        'shadow-primary-900/20 bg-gradient-to-br shadow-lg',
-      ].join(' '),
-      icon: 'text-primary-400',
-    },
-    info: {
-      achieved: [
-        'from-info-900/40 to-surface-900 border-info-600/50',
-        'shadow-info-900/20 bg-gradient-to-br shadow-lg',
-      ].join(' '),
-      icon: 'text-info-400',
-    },
-    success: {
-      achieved: [
-        'from-success-900/40 to-surface-900 border-success-600/50',
-        'shadow-success-900/20 bg-gradient-to-br shadow-lg',
-      ].join(' '),
-      icon: 'text-success-400',
-    },
-    kappa: {
-      achieved: [
-        'from-kappa-900/40 to-surface-900 border-kappa-600/50',
-        'shadow-kappa-900/20 bg-gradient-to-br shadow-lg',
-      ].join(' '),
-      icon: 'text-kappa-400',
-    },
-    lightkeeper: {
-      achieved: [
-        'from-lightkeeper-900/40 to-surface-900 border-lightkeeper-600/50',
-        'shadow-lightkeeper-900/20 bg-gradient-to-br shadow-lg',
-      ].join(' '),
-      icon: 'text-lightkeeper-400',
-    },
-  };
+  const colorClasses: Record<MilestoneColor, { achieved: string; icon: string; progress: string }> =
+    {
+      primary: {
+        achieved: [
+          'from-primary-500/10 via-panel to-shell border-primary-500/28',
+          'bg-gradient-to-br shadow-lg shadow-primary-500/8',
+        ].join(' '),
+        icon: 'text-primary-400',
+        progress: 'var(--color-primary-500)',
+      },
+      info: {
+        achieved: [
+          'from-info-500/10 via-panel to-shell border-info-500/28',
+          'bg-gradient-to-br shadow-lg shadow-info-500/8',
+        ].join(' '),
+        icon: 'text-info-400',
+        progress: 'var(--color-info-500)',
+      },
+      success: {
+        achieved: [
+          'from-success-500/10 via-panel to-shell border-success-500/28',
+          'bg-gradient-to-br shadow-lg shadow-success-500/8',
+        ].join(' '),
+        icon: 'text-success-400',
+        progress: 'var(--color-success-500)',
+      },
+      kappa: {
+        achieved: [
+          'from-kappa-500/10 via-panel to-shell border-kappa-500/28',
+          'bg-gradient-to-br shadow-lg shadow-kappa-500/8',
+        ].join(' '),
+        icon: 'text-kappa-400',
+        progress: 'var(--color-kappa-500)',
+      },
+      lightkeeper: {
+        achieved: [
+          'from-lightkeeper-500/10 via-panel to-shell border-lightkeeper-500/28',
+          'bg-gradient-to-br shadow-lg shadow-lightkeeper-500/8',
+        ].join(' '),
+        icon: 'text-lightkeeper-400',
+        progress: 'var(--color-lightkeeper-500)',
+      },
+    };
   const achievedClasses = computed(() => colorClasses[props.color].achieved);
   const iconColorClass = computed(() => colorClasses[props.color].icon);
+  const showsProgressRing = computed(() => !props.isAchieved && props.progressValue !== null);
+  const normalizedProgressValue = computed(() =>
+    Math.max(0, Math.min(100, props.progressValue ?? 0))
+  );
+  const progressRingStyle = computed(() => {
+    const progress = normalizedProgressValue.value * 3.6;
+    const progressColor = colorClasses[props.color].progress;
+    return {
+      background: `conic-gradient(${progressColor} 0deg ${progress}deg, var(--theme-border-muted) ${progress}deg 360deg)`,
+    };
+  });
 </script>

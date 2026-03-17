@@ -53,7 +53,7 @@
             </div>
             <div
               v-if="highlightedLevel"
-              class="border-primary-500/60 bg-primary-500/10 text-primary-200 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold"
+              class="border-primary-500/60 bg-primary-500/10 text-primary-700 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold"
             >
               <UIcon name="i-mdi-link-variant" class="h-3.5 w-3.5" />
               <i18n-t
@@ -83,9 +83,9 @@
         <!-- Stash station special content -->
         <div
           v-if="props.station.normalizedName === SPECIAL_STATIONS.STASH"
-          class="bg-surface-700 mb-3 rounded-lg p-3 text-center"
+          class="bg-field border-border-muted mb-3 rounded-lg border p-3 text-center"
         >
-          <div class="mb-2 text-sm">
+          <div class="text-foreground-muted mb-2 text-sm">
             {{ $t('page.hideout.stationcard.game_edition_description') }}
           </div>
           <UButton variant="soft" to="/settings" color="neutral">
@@ -97,7 +97,7 @@
           <!-- Item Requirements Section -->
           <div
             v-if="hasItemRequirements"
-            class="bg-surface-800 relative rounded-lg p-3"
+            class="bg-field border-border-muted relative rounded-lg border p-3"
             :class="moduleHighlightClasses"
           >
             <div class="mb-3 flex items-center text-base font-medium">
@@ -118,8 +118,8 @@
               />
             </div>
             <!-- Prerequisites Section -->
-            <div v-if="hasPrerequisites" class="border-surface-700 space-y-2 border-t pt-3">
-              <div class="text-surface-400 mb-2 text-xs font-medium tracking-wider uppercase">
+            <div v-if="hasPrerequisites" class="border-border-muted space-y-2 border-t pt-3">
+              <div class="text-foreground-subtle mb-2 text-xs font-medium tracking-wider uppercase">
                 {{ $t('page.hideout.stationcard.prerequisites') }}
               </div>
               <!-- Station Level Requirements -->
@@ -195,7 +195,7 @@
           </div>
         </div>
         <!-- Max level indicator -->
-        <div v-if="!nextLevel" class="bg-surface-800 rounded p-3">
+        <div v-if="!nextLevel" class="bg-field border-border-muted rounded border p-3">
           <div
             class="text-warning-500 flex items-center justify-center text-center text-base font-medium"
           >
@@ -264,7 +264,7 @@
           </UButton>
           <span
             v-if="nextLevel && (!currentLevel || downgradeDisabled)"
-            class="text-surface-400 text-sm"
+            class="text-foreground-subtle text-sm"
           >
             {{ t('page.hideout.stationcard.upgrade_unavailable') }}
           </span>
@@ -274,7 +274,6 @@
   </GenericCard>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useToast } from '#imports';
   import { useSkillCalculation } from '@/composables/useSkillCalculation';
   import { useProgressStore } from '@/stores/useProgress';
@@ -335,7 +334,7 @@
     base: 'bg-success-500 hover:bg-success-600 active:bg-success-700 text-white border border-success-700',
   };
   const downgradeButtonUi = {
-    base: 'bg-error-900/40 hover:bg-error-900/60 active:bg-error-900/80 text-error-300 border border-error-700/50',
+    base: 'border border-[color:var(--color-failed-border)] bg-[var(--color-failed-surface)] text-[color:var(--color-failed-text)] hover:bg-error-500/15 active:bg-error-500/20',
   };
   const highlightColor = computed((): 'success' | 'error' | 'primary' => {
     if (!nextLevel.value) return 'primary';
@@ -457,11 +456,11 @@
   });
   const cardHighlightClasses = computed(() => {
     if (!highlightActive.value || highlightTargetsModule.value) return '';
-    return 'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-2 after:ring-primary-400/70 after:ring-offset-2 after:ring-offset-surface-900 after:content-[""] after:animate-pulse';
+    return 'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-2 after:ring-primary-400/70 after:ring-offset-2 after:ring-offset-panel after:content-[""] after:animate-pulse';
   });
   const moduleHighlightClasses = computed(() => {
     if (!highlightActive.value || !highlightTargetsModule.value) return '';
-    return 'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-2 after:ring-primary-400/70 after:ring-offset-2 after:ring-offset-surface-800 after:content-[""] after:animate-pulse';
+    return 'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-2 after:ring-primary-400/70 after:ring-offset-2 after:ring-offset-field after:content-[""] after:animate-pulse';
   });
   const dismissHighlight = () => {
     if (!highlightActive.value) return;

@@ -1,8 +1,8 @@
 <template>
   <div
-    class="border-surface-700/50 bg-surface-800/30 mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-2 py-1.5"
+    class="bg-field border-border-muted mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-2 py-1.5"
   >
-    <UIcon :name="variantIcon" aria-hidden="true" class="text-surface-400 h-3.5 w-3.5" />
+    <UIcon :name="variantIcon" aria-hidden="true" class="text-foreground-subtle h-3.5 w-3.5" />
     <span
       v-for="(item, itemIndex) in flatItems"
       :key="item.id"
@@ -37,12 +37,12 @@
           @click.stop
         >
           {{ item.shortName || item.name || item.id }}
-          <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
+          <UIcon name="i-mdi-open-in-new" class="text-foreground-subtle h-2.5 w-2.5 shrink-0" />
         </a>
       </AppTooltip>
       <span
         v-if="getItemCount(item.id) > 1"
-        class="bg-surface-700 text-surface-200/90 ml-1 inline-block min-w-5 rounded px-1 text-center text-[10px] leading-relaxed font-bold tabular-nums"
+        class="bg-raised text-foreground-muted ml-1 inline-block min-w-5 rounded px-1 text-center text-[10px] leading-relaxed font-bold tabular-nums"
       >
         x{{ getItemCount(item.id) }}
       </span>
@@ -51,7 +51,7 @@
           :href="getKeyDevUrl(item)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
+          class="text-foreground-subtle hover:text-foreground inline-flex items-center self-center rounded p-0.5 transition-colors"
           @click.stop
         >
           <img
@@ -63,7 +63,7 @@
       </AppTooltip>
       <span
         v-if="isAnyOf && itemIndex < flatItems.length - 1"
-        class="text-surface-500 text-[10px] italic"
+        class="text-foreground-disabled text-[10px] italic"
       >
         {{ $t('page.tasks.questcard.keys_or') }}
       </span>
@@ -71,7 +71,7 @@
     <AppTooltip :text="$t(variantDisclaimerKey)">
       <button
         type="button"
-        class="text-surface-500 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 hover:text-surface-300 inline-flex items-center self-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+        class="text-foreground-disabled focus-visible:ring-primary-500 focus-visible:ring-offset-panel hover:text-foreground-muted inline-flex items-center self-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
         :aria-label="$t(variantAriaKey)"
         @click.stop
       >
@@ -105,7 +105,7 @@
             close();
           "
         />
-        <div v-if="activeItem?.name" class="border-surface-700 my-1 border-t" />
+        <div v-if="activeItem?.name" class="border-border my-1 border-t" />
         <ContextMenuItem
           v-if="activeItem?.name"
           icon="i-mdi-content-copy"

@@ -33,7 +33,9 @@ const mockMetadataStore = reactive({
 const mockPreferencesStore = {
   getStreamerMode: false,
   getLocaleOverride: 'en' as string | null,
+  getThemeMode: 'dark' as 'dark' | 'light',
   setLocaleOverride: vi.fn(),
+  setThemeMode: vi.fn(),
 };
 const routeState = reactive({
   name: 'tasks',
@@ -149,9 +151,14 @@ describe('AppBar locale switching', () => {
     mockMetadataStore.fetchAllData.mockResolvedValue(undefined);
     mockPreferencesStore.getStreamerMode = false;
     mockPreferencesStore.getLocaleOverride = 'en';
+    mockPreferencesStore.getThemeMode = 'dark';
     mockPreferencesStore.setLocaleOverride.mockClear();
+    mockPreferencesStore.setThemeMode.mockClear();
     mockPreferencesStore.setLocaleOverride.mockImplementation((value: string | null) => {
       mockPreferencesStore.getLocaleOverride = value;
+    });
+    mockPreferencesStore.setThemeMode.mockImplementation((value: 'dark' | 'light') => {
+      mockPreferencesStore.getThemeMode = value;
     });
     mockSkillCalculation.migrateLegacySkillOffsets.mockClear();
     mockTarkovStore.getCurrentGameMode.mockClear();
@@ -175,7 +182,7 @@ describe('AppBar locale switching', () => {
   });
   it('switches locale with setLocale and refreshes language-bound metadata', async () => {
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
+    const select = wrapper.get('#app-locale-select');
     await select.setValue('de');
     await flushPromises();
     expect(setLocale).toHaveBeenCalledWith('de');
@@ -187,7 +194,7 @@ describe('AppBar locale switching', () => {
   });
   it('does not run locale switch flow when selecting the active locale', async () => {
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
+    const select = wrapper.get('#app-locale-select');
     await select.setValue('en');
     await flushPromises();
     expect(setLocale).not.toHaveBeenCalled();
@@ -199,7 +206,7 @@ describe('AppBar locale switching', () => {
   });
   it('handles setLocale errors without running metadata refresh side effects', async () => {
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
+    const select = wrapper.get('#app-locale-select');
     const localeError = new Error('locale switch failed');
     setLocale.mockRejectedValueOnce(localeError);
     await select.setValue('de');
@@ -218,7 +225,7 @@ describe('AppBar locale switching', () => {
     const previousLocale = localeRef.value;
     mockMetadataStore.fetchAllData.mockRejectedValueOnce(fetchError);
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
+    const select = wrapper.get('#app-locale-select');
     await select.setValue('de');
     await flushPromises();
     expect(setLocale).toHaveBeenNthCalledWith(1, 'de');
@@ -244,7 +251,7 @@ describe('AppBar locale switching', () => {
       .mockImplementationOnce(() => staleFetch.promise)
       .mockResolvedValueOnce(undefined);
     const wrapper = await mountAppBar();
-    const select = wrapper.get('select');
+    const select = wrapper.get('#app-locale-select');
     await select.setValue('de');
     await flushPromises();
     await select.setValue('fr');
@@ -261,6 +268,27 @@ describe('AppBar locale switching', () => {
       'de',
       'fr',
     ]);
+    wrapper.unmount();
+  });
+});
+describe('AppBar theme switching', () => {
+  beforeEach(() => {
+    mockPreferencesStore.getThemeMode = 'dark';
+    mockPreferencesStore.setThemeMode.mockClear();
+    mockPreferencesStore.setThemeMode.mockImplementation((value: 'dark' | 'light') => {
+      mockPreferencesStore.getThemeMode = value;
+    });
+  });
+  it('updates theme preference when selecting a new theme mode', async () => {
+    const wrapper = await mountAppBar();
+    await wrapper.get('#app-theme-select').setValue('light');
+    expect(mockPreferencesStore.setThemeMode).toHaveBeenCalledWith('light');
+    wrapper.unmount();
+  });
+  it('does not update theme preference when selecting the active mode', async () => {
+    const wrapper = await mountAppBar();
+    await wrapper.get('#app-theme-select').setValue('dark');
+    expect(mockPreferencesStore.setThemeMode).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 });

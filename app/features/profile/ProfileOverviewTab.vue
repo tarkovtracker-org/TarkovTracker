@@ -11,27 +11,33 @@
         <template #content>
           <div class="space-y-3 p-4">
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <div class="bg-surface-900/80 rounded-md border border-white/10 p-2.5">
-                <div class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase">
+              <div class="bg-panel border-border rounded-md border p-2.5">
+                <div
+                  class="text-foreground-subtle text-[11px] font-semibold tracking-wider uppercase"
+                >
                   {{ t('page.profile.started') }}
                 </div>
-                <div class="text-surface-100 mt-1 text-sm font-medium">
+                <div class="text-foreground mt-1 text-sm font-medium">
                   {{ firstProgressLabel }}
                 </div>
               </div>
-              <div class="bg-surface-900/80 rounded-md border border-white/10 p-2.5">
-                <div class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase">
+              <div class="bg-panel border-border rounded-md border p-2.5">
+                <div
+                  class="text-foreground-subtle text-[11px] font-semibold tracking-wider uppercase"
+                >
                   {{ t('page.profile.latest_activity') }}
                 </div>
-                <div class="text-surface-100 mt-1 text-sm font-medium">
+                <div class="text-foreground mt-1 text-sm font-medium">
                   {{ latestProgressLabel }}
                 </div>
               </div>
-              <div class="bg-surface-900/80 rounded-md border border-white/10 p-2.5">
-                <div class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase">
+              <div class="bg-panel border-border rounded-md border p-2.5">
+                <div
+                  class="text-foreground-subtle text-[11px] font-semibold tracking-wider uppercase"
+                >
                   {{ t('page.profile.recent_momentum') }}
                 </div>
-                <div class="text-surface-100 mt-1 text-sm font-medium">
+                <div class="text-foreground mt-1 text-sm font-medium">
                   {{
                     t('page.profile.recent_momentum_value', {
                       count: formatNumber(recentCompletedTasks),
@@ -44,7 +50,7 @@
               <article
                 v-for="event in timelineEvents"
                 :key="event.key"
-                class="bg-surface-900/70 flex items-start gap-3 rounded-md border border-white/8 p-3"
+                class="bg-panel border-border-muted flex items-start gap-3 rounded-md border p-3"
               >
                 <div
                   class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
@@ -57,14 +63,14 @@
                   />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="text-surface-100 truncate text-sm font-medium">
+                  <div class="text-foreground truncate text-sm font-medium">
                     {{ event.title }}
                   </div>
-                  <div class="text-surface-400 truncate text-xs">
+                  <div class="text-foreground-muted truncate text-xs">
                     {{ event.subtitle }}
                   </div>
                 </div>
-                <div class="text-surface-500 shrink-0 text-[11px]">
+                <div class="text-foreground-subtle shrink-0 text-[11px]">
                   {{ formatDateTime(event.timestamp) }}
                 </div>
               </article>
@@ -90,22 +96,26 @@
       >
         <template #content>
           <div class="space-y-3 p-4 text-sm">
-            <p class="text-surface-200 leading-relaxed">
+            <p class="text-foreground leading-relaxed">
               {{ storyParagraph }}
             </p>
-            <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
-              <div class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase">
+            <div class="bg-panel border-border rounded-md border p-3">
+              <div
+                class="text-foreground-subtle text-[11px] font-semibold tracking-wider uppercase"
+              >
                 {{ t('page.profile.next_milestone') }}
               </div>
-              <p class="text-surface-200 mt-1">
+              <p class="text-foreground mt-1">
                 {{ nextMilestoneCopy }}
               </p>
             </div>
-            <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
-              <div class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase">
+            <div class="bg-panel border-border rounded-md border p-3">
+              <div
+                class="text-foreground-subtle text-[11px] font-semibold tracking-wider uppercase"
+              >
                 {{ t('page.profile.total_actions') }}
               </div>
-              <p class="text-surface-200 mt-1">
+              <p class="text-foreground mt-1">
                 {{
                   t('page.profile.total_actions_value', {
                     count: formatNumber(totalTrackedActions),
@@ -128,7 +138,7 @@
             <article
               v-for="achievement in achievementRows"
               :key="achievement.id"
-              class="bg-surface-900/80 rounded-md border border-white/10 p-3"
+              class="bg-panel border-border rounded-md border p-3"
             >
               <div class="mb-2 flex items-center justify-between gap-2">
                 <div class="flex min-w-0 items-center gap-2 leading-none">
@@ -137,15 +147,15 @@
                     class="h-4.5 w-4.5 shrink-0"
                     :class="achievement.iconClass"
                   />
-                  <span class="text-surface-100 truncate text-sm leading-none font-medium">
+                  <span class="text-foreground truncate text-sm leading-none font-medium">
                     {{ achievement.title }}
                   </span>
                 </div>
-                <span class="text-surface-400 shrink-0 text-xs leading-none">
+                <span class="text-foreground-muted shrink-0 text-xs leading-none">
                   {{ formatNumber(achievement.completed) }}/{{ formatNumber(achievement.total) }}
                 </span>
               </div>
-              <div class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full">
+              <div class="bg-field h-1.5 overflow-hidden rounded-full">
                 <div
                   class="h-full rounded-full transition-[width] duration-300"
                   :class="achievement.barClass"
@@ -165,16 +175,18 @@
       >
         <template #content>
           <div class="space-y-3 p-4 text-sm">
-            <p class="text-surface-100 font-semibold">{{ kappaProjection.headline }}</p>
-            <p class="text-surface-300">{{ kappaProjection.detail }}</p>
+            <p class="text-foreground font-semibold">{{ kappaProjection.headline }}</p>
+            <p class="text-foreground-muted">{{ kappaProjection.detail }}</p>
             <div
               v-if="kappaProjection.etaTimestamp"
-              class="bg-surface-900/80 rounded-md border border-white/10 p-3"
+              class="bg-panel border-border rounded-md border p-3"
             >
-              <div class="text-surface-500 text-[11px] font-semibold tracking-wider uppercase">
+              <div
+                class="text-foreground-subtle text-[11px] font-semibold tracking-wider uppercase"
+              >
                 {{ t('page.profile.estimated_finish') }}
               </div>
-              <p class="text-surface-100 mt-1 text-sm font-medium">
+              <p class="text-foreground mt-1 text-sm font-medium">
                 {{ formatDate(kappaProjection.etaTimestamp) }}
               </p>
             </div>

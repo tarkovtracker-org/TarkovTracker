@@ -13,7 +13,7 @@
         ref="menuRef"
         role="menu"
         tabindex="-1"
-        class="context-menu border-surface-700 bg-surface-900 fixed z-9999 min-w-45 overflow-hidden rounded-lg border shadow-xl"
+        class="context-menu border-border bg-panel shadow-elevated fixed z-9999 min-w-45 overflow-hidden rounded-lg border"
         :style="{ top: `${y}px`, left: `${x}px` }"
         @click.stop
         @keydown="handleMenuKeydown"

@@ -16,7 +16,7 @@
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
           <template v-else>
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
-              <div class="bg-surface-800/50 rounded-lg p-4">
+              <div class="bg-panel border-border shadow-card rounded-lg border p-4">
                 <div class="mb-3 flex items-start justify-between gap-3">
                   <div class="min-w-0 space-y-2">
                     <div class="flex min-w-0 items-center gap-2">
@@ -28,7 +28,7 @@
                           class="text-primary-300 h-4 w-4"
                         />
                       </span>
-                      <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
+                      <h3 class="text-foreground truncate text-lg leading-tight font-semibold">
                         {{ selectedMapData?.name || t('tasks.view.map') }}
                       </h3>
                     </div>
@@ -91,8 +91,10 @@
                         :aria-valuemax="mapHeightMax"
                         :aria-valuenow="mapHeight"
                         tabindex="0"
-                        class="bg-surface-900/60 border-surface-700 text-surface-400 hover:text-surface-200 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                        :class="{ 'ring-primary-500 text-surface-200 ring-1': isResizing }"
+                        class="bg-field border-border text-foreground-subtle hover:bg-interactive hover:text-foreground focus-visible:ring-primary-500 focus-visible:ring-offset-panel mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        :class="{
+                          'ring-primary-500 bg-interactive text-foreground ring-1': isResizing,
+                        }"
                         @pointerdown="startResize"
                         @keydown="onResizeKeydown"
                       >
@@ -135,10 +137,10 @@
                   <div class="flex min-w-0 items-center gap-2">
                     <UIcon name="i-mdi-crosshairs-gps" class="text-primary-400 h-4 w-4 shrink-0" />
                     <div class="min-w-0">
-                      <h3 class="text-surface-100 text-sm font-medium">
+                      <h3 class="text-foreground text-sm font-medium">
                         {{ t('page.tasks.focused_task_section') }}
                       </h3>
-                      <p class="text-surface-400 text-xs">
+                      <p class="text-foreground-subtle text-xs">
                         {{ t('page.tasks.focused_task_description') }}
                       </p>
                     </div>
@@ -171,14 +173,14 @@
               </div>
               <div v-if="pinnedTasksInSlice.length > 0" class="mb-6">
                 <div class="mb-3 flex items-center gap-2">
-                  <div class="bg-surface-700 h-px flex-1" />
+                  <div class="bg-border-muted h-px flex-1" />
                   <div class="flex items-center gap-2">
                     <UIcon name="i-mdi-pin" class="text-primary-400 h-4 w-4" />
-                    <h3 class="text-surface-200 text-sm font-medium">
+                    <h3 class="text-foreground text-sm font-medium">
                       {{ t('page.tasks.pinned_tasks_section') }}
                     </h3>
                   </div>
-                  <div class="bg-surface-700 h-px flex-1" />
+                  <div class="bg-border-muted h-px flex-1" />
                 </div>
                 <div>
                   <div
@@ -227,14 +229,14 @@
               </div>
               <div v-if="globalTasksInSlice.length > 0" class="mt-2 mb-6">
                 <div class="mb-3 flex items-center gap-2">
-                  <div class="bg-surface-700 h-px flex-1" />
+                  <div class="bg-border-muted h-px flex-1" />
                   <div class="flex items-center gap-2">
                     <UIcon name="i-mdi-earth" class="text-primary-400 h-4 w-4" />
-                    <h3 class="text-surface-200 text-sm font-medium">
+                    <h3 class="text-foreground text-sm font-medium">
                       {{ t('page.tasks.global_tasks_section') }}
                     </h3>
                   </div>
-                  <div class="bg-surface-700 h-px flex-1" />
+                  <div class="bg-border-muted h-px flex-1" />
                 </div>
                 <div>
                   <div
@@ -266,7 +268,7 @@
                 ref="loadMoreSentinel"
                 class="flex items-center justify-center py-4"
               >
-                <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
+                <UIcon name="i-mdi-loading" class="text-foreground-subtle h-5 w-5 animate-spin" />
               </div>
             </div>
           </template>
@@ -315,7 +317,7 @@
           v-if="taskStatusUpdated"
           class="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
         >
-          <UCard class="bg-surface-900/95 w-full max-w-xl border border-white/10 shadow-2xl">
+          <UCard class="bg-panel border-border shadow-elevated w-full max-w-xl border">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
               <span
                 class="text-sm sm:text-base"
@@ -349,7 +351,6 @@
 <script setup lang="ts">
   import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import {
     type DashboardFocusProgressInteraction,
     useDashboardFocusAnalytics,
@@ -495,10 +496,10 @@
       valueClass: 'text-info-100',
     },
     default: {
-      badgeClass: 'bg-surface-900/60 border-surface-700',
-      iconClass: 'text-surface-300',
-      labelClass: 'text-surface-300',
-      valueClass: 'text-surface-100',
+      badgeClass: 'bg-field border-border',
+      iconClass: 'text-foreground-subtle',
+      labelClass: 'text-foreground-subtle',
+      valueClass: 'text-foreground',
     },
   };
   const resolveMapTimePeriod = (hour: number): MapTimePeriod => {

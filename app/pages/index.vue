@@ -8,7 +8,7 @@
         <button
           type="button"
           data-testid="dashboard-progress-toggle"
-          class="group text-surface-100 mb-4 flex w-full cursor-pointer items-center text-xl font-semibold"
+          class="text-foreground group mb-4 flex w-full cursor-pointer items-center text-xl font-semibold"
           :aria-expanded="!progressSectionCollapsed"
           @click="progressSectionCollapsed = !progressSectionCollapsed"
         >
@@ -16,15 +16,15 @@
           {{ $t('page.dashboard.progress.title') }}
           <UIcon
             :name="progressSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
-            class="text-surface-400 group-hover:text-surface-200 ml-auto h-5 w-5 transition-colors"
+            class="text-foreground-subtle group-hover:text-foreground-muted ml-auto h-5 w-5 transition-colors"
           />
         </button>
         <div
           v-show="!progressSectionCollapsed"
-          class="bg-surface-950/40 rounded-2xl border border-white/8 p-4 sm:p-5"
+          class="bg-shell/70 border-border shadow-card rounded-2xl border p-4 sm:p-5"
         >
           <div
-            class="text-surface-400 mb-3 flex items-center justify-end gap-1.5 text-[11px] sm:text-xs"
+            class="text-foreground-muted mb-3 flex items-center justify-end gap-1.5 text-[11px] sm:text-xs"
             data-testid="dashboard-filter-notice"
             :data-filter-active="hasDashboardFiltersActive ? 'true' : 'false'"
           >
@@ -33,9 +33,9 @@
                 hasDashboardFiltersActive ? 'i-mdi-filter-variant-minus' : 'i-mdi-filter-variant'
               "
               class="h-3.5 w-3.5 shrink-0"
-              :class="hasDashboardFiltersActive ? 'text-warning-300' : 'text-info-300'"
+              :class="hasDashboardFiltersActive ? 'text-warning-600' : 'text-info-500'"
             />
-            <span :class="hasDashboardFiltersActive ? 'text-warning-200' : 'text-surface-400'">
+            <span :class="hasDashboardFiltersActive ? 'text-warning-700' : 'text-foreground-muted'">
               {{
                 hasDashboardFiltersActive
                   ? $t('page.dashboard.progress.filtered_status_active')
@@ -46,7 +46,7 @@
               <UIcon
                 name="i-mdi-help-circle-outline"
                 class="h-3.5 w-3.5 shrink-0"
-                :class="hasDashboardFiltersActive ? 'text-warning-300' : 'text-info-300'"
+                :class="hasDashboardFiltersActive ? 'text-warning-600' : 'text-info-500'"
                 aria-hidden="true"
               />
             </AppTooltip>
@@ -112,7 +112,7 @@
       <div class="mb-8">
         <button
           type="button"
-          class="group mb-4 flex w-full cursor-pointer items-center text-2xl font-bold text-white"
+          class="text-foreground group mb-4 flex w-full cursor-pointer items-center text-2xl font-bold"
           :aria-expanded="!tradersSectionCollapsed"
           @click="tradersSectionCollapsed = !tradersSectionCollapsed"
         >
@@ -120,7 +120,7 @@
           {{ $t('page.dashboard.traders.title') }}
           <UIcon
             :name="tradersSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
-            class="text-surface-400 group-hover:text-surface-200 ml-auto h-5 w-5 transition-colors"
+            class="text-foreground-subtle group-hover:text-foreground-muted ml-auto h-5 w-5 transition-colors"
           />
         </button>
         <div
@@ -144,7 +144,7 @@
       <div class="content-visibility-auto-240">
         <button
           type="button"
-          class="group mb-4 flex w-full cursor-pointer items-center text-2xl font-bold text-white"
+          class="text-foreground group mb-4 flex w-full cursor-pointer items-center text-2xl font-bold"
           :aria-expanded="!milestonesSectionCollapsed"
           @click="milestonesSectionCollapsed = !milestonesSectionCollapsed"
         >
@@ -152,7 +152,7 @@
           {{ $t('page.dashboard.milestones.title') }}
           <UIcon
             :name="milestonesSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
-            class="text-surface-400 group-hover:text-surface-200 ml-auto h-5 w-5 transition-colors"
+            class="text-foreground-subtle group-hover:text-foreground-muted ml-auto h-5 w-5 transition-colors"
           />
         </button>
         <div
@@ -165,6 +165,7 @@
             :is-achieved="totalTasksPercentageNum >= 25"
             achieved-icon="i-mdi-check-circle"
             unachieved-icon="i-mdi-circle-outline"
+            :progress-value="getMilestoneProgress(25)"
             color="primary"
           />
           <DashboardMilestoneCard
@@ -173,6 +174,7 @@
             :is-achieved="totalTasksPercentageNum >= 50"
             achieved-icon="i-mdi-check-circle"
             unachieved-icon="i-mdi-circle-outline"
+            :progress-value="getMilestoneProgress(50)"
             color="info"
           />
           <DashboardMilestoneCard
@@ -181,6 +183,7 @@
             :is-achieved="totalTasksPercentageNum >= 75"
             achieved-icon="i-mdi-check-circle"
             unachieved-icon="i-mdi-circle-outline"
+            :progress-value="getMilestoneProgress(75)"
             color="success"
           />
           <DashboardMilestoneCard
@@ -260,4 +263,6 @@
       dashboardStats.totalLightkeeperTasks.value
     )
   );
+  const getMilestoneProgress = (target: number): number =>
+    Math.max(0, Math.min(100, (totalTasksPercentageNum.value / target) * 100));
 </script>

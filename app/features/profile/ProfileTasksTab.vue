@@ -21,19 +21,19 @@
           >
             <UIcon :name="section.icon" class="h-5 w-5" :class="section.iconClass" />
           </div>
-          <span class="text-surface-100 text-sm font-semibold">{{ section.label }}</span>
+          <span class="text-foreground text-sm font-semibold">{{ section.label }}</span>
           <UBadge color="neutral" variant="soft" size="xs">
             {{ section.tasks.length }}
           </UBadge>
           <UIcon
             name="i-mdi-chevron-down"
-            class="text-surface-400 ml-auto h-5 w-5 transition-transform duration-200"
+            class="text-foreground-muted ml-auto h-5 w-5 transition-transform duration-200"
             :class="collapsedSections.has(section.key) ? '-rotate-90' : ''"
           />
         </button>
         <div
           v-if="section.tasks.length && !collapsedSections.has(section.key)"
-          class="bg-surface-900 rounded-lg border border-white/10"
+          class="bg-panel border-border rounded-lg border"
         >
           <div v-for="(task, idx) in section.tasks" :key="task.id">
             <button
@@ -41,7 +41,7 @@
               class="flex w-full items-center gap-2 px-3 py-2 text-left"
               :class="[
                 idx !== section.tasks.length - 1 && !expandedTasks.has(task.id)
-                  ? 'border-b border-white/5'
+                  ? 'border-border-muted border-b'
                   : '',
                 isTaskSuccessful(task.id) ? 'opacity-50' : '',
               ]"
@@ -52,12 +52,12 @@
                 class="h-4 w-4 shrink-0"
                 :class="taskStatusColor(task.id)"
               />
-              <span class="text-surface-200 min-w-0 flex-1 truncate text-sm">
+              <span class="text-foreground min-w-0 flex-1 truncate text-sm">
                 {{ task.name || t('page.profile.task_fallback') }}
               </span>
               <span
                 v-if="task.trader?.name"
-                class="text-surface-500 hidden shrink-0 text-xs sm:inline"
+                class="text-foreground-subtle hidden shrink-0 text-xs sm:inline"
               >
                 {{ task.trader.name }}
               </span>
@@ -82,18 +82,18 @@
               />
               <UIcon
                 name="i-mdi-chevron-down"
-                class="text-surface-500 h-4 w-4 shrink-0 transition-transform duration-200"
+                class="text-foreground-subtle h-4 w-4 shrink-0 transition-transform duration-200"
                 :class="expandedTasks.has(task.id) ? 'rotate-180' : ''"
               />
             </button>
             <div
               v-if="expandedTasks.has(task.id)"
-              class="border-b border-white/5 px-3 pb-3"
+              class="border-border-muted border-b px-3 pb-3"
               :class="idx !== section.tasks.length - 1 ? '' : 'border-b-0'"
             >
               <div
                 v-if="task.objectives?.length"
-                class="bg-surface-950/50 ml-6 space-y-1 rounded-md border border-white/5 p-2"
+                class="bg-shell border-border-muted ml-6 space-y-1 rounded-md border p-2"
               >
                 <div
                   v-for="objective in task.objectives"
@@ -105,18 +105,18 @@
                     class="mt-0.5 h-3.5 w-3.5 shrink-0"
                     :class="objectiveColor(objective.id)"
                   />
-                  <span class="text-surface-300 text-xs leading-relaxed">
+                  <span class="text-foreground-muted text-xs leading-relaxed">
                     {{ objective.description || t('page.profile.objective_fallback') }}
                   </span>
                   <span
                     v-if="objective.count && objective.count > 1"
-                    class="text-surface-500 ml-auto shrink-0 text-xs"
+                    class="text-foreground-subtle ml-auto shrink-0 text-xs"
                   >
                     {{ objectiveCount(objective.id) }}/{{ objective.count }}
                   </span>
                 </div>
               </div>
-              <div v-else class="text-surface-500 ml-6 py-1 text-xs">
+              <div v-else class="text-foreground-subtle ml-6 py-1 text-xs">
                 {{ t('page.profile.no_objectives') }}
               </div>
             </div>
@@ -230,7 +230,7 @@
   const objectiveColor = (objectiveId: string): string => {
     return props.objectiveCompletions[objectiveId]?.complete
       ? 'text-success-400'
-      : 'text-surface-500';
+      : 'text-foreground-subtle';
   };
   const objectiveCount = (objectiveId: string): number => {
     return props.objectiveCompletions[objectiveId]?.count ?? 0;

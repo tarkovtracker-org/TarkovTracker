@@ -1,8 +1,8 @@
 <template>
   <div
-    class="bg-surface-900 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/12 px-3 py-2 shadow-sm sm:px-4"
+    class="bg-panel border-border shadow-card flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 sm:px-4"
   >
-    <span class="text-surface-300 text-xs sm:text-sm">
+    <span class="text-foreground-muted text-xs sm:text-sm">
       {{ t(noticeKey, { count }) }}
     </span>
     <UButton
@@ -18,7 +18,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   const { t } = useI18n({ useScope: 'global' });
   const props = defineProps<{
     count: number;

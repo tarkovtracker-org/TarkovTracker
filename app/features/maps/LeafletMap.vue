@@ -2,19 +2,19 @@
   <div
     ref="mapSurfaceRef"
     tabindex="0"
-    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 relative isolate w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+    class="focus-visible:ring-primary-500 focus-visible:ring-offset-panel relative isolate w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     @pointerdown.capture="focusMapSurface"
   >
     <div
       v-if="isMapUnavailable"
-      class="bg-surface-900 flex h-100 w-full flex-col items-center justify-center rounded sm:h-125 lg:h-150"
+      class="bg-panel flex h-100 w-full flex-col items-center justify-center rounded sm:h-125 lg:h-150"
       :style="mapHeightStyle"
     >
-      <UIcon name="i-mdi-map-marker-off" class="text-surface-500 mb-4 h-16 w-16" />
-      <h3 class="text-surface-300 mb-2 text-lg font-semibold">
+      <UIcon name="i-mdi-map-marker-off" class="text-foreground-subtle mb-4 h-16 w-16" />
+      <h3 class="text-foreground mb-2 text-lg font-semibold">
         {{ t('maps.not_available_title') }}
       </h3>
-      <p class="text-surface-500 max-w-md text-center text-sm">
+      <p class="text-foreground-muted max-w-md text-center text-sm">
         {{
           t('maps.not_available_description', {
             mapName: props.map?.name || t('maps.placeholder'),
@@ -25,9 +25,9 @@
     <template v-else>
       <div
         v-if="hasMultipleFloors"
-        class="bg-surface-800/90 absolute top-2 left-2 z-1000 flex flex-col gap-1 rounded p-1.5"
+        class="bg-shell/90 border-border shadow-card absolute top-2 left-2 z-1000 flex flex-col gap-1 rounded border p-1.5"
       >
-        <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
+        <span class="text-foreground-muted px-1 text-[10px] font-medium tracking-wide uppercase">
           {{ t('maps.floors') }}
         </span>
         <div class="flex flex-col-reverse gap-1">
@@ -49,12 +49,12 @@
       </div>
       <div
         v-if="isLoading"
-        class="bg-surface-900/50 absolute inset-0 z-1001 flex items-center justify-center"
+        class="absolute inset-0 z-1001 flex items-center justify-center bg-[var(--theme-overlay)]"
       >
-        <UIcon name="i-mdi-loading" class="text-surface-200 h-8 w-8 animate-spin" />
+        <UIcon name="i-mdi-loading" class="text-foreground h-8 w-8 animate-spin" />
       </div>
       <div
-        class="bg-surface-800/90 absolute top-2 right-2 z-1000 flex flex-wrap items-center gap-2 rounded p-1.5"
+        class="bg-shell/90 border-border shadow-card absolute top-2 right-2 z-1000 flex flex-wrap items-center gap-2 rounded border p-1.5"
       >
         <UButton
           v-if="props.showExtractToggle"
@@ -103,14 +103,14 @@
           </UButton>
           <template #content>
             <div
-              class="bg-surface-900 border-surface-700 w-72 space-y-3 rounded-md border p-3 md:w-80"
+              class="bg-panel border-border shadow-card w-72 space-y-3 rounded-md border p-3 md:w-80"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="space-y-0.5">
-                  <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wide uppercase">
                     {{ t('settings.interface.maps.colors.title') }}
                   </p>
-                  <p class="text-surface-400 text-xs">
+                  <p class="text-foreground-muted text-xs">
                     {{ t('settings.interface.maps.colors.description') }}
                   </p>
                 </div>
@@ -127,14 +127,14 @@
                 <label
                   v-for="option in mapColorOptions"
                   :key="option.key"
-                  class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
+                  class="bg-shell border-border flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
                 >
                   <span class="flex min-w-0 items-center gap-2">
                     <span
-                      class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
+                      class="border-border-muted h-3.5 w-3.5 shrink-0 rounded-full border"
                       :style="{ backgroundColor: mapColors[option.key] }"
                     />
-                    <span class="text-surface-200 truncate text-[11px] font-medium">
+                    <span class="text-foreground truncate text-[11px] font-medium">
                       {{ option.label }}
                     </span>
                   </span>
@@ -142,7 +142,7 @@
                     :aria-label="option.label"
                     :value="mapColors[option.key]"
                     type="color"
-                    class="bg-surface-900 border-surface-700 h-7 w-10 shrink-0 cursor-pointer rounded border p-1"
+                    class="bg-field border-border h-7 w-10 shrink-0 cursor-pointer rounded border p-1"
                     @input="onMapColorInput(option.key, $event)"
                   />
                 </label>
@@ -161,17 +161,17 @@
             :aria-label="t('maps.map_settings')"
           />
           <template #content>
-            <div class="bg-surface-900 border-surface-700 w-56 space-y-2 rounded-md border p-3">
-              <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+            <div class="bg-panel border-border shadow-card w-56 space-y-2 rounded-md border p-3">
+              <p class="text-foreground text-xs font-semibold tracking-wide uppercase">
                 {{ t('maps.map_settings') }}
               </p>
               <div class="space-y-2">
                 <div class="space-y-1">
                   <div
-                    class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                    class="text-foreground-muted flex items-center justify-between text-[10px] font-semibold uppercase"
                   >
                     <span>{{ t('maps.zoom_speed') }}</span>
-                    <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
+                    <span class="text-foreground tabular-nums">{{ zoomSpeedLabel }}</span>
                   </div>
                   <input
                     v-model.number="mapZoomSpeed"
@@ -179,16 +179,16 @@
                     :min="ZOOM_SPEED_MIN"
                     :max="ZOOM_SPEED_MAX"
                     step="0.1"
-                    class="accent-surface-200 h-1.5 w-full cursor-pointer"
+                    class="accent-primary-500 h-1.5 w-full cursor-pointer"
                     :aria-label="t('maps.aria.zoom_speed')"
                   />
                 </div>
                 <div class="space-y-1">
                   <div
-                    class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                    class="text-foreground-muted flex items-center justify-between text-[10px] font-semibold uppercase"
                   >
                     <span>{{ t('maps.pan_speed') }}</span>
-                    <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
+                    <span class="text-foreground tabular-nums">{{ panSpeedLabel }}</span>
                   </div>
                   <input
                     v-model.number="mapPanSpeed"
@@ -196,16 +196,16 @@
                     :min="PAN_SPEED_MIN"
                     :max="PAN_SPEED_MAX"
                     step="0.1"
-                    class="accent-surface-200 h-1.5 w-full cursor-pointer"
+                    class="accent-primary-500 h-1.5 w-full cursor-pointer"
                     :aria-label="t('maps.aria.pan_speed')"
                   />
                 </div>
                 <div class="space-y-1">
                   <div
-                    class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                    class="text-foreground-muted flex items-center justify-between text-[10px] font-semibold uppercase"
                   >
                     <span>{{ t('maps.zone_opacity') }}</span>
-                    <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
+                    <span class="text-foreground tabular-nums">{{ zoneOpacityLabel }}</span>
                   </div>
                   <input
                     v-model.number="mapZoneOpacity"
@@ -213,7 +213,7 @@
                     :min="ZONE_OPACITY_MIN"
                     :max="ZONE_OPACITY_MAX"
                     step="0.01"
-                    class="accent-surface-200 h-1.5 w-full cursor-pointer"
+                    class="accent-primary-500 h-1.5 w-full cursor-pointer"
                     :aria-label="t('maps.aria.zone_opacity')"
                   />
                 </div>
@@ -225,7 +225,7 @@
       <div class="relative">
         <div
           ref="mapContainer"
-          class="bg-surface-900 h-100 w-full rounded sm:h-125 lg:h-150"
+          class="bg-panel h-100 w-full rounded sm:h-125 lg:h-150"
           :style="mapHeightStyle"
         />
         <div
@@ -234,10 +234,10 @@
           class="pointer-events-none absolute inset-0 z-1000"
         >
           <div
-            class="border-surface-50/80 bg-surface-950/40 ring-surface-950/80 absolute top-1/2 left-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border ring-1"
+            class="bg-shell/70 border-border-muted ring-border absolute top-1/2 left-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border ring-1"
           >
             <div
-              class="bg-surface-50 absolute top-1/2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              class="bg-foreground absolute top-1/2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
             />
           </div>
         </div>
@@ -245,18 +245,18 @@
       <div class="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-4">
         <div
           v-if="props.showLegend"
-          class="text-surface-300 flex flex-wrap items-center gap-4 text-xs"
+          class="text-foreground-muted flex flex-wrap items-center gap-4 text-xs"
         >
           <div class="flex items-center gap-1">
             <div
-              class="h-3 w-3 rounded-full border border-white/30"
+              class="border-border-muted h-3 w-3 rounded-full border"
               :style="{ backgroundColor: mapColors.SELF_OBJECTIVE }"
             />
             <span>{{ t('maps.legend.your_objectives') }}</span>
           </div>
           <div class="flex items-center gap-1">
             <div
-              class="h-3 w-3 rounded-full border border-white/30"
+              class="border-border-muted h-3 w-3 rounded-full border"
               :style="{ backgroundColor: mapColors.TEAM_OBJECTIVE }"
             />
             <span>{{ t('maps.legend.team_objectives') }}</span>
@@ -305,32 +305,32 @@
           </div>
         </div>
         <div
-          class="text-surface-400 ml-auto flex flex-wrap-reverse items-center justify-end gap-x-4 gap-y-1 text-[10px] font-medium"
+          class="text-foreground-subtle ml-auto flex flex-wrap-reverse items-center justify-end gap-x-4 gap-y-1 text-[10px] font-medium"
         >
           <div class="flex items-center gap-1">
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">WASD</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">WASD</kbd>
             <span>/</span>
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">←↑↓→</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">←↑↓→</kbd>
             <span>{{ t('maps.controls.keyboard.pan') }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">Q/E</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">Q/E</kbd>
             <span>{{ t('maps.controls.keyboard.zoom_keys') }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">F</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">F</kbd>
             <span>{{ t('maps.controls.keyboard.click') }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">R</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">R</kbd>
             <span>{{ t('maps.controls.keyboard.reset') }}</span>
           </div>
           <div v-if="hasMultipleFloors" class="flex items-center gap-1">
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">Ctrl</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">Ctrl</kbd>
             <span>{{ t('maps.controls.keyboard.cycle_floors') }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <kbd class="bg-surface-700 text-surface-300 rounded px-1 py-0.5 font-mono">Shift</kbd>
+            <kbd class="bg-field text-foreground-muted rounded px-1 py-0.5 font-mono">Shift</kbd>
             <span>{{ t('maps.controls.keyboard.zoom') }}</span>
           </div>
         </div>
@@ -341,7 +341,6 @@
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
   import { createApp } from 'vue';
-  import { useI18n } from 'vue-i18n';
   import { useLeafletMap } from '@/composables/useLeafletMap';
   import {
     MAP_BUTTON_ACTIVE_CLASS,

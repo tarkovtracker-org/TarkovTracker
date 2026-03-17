@@ -1,23 +1,26 @@
 <template>
-  <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
+  <section class="bg-field border-border-muted rounded-lg border p-3">
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-cog" class="text-warning-400 h-4 w-4" />
-      <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
+      <h3 class="text-foreground text-xs font-semibold tracking-wide uppercase">
         {{ t('page.tasks.settings.tabs.advanced') }}
       </h3>
     </div>
     <div class="space-y-1">
       <label
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="enableManualTaskFailModel" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t('page.tasks.settings.advanced.manual_fail_actions') }}
         </span>
       </label>
-      <div v-if="failedTasksCount > 0" class="bg-surface-900/50 mt-2 rounded p-2">
+      <div
+        v-if="failedTasksCount > 0"
+        class="bg-raised border-border-muted mt-2 rounded border p-2"
+      >
         <div class="mb-1.5 flex items-center justify-between">
-          <span class="text-surface-400 text-xs">
+          <span class="text-foreground-subtle text-xs">
             {{ t('page.tasks.settings.advanced.failed_tasks_label') }}
           </span>
           <UBadge color="warning" variant="soft" size="xs">

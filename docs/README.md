@@ -8,6 +8,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 - **Frontend**: Vue 3 SFCs (`<script setup lang="ts">`), Pinia state, @nuxt/ui v4, Tailwind CSS v4.
 - **Backend**: Supabase (Auth, DB, Realtime) + Cloudflare Workers (Gateway).
 - **Styling**: Strictly use Tailwind v4 theme layer (`@theme {}`). No hex colors or legacy UI patterns.
+- **Theme Tokens**: [`docs/theme-token-system.md`](./theme-token-system.md) explains the light/dark token layer and semantic utility contract.
 - **Philosophy**: Pragmatic flat structure. Shallow nesting (e.g., [`app/shell/`](../app/shell/)). Avoid unnecessary abstractions.
 - **Conventions**: 2-space indent, 100-char width. Group imports (builtin → external → internal). Use `@/` aliases.
 

@@ -1,52 +1,52 @@
 <template>
-  <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
+  <section class="bg-field border-border-muted rounded-lg border p-3">
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-card-text" class="text-info-400 h-4 w-4" />
-      <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
+      <h3 class="text-foreground text-xs font-semibold tracking-wide uppercase">
         {{ t('page.tasks.settings.tabs.appearance') }}
       </h3>
     </div>
-    <p class="text-surface-500 mb-2 text-xs">
+    <p class="text-foreground-subtle mb-2 text-xs">
       {{ t('page.tasks.settings.appearance.hint') }}
     </p>
     <div class="space-y-1">
       <label
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="showRequiredLabelsModel" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t('page.tasks.settings.appearance.required_labels') }}
         </span>
       </label>
       <label
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="showExperienceRewardsModel" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t('page.tasks.settings.appearance.experience_rewards') }}
         </span>
       </label>
       <label
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="showNextQuestsModel" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t('page.tasks.settings.appearance.next_tasks') }}
         </span>
       </label>
       <label
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="showPreviousQuestsModel" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t('page.tasks.settings.appearance.previous_tasks') }}
         </span>
       </label>
       <label
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="hideCompletedTaskObjectivesModel" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t('page.tasks.settings.appearance.collapse_completed_objectives') }}
         </span>
       </label>

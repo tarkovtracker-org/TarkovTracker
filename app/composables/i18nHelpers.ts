@@ -1,4 +1,3 @@
-import { useI18n } from 'vue-i18n';
 import { resolveAppLocale } from '@/utils/locales';
 import { logger } from '@/utils/logger';
 import { parseBootstrapPreferencesState } from '@/utils/preferencesStorage';

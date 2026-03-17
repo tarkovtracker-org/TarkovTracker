@@ -5,7 +5,7 @@
     :role="isOverlayMode ? 'dialog' : 'complementary'"
     :aria-modal="isOverlayMode ? 'true' : undefined"
     aria-labelledby="needed-items-settings-drawer-title"
-    class="bg-surface-800/95 w-72 overflow-y-auto rounded-lg border border-white/10 p-4 shadow-xl backdrop-blur-sm"
+    class="bg-panel border-border shadow-elevated w-72 overflow-y-auto rounded-lg border p-4 backdrop-blur-sm"
     :class="
       isOverlayMode
         ? 'fixed top-1/2 right-4 z-40 h-fit max-h-[calc(100vh-6rem)] -translate-y-1/2'
@@ -14,7 +14,7 @@
     @keydown="handleKeydown"
   >
     <div class="mb-3 flex items-center justify-between">
-      <h2 id="needed-items-settings-drawer-title" class="text-sm font-semibold text-white">
+      <h2 id="needed-items-settings-drawer-title" class="text-foreground text-sm font-semibold">
         {{ t('page.needed_items.settings.title', 'Needed Items Settings') }}
       </h2>
       <UButton
@@ -27,22 +27,24 @@
       />
     </div>
     <div class="space-y-3">
-      <div class="rounded-lg border border-white/10 p-3">
+      <div class="bg-field border-border-muted rounded-lg border p-3">
         <div class="mb-2">
-          <h3 class="text-surface-200 text-[10px] font-semibold tracking-wider uppercase">
+          <h3 class="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">
             {{ t('page.needed_items.filters.label') }}
           </h3>
         </div>
         <div class="space-y-2">
-          <div
-            class="bg-surface-900/60 flex items-center gap-1 rounded-md border border-white/10 p-1"
-          >
+          <div class="bg-raised border-border-muted flex items-center gap-1 rounded-md border p-1">
             <UButton
               variant="ghost"
               color="neutral"
               size="xs"
               class="flex-1"
-              :class="firFilter === 'all' ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                firFilter === 'all'
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+              "
               @click="firFilter = 'all'"
             >
               {{ t('page.tasks.primary_views.all') }}
@@ -52,7 +54,11 @@
               color="neutral"
               size="xs"
               class="flex-1"
-              :class="firFilter === 'fir' ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                firFilter === 'fir'
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+              "
               @click="firFilter = 'fir'"
             >
               {{ t('page.needed_items.filters.fir') }}
@@ -62,7 +68,11 @@
               color="neutral"
               size="xs"
               class="flex-1"
-              :class="firFilter === 'non-fir' ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                firFilter === 'non-fir'
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+              "
               @click="firFilter = 'non-fir'"
             >
               {{ t('page.needed_items.filters.non_fir') }}
@@ -94,9 +104,9 @@
           />
         </div>
       </div>
-      <div class="rounded-lg border border-white/10 p-3">
+      <div class="bg-field border-border-muted rounded-lg border p-3">
         <div class="mb-2">
-          <h3 class="text-surface-200 text-[10px] font-semibold tracking-wider uppercase">
+          <h3 class="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">
             {{ t('page.tasks.settings.tabs.appearance') }}
           </h3>
         </div>
@@ -108,7 +118,9 @@
               size="xs"
               icon="i-mdi-view-list"
               :class="
-                !groupByItem && viewMode === 'list' ? 'bg-white/10 text-white' : 'text-surface-300'
+                !groupByItem && viewMode === 'list'
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
               "
               @click="setListView"
             >
@@ -120,7 +132,9 @@
               size="xs"
               icon="i-mdi-view-grid"
               :class="
-                !groupByItem && viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-surface-300'
+                !groupByItem && viewMode === 'grid'
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
               "
               @click="setGridView"
             >
@@ -131,7 +145,11 @@
               color="neutral"
               size="xs"
               icon="i-mdi-group"
-              :class="groupByItem ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                groupByItem
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+              "
               @click="setGroupedView"
             >
               {{ t('page.needed_items.view.combined') }}
@@ -158,7 +176,6 @@
   </aside>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
   type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
   type ViewMode = 'list' | 'grid';

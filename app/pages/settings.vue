@@ -14,7 +14,7 @@
         <template #content>
           <div class="grid gap-4 px-4 py-4 md:grid-cols-2">
             <div class="space-y-2">
-              <p class="text-surface-200 text-sm font-semibold">
+              <p class="text-foreground text-sm font-semibold">
                 {{ $t('settings.game_profile.game_edition') }}
               </p>
               <SelectMenuFixed
@@ -23,12 +23,12 @@
                 value-key="value"
               >
                 <template #leading>
-                  <UIcon name="i-mdi-gift-open" class="text-surface-300 h-4 w-4" />
+                  <UIcon name="i-mdi-gift-open" class="text-foreground-subtle h-4 w-4" />
                 </template>
               </SelectMenuFixed>
             </div>
             <div class="space-y-2">
-              <p class="text-surface-200 text-sm font-semibold">
+              <p class="text-foreground text-sm font-semibold">
                 {{ $t('settings.prestige.current_level') }}
               </p>
               <SelectMenuFixed
@@ -49,6 +49,7 @@
           </div>
         </template>
       </GenericCard>
+      <AppearanceCard />
       <TaskDisplayCard />
       <MapSettingsCard />
       <SkillsCard />
@@ -57,6 +58,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import AppearanceCard from '@/features/settings/AppearanceCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';

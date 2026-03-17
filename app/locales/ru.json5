@@ -1179,6 +1179,7 @@
   settings: {
     title: 'Настройки',
     locale: 'Язык',
+    theme: 'Theme',
     tabs: {
       gameplay: 'Геймплей',
       interface: 'Интерфейс',
@@ -1202,6 +1203,13 @@
     },
     interface: {
       title: 'Настройка интерфейса',
+      appearance: {
+        title: 'Внешний вид',
+        description: 'Выберите предпочитаемую тему интерфейса.',
+        mode: 'Режим темы',
+        light: 'Светлая',
+        dark: 'Тёмная',
+      },
       tasks: {
         title: 'Карточки заданий',
         show_required: 'Показывать значки требований',
@@ -1688,4 +1696,3 @@
     close_button: 'Закрыть',
   },
 }
-

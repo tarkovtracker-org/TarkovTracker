@@ -2,7 +2,7 @@
   <Transition name="fade">
     <button
       v-show="visible"
-      class="border-surface-600 bg-surface-800/90 text-surface-300 hover:border-primary-700 hover:bg-surface-700/90 hover:text-primary-400 fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium shadow-lg backdrop-blur-sm transition-colors"
+      class="border-border bg-panel/90 text-foreground-muted shadow-card hover:border-border-strong hover:bg-raised/95 hover:text-foreground fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium backdrop-blur-sm transition-colors"
       :aria-label="t('common.back_to_top')"
       @click="scrollToTop"
     >

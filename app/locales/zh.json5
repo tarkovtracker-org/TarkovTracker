@@ -1179,6 +1179,7 @@
   settings: {
     title: '设置',
     locale: '语言',
+    theme: 'Theme',
     tabs: {
       gameplay: '游戏玩法',
       interface: '界面',
@@ -1202,6 +1203,13 @@
     },
     interface: {
       title: '界面定制',
+      appearance: {
+        title: '外观',
+        description: '选择你偏好的界面主题。',
+        mode: '主题模式',
+        light: '浅色',
+        dark: '深色',
+      },
       tasks: {
         title: '任务卡片',
         show_required: '显示必需标签',
@@ -1688,4 +1696,3 @@
     close_button: '关闭',
   },
 }
-

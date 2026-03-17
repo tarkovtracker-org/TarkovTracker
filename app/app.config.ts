@@ -17,7 +17,7 @@ const uiConfig = {
   },
   header: {
     slots: {
-      root: 'fixed top-0 inset-x-0 z-50 backdrop-blur-sm bg-gradient-to-tr from-surface-800/95 to-surface-950/95 border-b border-surface-700/70 h-[var(--ui-header-height)]',
+      root: 'fixed top-0 inset-x-0 z-50 h-[var(--ui-header-height)] border-b border-border backdrop-blur-sm bg-shell',
       container: 'h-full px-3 flex items-center gap-3',
       left: 'flex items-center gap-2',
       default: 'flex-1 min-w-0',
@@ -29,9 +29,9 @@ const uiConfig = {
   tooltip: {
     slots: {
       content:
-        'z-[9999] bg-surface-800 text-surface-100 px-2.5 py-1.5 rounded-md shadow-lg border border-surface-700',
+        'z-[9999] rounded-md border border-border bg-raised px-2.5 py-1.5 text-foreground shadow-card',
       text: 'font-normal',
-      arrow: 'fill-surface-800',
+      arrow: 'fill-raised',
     },
   },
   // Popover configuration to ensure proper display above other content
@@ -48,23 +48,23 @@ const uiConfig = {
     slots: {
       trigger: 'ring-0 outline-none',
       content:
-        'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-[140px] ring-0',
+        'z-[9999] min-w-[140px] rounded-lg border border-border bg-panel shadow-elevated ring-0',
       group: 'p-1',
-      label: 'px-2 py-1.5 text-xs font-semibold text-surface-400',
-      separator: '-mx-1 my-1 h-px bg-surface-700',
-      item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white',
-      itemLeadingIcon: 'text-surface-400 shrink-0 size-4',
-      itemTrailingIcon: 'text-surface-400 shrink-0 size-4',
+      label: 'px-2 py-1.5 text-xs font-semibold text-foreground-subtle',
+      separator: '-mx-1 my-1 h-px bg-border',
+      item: 'px-3 py-2 text-sm cursor-pointer rounded text-foreground-muted transition-colors data-[highlighted]:bg-interactive data-[highlighted]:text-foreground',
+      itemLeadingIcon: 'text-foreground-subtle shrink-0 size-4',
+      itemTrailingIcon: 'text-foreground-subtle shrink-0 size-4',
     },
   },
   input: {
     slots: {
-      base: 'placeholder:text-surface-500',
+      base: 'placeholder:text-foreground-subtle',
     },
     variants: {
       variant: {
         outline:
-          'text-surface-100 bg-surface-800 border border-surface-700 focus:border-surface-500 ring-0 outline-none',
+          'border border-border bg-field text-foreground ring-0 outline-none focus:border-border-strong',
       },
     },
   },
@@ -77,46 +77,47 @@ const uiConfig = {
     slots: {
       base: 'relative w-full',
       input:
-        'h-11 bg-surface-900 border border-white/15 text-surface-50 placeholder:text-surface-500 rounded-md pl-10 pr-3 py-2 focus:border-surface-500 ring-0 outline-none',
-      leading: 'absolute inset-y-0 left-3 flex items-center pointer-events-none text-surface-300',
+        'h-11 rounded-md border border-border-muted bg-field py-2 pl-10 pr-3 text-foreground placeholder:text-foreground-subtle ring-0 outline-none focus:border-border-strong',
+      leading:
+        'absolute inset-y-0 left-3 flex items-center pointer-events-none text-foreground-muted',
       options: 'z-[9999] max-h-60 overflow-auto !w-max',
     },
   },
   // SelectMenu configuration (Nuxt UI v4 slots)
   selectMenu: {
     slots: {
-      base: 'bg-surface-900 border border-surface-700 rounded-md px-3 py-2 cursor-pointer ring-0 outline-none',
-      leading: 'shrink-0 text-surface-300',
-      trailing: 'shrink-0 text-surface-400',
-      value: 'text-surface-100',
-      placeholder: 'text-surface-500',
+      base: 'cursor-pointer rounded-md border border-border bg-field px-3 py-2 ring-0 outline-none',
+      leading: 'shrink-0 text-foreground-muted',
+      trailing: 'shrink-0 text-foreground-subtle',
+      value: 'text-foreground',
+      placeholder: 'text-foreground-subtle',
       content:
-        'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] !w-[var(--reka-combobox-trigger-width)]',
+        'z-[9999] !w-[var(--reka-combobox-trigger-width)] rounded-lg border border-border bg-panel shadow-elevated',
       viewport: 'p-1 max-h-60 overflow-y-auto',
       group: '',
-      empty: 'px-3 py-2 text-sm text-surface-500 text-center',
-      label: 'px-2 py-1.5 text-xs font-semibold text-surface-400',
-      separator: '-mx-1 my-1 h-px bg-surface-700',
-      item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
-      itemLeadingIcon: 'text-surface-400 shrink-0',
+      empty: 'px-3 py-2 text-center text-sm text-foreground-subtle',
+      label: 'px-2 py-1.5 text-xs font-semibold text-foreground-subtle',
+      separator: '-mx-1 my-1 h-px bg-border',
+      item: 'px-3 py-2 text-sm cursor-pointer rounded text-foreground-muted transition-colors data-[highlighted]:bg-interactive data-[highlighted]:text-foreground data-[state=checked]:bg-selected-surface data-[state=checked]:text-foreground data-[state=checked]:font-medium',
+      itemLeadingIcon: 'text-foreground-subtle shrink-0',
       itemLeadingAvatar: 'shrink-0',
       itemLeadingChip: 'shrink-0',
       itemLabel: 'whitespace-nowrap',
       itemTrailing: 'ms-auto',
-      itemTrailingIcon: 'text-surface-400 shrink-0',
+      itemTrailingIcon: 'text-foreground-subtle shrink-0',
     },
   },
   // Modal configuration with proper z-index stacking
   modal: {
     slots: {
       // Overlay must be above all content
-      overlay: 'fixed inset-0 z-[60] bg-surface-900/75',
+      overlay: 'fixed inset-0 z-[60] bg-[var(--theme-overlay)]',
       // Content panel - must be above overlay with proper centering
       content:
         'fixed inset-0 z-[61] flex items-center justify-center p-4 overflow-y-auto pointer-events-none',
       // Actual modal content wrapper
       wrapper:
-        'relative w-full max-w-md bg-surface-800 border border-surface-700 rounded-lg shadow-xl pointer-events-auto',
+        'relative w-full max-w-md pointer-events-auto rounded-lg border border-border bg-panel shadow-elevated',
     },
   },
   // Badge configuration for custom colors
@@ -157,7 +158,7 @@ const uiConfig = {
   // Button configuration - neutral default, tan only for CTAs
   button: {
     slots: {
-      base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 focus-visible:ring-2 focus-visible:ring-offset-2 focus:outline-none',
+      base: 'focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas focus:outline-none',
     },
     defaultVariants: {
       color: 'neutral',
@@ -168,7 +169,7 @@ const uiConfig = {
         color: 'primary',
         variant: 'solid',
         class:
-          'bg-primary-500 hover:bg-primary-400 active:bg-primary-600 text-surface-950 font-medium',
+          'bg-primary-500 hover:bg-primary-400 active:bg-primary-600 text-[color:var(--color-secondary-950)] font-medium',
       },
       {
         color: 'primary',
@@ -193,27 +194,27 @@ const uiConfig = {
       {
         color: 'neutral',
         variant: 'solid',
-        class: 'bg-surface-700 hover:bg-surface-600 text-surface-100',
+        class: 'bg-interactive hover:bg-interactive-hover text-foreground',
       },
       {
         color: 'neutral',
         variant: 'soft',
-        class: 'bg-surface-800 hover:bg-surface-700 text-surface-200',
+        class: 'bg-raised hover:bg-interactive text-foreground-muted',
       },
       {
         color: 'neutral',
         variant: 'ghost',
-        class: 'text-surface-300 hover:bg-surface-800 hover:text-surface-100',
+        class: 'text-foreground-muted hover:bg-interactive hover:text-foreground',
       },
       {
         color: 'neutral',
         variant: 'outline',
-        class: 'ring ring-inset ring-surface-600 text-surface-300 hover:bg-surface-800',
+        class: 'ring ring-inset ring-border text-foreground-muted hover:bg-interactive',
       },
       {
         color: 'neutral',
         variant: 'link',
-        class: 'text-surface-300 hover:text-surface-100 underline-offset-4 hover:underline',
+        class: 'text-foreground-muted hover:text-foreground underline-offset-4 hover:underline',
       },
       {
         color: 'pvp',
@@ -223,22 +224,26 @@ const uiConfig = {
       {
         color: 'pvp',
         variant: 'soft',
-        class: 'bg-pvp-900 hover:bg-pvp-800 text-pvp-200',
+        class:
+          'bg-[color-mix(in_srgb,var(--color-pvp-500)_14%,var(--color-panel))] hover:bg-[color-mix(in_srgb,var(--color-pvp-500)_22%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-pvp-500)_70%,var(--color-foreground))]',
       },
       {
         color: 'pvp',
         variant: 'ghost',
-        class: 'text-pvp-400 hover:bg-pvp-900',
+        class:
+          'text-[color-mix(in_srgb,var(--color-pvp-500)_70%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pvp-500)_14%,transparent)]',
       },
       {
         color: 'pvp',
         variant: 'outline',
-        class: 'ring ring-inset ring-pvp-500 text-pvp-400 hover:bg-pvp-950',
+        class:
+          'ring ring-inset ring-pvp-500/45 text-[color-mix(in_srgb,var(--color-pvp-500)_70%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pvp-500)_12%,transparent)]',
       },
       {
         color: 'pvp',
         variant: 'link',
-        class: 'text-pvp-400 hover:text-pvp-300 underline-offset-4 hover:underline',
+        class:
+          'text-[color-mix(in_srgb,var(--color-pvp-500)_70%,var(--color-foreground))] hover:text-[color-mix(in_srgb,var(--color-pvp-500)_82%,var(--color-foreground))] underline-offset-4 hover:underline',
       },
       {
         color: 'pve',
@@ -248,22 +253,26 @@ const uiConfig = {
       {
         color: 'pve',
         variant: 'soft',
-        class: 'bg-pve-900 hover:bg-pve-800 text-pve-200',
+        class:
+          'bg-[color-mix(in_srgb,var(--color-pve-500)_14%,var(--color-panel))] hover:bg-[color-mix(in_srgb,var(--color-pve-500)_22%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-pve-500)_74%,var(--color-foreground))]',
       },
       {
         color: 'pve',
         variant: 'ghost',
-        class: 'text-pve-400 hover:bg-pve-900',
+        class:
+          'text-[color-mix(in_srgb,var(--color-pve-500)_74%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pve-500)_14%,transparent)]',
       },
       {
         color: 'pve',
         variant: 'outline',
-        class: 'ring ring-inset ring-pve-500 text-pve-400 hover:bg-pve-950',
+        class:
+          'ring ring-inset ring-pve-500/45 text-[color-mix(in_srgb,var(--color-pve-500)_74%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pve-500)_12%,transparent)]',
       },
       {
         color: 'pve',
         variant: 'link',
-        class: 'text-pve-400 hover:text-pve-300 underline-offset-4 hover:underline',
+        class:
+          'text-[color-mix(in_srgb,var(--color-pve-500)_74%,var(--color-foreground))] hover:text-[color-mix(in_srgb,var(--color-pve-500)_82%,var(--color-foreground))] underline-offset-4 hover:underline',
       },
       {
         color: 'success',
@@ -273,23 +282,26 @@ const uiConfig = {
       {
         color: 'success',
         variant: 'soft',
-        class: 'bg-success-950 hover:bg-success-900 text-success-200',
+        class:
+          'bg-[color-mix(in_srgb,var(--color-success-500)_14%,var(--color-panel))] hover:bg-[color-mix(in_srgb,var(--color-success-500)_22%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-success-500)_78%,var(--color-foreground))]',
       },
       {
         color: 'success',
         variant: 'ghost',
-        class: 'text-success-500 hover:bg-success-950',
+        class:
+          'text-[color-mix(in_srgb,var(--color-success-500)_78%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-success-500)_14%,transparent)]',
       },
       {
         color: 'success',
         variant: 'outline',
         class:
-          'ring ring-inset ring-success-500 text-success-500 hover:bg-success-950 hover:text-white',
+          'ring ring-inset ring-success-500/45 text-[color-mix(in_srgb,var(--color-success-500)_78%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-success-500)_12%,transparent)]',
       },
       {
         color: 'success',
         variant: 'link',
-        class: 'text-success-500 hover:text-success-400 underline-offset-4 hover:underline',
+        class:
+          'text-[color-mix(in_srgb,var(--color-success-500)_78%,var(--color-foreground))] hover:text-[color-mix(in_srgb,var(--color-success-500)_86%,var(--color-foreground))] underline-offset-4 hover:underline',
       },
     ],
   },
@@ -319,8 +331,8 @@ const uiConfig = {
   checkbox: {
     slots: {
       root: 'relative flex items-start',
-      base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800',
-      icon: 'h-4 w-4 text-surface-900',
+      base: 'h-4 w-4 shrink-0 rounded border border-border-strong transition-all data-[state=unchecked]:bg-field',
+      icon: 'h-4 w-4 text-[color:var(--color-secondary-950)]',
     },
     defaultVariants: {
       color: 'success',

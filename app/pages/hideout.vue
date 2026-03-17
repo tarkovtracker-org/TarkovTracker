@@ -4,7 +4,7 @@
       <div class="flex flex-col gap-4">
         <div class="flex justify-center">
           <div
-            class="bg-surface-900 border-surface-700/50 w-full max-w-4xl rounded-lg border px-4 py-3 shadow-sm"
+            class="bg-panel border-border shadow-card w-full max-w-4xl rounded-lg border px-4 py-3"
           >
             <div class="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
               <div></div>
@@ -17,14 +17,15 @@
                     size="md"
                     class="shrink-0"
                     :class="{
-                      'border-surface-200 rounded-none border-b-2': activePrimaryView === view.view,
+                      'bg-selected-surface border-border-strong rounded-none border-b-2':
+                        activePrimaryView === view.view,
                     }"
                     @click="activePrimaryView = view.view"
                   >
                     <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
                     <span
                       :class="[
-                        'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+                        'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
                         view.badgeColor,
                       ]"
                     >
@@ -34,7 +35,7 @@
                   <span
                     v-if="index === 0"
                     aria-hidden="true"
-                    class="bg-surface-700/60 h-6 w-px self-center"
+                    class="bg-border-muted h-6 w-px self-center"
                   ></span>
                 </template>
               </div>
@@ -65,9 +66,9 @@
                         :label="$t('page.hideout.sort.ready_first') || 'Sort ready to build first'"
                         color="info"
                       />
-                      <div class="border-surface-700/60 space-y-2 border-t pt-3">
+                      <div class="border-border-muted space-y-2 border-t pt-3">
                         <div
-                          class="text-surface-400 text-xs font-semibold tracking-wider uppercase"
+                          class="text-foreground-subtle text-xs font-semibold tracking-wider uppercase"
                         >
                           {{
                             $t('page.hideout.prereq_filters.title') || 'Availability requirements'
@@ -121,11 +122,11 @@
         <template #content>
           <UCard class="w-full max-w-sm">
             <template #header>
-              <div class="px-4 py-3 text-lg font-semibold text-white">
+              <div class="text-foreground px-4 py-3 text-lg font-semibold">
                 {{ prereqConfirmTitle }}
               </div>
             </template>
-            <div class="text-surface-300 px-4 pb-4 text-sm">
+            <div class="text-foreground-muted px-4 pb-4 text-sm">
               {{ prereqConfirmDescription }}
             </div>
             <template #footer>
@@ -142,7 +143,10 @@
         </template>
       </UModal>
       <div>
-        <div v-if="isStoreLoading" class="text-surface-200 flex flex-col items-center gap-3 py-10">
+        <div
+          v-if="isStoreLoading"
+          class="text-foreground-muted flex flex-col items-center gap-3 py-10"
+        >
           <UIcon name="i-heroicons-arrow-path" class="text-info-400 h-8 w-8 animate-spin" />
           <div class="flex items-center gap-2 text-sm">
             {{ $t('page.hideout.loading') }}
@@ -181,7 +185,7 @@
           ref="loadMoreSentinel"
           class="flex items-center justify-center py-4"
         >
-          <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
+          <UIcon name="i-mdi-loading" class="text-foreground-subtle h-5 w-5 animate-spin" />
         </div>
       </div>
     </div>
@@ -311,7 +315,7 @@
       icon: 'mdi-lock',
       view: 'locked',
       count: stationCounts.value.locked,
-      badgeColor: 'bg-surface-600',
+      badgeColor: 'bg-field text-foreground-muted',
     },
     {
       title: t('page.hideout.primary_views.maxed'),

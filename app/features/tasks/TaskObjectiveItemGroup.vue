@@ -1,9 +1,13 @@
 <template>
   <div class="space-y-2">
     <div class="grid grid-cols-[16px_1fr] items-start gap-2">
-      <UIcon :name="`i-${iconName}`" aria-hidden="true" class="text-surface-400 mt-0.5 h-4 w-4" />
+      <UIcon
+        :name="`i-${iconName}`"
+        aria-hidden="true"
+        class="text-foreground-subtle mt-0.5 h-4 w-4"
+      />
       <div class="min-w-0">
-        <div class="text-surface-100 flex items-center gap-1.5 text-sm font-medium">
+        <div class="text-foreground flex items-center gap-1.5 text-sm font-medium">
           {{ title }}
           <span v-if="props.optional" class="text-warning-300 text-[10px] font-semibold uppercase">
             ({{ t('page.tasks.questcard.objective_optional_badge') }})
@@ -19,9 +23,7 @@
         :data-objective-ids="getRowObjectiveIds(row).join(',')"
         class="flex w-full max-w-full items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
         :class="[
-          row.allComplete
-            ? 'border-success-500/50 bg-success-500/10'
-            : 'border-white/10 bg-white/5',
+          row.allComplete ? 'border-success-500/50 bg-success-500/10' : 'border-border bg-field',
           isParentTaskLocked ? 'opacity-70' : '',
         ]"
       >
@@ -39,7 +41,7 @@
             <img
               :src="row.meta.itemPreview ?? row.meta.itemIcon"
               :alt="row.meta.itemName"
-              class="bg-surface-900/90 block h-28 w-28 object-contain"
+              class="bg-field block h-28 w-28 object-contain"
             />
           </template>
         </AppTooltip>
@@ -54,9 +56,9 @@
               @click.stop
             >
               <span class="truncate">{{ row.meta.itemName }}</span>
-              <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
+              <UIcon name="i-mdi-open-in-new" class="text-foreground-subtle h-2.5 w-2.5 shrink-0" />
             </a>
-            <span v-else class="text-surface-100 block truncate text-xs font-semibold">
+            <span v-else class="text-foreground block truncate text-xs font-semibold">
               {{ row.meta.itemName }}
             </span>
           </AppTooltip>
@@ -68,7 +70,7 @@
               :href="row.meta.itemDevUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
+              class="text-foreground-subtle hover:text-foreground inline-flex items-center self-center rounded p-0.5 transition-colors"
               @click.stop
             >
               <img
@@ -100,9 +102,11 @@
         <AppTooltip v-if="rowHasMapLocation(row)" :text="t('page.tasks.questcard.jump_to_map')">
           <button
             type="button"
-            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            class="focus-visible:ring-primary-500 focus-visible:ring-offset-panel text-foreground-muted bg-field border-border flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             :class="
-              isJumpToMapDisabledForRow(row) ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'
+              isJumpToMapDisabledForRow(row)
+                ? 'cursor-not-allowed opacity-50'
+                : 'hover:bg-interactive'
             "
             :aria-label="t('page.tasks.questcard.jump_to_map')"
             :disabled="isJumpToMapDisabledForRow(row)"
@@ -140,7 +144,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import {

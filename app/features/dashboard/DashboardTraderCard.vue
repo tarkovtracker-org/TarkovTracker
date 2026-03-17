@@ -23,10 +23,10 @@
           />
           <div
             v-if="isLocked"
-            class="bg-surface-800 ring-surface-600 absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full ring-1"
+            class="bg-shell ring-border absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full ring-1"
             aria-hidden="true"
           >
-            <UIcon name="i-mdi-lock" class="text-surface-400 h-3 w-3" />
+            <UIcon name="i-mdi-lock" class="text-foreground-subtle h-3 w-3" />
           </div>
           <div
             v-else-if="isComplete"
@@ -39,7 +39,13 @@
         <div class="min-w-0 flex-1">
           <div
             class="truncate text-sm font-semibold"
-            :class="isLocked ? 'text-surface-400' : isComplete ? 'text-surface-300' : 'text-white'"
+            :class="
+              isLocked
+                ? 'text-foreground-subtle'
+                : isComplete
+                  ? 'text-foreground-muted'
+                  : 'text-foreground'
+            "
           >
             {{ trader.name }}
           </div>
@@ -55,7 +61,13 @@
     </div>
     <div
       class="mb-2 flex items-center justify-between text-xs font-medium"
-      :class="isLocked ? 'text-surface-500' : isComplete ? 'text-surface-400' : 'text-surface-300'"
+      :class="
+        isLocked
+          ? 'text-foreground-disabled'
+          : isComplete
+            ? 'text-foreground-subtle'
+            : 'text-foreground-muted'
+      "
     >
       <span>{{ completedTasks }}/{{ totalTasks }} {{ $t('page.dashboard.traders.tasks') }}</span>
     </div>
@@ -65,16 +77,16 @@
       :class="{ 'mb-4': isLocked || hasLoyaltyLevels || isFence }"
     />
     <div v-if="isLocked && unlockTask">
-      <div class="border-warning-500/15 bg-warning-950/20 rounded-lg border px-3 py-2.5">
+      <div class="border-warning-500/20 bg-warning-500/10 rounded-lg border px-3 py-2.5">
         <div class="mb-1.5 flex items-center gap-1.5 leading-none">
-          <UIcon name="i-mdi-lock-outline" class="text-warning-400/80 h-3.5 w-3.5 shrink-0" />
-          <span class="text-warning-300/80 text-xs leading-none font-medium">
+          <UIcon name="i-mdi-lock-outline" class="text-warning-600 h-3.5 w-3.5 shrink-0" />
+          <span class="text-warning-700 text-xs leading-none font-medium">
             {{ $t('page.dashboard.traders.unlock_required') }}
           </span>
         </div>
         <NuxtLink
           :to="{ path: '/tasks', query: { task: unlockTaskId } }"
-          class="text-info-400 hover:text-info-300 block text-sm font-medium transition-colors hover:underline"
+          class="text-info-600 hover:text-info-500 block text-sm font-medium transition-colors hover:underline"
         >
           {{ unlockTask.name }}
         </NuxtLink>
@@ -83,7 +95,7 @@
     <div v-else-if="hasLoyaltyLevels" class="space-y-2">
       <div
         class="flex items-center justify-between text-xs font-medium"
-        :class="isComplete ? 'text-surface-400' : 'text-surface-300'"
+        :class="isComplete ? 'text-foreground-subtle' : 'text-foreground-muted'"
       >
         <span>{{ $t('page.dashboard.traders.loyalty_level') }}</span>
         <span v-if="hasReputation">{{ $t('page.dashboard.traders.reputation') }}</span>
@@ -92,9 +104,7 @@
         <div
           class="flex flex-1 overflow-hidden rounded-md border"
           :class="
-            isComplete
-              ? 'bg-surface-800/40 border-surface-700/60'
-              : 'bg-surface-800/60 border-surface-700'
+            isComplete ? 'bg-success-500/8 border-success-500/18' : 'bg-field border-border-muted'
           "
         >
           <button
@@ -123,7 +133,9 @@
         />
       </div>
       <div v-if="nextLevelInfo" class="pt-0.5">
-        <div class="text-surface-400 flex items-center justify-between text-[11px] tabular-nums">
+        <div
+          class="text-foreground-subtle flex items-center justify-between text-[11px] tabular-nums"
+        >
           <span>
             {{
               $t('page.dashboard.traders.rep_progress_label', { level: nextLevelInfo.nextLevel })
@@ -145,7 +157,7 @@
     <div
       v-else-if="isFence"
       class="flex items-center justify-between text-xs font-medium"
-      :class="isComplete ? 'text-surface-400' : 'text-surface-300'"
+      :class="isComplete ? 'text-foreground-subtle' : 'text-foreground-muted'"
     >
       <span>{{ $t('page.dashboard.traders.scav_karma') }}</span>
       <ReputationInput
@@ -237,25 +249,25 @@
   });
   const cardContainerClasses = computed(() => {
     if (isLocked.value) {
-      return 'bg-surface-950/80 border-surface-700/25';
+      return 'bg-raised/55 border-border-muted';
     }
     if (isComplete.value) {
       return [
-        'bg-surface-950/50 border-success-500/15',
-        'hover:border-success-500/25 hover:shadow-lg',
-        'focus-visible:border-success-500/30 focus-visible:ring-success-700/30 focus-visible:ring-2',
+        'bg-panel border-success-500/20',
+        'hover:border-success-500/35 hover:shadow-lg',
+        'focus-visible:border-success-500/35 focus-visible:ring-success-500/20 focus-visible:ring-2',
       ];
     }
     return [
-      'bg-surface-900 border-white/12',
-      'hover:border-surface-600 hover:shadow-lg',
-      'focus-visible:border-surface-500 focus-visible:ring-surface-700/50 focus-visible:ring-2',
+      'bg-panel border-border',
+      'hover:border-border-strong hover:bg-raised/55 hover:shadow-lg',
+      'focus-visible:border-border-strong focus-visible:ring-border-strong/25 focus-visible:ring-2',
     ];
   });
   const portraitClasses = computed(() => {
-    if (isLocked.value) return 'bg-surface-800 border-surface-700/50 opacity-50 grayscale';
-    if (isComplete.value) return 'bg-surface-800 border-success-600/40';
-    return 'bg-surface-800 border-surface-700';
+    if (isLocked.value) return 'bg-field border-border opacity-60 grayscale';
+    if (isComplete.value) return 'bg-field border-success-500/35';
+    return 'bg-field border-border-muted';
   });
   const mainBarColor = computed(() => {
     if (isLocked.value) return 'locked' as const;
@@ -268,20 +280,20 @@
     return { color: `hsl(${hue}, 70%, 55%)` };
   });
   const percentageTextClass = computed(() => {
-    if (isLocked.value) return 'text-surface-500';
-    if (isComplete.value) return 'text-success-400/70';
+    if (isLocked.value) return 'text-foreground-disabled';
+    if (isComplete.value) return 'text-success-600';
     return '';
   });
   const loyaltyButtonClasses = (lvl: number) => {
     const isActive = currentLevel.value === lvl;
     if (isComplete.value) {
       return isActive
-        ? 'bg-success-900/40 text-success-300/70'
-        : 'text-surface-500 hover:bg-surface-700/40 hover:text-surface-400';
+        ? 'bg-success-500/12 text-success-700'
+        : 'text-foreground-subtle hover:bg-interactive hover:text-foreground-muted';
     }
     return isActive
-      ? 'bg-surface-600 text-white'
-      : 'text-surface-300 hover:bg-surface-700/70 hover:text-surface-100';
+      ? 'bg-interactive text-foreground'
+      : 'text-foreground-muted hover:bg-interactive hover:text-foreground';
   };
   const nextLevelInfo = computed(() => {
     if (isComplete.value) return null;

@@ -6,7 +6,7 @@
     aria-modal="true"
     aria-labelledby="loading-screen-title"
     aria-describedby="loading-screen-description"
-    class="bg-surface-950 fixed inset-x-0 top-11 bottom-0 z-50 flex items-center justify-center"
+    class="bg-canvas/95 fixed inset-x-0 top-11 bottom-0 z-50 flex items-center justify-center backdrop-blur-sm"
   >
     <div class="flex flex-col items-center gap-6 px-4">
       <div class="relative">
@@ -21,19 +21,19 @@
         <h2
           id="loading-screen-title"
           data-loading-screen-title
-          class="focus-visible:ring-primary-500 text-surface-100 focus-visible:ring-offset-surface-950 rounded-sm text-xl font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          class="text-foreground focus-visible:ring-primary-500 focus-visible:ring-offset-canvas rounded-sm text-xl font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {{ hasErrors ? $t('loading_screen.title_error') : $t('loading_screen.title') }}
         </h2>
-        <p id="loading-screen-description" class="text-surface-400 text-sm">
+        <p id="loading-screen-description" class="text-foreground-muted text-sm">
           {{ hasErrors ? $t('loading_screen.subtitle_error') : $t('loading_screen.subtitle') }}
         </p>
       </div>
-      <div v-if="!hasErrors" class="text-surface-600 mt-4 max-w-md text-center text-xs">
+      <div v-if="!hasErrors" class="text-foreground-subtle mt-4 max-w-md text-center text-xs">
         {{ $t('loading_screen.first_load_info') }}
       </div>
       <div v-else class="mt-4 flex flex-col items-center gap-3">
-        <p class="text-surface-500 max-w-md text-center text-xs">
+        <p class="text-foreground-subtle max-w-md text-center text-xs">
           {{ $t('loading_screen.partial_data_info') }}
         </p>
         <div class="flex gap-3">

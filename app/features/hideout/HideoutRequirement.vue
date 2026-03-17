@@ -4,8 +4,8 @@
     class="group relative flex flex-col items-center rounded-lg border p-2 transition-all select-none hover:scale-105"
     :class="[
       isComplete
-        ? 'border-success-500/50 bg-success-900/20'
-        : 'border-surface-700 bg-surface-800/80 hover:border-surface-600 hover:bg-surface-800',
+        ? 'border-success-500/50 bg-success-500/10'
+        : 'border-border bg-panel hover:border-border-strong hover:bg-raised',
     ]"
     @click="toggleComplete"
     @contextmenu.prevent="openContextMenu"
@@ -41,22 +41,22 @@
       <!-- Count Badge for multi-count items -->
       <div v-if="requiredCount > 1" class="absolute right-0 -bottom-1 left-0 flex justify-center">
         <div
-          class="border-surface-700 bg-surface-900/90 rounded border px-1.5 py-0.5 text-[10px] font-bold"
-          :class="isComplete ? 'text-success-400' : 'text-surface-300'"
+          class="bg-field border-border rounded border px-1.5 py-0.5 text-[10px] font-bold"
+          :class="isComplete ? 'text-success-600' : 'text-foreground-muted'"
         >
           {{ formatNumber(currentCount) }}/{{ formatNumber(requiredCount) }}
         </div>
       </div>
     </div>
     <!-- Item Name -->
-    <div class="text-surface-200 line-clamp-2 w-full text-center text-xs leading-tight font-medium">
+    <div class="text-foreground line-clamp-2 w-full text-center text-xs leading-tight font-medium">
       {{ requirement.item.name }}
     </div>
   </div>
   <!-- Context Menu for Manual Count Adjustment -->
   <ContextMenu ref="contextMenu">
     <template #default="{ close }">
-      <div class="border-surface-700 text-surface-400 border-b px-2 py-1 text-xs font-medium">
+      <div class="border-border text-foreground-subtle border-b px-2 py-1 text-xs font-medium">
         {{ requirement.item.name }}
       </div>
       <ContextMenuItem
@@ -81,10 +81,10 @@
           close();
         "
       />
-      <div v-if="requiredCount > 1" class="border-surface-700 my-1 border-t" />
+      <div v-if="requiredCount > 1" class="border-border my-1 border-t" />
       <template v-if="requiredCount > 1">
         <div class="space-y-2 px-3 py-2">
-          <div class="text-surface-400 text-xs">
+          <div class="text-foreground-subtle text-xs">
             {{ $t('page.hideout.stationcard.requirement.set_custom_amount') }}
           </div>
           <div class="flex items-center gap-2">
@@ -102,8 +102,8 @@
               type="number"
               :min="0"
               :max="requirement.count"
-              class="border-surface-600 focus:ring-primary-500/30 bg-surface-700 w-20 rounded border px-2 py-1 text-center text-sm font-bold focus:ring-1 focus:outline-none"
-              :class="isComplete ? 'text-success-400' : 'text-surface-300'"
+              class="bg-field border-border focus:ring-primary-500/30 w-20 rounded border px-2 py-1 text-center text-sm font-bold focus:ring-1 focus:outline-none"
+              :class="isComplete ? 'text-success-600' : 'text-foreground-muted'"
               @input="handleInput"
               @click.stop
             />
@@ -130,7 +130,7 @@
           </UButton>
         </div>
       </template>
-      <div class="border-surface-700 my-1 border-t" />
+      <div class="border-border my-1 border-t" />
       <ContextMenuItem
         v-if="requirement.item.link"
         icon="/img/logos/tarkovdevlogo.webp"

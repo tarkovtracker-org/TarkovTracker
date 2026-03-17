@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isComplete && !isFailed"
-    class="bg-completed-600/30 pointer-events-none absolute inset-0 z-0"
+    class="pointer-events-none absolute inset-0 z-0 bg-[var(--color-completed-overlay)]"
   />
   <div
     v-if="showIcon"
@@ -33,9 +33,9 @@
     return base.startsWith('mdi-') ? `i-${base}` : base;
   });
   const iconColor = computed(() => {
-    if (props.isFailed) return 'text-error-400';
-    if (props.isComplete) return 'text-completed-400';
-    if (props.isInvalid) return 'text-surface-400';
+    if (props.isFailed) return 'text-[color:var(--color-failed-icon)]';
+    if (props.isComplete) return 'text-[color:var(--color-completed-icon)]';
+    if (props.isInvalid) return 'text-foreground-subtle';
     if (props.isLocked) return 'text-locked-500';
     return 'text-brand-200';
   });

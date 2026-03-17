@@ -10,6 +10,7 @@ const setLocale = vi.fn(async (value: string) => {
 });
 const mockPreferencesStore = reactive({
   localeOverride: 'de' as string | null,
+  themeMode: 'dark' as 'dark' | 'light',
 });
 const mockMetadataStore = reactive({
   fetchAllData: vi.fn(async () => {}),
@@ -86,6 +87,7 @@ describe('useAppInitialization locale setup', () => {
       localeRef.value = value;
     });
     mockPreferencesStore.localeOverride = 'de';
+    mockPreferencesStore.themeMode = 'dark';
     mockMetadataStore.fetchAllData.mockClear();
     mockMetadataStore.hasInitialized = true;
     mockMetadataStore.languageCode = 'en';
@@ -105,6 +107,25 @@ describe('useAppInitialization locale setup', () => {
     (logger.error as Mock).mockClear();
     mockSupabaseUser.loggedIn = false;
     mockSupabaseUser.id = null;
+    delete document.documentElement.dataset.theme;
+    document.documentElement.style.colorScheme = '';
+  });
+  it('applies theme mode to the document root on mount', async () => {
+    mockPreferencesStore.themeMode = 'light';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    wrapper.unmount();
+  });
+  it('reapplies theme mode when the preference changes after mount', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    mockPreferencesStore.themeMode = 'light';
+    await flushPromises();
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    wrapper.unmount();
   });
   it('applies locale override through setLocale on mount', async () => {
     const wrapper = await mountWithComposable();

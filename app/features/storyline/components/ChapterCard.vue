@@ -1,7 +1,7 @@
 <template>
   <div
-    class="bg-surface-900 rounded-lg border border-white/10 p-4 transition-colors"
-    :class="chapter.complete ? 'border-success-700/30' : ''"
+    class="bg-panel border-border shadow-card rounded-lg border p-4 transition-colors"
+    :class="chapter.complete ? 'border-success-600/35' : ''"
   >
     <div class="mb-3 flex items-center gap-3">
       <button
@@ -48,7 +48,7 @@
           <span class="truncate">{{ chapter.name }}</span>
           <UIcon
             name="i-mdi-open-in-new"
-            class="text-surface-400 h-3.5 w-3.5 shrink-0"
+            class="text-foreground-subtle h-3.5 w-3.5 shrink-0"
             aria-hidden="true"
           />
         </a>
@@ -64,16 +64,16 @@
     </div>
     <div
       v-if="chapter.requirements.length"
-      class="bg-surface-950/20 mb-2 rounded-md border border-white/5 p-2"
+      class="bg-field border-border-muted mb-2 rounded-md border p-2"
     >
-      <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
+      <div class="text-foreground-subtle mb-0.5 text-[11px] font-medium tracking-wider uppercase">
         {{ t('page.profile.storyline_requires') }}
       </div>
       <ul class="space-y-0.5">
         <li
           v-for="requirement in chapter.requirements"
           :key="requirement.id"
-          class="text-surface-300 text-xs"
+          class="text-foreground-muted text-xs"
         >
           {{ requirement.label }}
         </li>
@@ -99,7 +99,7 @@
           :class="getEndingCardClass(ending.routeState)"
         >
           <div class="flex flex-wrap items-center gap-1">
-            <span class="text-xs font-semibold text-white">{{ ending.label }}</span>
+            <span class="text-foreground text-xs font-semibold">{{ ending.label }}</span>
             <UBadge
               v-if="ending.routeChoiceIndex !== null"
               variant="subtle"
@@ -114,7 +114,7 @@
           </div>
           <div
             v-if="ending.objectiveLabel && ending.objectiveLabel !== ending.label"
-            class="text-surface-400 mt-0.5 text-[11px] leading-tight"
+            class="text-foreground-subtle mt-0.5 text-[11px] leading-tight"
           >
             {{ ending.objectiveLabel }}
           </div>
@@ -133,11 +133,11 @@
     </div>
     <div
       v-if="chapter.mainObjectives.length || chapter.optionalObjectives.length"
-      class="bg-surface-950/20 mb-2 rounded-md border border-white/5 p-2"
+      class="bg-field border-border-muted mb-2 rounded-md border p-2"
     >
       <div v-if="chapter.mainObjectives.length">
         <div
-          class="text-surface-500 mb-0.5 flex items-center justify-between text-[11px] font-medium tracking-wider uppercase"
+          class="text-foreground-subtle mb-0.5 flex items-center justify-between text-[11px] font-medium tracking-wider uppercase"
         >
           <span>{{ t('page.profile.storyline_objectives_main') }}</span>
           <span>{{ chapter.mainObjectiveCompleted }}/{{ chapter.mainObjectiveTotal }}</span>
@@ -166,7 +166,7 @@
                     ? 'border-success-700/40 bg-success-950/20'
                     : props.readOnly || objective.routeState === 'blocked'
                       ? 'border-error-700/30 bg-error-950/10 cursor-not-allowed opacity-70'
-                      : 'bg-surface-900/40 cursor-pointer border-white/10 hover:bg-white/5'
+                      : 'bg-raised border-border-muted hover:bg-interactive cursor-pointer'
                 "
               >
                 <input
@@ -183,7 +183,9 @@
                     <span
                       class="text-xs"
                       :class="
-                        objective.complete ? 'text-surface-500 line-through' : 'text-surface-200'
+                        objective.complete
+                          ? 'text-foreground-subtle line-through'
+                          : 'text-foreground'
                       "
                     >
                       {{ objective.description }}
@@ -230,7 +232,7 @@
                     v-if="objective.unlocks.length"
                     class="mt-0.5 flex flex-wrap items-center gap-1"
                   >
-                    <span class="text-surface-500 text-[11px] font-medium uppercase">
+                    <span class="text-foreground-subtle text-[11px] font-medium uppercase">
                       {{ t('page.storyline.route_unlocks_here') }}:
                     </span>
                     <UBadge
@@ -256,14 +258,16 @@
             </div>
             <div
               v-if="routeChoice.chosenObjectiveId"
-              class="text-warning-200 mt-1 text-[11px] leading-tight"
+              class="text-warning-700 mt-1 text-[11px] leading-tight"
             >
               {{ t('page.storyline.route_switch_hint') }}
             </div>
           </div>
         </div>
         <div v-if="getInterleavedTimelineObjectives(chapter).length" class="mb-1">
-          <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
+          <div
+            class="text-foreground-subtle mb-0.5 text-[11px] font-medium tracking-wider uppercase"
+          >
             {{ t('page.storyline.route_required_steps') }}
           </div>
         </div>
@@ -271,14 +275,14 @@
           <div
             v-for="objective in getInterleavedTimelineObjectives(chapter)"
             :key="objective.id"
-            :class="objective.type === 'optional' ? 'ml-3 border-l border-white/5 pl-2' : ''"
+            :class="objective.type === 'optional' ? 'border-border-muted ml-3 border-l pl-2' : ''"
           >
             <label
               class="flex items-start gap-1.5 rounded px-1 py-0.5"
               :class="
                 props.readOnly || objective.routeState === 'blocked'
                   ? 'cursor-not-allowed opacity-65'
-                  : 'cursor-pointer hover:bg-white/5'
+                  : 'hover:bg-interactive cursor-pointer'
               "
             >
               <input
@@ -306,11 +310,11 @@
                     :class="
                       objective.complete
                         ? objective.type === 'optional'
-                          ? 'text-surface-500 min-w-0 flex-1 break-words line-through'
-                          : 'text-surface-500 line-through'
+                          ? 'text-foreground-subtle min-w-0 flex-1 break-words line-through'
+                          : 'text-foreground-subtle line-through'
                         : objective.type === 'optional'
-                          ? 'text-surface-300 min-w-0 flex-1 break-words'
-                          : 'text-surface-300'
+                          ? 'text-foreground-muted min-w-0 flex-1 break-words'
+                          : 'text-foreground-muted'
                     "
                   >
                     {{ objective.description }}
@@ -356,7 +360,7 @@
                 </span>
                 <span
                   v-else-if="objective.routeAlternatives.length"
-                  class="text-surface-500 mt-0.5 block text-[11px] leading-tight"
+                  class="text-foreground-subtle mt-0.5 block text-[11px] leading-tight"
                 >
                   {{
                     t('page.storyline.route_blocks', {
@@ -370,7 +374,7 @@
                   v-if="objective.unlocks.length"
                   class="mt-0.5 flex flex-wrap items-center gap-1"
                 >
-                  <span class="text-surface-500 text-[11px] font-medium uppercase">
+                  <span class="text-foreground-subtle text-[11px] font-medium uppercase">
                     {{ t('page.storyline.route_unlocks_here') }}:
                   </span>
                   <UBadge
@@ -400,11 +404,11 @@
         v-if="shouldShowOptionalSection(chapter)"
         :class="
           chapter.mainObjectives.length || getInterleavedTimelineObjectives(chapter).length
-            ? 'mt-2 border-t border-white/5 pt-2'
+            ? 'border-border-muted mt-2 border-t pt-2'
             : ''
         "
       >
-        <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
+        <div class="text-foreground-subtle mb-0.5 text-[11px] font-medium tracking-wider uppercase">
           {{ t('page.profile.storyline_objectives_optional') }}
         </div>
         <div v-if="chapter.optionalRouteChoices.length" class="mb-1.5 space-y-1.5">
@@ -431,7 +435,7 @@
                     ? 'border-success-700/40 bg-success-950/20'
                     : props.readOnly || objective.routeState === 'blocked'
                       ? 'border-error-700/30 bg-error-950/10 cursor-not-allowed opacity-70'
-                      : 'bg-surface-900/40 cursor-pointer border-white/10 hover:bg-white/5'
+                      : 'bg-raised border-border-muted hover:bg-interactive cursor-pointer'
                 "
               >
                 <input
@@ -448,7 +452,9 @@
                     <span
                       class="text-xs"
                       :class="
-                        objective.complete ? 'text-surface-500 line-through' : 'text-surface-200'
+                        objective.complete
+                          ? 'text-foreground-subtle line-through'
+                          : 'text-foreground'
                       "
                     >
                       {{ objective.description }}
@@ -495,7 +501,7 @@
                     v-if="objective.unlocks.length"
                     class="mt-0.5 flex flex-wrap items-center gap-1"
                   >
-                    <span class="text-surface-500 text-[11px] font-medium uppercase">
+                    <span class="text-foreground-subtle text-[11px] font-medium uppercase">
                       {{ t('page.storyline.route_unlocks_here') }}:
                     </span>
                     <UBadge
@@ -521,14 +527,16 @@
             </div>
             <div
               v-if="routeChoice.chosenObjectiveId"
-              class="text-info-200 mt-1 text-[11px] leading-tight"
+              class="text-info-700 mt-1 text-[11px] leading-tight"
             >
               {{ t('page.storyline.route_switch_hint') }}
             </div>
           </div>
         </div>
         <div v-if="shouldShowStandaloneOptionalLinearObjectives(chapter)" class="mb-1">
-          <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
+          <div
+            class="text-foreground-subtle mb-0.5 text-[11px] font-medium tracking-wider uppercase"
+          >
             {{ t('page.storyline.route_optional_steps') }}
           </div>
         </div>
@@ -542,7 +550,7 @@
               :class="
                 props.readOnly || objective.routeState === 'blocked'
                   ? 'cursor-not-allowed opacity-65'
-                  : 'cursor-pointer hover:bg-white/5'
+                  : 'hover:bg-interactive cursor-pointer'
               "
             >
               <input
@@ -563,8 +571,8 @@
                     class="text-xs"
                     :class="
                       objective.complete
-                        ? 'text-surface-500 min-w-0 flex-1 break-words line-through'
-                        : 'text-surface-300 min-w-0 flex-1 break-words'
+                        ? 'text-foreground-subtle min-w-0 flex-1 break-words line-through'
+                        : 'text-foreground-muted min-w-0 flex-1 break-words'
                     "
                   >
                     {{ objective.description }}
@@ -610,7 +618,7 @@
                 </span>
                 <span
                   v-else-if="objective.routeAlternatives.length"
-                  class="text-surface-500 mt-0.5 block text-[11px] leading-tight"
+                  class="text-foreground-subtle mt-0.5 block text-[11px] leading-tight"
                 >
                   {{
                     t('page.storyline.route_blocks', {
@@ -624,7 +632,7 @@
                   v-if="objective.unlocks.length"
                   class="mt-0.5 flex flex-wrap items-center gap-1"
                 >
-                  <span class="text-surface-500 text-[11px] font-medium uppercase">
+                  <span class="text-foreground-subtle text-[11px] font-medium uppercase">
                     {{ t('page.storyline.route_unlocks_here') }}:
                   </span>
                   <UBadge
@@ -653,9 +661,9 @@
     </div>
     <div
       v-if="chapter.chapterUnlocks.length"
-      class="bg-surface-950/20 mb-2 rounded-md border border-white/5 p-2"
+      class="bg-field border-border-muted mb-2 rounded-md border p-2"
     >
-      <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
+      <div class="text-foreground-subtle mb-0.5 text-[11px] font-medium tracking-wider uppercase">
         {{ t('page.storyline.route_unlocks_chapter') }}
       </div>
       <div class="flex flex-wrap gap-1">
@@ -672,7 +680,7 @@
     </div>
     <div
       v-if="canToggleChapter"
-      class="mt-3 flex items-center justify-end border-t border-white/5 pt-2"
+      class="border-border-muted mt-3 flex items-center justify-end border-t pt-2"
     >
       <UButton
         size="xs"
@@ -746,7 +754,7 @@
     if (routeState === 'blocked') {
       return 'border-error-700/30 bg-error-950/10 opacity-70';
     }
-    return 'border-white/10 bg-surface-900/40';
+    return 'border-border-muted bg-raised';
   };
   const sortObjectivesByOrder = (objectives: StorylineObjectiveProgress[]) => {
     return [...objectives].sort((left, right) => {

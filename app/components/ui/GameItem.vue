@@ -31,12 +31,9 @@
       />
       <div
         v-else
-        :class="[
-          'bg-surface-800 flex h-full w-full items-center justify-center rounded',
-          imageClasses,
-        ]"
+        :class="['bg-raised flex h-full w-full items-center justify-center rounded', imageClasses]"
       >
-        <UIcon name="i-mdi-loading" class="text-surface-400 h-6 w-6 animate-spin" />
+        <UIcon name="i-mdi-loading" class="text-foreground-subtle h-6 w-6 animate-spin" />
       </div>
     </div>
     <!-- Full item display mode (for TarkovItem compatibility) -->
@@ -64,26 +61,26 @@
         />
       </div>
       <!-- Simple count display for single items -->
-      <div v-else-if="props.count" class="text-surface-300 mr-2 text-sm font-medium">
+      <div v-else-if="props.count" class="text-foreground-muted mr-2 text-sm font-medium">
         {{ formatNumber(props.count) }}
       </div>
       <div
         v-if="props.itemName"
-        class="flex items-center justify-center text-center text-sm leading-tight font-bold text-white"
+        class="text-foreground flex items-center justify-center text-center text-sm leading-tight font-bold"
       >
         {{ props.itemName }}
       </div>
       <!-- Hover action buttons - covers entire row -->
       <div
         v-if="showActions && (props.devLink || props.wikiLink)"
-        class="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/80 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+        class="bg-panel/95 shadow-card absolute inset-0 flex items-center justify-center gap-2 rounded opacity-0 backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
         <AppTooltip v-if="props.devLink" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
           <a
             :href="props.devLink"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-surface-200 inline-flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
+            class="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex items-center justify-center rounded p-1.5 transition-colors"
             @click.stop
           >
             <NuxtImg
@@ -101,7 +98,7 @@
             :href="props.wikiLink"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-surface-200 inline-flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
+            class="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex items-center justify-center rounded p-1.5 transition-colors"
             @click.stop
           >
             <NuxtImg
@@ -120,7 +117,7 @@
         >
           <button
             type="button"
-            class="text-surface-200 inline-flex cursor-pointer items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
+            class="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex cursor-pointer items-center justify-center rounded p-1.5 transition-colors"
             @click.stop="copyItemName"
           >
             <UIcon name="i-mdi-content-copy" class="h-5 w-5" />
@@ -143,7 +140,7 @@
           />
           <div
             v-if="props.wikiLink || props.devLink || props.itemName"
-            class="border-surface-700 my-1 border-t"
+            class="border-border my-1 border-t"
           />
         </template>
         <!-- Item Options -->
@@ -187,7 +184,7 @@
         </template>
         <div
           v-if="props.itemName && (props.wikiLink || props.devLink)"
-          class="border-surface-700 my-1 border-t"
+          class="border-border my-1 border-t"
         />
         <ContextMenuItem
           v-if="props.itemName"
@@ -366,7 +363,7 @@
     const backgroundClass = resolvedBackgroundClass.value;
     const classes: string[] = baseImageClasses.slice();
     if (backgroundClass !== BACKGROUND_CLASS_MAP.default) {
-      classes.push('ring-1', 'ring-white/5', 'shadow-inner');
+      classes.push('ring-1', 'ring-border-muted', 'shadow-inner');
     }
     return classes;
   });

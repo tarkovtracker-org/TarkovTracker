@@ -5,7 +5,7 @@
     </template>
     <template #content>
       <div v-if="isLoadingTeamState" class="flex items-center justify-center py-8">
-        <UIcon name="i-mdi-loading" class="text-surface-400 h-6 w-6 animate-spin" />
+        <UIcon name="i-mdi-loading" class="text-foreground-muted h-6 w-6 animate-spin" />
       </div>
       <div v-else-if="!localUserTeam" class="py-4 text-center">
         {{ $t('page.team.card.myteam.no_team') }}
@@ -39,20 +39,20 @@
             </UButton>
           </div>
         </div>
-        <div v-if="linkVisible" class="bg-surface-800 rounded-lg p-3">
+        <div v-if="linkVisible" class="bg-shell rounded-lg p-3">
           <div class="font-mono text-sm break-all">
             {{ teamUrl }}
           </div>
         </div>
-        <div v-else class="bg-surface-800 rounded-lg p-3">
-          <div class="text-surface-400 text-sm italic">
+        <div v-else class="bg-shell rounded-lg p-3">
+          <div class="text-foreground-muted text-sm italic">
             {{ $t('page.team.card.myteam.link_hidden_message') }}
           </div>
         </div>
       </div>
     </template>
     <template #footer>
-      <div class="border-surface-700 flex items-center justify-start gap-2 border-t p-4">
+      <div class="border-border flex items-center justify-start gap-2 border-t p-4">
         <template v-if="isLoadingTeamState" />
         <UButton
           v-else-if="!localUserTeam"

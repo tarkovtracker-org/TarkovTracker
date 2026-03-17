@@ -11,11 +11,11 @@
       <div class="space-y-4 px-4 py-4">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
-            <span class="text-surface-200 text-sm font-semibold">
+            <span class="text-foreground text-sm font-semibold">
               {{ $t('settings.experience.auto_level_title') }}
             </span>
             <UTooltip :text="$t('settings.experience.auto_level_description')">
-              <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
+              <UIcon name="i-mdi-information" class="text-foreground-subtle h-4 w-4" />
             </UTooltip>
           </div>
           <USwitch
@@ -27,13 +27,13 @@
           />
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-surface-200 text-sm font-semibold">
+          <span class="text-foreground text-sm font-semibold">
             {{ $t('settings.experience.current_level') }}
           </span>
           <span class="text-primary-400 text-2xl font-bold">{{ derivedLevel }}</span>
         </div>
         <div class="space-y-1">
-          <div class="text-surface-400 flex justify-between text-xs">
+          <div class="text-foreground-muted flex justify-between text-xs">
             <span>
               {{ $t('settings.experience.xp_amount', { amount: formatNumber(totalXP) }) }}
             </span>
@@ -41,7 +41,7 @@
               {{ $t('settings.experience.xp_to_next', { amount: formatNumber(xpToNextLevel) }) }}
             </span>
           </div>
-          <div class="bg-surface-800/35 h-2 overflow-hidden rounded-full">
+          <div class="bg-border-muted h-2 overflow-hidden rounded-full">
             <div
               class="bg-primary-500/60 h-full rounded-full transition-[width] duration-300 ease-out"
               :style="{ width: `${xpProgress}%` }"
@@ -50,11 +50,11 @@
         </div>
         <div class="flex items-center gap-2">
           <div class="flex flex-1 items-center gap-2">
-            <label :for="totalXpInputId" class="text-surface-200 text-sm font-semibold">
+            <label :for="totalXpInputId" class="text-foreground text-sm font-semibold">
               {{ $t('settings.experience.set_total_xp') }}
             </label>
             <UTooltip :text="$t('settings.experience.manual_hint')">
-              <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
+              <UIcon name="i-mdi-information" class="text-foreground-subtle h-4 w-4" />
             </UTooltip>
           </div>
           <div class="flex max-w-xs items-center gap-2">

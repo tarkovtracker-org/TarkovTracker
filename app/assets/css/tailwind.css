@@ -84,14 +84,13 @@ html.no-smooth-scroll {
   --color-surface-850: hsl(0 0% 12%); /* Content surfaces */
   --color-surface-900: hsl(0 0% 9%); /* Shell chrome */
   --color-surface-950: hsl(0 0% 4%); /* Page canvas */
-  /* State overlay tokens */
-  --state-hover: rgba(255, 255, 255, 0.05);
-  --state-pressed: rgba(255, 255, 255, 0.08);
-  --state-selected: rgba(198, 145, 89, 0.12);
-  /* Border tokens */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.15);
+  /* Theme-mode neutrals are resolved by the root [data-theme] selector */
+  --state-hover: var(--theme-state-hover);
+  --state-pressed: var(--theme-state-pressed);
+  --state-selected: var(--theme-state-selected);
+  --border-subtle: var(--theme-border-muted);
+  --border-default: var(--theme-border);
+  --border-strong: var(--theme-border-strong);
   /* PvP (in-game tan) */
   --color-pvp-50: hsl(40 60% 99%);
   --color-pvp-100: hsl(38 44.4% 96.5%);
@@ -317,32 +316,219 @@ html.no-smooth-scroll {
   /* Custom semantic colors for Tarkov Tracker */
   --color-complete: var(--color-success-700);
   --color-failed: var(--color-error-300);
+  --color-completed-surface: var(--theme-completed-surface);
+  --color-completed-border: var(--theme-completed-border);
+  --color-completed-icon: var(--theme-completed-icon);
+  --color-completed-overlay: var(--theme-completed-overlay);
+  --color-failed-surface: var(--theme-failed-surface);
+  --color-failed-border: var(--theme-failed-border);
+  --color-failed-text: var(--theme-failed-text);
+  --color-failed-text-muted: var(--theme-failed-text-muted);
+  --color-failed-link: var(--theme-failed-link);
+  --color-failed-icon: var(--theme-failed-icon);
+  --color-map-popup-surface: var(--theme-map-popup-surface);
+  --color-map-canvas: var(--theme-map-canvas);
+  --color-map-control-surface: var(--theme-map-control-surface);
+  --color-map-control-hover: var(--theme-map-control-hover);
+  --color-map-badge-surface: var(--theme-map-badge-surface);
+  --color-map-badge-text: var(--theme-map-badge-text);
+  --color-map-cluster-text: var(--theme-map-cluster-text);
+  --color-graph-surface: var(--theme-graph-surface);
+  --color-graph-shell: var(--theme-graph-shell);
+  --color-graph-shell-muted: var(--theme-graph-shell-muted);
+  --color-graph-border: var(--theme-graph-border);
+  --color-graph-grid: var(--theme-graph-grid);
+  --color-graph-text-muted: var(--theme-graph-text-muted);
+  --color-graph-text: var(--theme-graph-text);
+  --color-graph-node-text: var(--theme-graph-node-text);
+  --color-graph-connection: var(--theme-graph-connection);
+  --color-graph-minimap-mask: var(--theme-graph-minimap-mask);
+  --color-graph-handle: var(--theme-graph-handle);
+  --color-graph-handle-border: var(--theme-graph-handle-border);
   --color-tasklink: var(--color-info-500);
   --color-link: hsl(208 93% 52%);
   --color-link-hover: hsl(208 93% 65%);
   --color-enough: var(--color-info-900);
-  --color-questlink: var(--color-surface-50);
+  --color-questlink: var(--color-foreground);
   --color-objectiveahead: var(--color-success-900);
   --color-objectivecomplete: var(--color-success-800);
   --color-objectiveuncomplete: var(--color-error-900);
   --color-objectiveenough: var(--color-info-800);
-  --color-chartbase: var(--color-surface-50);
-  --color-sitebackground: var(--color-surface-950);
-  --color-contentbackground: var(--color-surface-900);
-  --color-border: var(--color-surface-600);
+  --color-chartbase: var(--color-foreground);
+  --color-sitebackground: var(--color-canvas);
+  --color-contentbackground: var(--color-shell);
+  --color-canvas: var(--theme-canvas);
+  --color-shell: var(--theme-shell);
+  --color-panel: var(--theme-panel);
+  --color-raised: var(--theme-raised);
+  --color-field: var(--theme-field);
+  --color-interactive: var(--theme-interactive);
+  --color-interactive-hover: var(--theme-interactive-hover);
+  --color-selected-surface: var(--theme-selected-surface);
+  --color-inverted: var(--theme-inverted);
+  --color-foreground: var(--theme-foreground);
+  --color-foreground-muted: var(--theme-foreground-muted);
+  --color-foreground-subtle: var(--theme-foreground-subtle);
+  --color-foreground-disabled: var(--theme-foreground-disabled);
+  --color-foreground-inverted: var(--theme-foreground-inverted);
+  --color-border: var(--theme-border);
+  --color-border-muted: var(--theme-border-muted);
+  --color-border-strong: var(--theme-border-strong);
   --color-checker-dark: hsl(240 27% 14%);
   --color-checker-bg: hsl(240 27% 10%);
   /* Surface ladder: bg(950) → panel(900) → card(800) → hover(700) → border(600) */
-  --color-bg: var(--color-surface-950);
-  --color-panel: var(--color-surface-900);
-  --color-raised: var(--color-surface-800);
-  --color-hover: var(--color-surface-700);
-  --color-divider: var(--color-surface-600);
+  --color-bg: var(--color-canvas);
+  --color-hover: var(--color-interactive-hover);
+  --color-divider: var(--color-border);
   /* Text hierarchy: primary (90%) → secondary (74%) → tertiary (64%) → disabled (44%) */
-  --color-text: hsl(0 0% 90%);
-  --color-text-secondary: hsl(216 8% 74%);
-  --color-text-muted: hsl(216 7% 64%);
-  --color-text-disabled: hsl(215 6% 44%);
+  --color-text: var(--color-foreground);
+  --color-text-secondary: var(--color-foreground-muted);
+  --color-text-muted: var(--color-foreground-subtle);
+  --color-text-disabled: var(--color-foreground-disabled);
+}
+:root,
+:root[data-theme='dark'] {
+  --theme-canvas: var(--color-surface-950);
+  --theme-shell: var(--color-surface-900);
+  --theme-panel: var(--color-surface-850);
+  --theme-raised: var(--color-surface-800);
+  --theme-field: var(--color-surface-850);
+  --theme-interactive: var(--color-surface-800);
+  --theme-interactive-hover: var(--color-surface-700);
+  --theme-selected-surface: color-mix(
+    in srgb,
+    var(--color-primary-500) 12%,
+    var(--color-surface-800)
+  );
+  --theme-inverted: var(--color-surface-50);
+  --theme-foreground: hsl(0 0% 92%);
+  --theme-foreground-muted: hsl(216 8% 74%);
+  --theme-foreground-subtle: hsl(216 7% 64%);
+  --theme-foreground-disabled: hsl(215 6% 44%);
+  --theme-foreground-inverted: var(--color-surface-950);
+  --theme-border-muted: rgba(255, 255, 255, 0.06);
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-border-strong: rgba(255, 255, 255, 0.18);
+  --theme-state-hover: rgba(255, 255, 255, 0.05);
+  --theme-state-pressed: rgba(255, 255, 255, 0.08);
+  --theme-state-selected: rgba(198, 145, 89, 0.12);
+  --theme-overlay: rgba(0, 0, 0, 0.7);
+  --theme-completed-surface: color-mix(in srgb, var(--color-completed-600) 14%, var(--color-panel));
+  --theme-completed-border: color-mix(in srgb, var(--color-completed-400) 28%, transparent);
+  --theme-completed-icon: color-mix(in srgb, var(--color-completed-400) 85%, white);
+  --theme-completed-overlay: color-mix(in srgb, var(--color-completed-600) 22%, transparent);
+  --theme-completed-content-opacity: 0.8;
+  --theme-failed-surface: color-mix(in srgb, var(--color-error-950) 88%, var(--color-panel));
+  --theme-failed-border: color-mix(in srgb, var(--color-error-500) 52%, transparent);
+  --theme-failed-text: var(--color-error-200);
+  --theme-failed-text-muted: var(--color-error-300);
+  --theme-failed-link: var(--color-error-100);
+  --theme-failed-icon: var(--color-error-400);
+  --theme-map-popup-surface: var(--color-surface-800);
+  --theme-map-canvas: var(--color-surface-900);
+  --theme-map-control-surface: var(--color-surface-800);
+  --theme-map-control-hover: var(--color-surface-700);
+  --theme-map-badge-surface: var(--color-surface-900);
+  --theme-map-badge-text: var(--color-surface-200);
+  --theme-map-cluster-text: var(--color-surface-50);
+  --theme-map-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --theme-map-cluster-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.6);
+  --theme-map-background-filter: brightness(0.75) saturate(0.9);
+  --theme-graph-surface: var(--color-surface-850);
+  --theme-graph-shell: var(--color-surface-900);
+  --theme-graph-shell-muted: color-mix(
+    in srgb,
+    var(--color-surface-900) 80%,
+    var(--color-surface-950)
+  );
+  --theme-graph-border: var(--color-surface-600);
+  --theme-graph-grid: color-mix(in srgb, var(--color-surface-700) 50%, var(--color-surface-800));
+  --theme-graph-surface-alpha-06: color-mix(in srgb, var(--color-surface-850) 6%, transparent);
+  --theme-graph-surface-alpha-08: color-mix(in srgb, var(--color-surface-850) 8%, transparent);
+  --theme-graph-surface-alpha-10: color-mix(in srgb, var(--color-surface-850) 10%, transparent);
+  --theme-graph-surface-alpha-12: color-mix(in srgb, var(--color-surface-850) 12%, transparent);
+  --theme-graph-text-muted: hsl(0 0% 75%);
+  --theme-graph-text: hsl(0 0% 80%);
+  --theme-graph-node-text: hsl(0 0% 90%);
+  --theme-graph-connection: hsl(0 0% 45%);
+  --theme-graph-shadow: 0 2px 8px hsl(0 0% 0% / 0.4);
+  --theme-graph-minimap-mask: hsl(0 0% 1% / 0.74);
+  --theme-graph-handle: hsl(0 0% 30%);
+  --theme-graph-handle-border: hsl(0 0% 50%);
+  --theme-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15);
+  --theme-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.35), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --theme-shadow-nav-drawer:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03), inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    1px 0 0 rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='light'] {
+  --theme-canvas: hsl(38 20% 96%);
+  --theme-shell: hsl(36 18% 91%);
+  --theme-panel: hsl(38 30% 98%);
+  --theme-raised: hsl(0 0% 100%);
+  --theme-field: hsl(38 26% 99%);
+  --theme-interactive: hsl(36 16% 90%);
+  --theme-interactive-hover: hsl(36 18% 84%);
+  --theme-selected-surface: color-mix(in srgb, var(--color-primary-500) 12%, hsl(38 28% 97%));
+  --theme-inverted: var(--color-surface-950);
+  --theme-foreground: hsl(32 16% 12%);
+  --theme-foreground-muted: hsl(30 12% 28%);
+  --theme-foreground-subtle: hsl(30 10% 42%);
+  --theme-foreground-disabled: hsl(30 8% 58%);
+  --theme-foreground-inverted: var(--color-surface-50);
+  --theme-border-muted: rgba(49, 37, 24, 0.08);
+  --theme-border: rgba(49, 37, 24, 0.14);
+  --theme-border-strong: rgba(49, 37, 24, 0.22);
+  --theme-state-hover: rgba(15, 23, 42, 0.04);
+  --theme-state-pressed: rgba(15, 23, 42, 0.08);
+  --theme-state-selected: rgba(146, 103, 54, 0.14);
+  --theme-overlay: rgba(15, 23, 42, 0.44);
+  --theme-completed-surface: color-mix(in srgb, var(--color-completed-400) 9%, var(--color-panel));
+  --theme-completed-border: color-mix(in srgb, var(--color-completed-600) 18%, transparent);
+  --theme-completed-icon: color-mix(
+    in srgb,
+    var(--color-completed-400) 72%,
+    var(--color-foreground)
+  );
+  --theme-completed-overlay: color-mix(in srgb, var(--color-completed-400) 10%, transparent);
+  --theme-completed-content-opacity: 0.94;
+  --theme-failed-surface: color-mix(in srgb, var(--color-error-500) 10%, var(--color-panel));
+  --theme-failed-border: color-mix(in srgb, var(--color-error-500) 28%, transparent);
+  --theme-failed-text: var(--color-error-700);
+  --theme-failed-text-muted: var(--color-error-600);
+  --theme-failed-link: var(--color-error-700);
+  --theme-failed-icon: var(--color-error-500);
+  --theme-map-popup-surface: var(--color-raised);
+  --theme-map-canvas: color-mix(in srgb, var(--color-shell) 78%, var(--color-canvas));
+  --theme-map-control-surface: var(--color-raised);
+  --theme-map-control-hover: var(--color-interactive);
+  --theme-map-badge-surface: color-mix(in srgb, var(--color-shell) 74%, var(--color-panel));
+  --theme-map-badge-text: var(--color-foreground);
+  --theme-map-cluster-text: var(--color-raised);
+  --theme-map-shadow: var(--theme-shadow-card);
+  --theme-map-cluster-shadow: 0 1px 2px rgba(15, 23, 42, 0.85), 0 0 4px rgba(15, 23, 42, 0.45);
+  --theme-map-background-filter: brightness(0.96) saturate(0.98);
+  --theme-graph-surface: var(--color-panel);
+  --theme-graph-shell: var(--color-shell);
+  --theme-graph-shell-muted: color-mix(in srgb, var(--color-shell) 82%, var(--color-canvas));
+  --theme-graph-border: var(--color-border-strong);
+  --theme-graph-grid: color-mix(in srgb, var(--color-border) 55%, transparent);
+  --theme-graph-surface-alpha-06: color-mix(in srgb, var(--color-panel) 6%, transparent);
+  --theme-graph-surface-alpha-08: color-mix(in srgb, var(--color-panel) 8%, transparent);
+  --theme-graph-surface-alpha-10: color-mix(in srgb, var(--color-panel) 10%, transparent);
+  --theme-graph-surface-alpha-12: color-mix(in srgb, var(--color-panel) 12%, transparent);
+  --theme-graph-text-muted: var(--color-foreground-subtle);
+  --theme-graph-text: var(--color-foreground-muted);
+  --theme-graph-node-text: var(--color-foreground);
+  --theme-graph-connection: color-mix(in srgb, var(--color-border-strong) 85%, transparent);
+  --theme-graph-shadow: var(--theme-shadow-card);
+  --theme-graph-minimap-mask: color-mix(in srgb, var(--color-canvas) 64%, transparent);
+  --theme-graph-handle: var(--color-raised);
+  --theme-graph-handle-border: var(--color-border-strong);
+  --theme-shadow-card: 0 12px 30px rgba(72, 53, 28, 0.08), 0 2px 8px rgba(72, 53, 28, 0.05);
+  --theme-shadow-elevated: 0 22px 48px rgba(72, 53, 28, 0.14), 0 8px 18px rgba(72, 53, 28, 0.08);
+  --theme-shadow-nav-drawer:
+    inset -1px 0 0 rgba(255, 255, 255, 0.55), 1px 0 0 rgba(49, 37, 24, 0.08);
 }
 /* Modern override: use OKLCH where supported for better perceptual consistency */
 @supports (color: oklch(0 0 0)) {
@@ -493,27 +679,25 @@ html.no-smooth-scroll {
 }
 /* Nuxt UI core tokens mapped to Tarkov Tracker theme */
 :root {
-  --ui-bg: var(--color-surface-950);
-  --ui-bg-muted: var(--color-surface-900);
-  --ui-bg-elevated: var(--color-surface-800);
-  --ui-bg-accented: var(--color-surface-700);
-  --ui-bg-inverted: var(--color-surface-50);
-  /* Text hierarchy: avoid pure white, use warm off-whites */
-  --ui-text: var(--color-text);
-  --ui-text-muted: var(--color-text-secondary);
-  --ui-text-highlighted: var(--color-primary-400);
-  --ui-text-dimmed: var(--color-text-muted);
-  --ui-text-inverted: var(--color-surface-950);
-  /* Borders: clear separation */
-  --ui-border: var(--color-surface-600);
-  --ui-border-accented: var(--color-surface-500);
-  --ui-color-neutral-700: var(--color-surface-600);
+  --ui-bg: var(--color-canvas);
+  --ui-bg-muted: var(--color-shell);
+  --ui-bg-elevated: var(--color-panel);
+  --ui-bg-accented: var(--color-interactive);
+  --ui-bg-inverted: var(--color-inverted);
+  --ui-text: var(--color-foreground);
+  --ui-text-muted: var(--color-foreground-muted);
+  --ui-text-highlighted: var(--color-primary-600);
+  --ui-text-dimmed: var(--color-foreground-subtle);
+  --ui-text-inverted: var(--color-foreground-inverted);
+  --ui-border: var(--color-border);
+  --ui-border-accented: var(--color-border-strong);
+  --ui-color-neutral-700: var(--color-border);
   /* Primary accent */
   --ui-primary: var(--color-primary-500);
 }
 /* Utility: default ring color aligned to surface (neutral) */
 .ring-default {
-  --tw-ring-color: var(--color-surface-700);
+  --tw-ring-color: var(--color-border-strong);
 }
 /* Utility: force accented ring to brand as well */
 .ring-accented {
@@ -592,21 +776,19 @@ html.no-smooth-scroll {
   }
   /* Background: solid dark base */
   .bg-military-background {
-    background-color: var(--color-surface-950);
+    background-color: var(--color-canvas);
   }
   /* Panel: shell-level containers */
   .panel {
-    background-color: var(--color-surface-900);
-    border: 1px solid var(--color-surface-700);
+    background-color: var(--color-shell);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
   }
   /* Card: content surfaces (background handled by component) */
   .card {
-    border: 1px solid var(--border-default);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.25),
-      0 1px 3px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--theme-shadow-card);
   }
   /* Card hover: use state overlay instead of solid color */
   .card-interactive {
@@ -615,11 +797,11 @@ html.no-smooth-scroll {
       transform 150ms ease-in-out;
   }
   .card-interactive:hover {
-    background-color: color-mix(in srgb, var(--color-surface-850), var(--state-hover));
+    background-color: var(--color-interactive-hover);
     transform: translateY(-1px);
   }
   .card-interactive:focus-visible {
-    outline: 2px solid var(--color-surface-600);
+    outline: 2px solid var(--color-border-strong);
     outline-offset: 2px;
   }
   .content-visibility-auto-128 {
@@ -639,29 +821,22 @@ html.no-smooth-scroll {
     contain-intrinsic-size: auto 280px;
   }
   .shadow-nav-drawer {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.03),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.6),
-      1px 0 0 rgba(0, 0, 0, 0.55);
+    box-shadow: var(--theme-shadow-nav-drawer);
   }
   /* Shadow scale for elevation */
   .shadow-card {
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.25),
-      0 1px 3px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--theme-shadow-card);
   }
   .shadow-elevated {
-    box-shadow:
-      0 8px 24px rgba(0, 0, 0, 0.35),
-      0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--theme-shadow-elevated);
   }
   /* Sidebar: shell chrome (same as appbar) */
   .bg-sidebar {
-    background-color: var(--color-surface-900);
+    background-color: var(--color-shell);
   }
   /* Legacy alias */
   .bg-military-panel {
-    background-color: var(--color-surface-900);
+    background-color: var(--color-shell);
   }
 }
 
@@ -811,58 +986,59 @@ summary {
   }
 }
 .map-objective-popup .leaflet-popup-content-wrapper {
-  background-color: var(--color-surface-800) !important;
-  color: var(--color-gray-200) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-map-popup-surface) !important;
+  color: var(--color-foreground-muted) !important;
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--theme-map-shadow);
 }
 .map-objective-popup .leaflet-popup-content {
   margin: 10px 12px;
 }
 .map-objective-popup .leaflet-popup-tip {
-  background-color: var(--color-surface-800) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-map-popup-surface) !important;
+  border-left: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
 }
 .leaflet-container {
-  background-color: var(--color-surface-900) !important;
+  background-color: var(--color-map-canvas) !important;
   font-family: inherit;
 }
 .map-background-pane {
-  background-color: var(--color-surface-900);
-  filter: brightness(0.75) saturate(0.9);
+  background-color: var(--color-map-canvas);
+  filter: var(--theme-map-background-filter);
 }
 .leaflet-popup-content-wrapper {
-  background-color: var(--color-surface-900) !important;
-  color: var(--color-gray-200) !important;
+  background-color: var(--color-map-popup-surface) !important;
+  color: var(--color-foreground-muted) !important;
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--theme-map-shadow);
 }
 .leaflet-popup-tip {
-  background-color: var(--color-surface-900) !important;
+  background-color: var(--color-map-popup-surface) !important;
 }
 .leaflet-popup-content {
   margin: 0.75rem;
 }
 .leaflet-control-zoom a {
-  background-color: var(--color-surface-800) !important;
-  color: var(--color-gray-200) !important;
-  border-color: var(--color-surface-700) !important;
+  background-color: var(--color-map-control-surface) !important;
+  color: var(--color-foreground-muted) !important;
+  border-color: var(--color-border-strong) !important;
 }
 .leaflet-control-zoom a:hover {
-  background-color: var(--color-surface-700) !important;
+  background-color: var(--color-map-control-hover) !important;
 }
 .leaflet-control-zoom-reset {
-  border-top: 1px solid var(--color-surface-700) !important;
+  border-top: 1px solid var(--color-border-strong) !important;
   font-size: 18px;
 }
 .map-zone-tooltip {
-  background-color: var(--color-surface-900) !important;
-  color: var(--color-gray-200) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-map-popup-surface) !important;
+  color: var(--color-foreground-muted) !important;
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--theme-map-shadow);
   padding: 6px 8px;
 }
 .extract-marker {
@@ -876,12 +1052,12 @@ summary {
   padding: 3px 6px;
   border: 2px solid transparent;
   border-radius: 999px;
-  background-color: var(--color-surface-900);
-  color: var(--color-surface-200);
+  background-color: var(--color-map-badge-surface);
+  color: var(--color-map-badge-text);
   font-size: 11px;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.5);
+  box-shadow: var(--theme-map-shadow);
   transform: translate(-50%, calc(-100% - 6px));
 }
 .extract-badge-label {
@@ -892,35 +1068,32 @@ summary {
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
-  color: var(--color-surface-50) !important;
+  color: var(--color-map-cluster-text) !important;
   font-size: 10px;
   font-weight: 700;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 0 4px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--theme-map-cluster-shadow);
   white-space: nowrap;
 }
 .leaflet-tooltip.spawn-cluster-label::before {
   display: none !important;
 }
-/* Vue Flow dark theme overrides */
 .vue-flow {
   --vf-accent-color: var(--color-primary-500);
-  --vf-surface-850: var(--color-surface-850);
-  --vf-surface-900: var(--color-surface-900);
-  --vf-surface-925: color-mix(in srgb, var(--color-surface-900) 80%, var(--color-surface-950));
-  --vf-surface-600: var(--color-surface-600);
-  --vf-surface-grid: color-mix(in srgb, var(--color-surface-700) 50%, var(--color-surface-800));
-  --vf-surface-850-alpha-06: color-mix(in srgb, var(--color-surface-850) 6%, transparent);
-  --vf-surface-850-alpha-08: color-mix(in srgb, var(--color-surface-850) 8%, transparent);
-  --vf-surface-850-alpha-10: color-mix(in srgb, var(--color-surface-850) 10%, transparent);
-  --vf-surface-850-alpha-12: color-mix(in srgb, var(--color-surface-850) 12%, transparent);
-  --vf-text-75: hsl(0 0% 75%);
-  --vf-text-80: hsl(0 0% 80%);
-  --vf-text-95: hsl(0 0% 95%);
+  --vf-surface-850: var(--color-graph-surface);
+  --vf-surface-900: var(--color-graph-shell);
+  --vf-surface-925: var(--color-graph-shell-muted);
+  --vf-surface-600: var(--color-graph-border);
+  --vf-surface-grid: var(--color-graph-grid);
+  --vf-surface-850-alpha-06: var(--theme-graph-surface-alpha-06);
+  --vf-surface-850-alpha-08: var(--theme-graph-surface-alpha-08);
+  --vf-surface-850-alpha-10: var(--theme-graph-surface-alpha-10);
+  --vf-surface-850-alpha-12: var(--theme-graph-surface-alpha-12);
+  --vf-text-75: var(--color-graph-text-muted);
+  --vf-text-80: var(--color-graph-text);
+  --vf-text-95: var(--color-foreground);
   --vf-node-bg: transparent;
-  --vf-node-text: hsl(0 0% 90%);
-  --vf-connection-path: hsl(0 0% 45%);
+  --vf-node-text: var(--color-graph-node-text);
+  --vf-connection-path: var(--color-graph-connection);
   --vf-handle: var(--vf-accent-color);
 }
 .vue-flow__edge-textbg {
@@ -944,7 +1117,7 @@ summary {
   background: var(--vf-surface-900) !important;
   border: 1px solid var(--vf-surface-850-alpha-12) !important;
   border-radius: 8px;
-  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.4) !important;
+  box-shadow: var(--theme-graph-shadow) !important;
   overflow: hidden;
 }
 .vue-flow__controls-button {
@@ -964,7 +1137,7 @@ summary {
   background-color: var(--vf-surface-925) !important;
   border: 1px solid var(--vf-surface-850-alpha-12) !important;
   border-radius: 8px;
-  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.4) !important;
+  box-shadow: var(--theme-graph-shadow) !important;
   overflow: hidden;
 }
 .vue-flow__minimap svg {
@@ -978,10 +1151,10 @@ summary {
 }
 .vue-flow__minimap.task-graph-minimap {
   background-color: var(--vf-surface-900) !important;
-  border-color: hsl(0 0% 100% / 0.15) !important;
+  border-color: var(--vf-surface-850-alpha-12) !important;
 }
 .vue-flow__minimap.task-graph-minimap .vue-flow__minimap-mask {
-  fill: hsl(0 0% 1% / 0.74) !important;
+  fill: var(--color-graph-minimap-mask) !important;
   filter: drop-shadow(0 0 6px hsl(40 95% 61% / 0.3));
   stroke: var(--vf-accent-color) !important;
   stroke-dasharray: 6 3;
@@ -991,8 +1164,8 @@ summary {
   stroke-width: 0.75 !important;
 }
 .vue-flow__handle {
-  background: hsl(0 0% 30%) !important;
-  border: 1px solid hsl(0 0% 50%) !important;
+  background: var(--color-graph-handle) !important;
+  border: 1px solid var(--color-graph-handle-border) !important;
   width: 6px !important;
   height: 6px !important;
 }

@@ -9,7 +9,7 @@
   >
     <template #content>
       <div class="space-y-4 px-4 py-4">
-        <p class="text-surface-400 text-sm">
+        <p class="text-foreground-muted text-sm">
           {{
             t(
               'settings.profile_sharing.description',
@@ -19,19 +19,19 @@
         </p>
         <div class="space-y-3">
           <div
-            class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+            class="bg-shell border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
           >
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-2">
                 <UBadge color="pvp" variant="soft" size="sm">PvP</UBadge>
-                <span class="text-surface-300 text-xs">{{ pvpVisibilityLabel }}</span>
+                <span class="text-foreground-muted text-xs">{{ pvpVisibilityLabel }}</span>
               </div>
               <div class="flex min-w-0 items-center gap-1.5">
                 <a
                   :href="pvpShareUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-info-300 hover:text-info-200 truncate text-[11px] transition-colors"
+                  class="text-info-600 hover:text-info-500 truncate text-[11px] transition-colors"
                 >
                   {{ pvpShareUrl }}
                 </a>
@@ -49,19 +49,19 @@
             <USwitch v-model="pvpPublic" :disabled="!isLoggedIn" />
           </div>
           <div
-            class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+            class="bg-shell border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
           >
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-2">
                 <UBadge color="pve" variant="soft" size="sm">PvE</UBadge>
-                <span class="text-surface-300 text-xs">{{ pveVisibilityLabel }}</span>
+                <span class="text-foreground-muted text-xs">{{ pveVisibilityLabel }}</span>
               </div>
               <div class="flex min-w-0 items-center gap-1.5">
                 <a
                   :href="pveShareUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-info-300 hover:text-info-200 truncate text-[11px] transition-colors"
+                  class="text-info-600 hover:text-info-500 truncate text-[11px] transition-colors"
                 >
                   {{ pveShareUrl }}
                 </a>

@@ -9,14 +9,14 @@
       v-if="belowMd && mobileExpanded"
       type="button"
       :aria-label="t('navigation_drawer.close_menu')"
-      class="fixed inset-0 z-40 bg-black/60"
+      class="fixed inset-0 z-40 bg-[var(--theme-overlay)] backdrop-blur-[1px]"
       @click="closeMobileDrawer"
       @keydown.esc="closeMobileDrawer"
     />
   </Transition>
   <nav
     :aria-label="t('navigation_drawer.main_navigation')"
-    class="bg-sidebar border-surface-700/50 shadow-nav-drawer fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
+    class="bg-sidebar shadow-nav-drawer border-border fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
     :class="[sidebarWidth]"
   >
     <div
@@ -41,12 +41,12 @@
             v-else
             src="/img/logos/tarkovtrackerlogo-light.webp"
             :alt="t('navigation_drawer.brand_name')"
-            class="h-auto w-full"
+            class="border-border shadow-card h-auto w-full rounded-lg border bg-[color-mix(in_srgb,var(--color-inverted)_82%,var(--color-panel))] px-3 py-2"
             preload
           />
         </div>
         <div v-if="!isCollapsed" class="mt-1 text-center">
-          <div class="text-base leading-tight font-medium text-white">
+          <div class="text-foreground text-base leading-tight font-medium">
             {{ t('navigation_drawer.brand_name') }}
           </div>
         </div>
@@ -58,12 +58,12 @@
       <template v-else>
         <DrawerLevel :is-collapsed="true" />
       </template>
-      <div class="bg-surface-800 mx-3 my-2 h-px shrink-0" />
+      <div class="bg-border mx-3 my-2 h-px shrink-0" />
       <DrawerLinks :is-collapsed="isCollapsed" />
-      <div class="bg-surface-800 mx-3 my-2 h-px shrink-0" />
+      <div class="bg-border mx-3 my-2 h-px shrink-0" />
       <div class="flex flex-col gap-0.5">
         <div v-if="!isCollapsed" class="px-4 py-2">
-          <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
+          <h3 class="text-foreground-subtle text-xs font-semibold tracking-wider uppercase">
             {{ t('navigation_drawer.section_external') }}
           </h3>
         </div>

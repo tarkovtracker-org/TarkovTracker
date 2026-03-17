@@ -42,6 +42,53 @@ describe('preferences sync plugin', () => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
+  it('hydrates theme mode from Supabase rows', async () => {
+    vi.mocked(useSupabaseSync).mockReturnValue({
+      isSyncing: ref(false),
+      isPaused: ref(false),
+      cleanup: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      syncToSupabase: vi.fn().mockResolvedValue(null),
+    });
+    const preferencesStore = {
+      $state: {
+        themeMode: 'dark',
+      },
+      localeOverride: 'en',
+      replacePersistedState: vi.fn(),
+      resetToDefaults: vi.fn(),
+      setLocaleOverride: vi.fn(),
+      setProfileSharePvePublic: vi.fn(),
+      setProfileSharePvpPublic: vi.fn(),
+    };
+    vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
+    vi.mocked(readPersistedPreferencesSnapshot).mockReturnValue(null);
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { theme_mode: 'light', user_id: 'user-1' },
+      error: null,
+    });
+    const plugin = (await import('@/plugins/zz.preferences-sync.client')).default as (
+      nuxtApp: unknown
+    ) => unknown;
+    plugin({
+      $pinia: {},
+      $supabase: {
+        client: {
+          from: vi.fn(() => ({
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle,
+              })),
+            })),
+          })),
+        },
+        user: { id: 'user-1', loggedIn: true },
+      },
+    });
+    await waitForWatchCallback();
+    expect(preferencesStore.$state.themeMode).toBe('light');
+  });
   it('does not start sync after non-PGRST116 bootstrap errors', async () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
       isSyncing: ref(false),

@@ -3,7 +3,7 @@
     role="button"
     tabindex="0"
     :aria-label="$t('needed_items.view_details_for', { name: groupedItem.item.name })"
-    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800 hover:bg-surface-700 flex h-full cursor-pointer flex-col rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+    class="focus-visible:ring-primary-500 focus-visible:ring-offset-panel bg-panel hover:bg-raised border-border shadow-card flex h-full cursor-pointer flex-col rounded-lg border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     @click="handleCardClick"
     @keydown.enter="handleCardClick"
     @keydown.space.prevent="handleCardClick"
@@ -11,7 +11,7 @@
     <!-- Top section: Image + Name side by side -->
     <div class="flex items-center gap-3 p-3">
       <!-- Item image -->
-      <div class="bg-surface-900 relative h-16 w-16 shrink-0 overflow-hidden rounded">
+      <div class="bg-field relative h-16 w-16 shrink-0 overflow-hidden rounded">
         <GameItem
           :src="groupedItem.item.image512pxLink || groupedItem.item.iconLink"
           :item-name="groupedItem.item.name"
@@ -38,7 +38,7 @@
           </AppTooltip>
         </div>
         <div class="mt-1 flex items-center gap-1">
-          <span class="text-surface-400 text-xs">{{ $t('needed_items.total') }}</span>
+          <span class="text-foreground-subtle text-xs">{{ $t('needed_items.total') }}</span>
           <span
             class="text-lg font-bold"
             :class="isComplete ? 'text-success-400' : 'text-primary-400'"
@@ -52,14 +52,14 @@
     </div>
     <!-- Breakdown grid -->
     <div
-      class="gap-px border-t border-white/10 bg-white/5 text-xs"
+      class="bg-border-muted border-border gap-px border-t text-xs"
       :class="activeFilter === 'tasks' || activeFilter === 'hideout' ? '' : 'grid grid-cols-2'"
     >
       <!-- Tasks section -->
-      <div v-if="activeFilter !== 'hideout'" class="bg-surface-800 p-2">
+      <div v-if="activeFilter !== 'hideout'" class="bg-raised p-2">
         <div
           v-if="activeFilter === 'all' || activeFilter === 'completed'"
-          class="text-surface-400 mb-1.5 flex items-center gap-1"
+          class="text-foreground-subtle mb-1.5 flex items-center gap-1"
         >
           <UIcon name="i-mdi-clipboard-list" class="h-3.5 w-3.5" />
           <span class="font-medium">{{ $t('needed_items.tasks') }}</span>
@@ -73,7 +73,7 @@
                 :class="
                   groupedItem.taskFirCurrent >= groupedItem.taskFir
                     ? 'text-success-400'
-                    : 'text-white'
+                    : 'text-foreground'
                 "
               />
             </AppTooltip>
@@ -82,7 +82,7 @@
               :class="
                 groupedItem.taskFirCurrent >= groupedItem.taskFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'text-foreground'
               "
             >
               {{ groupedItem.taskFirCurrent }}/{{ groupedItem.taskFir }}
@@ -95,7 +95,7 @@
               :class="
                 groupedItem.taskNonFirCurrent >= groupedItem.taskNonFir
                   ? 'text-success-400'
-                  : 'text-surface-400'
+                  : 'text-foreground-subtle'
               "
             />
             <span
@@ -103,7 +103,7 @@
               :class="
                 groupedItem.taskNonFirCurrent >= groupedItem.taskNonFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'text-foreground'
               "
             >
               {{ groupedItem.taskNonFirCurrent }}/{{ groupedItem.taskNonFir }}
@@ -111,17 +111,17 @@
           </div>
           <span
             v-if="groupedItem.taskFir === 0 && groupedItem.taskNonFir === 0"
-            class="text-surface-500"
+            class="text-foreground-disabled"
           >
             -
           </span>
         </div>
       </div>
       <!-- Hideout section -->
-      <div v-if="activeFilter !== 'tasks'" class="bg-surface-800 p-2">
+      <div v-if="activeFilter !== 'tasks'" class="bg-raised p-2">
         <div
           v-if="activeFilter === 'all' || activeFilter === 'completed'"
-          class="text-surface-400 mb-1.5 flex items-center gap-1"
+          class="text-foreground-subtle mb-1.5 flex items-center gap-1"
         >
           <UIcon name="i-mdi-home" class="h-3.5 w-3.5" />
           <span class="font-medium">{{ $t('needed_items.hideout_label') }}</span>
@@ -135,7 +135,7 @@
                 :class="
                   groupedItem.hideoutFirCurrent >= groupedItem.hideoutFir
                     ? 'text-success-400'
-                    : 'text-white'
+                    : 'text-foreground'
                 "
               />
             </AppTooltip>
@@ -144,7 +144,7 @@
               :class="
                 groupedItem.hideoutFirCurrent >= groupedItem.hideoutFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'text-foreground'
               "
             >
               {{ groupedItem.hideoutFirCurrent }}/{{ groupedItem.hideoutFir }}
@@ -157,7 +157,7 @@
               :class="
                 groupedItem.hideoutNonFirCurrent >= groupedItem.hideoutNonFir
                   ? 'text-success-400'
-                  : 'text-surface-400'
+                  : 'text-foreground-subtle'
               "
             />
             <span
@@ -165,7 +165,7 @@
               :class="
                 groupedItem.hideoutNonFirCurrent >= groupedItem.hideoutNonFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'text-foreground'
               "
             >
               {{ groupedItem.hideoutNonFirCurrent }}/{{ groupedItem.hideoutNonFir }}
@@ -173,7 +173,7 @@
           </div>
           <span
             v-if="groupedItem.hideoutFir === 0 && groupedItem.hideoutNonFir === 0"
-            class="text-surface-500"
+            class="text-foreground-disabled"
           >
             -
           </span>

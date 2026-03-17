@@ -28,10 +28,10 @@
         :description="t('page.settings.card.apitokens.token_value_unavailable_desc')"
       />
       <div v-if="loading" class="space-y-2">
-        <div class="h-12 animate-pulse rounded-lg bg-white/5"></div>
-        <div class="h-12 animate-pulse rounded-lg bg-white/5"></div>
+        <div class="bg-shell h-12 animate-pulse rounded-lg"></div>
+        <div class="bg-shell h-12 animate-pulse rounded-lg"></div>
       </div>
-      <div v-else-if="!tokens.length" class="bg-surface-900 rounded-lg border border-white/5 p-4">
+      <div v-else-if="!tokens.length" class="bg-shell border-border-muted rounded-lg border p-4">
         <UAlert
           color="primary"
           variant="soft"
@@ -42,14 +42,14 @@
         <UCard
           v-for="token in tokens"
           :key="token.id"
-          class="bg-surface-900 border border-white/10"
+          class="bg-panel border-border"
           :ui="{ body: 'space-y-3' }"
         >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="w-full space-y-2">
               <div class="flex items-center gap-2">
                 <UIcon name="i-mdi-key-variant" class="text-primary-400 h-5 w-5" />
-                <span class="text-surface-50 font-medium">
+                <span class="text-foreground font-medium">
                   {{ token.note || t('page.settings.card.apitokens.default_note') }}
                 </span>
               </div>
@@ -72,10 +72,10 @@
                 </UBadge>
               </div>
               <div
-                class="bg-surface-950/50 flex items-center gap-2 rounded border border-white/5 p-2"
+                class="bg-shell border-border-muted flex items-center gap-2 rounded border p-2"
                 :class="{ 'opacity-70': !token.tokenValue }"
               >
-                <code class="text-surface-300 flex-1 font-mono text-xs">
+                <code class="text-foreground-muted flex-1 font-mono text-xs">
                   <template v-if="token.tokenValue">
                     {{
                       visibleTokens.has(token.id) ? token.tokenValue : maskToken(token.tokenValue)
@@ -116,7 +116,7 @@
                   />
                 </div>
               </div>
-              <div class="text-surface-400 flex items-center gap-2 text-xs">
+              <div class="text-foreground-muted flex items-center gap-2 text-xs">
                 <span>
                   {{ t('page.settings.card.apitokens.list.created') }}:
                   {{ formatDate(token.createdAt) }}
@@ -134,7 +134,7 @@
                     class="inline-flex items-center justify-center"
                     :aria-label="lastUsedTooltip(token.lastUsedAt)"
                   >
-                    <UIcon name="i-mdi-clock-outline" class="text-surface-500 h-3.5 w-3.5" />
+                    <UIcon name="i-mdi-clock-outline" class="text-foreground-subtle h-3.5 w-3.5" />
                   </button>
                 </UTooltip>
               </div>
@@ -181,13 +181,13 @@
               class="w-full"
               :ui="{
                 fieldset: 'w-full',
-                item: 'rounded-lg border border-surface-700 bg-surface-800/50 px-3 py-3 data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500/10',
-                label: 'text-sm font-medium text-white',
+                item: 'bg-shell border-border rounded-lg border px-3 py-3 data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500/10',
+                label: 'text-sm font-medium text-foreground',
               }"
             />
           </UFormField>
           <div class="space-y-2">
-            <p class="text-surface-200 text-sm font-semibold">
+            <p class="text-foreground text-sm font-semibold">
               {{ t('page.settings.card.apitokens.form.permissions_title') }}
             </p>
             <div class="grid gap-2 md:grid-cols-2">
@@ -204,7 +204,7 @@
             </div>
           </div>
           <div class="space-y-2">
-            <p class="text-surface-200 text-sm font-semibold">
+            <p class="text-foreground text-sm font-semibold">
               {{ t('page.settings.card.apitokens.form.note_label') }}
             </p>
             <UInput
@@ -242,7 +242,7 @@
       </template>
       <template #body>
         <div class="space-y-3">
-          <p class="text-surface-300 text-sm">
+          <p class="text-foreground-muted text-sm">
             {{ t('page.settings.card.apitokens.token_created_description') }}
           </p>
           <UInput v-model="generatedToken" readonly>

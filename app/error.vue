@@ -1,15 +1,13 @@
 <template>
   <div
-    class="bg-surface-950 flex min-h-screen flex-col items-center justify-center px-4 py-10 text-center"
+    class="bg-canvas flex min-h-screen flex-col items-center justify-center px-4 py-10 text-center"
   >
-    <div
-      class="bg-surface-900 border-surface-700/60 w-full max-w-xl rounded-2xl border px-6 py-8 shadow-2xl"
-    >
+    <div class="bg-panel border-border shadow-card w-full max-w-xl rounded-2xl border px-6 py-8">
       <UIcon name="i-mdi-alert-circle-outline" class="text-warning-400 mx-auto h-16 w-16" />
-      <h1 class="text-surface-50 mt-4 text-3xl font-semibold sm:text-4xl">
+      <h1 class="text-foreground mt-4 text-3xl font-semibold sm:text-4xl">
         {{ errorTitle }}
       </h1>
-      <p class="text-surface-300 mt-3 text-sm sm:text-base">
+      <p class="text-foreground-muted mt-3 text-sm sm:text-base">
         {{ errorDescription }}
       </p>
       <div class="mt-6 flex justify-center">
@@ -24,7 +22,7 @@
           {{ t('error.return_home', 'Return Home') }}
         </UButton>
       </div>
-      <p class="text-surface-500 mt-6 text-xs">
+      <p class="text-foreground-subtle mt-6 text-xs">
         {{ t('error.status_prefix', 'Error') }} {{ statusCode }}
       </p>
     </div>

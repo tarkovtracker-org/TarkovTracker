@@ -5,9 +5,9 @@
     :tabindex="isParentTaskLocked ? -1 : 0"
     :aria-label="objectiveAriaLabel"
     :aria-disabled="isParentTaskLocked"
-    class="group focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex w-full items-start gap-4 rounded-md px-2 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2"
+    class="group focus-visible:ring-primary-500 focus-visible:ring-offset-panel flex w-full items-start gap-4 rounded-md px-2 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2"
     :class="[
-      isComplete ? 'bg-success-500/10' : 'hover:bg-white/5',
+      isComplete ? 'bg-success-500/10' : 'hover:bg-interactive',
       isParentTaskLocked ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
     ]"
     @click="handleRowClick"
@@ -24,13 +24,13 @@
         isComplete
           ? 'text-success-300'
           : isParentTaskLocked
-            ? 'text-surface-400'
-            : 'text-surface-300 group-hover:text-surface-200'
+            ? 'text-foreground-disabled'
+            : 'text-foreground-muted group-hover:text-foreground'
       "
     />
     <div class="flex flex-1 flex-wrap items-center gap-2">
       <div class="min-w-0">
-        <div class="text-surface-100 text-sm leading-5">
+        <div class="text-foreground text-sm leading-5">
           {{ props.objective?.description }}
           <AppTooltip v-if="objectiveModeCountDifference" :text="objectiveModeCountDifferenceText">
             <UBadge
@@ -63,7 +63,7 @@
           v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
           :text="userNeedsTitle"
         >
-          <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
+          <div class="text-foreground-disabled mt-1 inline-flex items-center gap-1 text-[11px]">
             <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
             <span>{{ userNeeds.length }}</span>
           </div>
@@ -73,8 +73,8 @@
         <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
           <button
             type="button"
-            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
+            class="focus-visible:ring-primary-500 focus-visible:ring-offset-panel text-foreground-muted bg-field border-border flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-interactive'"
             :aria-label="t('page.tasks.questcard.jump_to_map')"
             :disabled="isJumpToMapDisabled"
             @click.stop="onJumpToMapClick"
@@ -107,7 +107,7 @@
             :class="
               isComplete
                 ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
-                : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
+                : 'text-foreground-muted border-border bg-field hover:bg-interactive disabled:opacity-60'
             "
             @click="toggleObjectiveCompletion()"
           >
@@ -123,7 +123,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import {

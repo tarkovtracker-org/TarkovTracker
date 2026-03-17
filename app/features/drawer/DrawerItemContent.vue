@@ -7,8 +7,8 @@
     :class="[
       props.isCollapsed ? 'justify-center' : '',
       isActive
-        ? 'border-primary-500 bg-surface-800/50 text-white'
-        : 'text-surface-300 hover:bg-surface-800/30 border-transparent hover:text-white',
+        ? 'border-primary-500 bg-selected-surface text-foreground shadow-card'
+        : 'text-foreground-muted hover:bg-interactive hover:text-foreground border-transparent',
     ]"
   >
     <DrawerItemIcon
@@ -21,7 +21,7 @@
       <span class="truncate leading-none">{{ props.labelText }}</span>
       <span
         v-if="props.badge"
-        class="bg-warning-500/20 text-warning-400 shrink-0 rounded px-1.5 py-0.5 text-[10px] leading-none font-bold uppercase"
+        class="bg-warning-500/12 text-warning-700 shrink-0 rounded px-1.5 py-0.5 text-[10px] leading-none font-bold uppercase"
       >
         {{ props.badge }}
       </span>
@@ -33,7 +33,7 @@
     :aria-label="props.labelText ?? ''"
     target="_blank"
     rel="noopener noreferrer"
-    class="group text-surface-300 hover:bg-surface-800/30 flex min-h-10 items-center rounded-sm border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150 hover:text-white"
+    class="group text-foreground-muted hover:bg-interactive hover:text-foreground flex min-h-10 items-center rounded-sm border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150"
     :class="[props.isCollapsed ? 'justify-center' : '']"
   >
     <DrawerItemIcon
@@ -51,7 +51,7 @@
   <span
     v-else
     :aria-label="props.labelText ?? ''"
-    class="group flex min-h-12 cursor-not-allowed items-center rounded-sm border-l-2 border-transparent px-3 py-3 text-base font-medium text-white/50 opacity-60 transition-colors duration-200"
+    class="text-foreground-disabled group flex min-h-12 cursor-not-allowed items-center rounded-sm border-l-2 border-transparent px-3 py-3 text-base font-medium opacity-60 transition-colors duration-200"
     :class="[props.isCollapsed ? 'justify-center' : '']"
     aria-disabled="true"
   >

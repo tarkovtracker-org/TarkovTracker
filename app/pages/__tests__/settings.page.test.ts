@@ -88,6 +88,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
+  AppearanceCard: true,
   DataManagementCard: true,
   DisplayNameCard: true,
   ApiTokens: true,

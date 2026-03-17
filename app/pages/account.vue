@@ -28,7 +28,7 @@
       <div v-if="isAdmin" class="flex justify-center pt-4">
         <NuxtLink
           to="/admin"
-          class="hover:text-error-400 text-surface-500 flex items-center gap-1.5 text-xs transition-colors"
+          class="text-foreground-subtle hover:text-error-500 flex items-center gap-1.5 text-xs transition-colors"
         >
           <UIcon name="i-mdi-shield-crown" class="size-3.5" />
           {{ $t('settings.general.admin_panel') }}

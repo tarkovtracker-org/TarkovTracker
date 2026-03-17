@@ -1,12 +1,12 @@
 <template>
-  <div class="flex overflow-hidden rounded-md border border-white/10" role="group">
+  <div class="border-border flex overflow-hidden rounded-md border" role="group">
     <button
       type="button"
       class="flex min-h-8 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase transition-colors"
       :class="
         modelValue === GAME_MODES.PVP
-          ? 'bg-pvp-800 text-pvp-100'
-          : 'text-pvp-500 hover:bg-pvp-950/50 bg-transparent'
+          ? 'bg-[color-mix(in_srgb,var(--color-pvp-500)_18%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-pvp-500)_75%,var(--color-foreground))]'
+          : 'bg-transparent text-[color-mix(in_srgb,var(--color-pvp-500)_70%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pvp-500)_12%,transparent)]'
       "
       :aria-pressed="modelValue === GAME_MODES.PVP"
       @click="setMode(GAME_MODES.PVP)"
@@ -19,8 +19,8 @@
       class="flex min-h-8 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase transition-colors"
       :class="
         modelValue === GAME_MODES.PVE
-          ? 'bg-pve-600 text-white'
-          : 'text-pve-500 hover:bg-pve-950/50 bg-transparent'
+          ? 'bg-[color-mix(in_srgb,var(--color-pve-500)_18%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-pve-500)_78%,var(--color-foreground))]'
+          : 'bg-transparent text-[color-mix(in_srgb,var(--color-pve-500)_74%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pve-500)_12%,transparent)]'
       "
       :aria-pressed="modelValue === GAME_MODES.PVE"
       @click="setMode(GAME_MODES.PVE)"

@@ -4,7 +4,6 @@
   import { MiniMap } from '@vue-flow/minimap';
   import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import { useMapResize } from '@/composables/useMapResize';
   import { useTaskGraphData } from '@/composables/useTaskGraphData';
   import TaskGraphNode from '@/features/tasks/TaskGraphNode.vue';
@@ -427,7 +426,7 @@
   const legendItems = computed(() => [
     { label: t('page.tasks.graph.completed'), colorClass: 'bg-success-500' },
     { label: t('page.tasks.graph.available'), colorClass: 'bg-info-500' },
-    { label: t('page.tasks.graph.locked'), colorClass: 'bg-surface-500' },
+    { label: t('page.tasks.graph.locked'), colorClass: 'bg-shell' },
     { label: t('page.tasks.graph.failed'), colorClass: 'bg-error-500' },
     { label: t('page.tasks.graph.flow_start'), colorClass: 'bg-primary-400' },
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },
@@ -452,19 +451,19 @@
 </script>
 <template>
   <div v-if="!isLgAndUp" class="py-8 text-center">
-    <UIcon name="i-mdi-monitor" class="text-surface-400 mx-auto mb-3 h-10 w-10" />
-    <p class="text-surface-400 text-sm">{{ t('page.tasks.graph.mobile_unavailable') }}</p>
+    <UIcon name="i-mdi-monitor" class="text-foreground-subtle mx-auto mb-3 h-10 w-10" />
+    <p class="text-foreground-subtle text-sm">{{ t('page.tasks.graph.mobile_unavailable') }}</p>
   </div>
   <div v-else-if="!hasNodes" class="py-8 text-center">
-    <UIcon name="i-mdi-graph-outline" class="text-surface-400 mx-auto mb-3 h-10 w-10" />
-    <p class="text-surface-400 text-sm">{{ t('page.tasks.graph.no_tasks') }}</p>
+    <UIcon name="i-mdi-graph-outline" class="text-foreground-subtle mx-auto mb-3 h-10 w-10" />
+    <p class="text-foreground-subtle text-sm">{{ t('page.tasks.graph.no_tasks') }}</p>
   </div>
   <div v-else class="relative">
     <div
       class="bg-warning-500/10 border-warning-500/30 mb-3 flex items-center gap-2 rounded-lg border px-4 py-2"
     >
       <UIcon name="i-mdi-flask-outline" class="text-warning-400 h-4 w-4 shrink-0" />
-      <span class="text-surface-300 text-xs">
+      <span class="text-foreground-muted text-xs">
         {{ t('page.tasks.graph.alpha_notice') }}
       </span>
     </div>
@@ -473,7 +472,7 @@
       class="bg-primary-500/10 border-primary-500/30 mb-3 flex items-center gap-2 rounded-lg border px-4 py-2"
     >
       <UIcon name="i-mdi-target" class="text-primary-400 h-4 w-4 shrink-0" />
-      <span class="text-surface-200 text-sm">
+      <span class="text-foreground text-sm">
         {{ t('page.tasks.graph.focus_mode_active', { taskName: focusedTaskName }) }}
       </span>
       <UButton
@@ -496,7 +495,7 @@
     <div
       ref="graphSurfaceRef"
       tabindex="0"
-      class="bg-surface-900 focus-visible:ring-primary-500 relative rounded-lg border border-white/12 focus:outline-none focus-visible:ring-2"
+      class="bg-panel border-border focus-visible:ring-primary-500 shadow-card relative rounded-lg border focus:outline-none focus-visible:ring-2"
       :style="graphContainerStyle"
       @pointerdown="focusGraphSurface"
     >
@@ -535,62 +534,62 @@
         />
       </VueFlow>
       <div
-        class="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-md border border-white/8 bg-black/40 px-2.5 py-1.5 backdrop-blur-sm"
+        class="bg-field/90 border-border-muted absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 backdrop-blur-sm"
       >
-        <UIcon name="i-mdi-arrow-down" class="text-surface-400 h-3.5 w-3.5" />
-        <span class="text-surface-400 text-[10px] font-medium tracking-wide">
+        <UIcon name="i-mdi-arrow-down" class="text-foreground-subtle h-3.5 w-3.5" />
+        <span class="text-foreground-subtle text-[10px] font-medium tracking-wide">
           {{ t('page.tasks.graph.flow_direction') }}
         </span>
       </div>
       <div
-        class="bg-surface-900/90 absolute top-12 right-3 z-10 w-52 rounded-lg border border-white/10 px-3 py-2"
+        class="bg-field/95 border-border shadow-card absolute top-12 right-3 z-10 w-52 rounded-lg border px-3 py-2"
       >
         <span
-          class="text-surface-400 mb-2 block text-[10px] font-semibold tracking-wider uppercase"
+          class="text-foreground-subtle mb-2 block text-[10px] font-semibold tracking-wider uppercase"
         >
           {{ t('page.tasks.graph.keyboard_controls_title') }}
         </span>
         <div class="space-y-1.5">
           <div class="flex items-center justify-between gap-2">
-            <div class="text-surface-200 flex items-center gap-1 text-[10px] font-medium">
-              <kbd class="bg-surface-800 rounded border border-white/10 px-1.5 py-0.5">WASD</kbd>
+            <div class="text-foreground flex items-center gap-1 text-[10px] font-medium">
+              <kbd class="bg-raised border-border rounded border px-1.5 py-0.5">WASD</kbd>
               <span>/</span>
-              <kbd class="bg-surface-800 rounded border border-white/10 px-1.5 py-0.5">↑↓←→</kbd>
+              <kbd class="bg-raised border-border rounded border px-1.5 py-0.5">↑↓←→</kbd>
             </div>
-            <span class="text-surface-400 text-[10px]">
+            <span class="text-foreground-subtle text-[10px]">
               {{ t('page.tasks.graph.keyboard_pan') }}
             </span>
           </div>
           <div class="flex items-center justify-between gap-2">
-            <div class="text-surface-200 flex items-center gap-1 text-[10px] font-medium">
-              <kbd class="bg-surface-800 rounded border border-white/10 px-1.5 py-0.5">Q/E</kbd>
+            <div class="text-foreground flex items-center gap-1 text-[10px] font-medium">
+              <kbd class="bg-raised border-border rounded border px-1.5 py-0.5">Q/E</kbd>
             </div>
-            <span class="text-surface-400 text-[10px]">
+            <span class="text-foreground-subtle text-[10px]">
               {{ t('page.tasks.graph.keyboard_zoom') }}
             </span>
           </div>
           <div class="flex items-center justify-between gap-2">
-            <div class="text-surface-200 flex items-center gap-1 text-[10px] font-medium">
-              <kbd class="bg-surface-800 rounded border border-white/10 px-1.5 py-0.5">R</kbd>
+            <div class="text-foreground flex items-center gap-1 text-[10px] font-medium">
+              <kbd class="bg-raised border-border rounded border px-1.5 py-0.5">R</kbd>
             </div>
-            <span class="text-surface-400 text-[10px]">
+            <span class="text-foreground-subtle text-[10px]">
               {{ t('page.tasks.graph.keyboard_reset') }}
             </span>
           </div>
         </div>
       </div>
       <div
-        class="bg-surface-900/90 absolute bottom-4 left-4 z-10 rounded-lg border border-white/10 px-3 py-2"
+        class="bg-field/95 border-border shadow-card absolute bottom-4 left-4 z-10 rounded-lg border px-3 py-2"
       >
         <span
-          class="text-surface-400 mb-1.5 block text-[10px] font-semibold tracking-wider uppercase"
+          class="text-foreground-subtle mb-1.5 block text-[10px] font-semibold tracking-wider uppercase"
         >
           {{ t('page.tasks.graph.legend') }}
         </span>
         <div class="flex flex-col gap-1">
           <div v-for="item in legendItems" :key="item.label" class="flex items-center gap-1.5">
             <span class="h-2.5 w-2.5 rounded-full" :class="item.colorClass" />
-            <span class="text-surface-300 text-[11px]">{{ item.label }}</span>
+            <span class="text-foreground-muted text-[11px]">{{ item.label }}</span>
           </div>
         </div>
       </div>
@@ -604,8 +603,8 @@
       :aria-valuemax="graphHeightMax"
       :aria-valuenow="graphHeight"
       tabindex="0"
-      class="bg-surface-900/60 border-surface-700 text-surface-400 hover:text-surface-200 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      :class="{ 'ring-primary-500 text-surface-200 ring-1': isResizing }"
+      class="bg-field border-border text-foreground-subtle hover:bg-interactive hover:text-foreground focus-visible:ring-primary-500 focus-visible:ring-offset-panel mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      :class="{ 'ring-primary-500 bg-interactive text-foreground ring-1': isResizing }"
       @pointerdown="startResize"
       @keydown="onResizeKeydown"
     >

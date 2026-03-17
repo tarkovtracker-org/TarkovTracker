@@ -7,8 +7,8 @@
       <NuxtErrorBoundary @error="handlePageError">
         <NuxtPage />
         <template #error="{ clearError, error }">
-          <div class="bg-surface-900 border-surface-700/60 rounded-xl border p-6 text-center">
-            <p class="text-surface-100 text-sm">{{ getPageErrorMessage(error) }}</p>
+          <div class="bg-panel border-border shadow-card rounded-xl border p-6 text-center">
+            <p class="text-foreground text-sm">{{ getPageErrorMessage(error) }}</p>
             <UButton
               class="mt-4"
               color="primary"

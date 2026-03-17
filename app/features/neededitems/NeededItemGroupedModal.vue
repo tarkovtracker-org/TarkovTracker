@@ -8,11 +8,9 @@
     @update:open="$emit('update:open', $event)"
   >
     <template #content>
-      <div
-        class="bg-surface-900 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg"
-      >
-        <div class="flex items-center gap-4 border-b border-white/10 p-4">
-          <div class="bg-surface-800 relative h-16 w-16 shrink-0 overflow-hidden rounded">
+      <div class="bg-panel flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg">
+        <div class="border-border flex items-center gap-4 border-b p-4">
+          <div class="bg-shell relative h-16 w-16 shrink-0 overflow-hidden rounded">
             <GameItem
               :src="itemInfo.image512pxLink || itemInfo.iconLink"
               :item-name="itemInfo.name"
@@ -28,7 +26,7 @@
           </div>
           <div class="min-w-0 flex-1">
             <h3 class="text-lg font-semibold">{{ itemInfo.name }}</h3>
-            <div class="text-surface-400 text-sm">
+            <div class="text-foreground-muted text-sm">
               {{ $t('needed_items.total') }}
               <span :class="isComplete ? 'text-success-400' : 'text-primary-400'" class="font-bold">
                 {{ currentTotal }}/{{ totalNeeded }}
@@ -36,7 +34,7 @@
             </div>
           </div>
           <button
-            class="text-surface-400 hover:text-white"
+            class="text-foreground-muted hover:text-foreground"
             :aria-label="$t('generic.close_button')"
             @click="$emit('update:open', false)"
           >
@@ -44,8 +42,8 @@
           </button>
         </div>
         <div class="min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
-          <div class="bg-surface-800 rounded-lg p-4">
-            <h4 class="text-surface-300 mb-3 text-sm font-medium tracking-wide uppercase">
+          <div class="bg-shell rounded-lg p-4">
+            <h4 class="text-foreground mb-3 text-sm font-medium tracking-wide uppercase">
               {{ $t('needed_items.collected_items') }}
             </h4>
             <NeededItemGroupedInputControls
@@ -69,7 +67,7 @@
           </div>
           <div v-if="sortedTaskObjectives.length > 0">
             <h4
-              class="text-surface-300 mb-3 flex items-center gap-2 text-sm font-medium tracking-wide uppercase"
+              class="text-foreground mb-3 flex items-center gap-2 text-sm font-medium tracking-wide uppercase"
             >
               <UIcon name="i-mdi-clipboard-list" class="h-4 w-4" />
               {{ $t('needed_items.tasks') }} ({{ taskObjectivesList.length }})
@@ -78,7 +76,7 @@
               <div
                 v-for="obj in sortedTaskObjectives"
                 :key="obj.id"
-                class="bg-surface-800 flex items-center justify-between gap-3 rounded-lg p-3"
+                class="bg-shell flex items-center justify-between gap-3 rounded-lg p-3"
               >
                 <div class="flex min-w-0 flex-1 items-center gap-2">
                   <router-link
@@ -102,13 +100,13 @@
                 <div class="flex shrink-0 items-center gap-2">
                   <span
                     class="text-xs"
-                    :class="obj.foundInRaid ? 'text-warning-400' : 'text-surface-400'"
+                    :class="obj.foundInRaid ? 'text-warning-600' : 'text-foreground-muted'"
                   >
                     {{ obj.foundInRaid ? $t('needed_items.fir') : $t('needed_items.non') }}
                   </span>
-                  <div class="bg-surface-700 flex items-center rounded border border-white/20">
+                  <div class="bg-field border-border flex items-center rounded border">
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
+                      class="text-foreground-muted hover:bg-interactive hover:text-foreground flex h-6 w-6 items-center justify-center rounded-l transition-colors"
                       :aria-label="
                         t('needed_items.aria.decrease_objective_count', {
                           task_name: getTaskName(obj.taskId),
@@ -119,15 +117,15 @@
                       <UIcon name="i-mdi-minus" class="h-3 w-3" />
                     </button>
                     <span
-                      class="bg-surface-800 flex h-6 min-w-10 items-center justify-center border-x border-white/20 px-1 text-xs font-semibold"
+                      class="bg-panel border-border flex h-6 min-w-10 items-center justify-center border-x px-1 text-xs font-semibold"
                       :class="
-                        getObjectiveCount(obj) >= obj.count ? 'text-success-400' : 'text-white'
+                        getObjectiveCount(obj) >= obj.count ? 'text-success-600' : 'text-foreground'
                       "
                     >
                       {{ getObjectiveCount(obj) }}/{{ obj.count }}
                     </span>
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
+                      class="text-foreground-muted hover:bg-interactive hover:text-foreground flex h-6 w-6 items-center justify-center rounded-r transition-colors"
                       :aria-label="
                         t('needed_items.aria.increase_objective_count', {
                           task_name: getTaskName(obj.taskId),
@@ -144,7 +142,7 @@
           </div>
           <div v-if="sortedHideoutModules.length > 0">
             <h4
-              class="text-surface-300 mb-3 flex items-center gap-2 text-sm font-medium tracking-wide uppercase"
+              class="text-foreground mb-3 flex items-center gap-2 text-sm font-medium tracking-wide uppercase"
             >
               <UIcon name="i-mdi-home" class="h-4 w-4" />
               {{ $t('needed_items.hideout_label') }} ({{ hideoutModulesList.length }})
@@ -153,7 +151,7 @@
               <div
                 v-for="mod in sortedHideoutModules"
                 :key="mod.id"
-                class="bg-surface-800 flex items-center justify-between gap-3 rounded-lg p-3"
+                class="bg-shell flex items-center justify-between gap-3 rounded-lg p-3"
               >
                 <div class="flex min-w-0 flex-1 items-center gap-2">
                   <router-link
@@ -173,20 +171,20 @@
                       {{ getStationName(mod) }}
                     </span>
                   </router-link>
-                  <span class="text-surface-400 text-xs">
+                  <span class="text-foreground-muted text-xs">
                     {{ $t('needed_items.lvl') }} {{ mod.hideoutModule.level }}
                   </span>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <span
                     class="text-xs"
-                    :class="mod.foundInRaid ? 'text-warning-400' : 'text-surface-400'"
+                    :class="mod.foundInRaid ? 'text-warning-600' : 'text-foreground-muted'"
                   >
                     {{ mod.foundInRaid ? $t('needed_items.fir') : $t('needed_items.non') }}
                   </span>
-                  <div class="bg-surface-700 flex items-center rounded border border-white/20">
+                  <div class="bg-field border-border flex items-center rounded border">
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
+                      class="text-foreground-muted hover:bg-interactive hover:text-foreground flex h-6 w-6 items-center justify-center rounded-l transition-colors"
                       :aria-label="
                         t('needed_items.aria.decrease_hideout_count', {
                           station_name: getStationName(mod),
@@ -197,13 +195,15 @@
                       <UIcon name="i-mdi-minus" class="h-3 w-3" />
                     </button>
                     <span
-                      class="bg-surface-800 flex h-6 min-w-10 items-center justify-center border-x border-white/20 px-1 text-xs font-semibold"
-                      :class="getHideoutCount(mod) >= mod.count ? 'text-success-400' : 'text-white'"
+                      class="bg-panel border-border flex h-6 min-w-10 items-center justify-center border-x px-1 text-xs font-semibold"
+                      :class="
+                        getHideoutCount(mod) >= mod.count ? 'text-success-600' : 'text-foreground'
+                      "
                     >
                       {{ getHideoutCount(mod) }}/{{ mod.count }}
                     </span>
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
+                      class="text-foreground-muted hover:bg-interactive hover:text-foreground flex h-6 w-6 items-center justify-center rounded-r transition-colors"
                       :aria-label="
                         t('needed_items.aria.increase_hideout_count', {
                           station_name: getStationName(mod),

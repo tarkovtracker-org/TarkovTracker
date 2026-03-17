@@ -15,7 +15,7 @@
           :show-chapter-actions="false"
           @toggle-objective="handleObjectiveToggle"
         />
-        <div class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full">
+        <div class="bg-field h-1.5 overflow-hidden rounded-full">
           <div
             class="h-full rounded-full transition-[width] duration-300"
             :class="
@@ -23,7 +23,7 @@
                 ? 'bg-success-500/70'
                 : chapter.mainProgress > 0
                   ? 'bg-primary-500/70'
-                  : 'bg-surface-700'
+                  : 'bg-shell'
             "
             :style="{
               width:

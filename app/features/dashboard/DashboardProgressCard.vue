@@ -1,9 +1,9 @@
 <template>
   <div
     :class="[
-      'bg-surface-900 cursor-pointer rounded-lg border border-white/12 px-4 py-3 shadow-md',
+      'bg-panel border-border shadow-card cursor-pointer rounded-lg border px-4 py-3',
       'transition-all duration-150',
-      'focus-visible:ring-surface-700/50 outline-none hover:shadow-lg focus-visible:ring-2',
+      'hover:bg-raised/65 outline-none hover:shadow-lg focus-visible:ring-2',
       hoverBorderClass,
     ]"
     role="button"
@@ -22,10 +22,12 @@
           <UIcon :name="icon" class="h-7 w-7" :class="iconColorClass" />
         </div>
         <div>
-          <div class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+          <div class="text-foreground-muted text-xs font-semibold tracking-wider uppercase">
             {{ label }}
           </div>
-          <div class="text-xl font-bold text-white">{{ completedDisplay }}/{{ totalDisplay }}</div>
+          <div class="text-foreground text-xl font-bold">
+            {{ completedDisplay }}/{{ totalDisplay }}
+          </div>
         </div>
       </div>
       <div class="text-3xl font-bold" :class="percentageColorClass">{{ percentageDisplay }}%</div>
@@ -34,7 +36,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { ProgressCardColor } from '@/features/dashboard/progressCard';
   const props = defineProps<{
@@ -67,37 +68,37 @@
     { hover: string; iconBg: string; icon: string; percentage: string }
   > = {
     primary: {
-      hover: 'hover:border-surface-600',
+      hover: 'hover:border-primary-500/25 focus-visible:ring-primary-500/20',
       iconBg: 'bg-primary-600/15',
       icon: 'text-primary-400',
       percentage: 'text-primary-400',
     },
     neutral: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-surface-700',
-      icon: 'text-surface-300',
-      percentage: 'text-surface-50',
+      hover: 'hover:border-border-strong focus-visible:ring-border-strong/25',
+      iconBg: 'bg-raised',
+      icon: 'text-foreground-muted',
+      percentage: 'text-foreground',
     },
     info: {
-      hover: 'hover:border-surface-600',
+      hover: 'hover:border-info-500/25 focus-visible:ring-info-500/20',
       iconBg: 'bg-info-600/15',
       icon: 'text-info-400',
       percentage: 'text-info-400',
     },
     success: {
-      hover: 'hover:border-surface-600',
+      hover: 'hover:border-success-500/25 focus-visible:ring-success-500/20',
       iconBg: 'bg-success-600/15',
       icon: 'text-success-400',
       percentage: 'text-success-400',
     },
     kappa: {
-      hover: 'hover:border-surface-600',
+      hover: 'hover:border-kappa-500/25 focus-visible:ring-kappa-500/20',
       iconBg: 'bg-kappa-600/15',
       icon: 'text-kappa-400',
       percentage: 'text-kappa-400',
     },
     lightkeeper: {
-      hover: 'hover:border-surface-600',
+      hover: 'hover:border-lightkeeper-500/25 focus-visible:ring-lightkeeper-500/20',
       iconBg: 'bg-lightkeeper-600/15',
       icon: 'text-lightkeeper-400',
       percentage: 'text-lightkeeper-400',

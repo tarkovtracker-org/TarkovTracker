@@ -1,7 +1,5 @@
 <template>
-  <header
-    class="border-surface-700/50 bg-surface-900 fixed top-0 right-0 z-40 h-11 border-b shadow-[0_1px_0_rgba(0,0,0,0.4)]"
-  >
+  <header class="border-border bg-shell shadow-card fixed top-0 right-0 z-40 h-11 border-b">
     <div class="flex h-full items-center gap-1 px-2 sm:gap-2 sm:px-3">
       <!-- Left: Toggle Button -->
       <AppTooltip :text="t('navigation_drawer.toggle')">
@@ -18,7 +16,7 @@
       </AppTooltip>
       <!-- Center: Page Title -->
       <span class="flex min-w-0 flex-1 items-center">
-        <span class="truncate text-base leading-none font-semibold text-white">
+        <span class="text-foreground truncate text-base leading-none font-semibold">
           {{ pageTitle }}
         </span>
       </span>
@@ -41,7 +39,7 @@
             target="_blank"
             rel="noopener noreferrer"
             :aria-label="t('footer.call_to_action.discord')"
-            class="hover:bg-surface-700 group flex h-7 w-7 items-center justify-center rounded transition-colors"
+            class="group hover:bg-interactive flex h-7 w-7 items-center justify-center rounded transition-colors"
           >
             <DiscordIcon class="text-discord group-hover:text-discord-hover" />
           </a>
@@ -52,28 +50,53 @@
             target="_blank"
             rel="noopener noreferrer"
             :aria-label="t('footer.call_to_action.github')"
-            class="hover:bg-surface-700 flex h-7 w-7 items-center justify-center rounded transition-colors"
+            class="hover:bg-interactive flex h-7 w-7 items-center justify-center rounded transition-colors"
           >
-            <UIcon name="i-mdi-github" class="text-surface-300 h-4.5 w-4.5 hover:text-white" />
+            <UIcon
+              name="i-mdi-github"
+              class="text-foreground-muted hover:text-foreground h-4.5 w-4.5 transition-colors"
+            />
           </a>
         </AppTooltip>
         <label
-          class="focus-within:ring-primary-500 focus-within:ring-offset-surface-900 bg-surface-800/60 border-surface-700 flex min-h-8 items-center gap-1 rounded border px-2 focus-within:ring-2 focus-within:ring-offset-2"
+          class="border-border bg-raised/70 text-foreground-muted focus-within:ring-primary-500 focus-within:ring-offset-shell flex min-h-8 items-center gap-1 rounded border px-2 focus-within:ring-2 focus-within:ring-offset-2"
         >
-          <UIcon name="i-mdi-translate" class="text-surface-300 h-4 w-4 shrink-0" />
+          <UIcon name="i-mdi-theme-light-dark" class="h-4 w-4 shrink-0" />
+          <span class="sr-only">{{ t('settings.theme') }}</span>
+          <select
+            id="app-theme-select"
+            v-model="selectedThemeMode"
+            :aria-label="t('settings.theme')"
+            name="theme"
+            class="text-foreground h-6 bg-transparent py-1 text-xs leading-none font-medium focus:outline-none"
+          >
+            <option
+              v-for="item in themeItems"
+              :key="item.value"
+              :value="item.value"
+              class="bg-panel text-foreground"
+            >
+              {{ item.label }}
+            </option>
+          </select>
+        </label>
+        <label
+          class="border-border bg-raised/70 text-foreground-muted focus-within:ring-primary-500 focus-within:ring-offset-shell flex min-h-8 items-center gap-1 rounded border px-2 focus-within:ring-2 focus-within:ring-offset-2"
+        >
+          <UIcon name="i-mdi-translate" class="h-4 w-4 shrink-0" />
           <span class="sr-only">{{ t('settings.locale') }}</span>
           <select
             id="app-locale-select"
             v-model="selectedLocale"
             :aria-label="t('settings.locale')"
             name="locale"
-            class="text-surface-200 h-6 bg-transparent py-1 text-xs leading-none font-medium focus:outline-none"
+            class="text-foreground h-6 bg-transparent py-1 text-xs leading-none font-medium focus:outline-none"
           >
             <option
               v-for="item in localeItems"
               :key="item.value"
               :value="item.value"
-              class="bg-surface-900 text-surface-100"
+              class="bg-panel text-foreground"
             >
               {{ item.label }}
             </option>
@@ -81,11 +104,11 @@
         </label>
         <!-- Account section -->
         <template v-if="isLoggedIn">
-          <div class="bg-surface-700/50 mx-1 h-5 w-px" />
+          <div class="bg-border mx-1 h-5 w-px" />
           <UDropdownMenu :items="accountMenuItems" :content="{ align: 'end', sideOffset: 8 }">
             <button
               type="button"
-              class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex min-h-8 items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors"
+              class="border-border bg-raised/70 hover:bg-interactive flex min-h-8 items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors"
               :aria-label="t('navigation_drawer.account_menu')"
             >
               <img
@@ -94,36 +117,39 @@
                 class="h-4 w-4 shrink-0 rounded-full"
                 loading="lazy"
               />
-              <span class="text-surface-200 hidden text-sm leading-none font-medium sm:inline">
+              <span class="text-foreground hidden text-sm leading-none font-medium sm:inline">
                 {{ userDisplayName }}
               </span>
-              <UIcon name="i-mdi-chevron-down" class="text-surface-400 h-3.5 w-3.5 shrink-0" />
+              <UIcon
+                name="i-mdi-chevron-down"
+                class="text-foreground-subtle h-3.5 w-3.5 shrink-0"
+              />
             </button>
           </UDropdownMenu>
         </template>
         <template v-else>
-          <div class="bg-surface-700/50 mx-1 h-5 w-px" />
+          <div class="bg-border mx-1 h-5 w-px" />
           <AppTooltip :text="t('navigation_drawer.settings')">
             <NuxtLink
               to="/settings"
-              class="hover:bg-surface-700 flex h-7 w-7 items-center justify-center rounded transition-colors"
+              class="hover:bg-interactive flex h-7 w-7 items-center justify-center rounded transition-colors"
               :aria-label="t('navigation_drawer.settings')"
             >
               <UIcon
                 name="i-mdi-cog-outline"
-                class="text-surface-300 h-4.5 w-4.5 hover:text-white"
+                class="text-foreground-muted hover:text-foreground h-4.5 w-4.5 transition-colors"
               />
             </NuxtLink>
           </AppTooltip>
           <NuxtLink
             to="/login"
-            class="hover:bg-surface-700 hidden min-h-8 items-center rounded px-2 py-1 text-sm leading-none text-white sm:inline-flex"
+            class="text-foreground hover:bg-interactive hidden min-h-8 items-center rounded px-2 py-1 text-sm leading-none transition-colors sm:inline-flex"
           >
             <span class="leading-none">{{ t('navigation_drawer.login') }}</span>
           </NuxtLink>
           <NuxtLink
             to="/login"
-            class="hover:bg-surface-700 rounded p-1 text-white sm:hidden"
+            class="text-foreground hover:bg-interactive rounded p-1 transition-colors sm:hidden"
             :aria-label="t('navigation_drawer.login')"
           >
             <UIcon name="i-mdi-fingerprint" class="h-4 w-4" />
@@ -141,6 +167,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
+  import type { ThemeMode } from '@/stores/usePreferences';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
   const appStore = useAppStore();
   const metadataStore = useMetadataStore();
@@ -333,6 +360,11 @@
       value: localeCode,
     }));
   });
+  const isThemeMode = (value: string): value is ThemeMode => value === 'dark' || value === 'light';
+  const themeItems = computed(() => [
+    { label: t('settings.interface.appearance.light'), value: 'light' as ThemeMode },
+    { label: t('settings.interface.appearance.dark'), value: 'dark' as ThemeMode },
+  ]);
   let latestLocaleSwitchRequestId = 0;
   async function applyLocaleSelection(newLocale: string) {
     if (!isAvailableLocale(newLocale) || newLocale === locale.value) return;
@@ -376,6 +408,15 @@
     set(newValue: string) {
       if (!newValue) return;
       void applyLocaleSelection(newValue);
+    },
+  });
+  const selectedThemeMode = computed({
+    get() {
+      return preferencesStore.getThemeMode;
+    },
+    set(newValue: string) {
+      if (!isThemeMode(newValue) || newValue === preferencesStore.getThemeMode) return;
+      preferencesStore.setThemeMode(newValue);
     },
   });
 </script>

@@ -9,11 +9,11 @@
     <template #content>
       <form class="space-y-2 px-4 py-4" @submit.prevent="saveDisplayName">
         <div class="flex items-center gap-2">
-          <label :for="displayNameInputId" class="text-surface-200 text-sm font-semibold">
+          <label :for="displayNameInputId" class="text-foreground text-sm font-semibold">
             {{ $t('settings.display_name.label') }}
           </label>
           <UTooltip :text="$t('settings.display_name.explanation')">
-            <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
+            <UIcon name="i-mdi-information" class="text-foreground-subtle h-4 w-4" />
           </UTooltip>
         </div>
         <UFormField name="displayName" :error="displayNameError" class="space-y-0">
@@ -37,7 +37,7 @@
             />
           </div>
         </UFormField>
-        <p class="text-surface-400 text-xs">
+        <p class="text-foreground-muted text-xs">
           {{
             $t('settings.display_name.mode_hint', {
               mode: currentModeLabel,

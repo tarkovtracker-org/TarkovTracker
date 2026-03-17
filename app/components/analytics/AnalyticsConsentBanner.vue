@@ -8,19 +8,19 @@
     class="pointer-events-none fixed inset-x-0 bottom-4 z-[70] px-4"
   >
     <div class="pointer-events-auto mx-auto max-w-5xl">
-      <UCard class="border-surface-700/80 bg-surface-900/95 border shadow-xl backdrop-blur">
+      <UCard class="border-border bg-panel/95 shadow-card border backdrop-blur">
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
           <div class="space-y-3">
             <p class="text-primary-300 text-xs font-semibold tracking-[0.25em] uppercase">
               {{ t('analytics_consent.eyebrow') }}
             </p>
             <div class="space-y-1">
-              <h2 :id="consentTitleId" class="text-lg font-semibold text-white">
+              <h2 :id="consentTitleId" class="text-foreground text-lg font-semibold">
                 {{ consentTitle }}
               </h2>
               <p
                 :id="consentDescriptionId"
-                class="text-surface-300 max-w-2xl text-sm leading-relaxed"
+                class="text-foreground-muted max-w-2xl text-sm leading-relaxed"
               >
                 {{ consentDescription }}
               </p>
@@ -37,15 +37,15 @@
               </UBadge>
             </div>
             <div
-              class="text-surface-400 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-relaxed"
+              class="text-foreground-subtle flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-relaxed"
             >
               <span>{{ t('analytics_consent.change_anytime') }}</span>
-              <router-link to="/privacy" class="text-info-300 hover:text-info-200 underline">
+              <router-link to="/privacy" class="text-info-600 hover:text-info-500 underline">
                 {{ t('analytics_consent.review_details') }}
               </router-link>
             </div>
           </div>
-          <div class="bg-surface-950/70 border-surface-800/80 rounded-xl border p-2">
+          <div class="bg-shell border-border rounded-xl border p-2">
             <div class="flex flex-col gap-2">
               <UButton
                 color="primary"

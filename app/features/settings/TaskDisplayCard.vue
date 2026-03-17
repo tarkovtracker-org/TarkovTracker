@@ -27,7 +27,7 @@
         <USeparator />
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div class="space-y-2">
-            <p class="text-surface-200 text-sm font-semibold">
+            <p class="text-foreground text-sm font-semibold">
               {{ $t('settings.interface.tasks.density') }}
             </p>
             <SelectMenuFixed
@@ -38,7 +38,7 @@
             />
           </div>
           <div class="space-y-2">
-            <p class="text-surface-200 text-sm font-semibold">
+            <p class="text-foreground text-sm font-semibold">
               {{ $t('page.tasks.title') }}
             </p>
             <SelectMenuFixed
@@ -49,7 +49,7 @@
             />
           </div>
           <div class="space-y-2">
-            <p class="text-surface-200 text-sm font-semibold">
+            <p class="text-foreground text-sm font-semibold">
               {{ $t('page.hideout.title') }}
             </p>
             <SelectMenuFixed
@@ -65,7 +65,6 @@
   </GenericCard>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   const { t } = useI18n({ useScope: 'global' });

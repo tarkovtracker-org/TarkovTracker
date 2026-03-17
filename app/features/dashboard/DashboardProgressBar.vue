@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-surface-700/50 relative overflow-hidden rounded-full" :class="sizeClass">
+  <div class="bg-border-muted/80 relative overflow-hidden rounded-full" :class="sizeClass">
     <div
       class="absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-300 ease-out"
       :class="fillClass"
@@ -29,12 +29,12 @@
   );
   const fillColors: Record<ProgressBarColor, string> = {
     primary: 'bg-primary-500',
-    neutral: 'bg-surface-400',
+    neutral: 'bg-foreground-muted',
     info: 'bg-info-500',
     success: 'bg-success-500',
     kappa: 'bg-kappa-500',
     lightkeeper: 'bg-lightkeeper-500',
-    locked: 'bg-surface-600/40',
+    locked: 'bg-shell',
     gradient: '',
   };
   const sizeClass = computed(() => (props.size === 'sm' ? 'h-1' : 'h-2.5'));

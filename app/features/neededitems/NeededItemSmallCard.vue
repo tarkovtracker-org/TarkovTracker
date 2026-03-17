@@ -10,7 +10,7 @@
       "
     >
       <div
-        class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-full flex-col rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        class="focus-visible:ring-primary-500 focus-visible:ring-offset-panel flex h-full flex-col rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         :class="[
           itemCardClasses,
           {
@@ -81,7 +81,7 @@
             </div>
             <div
               v-if="cardStyle === 'compact' && !isSingleItem && !selfCompletedNeed"
-              class="bg-surface-900/70 absolute inset-x-0 bottom-0 z-20 flex justify-center p-1"
+              class="bg-panel/92 border-border absolute inset-x-0 bottom-0 z-20 flex justify-center border-t p-1 backdrop-blur-sm"
               @click.stop
             >
               <ItemCountControls
@@ -119,13 +119,13 @@
                   compact
                   class="max-w-full text-[clamp(0.625rem,2vw,0.75rem)]"
                 />
-                <span class="text-surface-400 ml-1 text-[clamp(0.625rem,2vw,0.75rem)]">
+                <span class="text-foreground-subtle ml-1 text-[clamp(0.625rem,2vw,0.75rem)]">
                   {{ props.need.hideoutModule.level }}
                 </span>
               </template>
             </div>
             <div
-              class="text-surface-400 flex min-h-10 flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[clamp(0.625rem,1.8vw,0.75rem)]"
+              class="text-foreground-subtle flex min-h-10 flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[clamp(0.625rem,1.8vw,0.75rem)]"
             >
               <span
                 v-if="levelRequired > 0 && levelRequired > playerLevel"
@@ -158,21 +158,21 @@
         </template>
         <template v-else>
           <div :class="imageContainerClasses">
-            <div class="bg-surface-700 h-full w-full animate-pulse rounded-t-lg"></div>
+            <div class="bg-interactive h-full w-full animate-pulse rounded-t-lg"></div>
           </div>
           <div class="flex flex-1 flex-col p-2">
             <div class="flex min-h-10 items-start justify-center">
-              <span class="bg-surface-700 h-4 w-3/4 animate-pulse rounded"></span>
+              <span class="bg-interactive h-4 w-3/4 animate-pulse rounded"></span>
             </div>
             <div class="flex min-h-7 w-full items-center justify-center">
-              <span class="bg-surface-700 h-3 w-1/2 animate-pulse rounded"></span>
+              <span class="bg-interactive h-3 w-1/2 animate-pulse rounded"></span>
             </div>
             <div class="flex min-h-10 flex-wrap items-center justify-center gap-x-3 gap-y-0.5">
-              <span class="bg-surface-700 h-3 w-1/3 animate-pulse rounded"></span>
-              <span class="bg-surface-700 h-3 w-1/3 animate-pulse rounded"></span>
+              <span class="bg-interactive h-3 w-1/3 animate-pulse rounded"></span>
+              <span class="bg-interactive h-3 w-1/3 animate-pulse rounded"></span>
             </div>
             <div class="mt-auto flex items-center justify-center pt-2">
-              <span class="bg-surface-700 h-4 w-10 animate-pulse rounded"></span>
+              <span class="bg-interactive h-4 w-10 animate-pulse rounded"></span>
             </div>
           </div>
         </template>
@@ -241,9 +241,11 @@
   };
   const itemCardClasses = computed(() => {
     return {
-      'bg-gradient-to-t from-complete to-surface':
+      'border-border shadow-card border bg-gradient-to-t from-complete/12 to-panel':
         selfCompletedNeed.value || currentCount.value >= neededCount.value,
-      'bg-surface-800': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
+      'bg-panel border-border shadow-card border': !(
+        selfCompletedNeed.value || currentCount.value >= neededCount.value
+      ),
     };
   });
   const imageContainerClasses = computed(() => {
@@ -256,10 +258,11 @@
   const itemCountTagClasses = computed(() => {
     return {
       'bg-clip-padding rounded-tl-[5px] rounded-br-[10px]': true,
-      'bg-surface-800/90 text-surface-100 ring-1 ring-white/10': !(
+      'bg-panel/95 text-foreground border-border shadow-sm border': !(
         selfCompletedNeed.value || currentCount.value >= neededCount.value
       ),
-      'bg-complete text-white': selfCompletedNeed.value || currentCount.value >= neededCount.value,
+      'bg-complete text-white shadow-sm':
+        selfCompletedNeed.value || currentCount.value >= neededCount.value,
     };
   });
 </script>

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="!props.isCollapsed" class="px-4 py-1">
-      <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
+      <h3 class="text-foreground-subtle text-xs font-semibold tracking-wider uppercase">
         {{ t('navigation_drawer.section_navigation') }}
       </h3>
     </div>
@@ -59,7 +59,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import DrawerItem from '@/features/drawer/DrawerItem.vue';
   const props = defineProps({
     isCollapsed: {

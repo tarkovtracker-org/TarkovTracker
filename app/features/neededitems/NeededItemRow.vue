@@ -35,7 +35,7 @@
               <span class="mt-1">
                 <template v-if="props.need.needType == 'taskObjective'">
                   <TaskLink v-if="relatedTask" :task="relatedTask" />
-                  <span v-else class="text-surface-300 text-sm">
+                  <span v-else class="text-foreground-muted text-sm">
                     {{ $t('needed_items.unknown_task') }}
                   </span>
                   <span class="mt-1 flex">
@@ -53,7 +53,7 @@
                     :station="relatedStation"
                     :module-id="props.need.hideoutModule.id"
                   />
-                  <span v-else class="text-surface-300 text-sm">
+                  <span v-else class="text-foreground-muted text-sm">
                     {{ $t('needed_items.unknown_station') }}
                   </span>
                 </template>
@@ -72,7 +72,7 @@
                   <UIcon
                     name="i-mdi-check-circle"
                     class="h-5 w-5"
-                    :class="isCollected ? 'text-success-400' : 'text-surface-300'"
+                    :class="isCollected ? 'text-success-400' : 'text-foreground-muted'"
                   />
                 </template>
                 <template v-else>
@@ -127,7 +127,7 @@
                       <div class="mx-2 mt-2 flex w-full flex-col self-center">
                         <template v-if="props.need.needType == 'taskObjective'">
                           <TaskLink v-if="relatedTask" :task="relatedTask" />
-                          <span v-else class="text-surface-300 text-sm">
+                          <span v-else class="text-foreground-muted text-sm">
                             {{ $t('needed_items.unknown_task') }}
                           </span>
                           <span class="mt-1 flex">
@@ -156,7 +156,7 @@
                                 />
                               </template>
                               <template v-else>
-                                <span class="text-surface-300 text-sm">
+                                <span class="text-foreground-muted text-sm">
                                   {{ $t('needed_items.unknown_station') }}
                                 </span>
                               </template>
@@ -205,7 +205,7 @@
                               :class="
                                 isCollected
                                   ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
-                                  : 'bg-surface-700 text-surface-200 hover:bg-surface-600 border-white/20 hover:text-white'
+                                  : 'bg-field text-foreground-muted hover:bg-interactive border-border hover:text-foreground'
                               "
                               :aria-label="
                                 isCollected
@@ -290,7 +290,7 @@
                       :class="
                         isCollected
                           ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
-                          : 'bg-surface-700 text-surface-200 hover:bg-surface-600 border-white/20 hover:text-white'
+                          : 'bg-field text-foreground-muted hover:bg-interactive border-border hover:text-foreground'
                       "
                       :aria-label="
                         isCollected
@@ -389,7 +389,7 @@
     return {
       'bg-gradient-to-l from-complete to-surface':
         selfCompletedNeed.value || currentCount.value >= neededCount.value,
-      'bg-surface-800': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
+      'bg-panel': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
     };
   });
   const isSingleItem = computed(() => neededCount.value === 1);
@@ -416,7 +416,7 @@
     if (isCollected.value) {
       return 'bg-info-500/20 text-info-300';
     }
-    return 'bg-surface-700 text-surface-300';
+    return 'bg-field text-foreground-muted';
   });
   defineEmits<{
     (event: 'decreaseCount' | 'increaseCount' | 'toggleCount'): void;

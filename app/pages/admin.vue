@@ -37,7 +37,7 @@
   <div v-if="!hasInitiallyLoaded" class="flex min-h-[50vh] items-center justify-center">
     <div class="text-center">
       <UIcon name="i-mdi-loading" class="text-primary-400 h-12 w-12 animate-spin" />
-      <p class="text-surface-400 mt-4">Verifying admin access...</p>
+      <p class="text-foreground-muted mt-4">Verifying admin access...</p>
     </div>
   </div>
   <div v-else-if="loadError" class="flex min-h-[50vh] items-center justify-center px-4">

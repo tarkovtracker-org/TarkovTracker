@@ -37,7 +37,7 @@
       <div class="flex shrink-0 gap-1">
         <button
           type="button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200 hover:bg-white/10"
+          class="bg-shell border-border text-foreground hover:bg-interactive inline-flex h-7 w-7 items-center justify-center rounded-md border"
           :aria-label="translate('maps.tooltip.go_to_in_task_list')"
           :title="translate('maps.tooltip.go_to')"
           @click.stop="scrollToObjective"
@@ -47,8 +47,8 @@
         <button
           v-if="!readOnly"
           type="button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200"
-          :class="isToggleDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
+          class="bg-shell border-border text-foreground inline-flex h-7 w-7 items-center justify-center rounded-md border"
+          :class="isToggleDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-interactive'"
           :aria-label="
             isComplete ? translate('maps.tooltip.uncomplete') : translate('maps.tooltip.complete')
           "
@@ -64,7 +64,7 @@
         <button
           type="button"
           data-testid="objective-close-button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-300 hover:bg-white/10"
+          class="text-foreground-muted hover:bg-interactive inline-flex h-7 w-7 items-center justify-center rounded-md"
           :aria-label="translate('generic.close_button')"
           @click.stop="emitClose"
         >
@@ -73,12 +73,12 @@
       </div>
     </div>
     <div class="mt-1">
-      <div v-if="!objective" class="text-xs text-gray-400">
+      <div v-if="!objective" class="text-foreground-subtle text-xs">
         {{ translate('maps.tooltip.objective_unavailable') }}
       </div>
-      <div v-else class="text-sm text-gray-200">
-        <div class="text-gray-300">{{ objective.description }}</div>
-        <div v-if="!readOnly && requiredCount > 1" class="mt-1 text-[11px] text-gray-400">
+      <div v-else class="text-foreground text-sm">
+        <div class="text-foreground-muted">{{ objective.description }}</div>
+        <div v-if="!readOnly && requiredCount > 1" class="text-foreground-subtle mt-1 text-[11px]">
           {{ currentCount }}/{{ requiredCount }}
         </div>
       </div>
@@ -86,10 +86,10 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n, type Composer } from 'vue-i18n';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
+  import type { Composer } from 'vue-i18n';
   import type { Router } from 'vue-router';
   const props = withDefaults(
     defineProps<{
@@ -162,12 +162,12 @@
     if (task.value?.wikiLink) {
       return `${base} text-link hover:text-link-hover no-underline`;
     }
-    return `${base} text-gray-100`;
+    return `${base} text-foreground`;
   });
   const linkButtonClass = [
     'inline-flex items-center justify-center rounded p-1 transition-colors',
-    'text-surface-400 hover:text-surface-200 hover:bg-white/10',
-    'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900',
+    'text-foreground-muted hover:text-foreground hover:bg-interactive',
+    'focus-visible:ring-primary-500 focus-visible:ring-offset-panel',
     'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
   ];
   const isComplete = computed(() => tarkovStore.isTaskObjectiveComplete(props.objectiveId));

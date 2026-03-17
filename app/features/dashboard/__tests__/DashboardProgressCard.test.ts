@@ -31,7 +31,7 @@ const i18n = createI18n({
 });
 const colorVariants: Array<{ color: ProgressCardColor; barClass: string }> = [
   { color: 'primary', barClass: 'bg-primary-500' },
-  { color: 'neutral', barClass: 'bg-surface-400' },
+  { color: 'neutral', barClass: 'bg-foreground-muted' },
   { color: 'info', barClass: 'bg-info-500' },
   { color: 'success', barClass: 'bg-success-500' },
   { color: 'kappa', barClass: 'bg-kappa-500' },

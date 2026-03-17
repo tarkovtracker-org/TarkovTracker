@@ -32,8 +32,8 @@
     keydown: [KeyboardEvent];
   }>();
   const inputClasses = [
-    'bg-surface-800 border-surface-700 text-surface-100 placeholder-surface-500',
-    'focus:border-surface-600 focus:ring-primary-500/30',
+    'border-border-muted bg-field text-foreground placeholder:text-foreground-subtle',
+    'focus:border-border-strong focus:ring-primary-500/30',
     'h-7 w-16 rounded border px-1.5 text-center text-sm tabular-nums transition-colors',
     'focus:ring-1 focus:outline-none',
   ];

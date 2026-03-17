@@ -5,6 +5,7 @@ A comprehensive Escape from Tarkov progress tracker built with Nuxt 4, featuring
 ## Features
 
 - **Dual Game Mode Support**: Track progress separately for PvP and PvE modes
+- **Theme Mode Support**: Switch between light and dark interface themes
 - **Team Collaboration**: Share progress with teammates in real-time
 - **Task Tracking**: Monitor quest completions and objectives
 - **Hideout Progress**: Track module upgrades and parts
@@ -132,6 +133,8 @@ npm run preview
 ## Documentation
 
 For detailed development guidelines, architecture references, and migration progress, see the files in the [`docs/`](docs/) directory.
+
+- [Theme Token System](docs/theme-token-system.md): semantic light/dark token architecture, runtime theme application, and component styling rules
 
 This repository includes both **contribution workflow guidance** and **technical documentation**. 
 

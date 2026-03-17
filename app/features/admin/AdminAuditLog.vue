@@ -140,7 +140,7 @@
       <div class="px-4 py-4">
         <!-- Loading state -->
         <div v-if="isLoading" class="flex items-center justify-center py-8">
-          <UIcon name="i-mdi-loading" class="text-surface-400 size-6 animate-spin" />
+          <UIcon name="i-mdi-loading" class="text-foreground-subtle size-6 animate-spin" />
         </div>
         <!-- Error state -->
         <UAlert
@@ -152,7 +152,7 @@
           :description="errorDescription || undefined"
         />
         <!-- Empty state -->
-        <div v-else-if="logs.length === 0" class="text-surface-400 py-8 text-center">
+        <div v-else-if="logs.length === 0" class="text-foreground-muted py-8 text-center">
           <UIcon name="i-mdi-clipboard-text-off" class="mb-2 size-8" />
           <p>No admin actions recorded yet</p>
         </div>
@@ -161,7 +161,7 @@
           <div
             v-for="log in logs"
             :key="log.id"
-            class="border-surface-700 bg-surface-800/50 rounded-lg border p-3"
+            class="bg-panel border-border rounded-lg border p-3"
           >
             <div class="flex items-start justify-between gap-2">
               <div class="flex flex-wrap items-center gap-2">
@@ -169,18 +169,18 @@
                   <UIcon :name="getActionIcon(log.action)" class="mr-1 size-3" />
                   {{ log.action }}
                 </UBadge>
-                <span class="text-surface-400 text-xs">by</span>
+                <span class="text-foreground-muted text-xs">by</span>
                 <UBadge color="neutral" variant="outline" size="xs" class="font-mono">
                   {{ getAdminDisplay(log) }}
                 </UBadge>
               </div>
-              <span class="text-surface-500 text-xs">
+              <span class="text-foreground-subtle text-xs">
                 {{ formatDate(log.created_at) }}
               </span>
             </div>
-            <div v-if="log.details" class="text-surface-400 mt-2 text-xs">
+            <div v-if="log.details" class="text-foreground-muted mt-2 text-xs">
               <pre
-                class="bg-surface-900 overflow-x-auto rounded p-2 font-mono text-xs whitespace-pre-wrap"
+                class="bg-shell border-border-muted overflow-x-auto rounded border p-2 font-mono text-xs whitespace-pre-wrap"
                 >{{ JSON.stringify(log.details, null, 2) }}</pre
               >
             </div>

@@ -2,20 +2,20 @@
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-[1400px] space-y-4 sm:space-y-6">
       <section
-        class="bg-surface-900 relative overflow-hidden rounded-xl border border-white/10 p-4 shadow-md sm:p-6"
+        class="bg-panel border-border shadow-card relative overflow-hidden rounded-xl border p-4 sm:p-6"
       >
         <div class="pointer-events-none absolute inset-0" :class="modeTheme.heroBackdrop"></div>
         <div class="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex items-start gap-3 sm:gap-4">
             <div
-              class="ring-default bg-surface-800 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg ring-1 sm:h-16 sm:w-16"
+              class="ring-default bg-shell flex h-14 w-14 shrink-0 items-center justify-center rounded-lg ring-1 sm:h-16 sm:w-16"
               :class="modeTheme.iconTint"
             >
               <UIcon :name="modeTheme.icon" class="h-7 w-7 sm:h-8 sm:w-8" />
             </div>
             <div class="space-y-1">
               <div class="flex flex-wrap items-center gap-2">
-                <h1 class="text-xl font-bold text-white sm:text-2xl">{{ displayName }}</h1>
+                <h1 class="text-foreground text-xl font-bold sm:text-2xl">{{ displayName }}</h1>
                 <UBadge variant="soft" size="sm" :class="modeTheme.modeBadgeClass">
                   {{ modeLabel }}
                 </UBadge>
@@ -31,23 +31,23 @@
                   external
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
+                  class="border-info-300 bg-info-500/10 text-info-700 hover:bg-info-500/16 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                 >
                   <UIcon name="i-mdi-open-in-new" class="h-3 w-3" />
                   {{ t('page.profile.view_tarkov_dev') }}
                 </NuxtLink>
               </div>
-              <p class="text-surface-300 text-sm sm:text-base">
+              <p class="text-foreground-muted text-sm sm:text-base">
                 {{ storyHeadline }}
               </p>
-              <p class="text-surface-400 text-xs sm:text-sm">
+              <p class="text-foreground-subtle text-xs sm:text-sm">
                 {{ storySubline }}
               </p>
             </div>
           </div>
           <div class="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[340px]">
             <div
-              class="flex overflow-hidden rounded-md border border-white/10"
+              class="border-border flex overflow-hidden rounded-md border"
               role="group"
               :aria-label="t('page.profile.mode_toggle_label', 'Select profile mode')"
             >
@@ -93,8 +93,8 @@
                 {{ t('page.profile.view_tasks', 'Open Tasks') }}
               </UButton>
             </div>
-            <p class="text-surface-500 truncate text-[11px]">{{ shareUrl }}</p>
-            <p class="text-surface-400 text-[11px]">
+            <p class="text-foreground-subtle truncate text-[11px]">{{ shareUrl }}</p>
+            <p class="text-foreground-muted text-[11px]">
               <template v-if="shareIsPrivate">
                 {{
                   t('page.profile.share_private_intro', 'This mode is private. Enable sharing in ')
@@ -140,10 +140,10 @@
           <article
             v-for="card in statCards"
             :key="card.id"
-            class="bg-surface-900 rounded-lg border border-white/10 p-4"
+            class="bg-panel border-border rounded-lg border p-4"
           >
             <div class="mb-3 flex items-center justify-between gap-2">
-              <div class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
+              <div class="text-foreground-subtle text-xs font-semibold tracking-wider uppercase">
                 {{ card.label }}
               </div>
               <div
@@ -157,9 +157,9 @@
                 />
               </div>
             </div>
-            <div class="text-xl font-bold text-white">{{ card.value }}</div>
-            <div class="text-surface-400 mt-0.5 text-xs">{{ card.meta }}</div>
-            <div class="bg-surface-800/60 mt-3 h-1.5 overflow-hidden rounded-full">
+            <div class="text-foreground text-xl font-bold">{{ card.value }}</div>
+            <div class="text-foreground-muted mt-0.5 text-xs">{{ card.meta }}</div>
+            <div class="bg-field mt-3 h-1.5 overflow-hidden rounded-full">
               <div
                 class="h-full rounded-full transition-[width] duration-300"
                 :class="statToneClasses[card.tone].bar"
@@ -533,12 +533,12 @@
   const modeLabel = computed(() => modeTheme.value.label);
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 text-pvp-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
+      ? 'bg-pvp-800 text-pvp-100 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-foreground-inverted)_15%,transparent)]'
       : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300'
   );
   const pveToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVE
-      ? 'bg-pve-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+      ? 'bg-pve-600 text-white shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-foreground-inverted)_20%,transparent)]'
       : 'bg-transparent text-pve-500 hover:bg-pve-950/50 hover:text-pve-300'
   );
   const modeData = computed<UserProgressData>(() => {

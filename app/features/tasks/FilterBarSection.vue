@@ -1,22 +1,22 @@
 <template>
-  <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
+  <section class="bg-field border-border-muted rounded-lg border p-3">
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-filter-variant" class="text-success-400 h-4 w-4" />
-      <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
+      <h3 class="text-foreground text-xs font-semibold tracking-wide uppercase">
         {{ t('page.tasks.settings.tabs.filter_bar') }}
       </h3>
     </div>
-    <p class="text-surface-500 mb-2 text-xs">
+    <p class="text-foreground-subtle mb-2 text-xs">
       {{ t('page.tasks.settings.filter_bar.hint') }}
     </p>
     <div class="space-y-1">
       <label
         v-for="filter in filters"
         :key="filter.key"
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="hover:bg-interactive flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
       >
         <UCheckbox v-model="filter.model.value" />
-        <span class="text-surface-200 text-sm">
+        <span class="text-foreground text-sm">
           {{ t(`page.tasks.settings.filter_bar.${filter.key}`, filter.key) }}
         </span>
       </label>

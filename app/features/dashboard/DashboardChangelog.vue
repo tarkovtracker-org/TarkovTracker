@@ -2,18 +2,18 @@
   <div class="mb-3">
     <div class="panel px-3 py-2">
       <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 text-sm font-semibold text-white">
+        <div class="text-foreground flex items-center gap-2 text-sm font-semibold">
           <UIcon name="i-mdi-history" class="text-primary-400 h-4 w-4" />
           {{ t('page.dashboard.changelog.title') }}
         </div>
         <div class="flex items-center gap-2">
           <NuxtLink
             to="/changelog"
-            class="text-primary-400 hover:text-primary-300 text-xs transition-colors"
+            class="text-primary-600 hover:text-primary-500 text-xs transition-colors"
           >
             {{ t('page.dashboard.changelog.view_all') }}
           </NuxtLink>
-          <span class="text-surface-600">|</span>
+          <span class="text-foreground-disabled">|</span>
           <UButton
             size="xs"
             color="neutral"
@@ -27,16 +27,16 @@
         </div>
       </div>
       <div v-if="isOpen" :id="PANEL_ID" class="mt-2 space-y-3 text-xs sm:text-sm">
-        <div v-if="pending" class="text-surface-400 text-xs">
+        <div v-if="pending" class="text-foreground-muted text-xs">
           {{ t('page.dashboard.changelog.loading') }}
         </div>
-        <div v-else-if="error" class="text-surface-400 flex items-center gap-2 text-xs">
+        <div v-else-if="error" class="text-foreground-muted flex items-center gap-2 text-xs">
           <span>{{ t('page.dashboard.changelog.error') }}</span>
           <UButton size="xs" color="neutral" variant="link" @click="retry">
             {{ t('page.dashboard.changelog.retry') }}
           </UButton>
         </div>
-        <div v-else-if="showEmpty" class="text-surface-400 text-xs">
+        <div v-else-if="showEmpty" class="text-foreground-muted text-xs">
           {{ t('page.dashboard.changelog.empty') }}
         </div>
         <div v-else class="space-y-3">
@@ -45,11 +45,13 @@
             :key="`${entry.date}-${entryIndex}`"
             class="space-y-1"
           >
-            <div class="text-surface-300 text-[11px] font-semibold tracking-wide uppercase">
+            <div class="text-foreground-muted text-[11px] font-semibold tracking-wide uppercase">
               <span>{{ formatDate(entry.date) }}</span>
-              <span v-if="entry.label" class="text-surface-400">· {{ entry.label }}</span>
+              <span v-if="entry.label" class="text-foreground-subtle">
+                &middot; {{ entry.label }}
+              </span>
             </div>
-            <ul class="text-surface-200 list-disc space-y-1 pl-4">
+            <ul class="text-foreground list-disc space-y-1 pl-4">
               <li v-for="(bullet, index) in entry.bullets" :key="index">
                 {{ getBulletText(bullet) }}
               </li>
@@ -61,7 +63,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import {
     cleanText,
     extractReleaseBullets,

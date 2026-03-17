@@ -1,7 +1,7 @@
 <template>
   <div class="mb-6 space-y-3">
     <div
-      class="bg-surface-900 flex flex-wrap items-center gap-3 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+      class="bg-panel border-border shadow-card flex flex-wrap items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
     >
       <div class="w-full sm:w-56 sm:max-w-64 lg:max-w-72">
         <UInput
@@ -36,7 +36,11 @@
           class="leading-none"
           :aria-label="t('page.tasks.primary_views.all')"
           :aria-pressed="primaryView === 'all'"
-          :class="primaryView === 'all' ? 'bg-white/10 text-white' : 'text-surface-200'"
+          :class="
+            primaryView === 'all'
+              ? 'bg-selected-surface text-foreground'
+              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+          "
           @click="setPrimaryView('all')"
         >
           <UIcon name="i-mdi-checkbox-multiple-marked" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -51,7 +55,11 @@
           class="leading-none"
           :aria-label="t('page.tasks.primary_views.traders')"
           :aria-pressed="primaryView === 'traders'"
-          :class="primaryView === 'traders' ? 'bg-white/10 text-white' : 'text-surface-200'"
+          :class="
+            primaryView === 'traders'
+              ? 'bg-selected-surface text-foreground'
+              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+          "
           @click="setPrimaryView('traders')"
         >
           <UIcon name="i-mdi-account-group" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -66,7 +74,11 @@
           class="leading-none"
           :aria-label="t('page.tasks.primary_views.maps')"
           :aria-pressed="primaryView === 'maps'"
-          :class="primaryView === 'maps' ? 'bg-white/10 text-white' : 'text-surface-200'"
+          :class="
+            primaryView === 'maps'
+              ? 'bg-selected-surface text-foreground'
+              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+          "
           @click="setPrimaryView('maps')"
         >
           <UIcon name="i-mdi-map" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -81,7 +93,11 @@
           class="hidden leading-none lg:inline-flex"
           :aria-label="t('page.tasks.primary_views.graph')"
           :aria-pressed="primaryView === 'graph'"
-          :class="primaryView === 'graph' ? 'bg-white/10 text-white' : 'text-surface-200'"
+          :class="
+            primaryView === 'graph'
+              ? 'bg-selected-surface text-foreground'
+              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
+          "
           @click="setPrimaryView('graph')"
         >
           <UIcon name="i-mdi-graph-outline" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -125,7 +141,11 @@
             icon="i-mdi-cog"
             :aria-label="t('page.tasks.settings.title')"
             :aria-pressed="isDrawerOpen"
-            :class="isDrawerOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              isDrawerOpen
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="toggleDrawer"
           />
         </AppTooltip>
@@ -133,7 +153,7 @@
     </div>
     <div class="space-y-3">
       <div
-        class="scrollbar-none bg-surface-900 flex items-center gap-3 overflow-x-auto rounded-lg border border-white/12 px-3 py-3 shadow-sm [-webkit-overflow-scrolling:touch] sm:flex-wrap sm:justify-center sm:overflow-x-visible sm:px-4"
+        class="scrollbar-none bg-panel border-border shadow-card flex items-center gap-3 overflow-x-auto rounded-lg border px-3 py-3 [-webkit-overflow-scrolling:touch] sm:flex-wrap sm:justify-center sm:overflow-x-visible sm:px-4"
       >
         <div class="flex shrink-0 items-center gap-1">
           <UButton
@@ -143,7 +163,11 @@
             size="sm"
             class="leading-none"
             :aria-pressed="secondaryView === 'all'"
-            :class="secondaryView === 'all' ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              secondaryView === 'all'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="setSecondaryView('all')"
           >
             <UIcon
@@ -154,8 +178,12 @@
               {{ t('page.tasks.primary_views.all').toUpperCase() }}
             </span>
             <span
-              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-              :class="displayStatusCounts.all > 0 ? 'bg-surface-500' : 'bg-surface-600'"
+              class="text-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+              :class="
+                displayStatusCounts.all > 0
+                  ? 'bg-selected-surface'
+                  : 'bg-field text-foreground-muted'
+              "
             >
               {{ displayStatusCounts.all }}
             </span>
@@ -163,7 +191,7 @@
           <span
             v-if="showStatusAllDivider"
             aria-hidden="true"
-            class="bg-surface-700/60 h-6 w-px self-center"
+            class="bg-border-muted h-6 w-px self-center"
           ></span>
           <UButton
             v-if="!isGraphView && preferencesStore.getShowAvailableFilter"
@@ -172,7 +200,11 @@
             size="sm"
             class="leading-none"
             :aria-pressed="secondaryView === 'available'"
-            :class="secondaryView === 'available' ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              secondaryView === 'available'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="setSecondaryView('available')"
           >
             <UIcon name="i-mdi-clipboard-text" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -180,8 +212,12 @@
               {{ t('page.tasks.secondary_views.available').toUpperCase() }}
             </span>
             <span
-              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-              :class="displayStatusCounts.available > 0 ? 'bg-info-500' : 'bg-surface-600'"
+              class="text-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+              :class="
+                displayStatusCounts.available > 0
+                  ? 'bg-info-500 text-white'
+                  : 'bg-field text-foreground-muted'
+              "
             >
               {{ displayStatusCounts.available }}
             </span>
@@ -193,7 +229,11 @@
             size="sm"
             class="leading-none"
             :aria-pressed="secondaryView === 'locked'"
-            :class="secondaryView === 'locked' ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              secondaryView === 'locked'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="setSecondaryView('locked')"
           >
             <UIcon name="i-mdi-lock" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -201,8 +241,10 @@
               {{ t('page.tasks.secondary_views.locked').toUpperCase() }}
             </span>
             <span
-              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-              :class="displayStatusCounts.locked > 0 ? 'bg-surface-600' : 'bg-surface-700'"
+              class="text-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+              :class="
+                displayStatusCounts.locked > 0 ? 'bg-shell' : 'bg-field text-foreground-muted'
+              "
             >
               {{ displayStatusCounts.locked }}
             </span>
@@ -216,7 +258,11 @@
             size="sm"
             class="leading-none"
             :aria-pressed="secondaryView === 'completed'"
-            :class="secondaryView === 'completed' ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              secondaryView === 'completed'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="setSecondaryView('completed')"
           >
             <UIcon name="i-mdi-check-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -236,7 +282,11 @@
             size="sm"
             class="leading-none"
             :aria-pressed="secondaryView === 'failed'"
-            :class="secondaryView === 'failed' ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              secondaryView === 'failed'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
+            "
             @click="setSecondaryView('failed')"
           >
             <UIcon name="i-mdi-close-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -250,7 +300,7 @@
             </span>
           </UButton>
         </div>
-        <div class="hidden h-6 w-px shrink-0 bg-white/20 sm:block" />
+        <div class="bg-border-muted hidden h-6 w-px shrink-0 sm:block" />
         <div class="flex shrink-0 items-center gap-1">
           <UButton
             variant="ghost"
@@ -260,8 +310,8 @@
             :aria-pressed="preferencesStore.getTaskUserView === 'self'"
             :class="
               preferencesStore.getTaskUserView === 'self'
-                ? 'bg-white/10 text-white'
-                : 'text-surface-400'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
             "
             @click="onUserViewSelect({ label: currentUserDisplayName, value: 'self' })"
           >
@@ -282,8 +332,8 @@
               :aria-pressed="preferencesStore.getTaskUserView === teamId"
               :class="[
                 preferencesStore.getTaskUserView === teamId
-                  ? 'bg-white/10 text-white'
-                  : 'text-surface-400',
+                  ? 'bg-selected-surface text-foreground'
+                  : 'text-foreground-subtle hover:bg-interactive hover:text-foreground',
                 isTeammateHidden(teamId) ? 'opacity-50' : '',
               ]"
               @click="onUserViewSelect({ label: getTeammateDisplayName(teamId), value: teamId })"
@@ -313,8 +363,8 @@
             :aria-pressed="preferencesStore.getTaskUserView === 'all'"
             :class="
               preferencesStore.getTaskUserView === 'all'
-                ? 'bg-white/10 text-white'
-                : 'text-surface-400'
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
             "
             @click="onUserViewSelect({ label: t('page.tasks.user_views.all'), value: 'all' })"
           >
@@ -330,7 +380,7 @@
         class="scrollbar-none w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
       >
         <div
-          class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+          class="bg-panel border-border shadow-card flex w-max min-w-full justify-center gap-1 rounded-lg border px-3 py-3 sm:px-4"
         >
           <UButton
             v-for="mapOption in mapOptions"
@@ -342,18 +392,20 @@
             :aria-pressed="preferencesStore.getTaskMapView === mapOption.value"
             :class="[
               'gap-1.5 transition-colors',
-              'hover:bg-white/5',
+              'hover:bg-interactive',
               preferencesStore.getTaskMapView === mapOption.value
-                ? 'bg-white/10 text-white'
-                : 'text-surface-400 hover:text-white',
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:text-foreground',
             ]"
             @click="onMapSelect(mapOption)"
           >
             <span class="text-xs font-medium whitespace-nowrap">{{ mapOption.label }}</span>
             <span
               :class="[
-                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white',
-                (mapOption.count ?? 0) > 0 ? 'bg-pve-500' : 'bg-surface-600',
+                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold',
+                (mapOption.count ?? 0) > 0
+                  ? 'bg-pve-500 text-white'
+                  : 'bg-field text-foreground-muted',
               ]"
             >
               {{ mapOption.count ?? 0 }}
@@ -366,7 +418,7 @@
         class="scrollbar-none w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
       >
         <div
-          class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
+          class="bg-panel border-border shadow-card flex w-max min-w-full justify-center gap-1 rounded-lg border px-3 py-3 sm:px-4"
         >
           <UButton
             v-for="trader in traders"
@@ -378,27 +430,33 @@
             :aria-pressed="preferencesStore.getTaskTraderView === trader.id"
             :class="[
               'gap-2 transition-colors',
-              'hover:bg-white/5',
+              'hover:bg-interactive',
               preferencesStore.getTaskTraderView === trader.id
-                ? 'bg-white/10 text-white'
-                : 'text-surface-400 hover:text-white',
+                ? 'bg-selected-surface text-foreground'
+                : 'text-foreground-subtle hover:text-foreground',
             ]"
             @click="onTraderSelect({ label: trader.name, value: trader.id })"
           >
             <div class="relative">
-              <div class="bg-surface-800 h-8 w-8 overflow-hidden rounded-full">
+              <div class="bg-field border-border-muted h-8 w-8 overflow-hidden rounded-full border">
                 <img
                   v-if="trader.imageLink"
                   :src="trader.imageLink"
                   :alt="trader.name"
                   class="h-full w-full object-cover"
                 />
-                <UIcon v-else name="i-mdi-account-circle" class="text-surface-500 h-full w-full" />
+                <UIcon
+                  v-else
+                  name="i-mdi-account-circle"
+                  class="text-foreground-disabled h-full w-full"
+                />
               </div>
               <span
                 :class="[
-                  'absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold text-white',
-                  (traderCounts[trader.id] ?? 0) > 0 ? 'bg-pve-500' : 'bg-surface-600',
+                  'absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold',
+                  (traderCounts[trader.id] ?? 0) > 0
+                    ? 'bg-pve-500 text-white'
+                    : 'bg-field text-foreground-muted',
                 ]"
               >
                 {{ traderCounts[trader.id] ?? 0 }}

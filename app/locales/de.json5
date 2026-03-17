@@ -1179,6 +1179,7 @@
   settings: {
     title: 'Einstellungen',
     locale: 'Sprache',
+    theme: 'Theme',
     tabs: {
       gameplay: 'Gameplay',
       interface: 'Schnittstelle',
@@ -1202,6 +1203,13 @@
     },
     interface: {
       title: 'Interface-Anpassung',
+      appearance: {
+        title: 'Darstellung',
+        description: 'Wähle dein bevorzugtes Oberflächen-Design.',
+        mode: 'Designmodus',
+        light: 'Hell',
+        dark: 'Dunkel',
+      },
       tasks: {
         title: 'Aufgabenkarten',
         show_required: 'Erforderlich-Labels anzeigen',
@@ -1688,4 +1696,3 @@
     close_button: 'Schließen',
   },
 }
-

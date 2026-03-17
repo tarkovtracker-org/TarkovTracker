@@ -1179,6 +1179,7 @@
   settings: {
     title: 'Налаштування',
     locale: 'Мова',
+    theme: 'Theme',
     tabs: {
       gameplay: 'Геймплей',
       interface: 'Інтерфейс',
@@ -1202,6 +1203,13 @@
     },
     interface: {
       title: 'Налаштування інтерфейсу',
+      appearance: {
+        title: 'Зовнішній вигляд',
+        description: 'Оберіть бажану тему інтерфейсу.',
+        mode: 'Режим теми',
+        light: 'Світла',
+        dark: 'Темна',
+      },
       tasks: {
         title: 'Картки завдань',
         show_required: "Показувати обов'язкові мітки",
@@ -1688,4 +1696,3 @@
     close_button: 'Закрити',
   },
 }
-

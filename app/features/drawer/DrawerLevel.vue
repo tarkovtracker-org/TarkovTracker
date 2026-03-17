@@ -2,17 +2,19 @@
   <div class="flex items-center justify-center px-3 py-2">
     <template v-if="isCollapsed">
       <div class="text-center">
-        <div class="text-surface-400 mb-1 text-[0.7em]">
+        <div class="text-foreground-subtle mb-1 text-[0.7em]">
           {{ t('navigation_drawer.level') }}
         </div>
-        <span class="text-center text-2xl leading-tight font-bold">
+        <span class="text-foreground text-center text-2xl leading-tight font-bold">
           {{ displayedLevel }}
         </span>
       </div>
     </template>
     <template v-else>
       <div class="w-full">
-        <div class="flex min-w-0 items-center gap-2.5 rounded-md bg-white/5 px-2.5 py-2">
+        <div
+          class="border-border bg-raised/85 shadow-card flex min-w-0 items-center gap-2.5 rounded-md border px-2.5 py-2"
+        >
           <span class="shrink-0 leading-none">
             <div class="relative h-11 w-11 overflow-hidden">
               <template v-if="isDataReady && groupIcon">
@@ -24,15 +26,15 @@
                   height="44"
                   @error="handleGroupImageError"
                 />
-                <div v-else class="flex h-11 w-11 items-center justify-center rounded bg-white/5">
-                  <UIcon name="i-heroicons-photo" class="text-surface-600 h-5 w-5" />
+                <div v-else class="bg-field flex h-11 w-11 items-center justify-center rounded">
+                  <UIcon name="i-heroicons-photo" class="text-foreground-subtle h-5 w-5" />
                 </div>
               </template>
               <template v-else>
-                <div class="flex h-11 w-11 items-center justify-center rounded bg-white/5">
+                <div class="bg-field flex h-11 w-11 items-center justify-center rounded">
                   <UIcon
                     name="i-heroicons-arrow-path"
-                    class="text-surface-500 h-5 w-5 animate-spin"
+                    class="text-foreground-muted h-5 w-5 animate-spin"
                   />
                 </div>
               </template>
@@ -40,13 +42,13 @@
           </span>
           <span class="min-w-0 flex-1">
             <div
-              class="text-surface-400 mb-0.5 flex items-center justify-center gap-1 text-[0.6rem]"
+              class="text-foreground-subtle mb-0.5 flex items-center justify-center gap-1 text-[0.6rem]"
             >
               <span>{{ t('navigation_drawer.level') }}</span>
-              <span class="text-surface-500 text-[0.5rem]">·</span>
+              <span class="text-foreground-disabled text-[0.5rem]">&middot;</span>
               <span
                 class="text-[0.55rem]"
-                :class="useAutomaticLevel ? 'text-accent-400' : 'text-surface-500'"
+                :class="useAutomaticLevel ? 'text-accent-600' : 'text-foreground-subtle'"
               >
                 {{
                   useAutomaticLevel
@@ -63,8 +65,8 @@
                 <span
                   :class="
                     useAutomaticLevel
-                      ? 'mx-auto block h-8 w-12 text-center text-3xl leading-8 font-bold'
-                      : 'hover:text-primary mx-auto block h-8 w-12 cursor-pointer text-center text-3xl leading-8 font-bold transition-colors'
+                      ? 'text-foreground mx-auto block h-8 w-12 text-center text-3xl leading-8 font-bold'
+                      : 'text-foreground hover:text-primary mx-auto block h-8 w-12 cursor-pointer text-center text-3xl leading-8 font-bold transition-colors'
                   "
                   :tabindex="useAutomaticLevel ? '-1' : '0'"
                   :role="useAutomaticLevel ? undefined : 'button'"
@@ -96,7 +98,7 @@
                 type="number"
                 :min="minPlayerLevel"
                 :max="maxPlayerLevel"
-                class="no-spinner mx-auto block h-8 w-12 border-0 bg-transparent p-0 text-center text-3xl leading-8 font-bold outline-none focus:ring-0"
+                class="text-foreground no-spinner mx-auto block h-8 w-12 border-0 bg-transparent p-0 text-center text-3xl leading-8 font-bold outline-none focus:ring-0"
                 @input="enforceMaxLevel"
                 @blur="saveLevel"
                 @keyup.enter="saveLevel"
@@ -105,10 +107,10 @@
           </span>
           <span
             v-if="!useAutomaticLevel"
-            class="flex shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/5"
+            class="border-border-muted bg-field flex shrink-0 flex-col overflow-hidden rounded-md border"
           >
             <button
-              :class="[STEPPER_BUTTON_CLASS, 'border-b border-white/10']"
+              :class="[STEPPER_BUTTON_CLASS, 'border-border-muted border-b']"
               :disabled="displayedLevel >= maxPlayerLevel"
               :aria-label="t('navigation_drawer.increment_level')"
               @click="incrementLevel"
@@ -128,16 +130,18 @@
         <NuxtLink
           v-if="useAutomaticLevel"
           to="/settings"
-          class="hover:border-surface-600 mt-1.5 block cursor-pointer rounded border border-white/5 bg-white/5 px-2 py-1 no-underline transition-all hover:bg-white/10"
+          class="border-border-muted bg-field hover:border-border-strong hover:bg-interactive mt-1.5 block cursor-pointer rounded border px-2 py-1 no-underline transition-all"
           :aria-label="t('navigation_drawer.xp_settings_link')"
         >
           <div class="mb-0.5 flex items-center justify-between text-[0.6rem]">
-            <span class="text-surface-400">{{ formatNumber(xpCalculation.totalXP.value) }} XP</span>
-            <span class="text-surface-500">
+            <span class="text-foreground-muted">
+              {{ formatNumber(xpCalculation.totalXP.value) }} XP
+            </span>
+            <span class="text-foreground-subtle">
               {{ formatNumber(xpCalculation.xpToNextLevel.value) }} needed
             </span>
           </div>
-          <div class="bg-surface-800/35 h-2 overflow-hidden rounded-full">
+          <div class="bg-border-muted h-2 overflow-hidden rounded-full">
             <div
               class="bg-primary-500/60 h-full rounded-full transition-[width] duration-300 ease-out"
               :style="{ width: `${xpCalculation.xpProgress.value}%` }"
@@ -178,7 +182,7 @@
     () => preferencesStore.getUseAutomaticLevelCalculation
   );
   const STEPPER_BUTTON_CLASS =
-    'flex h-5.5 w-5.5 items-center justify-center p-0 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+    'text-foreground-muted hover:bg-interactive hover:text-foreground flex h-5.5 w-5.5 items-center justify-center p-0 transition-colors disabled:cursor-not-allowed disabled:opacity-40';
   const displayedLevel = computed<number>(() => {
     return useAutomaticLevel.value ? xpCalculation.derivedLevel.value : tarkovStore.playerLevel();
   });

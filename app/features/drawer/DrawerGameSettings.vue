@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-1.5 px-3 py-1">
     <div
-      class="flex w-full overflow-hidden rounded-md border border-white/10"
+      class="border-border flex w-full overflow-hidden rounded-md border"
       role="group"
       aria-label="Toggle game mode"
     >
@@ -28,24 +28,24 @@
         <span class="leading-none">{{ t('game_settings.pve') }}</span>
       </button>
     </div>
-    <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
+    <div v-if="switchModeError" class="text-error-500 text-xs" role="alert">
       {{ switchModeError }}
     </div>
     <div
-      class="flex w-full overflow-hidden rounded-md border border-white/10"
+      class="border-border flex w-full overflow-hidden rounded-md border"
       role="group"
       aria-label="Select faction"
     >
       <button
         v-for="faction in factions"
         :key="faction"
-        class="flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
+        class="focus:ring-border-strong/50 flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
         :class="[
           faction === currentFaction
-            ? 'bg-white/15 text-white'
+            ? 'bg-interactive text-foreground'
             : dataLoading
-              ? 'bg-transparent text-white/50'
-              : 'bg-transparent text-white/50 hover:bg-white/5 hover:text-white/80',
+              ? 'text-foreground-disabled bg-transparent'
+              : 'text-foreground-subtle hover:bg-interactive hover:text-foreground',
           dataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         ]"
         :disabled="dataLoading"
@@ -59,7 +59,6 @@
 </template>
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, PMC_FACTIONS, type GameMode, type PMCFaction } from '@/utils/constants';
@@ -78,13 +77,13 @@
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
   const pveClasses = computed(() =>
     currentGameMode.value === GAME_MODES.PVE
-      ? 'bg-pve-500 hover:bg-pve-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
-      : 'bg-transparent text-pve-600 hover:bg-pve-950/50 hover:text-pve-400'
+      ? 'bg-pve-500/16 text-pve-700 ring-pve-500/25 ring-inset ring-1'
+      : 'bg-transparent text-pve-700 hover:bg-pve-500/8 hover:text-pve-800'
   );
   const pvpClasses = computed(() =>
     currentGameMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 hover:bg-pvp-700 text-pvp-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
-      : 'bg-transparent text-pvp-600 hover:bg-pvp-950/50 hover:text-pvp-400'
+      ? 'bg-pvp-500/16 text-pvp-700 ring-pvp-500/25 ring-inset ring-1'
+      : 'bg-transparent text-pvp-700 hover:bg-pvp-500/8 hover:text-pvp-800'
   );
   const { loading: dataLoading } = storeToRefs(metadataStore);
   async function switchMode(mode: GameMode) {

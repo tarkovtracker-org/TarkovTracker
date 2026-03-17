@@ -1,9 +1,9 @@
 <template>
-  <div class="bg-military-background text-surface-200 flex min-h-screen flex-col">
+  <div class="bg-military-background text-foreground-muted flex min-h-screen flex-col">
     <!-- Skip navigation link for accessibility -->
     <a
       href="#main-content"
-      class="focus:bg-primary-600 sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-16 focus:z-100 focus:rounded focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
+      class="focus:bg-primary-600 sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-16 focus:z-100 focus:rounded focus:px-4 focus:py-2 focus:text-[color:var(--color-secondary-950)] focus:shadow-lg"
     >
       Skip to main content
     </a>

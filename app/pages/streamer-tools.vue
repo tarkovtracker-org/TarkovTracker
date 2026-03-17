@@ -1,13 +1,13 @@
 <template>
   <div class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-5xl space-y-4">
-      <section class="bg-surface-900 rounded-xl border border-white/10 p-4 sm:p-6">
+      <section class="bg-panel border-border shadow-card rounded-xl border p-4 sm:p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div class="space-y-2">
-            <h1 class="text-2xl font-bold text-white">
+            <h1 class="text-foreground text-2xl font-bold">
               {{ t('streamer_tools.title', 'Streamer Tools') }}
             </h1>
-            <p class="text-surface-300 max-w-2xl text-sm sm:text-base">
+            <p class="text-foreground-muted max-w-2xl text-sm sm:text-base">
               {{
                 t(
                   'streamer_tools.subtitle',
@@ -78,17 +78,17 @@
           <template #content>
             <div class="space-y-4 p-4">
               <article class="space-y-2">
-                <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                   {{ t('streamer_tools.mode_label', 'Game Mode') }}
                 </p>
-                <div class="flex rounded-md border border-white/10 p-1">
+                <div class="border-border flex rounded-md border p-1">
                   <button
                     type="button"
                     class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
                     :class="
                       selectedMode === GAME_MODES.PVP
-                        ? 'bg-pvp-800 text-pvp-100'
-                        : 'text-pvp-300 hover:bg-pvp-950/60'
+                        ? 'bg-[color-mix(in_srgb,var(--color-pvp-500)_18%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-pvp-500)_75%,var(--color-foreground))]'
+                        : 'text-[color-mix(in_srgb,var(--color-pvp-500)_70%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pvp-500)_12%,transparent)]'
                     "
                     @click="selectedMode = GAME_MODES.PVP"
                   >
@@ -99,8 +99,8 @@
                     class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
                     :class="
                       selectedMode === GAME_MODES.PVE
-                        ? 'bg-pve-700 text-pve-100'
-                        : 'text-pve-300 hover:bg-pve-950/60'
+                        ? 'bg-[color-mix(in_srgb,var(--color-pve-500)_18%,var(--color-panel))] text-[color-mix(in_srgb,var(--color-pve-500)_78%,var(--color-foreground))]'
+                        : 'text-[color-mix(in_srgb,var(--color-pve-500)_74%,var(--color-foreground))] hover:bg-[color-mix(in_srgb,var(--color-pve-500)_12%,transparent)]'
                     "
                     @click="selectedMode = GAME_MODES.PVE"
                   >
@@ -109,7 +109,7 @@
                 </div>
               </article>
               <article class="space-y-2">
-                <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                   {{ t('streamer_tools.metric_label', 'Widget') }}
                 </p>
                 <div class="grid gap-3 sm:grid-cols-3">
@@ -120,13 +120,13 @@
                     class="rounded-md border px-3 py-2 text-left transition-colors"
                     :class="
                       selectedMetric === option.value
-                        ? 'border-primary-400 bg-primary-800/30 text-primary-100'
-                        : 'text-surface-200 hover:bg-surface-800/80 border-white/10'
+                        ? 'border-primary-500 bg-primary-500/12 text-primary-700'
+                        : 'border-border text-foreground hover:bg-interactive'
                     "
                     @click="selectedMetric = option.value"
                   >
                     <div class="text-sm font-semibold">{{ option.label }}</div>
-                    <div class="text-surface-400 text-xs">{{ option.description }}</div>
+                    <div class="text-foreground-muted text-xs">{{ option.description }}</div>
                   </button>
                 </div>
               </article>
@@ -142,7 +142,7 @@
         >
           <template #content>
             <details open class="p-4">
-              <summary class="text-surface-300 cursor-pointer text-sm font-semibold select-none">
+              <summary class="text-foreground cursor-pointer text-sm font-semibold select-none">
                 {{ t('streamer_tools.customize_options', 'Customize overlay options') }}
               </summary>
               <div class="mt-3 flex justify-end">
@@ -158,7 +158,7 @@
               </div>
               <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.layout_label', 'Layout') }}
                   </p>
                   <SelectMenuFixed
@@ -168,7 +168,7 @@
                   />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.accent_label', 'Accent') }}
                   </p>
                   <SelectMenuFixed
@@ -178,13 +178,13 @@
                   />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.text_size', 'Text Size') }}
                   </p>
                   <SelectMenuFixed v-model="selectedSize" :items="sizeOptions" value-key="value" />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.resolution_label', 'Resolution') }}
                   </p>
                   <SelectMenuFixed
@@ -194,7 +194,7 @@
                   />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.container_label', 'Container') }}
                   </p>
                   <SelectMenuFixed
@@ -204,7 +204,7 @@
                   />
                 </article>
                 <article v-if="!isSelfContained" class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.align_label', 'Alignment') }}
                   </p>
                   <SelectMenuFixed
@@ -214,10 +214,10 @@
                   />
                 </article>
                 <article v-if="isSelfContained" class="space-y-2 sm:col-span-2 lg:col-span-3">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.self_contained_hint_label', 'Self Contained') }}
                   </p>
-                  <p class="text-surface-400 text-xs">
+                  <p class="text-foreground-muted text-xs">
                     {{
                       t(
                         'streamer_tools.self_contained_hint',
@@ -227,7 +227,7 @@
                   </p>
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.refresh_label', 'Refresh Interval') }}
                   </p>
                   <SelectMenuFixed
@@ -237,7 +237,7 @@
                   />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.background_label', 'Background') }}
                   </p>
                   <SelectMenuFixed
@@ -247,52 +247,52 @@
                   />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.font_label', 'Font') }}
                   </p>
                   <SelectMenuFixed v-model="selectedFont" :items="fontOptions" value-key="value" />
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.show_title', 'Show title') }}
                   </p>
                   <label
-                    class="flex h-9 cursor-pointer items-center justify-between rounded-md border border-white/10 px-3"
+                    class="border-border flex h-9 cursor-pointer items-center justify-between rounded-md border px-3"
                   >
-                    <span class="text-surface-200 text-sm">
+                    <span class="text-foreground text-sm">
                       {{ t('streamer_tools.show_title', 'Show title') }}
                     </span>
                     <USwitch v-model="showTitle" />
                   </label>
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.show_percent', 'Show percent') }}
                   </p>
                   <label
-                    class="flex h-9 cursor-pointer items-center justify-between rounded-md border border-white/10 px-3"
+                    class="border-border flex h-9 cursor-pointer items-center justify-between rounded-md border px-3"
                   >
-                    <span class="text-surface-200 text-sm">
+                    <span class="text-foreground text-sm">
                       {{ t('streamer_tools.show_percent', 'Show percent') }}
                     </span>
                     <USwitch v-model="showPercent" />
                   </label>
                 </article>
                 <article class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.show_remaining', 'Show remaining') }}
                   </p>
                   <label
-                    class="flex h-9 cursor-pointer items-center justify-between rounded-md border border-white/10 px-3"
+                    class="border-border flex h-9 cursor-pointer items-center justify-between rounded-md border px-3"
                   >
-                    <span class="text-surface-200 text-sm">
+                    <span class="text-foreground text-sm">
                       {{ t('streamer_tools.show_remaining', 'Show remaining') }}
                     </span>
                     <USwitch v-model="showRemaining" />
                   </label>
                 </article>
                 <article class="space-y-2 sm:col-span-2 lg:col-span-3">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.custom_label', 'Custom Label') }}
                   </p>
                   <UInput
@@ -307,32 +307,32 @@
                   />
                 </article>
                 <article v-if="isCustomAccent" class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.custom_accent', 'Custom Accent') }}
                   </p>
                   <input
                     v-model="customAccentColor"
                     type="color"
-                    class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
+                    class="bg-field border-border h-9 w-full cursor-pointer rounded border px-1"
                   />
                 </article>
                 <article v-if="isCustomBackground" class="space-y-2 sm:col-span-2 lg:col-span-3">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.custom_background', 'Custom Background') }}
                   </p>
                   <div class="grid gap-4 sm:grid-cols-2">
                     <div class="space-y-1">
-                      <label class="text-surface-200 block text-xs font-medium">
+                      <label class="text-foreground block text-xs font-medium">
                         {{ t('streamer_tools.background_color', 'Color') }}
                       </label>
                       <input
                         v-model="customBackgroundColor"
                         type="color"
-                        class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
+                        class="bg-field border-border h-9 w-full cursor-pointer rounded border px-1"
                       />
                     </div>
                     <div class="space-y-1">
-                      <label class="text-surface-200 block text-xs font-medium">
+                      <label class="text-foreground block text-xs font-medium">
                         {{
                           t('streamer_tools.background_opacity', 'Opacity') +
                           ` (${normalizedCustomBackgroundOpacity}%)`
@@ -350,11 +350,11 @@
                   </div>
                 </article>
                 <article v-if="isCustomResolution" class="space-y-2 sm:col-span-2 lg:col-span-3">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.custom_scale', 'Custom Scale') }}
                   </p>
                   <div class="max-w-sm space-y-1">
-                    <label class="text-surface-200 block text-xs font-medium">
+                    <label class="text-foreground block text-xs font-medium">
                       {{
                         t('streamer_tools.custom_scale_percent', 'Scale') +
                         ` (${normalizedCustomScalePercent}%)`
@@ -371,41 +371,45 @@
                   </div>
                 </article>
                 <article class="space-y-4 sm:col-span-2 lg:col-span-3">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.colors_label', 'Colors') }}
                   </p>
-                  <div class="border-surface-700 space-y-4 rounded-lg border p-3">
-                    <p class="text-surface-400 text-[11px] font-semibold tracking-wider uppercase">
+                  <div class="border-border space-y-4 rounded-lg border p-3">
+                    <p
+                      class="text-foreground-muted text-[11px] font-semibold tracking-wider uppercase"
+                    >
                       {{ t('streamer_tools.colors_text', 'Text') }}
                     </p>
                     <div class="space-y-1">
-                      <label class="text-surface-200 block text-xs font-medium">
+                      <label class="text-foreground block text-xs font-medium">
                         {{ t('streamer_tools.text_color', 'Text Color') }}
                       </label>
                       <input
                         v-model="textColor"
                         type="color"
-                        class="border-surface-700 bg-surface-850 h-9 w-full max-w-xs cursor-pointer rounded border px-1"
+                        class="bg-field border-border h-9 w-full max-w-xs cursor-pointer rounded border px-1"
                       />
                     </div>
                   </div>
-                  <div class="border-surface-700 space-y-4 rounded-lg border p-3">
-                    <p class="text-surface-400 text-[11px] font-semibold tracking-wider uppercase">
+                  <div class="border-border space-y-4 rounded-lg border p-3">
+                    <p
+                      class="text-foreground-muted text-[11px] font-semibold tracking-wider uppercase"
+                    >
                       {{ t('streamer_tools.colors_card', 'Card') }}
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label class="text-foreground block text-xs font-medium">
                           {{ t('streamer_tools.card_color', 'Card Color') }}
                         </label>
                         <input
                           v-model="cardColor"
                           type="color"
-                          class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
+                          class="bg-field border-border h-9 w-full cursor-pointer rounded border px-1"
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label class="text-foreground block text-xs font-medium">
                           {{
                             t('streamer_tools.card_opacity', 'Card Opacity') +
                             ` (${normalizedCardOpacity}%)`
@@ -422,23 +426,25 @@
                       </div>
                     </div>
                   </div>
-                  <div class="border-surface-700 space-y-4 rounded-lg border p-3">
-                    <p class="text-surface-400 text-[11px] font-semibold tracking-wider uppercase">
+                  <div class="border-border space-y-4 rounded-lg border p-3">
+                    <p
+                      class="text-foreground-muted text-[11px] font-semibold tracking-wider uppercase"
+                    >
                       {{ t('streamer_tools.colors_border', 'Border') }}
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label class="text-foreground block text-xs font-medium">
                           {{ t('streamer_tools.border_color', 'Border Color') }}
                         </label>
                         <input
                           v-model="borderColor"
                           type="color"
-                          class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
+                          class="bg-field border-border h-9 w-full cursor-pointer rounded border px-1"
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label class="text-foreground block text-xs font-medium">
                           {{
                             t('streamer_tools.border_opacity', 'Border Opacity') +
                             ` (${normalizedBorderOpacity}%)`
@@ -455,23 +461,25 @@
                       </div>
                     </div>
                   </div>
-                  <div class="border-surface-700 space-y-4 rounded-lg border p-3">
-                    <p class="text-surface-400 text-[11px] font-semibold tracking-wider uppercase">
+                  <div class="border-border space-y-4 rounded-lg border p-3">
+                    <p
+                      class="text-foreground-muted text-[11px] font-semibold tracking-wider uppercase"
+                    >
                       {{ t('streamer_tools.colors_progress', 'Progress Track') }}
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label class="text-foreground block text-xs font-medium">
                           {{ t('streamer_tools.track_color', 'Progress Track') }}
                         </label>
                         <input
                           v-model="trackColor"
                           type="color"
-                          class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
+                          class="bg-field border-border h-9 w-full cursor-pointer rounded border px-1"
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label class="text-foreground block text-xs font-medium">
                           {{
                             t('streamer_tools.track_opacity', 'Track Opacity') +
                             ` (${normalizedTrackOpacity}%)`
@@ -504,16 +512,16 @@
             <div class="space-y-4 p-4">
               <article class="space-y-2">
                 <div class="flex items-center justify-between">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                     {{ t('streamer_tools.preview', 'Preview') }}
                   </p>
-                  <span class="text-surface-500 text-xs">
+                  <span class="text-foreground-subtle text-xs">
                     {{ previewDimensionLabel }}
                   </span>
                 </div>
                 <div
-                  class="relative overflow-hidden rounded-lg border border-white/10"
-                  :class="isSelfContained ? 'bg-surface-950/70 p-3' : 'aspect-video'"
+                  class="border-border relative overflow-hidden rounded-lg border"
+                  :class="isSelfContained ? 'bg-shell p-3' : 'aspect-video'"
                 >
                   <div
                     v-if="!isSelfContained"
@@ -537,12 +545,12 @@
                     :title="t('streamer_tools.preview_title', 'Streamer overlay preview')"
                   ></iframe>
                 </div>
-                <p class="text-surface-500 text-xs">
+                <p class="text-foreground-subtle text-xs">
                   {{ previewHelpText }}
                 </p>
               </article>
               <article class="space-y-2">
-                <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                <p class="text-foreground text-xs font-semibold tracking-wider uppercase">
                   {{ t('streamer_tools.browser_source_url', 'Browser Source URL') }}
                 </p>
                 <div class="flex flex-col gap-2 sm:flex-row">
@@ -601,10 +609,10 @@
         >
           <template #content>
             <div class="space-y-4 p-4">
-              <div class="bg-surface-900 rounded-md border border-white/10 p-4">
+              <div class="bg-shell border-border rounded-md border p-4">
                 <div class="flex items-center gap-2">
                   <UIcon name="i-mdi-information-outline" class="text-primary-400 shrink-0" />
-                  <p class="text-surface-200 text-sm font-semibold">
+                  <p class="text-foreground text-sm font-semibold">
                     {{
                       isSelfContained
                         ? t(
@@ -618,7 +626,7 @@
                     }}
                   </p>
                 </div>
-                <p class="text-surface-400 mt-2 text-sm">
+                <p class="text-foreground-muted mt-2 text-sm">
                   {{
                     isSelfContained
                       ? t(
@@ -633,10 +641,10 @@
                 </p>
               </div>
               <details open class="text-sm">
-                <summary class="text-surface-300 cursor-pointer text-sm font-semibold select-none">
+                <summary class="text-foreground cursor-pointer text-sm font-semibold select-none">
                   OBS Studio / Streamlabs Desktop
                 </summary>
-                <ol class="text-surface-400 mt-3 list-inside list-decimal space-y-2 pl-1">
+                <ol class="text-foreground-muted mt-3 list-inside list-decimal space-y-2 pl-1">
                   <li>
                     {{
                       t(
@@ -660,7 +668,7 @@
                     <span class="text-primary-300 font-semibold">
                       {{ ` ${recommendedWidth} × ${recommendedHeight}` }}
                     </span>
-                    <span v-if="!isSelfContained" class="text-surface-500">
+                    <span v-if="!isSelfContained" class="text-foreground-subtle">
                       {{
                         ' ' +
                         t(
@@ -669,7 +677,7 @@
                         )
                       }}
                     </span>
-                    <span v-else class="text-surface-500">
+                    <span v-else class="text-foreground-subtle">
                       {{
                         ' ' +
                         t(
@@ -706,10 +714,10 @@
                 </ol>
               </details>
               <details class="text-sm">
-                <summary class="text-surface-300 cursor-pointer text-sm font-semibold select-none">
+                <summary class="text-foreground cursor-pointer text-sm font-semibold select-none">
                   XSplit / vMix
                 </summary>
-                <ol class="text-surface-400 mt-3 list-inside list-decimal space-y-2 pl-1">
+                <ol class="text-foreground-muted mt-3 list-inside list-decimal space-y-2 pl-1">
                   <li>
                     {{ t('streamer_tools.xsplit_step_1', 'Add a Webpage / Browser input source.') }}
                   </li>
@@ -759,8 +767,8 @@
                   </div>
                 </div>
               </div>
-              <div class="bg-surface-900/60 rounded-md border border-white/5 px-3 py-2">
-                <p class="text-surface-500 text-xs">
+              <div class="bg-shell border-border-muted rounded-md border px-3 py-2">
+                <p class="text-foreground-subtle text-xs">
                   {{
                     t(
                       'streamer_tools.setup_transparency_note',

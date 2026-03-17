@@ -3,10 +3,10 @@
     <div class="mx-auto flex w-full max-w-5xl flex-col gap-8">
       <header class="text-center">
         <h1 class="sr-only">{{ t('page.credits.title') }}</h1>
-        <p class="text-xs text-white/55">
+        <p class="text-foreground-subtle text-xs">
           {{ t('page.credits.notes.alphabetical') }}
         </p>
-        <p class="text-xs text-white/45">
+        <p class="text-foreground-subtle text-xs">
           {{ t('page.credits.notes.contributors') }}
         </p>
       </header>
@@ -15,7 +15,7 @@
           v-for="section in staticCreditSections"
           :key="section.key"
           :class="[
-            'bg-surface-900/80 rounded-2xl border border-white/10 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.35)]',
+            'bg-panel border-border shadow-card rounded-2xl border p-6',
             section.fullWidth ? 'md:col-span-2' : '',
           ]"
         >
@@ -23,7 +23,7 @@
             <p class="text-primary-300/80 text-xs font-semibold tracking-[0.3em] uppercase">
               {{ section.pretitle }}
             </p>
-            <h2 class="mt-2 text-2xl font-semibold text-white">
+            <h2 class="text-foreground mt-2 text-2xl font-semibold">
               {{ t(`page.credits.sections.${section.key}`) }}
             </h2>
           </div>
@@ -31,7 +31,7 @@
             <li
               v-for="member in section.members"
               :key="member.name"
-              class="rounded-xl bg-white/5 px-4 py-3 text-lg font-medium text-white"
+              class="bg-shell text-foreground rounded-xl px-4 py-3 text-lg font-medium"
             >
               <component
                 :is="member.link ? 'a' : 'div'"
@@ -47,7 +47,7 @@
                   v-if="member.avatar"
                   :src="member.avatar"
                   :alt="member.name"
-                  class="h-12 w-12 rounded-full border border-white/20 object-cover"
+                  class="border-border-muted h-12 w-12 rounded-full border object-cover"
                   width="48"
                   height="48"
                   loading="lazy"
@@ -57,18 +57,19 @@
             </li>
           </ul>
         </section>
-        <section
-          class="bg-surface-900/80 rounded-2xl border border-white/10 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.35)] md:col-span-2"
-        >
+        <section class="bg-panel border-border shadow-card rounded-2xl border p-6 md:col-span-2">
           <div class="mb-4">
             <p class="text-primary-300/80 text-xs font-semibold tracking-[0.3em] uppercase">
               {{ t('page.credits.labels.contributors') }}
             </p>
-            <h2 class="mt-2 text-2xl font-semibold text-white">
+            <h2 class="text-foreground mt-2 text-2xl font-semibold">
               {{ t('page.credits.sections.contributors') }}
             </h2>
           </div>
-          <div v-if="contributorsPending" class="text-surface-300 flex items-center gap-2 text-sm">
+          <div
+            v-if="contributorsPending"
+            class="text-foreground-muted flex items-center gap-2 text-sm"
+          >
             <UIcon name="i-mdi-loading" class="h-4 w-4 animate-spin" />
             <span>{{ t('page.credits.contributors.loading') }}</span>
           </div>
@@ -80,14 +81,14 @@
               {{ t('page.credits.contributors.retry') }}
             </UButton>
           </div>
-          <p v-else-if="!contributors.length" class="text-surface-300 text-sm">
+          <p v-else-if="!contributors.length" class="text-foreground-muted text-sm">
             {{ t('page.credits.contributors.empty') }}
           </p>
           <ul v-else class="space-y-3">
             <li
               v-for="contributor in contributors"
               :key="contributor.name"
-              class="rounded-xl bg-white/5 px-4 py-3 text-lg font-medium text-white"
+              class="bg-shell text-foreground rounded-xl px-4 py-3 text-lg font-medium"
             >
               <component
                 :is="contributor.link ? 'a' : 'div'"
@@ -101,13 +102,13 @@
                   v-if="contributor.avatar"
                   :src="contributor.avatar"
                   :alt="contributor.name"
-                  class="h-12 w-12 rounded-full border border-white/20 object-cover"
+                  class="border-border-muted h-12 w-12 rounded-full border object-cover"
                   width="48"
                   height="48"
                   loading="lazy"
                 />
                 <span>{{ contributor.name }}</span>
-                <span class="text-surface-400 ml-auto text-xs font-semibold">
+                <span class="text-foreground-subtle ml-auto text-xs font-semibold">
                   {{
                     t('page.credits.contributors.contributions', {
                       count: contributor.contributions,
@@ -123,7 +124,6 @@
   </UContainer>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import type { ContributorApiItem, ContributorsResponse } from '@/types/contributors';
   const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({

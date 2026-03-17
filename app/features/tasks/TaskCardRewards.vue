@@ -1,13 +1,13 @@
 <template>
   <div
     v-if="hasRewardsSummary || hasExpandableDetails"
-    class="border-surface-700/20 relative flex flex-col overflow-hidden rounded-b-md border-t transition-colors"
-    :class="[showDetails && hasExpandableDetails ? 'bg-surface-900/40' : 'bg-surface-900/20']"
+    class="border-border-muted relative flex flex-col overflow-hidden rounded-b-md border-t transition-colors"
+    :class="[showDetails && hasExpandableDetails ? 'bg-raised' : 'bg-field']"
   >
     <div
-      class="text-surface-400 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 group flex w-full flex-wrap items-center gap-1.5 text-xs transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:gap-2"
+      class="text-foreground-subtle focus-visible:ring-primary-500 focus-visible:ring-offset-panel group flex w-full flex-wrap items-center gap-1.5 text-xs transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:gap-2"
       :class="[
-        hasExpandableDetails ? 'hover:bg-surface-700/20 cursor-pointer' : '',
+        hasExpandableDetails ? 'hover:bg-interactive cursor-pointer' : '',
         isCompact ? 'px-3 py-1.5' : 'px-4 py-2',
       ]"
       :role="hasExpandableDetails ? 'button' : undefined"
@@ -18,19 +18,19 @@
       @keydown.space.prevent="toggleDetails"
     >
       <span
-        class="text-surface-500 inline-flex items-center gap-1 leading-none font-bold tracking-wider uppercase"
+        class="text-foreground-disabled inline-flex items-center gap-1 leading-none font-bold tracking-wider uppercase"
       >
         <UIcon name="i-mdi-gift" aria-hidden="true" class="h-3.5 w-3.5 shrink-0" />
         <span class="leading-none">{{ t('page.tasks.questcard.rewards') }}:</span>
       </span>
       <template v-for="standing in traderStandingRewards" :key="`standing-${standing.trader.id}`">
         <div
-          class="bg-surface-800 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+          class="bg-raised border-border-muted inline-flex items-center gap-1 rounded border px-1.5 py-0.5 leading-none"
         >
           <UIcon
             name="i-mdi-handshake"
             aria-hidden="true"
-            class="text-surface-400 h-3.5 w-3.5 shrink-0"
+            class="text-foreground-subtle h-3.5 w-3.5 shrink-0"
           />
           <span
             class="leading-none font-medium"
@@ -38,7 +38,7 @@
           >
             {{ standing.standing >= 0 ? '+' : '' }}{{ standing.standing.toFixed(2) }}
           </span>
-          <span class="text-surface-100 leading-none">{{ standing.trader.name }}</span>
+          <span class="text-foreground leading-none">{{ standing.trader.name }}</span>
         </div>
       </template>
       <template v-for="skill in skillRewards" :key="`skill-${skill.name}`">
@@ -118,7 +118,7 @@
         :text="t('page.tasks.questcard.unlocks_next_tooltip')"
       >
         <div
-          class="text-surface-400 border-surface-600 inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs leading-none"
+          class="text-foreground-subtle border-border inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs leading-none"
         >
           <UIcon name="i-mdi-arrow-right-circle-outline" class="h-3.5 w-3.5 shrink-0" />
           <span class="leading-none">
@@ -131,7 +131,7 @@
         :text="t('page.tasks.questcard.impact_tooltip')"
       >
         <div
-          class="text-surface-400 border-surface-600 inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs leading-none"
+          class="text-foreground-subtle border-border inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs leading-none"
         >
           <UIcon name="i-mdi-sitemap" class="h-3.5 w-3.5 shrink-0" />
           <span class="leading-none">
@@ -143,7 +143,7 @@
         v-if="hasExpandableDetails"
         name="i-mdi-chevron-down"
         aria-hidden="true"
-        class="text-surface-500 group-hover:text-surface-300 h-5 w-5 transition-transform duration-200"
+        class="text-foreground-disabled group-hover:text-foreground-subtle h-5 w-5 transition-transform duration-200"
         :class="{ 'rotate-180': showDetails }"
       />
     </div>
@@ -157,12 +157,12 @@
     >
       <div
         v-if="showDetails && hasExpandableDetails"
-        class="border-surface-700/30 bg-surface-900/30 border-t p-4"
+        class="bg-panel border-border-muted border-t p-4"
         :class="{ 'p-3': isCompact }"
       >
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div v-if="showPreviousTasks" class="space-y-2">
-            <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
+            <div class="text-foreground-disabled text-[10px] font-bold tracking-wider uppercase">
               {{ t('page.tasks.questcard.previous_tasks') }}
             </div>
             <div class="flex flex-col gap-1.5">
@@ -178,7 +178,7 @@
             </div>
           </div>
           <div v-if="itemRewards.length > 0" class="space-y-3">
-            <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
+            <div class="text-foreground-disabled text-[10px] font-bold tracking-wider uppercase">
               {{ t('page.tasks.questcard.reward_items') }}
             </div>
             <div class="flex flex-wrap gap-2">
@@ -192,7 +192,7 @@
                   :href="reward.item?.id ? `https://tarkov.dev/item/${reward.item?.id}` : undefined"
                   :target="reward.item?.id ? '_blank' : undefined"
                   :rel="reward.item?.id ? 'noopener noreferrer' : undefined"
-                  class="group bg-surface-800/80 ring-surface-700/50 hover:bg-surface-700/80 hover:ring-surface-600 relative flex flex-col items-center gap-1 rounded-lg p-2 ring-1 transition-all"
+                  class="group bg-raised ring-border hover:bg-interactive hover:ring-border-strong relative flex flex-col items-center gap-1 rounded-lg p-2 ring-1 transition-all"
                   @contextmenu.prevent.stop="$emit('item-context-menu', $event, reward.item)"
                   @click.stop
                 >
@@ -203,10 +203,13 @@
                     class="h-14 w-14 object-contain"
                   />
                   <div class="flex flex-col items-center gap-0.5">
-                    <span class="text-surface-200 max-w-16 truncate text-center text-[10px]">
+                    <span class="text-foreground max-w-16 truncate text-center text-[10px]">
                       {{ reward.item?.shortName || reward.item?.name || '' }}
                     </span>
-                    <span v-if="reward.count > 1" class="text-surface-400 text-[10px] font-bold">
+                    <span
+                      v-if="reward.count > 1"
+                      class="text-foreground-subtle text-[10px] font-bold"
+                    >
                       x{{ formatNumber(reward.count) }}
                     </span>
                   </div>
@@ -215,7 +218,7 @@
             </div>
           </div>
           <div v-if="offerUnlockRewards.length > 0" class="space-y-3">
-            <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
+            <div class="text-foreground-disabled text-[10px] font-bold tracking-wider uppercase">
               {{ t('page.tasks.questcard.unlocks_purchase') }}
             </div>
             <div class="flex flex-wrap gap-2">
@@ -229,7 +232,7 @@
                   :href="offer.item?.id ? `https://tarkov.dev/item/${offer.item?.id}` : undefined"
                   :target="offer.item?.id ? '_blank' : undefined"
                   :rel="offer.item?.id ? 'noopener noreferrer' : undefined"
-                  class="group bg-surface-800/80 ring-surface-700/50 hover:bg-surface-700/80 hover:ring-surface-600 relative flex flex-col items-center gap-1 rounded-lg p-2 ring-1 transition-all"
+                  class="group bg-raised ring-border hover:bg-interactive hover:ring-border-strong relative flex flex-col items-center gap-1 rounded-lg p-2 ring-1 transition-all"
                   @contextmenu.prevent.stop="$emit('item-context-menu', $event, offer.item)"
                   @click.stop
                 >
@@ -240,10 +243,10 @@
                     class="h-14 w-14 object-contain"
                   />
                   <div class="flex flex-col items-center gap-0.5 text-center">
-                    <span class="text-surface-200 max-w-16 truncate text-[10px]">
+                    <span class="text-foreground max-w-16 truncate text-[10px]">
                       {{ offer.item?.shortName || offer.item?.name || '' }}
                     </span>
-                    <span class="text-surface-500 text-[9px] font-medium uppercase">
+                    <span class="text-foreground-disabled text-[9px] font-medium uppercase">
                       {{ offer.trader.name }} LL{{ offer.level }}
                     </span>
                   </div>
@@ -252,7 +255,7 @@
             </div>
           </div>
           <div v-if="showNextTasks && childTasks.length > 0" class="space-y-2">
-            <div class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
+            <div class="text-foreground-disabled text-[10px] font-bold tracking-wider uppercase">
               {{ t('page.tasks.questcard.next_tasks') }}
             </div>
             <div class="flex flex-col gap-1.5">

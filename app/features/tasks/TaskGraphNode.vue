@@ -1,6 +1,5 @@
 <script setup lang="ts">
   import { Handle, Position } from '@vue-flow/core';
-  import { useI18n } from 'vue-i18n';
   import type { TaskNodeData } from '@/composables/useTaskGraphData';
   const props = defineProps<{
     data: TaskNodeData;
@@ -13,7 +12,7 @@
   const isKeyboardFocused = ref(false);
   const statusClasses = computed(() => {
     if (props.data.isDimmed) {
-      return 'border-surface-700 bg-surface-900/50 opacity-30';
+      return 'border-border bg-panel opacity-30';
     }
     switch (props.data.status) {
       case 'completed':
@@ -23,7 +22,7 @@
       case 'failed':
         return 'border-error-500/60 bg-error-500/10';
       default:
-        return 'border-surface-600 bg-surface-800';
+        return 'border-border bg-raised';
     }
   });
   const focusRingClass = computed(() => {
@@ -86,7 +85,7 @@
     @blur="onBlur"
     @keydown="onKeydown"
   >
-    <Handle type="target" :position="Position.Top" class="!bg-surface-500 !h-2 !w-2" />
+    <Handle type="target" :position="Position.Top" class="!bg-foreground-disabled !h-2 !w-2" />
     <div
       v-if="positionIndicator === 'root' || positionIndicator === 'standalone'"
       class="absolute -top-6 left-1/2 -translate-x-1/2"
@@ -110,10 +109,10 @@
       </span>
     </div>
     <div class="flex flex-col gap-0.5">
-      <span class="text-surface-100 truncate text-xs leading-tight font-medium">
+      <span class="text-foreground truncate text-xs leading-tight font-medium">
         {{ data.taskName }}
       </span>
-      <div class="text-surface-400 flex items-center gap-1.5 text-[10px]">
+      <div class="text-foreground-subtle flex items-center gap-1.5 text-[10px]">
         <span v-if="data.minPlayerLevel > 0">
           {{ t('page.tasks.graph.node_level', { level: data.minPlayerLevel }) }}
         </span>
@@ -132,10 +131,10 @@
           <UIcon name="i-mdi-lighthouse" class="text-lightkeeper h-3 w-3" aria-hidden="true" />
         </span>
       </div>
-      <span v-if="data.isCrossTrader" class="text-surface-500 truncate text-[10px] italic">
+      <span v-if="data.isCrossTrader" class="text-foreground-disabled truncate text-[10px] italic">
         {{ data.traderName }}
       </span>
     </div>
-    <Handle type="source" :position="Position.Bottom" class="!bg-surface-500 !h-2 !w-2" />
+    <Handle type="source" :position="Position.Bottom" class="!bg-foreground-disabled !h-2 !w-2" />
   </div>
 </template>

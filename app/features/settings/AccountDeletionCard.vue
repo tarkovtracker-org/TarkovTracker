@@ -91,9 +91,9 @@
     return 'i-mdi-account';
   };
   const getProviderBadgeClass = (provider: AuthProvider) => {
-    if (provider === 'google') return 'ring-surface-600 text-surface-900 ring-1';
-    if (provider === 'github') return 'ring-surface-600 text-white ring-1';
-    return 'text-white ring-1 ring-white/10';
+    if (provider === 'google') return 'ring-border text-foreground ring-1';
+    if (provider === 'github') return 'ring-border text-white ring-1';
+    return 'text-white ring-1 ring-border';
   };
   const getProviderBadgeStyle = (provider: AuthProvider) => {
     if (provider === 'discord') return { backgroundColor: 'var(--color-discord)' };
@@ -283,16 +283,16 @@
       <template #content>
         <div class="p-4">
           <template v-if="isLoggedIn">
-            <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
+            <div class="bg-shell border-border mb-6 rounded-lg border p-4">
               <div class="mb-3 text-base font-bold">
                 {{ $t('settings.account_data.account_info_title') }}
               </div>
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <div class="mb-2 flex items-center">
-                    <UIcon name="i-mdi-account" class="text-surface-400 mr-2 h-4.5 w-4.5" />
+                    <UIcon name="i-mdi-account" class="text-foreground-muted mr-2 h-4.5 w-4.5" />
                     <span class="text-sm">
-                      <span class="text-surface-400">
+                      <span class="text-foreground-muted">
                         {{ $t('settings.account_data.username_label') }}:
                       </span>
                       <span class="ml-1 font-mono font-medium">{{ maskedUsername }}</span>
@@ -320,9 +320,9 @@
                     </AppTooltip>
                   </div>
                   <div class="mb-2 flex items-center">
-                    <UIcon name="i-mdi-email" class="text-surface-400 mr-2 h-4.5 w-4.5" />
+                    <UIcon name="i-mdi-email" class="text-foreground-muted mr-2 h-4.5 w-4.5" />
                     <span class="text-sm">
-                      <span class="text-surface-400">
+                      <span class="text-foreground-muted">
                         {{ $t('settings.account_data.email_label') }}:
                       </span>
                       <span class="ml-1 font-mono font-medium">{{ maskedEmail }}</span>
@@ -352,9 +352,9 @@
                 </div>
                 <div>
                   <div class="mb-2 flex items-center">
-                    <UIcon name="i-mdi-login" class="text-surface-400 mr-2 h-4.5 w-4.5" />
+                    <UIcon name="i-mdi-login" class="text-foreground-muted mr-2 h-4.5 w-4.5" />
                     <span class="flex flex-wrap items-center gap-1 text-sm">
-                      <span class="text-surface-400 mr-1">{{ authMethodLabel }}:</span>
+                      <span class="text-foreground-muted mr-1">{{ authMethodLabel }}:</span>
                       <template v-if="providers.length > 0">
                         <UBadge
                           v-for="p in providers"
@@ -368,15 +368,15 @@
                           {{ getProviderLabel(p) }}
                         </UBadge>
                       </template>
-                      <span v-else class="text-surface-500">
+                      <span v-else class="text-foreground-subtle">
                         {{ $t('settings.account_data.unknown_label') }}
                       </span>
                     </span>
                   </div>
                   <div class="flex items-center">
-                    <UIcon name="i-mdi-calendar" class="text-surface-400 mr-2 h-4.5 w-4.5" />
+                    <UIcon name="i-mdi-calendar" class="text-foreground-muted mr-2 h-4.5 w-4.5" />
                     <span class="text-sm">
-                      <span class="text-surface-400">
+                      <span class="text-foreground-muted">
                         {{ $t('settings.account_data.member_since_label') }}:
                       </span>
                       <span class="ml-1 font-medium">
@@ -386,13 +386,13 @@
                   </div>
                 </div>
               </div>
-              <div class="border-surface-700 my-3 border-t"></div>
+              <div class="border-border my-3 border-t"></div>
               <div class="flex items-center">
-                <UIcon name="i-mdi-identifier" class="text-surface-400 mr-2 h-4.5 w-4.5" />
-                <span class="text-surface-400 mr-2 text-sm">
+                <UIcon name="i-mdi-identifier" class="text-foreground-muted mr-2 h-4.5 w-4.5" />
+                <span class="text-foreground-muted mr-2 text-sm">
                   {{ $t('settings.account_data.account_id_label') }}:
                 </span>
-                <code class="bg-surface-700 rounded px-2 py-1 text-xs">{{ maskedAccountId }}</code>
+                <code class="bg-field rounded px-2 py-1 text-xs">{{ maskedAccountId }}</code>
                 <AppTooltip
                   :text="
                     showAccountId
@@ -440,11 +440,11 @@
           </template>
           <div
             :class="{
-              'border-surface-700 border-t pt-6': isLoggedIn,
+              'border-border border-t pt-6': isLoggedIn,
               'pt-0': !isLoggedIn,
             }"
           >
-            <div class="text-surface-300 mb-3 text-sm font-semibold">
+            <div class="text-foreground-muted mb-3 text-sm font-semibold">
               {{ $t('settings.account_data.account_deletion_title') }}
             </div>
             <div class="flex justify-center">
@@ -544,7 +544,7 @@
           <div class="mb-2 text-base font-medium">
             {{ $t('settings.account_data.security_confirmation_title') }}
           </div>
-          <div class="text-surface-400 mb-3 text-sm">
+          <div class="text-foreground-muted mb-3 text-sm">
             {{ $t('settings.account_data.security_confirmation_description') }}
           </div>
         </div>
@@ -608,11 +608,11 @@
         <div class="text-base">
           {{ $t('settings.account_data.delete_success_description') }}
         </div>
-        <div v-if="cleanupScheduled" class="text-surface-400 text-sm">
+        <div v-if="cleanupScheduled" class="text-foreground-muted text-sm">
           <UIcon name="i-mdi-information" class="mr-1 inline h-4 w-4" />
           {{ $t('settings.account_data.cleanup_pending') }}
         </div>
-        <div class="text-surface-400 text-sm">
+        <div class="text-foreground-muted text-sm">
           {{ $t('settings.account_data.redirect_message') }}
         </div>
       </div>

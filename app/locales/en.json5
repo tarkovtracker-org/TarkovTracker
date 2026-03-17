@@ -1179,6 +1179,7 @@
   settings: {
     title: 'Settings',
     locale: 'Language',
+    theme: 'Theme',
     tabs: {
       gameplay: 'Gameplay',
       interface: 'Interface',
@@ -1202,6 +1203,13 @@
     },
     interface: {
       title: 'Interface Customization',
+      appearance: {
+        title: 'Appearance',
+        description: 'Choose your preferred interface theme.',
+        mode: 'Theme mode',
+        light: 'Light',
+        dark: 'Dark',
+      },
       tasks: {
         title: 'Task Cards',
         show_required: 'Show Required Labels',

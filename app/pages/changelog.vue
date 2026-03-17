@@ -4,41 +4,41 @@
       <header class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <UIcon name="i-mdi-history" class="text-primary-400 h-6 w-6" />
-          <h1 class="text-surface-100 text-2xl font-bold">{{ t('page.changelog.title') }}</h1>
+          <h1 class="text-foreground text-2xl font-bold">{{ t('page.changelog.title') }}</h1>
         </div>
-        <NuxtLink to="/" class="text-surface-400 hover:text-primary-400 transition-colors">
+        <NuxtLink to="/" class="text-foreground-muted hover:text-primary-500 transition-colors">
           <UIcon name="i-mdi-arrow-left" class="mr-1 inline h-4 w-4" />
           {{ t('page.changelog.back') }}
         </NuxtLink>
       </header>
-      <div v-if="showInitialLoading" class="text-surface-400 py-12 text-center">
+      <div v-if="showInitialLoading" class="text-foreground-muted py-12 text-center">
         <UIcon name="i-mdi-loading" class="mb-2 h-8 w-8 animate-spin" />
         <p>{{ t('page.changelog.loading') }}</p>
       </div>
       <div v-else-if="error && !groupedEntries.length" class="py-12 text-center">
         <UIcon name="i-mdi-alert-circle" class="text-error-400 mb-2 h-8 w-8" />
-        <p class="text-surface-400 mb-4">{{ t('page.changelog.error') }}</p>
+        <p class="text-foreground-muted mb-4">{{ t('page.changelog.error') }}</p>
         <UButton color="primary" variant="soft" @click="retryLoadChangelog">
           {{ t('page.changelog.retry') }}
         </UButton>
       </div>
-      <div v-else-if="!groupedEntries.length" class="text-surface-400 py-12 text-center">
+      <div v-else-if="!groupedEntries.length" class="text-foreground-muted py-12 text-center">
         <UIcon name="i-mdi-playlist-remove" class="mb-2 h-8 w-8" />
         <p>{{ t('page.changelog.empty') }}</p>
       </div>
       <div v-else class="space-y-8">
         <section v-for="group in groupedEntries" :key="group.month" class="space-y-4">
-          <h2 class="text-surface-400 text-sm font-semibold tracking-wide uppercase">
+          <h2 class="text-foreground-muted text-sm font-semibold tracking-wide uppercase">
             {{ group.month }}
           </h2>
           <div class="space-y-3">
             <article
               v-for="(entry, index) in group.entries"
               :key="`${entry.date}-${index}`"
-              class="bg-surface-900/60 rounded-xl border border-white/5 p-4"
+              class="bg-panel border-border-muted rounded-xl border p-4"
             >
               <div class="mb-3 flex flex-wrap items-center gap-2">
-                <time class="text-surface-300 text-sm font-medium">
+                <time class="text-foreground text-sm font-medium">
                   {{ formatDate(entry.date) }}
                 </time>
                 <span
@@ -49,10 +49,10 @@
                 </span>
                 <span
                   v-if="entry.stats"
-                  class="text-surface-500 ml-auto flex items-center gap-1.5 font-mono text-xs"
+                  class="text-foreground-subtle ml-auto flex items-center gap-1.5 font-mono text-xs"
                 >
                   <span class="text-success-400">+{{ formatNumber(entry.stats.additions) }}</span>
-                  <span class="text-surface-600">/</span>
+                  <span class="text-foreground-subtle">/</span>
                   <span class="text-error-400">-{{ formatNumber(entry.stats.deletions) }}</span>
                 </span>
               </div>
@@ -70,15 +70,15 @@
                   >
                     {{ getBulletType(getBulletText(bullet)) }}
                   </UBadge>
-                  <span class="text-surface-200 flex-1 text-sm">
+                  <span class="text-foreground flex-1 text-sm">
                     {{ cleanBulletText(getBulletText(bullet)) }}
                   </span>
                   <span
                     v-if="getBulletStats(bullet)"
-                    class="text-surface-500 shrink-0 font-mono text-[10px]"
+                    class="text-foreground-subtle shrink-0 font-mono text-[10px]"
                   >
                     <span class="text-success-500">+{{ getBulletStats(bullet)?.additions }}</span>
-                    <span class="text-surface-600">/</span>
+                    <span class="text-foreground-subtle">/</span>
                     <span class="text-error-500">-{{ getBulletStats(bullet)?.deletions }}</span>
                   </span>
                 </li>
@@ -108,7 +108,6 @@
   </UContainer>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { logger } from '@/utils/logger';
   import type {
     ChangelogBullet,

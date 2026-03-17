@@ -22,10 +22,10 @@
           :total-count="displayItems.length"
           :ungrouped-count="filteredItems.length"
         />
-        <UCard class="bg-contentbackground border border-white/5">
+        <UCard class="bg-panel border-border shadow-card border">
           <div
             v-if="itemsError"
-            class="text-surface-400 flex flex-col items-center justify-center gap-4 p-8"
+            class="text-foreground-subtle flex flex-col items-center justify-center gap-4 p-8"
             aria-live="polite"
           >
             <UIcon name="i-mdi-alert-circle" class="text-error-400 h-8 w-8" />
@@ -38,7 +38,7 @@
           </div>
           <div
             v-else-if="!itemsReady"
-            class="text-surface-400 flex items-center justify-center gap-2 p-8"
+            class="text-foreground-subtle flex items-center justify-center gap-2 p-8"
             aria-live="polite"
           >
             <UIcon name="i-mdi-loading" class="h-5 w-5 animate-spin" />
@@ -47,7 +47,7 @@
           <template v-else>
             <div
               v-if="displayItems.length === 0"
-              class="text-surface-400 p-8 text-center"
+              class="text-foreground-subtle p-8 text-center"
               aria-live="polite"
             >
               {{ $t('page.needed_items.empty') }}
@@ -77,7 +77,7 @@
               <div
                 v-for="(item, index) in visibleIndividualItems"
                 :key="`${item.needType}-${item.id}`"
-                class="content-visibility-auto-128 border-b border-white/5 pb-1"
+                class="content-visibility-auto-128 border-border-muted border-b pb-1"
               >
                 <NeededItem
                   :need="item"
@@ -155,7 +155,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
   import NeededItem from '@/features/neededitems/NeededItem.vue';
   import NeededItemGroupedCard from '@/features/neededitems/NeededItemGroupedCard.vue';

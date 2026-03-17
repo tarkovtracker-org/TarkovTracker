@@ -6,14 +6,14 @@
         <span class="text-sm font-medium">{{ $t('needed_items.fir') }}</span>
       </div>
       <div class="flex items-center gap-2">
-        <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">
+        <div class="bg-field border-border shadow-card flex items-center rounded-lg border">
           <button
             :disabled="isFirDecreaseDisabled"
             :class="[
-              'text-surface-200 flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
+              'text-foreground-muted flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
               isFirDecreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-interactive active:bg-interactive-hover hover:text-foreground',
             ]"
             :aria-label="$t('needed_items.aria.decrease_fir')"
             @click="decreaseFir"
@@ -21,7 +21,7 @@
             <UIcon name="i-mdi-minus" class="h-4 w-4" />
           </button>
           <div
-            class="bg-surface-800 flex h-8 min-w-16 items-center justify-center border-x border-white/20"
+            class="bg-raised border-border flex h-8 min-w-16 items-center justify-center border-x"
           >
             <input
               v-if="isEditingFir"
@@ -31,14 +31,14 @@
               :min="0"
               :max="firNeeded"
               step="1"
-              class="bg-surface-900 focus:ring-primary-500 h-full w-full px-2 text-center text-sm font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
+              class="bg-panel text-foreground focus:ring-primary-500 h-full w-full px-2 text-center text-sm font-semibold focus:ring-2 focus:outline-none focus:ring-inset"
               @blur="submitFirEdit"
               @keydown.enter="submitFirEdit"
               @keydown.escape="cancelFirEdit"
             />
             <button
               v-else
-              class="hover:bg-surface-600 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
+              class="text-foreground hover:bg-interactive h-full w-full px-2 text-sm font-semibold transition-colors"
               @click="startFirEdit"
             >
               {{ firCurrent }}
@@ -47,10 +47,10 @@
           <button
             :disabled="isFirIncreaseDisabled"
             :class="[
-              'text-surface-200 flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
+              'text-foreground-muted flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
               isFirIncreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-interactive active:bg-interactive-hover hover:text-foreground',
             ]"
             :aria-label="$t('needed_items.aria.increase_fir')"
             @click="increaseFir"
@@ -58,25 +58,25 @@
             <UIcon name="i-mdi-plus" class="h-4 w-4" />
           </button>
         </div>
-        <span class="text-surface-400 text-sm">
+        <span class="text-foreground-subtle text-sm">
           / {{ firNeeded }} {{ $t('needed_items.needed') }}
         </span>
       </div>
     </div>
     <div v-if="nonFirNeeded > 0" class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-2">
-        <UIcon name="i-mdi-checkbox-blank-circle-outline" class="text-surface-400 h-4 w-4" />
+        <UIcon name="i-mdi-checkbox-blank-circle-outline" class="text-foreground-subtle h-4 w-4" />
         <span class="text-sm font-medium">{{ $t('needed_items.non_fir') }}</span>
       </div>
       <div class="flex items-center gap-2">
-        <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">
+        <div class="bg-field border-border shadow-card flex items-center rounded-lg border">
           <button
             :disabled="isNonFirDecreaseDisabled"
             :class="[
-              'text-surface-200 flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
+              'text-foreground-muted flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
               isNonFirDecreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-interactive active:bg-interactive-hover hover:text-foreground',
             ]"
             :aria-label="$t('needed_items.aria.decrease_non_fir')"
             @click="decreaseNonFir"
@@ -84,7 +84,7 @@
             <UIcon name="i-mdi-minus" class="h-4 w-4" />
           </button>
           <div
-            class="bg-surface-800 flex h-8 min-w-16 items-center justify-center border-x border-white/20"
+            class="bg-raised border-border flex h-8 min-w-16 items-center justify-center border-x"
           >
             <input
               v-if="isEditingNonFir"
@@ -94,14 +94,14 @@
               :min="0"
               :max="nonFirNeeded"
               step="1"
-              class="bg-surface-900 focus:ring-primary-500 h-full w-full px-2 text-center text-sm font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
+              class="bg-panel text-foreground focus:ring-primary-500 h-full w-full px-2 text-center text-sm font-semibold focus:ring-2 focus:outline-none focus:ring-inset"
               @blur="submitNonFirEdit"
               @keydown.enter="submitNonFirEdit"
               @keydown.escape="cancelNonFirEdit"
             />
             <button
               v-else
-              class="hover:bg-surface-600 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
+              class="text-foreground hover:bg-interactive h-full w-full px-2 text-sm font-semibold transition-colors"
               @click="startNonFirEdit"
             >
               {{ nonFirCurrent }}
@@ -110,10 +110,10 @@
           <button
             :disabled="isNonFirIncreaseDisabled"
             :class="[
-              'text-surface-200 flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
+              'text-foreground-muted flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
               isNonFirIncreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-interactive active:bg-interactive-hover hover:text-foreground',
             ]"
             :aria-label="$t('needed_items.aria.increase_non_fir')"
             @click="increaseNonFir"
@@ -121,7 +121,7 @@
             <UIcon name="i-mdi-plus" class="h-4 w-4" />
           </button>
         </div>
-        <span class="text-surface-400 text-sm">
+        <span class="text-foreground-subtle text-sm">
           / {{ nonFirNeeded }} {{ $t('needed_items.needed') }}
         </span>
       </div>

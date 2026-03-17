@@ -101,18 +101,16 @@
   });
 </script>
 <template>
-  <div class="bg-surface-950 flex min-h-screen items-center justify-center p-4">
-    <div
-      class="bg-surface-900 border-surface-700/60 w-full max-w-md rounded-lg border p-6 shadow-lg"
-    >
-      <h1 class="text-surface-50 mb-6 text-2xl font-bold">
+  <div class="bg-canvas flex min-h-screen items-center justify-center p-4">
+    <div class="bg-panel border-border shadow-card w-full max-w-md rounded-lg border p-6">
+      <h1 class="text-foreground mb-6 text-2xl font-bold">
         {{ t('oauth.consent.authorize') }}
       </h1>
       <div v-if="loading" class="py-8 text-center">
         <div
           class="border-primary-400 inline-block h-8 w-8 animate-spin rounded-full border-b-2"
         ></div>
-        <p class="text-surface-300 mt-4">{{ t('oauth.consent.loading') }}</p>
+        <p class="text-foreground-muted mt-4">{{ t('oauth.consent.loading') }}</p>
       </div>
       <div v-else-if="error" class="border-error-500/40 bg-error-500/10 mb-4 rounded border p-4">
         <p class="text-error-300 text-sm">
@@ -121,27 +119,27 @@
       </div>
       <div v-else-if="details">
         <div class="mb-6">
-          <p class="text-surface-300 mb-4">
-            <strong class="text-surface-100">
+          <p class="text-foreground-muted mb-4">
+            <strong class="text-foreground">
               {{ details.client?.name || t('oauth.consent.unknown') }}
             </strong>
             {{ t('oauth.consent.requesting_access') }}
           </p>
-          <div v-if="details.scope" class="bg-surface-800 mb-4 rounded p-4">
-            <h3 class="text-surface-100 mb-2 font-semibold">
+          <div v-if="details.scope" class="bg-shell border-border mb-4 rounded border p-4">
+            <h3 class="text-foreground mb-2 font-semibold">
               {{ t('oauth.consent.requested_permissions') }}
             </h3>
             <ul class="list-inside list-disc space-y-1">
               <li
                 v-for="scope in details.scope?.split(' ') || []"
                 :key="scope"
-                class="text-surface-300 text-sm"
+                class="text-foreground-muted text-sm"
               >
                 {{ scope }}
               </li>
             </ul>
           </div>
-          <p v-if="details.redirect_url" class="text-surface-400 mb-4 text-xs">
+          <p v-if="details.redirect_url" class="text-foreground-subtle mb-4 text-xs">
             {{ t('oauth.consent.redirect_to') }}
             <span class="font-mono">{{ details.redirect_url }}</span>
           </p>
@@ -156,7 +154,7 @@
           </button>
           <button
             :disabled="loading"
-            class="bg-surface-800 hover:bg-surface-700 text-surface-100 flex-1 rounded px-4 py-2 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+            class="bg-shell border-border text-foreground hover:bg-interactive flex-1 rounded border px-4 py-2 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
             @click="deny"
           >
             {{ t('oauth.consent.deny') }}

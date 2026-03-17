@@ -2,7 +2,9 @@
   <div class="flex min-w-0 items-center gap-2">
     <AppTooltip :text="titleTooltip">
       <component :is="titleComponent" v-bind="titleProps" :class="titleClass">
-        <div class="bg-surface-800 h-9 w-9 shrink-0 overflow-hidden rounded-full">
+        <div
+          class="bg-field border-border-muted h-9 w-9 shrink-0 overflow-hidden rounded-full border"
+        >
           <NuxtImg
             v-if="task?.trader?.imageLink"
             :src="task.trader.imageLink"
@@ -12,7 +14,7 @@
             sizes="36px"
             class="h-full w-full object-cover"
           />
-          <UIcon v-else name="i-mdi-account-circle" class="text-surface-400 h-full w-full" />
+          <UIcon v-else name="i-mdi-account-circle" class="text-foreground-subtle h-full w-full" />
         </div>
         <NuxtImg
           v-if="factionImage"
@@ -29,7 +31,7 @@
         <UIcon
           v-if="shouldLinkToWiki"
           name="i-mdi-open-in-new"
-          class="text-surface-400 h-3.5 w-3.5 shrink-0"
+          class="text-foreground-subtle h-3.5 w-3.5 shrink-0"
           aria-hidden="true"
         />
       </component>
@@ -101,7 +103,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { getFactionIconPath } from '@/utils/factionIcons';
   import type { Task } from '@/types/tarkov';
   const props = defineProps<{
@@ -134,16 +135,16 @@
   });
   const titleClass = computed(() =>
     titleComponent.value === 'div'
-      ? 'text-surface-100 flex min-w-0 items-center gap-2'
+      ? 'text-foreground flex min-w-0 items-center gap-2'
       : 'text-link hover:text-link-hover flex min-w-0 items-center gap-2 no-underline'
   );
   const ICON_BUTTON_CLASS = [
     'focus-visible:ring-primary-500',
-    'focus-visible:ring-offset-surface-900',
-    'text-surface-400',
-    'hover:text-surface-200',
+    'focus-visible:ring-offset-panel',
+    'text-foreground-subtle',
+    'hover:text-foreground',
     'inline-flex items-center justify-center rounded p-1 transition-colors',
-    'hover:bg-white/10 focus:outline-none',
+    'hover:bg-interactive focus:outline-none',
     'focus-visible:ring-2 focus-visible:ring-offset-2',
   ];
   const titleTooltip = computed(() => {
