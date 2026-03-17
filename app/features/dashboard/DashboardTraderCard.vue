@@ -1,7 +1,8 @@
 <template>
   <div
-    class="flex h-full min-h-44 flex-col rounded-lg border px-5 py-4 shadow-md transition-all outline-none"
+    class="flex h-full min-h-44 cursor-pointer flex-col rounded-lg border px-5 py-4 shadow-md transition-all outline-none"
     :class="cardContainerClasses"
+    @click="handleCardClick"
   >
     <div class="mb-3 flex items-center gap-3">
       <button
@@ -358,6 +359,15 @@
     if (event.key !== 'Enter') return;
     const target = event.target as HTMLInputElement;
     target.blur();
+  };
+  const isInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
+  const handleCardClick = (event: MouseEvent) => {
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    navigateToTraderTasks();
   };
   const navigateToTraderTasks = () => {
     preferencesStore.setTaskPrimaryView('traders');

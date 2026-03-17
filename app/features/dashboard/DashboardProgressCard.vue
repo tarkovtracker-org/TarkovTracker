@@ -1,17 +1,14 @@
 <template>
-  <div
+  <button
+    type="button"
     :class="[
       'bg-panel border-border shadow-card cursor-pointer rounded-lg border px-4 py-3',
       'transition-all duration-150',
       'hover:bg-raised/65 outline-none hover:shadow-lg focus-visible:ring-2',
       hoverBorderClass,
     ]"
-    role="button"
-    tabindex="0"
     :aria-label="buttonAriaLabel"
     @click="$emit('click')"
-    @keydown.enter="$emit('click')"
-    @keydown.space.prevent="$emit('click')"
   >
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
@@ -33,7 +30,7 @@
       <div class="text-3xl font-bold" :class="percentageColorClass">{{ percentageDisplay }}%</div>
     </div>
     <DashboardProgressBar :percentage="percentage" :color="color" :aria-label="progressAriaLabel" />
-  </div>
+  </button>
 </template>
 <script setup lang="ts">
   import { useLocaleNumberFormatter } from '@/utils/formatters';

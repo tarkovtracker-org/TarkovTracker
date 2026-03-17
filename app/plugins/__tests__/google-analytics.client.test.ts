@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import { createDeferred } from '@/utils/test-helpers';
 import type { AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
 const runtimeConfig = {
   public: {
@@ -13,10 +14,31 @@ const analyticsConsentState = ref<AnalyticsConsentState>({
   status: 'accepted',
   updatedAt: '2026-03-09T00:00:00.000Z',
 });
+const createRoute = (fullPath: string): RouterRouteLike => {
+  const url = new URL(fullPath, 'https://tarkovtracker.org');
+  return {
+    fullPath,
+    path: url.pathname,
+    query: Object.fromEntries(url.searchParams.entries()),
+  };
+};
 const removeAfterEach = vi.fn();
+type RouterRouteLike = {
+  fullPath: string;
+  path: string;
+  query: Record<string, string | string[]>;
+};
+const currentRoute = ref<RouterRouteLike>(createRoute('/'));
+let afterEachHandler: ((to: RouterRouteLike) => void | Promise<void>) | null = null;
+const routerIsReadyMock = vi.fn().mockResolvedValue(undefined);
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 mockNuxtImport('useRouter', () => () => ({
-  afterEach: vi.fn(() => removeAfterEach),
+  afterEach: vi.fn((handler: (to: RouterRouteLike) => void | Promise<void>) => {
+    afterEachHandler = handler;
+    return removeAfterEach;
+  }),
+  currentRoute,
+  isReady: routerIsReadyMock,
 }));
 vi.mock('@/composables/useAnalyticsConsent', () => ({
   useAnalyticsConsent: () => ({
@@ -38,7 +60,10 @@ const getNormalizedDataLayer = () => {
     return entry;
   });
 };
-const expectAnalyticsInitialized = (measurementId: string) => {
+const expectAnalyticsInitialized = (
+  measurementId: string,
+  pagePath = currentRoute.value.fullPath
+) => {
   expect(window.gtag).toBeTypeOf('function');
   expect(getNormalizedDataLayer()).toEqual(
     expect.arrayContaining([
@@ -57,8 +82,8 @@ const expectAnalyticsInitialized = (measurementId: string) => {
         'event',
         'page_view',
         expect.objectContaining({
-          page_location: expect.stringContaining(window.location.origin),
-          page_path: `${window.location.pathname}${window.location.search}`,
+          page_location: `${window.location.origin}${pagePath}`,
+          page_path: pagePath,
           page_title: document.title,
         }),
       ],
@@ -79,10 +104,15 @@ describe('google analytics plugin', () => {
       status: 'accepted',
       updatedAt: '2026-03-09T00:00:00.000Z',
     };
+    currentRoute.value = createRoute('/');
+    afterEachHandler = null;
+    routerIsReadyMock.mockReset();
+    routerIsReadyMock.mockResolvedValue(undefined);
     runtimeConfig.public.googleAnalyticsMeasurementId = 'G-ABCDEF1234';
     document.head.innerHTML = '';
     delete window.dataLayer;
     delete window.gtag;
+    delete window.__ttGoogleAnalyticsReady;
     delete window['ga-disable-G-ABCDEF1234'];
   });
   afterEach(() => {
@@ -90,6 +120,7 @@ describe('google analytics plugin', () => {
     document.head.innerHTML = '';
     delete window.dataLayer;
     delete window.gtag;
+    delete window.__ttGoogleAnalyticsReady;
     delete window['ga-disable-G-ABCDEF1234'];
   });
   it('initial successful load with consent granted', async () => {
@@ -103,7 +134,21 @@ describe('google analytics plugin', () => {
       `googletagmanager.com/gtag/js?id=${runtimeConfig.public.googleAnalyticsMeasurementId}`
     );
     expect(script?.dataset.loaded).toBe('true');
+    expect(window.__ttGoogleAnalyticsReady).toBe(true);
     expectAnalyticsInitialized(runtimeConfig.public.googleAnalyticsMeasurementId);
+  });
+  it('tracks canonicalized query strings and strips transient retry params', async () => {
+    currentRoute.value = createRoute(
+      '/tasks?trader=54cb57776803fa99248b456e&view=maps&_tt_retry=123&view=maps'
+    );
+    window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
+    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushAnalyticsSync();
+    expectAnalyticsInitialized(
+      runtimeConfig.public.googleAnalyticsMeasurementId,
+      '/tasks?trader=54cb57776803fa99248b456e&view=maps'
+    );
   });
   it('consent denial before script loads', async () => {
     analyticsConsentState.value = {
@@ -115,6 +160,7 @@ describe('google analytics plugin', () => {
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     expect(document.getElementById('tt-google-analytics')).toBeNull();
+    expect(window.__ttGoogleAnalyticsReady).toBe(false);
     analyticsConsentState.value = {
       status: 'accepted',
       updatedAt: '2026-03-09T00:01:00.000Z',
@@ -126,6 +172,7 @@ describe('google analytics plugin', () => {
       `googletagmanager.com/gtag/js?id=${runtimeConfig.public.googleAnalyticsMeasurementId}`
     );
     expect(script?.dataset.loaded).toBe('true');
+    expect(window.__ttGoogleAnalyticsReady).toBe(true);
     expectAnalyticsInitialized(runtimeConfig.public.googleAnalyticsMeasurementId);
   });
   it('does not initialize analytics for an invalid measurement ID', async () => {
@@ -166,5 +213,33 @@ describe('google analytics plugin', () => {
     expect(replacementScript).not.toBe(originalScript);
     expect(replacementScript?.src).toContain('googletagmanager.com/gtag/js?id=G-ABCDEF1234');
     expect(replacementScript?.dataset.loaded).toBe('true');
+  });
+  it('tracks route changes with normalized page paths', async () => {
+    window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
+    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushAnalyticsSync();
+    currentRoute.value = createRoute('/needed-items?type=hideout&type=hideout');
+    await afterEachHandler?.(currentRoute.value);
+    await flushAnalyticsSync();
+    expectAnalyticsInitialized(
+      runtimeConfig.public.googleAnalyticsMeasurementId,
+      '/needed-items?type=hideout'
+    );
+  });
+  it('initializes the queueing gtag stub before router readiness completes', async () => {
+    window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
+    const routerReadyDeferred = createDeferred<undefined>();
+    routerIsReadyMock.mockReturnValueOnce(routerReadyDeferred.promise);
+    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushPromises();
+    expect(window.gtag).toBeTypeOf('function');
+    window.gtag?.('event', 'login_start', { method: 'discord' });
+    expect(getNormalizedDataLayer()).toEqual(
+      expect.arrayContaining([['event', 'login_start', { method: 'discord' }]])
+    );
+    routerReadyDeferred.resolve(undefined);
+    await flushAnalyticsSync();
   });
 });

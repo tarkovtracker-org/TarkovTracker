@@ -7,7 +7,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 **Automated Workflows:**
 
 - CI/CD pipeline with quality, testing, and builds
-- Cloudflare Pages + Workers deployment
+- Cloudflare-managed deployment from connected Git branches
 - Security scanning and dependency audits
 - Automated releases with semantic versioning
 - Pre-commit hooks for code quality
@@ -26,26 +26,7 @@ Runs on every push and PR:
 
 **Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
 
-### 2. Deployment (`.github/workflows/deploy.yml`)
-
-Automated deployment to production:
-
-**Jobs:**
-
-- `deploy` - Deploy Nuxt SPA to Cloudflare Pages, deploy api-gateway and team-gateway workers
-- `verify` - Smoke tests and Discord notifications
-
-**Triggers:** After CI workflow succeeds on main (workflow_run), manual dispatch
-
-**Required Secrets:**
-
-```text
-CLOUDFLARE_API_TOKEN
-CLOUDFLARE_ACCOUNT_ID
-DISCORD_WEBHOOK (optional)
-```
-
-### 3. Security Scanning (`.github/workflows/security.yml`)
+### 2. Security Scanning (`.github/workflows/security.yml`)
 
 Weekly security audits:
 
@@ -62,7 +43,7 @@ Weekly security audits:
 GITLEAKS_LICENSE (required for organization repos, free at gitleaks.io)
 ```
 
-### 4. Release Automation (`.github/workflows/release.yml`)
+### 3. Release Automation (`.github/workflows/release.yml`)
 
 Semantic versioning with automated releases:
 
@@ -82,7 +63,7 @@ Semantic versioning with automated releases:
 - `perf:` → patch version bump
 - `BREAKING CHANGE:` → major version bump
 
-### 5. PR Checks (`.github/workflows/pr-checks.yml`)
+### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 
 Enhanced PR validation:
 
@@ -93,7 +74,7 @@ Enhanced PR validation:
 - `conventional-commits` - Commit message validation
 - `lighthouse` - Performance checks (when `performance` label present)
 
-### 6. Stale Management (`.github/workflows/stale.yml`)
+### 5. Stale Management (`.github/workflows/stale.yml`)
 
 Automatic stale issue/PR management:
 
@@ -102,7 +83,7 @@ Automatic stale issue/PR management:
 - Exempts issues: `pinned`, `security`, `enhancement` labels
 - Exempts PRs: `pinned`, `security`, `enhancement` labels
 
-### 7. Link Check (`.github/workflows/link-check.yml`)
+### 6. Link Check (`.github/workflows/link-check.yml`)
 
 Validates external links in documentation:
 
@@ -223,18 +204,14 @@ npm run setup
 
 Push to `main` triggers:
 
-1. CI validation (quality, tests, build)
-2. Deploy to Cloudflare Pages
-3. Deploy workers (api-gateway, team-gateway)
-4. Smoke tests
-5. Discord notification
+1. CI validation in GitHub Actions
+2. Cloudflare Pages deploy for the connected branch
+3. Cloudflare-managed worker deploys for the connected branch
+4. Smoke tests in production
 
 ### Manual Deployment
 
 ```bash
-# Via GitHub Actions
-gh workflow run deploy.yml
-
 # Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)
 npm run build
 cd workers/api-gateway && npx wrangler deploy
@@ -245,16 +222,6 @@ cd "$OLDPWD" && cd workers/team-gateway && npx wrangler deploy
 > The `cd "$OLDPWD"` returns to the previous directory before switching to the next worker.
 
 ## Monitoring & Notifications
-
-### Discord Webhooks
-
-Configure `DISCORD_WEBHOOK` secret for deployment notifications:
-
-**Sent on:**
-
-- Deployment success/failure
-- Security scan findings (optional)
-- Release creation (optional)
 
 ### Coverage Reports
 
@@ -336,15 +303,15 @@ npm run lint:fix
 
 **Pages deployment:**
 
-- Check Cloudflare API token permissions
-- Verify project name in workflow
-- Check build output in `dist` (Nuxt cloudflare-pages preset)
+- Check the Cloudflare Pages deployment log for the branch
+- Verify build output in `dist`
+- Verify required environment variables in Cloudflare
 
 **Workers deployment:**
 
-- Verify wrangler.toml configuration
-- Check worker-specific secrets
-- Test locally with `npm run dev`
+- Verify Cloudflare Worker Git deployment status or deploy with `wrangler`
+- Check worker-specific secrets and bindings
+- Validate `wrangler.toml` and test locally with `npm run dev`
 
 ## Best Practices
 

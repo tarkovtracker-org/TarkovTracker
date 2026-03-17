@@ -1,6 +1,40 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-[1400px] space-y-4">
+      <div
+        class="bg-surface-900 border-surface-700/50 flex flex-col gap-4 rounded-2xl border px-4 py-4 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+      >
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-surface-50 text-lg font-semibold">
+              {{ t('page.hideout.title') }}
+            </span>
+            <UBadge color="success" variant="soft" size="sm">
+              {{ stationCounts.available }}
+              {{ t('page.hideout.primary_views.available') }}
+            </UBadge>
+            <UBadge color="neutral" variant="soft" size="sm">
+              {{ stationCounts.maxed }}
+              {{ t('page.hideout.primary_views.maxed') }}
+            </UBadge>
+          </div>
+          <p class="text-surface-300 text-sm">
+            {{ t('page.hideout.summary') }}
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <UButton color="primary" @click="activePrimaryView = 'available'">
+            {{ t('page.hideout.primary_views.available') }}
+          </UButton>
+          <UButton
+            color="neutral"
+            variant="soft"
+            :to="{ path: '/needed-items', query: { type: 'hideout' } }"
+          >
+            {{ t('page.needed_items.title') }}
+          </UButton>
+        </div>
+      </div>
       <div class="flex flex-col gap-4">
         <div class="flex justify-center">
           <div

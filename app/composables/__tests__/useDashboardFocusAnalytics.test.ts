@@ -8,12 +8,16 @@ describe('useDashboardFocusAnalytics', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-12T12:00:00.000Z'));
     window.sessionStorage.clear();
+    window.__ttGoogleAnalyticsReady = true;
+    window.__ttMicrosoftClarityReady = true;
     window.gtag = vi.fn();
     window.clarity = createClarityMock();
   });
   afterEach(() => {
     vi.useRealTimers();
     window.sessionStorage.clear();
+    delete window.__ttGoogleAnalyticsReady;
+    delete window.__ttMicrosoftClarityReady;
     delete window.gtag;
     delete window.clarity;
   });

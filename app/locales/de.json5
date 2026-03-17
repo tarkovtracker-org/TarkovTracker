@@ -640,7 +640,9 @@
     },
     hideout: {
       title: 'Versteck',
+      summary: 'Verfolge Stations-Upgrades, Blocker und was als Nächstes gebaut werden kann.',
       loading: 'Lade Versteck-Daten',
+      station_link_label: 'Zu {name} gehen',
       no_stations_found: 'Keine Stationen gefunden. Versuche deine Filter zu ändern.',
       load_more_stations: 'Weitere Sender laden',
       collapse_completed: 'Fertige Stationen einklappen',

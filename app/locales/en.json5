@@ -640,7 +640,9 @@
     },
     hideout: {
       title: 'Hideout',
+      summary: 'Track station upgrades, blockers, and what is ready to build next.',
       loading: 'Loading hideout data',
+      station_link_label: 'Go to {name}',
       no_stations_found: 'No stations found. Try changing your filters.',
       load_more_stations: 'Load more stations',
       collapse_completed: 'Collapse completed stations',
@@ -1180,6 +1182,7 @@
     title: 'Settings',
     locale: 'Language',
     theme: 'Theme',
+    reset: 'Reset',
     tabs: {
       gameplay: 'Gameplay',
       interface: 'Interface',

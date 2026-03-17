@@ -10,7 +10,17 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useProductAnalytics } from '@/composables/useProductAnalytics';
   import { sanitizeInternalRedirect } from '@/utils/redirect';
+  const { clearPendingLoginProvider, trackLoginSucceeded } = useProductAnalytics();
+  const { $supabase } = useNuxtApp();
+  const finalizeLoginTracking = () => {
+    if ($supabase.user.loggedIn) {
+      trackLoginSucceeded();
+      return;
+    }
+    clearPendingLoginProvider();
+  };
   onMounted(async () => {
     // Check if this is a popup window (has opener)
     const isPopup = window.opener && !window.opener.closed;
@@ -19,6 +29,8 @@
       // The Supabase client automatically processes the hash on page load
       // We just need to wait a moment for it to complete
       await new Promise((resolve) => setTimeout(resolve, 500));
+      await $supabase.ready();
+      finalizeLoginTracking();
       // Send success message to opener window
       window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, window.location.origin);
       // Close this popup after a short delay to ensure the message is sent
@@ -29,6 +41,8 @@
       // This is a full redirect (not popup) - redirect to original page or dashboard
       // Wait a moment for the session to be established
       await new Promise((resolve) => setTimeout(resolve, 500));
+      await $supabase.ready();
+      finalizeLoginTracking();
       const route = useRoute();
       const redirect = sanitizeInternalRedirect(route.query.redirect);
       await navigateTo(redirect, { replace: true });

@@ -275,6 +275,7 @@
 </template>
 <script setup lang="ts">
   import { useToast } from '#imports';
+  import { useAnalyticsEvents } from '@/composables/useAnalyticsEvents';
   import { useSkillCalculation } from '@/composables/useSkillCalculation';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -304,6 +305,7 @@
   );
   const progressStore = useProgressStore();
   const tarkovStore = useTarkovStore();
+  const { trackEvent } = useAnalyticsEvents();
   const skillCalculation = useSkillCalculation();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -475,6 +477,14 @@
     upgradeLevel.itemRequirements.forEach((o: ItemRequirement) => {
       tarkovStore.setHideoutPartComplete(o.id);
     });
+    trackEvent('hideout_upgrade', {
+      game_mode: tarkovStore.getCurrentGameMode(),
+      hideout_module_id: upgradeLevel.id,
+      hideout_station_id: props.station.id,
+      hideout_station_name: props.station.name,
+      level: upgradeLevel.level,
+      prerequisite_status: prerequisitesMet.value ? 'ready' : 'blocked',
+    });
     toast.add({
       title: t('page.hideout.stationcard.status_upgraded', {
         name: props.station.name,
@@ -491,6 +501,13 @@
     // For each objective, mark it as incomplete
     downgradeLevel.itemRequirements.forEach((o: ItemRequirement) => {
       tarkovStore.setHideoutPartUncomplete(o.id);
+    });
+    trackEvent('hideout_downgrade', {
+      game_mode: tarkovStore.getCurrentGameMode(),
+      hideout_module_id: downgradeLevel.id,
+      hideout_station_id: props.station.id,
+      hideout_station_name: props.station.name,
+      level: downgradeLevel.level,
     });
     toast.add({
       title: t('page.hideout.stationcard.status_downgraded', {

@@ -1,3 +1,44 @@
+# [1.28.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.27.2...v1.28.0) (2026-03-16)
+
+
+### Bug Fixes
+
+* address PR [#235](https://github.com/tarkovtracker-org/TarkovTracker/issues/235) review feedback ([4828911](https://github.com/tarkovtracker-org/TarkovTracker/commit/482891181ee2f98d443a2f9d87b2335bf49018f2))
+* complete preferences legacy migration ([96b79f1](https://github.com/tarkovtracker-org/TarkovTracker/commit/96b79f1cad8d79aba2e080cdc1039e1ddfa588e9))
+
+
+### Features
+
+* add hide collected filter to needed items (Issue 88) ([85d5f2c](https://github.com/tarkovtracker-org/TarkovTracker/commit/85d5f2c7c758a2eed8ca99457a5e2ad49f42ea8d))
+
+## [1.27.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.27.1...v1.27.2) (2026-03-15)
+
+
+### Bug Fixes
+
+* reduce remaining layout shifts ([da8f28b](https://github.com/tarkovtracker-org/TarkovTracker/commit/da8f28b89b0648e32e4b52fc69ad7b048554b21f))
+
+## [1.27.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.27.0...v1.27.1) (2026-03-15)
+
+
+### Bug Fixes
+
+* reduce tasks page layout shifts ([7af3cfa](https://github.com/tarkovtracker-org/TarkovTracker/commit/7af3cfa6dce03445de72dbd38c005aa69a7e26ed))
+
+# [1.27.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.26.1...v1.27.0) (2026-03-15)
+
+
+### Features
+
+* add analytics tracking and automatic level sync ([7d83971](https://github.com/tarkovtracker-org/TarkovTracker/commit/7d839710e44b54974c0fb8158e230b3cba08e514))
+
+## [1.26.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.26.0...v1.26.1) (2026-03-15)
+
+
+### Bug Fixes
+
+* refine data backup handling and settings ui ([2a669f1](https://github.com/tarkovtracker-org/TarkovTracker/commit/2a669f1018fe7a019c6bb1726eba8bc98fb3262d))
+
 # [1.26.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.25.6...v1.26.0) (2026-03-14)
 
 

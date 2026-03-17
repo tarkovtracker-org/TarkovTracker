@@ -4,7 +4,7 @@
       <h1 class="sr-only">Tarkov Tracker - Escape from Tarkov Progress Tracker</h1>
       <DashboardNextActions />
       <DashboardChangelog />
-      <div class="content-visibility-auto-280 mb-8">
+      <div class="mb-8">
         <button
           type="button"
           data-testid="dashboard-progress-toggle"

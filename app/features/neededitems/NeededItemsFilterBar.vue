@@ -111,6 +111,7 @@
             :color="!groupByItem && viewMode === 'list' ? 'primary' : 'neutral'"
             :variant="!groupByItem && viewMode === 'list' ? 'soft' : 'ghost'"
             size="sm"
+            :disabled="isListViewActive"
             :title="$t('page.needed_items.view.list')"
             :aria-label="$t('page.needed_items.view.list')"
             @click="setViewMode('list')"
@@ -120,6 +121,7 @@
             :color="!groupByItem && viewMode === 'grid' ? 'primary' : 'neutral'"
             :variant="!groupByItem && viewMode === 'grid' ? 'soft' : 'ghost'"
             size="sm"
+            :disabled="isGridViewActive"
             :title="$t('page.needed_items.view.grid')"
             :aria-label="$t('page.needed_items.view.grid')"
             @click="setViewMode('grid')"
@@ -129,6 +131,7 @@
             :color="groupByItem ? 'primary' : 'neutral'"
             :variant="groupByItem ? 'soft' : 'ghost'"
             size="sm"
+            :disabled="isGroupedViewActive"
             :title="$t('page.needed_items.view.combined')"
             :aria-label="$t('page.needed_items.view.combined')"
             @click="setGroupedView"
@@ -183,6 +186,10 @@
 </template>
 <script setup lang="ts">
   import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
+  import {
+    normalizeNeededItemsFilterType,
+    normalizeNeededItemsSortBy,
+  } from '@/features/neededitems/neededItemsFilterNormalization';
   import type { UInputInstance } from '@/types/ui';
   type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
   type ViewMode = 'list' | 'grid';
@@ -232,8 +239,8 @@
   const searchInputId = `needed-items-search-${useId()}`;
   const activeFilter = computed({
     get: () => props.modelValue,
-    set: (value: string | number) => {
-      emit('update:modelValue', value as FilterType);
+    set: (value: unknown) => {
+      emit('update:modelValue', normalizeNeededItemsFilterType(value));
     },
   });
   const getTabBadgeColor = (tab: FilterTab): string => {
@@ -306,7 +313,7 @@
   ]);
   const selectedSortBy = computed({
     get: () => props.sortBy,
-    set: (value: SortBy) => {
+    set: (value: unknown) => {
       setSort(value);
     },
   });
@@ -318,7 +325,16 @@
       ? t('page.tasks.sort.ascending')
       : t('page.tasks.sort.descending');
   });
+  const isListViewActive = computed(() => !props.groupByItem && props.viewMode === 'list');
+  const isGridViewActive = computed(() => !props.groupByItem && props.viewMode === 'grid');
+  const isGroupedViewActive = computed(() => props.groupByItem);
   const setViewMode = (mode: ViewMode) => {
+    if (
+      (mode === 'list' && isListViewActive.value) ||
+      (mode === 'grid' && isGridViewActive.value)
+    ) {
+      return;
+    }
     emit('update:groupByItem', false);
     emit('update:viewMode', mode);
   };
@@ -338,14 +354,19 @@
     }
   });
   const setGroupedView = () => {
+    if (isGroupedViewActive.value) return;
     emit('update:groupByItem', true);
   };
-  const setSort = (value: SortBy) => {
-    if (props.sortBy === value) {
+  const setSort = (value: unknown) => {
+    const normalizedSortBy = normalizeNeededItemsSortBy(value);
+    if (props.sortBy === normalizedSortBy) {
       emit('update:sortDirection', props.sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      emit('update:sortBy', value);
-      emit('update:sortDirection', value === 'priority' || value === 'count' ? 'desc' : 'asc');
+      emit('update:sortBy', normalizedSortBy);
+      emit(
+        'update:sortDirection',
+        normalizedSortBy === 'priority' || normalizedSortBy === 'count' ? 'desc' : 'asc'
+      );
     }
   };
   const toggleSortDirection = () => {

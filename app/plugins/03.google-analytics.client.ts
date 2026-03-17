@@ -2,12 +2,14 @@ import {
   useAnalyticsConsent,
   type AnalyticsConsentStatus,
 } from '@/composables/useAnalyticsConsent';
+import { getAnalyticsPageLocation, getAnalyticsPagePath } from '@/utils/analytics';
 import { logger } from '@/utils/logger';
 type Gtag = (...args: unknown[]) => void;
 declare global {
   interface Window {
     dataLayer?: unknown[];
     gtag?: Gtag;
+    __ttGoogleAnalyticsReady?: boolean;
     [key: `ga-disable-${string}`]: boolean | undefined;
   }
 }
@@ -28,10 +30,14 @@ export default defineNuxtPlugin(() => {
   const router = useRouter();
   const { state } = useAnalyticsConsent();
   let hasConfiguredTracker = false;
+  let lastTrackedPageLocation: string | null = null;
   let scriptLoadPromise: Promise<void> | null = null;
   let syncRequestId = 0;
   const setDisabled = (value: boolean) => {
     window[`ga-disable-${measurementId}`] = value;
+  };
+  const setGoogleAnalyticsReady = (value: boolean) => {
+    window.__ttGoogleAnalyticsReady = value;
   };
   const loadScript = async () => {
     if (scriptLoadPromise) {
@@ -93,25 +99,38 @@ export default defineNuxtPlugin(() => {
       transport_type: 'beacon',
     });
     hasConfiguredTracker = true;
+    setGoogleAnalyticsReady(true);
   };
-  const trackPageView = () => {
+  const trackPageView = (route = router.currentRoute.value) => {
     if (!hasConfiguredTracker || state.value.status !== 'accepted') {
       return;
     }
-    const pageLocation = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    const pagePath = getAnalyticsPagePath(route);
+    const pageLocation = getAnalyticsPageLocation(route);
+    if (!pagePath || pageLocation === lastTrackedPageLocation) {
+      return;
+    }
     window.gtag?.('event', 'page_view', {
       page_location: pageLocation,
-      page_path: `${window.location.pathname}${window.location.search}`,
+      page_path: pagePath,
+      page_referrer: lastTrackedPageLocation || document.referrer || undefined,
       page_title: document.title,
     });
+    lastTrackedPageLocation = pageLocation;
   };
   const syncAnalytics = async (status: AnalyticsConsentStatus) => {
     const requestId = ++syncRequestId;
     setDisabled(status !== 'accepted');
     if (status !== 'accepted') {
+      lastTrackedPageLocation = null;
+      setGoogleAnalyticsReady(false);
       return;
     }
     await ensureConfigured();
+    if (requestId !== syncRequestId || state.value.status !== 'accepted') {
+      return;
+    }
+    await router.isReady();
     if (requestId !== syncRequestId || state.value.status !== 'accepted') {
       return;
     }
@@ -122,6 +141,7 @@ export default defineNuxtPlugin(() => {
     trackPageView();
   };
   setDisabled(state.value.status !== 'accepted');
+  setGoogleAnalyticsReady(false);
   const stopConsentWatch = watch(
     () => state.value.status,
     async (status) => {
@@ -133,17 +153,19 @@ export default defineNuxtPlugin(() => {
     },
     { immediate: true }
   );
-  const removeAfterEach = router.afterEach(async () => {
+  const removeAfterEach = router.afterEach(async (to) => {
     if (state.value.status !== 'accepted') {
       return;
     }
     await nextTick();
-    trackPageView();
+    trackPageView(to);
   });
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {
       hasConfiguredTracker = false;
+      lastTrackedPageLocation = null;
       scriptLoadPromise = null;
+      setGoogleAnalyticsReady(false);
       stopConsentWatch();
       removeAfterEach();
     });

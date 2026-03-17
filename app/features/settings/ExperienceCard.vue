@@ -9,7 +9,15 @@
   >
     <template #content>
       <div class="space-y-4 px-4 py-4">
-        <div class="flex items-center justify-between gap-3">
+        <div
+          role="button"
+          tabindex="0"
+          class="group bg-surface-900/70 hover:border-surface-600 focus-visible:ring-primary-500/30 flex w-full items-center justify-between gap-3 rounded-lg border border-white/8 px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          :aria-pressed="preferencesStore.getUseAutomaticLevelCalculation"
+          @click="handleAutoLevelRowClick"
+          @keydown.enter.prevent="toggleAutoLevel"
+          @keydown.space.prevent="toggleAutoLevel"
+        >
           <div class="flex items-center gap-2">
             <span class="text-foreground text-sm font-semibold">
               {{ $t('settings.experience.auto_level_title') }}
@@ -23,7 +31,7 @@
             :ui="{
               base: 'data-[state=unchecked]:bg-error-500 data-[state=checked]:bg-success-500',
             }"
-            @update:model-value="handleAutoLevelToggle"
+            @update:model-value="setAutomaticLevelCalculation"
           />
         </div>
         <div class="flex items-center justify-between">
@@ -72,10 +80,13 @@
               icon="i-mdi-check"
               size="sm"
               color="primary"
+              class="min-w-24"
               :disabled="!isValidXPInput"
               :aria-label="$t('settings.experience.apply')"
               @click="applyManualXP"
-            />
+            >
+              {{ $t('settings.experience.apply') }}
+            </UButton>
           </div>
         </div>
         <UButton
@@ -98,12 +109,41 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
+  const { trackSettingChanged } = useProductAnalytics();
+  const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const preferencesStore = usePreferencesStore();
   const { derivedLevel, setTotalXP, totalXP, xpProgress, xpToNextLevel } = useXpCalculation();
   const formatNumber = useLocaleNumberFormatter();
   const totalXpInputId = 'settings-total-xp-input';
   const manualXPInput = ref<number | null>(null);
+  const isInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"],[role="switch"]'));
+  const setAutomaticLevelCalculation = (value: boolean) => {
+    preferencesStore.setUseAutomaticLevelCalculation(value);
+    trackSettingChanged({
+      area: 'experience',
+      name: 'automatic_level_calculation',
+      value,
+    });
+    if (
+      value &&
+      Array.isArray(metadataStore.playerLevels) &&
+      metadataStore.playerLevels.length > 0
+    ) {
+      tarkovStore.setLevel(derivedLevel.value);
+    }
+  };
+  const toggleAutoLevel = () => {
+    setAutomaticLevelCalculation(!preferencesStore.getUseAutomaticLevelCalculation);
+  };
+  const handleAutoLevelRowClick = (event: MouseEvent) => {
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    toggleAutoLevel();
+  };
   const isValidXPInput = computed(() => {
     return (
       manualXPInput.value !== null &&
@@ -115,17 +155,21 @@
   const applyManualXP = () => {
     if (isValidXPInput.value && manualXPInput.value !== null) {
       setTotalXP(manualXPInput.value);
+      trackSettingChanged({
+        area: 'experience',
+        name: 'manual_total_xp',
+        value: manualXPInput.value,
+      });
       manualXPInput.value = null;
     }
   };
   const resetOffset = () => {
     tarkovStore.setXpOffset(0);
+    trackSettingChanged({
+      area: 'experience',
+      name: 'xp_offset_reset',
+      value: true,
+    });
     manualXPInput.value = null;
-  };
-  const handleAutoLevelToggle = (value: boolean) => {
-    preferencesStore.setUseAutomaticLevelCalculation(value);
-    if (value) {
-      tarkovStore.setLevel(derivedLevel.value);
-    }
   };
 </script>

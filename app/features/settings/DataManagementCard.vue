@@ -17,26 +17,51 @@
             {{ $t('settings.data_management.export_description') }}
           </p>
           <div class="grid gap-3 md:grid-cols-2">
-            <UButton
-              icon="i-mdi-download"
-              block
-              :ui="{
-                base: 'bg-primary-900 hover:bg-primary-800 active:bg-primary-700 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
-              }"
-              @click="handleExportProgress"
-            >
-              {{ $t('settings.data_management.export_button') }}
-            </UButton>
-            <UButton
-              icon="i-mdi-bug-outline"
-              block
-              :ui="{
-                base: 'bg-warning-900 hover:bg-warning-800 active:bg-warning-700 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
-              }"
-              @click="handleExportDebugSnapshot"
-            >
-              {{ $t('settings.data_management.debug_export_button') }}
-            </UButton>
+            <div class="bg-panel border-border shadow-card space-y-4 rounded-md border p-4">
+              <div class="flex items-start gap-3">
+                <div
+                  class="bg-primary-500/10 text-primary-500 border-primary-500/20 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                >
+                  <UIcon name="i-mdi-download" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 space-y-1">
+                  <p class="text-foreground text-sm font-semibold">
+                    {{ $t('settings.data_management.export_button') }}
+                  </p>
+                  <p class="text-foreground-muted text-sm">
+                    {{ $t('settings.data_management.export_description') }}
+                  </p>
+                </div>
+              </div>
+              <UButton icon="i-mdi-download" color="primary" block @click="handleExportProgress">
+                {{ $t('settings.data_management.export_button') }}
+              </UButton>
+            </div>
+            <div class="bg-panel border-border shadow-card space-y-4 rounded-md border p-4">
+              <div class="flex items-start gap-3">
+                <div
+                  class="bg-warning-500/10 text-warning-500 border-warning-500/20 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                >
+                  <UIcon name="i-mdi-bug-outline" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 space-y-1">
+                  <p class="text-foreground text-sm font-semibold">
+                    {{ $t('settings.data_management.debug_export_button') }}
+                  </p>
+                  <p class="text-foreground-muted text-sm">
+                    {{ $t('settings.data_management.debug_export_description') }}
+                  </p>
+                </div>
+              </div>
+              <UButton
+                icon="i-mdi-bug-outline"
+                color="warning"
+                block
+                @click="handleExportDebugSnapshot"
+              >
+                {{ $t('settings.data_management.debug_export_button') }}
+              </UButton>
+            </div>
           </div>
           <p class="text-foreground-subtle text-xs">
             {{ $t('settings.data_management.debug_export_description') }}

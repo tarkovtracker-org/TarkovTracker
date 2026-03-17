@@ -17,88 +17,103 @@
       class="relative grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:p-6"
     >
       <div class="space-y-4">
-        <div class="flex items-start gap-4">
+        <NuxtLink
+          :to="primaryRecommendation.action"
+          class="group block rounded-2xl focus-visible:outline-none"
+          :aria-label="primaryHeading"
+          @click="handleRecommendationClick(primaryRecommendation, 'primary')"
+        >
           <div
-            :class="[
-              'flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border shadow-lg',
-              toneClasses.iconBg,
-            ]"
+            class="border-border/70 bg-shell/20 group-hover:border-border-strong group-hover:bg-raised/40 group-focus-visible:border-border-strong group-focus-visible:ring-primary-500/20 rounded-2xl border p-1 transition-all duration-150 group-focus-visible:ring-2"
           >
-            <UIcon :name="recommendationIcon" :class="['h-7 w-7', toneClasses.icon]" />
-          </div>
-          <div class="min-w-0 space-y-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                :class="[
-                  'text-[11px] font-semibold tracking-[0.26em] uppercase',
-                  toneClasses.eyebrow,
-                ]"
-              >
-                {{ sectionLabel }}
-              </span>
-              <span
-                v-if="filtersActive"
-                class="border-border-muted bg-raised/80 text-foreground-muted inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
-              >
-                <span class="leading-none">
-                  {{ t('page.dashboard.focus.badge.based_on_filters') }}
+            <div class="space-y-4 rounded-[calc(var(--ui-radius)*1.2)] px-3 py-3 sm:px-4 sm:py-4">
+              <div class="flex items-start gap-4">
+                <div
+                  :class="[
+                    'flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border shadow-lg',
+                    toneClasses.iconBg,
+                  ]"
+                >
+                  <UIcon :name="recommendationIcon" :class="['h-7 w-7', toneClasses.icon]" />
+                </div>
+                <div class="min-w-0 space-y-3">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span
+                      :class="[
+                        'text-[11px] font-semibold tracking-[0.26em] uppercase',
+                        toneClasses.eyebrow,
+                      ]"
+                    >
+                      {{ sectionLabel }}
+                    </span>
+                    <span
+                      v-if="filtersActive"
+                      class="border-border-muted bg-raised/80 text-foreground-muted inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
+                    >
+                      <span class="leading-none">
+                        {{ t('page.dashboard.focus.badge.based_on_filters') }}
+                      </span>
+                    </span>
+                    <span
+                      v-if="hiddenAvailableCount > 0"
+                      class="border-warning-500/25 bg-warning-500/12 text-warning-700 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
+                    >
+                      <span class="leading-none">{{ hiddenTasksBadge }}</span>
+                    </span>
+                  </div>
+                  <div class="space-y-2">
+                    <h2 class="text-foreground max-w-3xl text-2xl font-semibold sm:text-3xl">
+                      {{ primaryHeading }}
+                    </h2>
+                    <p class="text-foreground-muted max-w-3xl text-sm leading-6 sm:text-base">
+                      {{ primarySummary }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="badge in primaryBadges"
+                  :key="badge"
+                  :class="[
+                    'inline-flex min-h-7 items-center rounded-full border px-3 py-1 text-xs leading-none font-medium',
+                    toneClasses.badge,
+                  ]"
+                >
+                  <span class="leading-none">{{ badge }}</span>
                 </span>
-              </span>
-              <span
-                v-if="hiddenAvailableCount > 0"
-                class="border-warning-500/25 bg-warning-500/12 text-warning-700 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
+              </div>
+              <div
+                class="grid gap-3 md:grid-cols-[minmax(0,1.12fr)_minmax(0,0.94fr)_minmax(0,0.94fr)]"
               >
-                <span class="leading-none">{{ hiddenTasksBadge }}</span>
-              </span>
-            </div>
-            <div class="space-y-2">
-              <h2 class="text-foreground max-w-3xl text-2xl font-semibold sm:text-3xl">
-                {{ primaryHeading }}
-              </h2>
-              <p class="text-foreground-muted max-w-3xl text-sm leading-6 sm:text-base">
-                {{ primarySummary }}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="badge in primaryBadges"
-            :key="badge"
-            :class="[
-              'inline-flex min-h-7 items-center rounded-full border px-3 py-1 text-xs leading-none font-medium',
-              toneClasses.badge,
-            ]"
-          >
-            <span class="leading-none">{{ badge }}</span>
-          </span>
-        </div>
-        <div class="grid gap-3 md:grid-cols-[minmax(0,1.12fr)_minmax(0,0.94fr)_minmax(0,0.94fr)]">
-          <div :class="['rounded-xl p-4 shadow-lg', toneClasses.proofCard]">
-            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
-              {{ t('page.dashboard.focus.stat.why') }}
-            </div>
-            <div class="text-foreground mt-2 text-sm leading-6 font-medium">
-              {{ primaryWhy }}
+                <div :class="['rounded-xl p-4 shadow-lg', toneClasses.proofCard]">
+                  <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
+                    {{ t('page.dashboard.focus.stat.why') }}
+                  </div>
+                  <div class="text-foreground mt-2 text-sm leading-6 font-medium">
+                    {{ primaryWhy }}
+                  </div>
+                </div>
+                <div class="border-border bg-raised/90 rounded-xl border p-4">
+                  <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
+                    {{ t('page.dashboard.focus.stat.progress') }}
+                  </div>
+                  <div class="text-foreground mt-2 text-sm leading-6">
+                    {{ primaryContribution }}
+                  </div>
+                </div>
+                <div class="border-border bg-raised/90 rounded-xl border p-4">
+                  <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
+                    {{ t('page.dashboard.focus.stat.status') }}
+                  </div>
+                  <div class="text-foreground mt-2 text-sm leading-6">
+                    {{ primaryStatus }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="border-border bg-raised/90 rounded-xl border p-4">
-            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
-              {{ t('page.dashboard.focus.stat.progress') }}
-            </div>
-            <div class="text-foreground mt-2 text-sm leading-6">
-              {{ primaryContribution }}
-            </div>
-          </div>
-          <div class="border-border bg-raised/90 rounded-xl border p-4">
-            <div class="text-foreground-subtle text-[11px] tracking-[0.2em] uppercase">
-              {{ t('page.dashboard.focus.stat.status') }}
-            </div>
-            <div class="text-foreground mt-2 text-sm leading-6">
-              {{ primaryStatus }}
-            </div>
-          </div>
-        </div>
+        </NuxtLink>
         <div class="flex flex-wrap gap-3">
           <UButton
             :color="primaryCtaColor"

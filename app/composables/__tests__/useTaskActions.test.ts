@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import type { Task } from '@/types/tarkov';
+const { trackEventMock, trackTaskActionMock } = vi.hoisted(() => ({
+  trackEventMock: vi.fn(),
+  trackTaskActionMock: vi.fn(),
+}));
 const createTarkovStore = (options: {
   playerLevel?: number;
   objectiveCounts?: Record<string, number>;
@@ -19,6 +23,7 @@ const createTarkovStore = (options: {
       objectiveCounts.set(objectiveId, count);
     }),
     getObjectiveCount: vi.fn((objectiveId: string) => objectiveCounts.get(objectiveId) ?? 0),
+    getCurrentGameMode: vi.fn(() => 'pvp'),
     playerLevel: vi.fn(() => options.playerLevel ?? 1),
     setLevel: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => {
@@ -73,10 +78,20 @@ const setup = async (
   vi.doMock('@/stores/usePreferences', () => ({
     usePreferencesStore: () => preferencesStore,
   }));
+  vi.doMock('@/composables/useProductAnalytics', () => ({
+    useProductAnalytics: () => ({
+      trackTaskAction: trackTaskActionMock,
+    }),
+  }));
   vi.doMock('vue-i18n', async () => ({
     ...(await vi.importActual<typeof import('vue-i18n')>('vue-i18n')),
     useI18n: () => ({
       t: (_key: string, fallback?: string) => fallback ?? _key,
+    }),
+  }));
+  vi.doMock('@/composables/useAnalyticsEvents', () => ({
+    useAnalyticsEvents: () => ({
+      trackEvent: trackEventMock,
     }),
   }));
   const { useTaskActions } = await import('@/composables/useTaskActions');
@@ -91,6 +106,41 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('tracks each task action once with rich analytics metadata', async () => {
+    const task: Task = {
+      id: 'task-analytics',
+      name: 'Task Analytics',
+      objectives: [{ id: 'obj-analytics', count: 2 }],
+      requiredKeys: [
+        {
+          keys: [
+            { id: 'key-1' } as unknown as NonNullable<Task['requiredKeys']>[number]['keys'][number],
+          ],
+        },
+      ],
+      trader: {
+        name: 'Prapor',
+        normalizedName: 'prapor',
+      } as Task['trader'],
+    };
+    const { actions } = await setup(task, [task], {});
+    actions.markTaskComplete();
+    expect(trackTaskActionMock).toHaveBeenCalledTimes(1);
+    expect(trackTaskActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'complete',
+        analyticsParams: expect.objectContaining({
+          game_mode: 'pvp',
+          objective_count: 1,
+          task_has_required_keys: 'yes',
+          task_id: 'task-analytics',
+          task_name: 'Task Analytics',
+          task_trader: 'prapor',
+        }),
+      })
+    );
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
   it('marks a task complete and handles alternatives', async () => {
     const task: Task = {
       id: 'task-main',

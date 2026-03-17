@@ -42,7 +42,8 @@
           <div
             v-for="skill in visibleSkills"
             :key="skill.key"
-            class="border-border bg-panel rounded-lg border p-3"
+            class="border-border bg-panel hover:border-border-strong rounded-lg border p-3 transition-colors"
+            @click="handleSkillCardClick(skill.key, $event)"
           >
             <div class="mb-2 flex items-center gap-2">
               <div class="group relative shrink-0">
@@ -149,9 +150,12 @@
                 size="sm"
                 variant="soft"
                 color="neutral"
+                class="min-w-20"
                 :disabled="getSkillOffset(skill.key) === 0"
                 @click="resetOffset(skill.key)"
-              />
+              >
+                {{ $t('settings.reset') }}
+              </UButton>
             </div>
           </div>
         </div>
@@ -240,6 +244,24 @@
     `skill-input-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   const getSkillRangeId = (skillKey: string): string =>
     `skill-range-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  const isInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
+  const focusSkillInput = (skillKey: string) => {
+    const target = document.getElementById(getSkillInputId(skillKey));
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      target.focus();
+      target.select();
+      return;
+    }
+    target?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')?.focus();
+  };
+  const handleSkillCardClick = (skillKey: string, event: MouseEvent) => {
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    focusSkillInput(skillKey);
+  };
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);
@@ -308,7 +330,10 @@
     ) {
       return;
     }
-    const target = e.target as HTMLInputElement;
+    const target = e.currentTarget instanceof HTMLInputElement ? e.currentTarget : null;
+    if (!target) {
+      return;
+    }
     const currentVal = target.value;
     const selectionStart = target.selectionStart ?? 0;
     const selectionEnd = target.selectionEnd ?? currentVal.length;
@@ -348,10 +373,12 @@
   const resetOffset = (skillName: string) => {
     skillCalculation.resetSkillOffset(skillName);
   };
+  let lastSkillAliasMigrationSignature = '';
   watch(
-    skillAliasesForMigration,
-    (aliases) => {
-      if (aliases.length === 0) return;
+    () => skillAliasesForMigration.value.join('|'),
+    (signature) => {
+      if (!signature || signature === lastSkillAliasMigrationSignature) return;
+      lastSkillAliasMigrationSignature = signature;
       skillCalculation.migrateLegacySkillOffsets();
     },
     { immediate: true }

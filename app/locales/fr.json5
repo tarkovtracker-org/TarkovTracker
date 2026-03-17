@@ -640,7 +640,9 @@
     },
     hideout: {
       title: 'Planque',
+      summary: 'Suivez les améliorations de stations, les blocages et ce qui peut être construit ensuite.',
       loading: 'Chargement des données de la planque',
+      station_link_label: 'Aller à {name}',
       no_stations_found: 'Aucun module trouvé. Essayez de modifier vos filtres ou de mettre à jour votre niveau',
       load_more_stations: 'Charger plus de stations',
       collapse_completed: 'Réduire les modules terminés',

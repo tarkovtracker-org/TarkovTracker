@@ -57,6 +57,7 @@ export function useSkillCalculation() {
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  let migratingSkillOffsets = false;
   const isTaskSuccessful = (taskId: string) =>
     tarkovStore.isTaskComplete(taskId) && !tarkovStore.isTaskFailed(taskId);
   const allGameSkills = computed<SkillMetadata[]>(() => {
@@ -207,6 +208,7 @@ export function useSkillCalculation() {
     tarkovStore.resetSkillOffset(resolvedSkillKey);
   };
   const migrateLegacySkillOffsets = (): boolean => {
+    if (migratingSkillOffsets) return false;
     const offsets = tarkovStore.getAllSkillOffsets();
     const entries = Object.entries(offsets);
     if (!entries.length) return false;
@@ -219,6 +221,7 @@ export function useSkillCalculation() {
     });
     if (!hasChanges) return false;
     const snapshot = { ...offsets };
+    migratingSkillOffsets = true;
     try {
       entries.forEach(([skillKey]) => {
         tarkovStore.resetSkillOffset(skillKey);
@@ -237,6 +240,8 @@ export function useSkillCalculation() {
         logger.error('[useSkillCalculation] Rollback also failed:', rollbackError);
       }
       return false;
+    } finally {
+      migratingSkillOffsets = false;
     }
   };
   const allSkillNames = computed(() => {

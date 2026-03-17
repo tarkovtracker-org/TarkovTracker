@@ -640,7 +640,9 @@
     },
     hideout: {
       title: 'Escondite',
+      summary: 'Sigue las mejoras de estaciones, los bloqueos y qué está listo para construirse.',
       loading: 'Cargando datos del escondite',
+      station_link_label: 'Ir a {name}',
       no_stations_found: 'No se encontraron estaciones. Intenta cambiar los filtros.',
       load_more_stations: 'Cargar más estaciones',
       collapse_completed: 'Colapsar estaciones completadas',

@@ -188,6 +188,19 @@ describe('DashboardNextActions', () => {
       variant: 'primary',
     });
   });
+  it('makes the primary recommendation surface itself navigable', async () => {
+    const wrapper = await mountWithRecommendation(
+      createRecommendation({
+        impact: 2,
+        reason: 'impact',
+        taskId: 'task-impact',
+        taskName: 'Impact Task',
+      }),
+      'actionable'
+    );
+    const primarySurfaceLink = wrapper.get('a[data-task="task-impact"]');
+    expect(primarySurfaceLink.text()).toContain('Impact Task');
+  });
   it('uses blocker priority instead of insertion order for blocked cards', async () => {
     const wrapper = await mountWithRecommendation(
       createRecommendation({

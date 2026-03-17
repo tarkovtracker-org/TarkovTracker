@@ -21,7 +21,8 @@
         :alt="props.itemName || 'Item'"
         :width="imageSize"
         :height="imageSize"
-        :sizes="fill ? '100vw' : `${imageSize}px`"
+        :densities="fill ? 'x1 x2' : undefined"
+        :sizes="fill ? undefined : `${imageSize}px`"
         :class="[
           fill ? 'max-h-full max-w-full object-contain' : 'h-full w-full object-contain',
           imageElementClasses,

@@ -1,3 +1,4 @@
+import { useProductAnalytics } from '@/composables/useProductAnalytics';
 import { logger } from '@/utils/logger';
 import type { Ref } from '#imports';
 export type OAuthProvider = 'twitch' | 'discord' | 'google' | 'github';
@@ -17,10 +18,12 @@ export function useOAuthLogin({
   signInWithProvider: (provider: OAuthProvider) => Promise<void>;
 } {
   const { $supabase } = useNuxtApp();
+  const { trackLoginFailed, trackLoginStarted } = useProductAnalytics();
   const signInWithProvider = async (provider: OAuthProvider): Promise<void> => {
     let isLoadingManagedExternally = false;
     try {
       loading.value[provider] = true;
+      trackLoginStarted(provider);
       const callbackUrl = buildCallbackUrl();
       const data = await $supabase.signInWithOAuth(provider, {
         skipBrowserRedirect: true,
@@ -30,6 +33,7 @@ export function useOAuthLogin({
         isLoadingManagedExternally = openPopupOrRedirect(data.url, provider) === true;
       }
     } catch (error) {
+      trackLoginFailed(provider, error);
       logger.error(`[Login] ${toProviderLabel(provider)} sign in error:`, error);
     } finally {
       if (!isLoadingManagedExternally) {

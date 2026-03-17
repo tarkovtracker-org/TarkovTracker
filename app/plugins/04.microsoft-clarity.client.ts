@@ -7,6 +7,7 @@ type Clarity = ((...args: unknown[]) => void) & { q?: unknown[][] };
 declare global {
   interface Window {
     clarity?: Clarity;
+    __ttMicrosoftClarityReady?: boolean;
   }
 }
 const CLARITY_SCRIPT_ID = 'tt-microsoft-clarity';
@@ -34,6 +35,9 @@ export default defineNuxtPlugin(() => {
   const { state } = useAnalyticsConsent();
   let scriptLoadPromise: Promise<void> | null = null;
   let syncRequestId = 0;
+  const setMicrosoftClarityReady = (value: boolean) => {
+    window.__ttMicrosoftClarityReady = value;
+  };
   const ensureClarityApi = () => {
     if (typeof window.clarity === 'function') {
       return;
@@ -85,6 +89,7 @@ export default defineNuxtPlugin(() => {
     return scriptLoadPromise;
   };
   const revokeConsent = () => {
+    setMicrosoftClarityReady(false);
     if (typeof window.clarity !== 'function') {
       return;
     }
@@ -102,7 +107,9 @@ export default defineNuxtPlugin(() => {
       return;
     }
     window.clarity?.('consentv2', CLARITY_CONSENT_GRANTED);
+    setMicrosoftClarityReady(true);
   };
+  setMicrosoftClarityReady(false);
   const stopConsentWatch = watch(
     () => state.value.status,
     async (status) => {
@@ -118,6 +125,7 @@ export default defineNuxtPlugin(() => {
     import.meta.hot.dispose(() => {
       syncRequestId = 0;
       scriptLoadPromise = null;
+      setMicrosoftClarityReady(false);
       stopConsentWatch();
     });
   }

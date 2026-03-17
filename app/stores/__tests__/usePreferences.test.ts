@@ -13,6 +13,7 @@ import {
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { MAP_MARKER_COLORS } from '@/utils/theme-colors';
 import { serializeUserScopedStorage } from '@/utils/userScopedStorage';
+import type { NeededItemsFilterType } from '@/features/neededitems/neededitems-constants';
 const { currentUserId } = vi.hoisted(() => ({
   currentUserId: {
     value: null as string | null,
@@ -161,7 +162,8 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.localeOverride = 'de';
       store.themeMode = 'light';
-      store.saving.streamerMode = true;
+      expect(store.saving).toBeDefined();
+      store.saving!.streamerMode = true;
       let persistedState: ReturnType<typeof getPersistedPreferencesState> | null = null;
       expect(() => {
         persistedState = getPersistedPreferencesState(store.$state);
@@ -180,6 +182,25 @@ describe('usePreferencesStore', () => {
       setActivePinia(newPinia);
       const store = usePreferencesStore();
       expect(store.themeMode).toBe('dark');
+    });
+    it('drops non-serializable route state during persistence snapshots', () => {
+      let persistedState: ReturnType<typeof getPersistedPreferencesState> | null = null;
+      expect(() => {
+        persistedState = getPersistedPreferencesState({
+          neededItemsSortBy: globalThis.window as unknown as PreferencesState['neededItemsSortBy'],
+          neededItemsViewMode: {
+            value: 'list',
+          } as unknown as PreferencesState['neededItemsViewMode'],
+          taskPrimaryView: 'invalid' as unknown as PreferencesState['taskPrimaryView'],
+          taskUserView: globalThis.window as unknown as PreferencesState['taskUserView'],
+        });
+      }).not.toThrow();
+      expect(persistedState).toMatchObject({
+        neededItemsViewMode: 'list',
+        taskPrimaryView: null,
+      });
+      expect(persistedState).not.toHaveProperty('neededItemsSortBy');
+      expect(persistedState).not.toHaveProperty('taskUserView');
     });
     it('should migrate onlyTasksWithSuggestedKeys to onlyTasksWithRequiredKeys', () => {
       const persistedState = {
@@ -207,6 +228,56 @@ describe('usePreferencesStore', () => {
       setActivePinia(newPinia);
       const store = usePreferencesStore();
       expect(store.onlyTasksWithRequiredKeys).toBe(false);
+    });
+    it('should migrate neededItemsHideCollected to neededItemsHideOwned', () => {
+      const persistedState = {
+        neededItemsHideCollected: true,
+      };
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(persistedState));
+      const newPinia = createPinia();
+      setActivePinia(newPinia);
+      const store = usePreferencesStore();
+      const migratedValue = localStorageMock.setItem.mock.calls
+        .filter(([key]) => key === STORAGE_KEYS.preferences)
+        .map(([, value]) => JSON.parse(value))
+        .at(-1);
+      expect(store.neededItemsHideOwned).toBe(true);
+      expect(migratedValue?.data?.neededItemsHideOwned).toBe(true);
+      expect(migratedValue?.data?.neededItemsHideCollected).toBeUndefined();
+    });
+    it('should not override neededItemsHideOwned if both keys exist', () => {
+      const persistedState = {
+        neededItemsHideCollected: true,
+        neededItemsHideOwned: false,
+      };
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(persistedState));
+      const newPinia = createPinia();
+      setActivePinia(newPinia);
+      const store = usePreferencesStore();
+      expect(store.neededItemsHideOwned).toBe(false);
+    });
+    it('persists scoped migration for neededItemsHideCollected', () => {
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage(
+          {
+            neededItemsHideCollected: true,
+          },
+          'user-1',
+          1234
+        )
+      );
+      currentUserId.value = 'user-1';
+      const store = usePreferencesStore();
+      const migratedValue = JSON.parse(localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}');
+      expect(store.neededItemsHideOwned).toBe(true);
+      expect(migratedValue).toMatchObject({
+        _userId: 'user-1',
+        data: {
+          neededItemsHideOwned: true,
+        },
+      });
+      expect(migratedValue.data.neededItemsHideCollected).toBeUndefined();
     });
     it('should migrate untouched legacy map marker defaults', () => {
       const legacyMapMarkerColors = {
@@ -361,6 +432,35 @@ describe('usePreferencesStore', () => {
         },
       });
       expect(restoredSnapshot.data.onlyTasksWithSuggestedKeys).toBeUndefined();
+    });
+    it('rewrites preserved logout storage without the legacy needed items key', () => {
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage(
+          {
+            localeOverride: 'de',
+            neededItemsHideCollected: true,
+          },
+          'user-1',
+          1234
+        )
+      );
+      currentUserId.value = 'user-1';
+      usePreferencesStore();
+      currentUserId.value = null;
+      resetPreferencesStoreForSessionTransition('user-1');
+      const restoredSnapshot = JSON.parse(
+        localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}'
+      );
+      expect(restoredSnapshot._timestamp).toEqual(expect.any(Number));
+      expect(restoredSnapshot).toMatchObject({
+        _userId: 'user-1',
+        data: {
+          localeOverride: 'de',
+          neededItemsHideOwned: true,
+        },
+      });
+      expect(restoredSnapshot.data.neededItemsHideCollected).toBeUndefined();
     });
     it('clears prior scoped storage during an account switch', () => {
       const persistedState = {
@@ -950,6 +1050,15 @@ describe('usePreferencesStore', () => {
       store.setTaskUserView('all');
       expect(store.taskUserView).toBe('all');
     });
+    it('normalizes invalid task route values before storing them', () => {
+      const store = usePreferencesStore();
+      store.setTaskPrimaryView('invalid');
+      store.setTaskMapView(globalThis.window as unknown as string);
+      store.setTaskUserView(globalThis.window as unknown as string);
+      expect(store.taskPrimaryView).toBe('all');
+      expect(store.taskMapView).toBe('all');
+      expect(store.taskUserView).toBe('self');
+    });
     it('should set task sort mode with normalization', () => {
       const store = usePreferencesStore();
       store.setTaskSortMode('impact');
@@ -1001,6 +1110,17 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.setNeededItemsSortBy('name');
       expect(store.neededItemsSortBy).toBe('name');
+    });
+    it('normalizes needed-items route values before storing them', () => {
+      const store = usePreferencesStore();
+      store.setNeededTypeView({ value: 'hideout' } as unknown as NeededItemsFilterType);
+      store.setNeededItemsSortBy({ value: 'count' } as unknown as 'priority');
+      store.setNeededItemsSortDirection('invalid' as unknown as 'asc');
+      store.setNeededItemsCardStyle('invalid' as unknown as 'compact');
+      expect(store.neededTypeView).toBe('hideout');
+      expect(store.neededItemsSortBy).toBe('count');
+      expect(store.neededItemsSortDirection).toBe('desc');
+      expect(store.neededItemsCardStyle).toBe('expanded');
     });
     it('should set needed items sort direction', () => {
       const store = usePreferencesStore();

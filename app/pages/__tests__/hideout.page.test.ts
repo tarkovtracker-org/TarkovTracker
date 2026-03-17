@@ -119,6 +119,7 @@ describe('hideout page', () => {
     await mountSuspended(HideoutPage, {
       global: {
         stubs: {
+          UBadge: true,
           HideoutCard: { template: '<div data-testid="hideout-card" />' },
           RefreshButton: true,
           UAlert: true,
@@ -135,6 +136,7 @@ describe('hideout page', () => {
     const wrapper = await mountSuspended(HideoutPage, {
       global: {
         stubs: {
+          UBadge: true,
           HideoutCard: { template: '<div data-testid="hideout-card" />' },
           RefreshButton: true,
           UAlert: true,
@@ -145,5 +147,22 @@ describe('hideout page', () => {
       },
     });
     expect(wrapper.find('[data-testid="hideout-card"]').exists()).toBe(true);
+  });
+  it('renders the hideout-specific summary in the page header', async () => {
+    const wrapper = await mountSuspended(HideoutPage, {
+      global: {
+        stubs: {
+          UBadge: true,
+          HideoutCard: { template: '<div data-testid="hideout-card" />' },
+          RefreshButton: true,
+          UAlert: true,
+          UButton: true,
+          UIcon: true,
+          UModal: true,
+        },
+      },
+    });
+    expect(wrapper.text()).toContain('page.hideout.summary');
+    expect(wrapper.text()).not.toContain('page.needed_items.meta_description');
   });
 });

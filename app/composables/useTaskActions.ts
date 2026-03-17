@@ -1,3 +1,4 @@
+import { useProductAnalytics } from '@/composables/useProductAnalytics';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -11,6 +12,7 @@ export type TaskActionPayload = {
   taskId: string;
   taskName: string;
   action: 'available' | 'complete' | 'uncomplete' | 'reset_failed' | 'fail';
+  analyticsParams?: Record<string, boolean | number | string>;
   undoKey?: string;
   statusKey?: string;
   wasManualFail?: boolean;
@@ -29,6 +31,7 @@ export function useTaskActions(
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  const { trackTaskAction } = useProductAnalytics();
   const tasks = computed(() => metadataStore.tasks);
   const unpinTaskIfPinned = (taskId: string) => {
     if (preferencesStore.getPinnedTaskIds.includes(taskId)) {
@@ -121,7 +124,21 @@ export function useTaskActions(
     if (!Object.prototype.hasOwnProperty.call(completion, 'manual')) return false;
     return (completion as { manual?: boolean }).manual === true;
   };
+  const getTaskAnalyticsParams = (
+    currentTask: Task,
+    params: Record<string, boolean | number | string> = {}
+  ) => ({
+    game_mode: tarkovStore.getCurrentGameMode(),
+    task_has_required_keys: currentTask.requiredKeys?.length ? 'yes' : 'no',
+    task_id: currentTask.id,
+    task_is_kappa: currentTask.kappaRequired ? 'yes' : 'no',
+    task_is_lightkeeper: currentTask.lightkeeperRequired ? 'yes' : 'no',
+    task_name: currentTask.name || currentTask.id,
+    task_trader: currentTask.trader?.normalizedName || currentTask.trader?.name || 'unknown',
+    ...params,
+  });
   const emitAction = (payload: TaskActionPayload) => {
+    trackTaskAction(payload);
     onAction?.(payload);
   };
   const markTaskComplete = (isUndo = false) => {
@@ -132,6 +149,9 @@ export function useTaskActions(
         taskId: currentTask.id,
         taskName,
         action: 'complete',
+        analyticsParams: getTaskAnalyticsParams(currentTask, {
+          objective_count: currentTask.objectives?.length ?? 0,
+        }),
         statusKey: 'page.tasks.questcard.status_complete',
       });
     }
@@ -161,6 +181,9 @@ export function useTaskActions(
         taskId: currentTask.id,
         taskName,
         action: wasFailed ? 'reset_failed' : 'uncomplete',
+        analyticsParams: getTaskAnalyticsParams(currentTask, {
+          was_manual_fail: wasManualFail ? 'yes' : 'no',
+        }),
         wasManualFail,
         statusKey: wasFailed
           ? 'page.tasks.questcard.status_reset_failed'
@@ -201,6 +224,7 @@ export function useTaskActions(
       taskId: currentTask.id,
       taskName,
       action: 'available',
+      analyticsParams: getTaskAnalyticsParams(currentTask),
       statusKey: 'page.tasks.questcard.status_available',
     });
   };
@@ -212,6 +236,9 @@ export function useTaskActions(
         taskId: currentTask.id,
         taskName,
         action: 'fail',
+        analyticsParams: getTaskAnalyticsParams(currentTask, {
+          was_manual_fail: 'yes',
+        }),
         statusKey: 'page.tasks.questcard.status_failed',
       });
     }

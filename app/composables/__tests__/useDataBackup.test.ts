@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import type { UserProgressData, UserState } from '@/stores/progressState';
 const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
   mockLogger: {
     debug: vi.fn(),
@@ -72,11 +73,11 @@ const tarkovStore = {
       level: 1,
     },
     tarkovUid: 987654,
-  },
+  } as UserState,
   getCurrentGameMode: vi.fn(() => 'pvp'),
   getGameEdition: vi.fn(() => 1),
   getTarkovUid: vi.fn(() => null),
-  getPvPProgressData: vi.fn(() => ({
+  getPvPProgressData: vi.fn<() => UserProgressData>(() => ({
     level: 5,
     pmcFaction: 'USEC',
     displayName: 'TestPlayer',
@@ -92,7 +93,7 @@ const tarkovStore = {
     skillOffsets: {},
     storyChapters: {},
   })),
-  getPvEProgressData: vi.fn(() => ({
+  getPvEProgressData: vi.fn<() => UserProgressData>(() => ({
     level: 1,
     pmcFaction: 'BEAR',
     displayName: null,
@@ -172,10 +173,18 @@ type DebugExportTestJson = {
   storage: {
     authStorageKeyCount: number;
     localStorageKeys: string[];
-    progress: {
+    preferences: {
+      data: unknown | null;
+      format: string;
       ownerMatchesCurrentUser: boolean | null;
       ownerUserFingerprint: string | null;
-    };
+    } | null;
+    progress: {
+      data: unknown | null;
+      format: string;
+      ownerMatchesCurrentUser: boolean | null;
+      ownerUserFingerprint: string | null;
+    } | null;
     progressBackups: Array<{
       storageKey: string;
     }>;
@@ -199,6 +208,43 @@ describe('useDataBackup', () => {
     localStorage.clear();
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
+    tarkovStore.$state = {
+      currentGameMode: 'pvp',
+      gameEdition: 1,
+      pvp: {
+        displayName: 'CurrentUser',
+        hideoutModules: {},
+        hideoutParts: {},
+        pmcFaction: 'USEC',
+        prestigeLevel: 1,
+        progressEpoch: 4,
+        skillOffsets: {},
+        skills: { Endurance: 10 },
+        storyChapters: {},
+        taskCompletions: { task1: { complete: true, timestamp: 1000 } },
+        taskObjectives: {},
+        traders: {},
+        xpOffset: 0,
+        level: 5,
+      },
+      pve: {
+        displayName: null,
+        hideoutModules: {},
+        hideoutParts: {},
+        pmcFaction: 'BEAR',
+        prestigeLevel: 0,
+        progressEpoch: 0,
+        skillOffsets: {},
+        skills: {},
+        storyChapters: {},
+        taskCompletions: {},
+        taskObjectives: {},
+        traders: {},
+        xpOffset: 0,
+        level: 1,
+      },
+      tarkovUid: 987654,
+    };
     preferencesStore.$state = {
       taskFilterPresets: [
         {
@@ -309,7 +355,7 @@ describe('useDataBackup', () => {
           pmcFaction: 'USEC',
           displayName: 'ProxyPlayer',
           xpOffset: 0,
-          taskCompletions: {},
+          taskCompletions: { task1: { complete: true, timestamp: 1000 } },
           taskObjectives: {},
           hideoutParts: {},
           hideoutModules: {},
@@ -377,6 +423,22 @@ describe('useDataBackup', () => {
   });
   describe('exportDebugSnapshot', () => {
     it('exports a sanitized debug snapshot without auth secrets or player identifiers', async () => {
+      tarkovStore.$state.pvp.tarkovDevProfile = {
+        achievements: {},
+        importedAt: 1700000010000,
+        mastering: [],
+        pmcStats: {
+          Avatar_URL: 'https://example.com/avatar.png',
+          NickName: 'SensitiveNick',
+          player_id: 'pmc-player-1',
+        },
+        profileUpdatedAt: 1700000011000,
+        scavStats: {
+          accountId: 'account-77',
+          display_name: 'SensitiveScav',
+          UserName: 'scav-user-1',
+        },
+      };
       localStorage.setItem(
         STORAGE_KEYS.progress,
         JSON.stringify({
@@ -449,12 +511,12 @@ describe('useDataBackup', () => {
         expect(debugJson.state.tarkov.tarkovUid).toBeNull();
         expect(debugJson.state.tarkov.pvp.displayName).toBeNull();
         expect(debugJson.state.preferences.taskUserView).toMatch(/^user:(sha256|fnv1a):/);
+        const [teamHideKey] = Object.keys(debugJson.state.preferences.teamHide);
+        expect(teamHideKey).toBeDefined();
         expect(debugJson.state.preferences.teamHide).toEqual({
-          [Object.keys(debugJson.state.preferences.teamHide)[0]]: true,
+          [teamHideKey!]: true,
         });
-        expect(Object.keys(debugJson.state.preferences.teamHide)[0]).toMatch(
-          /^user:(sha256|fnv1a):/
-        );
+        expect(teamHideKey).toMatch(/^user:(sha256|fnv1a):/);
         expect(debugJson.state.preferences.taskFilterPresets[0]).toEqual(
           expect.objectContaining({
             name: 'Preset 1',
@@ -465,14 +527,349 @@ describe('useDataBackup', () => {
         );
         expect(debugJson.storage.authStorageKeyCount).toBe(1);
         expect(debugJson.storage.localStorageKeys).not.toContain('sb-localhost-auth-token');
-        expect(typeof debugJson.storage.progress.ownerMatchesCurrentUser).toBe('boolean');
-        expect(debugJson.storage.progress.ownerUserFingerprint).toMatch(/^(sha256|fnv1a):/);
-        expect(debugJson.storage.progressBackups[0].storageKey).toContain('{owner:');
+        const progressSnapshot = debugJson.storage.progress;
+        expect(progressSnapshot).not.toBeNull();
+        if (!progressSnapshot) {
+          throw new Error('Expected progress snapshot to be present');
+        }
+        expect(typeof progressSnapshot.ownerMatchesCurrentUser).toBe('boolean');
+        expect(progressSnapshot.ownerUserFingerprint).toMatch(/^(sha256|fnv1a):/);
+        expect(debugJson.storage.progressBackups).toHaveLength(1);
+        expect(debugJson.storage.progressBackups[0]).toBeDefined();
+        expect(debugJson.storage.progressBackups[0]!.storageKey).toContain('{owner:');
         expect(debugText).not.toContain('player@example.com');
         expect(debugText).not.toContain('token-secret');
         expect(debugText).not.toContain('user-123');
         expect(debugText).not.toContain('teammate-1');
+        expect(debugText).not.toContain('SensitiveNick');
+        expect(debugText).not.toContain('pmc-player-1');
+        expect(debugText).not.toContain('SensitiveScav');
+        expect(debugText).not.toContain('scav-user-1');
+        expect(debugText).not.toContain('account-77');
         expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-debug-url');
+        expect(clickSpy).toHaveBeenCalledOnce();
+      } finally {
+        createObjectURLSpy.mockRestore();
+        revokeObjectURLSpy.mockRestore();
+        clickSpy.mockRestore();
+        if (!hadCreateObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).createObjectURL;
+        }
+        if (!hadRevokeObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+        }
+      }
+    });
+    it('exports debug snapshots even when persisted presets are malformed', async () => {
+      preferencesStore.$state = {
+        taskFilterPresets: [
+          {
+            id: 'preset-1',
+            name: 'Broken Preset',
+            settings: null,
+          },
+          'invalid-preset-entry',
+        ],
+        taskUserView: 'teammate-2',
+        teamHide: {
+          'teammate-1': true,
+        },
+      };
+      localStorage.setItem(
+        STORAGE_KEYS.preferences,
+        JSON.stringify({
+          _timestamp: 1700000005000,
+          _userId: 'user-123',
+          data: preferencesStore.$state,
+        })
+      );
+      let backupBlob: Blob | null = null;
+      const hadCreateObjectURL = typeof URL.createObjectURL === 'function';
+      const hadRevokeObjectURL = typeof URL.revokeObjectURL === 'function';
+      if (!hadCreateObjectURL) {
+        Object.defineProperty(URL, 'createObjectURL', {
+          configurable: true,
+          value: () => '',
+          writable: true,
+        });
+      }
+      if (!hadRevokeObjectURL) {
+        Object.defineProperty(URL, 'revokeObjectURL', {
+          configurable: true,
+          value: () => undefined,
+          writable: true,
+        });
+      }
+      const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((object) => {
+        if (object instanceof Blob) {
+          backupBlob = object;
+        }
+        return 'blob:test-malformed-preset-url';
+      });
+      const revokeObjectURLSpy = vi
+        .spyOn(URL, 'revokeObjectURL')
+        .mockImplementation(() => undefined);
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      try {
+        const { exportDebugSnapshot, debugExportError } = await loadComposable();
+        await expect(exportDebugSnapshot()).resolves.toBeUndefined();
+        expect(debugExportError.value).toBeNull();
+        expect(backupBlob).toBeInstanceOf(Blob);
+        const debugJson = JSON.parse(await backupBlob!.text()) as DebugExportTestJson;
+        expect(debugJson.state.preferences.taskFilterPresets).toEqual([
+          expect.objectContaining({
+            id: 'preset-1',
+            name: 'Preset 1',
+            settings: expect.objectContaining({
+              taskUserView: null,
+            }),
+          }),
+          expect.objectContaining({
+            id: 'preset-2',
+            name: 'Preset 2',
+            settings: expect.objectContaining({
+              taskUserView: null,
+            }),
+          }),
+        ]);
+        expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-malformed-preset-url');
+        expect(clickSpy).toHaveBeenCalledOnce();
+      } finally {
+        createObjectURLSpy.mockRestore();
+        revokeObjectURLSpy.mockRestore();
+        clickSpy.mockRestore();
+        if (!hadCreateObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).createObjectURL;
+        }
+        if (!hadRevokeObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+        }
+      }
+    });
+    it('exports debug snapshots with an empty preset list when persisted presets are not an array', async () => {
+      preferencesStore.$state = {
+        taskFilterPresets: 'invalid-preset-container',
+        taskUserView: 'teammate-2',
+        teamHide: {
+          'teammate-1': true,
+        },
+      };
+      localStorage.setItem(
+        STORAGE_KEYS.preferences,
+        JSON.stringify({
+          _timestamp: 1700000005000,
+          _userId: 'user-123',
+          data: preferencesStore.$state,
+        })
+      );
+      let backupBlob: Blob | null = null;
+      const hadCreateObjectURL = typeof URL.createObjectURL === 'function';
+      const hadRevokeObjectURL = typeof URL.revokeObjectURL === 'function';
+      if (!hadCreateObjectURL) {
+        Object.defineProperty(URL, 'createObjectURL', {
+          configurable: true,
+          value: () => '',
+          writable: true,
+        });
+      }
+      if (!hadRevokeObjectURL) {
+        Object.defineProperty(URL, 'revokeObjectURL', {
+          configurable: true,
+          value: () => undefined,
+          writable: true,
+        });
+      }
+      const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((object) => {
+        if (object instanceof Blob) {
+          backupBlob = object;
+        }
+        return 'blob:test-invalid-preset-container-url';
+      });
+      const revokeObjectURLSpy = vi
+        .spyOn(URL, 'revokeObjectURL')
+        .mockImplementation(() => undefined);
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      try {
+        const { exportDebugSnapshot, debugExportError } = await loadComposable();
+        await expect(exportDebugSnapshot()).resolves.toBeUndefined();
+        expect(debugExportError.value).toBeNull();
+        expect(backupBlob).toBeInstanceOf(Blob);
+        const debugJson = JSON.parse(await backupBlob!.text()) as DebugExportTestJson;
+        expect(debugJson.state.preferences.taskFilterPresets).toEqual([]);
+        expect(debugJson.storage.preferences).toEqual(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              taskFilterPresets: [],
+            }),
+          })
+        );
+        expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-invalid-preset-container-url');
+        expect(clickSpy).toHaveBeenCalledOnce();
+      } finally {
+        createObjectURLSpy.mockRestore();
+        revokeObjectURLSpy.mockRestore();
+        clickSpy.mockRestore();
+        if (!hadCreateObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).createObjectURL;
+        }
+        if (!hadRevokeObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+        }
+      }
+    });
+    it('exports legacy progress storage without crashing on pre-gamemode data', async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.progress,
+        JSON.stringify({
+          displayName: 'Legacy Raider',
+          gameEdition: 3,
+          hideoutModules: {},
+          hideoutParts: {},
+          level: 14,
+          pmcFaction: 'USEC',
+          prestigeLevel: 2,
+          progressEpoch: 7,
+          skillOffsets: {},
+          skills: { Endurance: 12 },
+          storyChapters: {},
+          taskCompletions: { task1: { complete: true, timestamp: 1000 } },
+          taskObjectives: {},
+          tarkovUid: 998877,
+          traders: {},
+          xpOffset: 0,
+        })
+      );
+      let backupBlob: Blob | null = null;
+      const hadCreateObjectURL = typeof URL.createObjectURL === 'function';
+      const hadRevokeObjectURL = typeof URL.revokeObjectURL === 'function';
+      if (!hadCreateObjectURL) {
+        Object.defineProperty(URL, 'createObjectURL', {
+          configurable: true,
+          value: () => '',
+          writable: true,
+        });
+      }
+      if (!hadRevokeObjectURL) {
+        Object.defineProperty(URL, 'revokeObjectURL', {
+          configurable: true,
+          value: () => undefined,
+          writable: true,
+        });
+      }
+      const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((object) => {
+        if (object instanceof Blob) {
+          backupBlob = object;
+        }
+        return 'blob:test-legacy-debug-url';
+      });
+      const revokeObjectURLSpy = vi
+        .spyOn(URL, 'revokeObjectURL')
+        .mockImplementation(() => undefined);
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      try {
+        const { exportDebugSnapshot, debugExportError } = await loadComposable();
+        await expect(exportDebugSnapshot()).resolves.toBeUndefined();
+        expect(debugExportError.value).toBeNull();
+        expect(backupBlob).toBeInstanceOf(Blob);
+        const debugText = await backupBlob!.text();
+        const debugJson = JSON.parse(debugText) as DebugExportTestJson & {
+          storage: DebugExportTestJson['storage'] & {
+            progress: {
+              data: {
+                currentGameMode: string;
+                gameEdition: number;
+                pvp: {
+                  displayName: string | null;
+                  level: number;
+                  prestigeLevel: number;
+                };
+              };
+              format: string;
+            };
+          };
+        };
+        expect(debugJson.storage.progress.format).toBe('legacy');
+        expect(debugJson.storage.progress.data.currentGameMode).toBe('pvp');
+        expect(debugJson.storage.progress.data.gameEdition).toBe(3);
+        expect(debugJson.storage.progress.data.pvp.level).toBe(14);
+        expect(debugJson.storage.progress.data.pvp.prestigeLevel).toBe(2);
+        expect(debugJson.storage.progress.data.pvp.displayName).toBeNull();
+        expect(debugText).not.toContain('Legacy Raider');
+        expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-legacy-debug-url');
+        expect(clickSpy).toHaveBeenCalledOnce();
+      } finally {
+        createObjectURLSpy.mockRestore();
+        revokeObjectURLSpy.mockRestore();
+        clickSpy.mockRestore();
+        if (!hadCreateObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).createObjectURL;
+        }
+        if (!hadRevokeObjectURL) {
+          delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+        }
+      }
+    });
+    it('marks JSON-valid but invalid persisted storage payloads as unparseable', async () => {
+      localStorage.setItem(STORAGE_KEYS.progress, '123');
+      localStorage.setItem(STORAGE_KEYS.preferences, '[]');
+      let backupBlob: Blob | null = null;
+      const hadCreateObjectURL = typeof URL.createObjectURL === 'function';
+      const hadRevokeObjectURL = typeof URL.revokeObjectURL === 'function';
+      if (!hadCreateObjectURL) {
+        Object.defineProperty(URL, 'createObjectURL', {
+          configurable: true,
+          value: () => '',
+          writable: true,
+        });
+      }
+      if (!hadRevokeObjectURL) {
+        Object.defineProperty(URL, 'revokeObjectURL', {
+          configurable: true,
+          value: () => undefined,
+          writable: true,
+        });
+      }
+      const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((object) => {
+        if (object instanceof Blob) {
+          backupBlob = object;
+        }
+        return 'blob:test-invalid-storage-url';
+      });
+      const revokeObjectURLSpy = vi
+        .spyOn(URL, 'revokeObjectURL')
+        .mockImplementation(() => undefined);
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      try {
+        const { exportDebugSnapshot, debugExportError } = await loadComposable();
+        await expect(exportDebugSnapshot()).resolves.toBeUndefined();
+        expect(debugExportError.value).toBeNull();
+        expect(backupBlob).toBeInstanceOf(Blob);
+        const debugJson = JSON.parse(await backupBlob!.text()) as DebugExportTestJson;
+        expect(debugJson.storage.progress).toEqual(
+          expect.objectContaining({
+            data: null,
+            format: 'unparseable',
+            ownerMatchesCurrentUser: null,
+            ownerUserFingerprint: null,
+          })
+        );
+        expect(debugJson.storage.preferences).toEqual(
+          expect.objectContaining({
+            data: null,
+            format: 'unparseable',
+            ownerMatchesCurrentUser: null,
+            ownerUserFingerprint: null,
+          })
+        );
+        expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-invalid-storage-url');
         expect(clickSpy).toHaveBeenCalledOnce();
       } finally {
         createObjectURLSpy.mockRestore();

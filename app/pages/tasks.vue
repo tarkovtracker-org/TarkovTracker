@@ -159,7 +159,7 @@
                   <div
                     v-for="task in focusedTaskInSlice"
                     :key="`focused-${task.id}`"
-                    class="content-visibility-auto-280 pb-4"
+                    class="content-visibility-auto-420 pb-4"
                   >
                     <TaskCard
                       :accent-variant="
@@ -186,7 +186,7 @@
                   <div
                     v-for="task in pinnedTasksInSlice"
                     :key="`pinned-${task.id}`"
-                    class="content-visibility-auto-280 pb-4"
+                    class="content-visibility-auto-420 pb-4"
                   >
                     <TaskCard
                       :accent-variant="
@@ -216,7 +216,7 @@
                 <div
                   v-for="task in mapSpecificTasksInSlice"
                   :key="`task-${task.id}`"
-                  class="content-visibility-auto-280 pb-4"
+                  class="content-visibility-auto-420 pb-4"
                 >
                   <TaskCard
                     :accent-variant="
@@ -242,7 +242,7 @@
                   <div
                     v-for="task in globalTasksInSlice"
                     :key="`global-${task.id}`"
-                    class="content-visibility-auto-280 pb-4"
+                    class="content-visibility-auto-420 pb-4"
                   >
                     <TaskCard
                       accent-variant="global"

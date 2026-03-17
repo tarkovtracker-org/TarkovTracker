@@ -820,6 +820,10 @@ html.no-smooth-scroll {
     content-visibility: auto;
     contain-intrinsic-size: auto 280px;
   }
+  .content-visibility-auto-420 {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 420px;
+  }
   .shadow-nav-drawer {
     box-shadow: var(--theme-shadow-nav-drawer);
   }

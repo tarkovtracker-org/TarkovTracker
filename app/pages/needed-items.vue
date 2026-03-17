@@ -156,6 +156,7 @@
 </template>
 <script setup lang="ts">
   import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
+  import { useProductAnalytics } from '@/composables/useProductAnalytics';
   import NeededItem from '@/features/neededitems/NeededItem.vue';
   import NeededItemGroupedCard from '@/features/neededitems/NeededItemGroupedCard.vue';
   import {
@@ -175,6 +176,7 @@
     usesWindowScroll: true,
   });
   const { t } = useI18n({ useScope: 'global' });
+  const { trackNeededItemsView } = useProductAnalytics();
   const { close: closeSettingsDrawer, isOpen: isSettingsDrawerOpen } =
     useNeededItemsSettingsDrawer();
   useSeoMeta({
@@ -245,6 +247,12 @@
     itemsError,
     ensureNeededItemsData,
   } = useNeededItems({ perfDebug, search, t });
+  const selectedNeededItemsView = computed<'combined' | 'grid' | 'list'>(() => {
+    if (groupByItem.value) {
+      return 'combined';
+    }
+    return viewMode.value;
+  });
   useNeededItemsRouteSync({ activeFilter });
   onMounted(() => {
     if (perfDebug.value) {
@@ -426,6 +434,18 @@
       totalItems: displayItems.value.length,
     });
   });
+  watch(
+    selectedNeededItemsView,
+    (currentView, previousView) => {
+      trackNeededItemsView({
+        cardStyle: currentView === 'grid' ? cardStyle.value : undefined,
+        previousView,
+        source: previousView ? 'change' : 'page_load',
+        view: currentView,
+      });
+    },
+    { flush: 'post', immediate: true }
+  );
   watch(
     () => displayItems.value.length,
     (newLength, oldLength) => {

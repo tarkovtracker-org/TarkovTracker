@@ -640,7 +640,9 @@
     },
     hideout: {
       title: '藏身处',
+      summary: '跟踪设施升级、卡点以及接下来可以建造的内容。',
       loading: '加载藏身处数据中',
+      station_link_label: '前往 {name}',
       no_stations_found: '未找到设施，可尝试修改筛选条件',
       load_more_stations: '加载更多电台',
       collapse_completed: '折叠已完成的设施',

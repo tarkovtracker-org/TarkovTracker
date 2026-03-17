@@ -1,14 +1,16 @@
 <template>
   <div
     :id="`objective-${props.objective.id}`"
-    role="button"
-    :tabindex="isParentTaskLocked ? -1 : 0"
-    :aria-label="objectiveAriaLabel"
-    :aria-disabled="isParentTaskLocked"
-    class="group focus-visible:ring-primary-500 focus-visible:ring-offset-panel flex w-full items-start gap-4 rounded-md px-2 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2"
+    :role="isRowInteractive ? 'button' : undefined"
+    :tabindex="isRowInteractive ? 0 : undefined"
+    :aria-label="isRowInteractive ? objectiveAriaLabel : undefined"
+    :aria-disabled="isRowInteractive ? undefined : true"
+    class="group flex w-full items-start gap-4 rounded-md px-2 py-2 transition-colors"
     :class="[
-      isComplete ? 'bg-success-500/10' : 'hover:bg-interactive',
-      isParentTaskLocked ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
+      isComplete ? 'bg-success-500/10' : '',
+      isRowInteractive
+        ? 'focus-visible:ring-primary-500 focus-visible:ring-offset-panel hover:bg-interactive cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2'
+        : 'cursor-not-allowed opacity-80',
     ]"
     @click="handleRowClick"
     @keydown.enter.self="handleRowClick"
@@ -100,7 +102,7 @@
         >
           <button
             type="button"
-            class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+            class="focus-visible:ring-primary-500 focus-visible:ring-offset-panel flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
             :aria-label="toggleObjectiveLabel"
             :aria-pressed="isComplete"
             :disabled="isParentTaskLocked"
@@ -211,6 +213,7 @@
   const isParentTaskLocked = computed(() => {
     return isParentTaskComplete.value || isParentTaskFailed.value;
   });
+  const isRowInteractive = computed(() => !isParentTaskLocked.value);
   const userNeeds = computed(() => {
     const needingUsers: string[] = [];
     if (fullObjective.value == undefined) {

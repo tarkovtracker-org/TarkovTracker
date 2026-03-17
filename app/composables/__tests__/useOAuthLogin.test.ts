@@ -11,10 +11,20 @@ const { loggerMock, mockSignInWithOAuth } = vi.hoisted(() => ({
   },
   mockSignInWithOAuth: vi.fn(),
 }));
+const { trackLoginFailedMock, trackLoginStartedMock } = vi.hoisted(() => ({
+  trackLoginFailedMock: vi.fn(),
+  trackLoginStartedMock: vi.fn(),
+}));
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: {
     signInWithOAuth: mockSignInWithOAuth,
   },
+}));
+vi.mock('@/composables/useProductAnalytics', () => ({
+  useProductAnalytics: () => ({
+    trackLoginFailed: trackLoginFailedMock,
+    trackLoginStarted: trackLoginStartedMock,
+  }),
 }));
 vi.mock('@/utils/logger', () => ({
   logger: loggerMock,
@@ -46,6 +56,7 @@ describe('useOAuthLogin', () => {
       skipBrowserRedirect: true,
       redirectTo: 'https://tarkovtracker.test/auth/callback',
     });
+    expect(trackLoginStartedMock).toHaveBeenCalledWith('discord');
     expect(openPopupOrRedirect).toHaveBeenCalledWith('https://oauth.test/login', 'discord');
     expect(loading.value.discord).toBe(true);
   });
@@ -91,6 +102,7 @@ describe('useOAuthLogin', () => {
     await signInWithProvider('twitch');
     expect(openPopupOrRedirect).not.toHaveBeenCalled();
     expect(loading.value.twitch).toBe(false);
+    expect(trackLoginFailedMock).toHaveBeenCalledWith('twitch', oauthError);
     expect(loggerMock.error).toHaveBeenCalledWith('[Login] Twitch sign in error:', oauthError);
   });
 });

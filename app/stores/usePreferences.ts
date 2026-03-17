@@ -1,5 +1,19 @@
 import { defineStore } from 'pinia';
 import 'pinia-plugin-persistedstate';
+import {
+  normalizeNeededItemsCardStyle,
+  normalizeNeededItemsFilterType,
+  normalizeNeededItemsFirFilter,
+  normalizeNeededItemsSortBy,
+  normalizeNeededItemsSortDirection,
+  normalizeNeededItemsViewMode,
+} from '@/features/neededitems/neededItemsFilterNormalization';
+import {
+  isValidPrimaryView,
+  type TaskPrimaryView,
+  type TaskSecondaryView,
+} from '@/types/taskFilter';
+import { isValidSortDirection, type TaskSortDirection, type TaskSortMode } from '@/types/taskSort';
 import { clearPreferencesStorage } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -24,8 +38,6 @@ import type {
   NeededItemsFirFilter,
   NeededItemsFilterType,
 } from '@/features/neededitems/neededitems-constants';
-import type { TaskPrimaryView, TaskSecondaryView } from '@/types/taskFilter';
-import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
 import type { SkillSortMode } from '@/utils/constants';
 export type TaskFilterSettings = {
   taskPrimaryView: TaskPrimaryView | null;
@@ -227,20 +239,148 @@ const initialSavingState = {
 };
 export type PersistedPreferencesState = Partial<Omit<PreferencesState, 'saving'>>;
 type PersistedPreferencesStateWithLegacy = PersistedPreferencesState & {
+  neededItemsHideCollected?: boolean;
   onlyTasksWithSuggestedKeys?: boolean;
 };
-const hasLegacyOnlyTasksWithSuggestedKeys = (
+const requiresLegacyPreferencesMigration = (
   persistedState: PersistedPreferencesStateWithLegacy
 ): boolean => {
-  return 'onlyTasksWithSuggestedKeys' in persistedState;
+  return (
+    'neededItemsHideCollected' in persistedState || 'onlyTasksWithSuggestedKeys' in persistedState
+  );
 };
-const clonePreferencesSnapshot = <T>(value: T): T => {
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+const isBlockedBrowserObject = (value: object): boolean => {
+  const tag = Object.prototype.toString.call(value);
+  return (
+    tag === '[object Window]' ||
+    tag === '[object DOMWindow]' ||
+    tag === '[object Document]' ||
+    tag === '[object Location]' ||
+    tag.endsWith('Event]') ||
+    tag.startsWith('[object HTML')
+  );
+};
+const extractSelectionString = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value && typeof value === 'object' && 'value' in value) {
+    const candidate = (value as { value?: unknown }).value;
+    return typeof candidate === 'string' ? candidate : null;
+  }
+  return null;
+};
+const cloneSerializablePreferencesValue = (
+  value: unknown,
+  seen = new WeakMap<object, unknown>()
+): unknown => {
   const rawValue = value !== null && typeof value === 'object' ? toRaw(value) : value;
+  if (
+    rawValue === null ||
+    rawValue === undefined ||
+    typeof rawValue === 'string' ||
+    typeof rawValue === 'number' ||
+    typeof rawValue === 'boolean'
+  ) {
+    return rawValue;
+  }
+  if (typeof rawValue === 'bigint') {
+    return rawValue.toString();
+  }
+  if (typeof rawValue === 'function' || typeof rawValue === 'symbol') {
+    return undefined;
+  }
+  if (!(rawValue instanceof Object)) {
+    return rawValue;
+  }
+  if (seen.has(rawValue)) {
+    return seen.get(rawValue);
+  }
+  if (rawValue instanceof Date) {
+    return new Date(rawValue.getTime());
+  }
+  if (Array.isArray(rawValue)) {
+    const clonedArray: unknown[] = [];
+    seen.set(rawValue, clonedArray);
+    for (const item of rawValue) {
+      const clonedItem = cloneSerializablePreferencesValue(item, seen);
+      clonedArray.push(clonedItem === undefined ? null : clonedItem);
+    }
+    return clonedArray;
+  }
+  if (isBlockedBrowserObject(rawValue)) {
+    return undefined;
+  }
+  if (isPlainObject(rawValue)) {
+    const clonedRecord: Record<string, unknown> = {};
+    seen.set(rawValue, clonedRecord);
+    for (const [key, nestedValue] of Object.entries(rawValue)) {
+      const clonedValue = cloneSerializablePreferencesValue(nestedValue, seen);
+      if (clonedValue !== undefined) {
+        clonedRecord[key] = clonedValue;
+      }
+    }
+    return clonedRecord;
+  }
   try {
     return structuredClone(rawValue);
   } catch {
-    return JSON.parse(JSON.stringify(rawValue)) as T;
+    return undefined;
   }
+};
+const normalizeOptionalStringSelection = (value: unknown): string | null => {
+  const candidate = extractSelectionString(value);
+  return candidate && candidate.length > 0 ? candidate : null;
+};
+const normalizeOptionalTaskPrimaryView = (value: unknown): TaskPrimaryView | null => {
+  const candidate = extractSelectionString(value);
+  return candidate && isValidPrimaryView(candidate) ? candidate : null;
+};
+const normalizeOptionalTaskSortDirection = (value: unknown): TaskSortDirection | null => {
+  const candidate = extractSelectionString(value);
+  return candidate && isValidSortDirection(candidate) ? candidate : null;
+};
+const normalizeOptionalNeededItemsFilterType = (
+  value: unknown
+): NeededItemsFilterType | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  return normalizeNeededItemsFilterType(value);
+};
+const normalizeOptionalNeededItemsViewMode = (
+  value: unknown
+): PreferencesState['neededItemsViewMode'] => {
+  if (value === undefined) {
+    return null;
+  }
+  return normalizeNeededItemsViewMode(value);
+};
+const normalizeOptionalNeededItemsFirFilter = (
+  value: unknown
+): PreferencesState['neededItemsFirFilter'] => {
+  if (value === undefined) {
+    return null;
+  }
+  return normalizeNeededItemsFirFilter(value);
+};
+const normalizeOptionalNeededItemsCardStyle = (
+  value: unknown
+): PreferencesState['neededItemsCardStyle'] => {
+  if (value === undefined) {
+    return null;
+  }
+  return normalizeNeededItemsCardStyle(value);
+};
+const clonePreferencesSnapshot = <T>(value: T): T => {
+  return cloneSerializablePreferencesValue(value) as T;
 };
 const sanitizePersistedPreferencesState = (
   persistedState: PersistedPreferencesStateWithLegacy = {}
@@ -254,8 +394,7 @@ const sanitizePersistedPreferencesState = (
   ) {
     delete sanitizedState.themeMode;
   }
-  const legacyHideCollected = (sanitizedState as Record<string, unknown>)
-    .neededItemsHideCollected as boolean | undefined;
+  const legacyHideCollected = sanitizedState.neededItemsHideCollected;
   if (
     typeof sanitizedState.neededItemsHideOwned !== 'boolean' &&
     typeof legacyHideCollected === 'boolean'
@@ -263,7 +402,7 @@ const sanitizePersistedPreferencesState = (
     sanitizedState.neededItemsHideOwned = legacyHideCollected;
   }
   if ('neededItemsHideCollected' in sanitizedState) {
-    delete (sanitizedState as Record<string, unknown>).neededItemsHideCollected;
+    delete sanitizedState.neededItemsHideCollected;
   }
   if (
     typeof sanitizedState.onlyTasksWithRequiredKeys !== 'boolean' &&
@@ -273,6 +412,65 @@ const sanitizePersistedPreferencesState = (
   }
   if ('onlyTasksWithSuggestedKeys' in sanitizedState) {
     delete sanitizedState.onlyTasksWithSuggestedKeys;
+  }
+  if ('taskPrimaryView' in sanitizedState) {
+    sanitizedState.taskPrimaryView = normalizeOptionalTaskPrimaryView(
+      sanitizedState.taskPrimaryView
+    );
+  }
+  if ('taskMapView' in sanitizedState) {
+    sanitizedState.taskMapView = normalizeOptionalStringSelection(sanitizedState.taskMapView);
+  }
+  if ('taskTraderView' in sanitizedState) {
+    sanitizedState.taskTraderView = normalizeOptionalStringSelection(sanitizedState.taskTraderView);
+  }
+  if ('taskSecondaryView' in sanitizedState) {
+    sanitizedState.taskSecondaryView =
+      sanitizedState.taskSecondaryView === undefined
+        ? undefined
+        : normalizeSecondaryView(sanitizedState.taskSecondaryView);
+  }
+  if ('taskUserView' in sanitizedState) {
+    sanitizedState.taskUserView = normalizeOptionalStringSelection(sanitizedState.taskUserView);
+  }
+  if ('taskSortMode' in sanitizedState) {
+    sanitizedState.taskSortMode =
+      sanitizedState.taskSortMode === undefined
+        ? undefined
+        : normalizeSortMode(sanitizedState.taskSortMode);
+  }
+  if ('taskSortDirection' in sanitizedState) {
+    sanitizedState.taskSortDirection = normalizeOptionalTaskSortDirection(
+      sanitizedState.taskSortDirection
+    );
+  }
+  if ('neededTypeView' in sanitizedState) {
+    sanitizedState.neededTypeView = normalizeOptionalNeededItemsFilterType(
+      sanitizedState.neededTypeView
+    );
+  }
+  if ('neededItemsViewMode' in sanitizedState) {
+    sanitizedState.neededItemsViewMode = normalizeOptionalNeededItemsViewMode(
+      sanitizedState.neededItemsViewMode
+    );
+  }
+  if ('neededItemsFirFilter' in sanitizedState) {
+    sanitizedState.neededItemsFirFilter = normalizeOptionalNeededItemsFirFilter(
+      sanitizedState.neededItemsFirFilter
+    );
+  }
+  if ('neededItemsSortBy' in sanitizedState) {
+    sanitizedState.neededItemsSortBy = normalizeNeededItemsSortBy(sanitizedState.neededItemsSortBy);
+  }
+  if ('neededItemsSortDirection' in sanitizedState) {
+    sanitizedState.neededItemsSortDirection = normalizeNeededItemsSortDirection(
+      sanitizedState.neededItemsSortDirection
+    );
+  }
+  if ('neededItemsCardStyle' in sanitizedState) {
+    sanitizedState.neededItemsCardStyle = normalizeOptionalNeededItemsCardStyle(
+      sanitizedState.neededItemsCardStyle
+    );
   }
   return sanitizedState;
 };
@@ -341,12 +539,11 @@ export const readPersistedPreferencesSnapshot = (
     if (wrapped._userId !== userId || !isPersistedPreferencesStateRecord(wrapped.data)) {
       return null;
     }
-    const requiresStorageMigration = hasLegacyOnlyTasksWithSuggestedKeys(
-      wrapped.data as PersistedPreferencesStateWithLegacy
-    );
+    const persistedStateWithLegacy = wrapped.data as PersistedPreferencesStateWithLegacy;
+    const requiresStorageMigration = requiresLegacyPreferencesMigration(persistedStateWithLegacy);
     return {
       ownerUserId: wrapped._userId,
-      state: sanitizePersistedPreferencesState(wrapped.data as PersistedPreferencesStateWithLegacy),
+      state: sanitizePersistedPreferencesState(persistedStateWithLegacy),
       requiresStorageMigration: requiresStorageMigration || undefined,
     };
   }
@@ -457,13 +654,13 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     // Add default values for views using nullish coalescing
     getTaskPrimaryView: (state) => {
-      return state.taskPrimaryView ?? 'all';
+      return normalizeOptionalTaskPrimaryView(state.taskPrimaryView) ?? 'all';
     },
     getTaskMapView: (state) => {
-      return state.taskMapView ?? 'all';
+      return normalizeOptionalStringSelection(state.taskMapView) ?? 'all';
     },
     getTaskTraderView: (state) => {
-      return state.taskTraderView ?? 'all';
+      return normalizeOptionalStringSelection(state.taskTraderView) ?? 'all';
     },
     getTaskSecondaryView: (state) => {
       return getTaskSecondaryViewForPrimaryView(
@@ -472,26 +669,29 @@ export const usePreferencesStore = defineStore('preferences', {
       );
     },
     getTaskUserView: (state) => {
-      return state.taskUserView ?? 'self';
+      return normalizeOptionalStringSelection(state.taskUserView) ?? 'self';
     },
     getTaskSortMode: (state) => {
       return normalizeSortMode(state.taskSortMode ?? 'impact');
     },
     getTaskSortDirection: (state) => {
       const sortMode = state.taskSortMode ?? 'impact';
-      return state.taskSortDirection ?? (sortMode === 'impact' ? 'desc' : 'asc');
+      return (
+        normalizeOptionalTaskSortDirection(state.taskSortDirection) ??
+        (sortMode === 'impact' ? 'desc' : 'asc')
+      );
     },
     getTaskSharedByAllOnly: (state) => {
       return state.taskSharedByAllOnly ?? false;
     },
     getNeededTypeView: (state) => {
-      return state.neededTypeView ?? 'all';
+      return normalizeNeededItemsFilterType(state.neededTypeView);
     },
     getNeededItemsViewMode: (state) => {
-      return state.neededItemsViewMode ?? 'grid';
+      return normalizeNeededItemsViewMode(state.neededItemsViewMode);
     },
     getNeededItemsFirFilter: (state) => {
-      return state.neededItemsFirFilter ?? 'all';
+      return normalizeNeededItemsFirFilter(state.neededItemsFirFilter);
     },
     getNeededItemsGroupByItem: (state) => {
       return state.neededItemsGroupByItem ?? false;
@@ -503,16 +703,16 @@ export const usePreferencesStore = defineStore('preferences', {
       return state.neededItemsKappaOnly ?? false;
     },
     getNeededItemsSortBy: (state) => {
-      return state.neededItemsSortBy ?? 'priority';
+      return normalizeNeededItemsSortBy(state.neededItemsSortBy);
     },
     getNeededItemsSortDirection: (state) => {
-      return state.neededItemsSortDirection ?? 'desc';
+      return normalizeNeededItemsSortDirection(state.neededItemsSortDirection);
     },
     getNeededItemsHideOwned: (state) => {
       return state.neededItemsHideOwned ?? false;
     },
     getNeededItemsCardStyle: (state) => {
-      return state.neededItemsCardStyle ?? 'expanded';
+      return normalizeNeededItemsCardStyle(state.neededItemsCardStyle);
     },
     itemsNeededHideNonFIR: (state) => {
       return state.itemsHideNonFIR ?? false;
@@ -678,7 +878,7 @@ export const usePreferencesStore = defineStore('preferences', {
       this.mapTeamHideAll = hide;
     },
     setTaskPrimaryView(view: string) {
-      this.taskPrimaryView = view;
+      this.taskPrimaryView = isValidPrimaryView(view) ? view : 'all';
     },
     setMapZoomSpeed(speed: number) {
       if (!Number.isFinite(speed)) {
@@ -705,34 +905,36 @@ export const usePreferencesStore = defineStore('preferences', {
       this.mapZoneOpacity = clamped;
     },
     setTaskMapView(view: string) {
-      this.taskMapView = view;
+      this.taskMapView = normalizeOptionalStringSelection(view) ?? 'all';
     },
     setTaskTraderView(view: string) {
-      this.taskTraderView = view;
+      this.taskTraderView = normalizeOptionalStringSelection(view) ?? 'all';
     },
     setTaskSecondaryView(view: string) {
       this.taskSecondaryView = normalizeSecondaryView(view);
     },
     setTaskUserView(view: string) {
-      this.taskUserView = view;
+      this.taskUserView = normalizeOptionalStringSelection(view) ?? 'self';
     },
     setTaskSortMode(mode: TaskSortMode) {
       this.taskSortMode = normalizeSortMode(mode);
     },
     setTaskSortDirection(direction: TaskSortDirection) {
-      this.taskSortDirection = direction;
+      this.taskSortDirection =
+        normalizeOptionalTaskSortDirection(direction) ??
+        (this.getTaskSortMode === 'impact' ? 'desc' : 'asc');
     },
     setTaskSharedByAllOnly(enabled: boolean) {
       this.taskSharedByAllOnly = enabled;
     },
     setNeededTypeView(view: NeededItemsFilterType) {
-      this.neededTypeView = view;
+      this.neededTypeView = normalizeNeededItemsFilterType(view);
     },
     setNeededItemsViewMode(mode: 'list' | 'grid') {
-      this.neededItemsViewMode = mode;
+      this.neededItemsViewMode = normalizeNeededItemsViewMode(mode);
     },
     setNeededItemsFirFilter(filter: NeededItemsFirFilter) {
-      this.neededItemsFirFilter = filter;
+      this.neededItemsFirFilter = normalizeNeededItemsFirFilter(filter);
     },
     setNeededItemsGroupByItem(groupBy: boolean) {
       this.neededItemsGroupByItem = groupBy;
@@ -744,16 +946,16 @@ export const usePreferencesStore = defineStore('preferences', {
       this.neededItemsKappaOnly = kappaOnly;
     },
     setNeededItemsSortBy(sortBy: 'priority' | 'name' | 'category' | 'count') {
-      this.neededItemsSortBy = sortBy;
+      this.neededItemsSortBy = normalizeNeededItemsSortBy(sortBy);
     },
     setNeededItemsSortDirection(direction: 'asc' | 'desc') {
-      this.neededItemsSortDirection = direction;
+      this.neededItemsSortDirection = normalizeNeededItemsSortDirection(direction);
     },
     setNeededItemsHideOwned(hide: boolean) {
       this.neededItemsHideOwned = hide;
     },
     setNeededItemsCardStyle(style: 'compact' | 'expanded') {
-      this.neededItemsCardStyle = style;
+      this.neededItemsCardStyle = normalizeNeededItemsCardStyle(style);
     },
     setItemsNeededHideNonFIR(hide: boolean) {
       this.itemsHideNonFIR = hide;

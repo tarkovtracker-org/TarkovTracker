@@ -31,6 +31,7 @@ type SetupOptions = {
   traderCounts?: Record<string, number>;
   mapTaskTotals?: Record<string, number>;
   mapTaskTotalsHideCompleted?: Record<string, number>;
+  statusCounts?: Partial<Record<'all' | 'available' | 'locked' | 'completed' | 'failed', number>>;
   teammates?: string[];
   teamMembers?: string[];
   hiddenTeammates?: Record<string, boolean>;
@@ -80,6 +81,14 @@ const setup = async (options: SetupOptions = {}) => {
   const traderCounts = options.traderCounts ?? { 'trader-1': 2 };
   const mapTaskTotals = options.mapTaskTotals ?? { 'map-1': 2 };
   const mapTaskTotalsHideCompleted = options.mapTaskTotalsHideCompleted ?? { 'map-1': 1 };
+  const statusCounts = {
+    all: 2,
+    available: 1,
+    locked: 0,
+    completed: 1,
+    failed: 0,
+    ...(options.statusCounts ?? {}),
+  };
   const displayNames: Record<string, string> = {
     self: 'Self',
     ...(options.displayNames ?? {}),
@@ -97,13 +106,7 @@ const setup = async (options: SetupOptions = {}) => {
         _secondaryView: string,
         hideCompletedMapObjectives = false
       ) => (hideCompletedMapObjectives ? mapTaskTotalsHideCompleted : mapTaskTotals),
-      calculateStatusCounts: () => ({
-        all: 2,
-        available: 1,
-        locked: 0,
-        completed: 1,
-        failed: 0,
-      }),
+      calculateStatusCounts: () => statusCounts,
       calculateTraderCounts: () => traderCounts,
     }),
   }));
@@ -276,6 +279,18 @@ describe('TaskFilterBar', () => {
     expect(availableButton).toBeTruthy();
     expect(availableButton!.text()).toContain('0');
     expect(availableButton!.text()).not.toContain('1');
+  });
+  it('keeps completed and failed filters mounted when enabled, even with zero counts', async () => {
+    const { TaskFilterBar } = await setup({
+      statusCounts: {
+        completed: 0,
+        failed: 0,
+      },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const buttonTexts = wrapper.findAll('button').map((button) => button.text());
+    expect(buttonTexts.some((text) => text.includes('COMPLETED0'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('FAILED0'))).toBe(true);
   });
   it('forces graph view to show only the all status filter', async () => {
     const { TaskFilterBar } = await setup({

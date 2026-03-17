@@ -43,6 +43,7 @@
 - `npm run lint` runs ESLint on `app/` with zero warnings.
 - `npm run lint:fix` auto-fixes lint issues in `app/`.
 - `npm run format` runs Prettier then ESLint fixes.
+- `npm run typecheck` runs Nuxt/Vue TypeScript checking.
 - Prettier targets `app/**/*.{js,ts,tsx,vue,json,json5,css,md}`.
 - Prettier also formats `docs/**/*.{md,markdown}` and top-level configs.
 - Formatting uses `prettier-plugin-tailwindcss` for class sorting.
@@ -172,12 +173,23 @@
 - Respect existing lint warnings; do not introduce new ones.
 - Keep commits small and scoped when asked to commit.
 
+## Analytics Access
+
+- Prefer structured analytics access over dashboard scraping.
+- Use GA4 MCP or BigQuery for quantitative product analysis, events, funnels, trends, and segmentation.
+- Use Clarity MCP for recordings, heatmaps, rage clicks, dead clicks, quick backs, and session-level UX debugging.
+- Use Cloudflare GraphQL MCP for traffic anomalies, caching, latency, bot/security noise, and edge/network diagnostics.
+- When investigating user issues, correlate findings across GA4, Clarity, and Cloudflare when possible.
+- Always state the date range, property/project/zone, and source used in analytics conclusions.
+- Use browser-based dashboard inspection only as a fallback when MCP/API access is missing or insufficient.
+
 ## Agent Rules
 
 - **No over-thinking in responses**. Sacrifice explanatory language for brevity—layman's terms only when necessary.
 - **Be concise**. Direct responses only: "Fixed X by changing Y to Z." Minimize explanation unless asked. Use file references for context.
 - **No comments** unless explicitly requested. Comments are token overhead.
 - **Run `npm run format` once** before leaving code. It handles both formatting and linting. Only show errors, skip success output.
+- **Run `npm run typecheck` during review/fix loops and whenever TypeScript-affecting files change.** `npm run format` does not run type checking; fix reported TS errors as part of the loop unless they are clearly unrelated blockers.
 - **Own all issues**. Fix formatting, linting, and pre-existing bugs without being asked. Don't deflect with "these are from earlier changes."
 - **Find root cause**. When fixing issues, identify and address the root cause, not just the symptoms.
 - **Self-assess code**. Don't ask "what does this do?" Read and understand it. Only clarify ambiguous intent ("Is this supposed to do X or Y?").

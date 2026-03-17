@@ -16,6 +16,11 @@ const UIconStub = {
   props: ['name'],
   template: '<i :data-icon-name="name"></i>',
 };
+const SelectMenuFixedStub = {
+  emits: ['update:modelValue'],
+  template:
+    "<button data-testid=\"sort-select\" @click=\"$emit('update:modelValue', { label: 'Count', value: 'count' })\"><slot /></button>",
+};
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
@@ -65,6 +70,7 @@ const createDefaultGlobal = () => ({
     UButton: UButtonStub,
     UIcon: UIconStub,
     UInput: UInputStub,
+    SelectMenuFixed: SelectMenuFixedStub,
     UTabs: {
       props: ['items', 'modelValue', 'variant'],
       emits: ['update:modelValue'],
@@ -87,7 +93,10 @@ describe('NeededItemsFilterBar', () => {
   it('emits update:viewMode after triggering list view button', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
-      props: createDefaultProps(),
+      props: {
+        ...createDefaultProps(),
+        viewMode: 'grid',
+      },
       global: createDefaultGlobal(),
     });
     await wrapper.find('button[data-icon="i-mdi-view-list"]').trigger('click');
@@ -121,5 +130,15 @@ describe('NeededItemsFilterBar', () => {
     });
     expect(wrapper.findAll('[data-leading-icon="i-mdi-format-list-bulleted"]')).toHaveLength(1);
     expect(wrapper.findAll('[data-icon-name="i-mdi-format-list-bulleted"]')).toHaveLength(0);
+  });
+  it('normalizes object sort selections before emitting updates', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: createDefaultProps(),
+      global: createDefaultGlobal(),
+    });
+    await wrapper.find('[data-testid="sort-select"]').trigger('click');
+    expect(wrapper.emitted('update:sortBy')).toEqual([['count']]);
+    expect(wrapper.emitted('update:sortDirection')).toEqual([['desc']]);
   });
 });

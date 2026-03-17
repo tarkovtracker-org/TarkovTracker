@@ -7,9 +7,17 @@
     title-classes="text-lg font-semibold"
   >
     <template #content>
-      <form class="space-y-2 px-4 py-4" @submit.prevent="saveDisplayName">
+      <form
+        class="space-y-2 px-4 py-4"
+        @click="handleDisplayNameContainerClick"
+        @submit.prevent="saveDisplayName"
+      >
         <div class="flex items-center gap-2">
-          <label :for="displayNameInputId" class="text-foreground text-sm font-semibold">
+          <label
+            :for="displayNameInputId"
+            class="text-foreground cursor-text text-sm font-semibold"
+            @click.prevent="focusDisplayNameInput"
+          >
             {{ $t('settings.display_name.label') }}
           </label>
           <UTooltip :text="$t('settings.display_name.explanation')">
@@ -32,9 +40,12 @@
               color="primary"
               variant="soft"
               size="sm"
+              class="min-w-28"
               :disabled="!hasDisplayNameChanges"
               :aria-label="$t('settings.display_name.save')"
-            />
+            >
+              {{ $t('settings.display_name.save') }}
+            </UButton>
           </div>
         </UFormField>
         <p class="text-foreground-muted text-xs">
@@ -54,10 +65,29 @@
   import { LIMITS } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });
+  const { trackDisplayNameSaved } = useProductAnalytics();
   const toast = useToast();
   const tarkovStore = useTarkovStore();
   const DISPLAY_NAME_MAX_LENGTH = LIMITS.DISPLAY_NAME_MAX_LENGTH;
   const displayNameInputId = 'settings-display-name-input';
+  const focusDisplayNameInput = () => {
+    const target = document.getElementById(displayNameInputId);
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      target.focus();
+      target.select();
+      return;
+    }
+    target?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')?.focus();
+  };
+  const isInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
+  const handleDisplayNameContainerClick = (event: MouseEvent) => {
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    focusDisplayNameInput();
+  };
   const localDisplayName = ref(tarkovStore.getDisplayName() || '');
   const displayName = computed(() => tarkovStore.getDisplayName());
   const currentModeLabel = computed(() =>
@@ -95,6 +125,10 @@
     try {
       tarkovStore.setDisplayName(trimmedDisplayName);
       localDisplayName.value = trimmedDisplayName;
+      trackDisplayNameSaved({
+        gameMode: tarkovStore.getCurrentGameMode() || 'pvp',
+        length: trimmedDisplayName.length,
+      });
       toast.add({
         title: t('settings.display_name.saved_title'),
         description: t('settings.display_name.saved_description', {

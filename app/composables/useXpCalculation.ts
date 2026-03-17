@@ -7,28 +7,34 @@
  * @module composables/useXpCalculation
  */
 import { useMetadataStore } from '@/stores/useMetadata';
-import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
-// Module-level flag to ensure level sync watcher is only set up once
-let levelSyncWatcherInitialized = false;
 export function useXpCalculation() {
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
+  const getTasks = () => (Array.isArray(metadataStore.tasks) ? metadataStore.tasks : []);
+  const getPlayerLevels = () =>
+    Array.isArray(metadataStore.playerLevels) ? metadataStore.playerLevels : [];
   const isTaskSuccessful = (taskId: string) =>
-    tarkovStore.isTaskComplete(taskId) && !tarkovStore.isTaskFailed(taskId);
+    (typeof tarkovStore.isTaskComplete === 'function'
+      ? tarkovStore.isTaskComplete(taskId)
+      : false) &&
+    !(typeof tarkovStore.isTaskFailed === 'function' ? tarkovStore.isTaskFailed(taskId) : false);
   // Computed: Sum of XP from all completed tracked tasks
   const calculatedQuestXP = computed(() => {
-    return metadataStore.tasks
+    return getTasks()
       .filter((task) => isTaskSuccessful(task.id))
       .reduce((sum, task) => sum + (task.experience || 0), 0);
   });
   // Computed: User's total XP (calculated + offset)
   const totalXP = computed(() => {
-    return calculatedQuestXP.value + tarkovStore.getXpOffset();
+    return (
+      calculatedQuestXP.value +
+      (typeof tarkovStore.getXpOffset === 'function' ? tarkovStore.getXpOffset() : 0)
+    );
   });
   // Computed: Level derived from total XP
   const derivedLevel = computed(() => {
-    const levels = metadataStore.playerLevels;
+    const levels = getPlayerLevels();
     if (!levels || levels.length === 0) return 1;
     for (let i = levels.length - 1; i >= 0; i--) {
       const level = levels[i];
@@ -40,14 +46,14 @@ export function useXpCalculation() {
   });
   // Computed: XP threshold for current level
   const xpForCurrentLevel = computed(() => {
-    const levels = metadataStore.playerLevels;
+    const levels = getPlayerLevels();
     const currentLevel = derivedLevel.value;
     const levelData = levels.find((l) => l.level === currentLevel);
     return levelData?.exp || 0;
   });
   // Computed: XP threshold for next level
   const xpForNextLevel = computed(() => {
-    const levels = metadataStore.playerLevels;
+    const levels = getPlayerLevels();
     const nextLevel = derivedLevel.value + 1;
     const levelData = levels.find((l) => l.level === nextLevel);
     return levelData?.exp || xpForCurrentLevel.value;
@@ -66,35 +72,17 @@ export function useXpCalculation() {
   // Action: Set total XP (calculates and stores offset)
   function setTotalXP(xp: number) {
     const offset = xp - calculatedQuestXP.value;
-    tarkovStore.setXpOffset(offset);
+    if (typeof tarkovStore.setXpOffset === 'function') {
+      tarkovStore.setXpOffset(offset);
+    }
   }
   // Action: Set level (calculates XP from level threshold and stores offset)
   function setLevel(level: number) {
-    const levels = metadataStore.playerLevels;
+    const levels = getPlayerLevels();
     const levelData = levels.find((l) => l.level === level);
     if (levelData) {
       setTotalXP(levelData.exp);
     }
-  }
-  // Set up a watcher to sync derivedLevel to the store when automatic level calculation is enabled.
-  // This ensures the database stays in sync with the calculated level.
-  // Only set up once per app lifecycle to avoid duplicate watchers.
-  if (!levelSyncWatcherInitialized) {
-    levelSyncWatcherInitialized = true;
-    const preferencesStore = usePreferencesStore();
-    watch(
-      derivedLevel,
-      (newLevel) => {
-        // Only sync if automatic level calculation is enabled
-        if (!preferencesStore.getUseAutomaticLevelCalculation) return;
-        // Only update if the stored level differs from the derived level
-        const storedLevel = tarkovStore.playerLevel();
-        if (storedLevel !== newLevel) {
-          tarkovStore.setLevel(newLevel);
-        }
-      },
-      { immediate: true }
-    );
   }
   return {
     calculatedQuestXP,

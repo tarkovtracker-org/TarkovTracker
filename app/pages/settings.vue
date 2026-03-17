@@ -14,10 +14,14 @@
         <template #content>
           <div class="grid gap-4 px-4 py-4 md:grid-cols-2">
             <div class="space-y-2">
-              <p class="text-foreground text-sm font-semibold">
+              <label
+                :for="gameEditionInputId"
+                class="text-foreground cursor-pointer text-sm font-semibold"
+              >
                 {{ $t('settings.game_profile.game_edition') }}
-              </p>
+              </label>
               <SelectMenuFixed
+                :id="gameEditionInputId"
                 v-model="selectedGameEdition"
                 :items="gameEditionOptions"
                 value-key="value"
@@ -28,10 +32,14 @@
               </SelectMenuFixed>
             </div>
             <div class="space-y-2">
-              <p class="text-foreground text-sm font-semibold">
+              <label
+                :for="currentPrestigeInputId"
+                class="text-foreground cursor-pointer text-sm font-semibold"
+              >
                 {{ $t('settings.prestige.current_level') }}
-              </p>
+              </label>
               <SelectMenuFixed
+                :id="currentPrestigeInputId"
                 v-model="currentPrestige"
                 :items="prestigeOptions"
                 value-key="value"
@@ -75,8 +83,11 @@
     robots: 'noindex, nofollow',
   });
   const { t } = useI18n({ useScope: 'global' });
+  const { trackSettingChanged } = useProductAnalytics();
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
+  const currentPrestigeInputId = 'settings-current-prestige-input';
+  const gameEditionInputId = 'settings-game-edition-input';
   const isPveMode = computed(() => tarkovStore.getCurrentGameMode() === GAME_MODES.PVE);
   const gameEditionOptions = computed(() =>
     metadataStore.editions.map((edition) => ({
@@ -89,7 +100,15 @@
       return tarkovStore.getGameEdition() || 1;
     },
     set(newValue: number) {
+      if (tarkovStore.getGameEdition() === newValue) {
+        return;
+      }
       tarkovStore.setGameEdition(newValue || 1);
+      trackSettingChanged({
+        area: 'profile',
+        name: 'game_edition',
+        value: newValue || 1,
+      });
     },
   });
   const prestigeOptions = computed(() =>
@@ -101,9 +120,15 @@
   const currentPrestige = computed({
     get: () => (isPveMode.value ? 0 : tarkovStore.getPrestigeLevel()),
     set: (newValue: number) => {
-      if (!isPveMode.value) {
-        tarkovStore.setPrestigeLevel(newValue);
+      if (isPveMode.value || tarkovStore.getPrestigeLevel() === newValue) {
+        return;
       }
+      tarkovStore.setPrestigeLevel(newValue);
+      trackSettingChanged({
+        area: 'profile',
+        name: 'prestige_level',
+        value: newValue,
+      });
     },
   });
 </script>

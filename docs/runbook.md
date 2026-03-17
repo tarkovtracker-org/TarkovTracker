@@ -32,8 +32,8 @@
 ## Deployment
 
 1. Merge to `main` and verify CI workflow `Validate` and `Workers` jobs are green.
-2. Confirm Deploy workflow published Cloudflare Pages artifact successfully.
-3. Confirm workers deployed:
+2. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
+3. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
    - `workers/team-gateway`
 4. Smoke test:
@@ -42,7 +42,7 @@
 
 ## Incident Triage
 
-1. Check Cloudflare Pages deployment logs for failed build or missing secrets.
+1. Check Cloudflare Pages / Workers deployment logs for failed builds, missing variables, or failed Git sync.
 2. Check Supabase:
    - Auth service health
    - Edge Function logs

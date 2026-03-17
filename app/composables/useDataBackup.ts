@@ -1,7 +1,15 @@
 import { useAnalyticsConsent, type AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
+import {
+  migrateToGameModeStructure,
+  type UserProgressData,
+  type UserState,
+} from '@/stores/progressState';
 import { cloneStateSnapshot } from '@/stores/tarkov/localStorage';
 import {
   getPersistedPreferencesState,
+  preferencesDefaultState,
+  type TaskFilterPreset,
+  type TaskFilterSettings,
   type PersistedPreferencesState,
   usePreferencesStore,
 } from '@/stores/usePreferences';
@@ -10,7 +18,6 @@ import { MAX_SKILL_LEVEL } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
-import type { UserProgressData, UserState } from '@/stores/progressState';
 const BACKUP_FORMAT = 'tarkovtracker-backup' as const;
 const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
 const SUPPORTED_VERSIONS = [1] as const;
@@ -133,17 +140,51 @@ const ALLOWED_PROGRESS_KEYS = new Set([
 ]);
 const VALID_FACTIONS = new Set<Faction>(['USEC', 'BEAR']);
 const PII_DEBUG_KEYS = new Set([
-  'avatar_url',
-  'avatarUrl',
-  'displayName',
+  'accountid',
+  'aid',
+  'avatarurl',
+  'displayname',
   'email',
+  'memberid',
   'nickname',
-  'photoURL',
+  'photourl',
   'picture',
+  'playerid',
+  'profileid',
+  'uid',
+  'userid',
   'username',
 ]);
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function normalizeDebugKey(key: string): string {
+  return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+function getDefaultTaskFilterSettings(): TaskFilterSettings {
+  return {
+    taskPrimaryView:
+      preferencesDefaultState.taskPrimaryView as TaskFilterSettings['taskPrimaryView'],
+    taskMapView: preferencesDefaultState.taskMapView,
+    taskTraderView: preferencesDefaultState.taskTraderView,
+    taskSecondaryView:
+      preferencesDefaultState.taskSecondaryView as TaskFilterSettings['taskSecondaryView'],
+    taskUserView: preferencesDefaultState.taskUserView,
+    taskSortMode: preferencesDefaultState.taskSortMode,
+    taskSortDirection: preferencesDefaultState.taskSortDirection,
+    taskSharedByAllOnly: preferencesDefaultState.taskSharedByAllOnly,
+    hideGlobalTasks: preferencesDefaultState.hideGlobalTasks,
+    hideNonKappaTasks: preferencesDefaultState.hideNonKappaTasks,
+    showNonSpecialTasks: preferencesDefaultState.showNonSpecialTasks,
+    showLightkeeperTasks: preferencesDefaultState.showLightkeeperTasks,
+    onlyTasksWithRequiredKeys: preferencesDefaultState.onlyTasksWithRequiredKeys,
+    respectTaskFiltersForImpact: preferencesDefaultState.respectTaskFiltersForImpact,
+    showAllFilter: preferencesDefaultState.showAllFilter,
+    showAvailableFilter: preferencesDefaultState.showAvailableFilter,
+    showLockedFilter: preferencesDefaultState.showLockedFilter,
+    showCompletedFilter: preferencesDefaultState.showCompletedFilter,
+    showFailedFilter: preferencesDefaultState.showFailedFilter,
+  };
 }
 function toProgressEpoch(data: UserProgressData | undefined): number {
   if (!data || typeof data.progressEpoch !== 'number' || !Number.isFinite(data.progressEpoch)) {
@@ -366,7 +407,7 @@ function sanitizeDebugObject<T>(value: T): T {
   }
   return Object.fromEntries(
     Object.entries(value).map(([key, entryValue]) => {
-      if (PII_DEBUG_KEYS.has(key)) {
+      if (PII_DEBUG_KEYS.has(normalizeDebugKey(key))) {
         return [key, null];
       }
       return [key, sanitizeDebugObject(entryValue)];
@@ -393,19 +434,46 @@ async function sanitizePreferencesForDebug(
   );
   sanitizedState.teamHide = Object.fromEntries(teamHideEntries);
   sanitizedState.taskUserView = await sanitizeTaskUserView(sanitizedState.taskUserView ?? null);
-  if (Array.isArray(sanitizedState.taskFilterPresets)) {
-    sanitizedState.taskFilterPresets = await Promise.all(
-      sanitizedState.taskFilterPresets.map(async (preset, index) => ({
-        ...preset,
+  const rawTaskFilterPresets = Array.isArray(
+    (sanitizedState as Record<string, unknown>).taskFilterPresets
+  )
+    ? ((sanitizedState as Record<string, unknown>).taskFilterPresets as unknown[])
+    : null;
+  if (!rawTaskFilterPresets) {
+    sanitizedState.taskFilterPresets = [];
+    return sanitizedState;
+  }
+  sanitizedState.taskFilterPresets = await Promise.all(
+    rawTaskFilterPresets.map(async (preset, index): Promise<TaskFilterPreset> => {
+      const sanitizedPreset = isPlainObject(preset) ? preset : null;
+      const sanitizedSettings = isPlainObject(sanitizedPreset?.settings)
+        ? sanitizedPreset.settings
+        : {};
+      return {
+        id:
+          typeof sanitizedPreset?.id === 'string' && sanitizedPreset.id.length > 0
+            ? sanitizedPreset.id
+            : `preset-${index + 1}`,
         name: `Preset ${index + 1}`,
         settings: {
-          ...preset.settings,
-          taskUserView: await sanitizeTaskUserView(preset.settings.taskUserView),
+          ...getDefaultTaskFilterSettings(),
+          ...sanitizedSettings,
+          taskUserView: await sanitizeTaskUserView(
+            typeof sanitizedSettings.taskUserView === 'string'
+              ? sanitizedSettings.taskUserView
+              : null
+          ),
         },
-      }))
-    );
-  }
+      };
+    })
+  );
   return sanitizedState;
+}
+function normalizePreferencesForDebug(value: unknown): PersistedPreferencesState {
+  if (!isPlainObject(value)) {
+    throw new Error('Persisted preferences state must be an object');
+  }
+  return getPersistedPreferencesState(value);
 }
 function sanitizeProgressForDebug(data: UserProgressData): UserProgressData {
   const sanitizedData = stripInternalSyncMetadata(cloneStateSnapshot(data));
@@ -415,8 +483,11 @@ function sanitizeProgressForDebug(data: UserProgressData): UserProgressData {
   }
   return sanitizedData;
 }
-async function sanitizeTarkovStateForDebug(state: UserState): Promise<UserState> {
-  const clonedState = cloneStateSnapshot(state);
+async function sanitizeTarkovStateForDebug(state: unknown): Promise<UserState> {
+  if (!isPlainObject(state)) {
+    throw new Error('Persisted progress state must be an object');
+  }
+  const clonedState = migrateToGameModeStructure(cloneStateSnapshot(state));
   clonedState.tarkovUid = null;
   clonedState.pvp = sanitizeProgressForDebug(clonedState.pvp);
   clonedState.pve = sanitizeProgressForDebug(clonedState.pve);
@@ -499,16 +570,29 @@ async function buildProgressStorageSnapshot(
   const rawSize = rawValue.length;
   const wrapped = parseUserScopedStorage<UserState>(rawValue);
   if (wrapped) {
-    return {
-      storageKey: STORAGE_KEYS.progress,
-      format: 'scoped',
-      ownerUserFingerprint: await fingerprintValue(wrapped._userId),
-      ownerMatchesCurrentUser:
-        currentUserId === null ? wrapped._userId === null : wrapped._userId === currentUserId,
-      timestamp: wrapped._timestamp ?? null,
-      data: await sanitizeTarkovStateForDebug(wrapped.data),
-      rawSize,
-    };
+    try {
+      return {
+        storageKey: STORAGE_KEYS.progress,
+        format: 'scoped',
+        ownerUserFingerprint: await fingerprintValue(wrapped._userId),
+        ownerMatchesCurrentUser:
+          currentUserId === null ? wrapped._userId === null : wrapped._userId === currentUserId,
+        timestamp: wrapped._timestamp ?? null,
+        data: await sanitizeTarkovStateForDebug(wrapped.data),
+        rawSize,
+      };
+    } catch {
+      return {
+        storageKey: STORAGE_KEYS.progress,
+        format: 'unparseable',
+        ownerUserFingerprint: await fingerprintValue(wrapped._userId),
+        ownerMatchesCurrentUser:
+          currentUserId === null ? wrapped._userId === null : wrapped._userId === currentUserId,
+        timestamp: wrapped._timestamp ?? null,
+        data: null,
+        rawSize,
+      };
+    }
   }
   try {
     return {
@@ -542,16 +626,29 @@ async function buildPreferencesStorageSnapshot(
   const rawSize = rawValue.length;
   const wrapped = parseUserScopedStorage<PersistedPreferencesState>(rawValue);
   if (wrapped) {
-    return {
-      storageKey: STORAGE_KEYS.preferences,
-      format: 'scoped',
-      ownerUserFingerprint: await fingerprintValue(wrapped._userId),
-      ownerMatchesCurrentUser:
-        currentUserId === null ? wrapped._userId === null : wrapped._userId === currentUserId,
-      timestamp: wrapped._timestamp ?? null,
-      data: await sanitizePreferencesForDebug(getPersistedPreferencesState(wrapped.data)),
-      rawSize,
-    };
+    try {
+      return {
+        storageKey: STORAGE_KEYS.preferences,
+        format: 'scoped',
+        ownerUserFingerprint: await fingerprintValue(wrapped._userId),
+        ownerMatchesCurrentUser:
+          currentUserId === null ? wrapped._userId === null : wrapped._userId === currentUserId,
+        timestamp: wrapped._timestamp ?? null,
+        data: await sanitizePreferencesForDebug(normalizePreferencesForDebug(wrapped.data)),
+        rawSize,
+      };
+    } catch {
+      return {
+        storageKey: STORAGE_KEYS.preferences,
+        format: 'unparseable',
+        ownerUserFingerprint: await fingerprintValue(wrapped._userId),
+        ownerMatchesCurrentUser:
+          currentUserId === null ? wrapped._userId === null : wrapped._userId === currentUserId,
+        timestamp: wrapped._timestamp ?? null,
+        data: null,
+        rawSize,
+      };
+    }
   }
   try {
     return {
@@ -560,9 +657,7 @@ async function buildPreferencesStorageSnapshot(
       ownerUserFingerprint: null,
       ownerMatchesCurrentUser: null,
       timestamp: null,
-      data: await sanitizePreferencesForDebug(
-        getPersistedPreferencesState(JSON.parse(rawValue) as PersistedPreferencesState)
-      ),
+      data: await sanitizePreferencesForDebug(normalizePreferencesForDebug(JSON.parse(rawValue))),
       rawSize,
     };
   } catch {
