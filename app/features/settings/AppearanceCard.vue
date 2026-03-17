@@ -4,22 +4,22 @@
     icon-color="accent"
     highlight-color="accent"
     :fill-height="false"
-    :title="$t('settings.interface.appearance.title')"
+    :title="t('settings.interface.appearance.title')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
       <div class="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-end">
         <div class="space-y-1">
           <p class="text-foreground text-sm font-semibold">
-            {{ $t('settings.interface.appearance.mode') }}
+            {{ t('settings.interface.appearance.mode') }}
           </p>
           <p class="text-foreground-muted text-sm">
-            {{ $t('settings.interface.appearance.description') }}
+            {{ t('settings.interface.appearance.description') }}
           </p>
         </div>
         <div class="space-y-2">
           <p class="text-foreground-muted text-sm font-semibold">
-            {{ $t('settings.theme') }}
+            {{ t('settings.theme') }}
           </p>
           <SelectMenuFixed
             v-model="themeMode"
