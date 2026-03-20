@@ -33,6 +33,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
     locale: ref('en'),
+    t: (key: string) => key,
   }),
 }));
 vi.mock('#imports', async (importOriginal) => ({
@@ -83,12 +84,12 @@ describe('AdminCacheCard', () => {
         },
       },
     });
-    expect(wrapper.text()).not.toContain('Confirm Full Cache Purge');
+    expect(wrapper.text()).not.toContain('admin.cache.full_purge.confirm_title');
     const purgeEverythingButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Purge Everything'));
+      .find((button) => button.text().includes('admin.cache.full_purge.action'));
     expect(purgeEverythingButton).toBeDefined();
     await purgeEverythingButton!.trigger('click');
-    expect(wrapper.text()).toContain('Confirm Full Cache Purge');
+    expect(wrapper.text()).toContain('admin.cache.full_purge.confirm_title');
   });
 });
