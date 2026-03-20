@@ -40,6 +40,7 @@
               color="neutral"
               size="xs"
               class="flex-1"
+              :aria-pressed="firFilter === 'all'"
               :class="
                 firFilter === 'all'
                   ? 'bg-selected-surface text-foreground'
@@ -54,6 +55,7 @@
               color="neutral"
               size="xs"
               class="flex-1"
+              :aria-pressed="firFilter === 'fir'"
               :class="
                 firFilter === 'fir'
                   ? 'bg-selected-surface text-foreground'
@@ -68,6 +70,7 @@
               color="neutral"
               size="xs"
               class="flex-1"
+              :aria-pressed="firFilter === 'non-fir'"
               :class="
                 firFilter === 'non-fir'
                   ? 'bg-selected-surface text-foreground'
@@ -117,6 +120,7 @@
               color="neutral"
               size="xs"
               icon="i-mdi-view-list"
+              :aria-pressed="!groupByItem && viewMode === 'list'"
               :class="
                 !groupByItem && viewMode === 'list'
                   ? 'bg-selected-surface text-foreground'
@@ -131,6 +135,7 @@
               color="neutral"
               size="xs"
               icon="i-mdi-view-grid"
+              :aria-pressed="!groupByItem && viewMode === 'grid'"
               :class="
                 !groupByItem && viewMode === 'grid'
                   ? 'bg-selected-surface text-foreground'
@@ -145,6 +150,7 @@
               color="neutral"
               size="xs"
               icon="i-mdi-group"
+              :aria-pressed="groupByItem"
               :class="
                 groupByItem
                   ? 'bg-selected-surface text-foreground'

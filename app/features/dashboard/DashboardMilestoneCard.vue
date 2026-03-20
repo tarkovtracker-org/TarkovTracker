@@ -92,9 +92,11 @@
   const achievedClasses = computed(() => colorClasses[props.color].achieved);
   const iconColorClass = computed(() => colorClasses[props.color].icon);
   const showsProgressRing = computed(() => !props.isAchieved && props.progressValue !== null);
-  const normalizedProgressValue = computed(() =>
-    Math.max(0, Math.min(100, props.progressValue ?? 0))
-  );
+  const normalizedProgressValue = computed(() => {
+    const rawValue = Number(props.progressValue ?? 0);
+    const progressValue = Number.isFinite(rawValue) ? rawValue : 0;
+    return Math.max(0, Math.min(100, progressValue));
+  });
   const progressRingStyle = computed(() => {
     const progress = normalizedProgressValue.value * 3.6;
     const progressColor = colorClasses[props.color].progress;

@@ -1,5 +1,50 @@
 {
   admin: {
+    cache: {
+      title: '缓存管理',
+      last_purge: '上次清除：{type}，时间 {timestamp}',
+      purge_type: {
+        all: '全部缓存',
+        tarkov_data: 'Tarkov 数据',
+      },
+      tarkov_data: {
+        title: 'Tarkov 数据缓存',
+        description: '清除缓存的游戏数据（任务、藏身处、物品）。用户将从 tarkov.dev API 获取最新数据。',
+        action: '清除游戏数据',
+        success_title: '缓存已清除',
+        success_description: 'Tarkov 数据缓存已清除。用户将收到最新数据。',
+      },
+      full_purge: {
+        title: '完全清除缓存',
+        description: '清除所有缓存内容，包括静态资源。请谨慎使用，这会增加源站负载。',
+        action: '全部清除',
+        confirm_title: '确认完全清除缓存',
+        confirm_description: '这将清除 Cloudflare 中的所有缓存内容，包括静态资源、字体和 JavaScript 包。这可能会暂时增加所有用户的加载时间。',
+        confirm_action: '确认清除',
+        success_title: '全部缓存已清除',
+        success_description: '所有缓存内容都已从 Cloudflare 中清除。',
+      },
+      info: {
+        title: '缓存行为',
+        description: '清除后，下一次用户请求将触发从 tarkov.dev 重新获取数据。这些新数据随后会为所有用户缓存。',
+      },
+      unauthorized: {
+        title: '未授权',
+        description: '执行此操作需要管理员权限。',
+      },
+      purge_failed: {
+        title: '清除失败',
+        description: '无法清除缓存',
+      },
+    },
+    page: {
+      verifying_access: '正在验证管理员权限...',
+      connection_error: '连接错误',
+      load_error_description: '无法加载管理员数据。请刷新页面或联系支持。参考编号：{reference}',
+      access_notice_title: '管理员权限',
+      access_notice_description: '这里执行的操作会影响所有用户。当前登录为 {user}',
+      unknown_user: '未知',
+    },
     title: '管理面板',
   },
   alerts: {
@@ -196,6 +241,7 @@
           progress: '可带来的进度',
           status: '状态',
           secondary: '其他不错的选项',
+          secondary_description: '{reason} - {status}',
           secondary_actionable: '如果主要方案不合适，可以改做这些。',
           secondary_blocked: '这些是你队列里最接近解锁的内容。',
           secondary_empty: '这就是当前最明确的下一步。',
@@ -1181,7 +1227,7 @@
   settings: {
     title: '设置',
     locale: '语言',
-    theme: 'Theme',
+    theme: '主题',
     tabs: {
       gameplay: '游戏玩法',
       interface: '界面',
@@ -1661,8 +1707,14 @@
   game_settings: {
     pvp: 'PvP',
     pve: 'PvE',
+    toggle_mode: '切换游戏模式',
+    select_faction: '选择阵营',
   },
   oauth: {
+    callback: {
+      title: '正在验证身份...',
+      description: '请稍候，我们正在完成你的登录。',
+    },
     consent: {
       authorize: 'Authorize Application',
       loading: 'Loading...',

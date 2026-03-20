@@ -426,7 +426,7 @@
   const legendItems = computed(() => [
     { label: t('page.tasks.graph.completed'), colorClass: 'bg-success-500' },
     { label: t('page.tasks.graph.available'), colorClass: 'bg-info-500' },
-    { label: t('page.tasks.graph.locked'), colorClass: 'bg-shell' },
+    { label: t('page.tasks.graph.locked'), colorClass: 'bg-shell ring-1 ring-border-strong' },
     { label: t('page.tasks.graph.failed'), colorClass: 'bg-error-500' },
     { label: t('page.tasks.graph.flow_start'), colorClass: 'bg-primary-400' },
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },

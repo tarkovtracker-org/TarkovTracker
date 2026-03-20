@@ -8,7 +8,7 @@
   const toast = useToast();
   const { $supabase } = useNuxtApp();
   const { systemStore, hasInitiallyLoaded } = useSystemStoreWithSupabase();
-  const { locale } = useI18n({ useScope: 'global' });
+  const { t, locale } = useI18n({ useScope: 'global' });
   const LAST_PURGE_STORAGE_KEY = STORAGE_KEYS.adminLastPurge;
   const LAST_PURGE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
   interface LastPurgeEntry {
@@ -22,8 +22,7 @@
   const isPurgingTarkov = ref(false);
   const lastPurge = ref<LastPurgeEntry | null>(null);
   const showConfirmAll = ref(false);
-  const cacheInfoDescription =
-    'After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.';
+  const cacheInfoDescription = computed(() => t('admin.cache.info.description'));
   const isSystemReady = computed(() => {
     const storeUserId = (systemStore.$state as { user_id?: string | null }).user_id ?? null;
     const currentUserId = $supabase.user?.id ?? null;
@@ -49,7 +48,9 @@
     });
   };
   const getPurgeLabel = (purgeType: string) => {
-    return purgeType === 'all' ? 'All Cache' : 'Tarkov Data';
+    return purgeType === 'all'
+      ? t('admin.cache.purge_type.all')
+      : t('admin.cache.purge_type.tarkov_data');
   };
   const persistLastPurge = (entry: LastPurgeEntry) => {
     try {
@@ -102,8 +103,8 @@
   const checkAdminAuthorization = (): boolean => {
     if (!systemStore.isAdmin) {
       toast.add({
-        title: 'Unauthorized',
-        description: 'Admin privileges required for this action.',
+        title: t('admin.cache.unauthorized.title'),
+        description: t('admin.cache.unauthorized.description'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -153,8 +154,8 @@
   const handlePurgeTarkovData = async () => {
     if (!$supabase.user.loggedIn) {
       toast.add({
-        title: 'Unauthorized',
-        description: 'You do not have permission to perform this action.',
+        title: t('admin.cache.unauthorized.title'),
+        description: t('admin.cache.unauthorized.description'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -166,18 +167,19 @@
     isPurgingTarkov.value = true;
     try {
       const result = await purgeCache('tarkov-data');
-      if (updateLastPurgeIfValid(result, 'Tarkov Data')) {
+      if (updateLastPurgeIfValid(result, t('admin.cache.purge_type.tarkov_data'))) {
         toast.add({
-          title: 'Cache Purged',
-          description: 'Tarkov data cache has been cleared. Users will receive fresh data.',
+          title: t('admin.cache.tarkov_data.success_title'),
+          description: t('admin.cache.tarkov_data.success_description'),
           color: 'success',
           icon: 'i-mdi-check-circle',
         });
       }
     } catch (error) {
       toast.add({
-        title: 'Purge Failed',
-        description: error instanceof Error ? error.message : 'Failed to purge cache',
+        title: t('admin.cache.purge_failed.title'),
+        description:
+          error instanceof Error ? error.message : t('admin.cache.purge_failed.description'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -189,8 +191,8 @@
     showConfirmAll.value = false;
     if (!$supabase.user.loggedIn) {
       toast.add({
-        title: 'Unauthorized',
-        description: 'You do not have permission to perform this action.',
+        title: t('admin.cache.unauthorized.title'),
+        description: t('admin.cache.unauthorized.description'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -202,18 +204,19 @@
     isPurgingAll.value = true;
     try {
       const result = await purgeCache('all');
-      if (updateLastPurgeIfValid(result, 'All Cache')) {
+      if (updateLastPurgeIfValid(result, t('admin.cache.purge_type.all'))) {
         toast.add({
-          title: 'Full Cache Purged',
-          description: 'All cached content has been cleared from Cloudflare.',
+          title: t('admin.cache.full_purge.success_title'),
+          description: t('admin.cache.full_purge.success_description'),
           color: 'success',
           icon: 'i-mdi-check-circle',
         });
       }
     } catch (error) {
       toast.add({
-        title: 'Purge Failed',
-        description: error instanceof Error ? error.message : 'Failed to purge cache',
+        title: t('admin.cache.purge_failed.title'),
+        description:
+          error instanceof Error ? error.message : t('admin.cache.purge_failed.description'),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -249,7 +252,7 @@
     icon-color="warning"
     highlight-color="warning"
     :fill-height="false"
-    title="Cache Management"
+    :title="t('admin.cache.title')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
@@ -259,7 +262,12 @@
           <div class="text-success-400 flex items-center gap-2 text-sm">
             <UIcon name="i-mdi-check-circle" class="size-4" />
             <span>
-              Last purge: {{ lastPurge.type }} at {{ formatTimestamp(lastPurge.timestamp) }}
+              {{
+                t('admin.cache.last_purge', {
+                  type: lastPurge.type,
+                  timestamp: formatTimestamp(lastPurge.timestamp),
+                })
+              }}
             </span>
           </div>
         </div>
@@ -267,10 +275,11 @@
         <div class="grid gap-4 md:grid-cols-2">
           <!-- Tarkov Data Cache -->
           <div class="bg-panel border-border rounded-lg border p-4">
-            <h4 class="text-foreground mb-2 font-medium">Tarkov Data Cache</h4>
+            <h4 class="text-foreground mb-2 font-medium">
+              {{ t('admin.cache.tarkov_data.title') }}
+            </h4>
             <p class="text-foreground-muted mb-3 text-sm">
-              Clears cached game data (tasks, hideout, items). Users will fetch fresh data from
-              tarkov.dev API.
+              {{ t('admin.cache.tarkov_data.description') }}
             </p>
             <UButton
               color="warning"
@@ -280,7 +289,7 @@
               :disabled="isPurgingAll"
               @click="handlePurgeTarkovData"
             >
-              Purge Game Data
+              {{ t('admin.cache.tarkov_data.action') }}
             </UButton>
           </div>
           <!-- Full Cache -->
@@ -288,11 +297,10 @@
             <h4
               class="mb-2 font-medium text-[color-mix(in_srgb,var(--color-error-500)_78%,var(--color-foreground))]"
             >
-              Full Cache Purge
+              {{ t('admin.cache.full_purge.title') }}
             </h4>
             <p class="text-foreground-muted mb-3 text-sm">
-              Clears ALL cached content including static assets. Use sparingly - increases load on
-              origin.
+              {{ t('admin.cache.full_purge.description') }}
             </p>
             <UButton
               color="error"
@@ -302,7 +310,7 @@
               :disabled="isPurgingTarkov"
               @click="showConfirmAll = true"
             >
-              Purge Everything
+              {{ t('admin.cache.full_purge.action') }}
             </UButton>
           </div>
         </div>
@@ -311,7 +319,7 @@
           icon="i-mdi-information"
           color="info"
           variant="soft"
-          title="Cache Behavior"
+          :title="t('admin.cache.info.title')"
           :description="cacheInfoDescription"
         />
       </div>
@@ -325,16 +333,19 @@
           <div class="bg-error-500/15 rounded-full p-2">
             <UIcon name="i-mdi-alert" class="text-error-400 size-6" />
           </div>
-          <h3 class="text-foreground text-lg font-semibold">Confirm Full Cache Purge</h3>
+          <h3 class="text-foreground text-lg font-semibold">
+            {{ t('admin.cache.full_purge.confirm_title') }}
+          </h3>
         </div>
         <p class="text-foreground-muted mb-6">
-          This will clear ALL cached content from Cloudflare, including static assets, fonts, and
-          JavaScript bundles. This may temporarily increase load times for all users.
+          {{ t('admin.cache.full_purge.confirm_description') }}
         </p>
         <div class="flex justify-end gap-3">
-          <UButton color="neutral" variant="ghost" @click="showConfirmAll = false">Cancel</UButton>
+          <UButton color="neutral" variant="ghost" @click="showConfirmAll = false">
+            {{ t('common.cancel') }}
+          </UButton>
           <UButton color="error" icon="i-mdi-delete-sweep" @click="handlePurgeAll">
-            Confirm Purge
+            {{ t('admin.cache.full_purge.confirm_action') }}
           </UButton>
         </div>
       </div>

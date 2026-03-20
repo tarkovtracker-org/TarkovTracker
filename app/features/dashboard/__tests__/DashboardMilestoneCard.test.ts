@@ -40,4 +40,10 @@ describe('DashboardMilestoneCard', () => {
     const wrapper = await mountWithProps({ progressValue: null });
     expect(wrapper.findComponent({ name: 'UIcon' }).exists()).toBe(true);
   });
+  it('falls back to a 0 degree ring for non-finite progress values', async () => {
+    const wrapper = await mountWithProps({ progressValue: Number.NaN });
+    const ring = wrapper.find('[style*="conic-gradient"]');
+    expect(ring.exists()).toBe(true);
+    expect(ring.attributes('style')).toContain('0deg 0deg');
+  });
 });

@@ -3,8 +3,8 @@
     <UCard class="bg-panel border-border shadow-card w-full max-w-md border" :ui="{ body: 'p-8' }">
       <div class="flex flex-col items-center space-y-3 text-center">
         <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-10 w-10 animate-spin" />
-        <h2 class="text-foreground text-lg font-semibold">Authenticating...</h2>
-        <p class="text-foreground-muted text-sm">Please wait while we complete your sign in.</p>
+        <h2 class="text-foreground text-lg font-semibold">{{ t('oauth.callback.title') }}</h2>
+        <p class="text-foreground-muted text-sm">{{ t('oauth.callback.description') }}</p>
       </div>
     </UCard>
   </div>
@@ -12,6 +12,7 @@
 <script setup lang="ts">
   import { useProductAnalytics } from '@/composables/useProductAnalytics';
   import { sanitizeInternalRedirect } from '@/utils/redirect';
+  const { t } = useI18n({ useScope: 'global' });
   const { clearPendingLoginProvider, trackLoginSucceeded } = useProductAnalytics();
   const { $supabase } = useNuxtApp();
   const finalizeLoginTracking = () => {

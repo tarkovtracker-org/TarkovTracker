@@ -1,6 +1,51 @@
 {
   admin: {
     title: 'Панель адміністратора',
+    cache: {
+      title: 'Керування кешем',
+      last_purge: 'Останнє очищення: {type} о {timestamp}',
+      purge_type: {
+        all: 'Увесь кеш',
+        tarkov_data: 'Дані Tarkov',
+      },
+      tarkov_data: {
+        title: 'Кеш даних Tarkov',
+        description: 'Очищає кешовані ігрові дані (завдання, сховище, предмети). Користувачі завантажать свіжі дані з API tarkov.dev.',
+        action: 'Очистити ігрові дані',
+        success_title: 'Кеш очищено',
+        success_description: 'Кеш даних Tarkov очищено. Користувачі отримають свіжі дані.',
+      },
+      full_purge: {
+        title: 'Повне очищення кешу',
+        description: 'Очищає ВСІ кешовані дані, включно зі статичними ресурсами. Використовуйте обережно: це збільшує навантаження на origin.',
+        action: 'Очистити все',
+        confirm_title: 'Підтвердити повне очищення кешу',
+        confirm_description: 'Це очистить ВСІ кешовані дані з Cloudflare, включно зі статичними ресурсами, шрифтами та JavaScript-бандлами. Це може тимчасово збільшити час завантаження для всіх користувачів.',
+        confirm_action: 'Підтвердити очищення',
+        success_title: 'Повний кеш очищено',
+        success_description: 'Увесь кешований вміст було видалено з Cloudflare.',
+      },
+      info: {
+        title: 'Поведінка кешу',
+        description: 'Після очищення наступний запит користувача спричинить нове отримання даних із tarkov.dev. Ці нові дані потім будуть закешовані для всіх користувачів.',
+      },
+      unauthorized: {
+        title: 'Немає доступу',
+        description: 'Для цієї дії потрібні права адміністратора.',
+      },
+      purge_failed: {
+        title: 'Помилка очищення',
+        description: 'Не вдалося очистити кеш',
+      },
+    },
+    page: {
+      verifying_access: 'Перевірка доступу адміністратора...',
+      connection_error: 'Помилка з’єднання',
+      load_error_description: 'Не вдалося завантажити дані адмін-панелі. Оновіть сторінку або зверніться до підтримки. Посилання: {reference}',
+      access_notice_title: 'Доступ адміністратора',
+      access_notice_description: 'Дії тут впливають на всіх користувачів. Вхід виконано як {user}',
+      unknown_user: 'Невідомо',
+    },
   },
   alerts: {
     no_map_data: 'Для цього вибору немає даних мапи.',
@@ -196,6 +241,7 @@
           progress: 'Який прогрес це дає',
           status: 'Статус',
           secondary: 'Інші хороші варіанти',
+          secondary_description: '{reason} - {status}',
           secondary_actionable: 'Скористайтеся ними, якщо основний план вам не підходить.',
           secondary_blocked: 'Це найближчі розблокування у вашій черзі.',
           secondary_empty: 'Зараз це найочевидніший наступний крок.',
@@ -1181,7 +1227,7 @@
   settings: {
     title: 'Налаштування',
     locale: 'Мова',
-    theme: 'Theme',
+    theme: 'Тема',
     tabs: {
       gameplay: 'Геймплей',
       interface: 'Інтерфейс',
@@ -1661,8 +1707,14 @@
   game_settings: {
     pvp: 'PvP',
     pve: 'PvE',
+    toggle_mode: 'Перемкнути режим гри',
+    select_faction: 'Вибрати фракцію',
   },
   oauth: {
+    callback: {
+      title: 'Автентифікація...',
+      description: 'Будь ласка, зачекайте, поки ми завершимо вхід.',
+    },
     consent: {
       authorize: 'Authorize Application',
       loading: 'Loading...',

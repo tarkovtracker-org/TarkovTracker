@@ -595,5 +595,4 @@ git commit -m "feat(theme): add first-class light mode support"
 - Do not couple light mode logic to PvP/PvE accent logic. Theme mode and game mode must stay orthogonal.
 - The current logo asset may need a light-theme counterpart or a safer container treatment.
 - Avoid introducing lots of `dark:` and `light:` forks in templates. Prefer semantic variables first.
-- `privacy.vue` still contains `dark:` classes and should be normalized during the audit.
 - Because the app is SPA-only, client-side theme initialization is acceptable, but apply it as early as possible to reduce visible theme flash.

@@ -1,6 +1,51 @@
 {
   admin: {
     title: 'Admin-Panel',
+    cache: {
+      title: 'Cache-Verwaltung',
+      last_purge: 'Letzte Bereinigung: {type} um {timestamp}',
+      purge_type: {
+        all: 'Gesamter Cache',
+        tarkov_data: 'Tarkov-Daten',
+      },
+      tarkov_data: {
+        title: 'Tarkov-Datencache',
+        description: 'Löscht zwischengespeicherte Spieldaten (Aufgaben, Versteck, Gegenstände). Nutzer laden frische Daten von der tarkov.dev-API.',
+        action: 'Spieldaten bereinigen',
+        success_title: 'Cache geleert',
+        success_description: 'Der Tarkov-Datencache wurde geleert. Nutzer erhalten frische Daten.',
+      },
+      full_purge: {
+        title: 'Vollständige Cache-Bereinigung',
+        description: 'Löscht ALLE zwischengespeicherten Inhalte einschließlich statischer Assets. Sparsam verwenden - erhöht die Last auf dem Origin.',
+        action: 'Alles bereinigen',
+        confirm_title: 'Vollständige Cache-Bereinigung bestätigen',
+        confirm_description: 'Dadurch werden ALLE zwischengespeicherten Inhalte aus Cloudflare entfernt, einschließlich statischer Assets, Schriftarten und JavaScript-Bundles. Das kann die Ladezeiten für alle Nutzer vorübergehend erhöhen.',
+        confirm_action: 'Bereinigung bestätigen',
+        success_title: 'Vollständiger Cache geleert',
+        success_description: 'Alle zwischengespeicherten Inhalte wurden aus Cloudflare entfernt.',
+      },
+      info: {
+        title: 'Cache-Verhalten',
+        description: 'Nach dem Leeren löst die nächste Nutzeranfrage einen frischen Abruf von tarkov.dev aus. Diese neuen Daten werden dann für alle Nutzer zwischengespeichert.',
+      },
+      unauthorized: {
+        title: 'Nicht autorisiert',
+        description: 'Administratorrechte sind für diese Aktion erforderlich.',
+      },
+      purge_failed: {
+        title: 'Bereinigung fehlgeschlagen',
+        description: 'Cache konnte nicht bereinigt werden',
+      },
+    },
+    page: {
+      verifying_access: 'Adminzugriff wird überprüft...',
+      connection_error: 'Verbindungsfehler',
+      load_error_description: 'Admin-Daten konnten nicht geladen werden. Bitte aktualisieren oder den Support kontaktieren. Referenz: {reference}',
+      access_notice_title: 'Adminzugriff',
+      access_notice_description: 'Aktionen hier betreffen alle Nutzer. Angemeldet als {user}',
+      unknown_user: 'Unbekannt',
+    },
   },
   alerts: {
     no_map_data: 'Für diese Auswahl sind keine Kartendaten verfügbar.',
@@ -196,6 +241,7 @@
           progress: 'Welchen Fortschritt das bringt',
           status: 'Status',
           secondary: 'Weitere gute Optionen',
+          secondary_description: '{reason} - {status}',
           secondary_actionable: 'Nutze diese, wenn der Hauptplan nicht passt.',
           secondary_blocked: 'Das sind die nächsten Freischaltungen in deiner Warteschlange.',
           secondary_empty: 'Das ist gerade der klarste nächste Schritt.',
@@ -1181,7 +1227,7 @@
   settings: {
     title: 'Einstellungen',
     locale: 'Sprache',
-    theme: 'Theme',
+    theme: 'Design',
     tabs: {
       gameplay: 'Gameplay',
       interface: 'Schnittstelle',
@@ -1661,8 +1707,14 @@
   game_settings: {
     pvp: 'PvP',
     pve: 'PvE',
+    toggle_mode: 'Spielmodus umschalten',
+    select_faction: 'Fraktion auswählen',
   },
   oauth: {
+    callback: {
+      title: 'Authentifizierung...',
+      description: 'Bitte warte, während wir deine Anmeldung abschließen.',
+    },
     consent: {
       authorize: 'Authorize Application',
       loading: 'Loading...',

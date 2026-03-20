@@ -1,6 +1,51 @@
 {
   admin: {
     title: 'Admin Panel',
+    cache: {
+      title: 'Cache Management',
+      last_purge: 'Last purge: {type} at {timestamp}',
+      purge_type: {
+        all: 'All Cache',
+        tarkov_data: 'Tarkov Data',
+      },
+      tarkov_data: {
+        title: 'Tarkov Data Cache',
+        description: 'Clears cached game data (tasks, hideout, items). Users will fetch fresh data from the tarkov.dev API.',
+        action: 'Purge Game Data',
+        success_title: 'Cache Purged',
+        success_description: 'Tarkov data cache has been cleared. Users will receive fresh data.',
+      },
+      full_purge: {
+        title: 'Full Cache Purge',
+        description: 'Clears ALL cached content including static assets. Use sparingly - increases load on origin.',
+        action: 'Purge Everything',
+        confirm_title: 'Confirm Full Cache Purge',
+        confirm_description: 'This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.',
+        confirm_action: 'Confirm Purge',
+        success_title: 'Full Cache Purged',
+        success_description: 'All cached content has been cleared from Cloudflare.',
+      },
+      info: {
+        title: 'Cache Behavior',
+        description: 'After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.',
+      },
+      unauthorized: {
+        title: 'Unauthorized',
+        description: 'Admin privileges required for this action.',
+      },
+      purge_failed: {
+        title: 'Purge Failed',
+        description: 'Failed to purge cache',
+      },
+    },
+    page: {
+      verifying_access: 'Verifying admin access...',
+      connection_error: 'Connection Error',
+      load_error_description: 'Failed to load admin data. Please refresh or contact support. Reference: {reference}',
+      access_notice_title: 'Admin Access',
+      access_notice_description: 'Actions performed here affect all users. Logged in as {user}',
+      unknown_user: 'Unknown',
+    },
   },
   alerts: {
     no_map_data: 'No map data available for this selection.',
@@ -196,6 +241,7 @@
           progress: 'Progress this adds',
           status: 'Status',
           secondary: 'Other good options',
+          secondary_description: '{reason} - {status}',
           secondary_actionable: 'Use these if the primary plan is not a fit.',
           secondary_blocked: 'These are the next closest unlocks in your queue.',
           secondary_empty: 'This is the clearest next step right now.',
@@ -1662,8 +1708,14 @@
   game_settings: {
     pvp: 'PvP',
     pve: 'PvE',
+    toggle_mode: 'Toggle game mode',
+    select_faction: 'Select faction',
   },
   oauth: {
+    callback: {
+      title: 'Authenticating...',
+      description: 'Please wait while we complete your sign in.',
+    },
     consent: {
       authorize: 'Authorize Application',
       loading: 'Loading...',

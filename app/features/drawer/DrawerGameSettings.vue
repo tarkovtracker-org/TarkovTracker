@@ -3,7 +3,7 @@
     <div
       class="border-border flex w-full overflow-hidden rounded-md border"
       role="group"
-      aria-label="Toggle game mode"
+      :aria-label="t('game_settings.toggle_mode')"
     >
       <button
         type="button"
@@ -34,7 +34,7 @@
     <div
       class="border-border flex w-full overflow-hidden rounded-md border"
       role="group"
-      aria-label="Select faction"
+      :aria-label="t('game_settings.select_faction')"
     >
       <button
         v-for="faction in factions"

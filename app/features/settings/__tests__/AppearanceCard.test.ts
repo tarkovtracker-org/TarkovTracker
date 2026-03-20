@@ -69,4 +69,24 @@ describe('AppearanceCard', () => {
     await wrapper.get('[data-testid="theme-select"]').setValue('light');
     expect(mockPreferencesStore.setThemeMode).toHaveBeenCalledWith('light');
   });
+  it('normalizes object payloads from the select menu', async () => {
+    const wrapper = mount(AppearanceCard, {
+      global: {
+        stubs: {
+          GenericCard: {
+            template: '<div><slot name="content" /></div>',
+          },
+          SelectMenuFixed: {
+            props: ['modelValue', 'items'],
+            emits: ['update:modelValue'],
+            template:
+              "<button data-testid=\"theme-select-object\" @click=\"$emit('update:modelValue', { label: 'Light', value: 'light' })\">set</button>",
+          },
+          UIcon: true,
+        },
+      },
+    });
+    await wrapper.get('[data-testid="theme-select-object"]').trigger('click');
+    expect(mockPreferencesStore.setThemeMode).toHaveBeenCalledWith('light');
+  });
 });

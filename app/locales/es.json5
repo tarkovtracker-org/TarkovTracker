@@ -1,6 +1,51 @@
 {
   admin: {
     title: 'Panel de administración',
+    cache: {
+      title: 'Administración de caché',
+      last_purge: 'Última purga: {type} a las {timestamp}',
+      purge_type: {
+        all: 'Toda la caché',
+        tarkov_data: 'Datos de Tarkov',
+      },
+      tarkov_data: {
+        title: 'Caché de datos de Tarkov',
+        description: 'Borra los datos del juego en caché (tareas, escondite, objetos). Los usuarios obtendrán datos nuevos desde la API de tarkov.dev.',
+        action: 'Purgar datos del juego',
+        success_title: 'Caché purgada',
+        success_description: 'La caché de datos de Tarkov se ha borrado. Los usuarios recibirán datos nuevos.',
+      },
+      full_purge: {
+        title: 'Purga completa de caché',
+        description: 'Borra TODO el contenido en caché, incluidos los recursos estáticos. Úsalo con moderación: aumenta la carga en el origen.',
+        action: 'Purgarlo todo',
+        confirm_title: 'Confirmar purga completa de caché',
+        confirm_description: 'Esto borrará TODO el contenido en caché de Cloudflare, incluidos recursos estáticos, fuentes y paquetes de JavaScript. Esto puede aumentar temporalmente los tiempos de carga para todos los usuarios.',
+        confirm_action: 'Confirmar purga',
+        success_title: 'Caché completa purgada',
+        success_description: 'Todo el contenido en caché se ha borrado de Cloudflare.',
+      },
+      info: {
+        title: 'Comportamiento de la caché',
+        description: 'Después de purgar, la siguiente solicitud de un usuario activará una nueva carga desde tarkov.dev. Esos nuevos datos quedarán en caché para todos los usuarios.',
+      },
+      unauthorized: {
+        title: 'No autorizado',
+        description: 'Se requieren privilegios de administrador para esta acción.',
+      },
+      purge_failed: {
+        title: 'Purga fallida',
+        description: 'No se pudo purgar la caché',
+      },
+    },
+    page: {
+      verifying_access: 'Verificando acceso de administrador...',
+      connection_error: 'Error de conexión',
+      load_error_description: 'No se pudieron cargar los datos de administración. Actualiza la página o contacta con soporte. Referencia: {reference}',
+      access_notice_title: 'Acceso de administrador',
+      access_notice_description: 'Las acciones realizadas aquí afectan a todos los usuarios. Sesión iniciada como {user}',
+      unknown_user: 'Desconocido',
+    },
   },
   alerts: {
     no_map_data: 'No hay datos de mapa disponibles para esta selección.',
@@ -196,6 +241,7 @@
           progress: 'Progreso que añade',
           status: 'Estado',
           secondary: 'Otras buenas opciones',
+          secondary_description: '{reason} - {status}',
           secondary_actionable: 'Úsalas si el plan principal no te encaja.',
           secondary_blocked: 'Estos son los desbloqueos más cercanos en tu cola.',
           secondary_empty: 'Este es el siguiente paso más claro en este momento.',
@@ -1181,7 +1227,7 @@
   settings: {
     title: 'Configuración',
     locale: 'Idioma',
-    theme: 'Theme',
+    theme: 'Tema',
     tabs: {
       gameplay: 'Jugabilidad',
       interface: 'Interfaz',
@@ -1661,8 +1707,14 @@
   game_settings: {
     pvp: 'PvP',
     pve: 'PvE',
+    toggle_mode: 'Cambiar modo de juego',
+    select_faction: 'Seleccionar facción',
   },
   oauth: {
+    callback: {
+      title: 'Autenticando...',
+      description: 'Espera mientras completamos tu inicio de sesión.',
+    },
     consent: {
       authorize: 'Authorize Application',
       loading: 'Loading...',

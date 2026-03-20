@@ -1,6 +1,51 @@
 {
   admin: {
     title: 'Панель администратора',
+    cache: {
+      title: 'Управление кэшем',
+      last_purge: 'Последняя очистка: {type} в {timestamp}',
+      purge_type: {
+        all: 'Весь кэш',
+        tarkov_data: 'Данные Tarkov',
+      },
+      tarkov_data: {
+        title: 'Кэш данных Tarkov',
+        description: 'Очищает кэш игровых данных (задания, убежище, предметы). Пользователи загрузят свежие данные из API tarkov.dev.',
+        action: 'Очистить игровые данные',
+        success_title: 'Кэш очищен',
+        success_description: 'Кэш данных Tarkov очищен. Пользователи получат свежие данные.',
+      },
+      full_purge: {
+        title: 'Полная очистка кэша',
+        description: 'Очищает ВСЁ кэшированное содержимое, включая статические ресурсы. Используйте осторожно: это увеличивает нагрузку на origin.',
+        action: 'Очистить всё',
+        confirm_title: 'Подтвердить полную очистку кэша',
+        confirm_description: 'Это очистит ВСЁ кэшированное содержимое Cloudflare, включая статические ресурсы, шрифты и JavaScript-бандлы. Это может временно увеличить время загрузки для всех пользователей.',
+        confirm_action: 'Подтвердить очистку',
+        success_title: 'Полный кэш очищен',
+        success_description: 'Всё кэшированное содержимое было удалено из Cloudflare.',
+      },
+      info: {
+        title: 'Поведение кэша',
+        description: 'После очистки следующий запрос пользователя вызовет новую загрузку с tarkov.dev. Эти новые данные затем будут закэшированы для всех пользователей.',
+      },
+      unauthorized: {
+        title: 'Нет доступа',
+        description: 'Для этого действия требуются права администратора.',
+      },
+      purge_failed: {
+        title: 'Ошибка очистки',
+        description: 'Не удалось очистить кэш',
+      },
+    },
+    page: {
+      verifying_access: 'Проверка доступа администратора...',
+      connection_error: 'Ошибка соединения',
+      load_error_description: 'Не удалось загрузить данные админ-панели. Обновите страницу или обратитесь в поддержку. Ссылка: {reference}',
+      access_notice_title: 'Доступ администратора',
+      access_notice_description: 'Действия здесь влияют на всех пользователей. Выполнен вход как {user}',
+      unknown_user: 'Неизвестно',
+    },
   },
   alerts: {
     no_map_data: 'Для этого выбора нет данных карты.',
@@ -196,6 +241,7 @@
           progress: 'Какой прогресс это даёт',
           status: 'Статус',
           secondary: 'Другие хорошие варианты',
+          secondary_description: '{reason} - {status}',
           secondary_actionable: 'Используйте их, если основной план вам не подходит.',
           secondary_blocked: 'Это ближайшие разблокировки в вашей очереди.',
           secondary_empty: 'Сейчас это самый понятный следующий шаг.',
@@ -1181,7 +1227,7 @@
   settings: {
     title: 'Настройки',
     locale: 'Язык',
-    theme: 'Theme',
+    theme: 'Тема',
     tabs: {
       gameplay: 'Геймплей',
       interface: 'Интерфейс',
@@ -1661,8 +1707,14 @@
   game_settings: {
     pvp: 'PVP',
     pve: 'PVE',
+    toggle_mode: 'Переключить режим игры',
+    select_faction: 'Выбрать фракцию',
   },
   oauth: {
+    callback: {
+      title: 'Аутентификация...',
+      description: 'Пожалуйста, подождите, пока мы завершим вход.',
+    },
     consent: {
       authorize: 'Authorize Application',
       loading: 'Loading...',

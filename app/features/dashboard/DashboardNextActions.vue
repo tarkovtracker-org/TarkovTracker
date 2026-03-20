@@ -680,7 +680,10 @@
     return recommendation.taskName || '';
   };
   const getSecondaryDescription = (recommendation: DashboardRecommendation) =>
-    `${getCompactReasonText(recommendation)} - ${getStatusText(recommendation)}`;
+    t('page.dashboard.focus.stat.secondary_description', {
+      reason: getCompactReasonText(recommendation),
+      status: getStatusText(recommendation),
+    });
   const handleRecommendationClick = (
     recommendation: DashboardRecommendation,
     variant: DashboardRecommendationClickVariant

@@ -42,9 +42,18 @@
   import type { ThemeMode } from '@/stores/usePreferences';
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
+  const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark';
+  const normalizeThemeMode = (value: unknown): ThemeMode => {
+    if (isThemeMode(value)) return value;
+    if (value && typeof value === 'object' && 'value' in value) {
+      const candidate = (value as { value?: unknown }).value;
+      if (isThemeMode(candidate)) return candidate;
+    }
+    return preferencesStore.getThemeMode;
+  };
   const themeMode = computed({
     get: () => preferencesStore.getThemeMode,
-    set: (value: ThemeMode) => preferencesStore.setThemeMode(value),
+    set: (value: unknown) => preferencesStore.setThemeMode(normalizeThemeMode(value)),
   });
   const themeOptions = computed(() => [
     { label: t('settings.interface.appearance.light'), value: 'light' as ThemeMode },
