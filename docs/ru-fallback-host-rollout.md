@@ -25,8 +25,8 @@ Restore access for users who cannot reach Cloudflare-hosted domains by standing 
 
 Set the same production secrets plus these host-specific values:
 
-- `NUXT_PUBLIC_APP_URL=https://<fallback-domain>`
-- `API_ALLOWED_HOSTS=tarkovtracker.org,www.tarkovtracker.org,<fallback-domain>`
+- `NUXT_PUBLIC_APP_URL=https://fallback.example.com`
+- `API_ALLOWED_HOSTS=tarkovtracker.org,www.tarkovtracker.org,fallback.example.com`
 - `API_TRUST_PROXY=true` only when the fallback platform is behind a trusted proxy
 
 Also set existing required vars from production:
@@ -40,7 +40,7 @@ Also set existing required vars from production:
 
 ## Supabase Auth Updates
 
-1. Add `https://<fallback-domain>` to Auth site URL/redirect allowlist.
+1. Add `https://fallback.example.com` to Auth site URL/redirect allowlist.
 2. Keep existing production URLs in place.
 3. Test login, logout, and OAuth callback flow on fallback before announcing broadly.
 
