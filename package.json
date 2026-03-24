@@ -69,7 +69,7 @@
     "tailwindcss": "^4.2.0",
     "vitest": "^4.0.18",
     "wait-on": "^9.0.4",
-    "wrangler": "^4.69.0"
+    "wrangler": "^4.77.0"
   },
   "engines": {
     "node": ">=24.12.0",
