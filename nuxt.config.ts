@@ -387,7 +387,6 @@ export default defineNuxtConfig({
   typescript: {
     tsConfig: {
       compilerOptions: {
-        baseUrl: '.',
         paths: {
           '@/*': ['./app/*'],
           '#tests/*': ['./tests/*'],
