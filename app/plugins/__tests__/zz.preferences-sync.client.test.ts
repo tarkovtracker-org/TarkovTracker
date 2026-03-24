@@ -33,10 +33,49 @@ const waitForWatchCallback = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
+const createSyncController = () => ({
+  isSyncing: ref(false),
+  isPaused: ref(false),
+  cleanup: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
+  syncToSupabase: vi.fn().mockResolvedValue(null),
+});
+const createPreferencesStore = (state: Record<string, unknown> = {}) => {
+  const preferencesStore = {
+    $state: { ...state },
+    localeOverride: typeof state.localeOverride === 'string' ? state.localeOverride : null,
+    replacePersistedState: vi.fn((nextState: Record<string, unknown>) => {
+      Object.assign(preferencesStore.$state, nextState);
+      if ('localeOverride' in nextState) {
+        preferencesStore.localeOverride =
+          typeof nextState.localeOverride === 'string' ? nextState.localeOverride : null;
+      }
+    }),
+    resetToDefaults: vi.fn(() => {
+      preferencesStore.$state = {};
+      preferencesStore.localeOverride = null;
+    }),
+    setLocaleOverride: vi.fn((locale: string | null) => {
+      preferencesStore.localeOverride = locale;
+      preferencesStore.$state.localeOverride = locale;
+    }),
+    setProfileSharePvePublic: vi.fn((value: boolean) => {
+      preferencesStore.$state.profileSharePvePublic = value;
+    }),
+    setProfileSharePvpPublic: vi.fn((value: boolean) => {
+      preferencesStore.$state.profileSharePvpPublic = value;
+    }),
+  };
+  return preferencesStore;
+};
 describe('preferences sync plugin', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv('MODE', 'development');
+    vi.mocked(readPendingResetPreferencesSnapshot).mockReturnValue(null);
+    vi.mocked(readPersistedPreferencesSnapshot).mockReturnValue(null);
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -276,5 +315,148 @@ describe('preferences sync plugin', () => {
     expect(clearPendingResetPreferencesSnapshot).toHaveBeenCalledWith('user-1');
     expect(useSupabaseSync).toHaveBeenCalledTimes(1);
     expect(cleanup).not.toHaveBeenCalled();
+  });
+  it('keeps newer local preferences when the remote row is older and syncs them back', async () => {
+    const syncController = createSyncController();
+    vi.mocked(useSupabaseSync).mockReturnValue(syncController);
+    const preferencesStore = createPreferencesStore({
+      localeOverride: 'fr',
+      neededItemsHideOwned: false,
+    });
+    vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
+    vi.mocked(readPersistedPreferencesSnapshot).mockReturnValue({
+      ownerUserId: 'user-1',
+      persistedAt: Date.parse('2026-03-19T15:52:10.000Z'),
+      state: {
+        localeOverride: 'de',
+        neededItemsHideOwned: true,
+      },
+    });
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        locale_override: 'fr',
+        needed_items_hide_owned: false,
+        updated_at: '2026-03-19T15:52:00.000Z',
+      },
+      error: null,
+    });
+    const from = vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle,
+        })),
+      })),
+    }));
+    const plugin = (await import('@/plugins/zz.preferences-sync.client')).default as (
+      nuxtApp: unknown
+    ) => unknown;
+    plugin({
+      $pinia: {},
+      $supabase: {
+        client: { from },
+        user: { id: 'user-1', loggedIn: true },
+      },
+    });
+    await waitForWatchCallback();
+    expect(preferencesStore.$state.neededItemsHideOwned).toBe(true);
+    expect(preferencesStore.$state.localeOverride).toBe('de');
+    expect(syncController.syncToSupabase).toHaveBeenCalledWith(preferencesStore.$state);
+  });
+  it('keeps newer guest preferences when the remote row is older on first login', async () => {
+    const syncController = createSyncController();
+    vi.mocked(useSupabaseSync).mockReturnValue(syncController);
+    const preferencesStore = createPreferencesStore({
+      localeOverride: 'fr',
+      neededItemsHideOwned: false,
+    });
+    vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
+    vi.mocked(readPersistedPreferencesSnapshot).mockImplementation((userId?: string | null) => {
+      if (userId === null) {
+        return {
+          ownerUserId: null,
+          persistedAt: Date.parse('2026-03-19T15:52:10.000Z'),
+          state: {
+            localeOverride: 'de',
+            neededItemsHideOwned: true,
+          },
+        };
+      }
+      return null;
+    });
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        locale_override: 'fr',
+        needed_items_hide_owned: false,
+        updated_at: '2026-03-19T15:52:00.000Z',
+      },
+      error: null,
+    });
+    const from = vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle,
+        })),
+      })),
+    }));
+    const plugin = (await import('@/plugins/zz.preferences-sync.client')).default as (
+      nuxtApp: unknown
+    ) => unknown;
+    plugin({
+      $pinia: {},
+      $supabase: {
+        client: { from },
+        user: { id: 'user-1', loggedIn: true },
+      },
+    });
+    await waitForWatchCallback();
+    expect(preferencesStore.$state.neededItemsHideOwned).toBe(true);
+    expect(preferencesStore.$state.localeOverride).toBe('de');
+    expect(syncController.syncToSupabase).toHaveBeenCalledWith(preferencesStore.$state);
+  });
+  it('applies newer remote preferences when the local snapshot is older', async () => {
+    const syncController = createSyncController();
+    vi.mocked(useSupabaseSync).mockReturnValue(syncController);
+    const preferencesStore = createPreferencesStore({
+      localeOverride: 'de',
+      neededItemsHideOwned: true,
+    });
+    vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
+    vi.mocked(readPersistedPreferencesSnapshot).mockReturnValue({
+      ownerUserId: 'user-1',
+      persistedAt: Date.parse('2026-03-19T15:52:00.000Z'),
+      state: {
+        localeOverride: 'de',
+        neededItemsHideOwned: true,
+      },
+    });
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        locale_override: 'fr',
+        needed_items_hide_owned: false,
+        updated_at: '2026-03-19T15:52:10.000Z',
+      },
+      error: null,
+    });
+    const from = vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle,
+        })),
+      })),
+    }));
+    const plugin = (await import('@/plugins/zz.preferences-sync.client')).default as (
+      nuxtApp: unknown
+    ) => unknown;
+    plugin({
+      $pinia: {},
+      $supabase: {
+        client: { from },
+        user: { id: 'user-1', loggedIn: true },
+      },
+    });
+    await waitForWatchCallback();
+    expect(preferencesStore.$state.neededItemsHideOwned).toBe(false);
+    expect(preferencesStore.$state.localeOverride).toBe('fr');
+    expect(syncController.syncToSupabase).not.toHaveBeenCalled();
   });
 });

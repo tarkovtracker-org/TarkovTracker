@@ -61,12 +61,33 @@ const startPreferencesSync = (
     debounceMs: 500,
     transform: (state) => buildPreferencesSyncPayload(state, userId),
   });
+  return preferencesSyncController;
 };
 const applyPersistedPreferencesState = (
   preferencesStore: ReturnType<typeof usePreferencesStore>,
   state: PersistedPreferencesState
 ) => {
   preferencesStore.replacePersistedState(state);
+};
+const parseTimestamp = (value: unknown): number | null => {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+const shouldPreferLocalState = (
+  persistedAt: number | null | undefined,
+  row: Record<string, unknown>
+): boolean => {
+  if (typeof persistedAt !== 'number' || Number.isNaN(persistedAt)) {
+    return false;
+  }
+  const remoteUpdatedAt = parseTimestamp(row.updated_at);
+  if (remoteUpdatedAt === null) {
+    return true;
+  }
+  return persistedAt > remoteUpdatedAt;
 };
 const applyPreferencesRow = (
   preferencesStore: ReturnType<typeof usePreferencesStore>,
@@ -217,15 +238,19 @@ export default defineNuxtPlugin((nuxtApp) => {
       const isInitialRun = previous === undefined;
       let localeOverrideToRestore: string | null = null;
       let shouldApplyShareVisibilityDefaults = false;
+      let shouldSyncLocalStateToRemote = false;
       const pendingSnapshot = userId ? readPendingResetPreferencesSnapshot(userId) : null;
       const persistedSnapshot = pendingSnapshot ?? readPersistedPreferencesSnapshot(userId);
-      const matchingLocalState =
-        loggedIn && userId && persistedSnapshot?.ownerUserId === userId
-          ? persistedSnapshot.state
+      const matchingLocalSnapshot =
+        loggedIn && userId && persistedSnapshot?.ownerUserId === userId ? persistedSnapshot : null;
+      const guestLocalSnapshot =
+        loggedIn && userId && !matchingLocalSnapshot && previousUserId === null
+          ? readPersistedPreferencesSnapshot(null)
           : null;
+      const matchingLocalState = matchingLocalSnapshot?.state ?? null;
       const legacyLocalState =
         loggedIn && userId && !matchingLocalState && previousUserId === null
-          ? getPersistedPreferencesState(preferencesStore.$state)
+          ? (guestLocalSnapshot?.state ?? getPersistedPreferencesState(preferencesStore.$state))
           : null;
       const restoreState = matchingLocalState ?? legacyLocalState;
       try {
@@ -256,18 +281,29 @@ export default defineNuxtPlugin((nuxtApp) => {
         if (data) {
           logger.debug('[PreferencesSyncPlugin] Loading preferences from Supabase:', data);
           const row = data as Record<string, unknown>;
-          const rowLocaleOverride = getRowLocaleOverride(row);
-          applyPreferencesRow(preferencesStore, row);
-          if (
-            Object.prototype.hasOwnProperty.call(row, 'locale_override') &&
-            row['locale_override'] === null
-          ) {
-            localeOverrideToRestore = null;
-          } else if (!rowLocaleOverride) {
-            localeOverrideToRestore = getPersistedLocaleOverride(restoreState);
+          const preferLocalState =
+            Boolean(restoreState) &&
+            shouldPreferLocalState(
+              matchingLocalSnapshot?.persistedAt ?? guestLocalSnapshot?.persistedAt,
+              row
+            );
+          if (preferLocalState) {
+            shouldSyncLocalStateToRemote = true;
+          } else {
+            const rowLocaleOverride = getRowLocaleOverride(row);
+            applyPreferencesRow(preferencesStore, row);
+            if (
+              Object.prototype.hasOwnProperty.call(row, 'locale_override') &&
+              row['locale_override'] === null
+            ) {
+              localeOverrideToRestore = null;
+            } else if (!rowLocaleOverride) {
+              localeOverrideToRestore = getPersistedLocaleOverride(restoreState);
+            }
           }
         } else {
           shouldApplyShareVisibilityDefaults = !restoreState;
+          shouldSyncLocalStateToRemote = Boolean(restoreState);
         }
       } catch (error) {
         logger.error('[PreferencesSyncPlugin] Failed to initialize preferences sync:', error);
@@ -278,7 +314,10 @@ export default defineNuxtPlugin((nuxtApp) => {
         preferencesStore.setProfileSharePvePublic(false);
         preferencesStore.setProfileSharePvpPublic(false);
       }
-      startPreferencesSync(preferencesStore, userId);
+      const syncController = startPreferencesSync(preferencesStore, userId);
+      if (shouldSyncLocalStateToRemote) {
+        void syncController.syncToSupabase(preferencesStore.$state);
+      }
       if (localeOverrideToRestore && preferencesStore.localeOverride !== localeOverrideToRestore) {
         preferencesStore.setLocaleOverride(localeOverrideToRestore);
       }

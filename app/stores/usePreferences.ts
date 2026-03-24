@@ -480,6 +480,7 @@ const parseLegacyPersistedPreferencesState = (
 };
 export type PersistedPreferencesSnapshot = {
   ownerUserId: string | null;
+  persistedAt?: number | null;
   state: PersistedPreferencesState;
   requiresStorageMigration?: boolean;
 };
@@ -533,6 +534,7 @@ export const readPersistedPreferencesSnapshot = (
     const requiresStorageMigration = requiresLegacyPreferencesMigration(persistedStateWithLegacy);
     return {
       ownerUserId: wrapped._userId,
+      persistedAt: wrapped._timestamp ?? null,
       state: sanitizePersistedPreferencesState(persistedStateWithLegacy),
       requiresStorageMigration: requiresStorageMigration || undefined,
     };
@@ -543,6 +545,7 @@ export const readPersistedPreferencesSnapshot = (
   }
   return {
     ownerUserId: userId,
+    persistedAt: null,
     state: sanitizePersistedPreferencesState(legacyState),
     requiresStorageMigration: true,
   };
@@ -555,6 +558,7 @@ export const readPendingResetPreferencesSnapshot = (
   }
   return {
     ownerUserId: pendingResetPreferencesSnapshot.ownerUserId,
+    persistedAt: pendingResetPreferencesSnapshot.persistedAt ?? null,
     state: getPersistedPreferencesState(pendingResetPreferencesSnapshot.state),
   };
 };

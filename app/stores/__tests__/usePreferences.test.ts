@@ -383,10 +383,13 @@ describe('usePreferencesStore', () => {
       localStorageMock.setItem(STORAGE_KEYS.preferences, JSON.stringify({ localeOverride: 'fr' }));
       expect(store.teamHide).toEqual({});
       expect(store.mapMarkerColors).toEqual({ ...MAP_MARKER_COLORS });
-      expect(readPendingResetPreferencesSnapshot('user-1')).toEqual({
-        ownerUserId: 'user-1',
-        state: persistedState,
-      });
+      expect(readPendingResetPreferencesSnapshot('user-1')).toEqual(
+        expect.objectContaining({
+          ownerUserId: 'user-1',
+          persistedAt: expect.any(Number),
+          state: persistedState,
+        })
+      );
       clearPendingResetPreferencesSnapshot('user-1');
       expect(readPendingResetPreferencesSnapshot('user-1')).toBeNull();
     });
@@ -465,10 +468,13 @@ describe('usePreferencesStore', () => {
       expect(store.localeOverride).toBeNull();
       expect(store.teamHide).toEqual({});
       expect(localStorageMock.getItem(STORAGE_KEYS.preferences)).toBeNull();
-      expect(readPendingResetPreferencesSnapshot('user-1')).toEqual({
-        ownerUserId: 'user-1',
-        state: persistedState,
-      });
+      expect(readPendingResetPreferencesSnapshot('user-1')).toEqual(
+        expect.objectContaining({
+          ownerUserId: 'user-1',
+          persistedAt: expect.any(Number),
+          state: persistedState,
+        })
+      );
     });
   });
   describe('State Replacement Actions', () => {
