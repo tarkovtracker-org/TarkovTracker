@@ -2,16 +2,18 @@
   <div
     :class="[
       'shadow-card relative overflow-hidden rounded-md border px-4 py-3 transition-all',
-      isAchieved ? achievedClasses : 'bg-panel border-border-muted opacity-65',
+      isAchieved ? achievedClasses : 'bg-panel border-border-muted',
     ]"
   >
     <div class="relative z-10">
       <div
         v-if="showsProgressRing"
-        class="bg-shell/90 mb-3 flex h-12 w-12 items-center justify-center rounded-full"
+        :aria-label="progressRingLabel"
+        class="bg-field/90 mb-3 flex h-12 w-12 items-center justify-center rounded-full"
+        role="img"
       >
         <div
-          class="flex h-12 w-12 items-center justify-center rounded-full"
+          class="flex h-12 w-12 items-center justify-center rounded-full opacity-85"
           :style="progressRingStyle"
         >
           <div class="bg-panel h-8 w-8 rounded-full" />
@@ -20,10 +22,25 @@
       <UIcon
         v-else
         :name="isAchieved ? achievedIcon : unachievedIcon"
-        :class="['mb-3 h-12 w-12', isAchieved ? iconColorClass : 'text-foreground-subtle']"
+        :class="[
+          'mb-3 h-12 w-12',
+          isAchieved ? iconColorClass : 'text-foreground-subtle opacity-80',
+        ]"
       />
-      <div class="text-foreground mb-1 text-3xl font-bold">{{ title }}</div>
-      <div class="text-foreground-muted text-xs font-medium tracking-wider uppercase">
+      <div
+        :class="[
+          'mb-1 text-3xl font-bold',
+          isAchieved ? 'text-foreground' : 'text-foreground-muted',
+        ]"
+      >
+        {{ title }}
+      </div>
+      <div
+        :class="[
+          'text-xs font-medium tracking-wider uppercase',
+          isAchieved ? 'text-foreground-muted' : 'text-foreground-subtle',
+        ]"
+      >
         {{ subtitle }}
       </div>
     </div>
@@ -89,6 +106,7 @@
         progress: 'var(--color-lightkeeper-500)',
       },
     };
+  const { t } = useI18n({ useScope: 'global' });
   const achievedClasses = computed(() => colorClasses[props.color].achieved);
   const iconColorClass = computed(() => colorClasses[props.color].icon);
   const showsProgressRing = computed(() => !props.isAchieved && props.progressValue !== null);
@@ -104,4 +122,9 @@
       background: `conic-gradient(${progressColor} 0deg ${progress}deg, var(--theme-border-muted) ${progress}deg 360deg)`,
     };
   });
+  const progressRingLabel = computed(() =>
+    t('page.dashboard.progress_card.progress_label', {
+      label: `${Math.round(normalizedProgressValue.value)}%`,
+    })
+  );
 </script>

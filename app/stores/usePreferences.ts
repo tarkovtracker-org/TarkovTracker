@@ -29,6 +29,7 @@ import {
   type MapMarkerColorKey,
   type MapMarkerColors,
 } from '@/utils/theme-colors';
+import { THEME_MODES, type ThemeMode } from '@/utils/themeMode';
 import {
   getCurrentSupabaseUserId,
   parseUserScopedStorage,
@@ -65,8 +66,6 @@ export type TaskFilterPreset = {
   name: string;
   settings: TaskFilterSettings;
 };
-export type ThemeMode = 'dark' | 'light';
-const THEME_MODES = ['dark', 'light'] as const;
 // Define the state structure
 export interface PreferencesState {
   streamerMode: boolean;

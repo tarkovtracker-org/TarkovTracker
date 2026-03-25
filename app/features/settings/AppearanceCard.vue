@@ -39,21 +39,21 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import type { ThemeMode } from '@/stores/usePreferences';
+  import { normalizeThemeMode, type ThemeMode } from '@/utils/themeMode';
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
-  const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark';
-  const normalizeThemeMode = (value: unknown): ThemeMode => {
-    if (isThemeMode(value)) return value;
+  const normalizeThemeModeSelection = (value: unknown): ThemeMode => {
+    const directThemeMode = normalizeThemeMode(value);
+    if (directThemeMode) return directThemeMode;
     if (value && typeof value === 'object' && 'value' in value) {
-      const candidate = (value as { value?: unknown }).value;
-      if (isThemeMode(candidate)) return candidate;
+      const optionThemeMode = normalizeThemeMode((value as { value?: unknown }).value);
+      if (optionThemeMode) return optionThemeMode;
     }
     return preferencesStore.getThemeMode;
   };
   const themeMode = computed({
     get: () => preferencesStore.getThemeMode,
-    set: (value: unknown) => preferencesStore.setThemeMode(normalizeThemeMode(value)),
+    set: (value: unknown) => preferencesStore.setThemeMode(normalizeThemeModeSelection(value)),
   });
   const themeOptions = computed(() => [
     { label: t('settings.interface.appearance.light'), value: 'light' as ThemeMode },

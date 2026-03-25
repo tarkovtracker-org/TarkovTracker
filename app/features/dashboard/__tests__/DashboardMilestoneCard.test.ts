@@ -1,5 +1,16 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, string | number>) => {
+      if (key === 'page.dashboard.progress_card.progress_label') {
+        return `${params?.label ?? ''} progress`;
+      }
+      return key;
+    },
+  }),
+}));
 const setup = async () => {
   const { default: DashboardMilestoneCard } =
     await import('@/features/dashboard/DashboardMilestoneCard.vue');
@@ -30,6 +41,7 @@ describe('DashboardMilestoneCard', () => {
     const ring = wrapper.find('[style*="conic-gradient"]');
     expect(ring.exists()).toBe(true);
     expect(ring.attributes('style')).toContain('90deg');
+    expect(wrapper.find('[role="img"]').attributes('aria-label')).toBe('25% progress');
   });
   it('renders the achieved icon instead of the progress ring when completed', async () => {
     const wrapper = await mountWithProps({ isAchieved: true, progressValue: 100 });
@@ -45,5 +57,9 @@ describe('DashboardMilestoneCard', () => {
     const ring = wrapper.find('[style*="conic-gradient"]');
     expect(ring.exists()).toBe(true);
     expect(ring.attributes('style')).toContain('0deg 0deg');
+  });
+  it('does not dim the entire card when a milestone is still in progress', async () => {
+    const wrapper = await mountWithProps({ progressValue: 25 });
+    expect(wrapper.classes()).not.toContain('opacity-65');
   });
 });

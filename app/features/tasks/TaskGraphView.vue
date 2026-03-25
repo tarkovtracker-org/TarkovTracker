@@ -432,7 +432,7 @@
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },
   ]);
   const minimapNodeColor = (node: Node<TaskNodeData>) => {
-    if (node.data?.isDimmed) return 'hsl(0 0% 32%)';
+    if (node.data?.isDimmed) return 'var(--color-foreground-disabled)';
     switch (node.data?.status) {
       case 'completed':
         return 'var(--color-success-500)';
@@ -441,12 +441,12 @@
       case 'failed':
         return 'var(--color-error-500)';
       default:
-        return 'hsl(0 0% 58%)';
+        return 'var(--color-foreground-subtle)';
     }
   };
   const minimapNodeStrokeColor = (node: Node<TaskNodeData>) => {
     if (node.id === focusedTaskId.value) return 'var(--color-primary-300)';
-    return 'hsl(0 0% 6%)';
+    return 'var(--theme-graph-minimap-mask)';
   };
 </script>
 <template>
@@ -525,7 +525,7 @@
           :node-color="minimapNodeColor"
           :node-stroke-color="minimapNodeStrokeColor"
           :node-stroke-width="1"
-          :mask-color="'hsl(0 0% 1% / 0.74)'"
+          :mask-color="'var(--theme-graph-minimap-mask)'"
           :mask-stroke-color="'var(--color-primary-400)'"
           :mask-stroke-width="2.5"
           :mask-border-radius="6"
@@ -588,7 +588,7 @@
         </span>
         <div class="flex flex-col gap-1">
           <div v-for="item in legendItems" :key="item.label" class="flex items-center gap-1.5">
-            <span class="h-2.5 w-2.5 rounded-full" :class="item.colorClass" />
+            <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-full" :class="item.colorClass" />
             <span class="text-foreground-muted text-[11px]">{{ item.label }}</span>
           </div>
         </div>

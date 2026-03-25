@@ -7,6 +7,8 @@ describe('theme token contract', () => {
   it('defines semantic theme aliases for both dark and light root selectors', () => {
     expect(tailwindCss).toContain(":root[data-theme='dark']");
     expect(tailwindCss).toContain(":root[data-theme='light']");
+    expect(tailwindCss).toContain('color-scheme: dark;');
+    expect(tailwindCss).toContain('color-scheme: light;');
     const semanticAliases = [
       '--color-canvas: var(--theme-canvas);',
       '--color-shell: var(--theme-shell);',

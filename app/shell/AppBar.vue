@@ -181,7 +181,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
-  import type { ThemeMode } from '@/stores/usePreferences';
+  import { normalizeThemeMode, type ThemeMode } from '@/utils/themeMode';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
   const appStore = useAppStore();
   const metadataStore = useMetadataStore();
@@ -374,7 +374,6 @@
       value: localeCode,
     }));
   });
-  const isThemeMode = (value: string): value is ThemeMode => value === 'dark' || value === 'light';
   const themeItems = computed(() => [
     { label: t('settings.interface.appearance.light'), value: 'light' as ThemeMode },
     { label: t('settings.interface.appearance.dark'), value: 'dark' as ThemeMode },
@@ -429,8 +428,9 @@
       return preferencesStore.getThemeMode;
     },
     set(newValue: string) {
-      if (!isThemeMode(newValue) || newValue === preferencesStore.getThemeMode) return;
-      preferencesStore.setThemeMode(newValue);
+      const themeMode = normalizeThemeMode(newValue);
+      if (!themeMode || themeMode === preferencesStore.getThemeMode) return;
+      preferencesStore.setThemeMode(themeMode);
     },
   });
 </script>

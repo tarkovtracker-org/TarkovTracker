@@ -1,3 +1,4 @@
+import { useThemeMode } from '@/composables/useThemeMode';
 import { useToastI18n } from '@/composables/useToastI18n';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';

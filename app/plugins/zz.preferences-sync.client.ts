@@ -8,23 +8,17 @@ import {
   usePreferencesStore,
   type PersistedPreferencesState,
   type PreferencesState,
-  type ThemeMode,
 } from '@/stores/usePreferences';
 import { SKILL_SORT_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { migrateLegacyMapMarkerColors, normalizeMapMarkerColors } from '@/utils/theme-colors';
+import { normalizeThemeMode } from '@/utils/themeMode';
 import type { Pinia } from 'pinia';
 const NEEDED_ITEMS_CARD_STYLES = ['compact', 'expanded'] as const;
 const NEEDED_ITEMS_SORT_DIRECTIONS = ['asc', 'desc'] as const;
 const NEEDED_ITEMS_SORT_FIELDS = ['priority', 'name', 'category', 'count'] as const;
-const THEME_MODES = ['dark', 'light'] as const;
 function normalizeEnum<T>(value: T, allowed: readonly T[]): T | null {
   return value && allowed.includes(value) ? value : null;
-}
-function normalizeThemeMode(value: unknown): ThemeMode | null {
-  return typeof value === 'string' && THEME_MODES.includes(value as ThemeMode)
-    ? (value as ThemeMode)
-    : null;
 }
 let stopUserWatch: (() => void) | null = null;
 let preferencesSyncController: SupabaseSyncReturn<PreferencesState> | null = null;

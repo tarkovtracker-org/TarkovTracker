@@ -14,6 +14,8 @@ import {
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from './app/utils/storageKeys';
+import { buildThemeBootstrapScript } from './app/utils/themeMode';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
@@ -214,6 +216,13 @@ export default defineNuxtConfig({
       titleTemplate: '%s | Tarkov Tracker',
       title: 'Escape from Tarkov Quest, Hideout, and Item Tracker',
       script: [
+        {
+          key: 'theme-bootstrap',
+          textContent: buildThemeBootstrapScript([
+            STORAGE_KEYS.preferences,
+            LEGACY_STORAGE_KEYS.preferences,
+          ]),
+        },
         {
           type: 'application/ld+json',
           textContent: JSON.stringify(webApplicationSchema),
