@@ -146,7 +146,10 @@ function isHostAllowed(
     return host === allowedLower || host.endsWith('.' + allowedLower);
   });
 }
-function resolveAppUrlHosts(appUrl: string | undefined): string[] {
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '::1' || hostname.startsWith('127.');
+}
+function resolveAppUrlHosts(appUrl: string | undefined, isDevelopment: boolean): string[] {
   if (!appUrl || appUrl.trim().length === 0) {
     return [];
   }
@@ -159,7 +162,11 @@ function resolveAppUrlHosts(appUrl: string | undefined): string[] {
         hosts.push(hostnameParts.slice(1).join('.'));
       }
     }
-    return [...new Set(hosts)];
+    const uniqueHosts = [...new Set(hosts)];
+    if (isDevelopment) {
+      return uniqueHosts;
+    }
+    return uniqueHosts.filter((host) => !isLoopbackHost(host));
   } catch {
     return [];
   }
@@ -295,7 +302,7 @@ export default defineEventHandler(async (event) => {
     // Default production hosts
     effectiveAllowedHosts.push('tarkovtracker.org', 'www.tarkovtracker.org');
   }
-  effectiveAllowedHosts.push(...resolveAppUrlHosts(typedConfig.public?.appUrl));
+  effectiveAllowedHosts.push(...resolveAppUrlHosts(typedConfig.public?.appUrl, isDevelopment));
   const uniqueAllowedHosts = [...new Set(effectiveAllowedHosts.map((host) => host.toLowerCase()))];
   // === SECURITY CHECK 1: Host Header Validation ===
   const hostHeader = getRequestHeader(event, 'host');
