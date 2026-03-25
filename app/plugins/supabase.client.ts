@@ -2,6 +2,7 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
+import { shouldUseOfflineSupabaseFallback } from '@/utils/runtimeConfig';
 import { hydrateUserFromSession } from '@/utils/userHydration';
 type OAuthProvider = 'twitch' | 'discord' | 'google' | 'github';
 type SupabaseUser = {
@@ -139,15 +140,20 @@ export default defineNuxtPlugin({
       };
     };
     if (!supabaseUrl || !supabaseKey) {
-      if (import.meta.env.PROD) {
+      const allowOfflineFallback = shouldUseOfflineSupabaseFallback({
+        hostname: import.meta.client ? window.location.hostname : undefined,
+        isProduction: import.meta.env.PROD,
+      });
+      if (!allowOfflineFallback) {
         logger.error(
           `${missingConfigMessage}. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY.`
         );
         throw new Error(missingConfigMessage);
       }
-      logger.info(
-        `${missingConfigMessage}. Running in offline mode for development. ` +
-          'See .env.example to enable Supabase features.'
+      logger.warn(
+        `${missingConfigMessage}. Running in offline mode${
+          import.meta.env.PROD ? ' for this preview deployment' : ' for development'
+        }. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY to enable auth and sync.`
       );
       const stub = buildStub();
       return { provide: { supabase: stub } };

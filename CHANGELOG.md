@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.28.0...v1.28.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* **previews:** support Pages previews and improve error reports ([#242](https://github.com/tarkovtracker-org/TarkovTracker/issues/242)) ([aa25df7](https://github.com/tarkovtracker-org/TarkovTracker/commit/aa25df7e50d7e54a4aad0845c49948142cf272b8))
+
 # [1.28.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.27.2...v1.28.0) (2026-03-16)
 
 

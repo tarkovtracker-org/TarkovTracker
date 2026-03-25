@@ -32,8 +32,18 @@ const runtimeConfig = {
     trustedIpRanges: '',
     trustProxy: false,
   },
+  public: {
+    appUrl: 'https://tarkovtracker.org',
+  },
   supabaseUrl: 'https://test.supabase.co',
   supabaseAnonKey: 'test-anon-key',
+};
+const resetNodeEnv = (value: string | undefined) => {
+  if (value === undefined) {
+    delete process.env.NODE_ENV;
+    return;
+  }
+  process.env.NODE_ENV = value;
 };
 vi.mock('@/server/utils/logger', () => ({
   createLogger: () => ({
@@ -82,6 +92,7 @@ describe('API Protection Middleware', () => {
     runtimeConfig.apiProtection.allowedHosts = '';
     runtimeConfig.apiProtection.trustedIpRanges = '';
     runtimeConfig.apiProtection.trustProxy = false;
+    runtimeConfig.public.appUrl = 'https://tarkovtracker.org';
     mockEvent = {
       node: createNodeContext('127.0.0.1'),
       method: 'GET',
@@ -110,6 +121,38 @@ describe('API Protection Middleware', () => {
       const { default: middleware } = await import('../api-protection');
       await expect(middleware(mockEvent as H3Event)).rejects.toThrow();
       process.env.NODE_ENV = originalEnv;
+    });
+    it('should allow Cloudflare preview aliases derived from the deployment host', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      resetNodeEnv('production');
+      runtimeConfig.apiProtection.requireAuth = false;
+      runtimeConfig.public.appUrl = 'https://7c413d7a.tarkovtrackernuxt.pages.dev';
+      mockGetRequestURL.mockReturnValue(
+        new URL('https://dependabot-pr-241.tarkovtrackernuxt.pages.dev/api/tarkov/bootstrap')
+      );
+      mockGetRequestHeader.mockImplementation((_: unknown, header: string) => {
+        if (header === 'host') return 'dependabot-pr-241.tarkovtrackernuxt.pages.dev';
+        return undefined;
+      });
+      const { default: middleware } = await import('../api-protection');
+      await expect(middleware(mockEvent as H3Event)).resolves.toBeUndefined();
+      resetNodeEnv(originalEnv);
+    });
+    it('should block localhost hosts derived from appUrl in production', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      resetNodeEnv('production');
+      runtimeConfig.apiProtection.requireAuth = false;
+      runtimeConfig.apiProtection.allowedHosts = '';
+      runtimeConfig.public.appUrl = 'http://localhost:3000';
+      mockGetRequestHeader.mockImplementation((_: unknown, header: string) => {
+        if (header === 'host') return 'localhost';
+        return undefined;
+      });
+      const { default: middleware } = await import('../api-protection');
+      await expect(middleware(mockEvent as H3Event)).rejects.toThrow(
+        'Access denied - invalid host'
+      );
+      resetNodeEnv(originalEnv);
     });
   });
   describe('Public routes', () => {

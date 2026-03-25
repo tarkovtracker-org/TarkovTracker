@@ -32,6 +32,25 @@ describe('oauthConsent', () => {
       FIRST_NAME: REDACTED_LOG_VALUE,
     });
   });
+  it('redacts auth and identifier keys recursively', () => {
+    expect(
+      sanitizeForDebugLog({
+        token: 'secret-token',
+        nested: {
+          apiKey: 'top-secret',
+          authorization: 'Bearer abc',
+          user_id: '123',
+        },
+      })
+    ).toEqual({
+      token: REDACTED_LOG_VALUE,
+      nested: {
+        apiKey: REDACTED_LOG_VALUE,
+        authorization: REDACTED_LOG_VALUE,
+        user_id: REDACTED_LOG_VALUE,
+      },
+    });
+  });
   it('preserves primitive values without modification', () => {
     expect(sanitizeForDebugLog('value')).toBe('value');
     expect(sanitizeForDebugLog(42)).toBe(42);
