@@ -10,6 +10,7 @@ import {
 } from './app/utils/nuxtSecurityConfig';
 import {
   GITHUB_IMAGE_DOMAINS,
+  resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
@@ -157,7 +158,7 @@ export default defineNuxtConfig({
     public: {
       NODE_ENV: process.env.NODE_ENV || 'production',
       VITE_LOG_LEVEL: process.env.NUXT_PUBLIC_LOG_LEVEL || process.env.VITE_LOG_LEVEL || '',
-      appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      appUrl: resolvePublicAppUrl(process.env),
       appVersion,
       googleAnalyticsMeasurementId:
         process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID ||

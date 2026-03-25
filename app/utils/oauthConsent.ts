@@ -4,14 +4,28 @@ const DEFAULT_OAUTH_BASE_ORIGIN = 'http://localhost';
 const OAUTH_SECURE_PROTOCOLS = new Set(['http:', 'https:']);
 const OAUTH_REQUIRED_QUERY_PARAMS = ['code', 'state'] as const;
 export const PII_LOG_KEYS = new Set<string>([
+  'access_token',
   'address',
+  'api_key',
+  'apikey',
+  'auth',
+  'authorization',
+  'cookie',
   'email',
   'first_name',
   'full_name',
+  'id_token',
   'last_name',
   'name',
   'phone',
+  'private_key',
+  'refresh_token',
+  'secret',
+  'session',
+  'token',
   'user_metadata',
+  'user_id',
+  'userid',
 ]);
 function sanitizeForDebugLogWithSeen(value: unknown, seen: WeakSet<object>): unknown {
   if (Array.isArray(value)) {
