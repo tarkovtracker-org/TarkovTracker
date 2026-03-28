@@ -67,7 +67,6 @@ updates:
           - '@nuxt/test-utils'
           - '@vue/test-utils'
           - happy-dom
-          - jsdom
           - fake-indexeddb
           - wait-on
         update-types:
@@ -90,7 +89,6 @@ updates:
           - autoprefixer
           - postcss
           - prettier-plugin-tailwindcss
-          - sass
         update-types:
           - minor
           - patch

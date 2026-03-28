@@ -442,12 +442,6 @@ export default defineNuxtConfig({
             if (id.includes('node_modules/leaflet')) {
               return 'vendor-leaflet';
             }
-            if (id.includes('node_modules/d3')) {
-              return 'vendor-d3';
-            }
-            if (id.includes('node_modules/graphology')) {
-              return 'vendor-graphology';
-            }
             if (id.includes('node_modules/@supabase')) {
               return 'vendor-supabase';
             }
