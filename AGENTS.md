@@ -194,7 +194,28 @@
 - **Find root cause**. When fixing issues, identify and address the root cause, not just the symptoms.
 - **Self-assess code**. Don't ask "what does this do?" Read and understand it. Only clarify ambiguous intent ("Is this supposed to do X or Y?").
 - **Ask before acting on complex requests**. Clarify ambiguous or multi-interpretation tasks before proceeding—it's better to ask one question than redo work.
+- **Check before isolating workspace.** Inspect the current branch, working tree, and existing worktrees first; reuse or continue when clearly appropriate, and ask before creating a new worktree when there is any ambiguity.
+- **Use allowed commit scopes.** When creating commits, use the scopes listed in `commitlint.config.js`: `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`.
+- **Do not invent new scopes.** If a change does not fit an allowed scope cleanly, omit the scope instead of using an unrecognized one.
+- **Map common cases consistently.** Use `ui` for theme/styling/shell work and `docs` for repository/process documentation such as `AGENTS.md`.
 - **Never run destructive git commands without explicit user approval in the current conversation**. This includes `git restore`, `git checkout --`, `git reset` (any mode), `git clean`, and force-push operations. Always ask first.
+
+## Git Workspace Isolation
+
+- Default to one task per worktree.
+- Before edits, run `git status --short --branch` and `git worktree list`.
+- Reuse the current worktree when the request clearly belongs to the same task or branch already in progress.
+- Reuse an existing sibling worktree when it already matches the task instead of creating a duplicate for the same work.
+- If the current checkout is dirty, belongs to another task, or the user starts a new independent task, recommend isolation instead of mixing changes in place.
+- Before creating a new worktree, briefly state what you found and ask whether to continue here, reuse an existing worktree, or create a new one. Only create without asking when the user explicitly requested a new worktree, branch isolation, or parallel task checkout.
+- Do not create multiple worktrees for the same task or branch unless the user explicitly asks for another one.
+- Keep the primary repo checkout clean on `main`; do task work in sibling worktrees named like `../<repo>-<branch-slug>`.
+- Base new task worktrees from `main` unless the user explicitly asks for another base branch.
+- Branch names should be short and task-scoped, for example `review/pr-236`, `fix/foo`, `chore/readme`, or `spike/new-idea`.
+- Do not use `git stash` for normal context switching. Prefer a new worktree; if a checkpoint is needed, prefer a local WIP commit.
+- Never mix unrelated work in the same worktree and never make quick side changes inside an active PR or review worktree.
+- After isolating work, state the branch and filesystem path in one short line, then continue.
+- When work is complete, suggest exact cleanup commands for removing the worktree and deleting the branch, but do not run them unless the user asks.
 
 ## Plan Mode
 

@@ -236,6 +236,19 @@ const progressWithLevel = (level: number): UserProgressData => ({
   skillOffsets: {},
   storyChapters: {},
 });
+const progressWithStoryObjective = (complete: boolean, timestamp: number): UserProgressData => ({
+  ...progressWithLevel(1),
+  storyChapters: {
+    'chapter-1': {
+      objectives: {
+        'objective-1': {
+          complete,
+          timestamp,
+        },
+      },
+    },
+  },
+});
 const progressWithItemCounts = (
   overrides: Partial<Pick<UserProgressData, 'taskObjectives' | 'hideoutParts'>> = {}
 ): UserProgressData => ({
@@ -916,6 +929,30 @@ describe('useTarkov sync integration', () => {
     expect(upsert).not.toHaveBeenCalled();
     expect(store.pvp.taskObjectives['objective-1']).toEqual({
       complete: false,
+    });
+  });
+  it('preserves remote storyline progress when a newer local snapshot has no storyline data', async () => {
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: Date.parse('2026-03-01T00:00:00.000Z'),
+        _userId: 'user-1',
+        data: structuredClone(defaultState),
+      })
+    );
+    single.mockResolvedValue({
+      data: createRemoteRow({
+        pvp_data: progressWithStoryObjective(true, 2000),
+        updated_at: '2026-02-22T12:00:00.000Z',
+      }),
+      error: null,
+    });
+    const store = useTarkovStore();
+    await initializeTarkovSync();
+    expect(upsert).not.toHaveBeenCalled();
+    expect(store.pvp.storyChapters['chapter-1']?.objectives?.['objective-1']).toEqual({
+      complete: true,
+      timestamp: 2000,
     });
   });
   it('skips upsert when local and remote progress scores are equal', async () => {

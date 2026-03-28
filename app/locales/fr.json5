@@ -1011,7 +1011,7 @@
     privacy_policy: 'Politique de confidentialité',
     credits: 'Crédits',
     analytics_preferences: 'Préférences analytiques',
-    game_attribution: "Le contenu et les matériaux du jeu sont des marques déposées et des droits d'auteur de Battlestate Games et de ses concédants. Tous droits réservés.",
+    game_attribution: "Escape from Tarkov et le contenu et les matériaux de jeu associés sont des marques déposées et des œuvres protégées par le droit d'auteur de Battlestate Games Limited et de ses concédants. Tous droits réservés. TarkovTracker est un projet de fans non officiel et n'est pas affilié à Battlestate Games ni approuvé par celui-ci.",
   },
   navigation_drawer: {
     main_navigation: 'Navigation principale',

@@ -1011,7 +1011,7 @@
     privacy_policy: 'Политика конфиденциальности',
     credits: 'Благодарности',
     analytics_preferences: 'Настройки аналитики',
-    game_attribution: 'Игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games и ее лицензиаров. Все права защищены.',
+    game_attribution: 'Escape from Tarkov и связанный игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games Limited и ее лицензиаров. Все права защищены. TarkovTracker является неофициальным фанатским проектом и не связан с Battlestate Games и не одобрен ею.',
   },
   navigation_drawer: {
     main_navigation: 'Основная навигация',

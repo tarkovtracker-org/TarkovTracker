@@ -171,41 +171,6 @@ export default withNuxt(
     },
   },
   {
-    // Override for modules importing graphology-types.
-    // The import-x/order rule's pathGroups entry for 'graphology-types' must affect
-    // type imports to preserve required ordering. The global config excludes 'type'
-    // from pathGroupsExcludedImportTypes, which prevents pathGroups from matching
-    // type-only imports. Here we intentionally omit 'type' (only excluding 'builtin')
-    // so the { pattern: 'graphology-types', group: 'external' } entry can reorder
-    // type imports from graphology-types alongside regular imports.
-    files: ['app/composables/useGraphBuilder.ts', 'app/stores/useMetadata.ts'],
-    rules: {
-      'import-x/order': [
-        'warn',
-        {
-          'newlines-between': 'never',
-          alphabetize: { order: 'asc', caseInsensitive: true },
-          groups: [
-            'builtin',
-            'external',
-            'internal',
-            'parent',
-            'sibling',
-            'index',
-            'object',
-            'type',
-          ],
-          pathGroups: [
-            { pattern: 'graphology-types', group: 'external', position: 'before' },
-            { pattern: '#imports', group: 'internal', position: 'before' },
-            { pattern: '@/**', group: 'internal', position: 'before' },
-          ],
-          pathGroupsExcludedImportTypes: ['builtin'],
-        },
-      ],
-    },
-  },
-  {
     files: ['app/**/*.vue'],
     rules: {
       '@typescript-eslint/no-unused-vars': 'off',

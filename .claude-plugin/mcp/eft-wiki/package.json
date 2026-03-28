@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "node-html-parser": "^6.1.0"
+    "node-html-parser": "^7.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

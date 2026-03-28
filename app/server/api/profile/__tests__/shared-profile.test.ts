@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event, H3EventContext } from 'h3';
-import type { SiteConfigInput } from 'site-config-stack';
+type SiteConfigStackEntry = Record<string, unknown>;
 const { mockGetRequestHeader, mockGetRouterParam, mockFetch } = vi.hoisted(() => ({
   mockGetRequestHeader: vi.fn(),
   mockGetRouterParam: vi.fn(),
@@ -42,7 +42,7 @@ describe('Shared Profile API', () => {
   let mockEvent: Partial<H3Event>;
   const BASE_SITE_CONTEXT: Pick<H3EventContext, 'siteConfig' | 'siteConfigNitroOrigin'> = {
     siteConfig: {
-      stack: [] as Partial<SiteConfigInput>[],
+      stack: [] as Partial<SiteConfigStackEntry>[],
       push: vi.fn(() => () => {}),
       get: vi.fn(() => ({})),
     },

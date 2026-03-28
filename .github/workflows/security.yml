@@ -14,12 +14,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version-file: .nvmrc
           cache: 'npm'
@@ -36,24 +36,59 @@ jobs:
       - name: Check for outdated dependencies
         run: npm outdated || true
 
-      - name: Check Gitleaks license
-        id: gitleaks-check
+      - name: Install Gitleaks CLI
+        shell: bash
         run: |
-          if [ -z "$GITLEAKS_LICENSE" ]; then
-            echo "::warning::GITLEAKS_LICENSE secret not configured - Gitleaks scan will be skipped"
-            echo "has-license=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "has-license=true" >> "$GITHUB_OUTPUT"
-          fi
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          archive_path="$RUNNER_TEMP/$archive"
+          checksums_path="$RUNNER_TEMP/gitleaks_checksums.txt"
+          checksum_entry_path="$RUNNER_TEMP/gitleaks_checksum.txt"
+          install_dir="$RUNNER_TEMP/gitleaks"
+
+          mkdir -p "$install_dir"
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}" \
+            -o "$archive_path"
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" \
+            -o "$checksums_path"
+          awk -v archive="$archive" '$2 == archive { print }' "$checksums_path" > "$checksum_entry_path"
+          test -s "$checksum_entry_path"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum --check --strict "$checksum_entry_path"
+          )
+          tar -xzf "$archive_path" -C "$install_dir"
+          echo "$install_dir" >> "$GITHUB_PATH"
         env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_VERSION: 8.30.1
 
       - name: Gitleaks scan
-        if: steps.gitleaks-check.outputs.has-license == 'true'
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        id: gitleaks
+        continue-on-error: true
+        run: |
+          gitleaks git . \
+            --exit-code 1 \
+            --no-banner \
+            --redact \
+            --report-format sarif \
+            --report-path gitleaks.sarif
+
+      - name: Upload Gitleaks report
+        if: steps.gitleaks.outcome == 'failure'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail on Gitleaks findings
+        if: steps.gitleaks.outcome == 'failure'
+        run: |
+          echo "::error::Gitleaks detected secrets. Review the gitleaks-report artifact."
+          exit 1
 
   codeql:
     name: CodeQL
@@ -63,14 +98,13 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@b20883b0cd1f46c72ae0ba6d1090936928f9fa30
+        uses: github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13
         with:
           languages: javascript-typescript
           queries: security-extended
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@b20883b0cd1f46c72ae0ba6d1090936928f9fa30
-
+        uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13

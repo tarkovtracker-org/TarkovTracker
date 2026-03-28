@@ -11,6 +11,7 @@ node_modules
 .DS_Store
 .fleet
 .idea
+.vscode/settings.json
 logs
 *.log
 .env

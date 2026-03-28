@@ -11,7 +11,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Security scanning and dependency audits
 - Automated releases with semantic versioning
 - Pre-commit hooks for code quality
-- Dependency update automation via Renovate
+- Dependency update automation via Dependabot
 
 ## GitHub Actions Workflows
 
@@ -32,16 +32,10 @@ Weekly security audits:
 
 **Jobs:**
 
-- `security-scan` - npm audit (prod and all deps), outdated check, Gitleaks secret detection
+- `security-scan` - npm audit (prod and all deps), outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
 **Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
-
-**Required Secrets:**
-
-```text
-GITLEAKS_LICENSE (required for organization repos, free at gitleaks.io)
-```
 
 ### 3. Release Automation (`.github/workflows/release.yml`)
 
@@ -146,35 +140,41 @@ chore(deps): update nuxt to v4.2.2
 
 ## Dependency Updates
 
-Automated via Renovate (`renovate.json`):
+Automated via Dependabot (`.github/dependabot.yml`):
 
 **Features:**
 
-- Auto-merge for dev dependencies and type definitions
-- Grouped updates for related packages (eslint, nuxt, tailwind)
-- Security vulnerability auto-merge
-- Scheduled updates (nights/weekends)
-- Maximum 3 concurrent PRs
+- Weekly npm update batches across the app root and `workers/api-gateway`
+- Monthly grouped npm batches for `.claude-plugin` MCP tooling
+- Monthly grouped GitHub Actions updates
+- Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
+- Cooldown windows to avoid immediate churn from fresh releases
+- Grouped minor/patch updates for low-risk tooling families
+- Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
+- Maximum 3 concurrent npm PRs and 1 GitHub Actions PR
+- No automerge for version updates
+- Gitleaks runs via a pinned CLI download in CI with release checksum verification instead of the deprecated `gitleaks-action` runtime
 
-**Package Groups:**
+**Current package groups:**
 
-- eslint packages
-- nuxt packages
-- cloudflare packages
-- tailwind packages
-- testing packages
+- nuxt ecosystem
+- lint and format tooling
+- testing tooling
+- typescript and `@types/*`
+- tailwind tooling
+- cloudflare tooling
+- release tooling
+- remaining npm minor/patch updates
+- claude-plugin MCP runtime and dev tooling
 
-**Configuration:**
+**Review strategy:**
 
-```json
-{
-  "schedule": ["after 10pm every weekday", "before 5am every weekday", "every weekend"],
-  "prConcurrentLimit": 3,
-  "automerge": true
-}
-```
-
-_Automerge enabled for dev deps, types, and security updates._
+- Let Dependabot batch low-risk tooling updates for scheduled review windows
+- Keep major upgrades explicit
+- Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
+- Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
+- Keep `.claude-plugin` updates out of the main app queue; review them monthly as isolated tooling maintenance
+- Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
 
 ## Development Environment Setup
 
@@ -330,14 +330,14 @@ npm run lint:fix
 
 ### Dependencies
 
-- Let Renovate handle updates
-- Review grouped updates together
-- Test major version upgrades locally
+- Let Dependabot handle scheduled version updates
+- Review grouped low-risk tooling updates together
+- Test major version upgrades and framework/runtime bumps locally
 
 ### Security
 
 - Never commit secrets to repository
-- Review Dependabot/Renovate security PRs immediately
+- Review Dependabot security PRs immediately
 - Run `npm audit` before releases
 
 ## Configuration Files
@@ -347,7 +347,7 @@ npm run lint:fix
 - `.github/workflows/*.yml` - GitHub Actions workflows
 - `.husky/*` - Git hooks
 - `commitlint.config.js` - Commit message rules
-- `renovate.json` - Dependency update config
+- `.github/dependabot.yml` - Dependabot update config
 - `.releaserc.json` - Semantic release config
 
 **Development:**
@@ -360,10 +360,10 @@ npm run lint:fix
 > **Note:** External links are validated automatically on PRs via the `link-check` workflow.
 > Last manual verification: 2026-01-30
 
-| Resource             | Link                                                                                 | Notes                     |
-| -------------------- | ------------------------------------------------------------------------------------ | ------------------------- |
-| GitHub Actions Docs  | [docs.github.com/en/actions](https://docs.github.com/en/actions)                     | Stable documentation URL  |
-| Conventional Commits | [conventionalcommits.org/en/v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)  | Versioned spec permalink  |
-| Semantic Release     | [semantic-release.gitbook.io](https://semantic-release.gitbook.io/semantic-release/) | GitBook hosted docs       |
-| Renovate Docs        | [docs.renovatebot.com](https://docs.renovatebot.com/)                                | Official documentation    |
-| Cloudflare Pages     | [developers.cloudflare.com/pages](https://developers.cloudflare.com/pages/)          | Cloudflare developer docs |
+| Resource             | Link                                                                                         | Notes                     |
+| -------------------- | -------------------------------------------------------------------------------------------- | ------------------------- |
+| GitHub Actions Docs  | [docs.github.com/en/actions](https://docs.github.com/en/actions)                             | Stable documentation URL  |
+| Conventional Commits | [conventionalcommits.org/en/v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)          | Versioned spec permalink  |
+| Semantic Release     | [semantic-release.gitbook.io](https://semantic-release.gitbook.io/semantic-release/)         | GitBook hosted docs       |
+| Dependabot Docs      | [docs.github.com/code-security/dependabot](https://docs.github.com/code-security/dependabot) | Official documentation    |
+| Cloudflare Pages     | [developers.cloudflare.com/pages](https://developers.cloudflare.com/pages/)                  | Cloudflare developer docs |

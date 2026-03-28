@@ -1,0 +1,195 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /workers/api-gateway
+    exclude-paths:
+      - '.claude-plugin/**'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    rebase-strategy: disabled
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+    labels:
+      - dependencies
+      - javascript
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps)
+    versioning-strategy: increase-if-necessary
+    allow:
+      - dependency-type: direct
+    ignore:
+      - dependency-name: fast-xml-parser
+        update-types:
+          - version-update:semver-major
+    groups:
+      nuxt-ecosystem:
+        dependency-type: production
+        patterns:
+          - nuxt
+          - '@nuxt/*'
+          - '@nuxtjs/*'
+          - '@unhead/*'
+          - '@intlify/*'
+          - '@vueuse/*'
+          - vue
+          - vue-i18n
+          - vue-router
+        update-types:
+          - minor
+          - patch
+      lint-and-format:
+        dependency-type: development
+        patterns:
+          - eslint*
+          - '@nuxt/eslint'
+          - prettier
+          - prettier-*
+          - '@commitlint/*'
+          - lint-staged
+          - husky
+        update-types:
+          - minor
+          - patch
+      testing-tooling:
+        dependency-type: development
+        patterns:
+          - vitest
+          - '@vitest/*'
+          - '@nuxt/test-utils'
+          - '@vue/test-utils'
+          - happy-dom
+          - fake-indexeddb
+          - wait-on
+        update-types:
+          - minor
+          - patch
+      typescript-and-types:
+        dependency-type: development
+        patterns:
+          - typescript
+          - '@types/*'
+          - tsx
+        update-types:
+          - minor
+          - patch
+      tailwind-tooling:
+        dependency-type: development
+        patterns:
+          - tailwindcss
+          - '@tailwindcss/*'
+          - autoprefixer
+          - postcss
+          - prettier-plugin-tailwindcss
+        update-types:
+          - minor
+          - patch
+      cloudflare-tooling:
+        patterns:
+          - wrangler
+          - '@cloudflare/*'
+        update-types:
+          - minor
+          - patch
+      release-tooling:
+        dependency-type: development
+        patterns:
+          - semantic-release
+          - '@semantic-release/*'
+          - serve
+        update-types:
+          - minor
+          - patch
+      remaining-npm:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directories:
+      - /.claude-plugin/mcp/tarkov-dev
+      - /.claude-plugin/mcp/eft-wiki
+    schedule:
+      interval: monthly
+      day: monday
+      time: '05:00'
+      timezone: America/New_York
+    open-pull-requests-limit: 1
+    rebase-strategy: disabled
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
+    labels:
+      - dependencies
+      - javascript
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps)
+    versioning-strategy: increase-if-necessary
+    allow:
+      - dependency-type: direct
+    groups:
+      claude-plugin-dev:
+        dependency-type: development
+        patterns:
+          - typescript
+          - '@types/*'
+        update-types:
+          - minor
+          - patch
+      claude-plugin-runtime:
+        patterns:
+          - '@modelcontextprotocol/*'
+          - graphql-request
+          - node-html-parser
+        update-types:
+          - minor
+          - patch
+      claude-plugin-remaining:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      day: monday
+      time: '04:00'
+      timezone: America/New_York
+    open-pull-requests-limit: 1
+    rebase-strategy: disabled
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: chore(ci)
+    groups:
+      official-actions:
+        patterns:
+          - actions/*
+          - github/codeql-action
+        update-types:
+          - major
+          - minor
+          - patch
+      third-party-actions:
+        patterns:
+          - lycheeverse/lychee-action
+          - treosh/lighthouse-ci-action
+        update-types:
+          - minor
+          - patch

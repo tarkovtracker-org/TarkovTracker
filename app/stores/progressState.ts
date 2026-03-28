@@ -425,7 +425,10 @@ export const actions = {
     });
   },
   setStoryChapterUncomplete(this: UserState, chapterId: string) {
-    updateObjective(this, 'storyChapters', chapterId, { complete: false });
+    updateObjective(this, 'storyChapters', chapterId, {
+      complete: false,
+      timestamp: Date.now(),
+    });
   },
   toggleStoryChapterComplete(this: UserState, chapterId: string) {
     const isComplete = getters.isStoryChapterComplete(this)(chapterId);
@@ -458,6 +461,7 @@ export const actions = {
     }
     data.storyChapters[chapterId].objectives![objectiveId] = {
       complete: false,
+      timestamp: Date.now(),
     };
   },
   toggleStoryObjectiveComplete(this: UserState, chapterId: string, objectiveId: string) {

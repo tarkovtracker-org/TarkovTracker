@@ -1,14 +1,3 @@
-import type {
-  HideoutModule,
-  HideoutStation,
-  NeededItemHideoutModule,
-  NeededItemTaskObjective,
-  ObjectiveGPSInfo,
-  ObjectiveMapInfo,
-  Task,
-  TaskObjective,
-  TaskRequirement,
-} from '@/types/tarkov';
 import {
   createGraph,
   type TaskGraph,
@@ -22,6 +11,17 @@ import {
 import { logger } from '@/utils/logger';
 import { normalizeTaskObjectives } from '@/utils/taskNormalization';
 import { buildRequiredKeysFromObjectives } from '@/utils/taskRequiredKeys';
+import type {
+  HideoutModule,
+  HideoutStation,
+  NeededItemHideoutModule,
+  NeededItemTaskObjective,
+  ObjectiveGPSInfo,
+  ObjectiveMapInfo,
+  Task,
+  TaskObjective,
+  TaskRequirement,
+} from '@/types/tarkov';
 /**
  * Composable for building task and hideout dependency graphs
  * Extracts complex graph algorithms from the metadata store

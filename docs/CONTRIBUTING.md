@@ -170,6 +170,19 @@ docs: update contributing guide
 chore: update dependencies
 ```
 
+Use only the commit scopes allowed by `commitlint.config.js`:
+
+```text
+app, workers, api, ui, tasks, hideout, maps, team, settings, admin, i18n, deps, config, ci, test, docs, release
+```
+
+If none of those scopes fit cleanly, omit the scope instead of inventing a new one.
+
+Recommended mappings:
+
+- `ui` for theme, styling, layout, shell, and visual polish changes
+- `docs` for repository and process documentation such as contributor guidance or `AGENTS.md`
+
 ### Pull Request Process
 
 1. Create a feature branch from `main`

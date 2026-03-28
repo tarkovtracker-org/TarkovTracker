@@ -22,8 +22,8 @@
       "coordinateRotation": 90,
       "transform": [1.629, 119.9, 1.629, 139.3],
       "bounds": [
-        [79, -64.5],
-        [-66.5, 67.4]
+        [77, -64.5],
+        [-65.5, 67.4]
       ],
       "minZoom": 1,
       "maxZoom": 6
@@ -52,8 +52,8 @@
       "coordinateRotation": 180,
       "transform": [0.265, 150.6, 0.265, 134.6],
       "bounds": [
-        [598, -482],
-        [-433, 466]
+        [598, -442],
+        [-433, 426]
       ],
       "minZoom": 1,
       "maxZoom": 6
@@ -62,9 +62,6 @@
   "lab": {
     "tile": {
       "tilePath": "https://assets.tarkov.dev/maps/labs_v4/1st/{z}/{x}/{y}.png",
-      "tileFallbacks": [
-        "https://tarkovtracker.github.io/tarkovdata/maps/labs_v4/1st/{z}/{x}/{y}.png"
-      ],
       "coordinateRotation": 270,
       "transform": [0.575, 281.2, 0.575, 193.7],
       "bounds": [
@@ -118,8 +115,8 @@
         [-303, 244]
       ],
       "svgBounds": [
-        [289, -338],
-        [-303, 336]
+        [289, -274],
+        [-303, 272]
       ],
       "minZoom": 2,
       "maxZoom": 6,
@@ -134,8 +131,8 @@
       "coordinateRotation": 180,
       "transform": [0.16, 83.2, 0.16, 111.1],
       "bounds": [
-        [508, -415],
-        [-1060, 618]
+        [504, -415],
+        [-1056, 618]
       ],
       "minZoom": 2,
       "maxZoom": 6
@@ -149,15 +146,27 @@
       "coordinateRotation": 180,
       "transform": [0.38, 0, 0.38, 0],
       "bounds": [
-        [323, -317],
-        [-280, 554]
+        [323, -295],
+        [-280, 532]
       ],
       "minZoom": 1,
       "maxZoom": 5
     }
   },
   "terminal": {
-    "unavailable": true
+    "svg": {
+      "file": "Terminal.svg",
+      "floors": ["Ground_Level", "2nd Floor"],
+      "defaultFloor": "Ground_Level",
+      "coordinateRotation": 180,
+      "transform": [0.2, 0, 0.2, 0],
+      "bounds": [
+        [463, -580],
+        [-433, 475]
+      ],
+      "minZoom": 2,
+      "maxZoom": 6
+    }
   },
   "transits": {
     "unavailable": true
@@ -168,12 +177,12 @@
       "floors": ["Ground_Level"],
       "defaultFloor": "Ground_Level",
       "coordinateRotation": 180,
-      "transform": [0.1855, 113.1, 0.1855, 167.8],
+      "transform": [0.1855, 112.95, 0.1855, 167.85],
       "bounds": [
-        [650, -945],
-        [-762, 470]
+        [646, -914],
+        [-761, 442]
       ],
-      "minZoom": 1,
+      "minZoom": 2,
       "maxZoom": 6
     }
   }

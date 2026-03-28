@@ -10,6 +10,7 @@ import {
 } from './app/utils/nuxtSecurityConfig';
 import {
   GITHUB_IMAGE_DOMAINS,
+  resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
@@ -157,7 +158,7 @@ export default defineNuxtConfig({
     public: {
       NODE_ENV: process.env.NODE_ENV || 'production',
       VITE_LOG_LEVEL: process.env.NUXT_PUBLIC_LOG_LEVEL || process.env.VITE_LOG_LEVEL || '',
-      appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      appUrl: resolvePublicAppUrl(process.env),
       appVersion,
       googleAnalyticsMeasurementId:
         process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID ||
@@ -387,7 +388,6 @@ export default defineNuxtConfig({
   typescript: {
     tsConfig: {
       compilerOptions: {
-        baseUrl: '.',
         paths: {
           '@/*': ['./app/*'],
           '#tests/*': ['./tests/*'],
@@ -441,12 +441,6 @@ export default defineNuxtConfig({
           manualChunks: (id) => {
             if (id.includes('node_modules/leaflet')) {
               return 'vendor-leaflet';
-            }
-            if (id.includes('node_modules/d3')) {
-              return 'vendor-d3';
-            }
-            if (id.includes('node_modules/graphology')) {
-              return 'vendor-graphology';
             }
             if (id.includes('node_modules/@supabase')) {
               return 'vendor-supabase';

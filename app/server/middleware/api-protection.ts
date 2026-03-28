@@ -146,6 +146,31 @@ function isHostAllowed(
     return host === allowedLower || host.endsWith('.' + allowedLower);
   });
 }
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '::1' || hostname.startsWith('127.');
+}
+function resolveAppUrlHosts(appUrl: string | undefined, isDevelopment: boolean): string[] {
+  if (!appUrl || appUrl.trim().length === 0) {
+    return [];
+  }
+  try {
+    const hostname = new URL(appUrl).hostname.toLowerCase();
+    const hosts = [hostname];
+    if (hostname.endsWith('.pages.dev')) {
+      const hostnameParts = hostname.split('.');
+      if (hostnameParts.length > 3) {
+        hosts.push(hostnameParts.slice(1).join('.'));
+      }
+    }
+    const uniqueHosts = [...new Set(hosts)];
+    if (isDevelopment) {
+      return uniqueHosts;
+    }
+    return uniqueHosts.filter((host) => !isLoopbackHost(host));
+  } catch {
+    return [];
+  }
+}
 /**
  * Validate authentication token
  * Returns user info if valid, null otherwise
@@ -273,17 +298,19 @@ export default defineEventHandler(async (event) => {
       : defaultPublicRoutes;
   // Add default allowed hosts for production
   const effectiveAllowedHosts = [...allowedHosts];
-  if (effectiveAllowedHosts.length === 0 && !isDevelopment) {
+  if (allowedHosts.length === 0 && !isDevelopment) {
     // Default production hosts
     effectiveAllowedHosts.push('tarkovtracker.org', 'www.tarkovtracker.org');
   }
+  effectiveAllowedHosts.push(...resolveAppUrlHosts(typedConfig.public?.appUrl, isDevelopment));
+  const uniqueAllowedHosts = [...new Set(effectiveAllowedHosts.map((host) => host.toLowerCase()))];
   // === SECURITY CHECK 1: Host Header Validation ===
   const hostHeader = getRequestHeader(event, 'host');
-  if (!isHostAllowed(hostHeader, effectiveAllowedHosts, isDevelopment)) {
+  if (!isHostAllowed(hostHeader, uniqueAllowedHosts, isDevelopment)) {
     logSecurityEvent('warn', 'Blocked request - invalid host', {
       pathname,
       host: hostHeader || 'none',
-      allowedHosts: effectiveAllowedHosts,
+      allowedHosts: uniqueAllowedHosts,
     });
     throw createError({
       statusCode: 403,
@@ -305,7 +332,7 @@ export default defineEventHandler(async (event) => {
       message: 'Access denied - untrusted source',
     });
   }
-  applyCorsHeaders(event, effectiveAllowedHosts, isDevelopment, pathname, clientIp);
+  applyCorsHeaders(event, uniqueAllowedHosts, isDevelopment, pathname, clientIp);
   if (event.method === 'OPTIONS') {
     setResponseStatus(event, 204);
     return '';

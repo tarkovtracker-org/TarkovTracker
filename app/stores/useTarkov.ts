@@ -47,6 +47,7 @@ import {
   getNextProgressEpoch,
   hasProgress,
   mergeProgressData,
+  mergeStoryChapterProgress,
   normalizeApiTaskUpdates,
   normalizeApiUpdateMetaEntry,
   normalizeTaskCompletionsMap,
@@ -146,6 +147,17 @@ const shouldPreferLocalStartupMetadata = (
   }
   return false;
 };
+const getStoryProgressScore = (mode: UserProgressData | undefined): number => {
+  if (!mode?.storyChapters) {
+    return 0;
+  }
+  let score = 0;
+  for (const chapter of Object.values(mode.storyChapters)) {
+    score += 1;
+    score += Object.keys(chapter?.objectives || {}).length;
+  }
+  return score;
+};
 const resolveInitialSyncState = (
   localState: UserState,
   remoteState: UserState,
@@ -169,7 +181,14 @@ const resolveInitialSyncState = (
     if (localEpoch !== remoteEpoch) {
       return mergeProgressData(localModeData, remoteModeData);
     }
-    return preferLocalMetadata ? localModeData : remoteModeData;
+    const preferredModeData = preferLocalMetadata ? localModeData : remoteModeData;
+    return {
+      ...preferredModeData,
+      storyChapters: mergeStoryChapterProgress(
+        localModeData.storyChapters,
+        remoteModeData.storyChapters
+      ),
+    };
   };
   return {
     currentGameMode: preferLocalMetadata ? localState.currentGameMode : remoteState.currentGameMode,
@@ -1266,6 +1285,7 @@ export async function initializeTarkovSync() {
             Object.keys(mode.taskObjectives || {}).length +
             Object.keys(mode.hideoutModules || {}).length +
             Object.keys(mode.hideoutParts || {}).length +
+            getStoryProgressScore(mode) +
             (mode.level > 1 ? 1 : 0) +
             (mode.prestigeLevel || 0)
           );

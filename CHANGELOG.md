@@ -1,3 +1,31 @@
+## [1.28.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.28.3...v1.28.4) (2026-03-28)
+
+
+### Bug Fixes
+
+* align map metadata and attribution copy ([a53083e](https://github.com/tarkovtracker-org/TarkovTracker/commit/a53083e49be0d2610919282b53bbedc7217ba5c5))
+
+## [1.28.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.28.2...v1.28.3) (2026-03-28)
+
+
+### Bug Fixes
+
+* **deps:** resolve vue-router volar typecheck warning ([#262](https://github.com/tarkovtracker-org/TarkovTracker/issues/262)) ([50b1355](https://github.com/tarkovtracker-org/TarkovTracker/commit/50b1355a950e4355f37fb624dfe275f07e835e99))
+
+## [1.28.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.28.1...v1.28.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* **app:** preserve storyline progress sync ([3c40103](https://github.com/tarkovtracker-org/TarkovTracker/commit/3c4010359446ab91b21fd0067dc173d809e3ac86))
+
+## [1.28.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.28.0...v1.28.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* **previews:** support Pages previews and improve error reports ([#242](https://github.com/tarkovtracker-org/TarkovTracker/issues/242)) ([aa25df7](https://github.com/tarkovtracker-org/TarkovTracker/commit/aa25df7e50d7e54a4aad0845c49948142cf272b8))
+
 # [1.28.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.27.2...v1.28.0) (2026-03-16)
 
 

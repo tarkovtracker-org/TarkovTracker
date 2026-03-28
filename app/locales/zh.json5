@@ -1011,7 +1011,7 @@
     privacy_policy: '隐私政策',
     credits: '鸣谢',
     analytics_preferences: '分析偏好',
-    game_attribution: '游戏内容及素材为 Battlestate Games 及其授权方的商标与版权所有，保留所有权利',
+    game_attribution: 'Escape from Tarkov 及相关游戏内容和素材是 Battlestate Games Limited 及其授权方的商标和版权作品。保留所有权利。TarkovTracker 是非官方粉丝项目，与 Battlestate Games 无关联且未获其认可。',
   },
   navigation_drawer: {
     main_navigation: '主导航',

@@ -132,6 +132,47 @@ export const sanitizeNumberMap = (value: unknown): Record<string, number> => {
   }
   return sanitized;
 };
+export const sanitizeStoryChaptersMap = (value: unknown): UserProgressData['storyChapters'] => {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const sanitized: UserProgressData['storyChapters'] = {};
+  for (const [chapterId, chapter] of Object.entries(value)) {
+    if (!isRecord(chapter)) {
+      continue;
+    }
+    const normalized: UserProgressData['storyChapters'][string] = {};
+    if (typeof chapter.complete === 'boolean') {
+      normalized.complete = chapter.complete;
+    }
+    if (isRecord(chapter.objectives)) {
+      const objectives: Record<string, { complete?: boolean; timestamp?: number }> = {};
+      for (const [objectiveId, objective] of Object.entries(chapter.objectives)) {
+        if (!isRecord(objective)) {
+          continue;
+        }
+        const normalizedObjective: { complete?: boolean; timestamp?: number } = {};
+        if (typeof objective.complete === 'boolean') {
+          normalizedObjective.complete = objective.complete;
+        }
+        const timestamp = toFiniteNumber(objective.timestamp);
+        if (timestamp !== null) {
+          normalizedObjective.timestamp = Math.max(0, Math.trunc(timestamp));
+        }
+        if (Object.keys(normalizedObjective).length > 0) {
+          objectives[objectiveId] = normalizedObjective;
+        }
+      }
+      if (Object.keys(objectives).length > 0) {
+        normalized.objectives = objectives;
+      }
+    }
+    if (Object.keys(normalized).length > 0) {
+      sanitized[chapterId] = normalized;
+    }
+  }
+  return sanitized;
+};
 export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgressData> => {
   if (!isRecord(value)) {
     return {};
@@ -146,6 +187,7 @@ export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgre
     pmcFaction: sanitizeFaction(value.pmcFaction),
     skillOffsets: sanitizeNumberMap(value.skillOffsets),
     skills: sanitizeNumberMap(value.skills),
+    storyChapters: sanitizeStoryChaptersMap(value.storyChapters),
     taskCompletions: sanitizeTaskCompletionMap(value.taskCompletions),
     taskObjectives: sanitizeObjectiveProgressMap(value.taskObjectives),
     traders: sanitizeTraderMap(value.traders),

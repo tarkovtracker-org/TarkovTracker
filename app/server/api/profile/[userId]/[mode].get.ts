@@ -23,6 +23,7 @@ import {
   sanitizeHideoutModuleMap,
   sanitizeNumberMap,
   sanitizeObjectiveProgressMap,
+  sanitizeStoryChaptersMap,
   sanitizeTaskCompletionMap,
   sanitizeTraderMap,
   toFiniteNumber,
@@ -116,6 +117,10 @@ type SanitizedProgressData = Partial<{
   prestigeLevel: number;
   skillOffsets: Record<string, number>;
   skills: Record<string, number>;
+  storyChapters: Record<
+    string,
+    { complete?: boolean; objectives?: Record<string, { complete?: boolean; timestamp?: number }> }
+  >;
   taskCompletions: Record<string, SanitizedTaskCompletion>;
   taskObjectives: Record<string, SanitizedObjectiveProgress>;
   traders: Record<string, SanitizedTrader>;
@@ -244,6 +249,10 @@ const sanitizeProgressPayload = (
   const prestigeLevel = toFiniteNumber(value.prestigeLevel);
   if (prestigeLevel !== null) {
     sanitized.prestigeLevel = Math.max(0, Math.min(6, Math.trunc(prestigeLevel)));
+  }
+  const storyChapters = sanitizeStoryChaptersMap(value.storyChapters);
+  if (Object.keys(storyChapters).length > 0) {
+    sanitized.storyChapters = storyChapters;
   }
   const lastApiUpdate = sanitizeApiUpdateMeta(value.lastApiUpdate);
   if (lastApiUpdate) {

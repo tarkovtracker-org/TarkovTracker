@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { getters, type UserState } from '@/stores/progressState';
-const createStateWithTaskCompletion = (completion: unknown): UserState =>
+import { describe, expect, it, vi } from 'vitest';
+import { actions, getters, type UserState } from '@/stores/progressState';
+const createBaseState = (): UserState =>
   ({
     currentGameMode: 'pvp',
     gameEdition: 1,
@@ -11,7 +11,7 @@ const createStateWithTaskCompletion = (completion: unknown): UserState =>
       displayName: null,
       xpOffset: 0,
       taskObjectives: {},
-      taskCompletions: { 'task-1': completion },
+      taskCompletions: {},
       hideoutParts: {},
       hideoutModules: {},
       traders: {},
@@ -36,6 +36,14 @@ const createStateWithTaskCompletion = (completion: unknown): UserState =>
       storyChapters: {},
     },
   }) as UserState;
+const createStateWithTaskCompletion = (completion: unknown): UserState =>
+  ({
+    ...createBaseState(),
+    pvp: {
+      ...createBaseState().pvp,
+      taskCompletions: { 'task-1': completion },
+    },
+  }) as UserState;
 describe('progressState getters task completion compatibility', () => {
   it('treats legacy boolean completions as complete', () => {
     const state = createStateWithTaskCompletion(true);
@@ -46,5 +54,27 @@ describe('progressState getters task completion compatibility', () => {
     const state = createStateWithTaskCompletion({ complete: true, failed: true });
     expect(getters.isTaskComplete(state)('task-1')).toBe(false);
     expect(getters.isTaskFailed(state)('task-1')).toBe(true);
+  });
+});
+describe('progressState storyline timestamps', () => {
+  it('records timestamps for storyline uncomplete actions', () => {
+    const state = createBaseState();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);
+    try {
+      actions.setStoryChapterUncomplete.call(state, 'chapter-1');
+      actions.setStoryObjectiveUncomplete.call(state, 'chapter-1', 'objective-1');
+      expect(state.pvp.storyChapters['chapter-1']).toMatchObject({
+        complete: false,
+        timestamp: 5000,
+        objectives: {
+          'objective-1': {
+            complete: false,
+            timestamp: 5000,
+          },
+        },
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
