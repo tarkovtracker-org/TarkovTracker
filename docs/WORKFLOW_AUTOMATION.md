@@ -32,7 +32,7 @@ Weekly security audits:
 
 **Jobs:**
 
-- `security-scan` - npm audit (prod and all deps), outdated check, Gitleaks secret detection
+- `security-scan` - npm audit (prod and all deps), outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
 **Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
@@ -153,7 +153,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
 - Maximum 3 concurrent npm PRs and 1 GitHub Actions PR
 - No automerge for version updates
-- Gitleaks runs via the pinned CLI in CI instead of the deprecated `gitleaks-action` runtime
+- Gitleaks runs via a pinned CLI download in CI with release checksum verification instead of the deprecated `gitleaks-action` runtime
 
 **Current package groups:**
 

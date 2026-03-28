@@ -37,18 +37,30 @@ jobs:
         run: npm outdated || true
 
       - name: Install Gitleaks CLI
+        shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/gitleaks"
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          archive_path="$RUNNER_TEMP/$archive"
+          checksums_path="$RUNNER_TEMP/gitleaks_checksums.txt"
+          checksum_entry_path="$RUNNER_TEMP/gitleaks_checksum.txt"
+          install_dir="$RUNNER_TEMP/gitleaks"
+
+          mkdir -p "$install_dir"
           curl -sSfL \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            -o "$RUNNER_TEMP/gitleaks.tar.gz"
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}" \
+            -o "$archive_path"
           curl -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" \
-            -o "$RUNNER_TEMP/gitleaks_checksums.txt"
-          grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" "$RUNNER_TEMP/gitleaks_checksums.txt" | \
-            sha256sum --check --status
-          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks"
-          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+            -o "$checksums_path"
+          awk -v archive="$archive" '$2 == archive { print }' "$checksums_path" > "$checksum_entry_path"
+          test -s "$checksum_entry_path"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum --check --strict "$checksum_entry_path"
+          )
+          tar -xzf "$archive_path" -C "$install_dir"
+          echo "$install_dir" >> "$GITHUB_PATH"
         env:
           GITLEAKS_VERSION: 8.30.1
 
