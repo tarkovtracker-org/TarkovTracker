@@ -18,19 +18,19 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
 
       - name: Auto-label PR
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9
+        uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Calculate and apply size label
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const files = await github.paginate(github.rest.pulls.listFiles, {
@@ -87,7 +87,7 @@ jobs:
 
       - name: Detect Lighthouse scope
         id: lighthouse-gate
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const labels = context.payload.pull_request.labels.map(({ name }) => name);
@@ -107,7 +107,7 @@ jobs:
             console.log(`Lighthouse gate ${runLighthouse ? 'enabled' : 'skipped'}`);
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version-file: .nvmrc
           cache: 'npm'
@@ -128,10 +128,10 @@ jobs:
     env:
       API_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version-file: .nvmrc
           cache: 'npm'

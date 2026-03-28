@@ -180,9 +180,18 @@ updates:
     commit-message:
       prefix: chore(ci)
     groups:
-      github-actions:
+      official-actions:
         patterns:
-          - '*'
+          - actions/*
+          - github/codeql-action
+        update-types:
+          - major
+          - minor
+          - patch
+      third-party-actions:
+        patterns:
+          - lycheeverse/lychee-action
+          - treosh/lighthouse-ci-action
         update-types:
           - minor
           - patch

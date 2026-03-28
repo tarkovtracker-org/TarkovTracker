@@ -37,12 +37,6 @@ Weekly security audits:
 
 **Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
 
-**Required Secrets:**
-
-```text
-GITLEAKS_LICENSE (required for organization repos, free at gitleaks.io)
-```
-
 ### 3. Release Automation (`.github/workflows/release.yml`)
 
 Semantic versioning with automated releases:
@@ -153,11 +147,13 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Weekly npm update batches across the app root and `workers/api-gateway`
 - Monthly grouped npm batches for `.claude-plugin` MCP tooling
 - Monthly grouped GitHub Actions updates
+- Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
 - Grouped minor/patch updates for low-risk tooling families
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
 - Maximum 3 concurrent npm PRs and 1 GitHub Actions PR
 - No automerge for version updates
+- Gitleaks runs via the pinned CLI in CI instead of the deprecated `gitleaks-action` runtime
 
 **Current package groups:**
 
@@ -175,6 +171,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 
 - Let Dependabot batch low-risk tooling updates for scheduled review windows
 - Keep major upgrades explicit
+- Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
 - Keep `.claude-plugin` updates out of the main app queue; review them monthly as isolated tooling maintenance
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings

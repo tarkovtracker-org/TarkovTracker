@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-label from issue template
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             # Auto-assign labels based on issue body content

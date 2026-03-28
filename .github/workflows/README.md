@@ -12,7 +12,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 ### Security (`security.yml`)
 
 **Trigger:** Push to main/develop, PRs, weekly schedule
-**Jobs:** `Security Scan` (audit + gitleaks), `CodeQL` (static analysis)
+**Jobs:** `Security Scan` (audit + gitleaks CLI), `CodeQL` (static analysis)
 
 ### Release (`release.yml`)
 
@@ -40,9 +40,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ## Secrets
 
-```text
-GITLEAKS_LICENSE       - Gitleaks license key (optional)
-```
+Workflow-specific secrets are not required for the Gitleaks step anymore. App build jobs still use the existing Nuxt/Supabase secrets configured for CI and release.
 
 ## Commands
 
