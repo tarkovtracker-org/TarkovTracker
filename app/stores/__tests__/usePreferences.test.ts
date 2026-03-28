@@ -262,6 +262,7 @@ describe('usePreferencesStore', () => {
       const migratedValue = JSON.parse(localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}');
       expect(store.neededItemsHideOwned).toBe(true);
       expect(migratedValue).toMatchObject({
+        _timestamp: 1234,
         _userId: 'user-1',
         data: {
           neededItemsHideOwned: true,
@@ -412,7 +413,7 @@ describe('usePreferencesStore', () => {
       const restoredSnapshot = JSON.parse(
         localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}'
       );
-      expect(restoredSnapshot._timestamp).toEqual(expect.any(Number));
+      expect(restoredSnapshot._timestamp).toBe(1234);
       expect(restoredSnapshot).toMatchObject({
         _userId: 'user-1',
         data: {
@@ -441,7 +442,7 @@ describe('usePreferencesStore', () => {
       const restoredSnapshot = JSON.parse(
         localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}'
       );
-      expect(restoredSnapshot._timestamp).toEqual(expect.any(Number));
+      expect(restoredSnapshot._timestamp).toBe(1234);
       expect(restoredSnapshot).toMatchObject({
         _userId: 'user-1',
         data: {

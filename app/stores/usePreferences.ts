@@ -567,6 +567,15 @@ export const clearPendingResetPreferencesSnapshot = (userId?: string | null): vo
     pendingResetPreferencesSnapshot = null;
   }
 };
+const serializePersistedPreferencesSnapshot = (
+  state: PersistedPreferencesState,
+  userId: string | null,
+  persistedAt?: number | null
+): string => {
+  return typeof persistedAt === 'number'
+    ? serializeUserScopedStorage(state, userId, persistedAt)
+    : serializeUserScopedStorage(state, userId);
+};
 export const usePreferencesStore = defineStore('preferences', {
   state: (): PreferencesState => {
     const persistedSnapshot = import.meta.client ? readPersistedPreferencesSnapshot() : null;
@@ -591,7 +600,11 @@ export const usePreferencesStore = defineStore('preferences', {
           if (shouldPersistMigratedState) {
             localStorage.setItem(
               STORAGE_KEYS.preferences,
-              serializeUserScopedStorage(persistedState, persistedSnapshot.ownerUserId)
+              serializePersistedPreferencesSnapshot(
+                persistedState,
+                persistedSnapshot.ownerUserId,
+                persistedSnapshot.persistedAt
+              )
             );
           }
         }
