@@ -9,7 +9,7 @@
     "@intlify/unplugin-vue-i18n": "^11.0.7",
     "@mdi/font": "^7.4.47",
     "@nuxt/image": "^2.0.0",
-    "@nuxt/ui": "^4.4.0",
+    "@nuxt/ui": "^4.6.0",
     "@nuxtjs/i18n": "^10.2.3",
     "@nuxtjs/sitemap": "^7.6.0",
     "@pinia/nuxt": "^0.11.3",
@@ -34,7 +34,7 @@
     "typescript": "^5.9.3",
     "vue": "^3.5.28",
     "vue-i18n": "^11.2.8",
-    "vue-router": "^4.6.4"
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260228.0",
@@ -68,6 +68,7 @@
     "supabase": "^2.76.12",
     "tailwindcss": "^4.2.0",
     "vitest": "^4.0.18",
+    "vue-tsc": "^3.2.6",
     "wait-on": "^9.0.4",
     "wrangler": "^4.77.0"
   },

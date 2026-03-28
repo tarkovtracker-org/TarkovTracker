@@ -155,6 +155,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
+  import type { DropdownMenuItem } from '@nuxt/ui';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
   const appStore = useAppStore();
   const metadataStore = useMetadataStore();
@@ -180,7 +181,7 @@
     }
     return $supabase.user.displayName || $supabase.user.username || fallbackLabel;
   });
-  const accountMenuItems = computed(() => [
+  const accountMenuItems = computed<DropdownMenuItem[][]>(() => [
     [
       {
         icon: 'i-mdi-account-outline',
