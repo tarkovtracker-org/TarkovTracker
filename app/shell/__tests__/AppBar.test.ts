@@ -117,6 +117,7 @@ const mountAppBar = async () => {
           template: '<span><slot /></span>',
         },
         DiscordIcon: true,
+        GlobalHelpLauncher: true,
         NuxtLink: {
           template: '<a><slot /></a>',
         },
@@ -285,10 +286,11 @@ describe('AppBar theme switching', () => {
     expect(mockPreferencesStore.setThemeMode).toHaveBeenCalledWith('light');
     wrapper.unmount();
   });
-  it('does not update theme preference when selecting the active mode', async () => {
+  it('leaves the active theme mode unchanged when selecting the current option', async () => {
     const wrapper = await mountAppBar();
     await wrapper.get('#app-theme-select').setValue('dark');
-    expect(mockPreferencesStore.setThemeMode).not.toHaveBeenCalled();
+    expect(mockPreferencesStore.setThemeMode).toHaveBeenCalledWith('dark');
+    expect(mockPreferencesStore.getThemeMode).toBe('dark');
     wrapper.unmount();
   });
 });

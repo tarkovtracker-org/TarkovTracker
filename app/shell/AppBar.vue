@@ -41,6 +41,9 @@
             </AppTooltip>
           </span>
         </div>
+        <div class="shrink-0">
+          <GlobalHelpLauncher />
+        </div>
         <!-- Community Links -->
         <AppTooltip :text="t('footer.call_to_action.discord')">
           <a
@@ -181,7 +184,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
-  import { normalizeThemeMode, type ThemeMode } from '@/utils/themeMode';
+  import { normalizeThemeMode, THEME_MODES, type ThemeMode } from '@/utils/themeMode';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
   const appStore = useAppStore();
   const metadataStore = useMetadataStore();
@@ -374,10 +377,16 @@
       value: localeCode,
     }));
   });
-  const themeItems = computed(() => [
-    { label: t('settings.interface.appearance.light'), value: 'light' as ThemeMode },
-    { label: t('settings.interface.appearance.dark'), value: 'dark' as ThemeMode },
-  ]);
+  const THEME_LABEL_KEYS: Record<ThemeMode, string> = {
+    dark: 'settings.interface.appearance.dark',
+    light: 'settings.interface.appearance.light',
+  };
+  const themeItems = computed(() => {
+    return THEME_MODES.map((mode) => ({
+      label: t(THEME_LABEL_KEYS[mode]),
+      value: mode,
+    }));
+  });
   let latestLocaleSwitchRequestId = 0;
   async function applyLocaleSelection(newLocale: string) {
     if (!isAvailableLocale(newLocale) || newLocale === locale.value) return;

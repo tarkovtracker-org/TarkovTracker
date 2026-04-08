@@ -155,15 +155,9 @@
         <div
           v-if="isFailed || isInvalid"
           class="text-xs"
-          :class="
-            isFailed ? 'text-[color:var(--color-failed-text-muted)]' : 'text-foreground-muted'
-          "
+          :class="isFailed ? 'text-failed-text-muted' : 'text-foreground-muted'"
         >
-          <span
-            :class="
-              isFailed ? 'text-[color:var(--color-failed-text-muted)]' : 'text-foreground-disabled'
-            "
-          >
+          <span :class="isFailed ? 'text-failed-text-muted' : 'text-foreground-disabled'">
             {{
               isFailed
                 ? t('page.tasks.questcard.failed_because')
@@ -182,7 +176,7 @@
                     :to="`/tasks?task=${source.id}`"
                     :class="
                       isFailed
-                        ? 'decoration-error-500/35 hover:decoration-error-500/60 text-[color:var(--color-failed-link)]'
+                        ? 'decoration-error-500/35 hover:decoration-error-500/60 text-failed-link'
                         : 'text-foreground decoration-border-strong hover:decoration-primary-500/60'
                     "
                     class="text-[11px] underline underline-offset-2"
@@ -190,11 +184,7 @@
                     {{ source.name }}
                   </router-link>
                   <span
-                    :class="
-                      isFailed
-                        ? 'text-[color:var(--color-failed-text-muted)]'
-                        : 'text-foreground-subtle'
-                    "
+                    :class="isFailed ? 'text-failed-text-muted' : 'text-foreground-subtle'"
                     class="text-[11px]"
                   >
                     {{
@@ -222,9 +212,7 @@
           <span
             v-else
             class="ml-2"
-            :class="
-              isFailed ? 'text-[color:var(--color-failed-text-muted)]' : 'text-foreground-subtle'
-            "
+            :class="isFailed ? 'text-failed-text-muted' : 'text-foreground-subtle'"
           >
             {{
               isFailed
@@ -730,10 +718,9 @@
   });
   const taskClasses = computed(() => {
     if (isComplete.value && !isFailed.value) {
-      return 'border-[color:var(--color-completed-border)] bg-[var(--color-completed-surface)]';
+      return 'border-completed-border bg-completed-surface';
     }
-    if (isFailed.value)
-      return 'border-[color:var(--color-failed-border)] bg-[var(--color-failed-surface)]';
+    if (isFailed.value) return 'border-failed-border bg-failed-surface';
     if (isInvalid.value) return 'border-border-muted bg-panel opacity-60';
     if (isLocked.value) return 'border-border-muted bg-panel';
     return 'border-border bg-panel';

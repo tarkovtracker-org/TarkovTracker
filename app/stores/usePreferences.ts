@@ -29,7 +29,7 @@ import {
   type MapMarkerColorKey,
   type MapMarkerColors,
 } from '@/utils/theme-colors';
-import { THEME_MODES, type ThemeMode } from '@/utils/themeMode';
+import { normalizeThemeMode, type ThemeMode } from '@/utils/themeMode';
 import {
   getCurrentSupabaseUserId,
   parseUserScopedStorage,
@@ -387,10 +387,7 @@ const sanitizePersistedPreferencesState = (
   const sanitizedState = clonePreferencesSnapshot(
     persistedState
   ) as PersistedPreferencesStateWithLegacy;
-  if (
-    typeof sanitizedState.themeMode !== 'string' ||
-    !THEME_MODES.includes(sanitizedState.themeMode as ThemeMode)
-  ) {
+  if (!normalizeThemeMode(sanitizedState.themeMode)) {
     delete sanitizedState.themeMode;
   }
   const legacyHideCollected = sanitizedState.neededItemsHideCollected;
@@ -1004,8 +1001,10 @@ export const usePreferencesStore = defineStore('preferences', {
     setLocaleOverride(locale: string | null) {
       this.localeOverride = locale;
     },
-    setThemeMode(themeMode: ThemeMode) {
-      this.themeMode = themeMode;
+    setThemeMode(themeMode: ThemeMode | string) {
+      const normalizedThemeMode = normalizeThemeMode(themeMode);
+      if (!normalizedThemeMode || normalizedThemeMode === this.themeMode) return;
+      this.themeMode = normalizedThemeMode;
     },
     // Task filter actions
     setShowNonSpecialTasks(show: boolean) {

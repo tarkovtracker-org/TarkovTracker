@@ -4,7 +4,9 @@ import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import {
   buildThemeBootstrapScript,
   getThemeModeFromBootstrapState,
+  isThemeMode,
   normalizeThemeMode,
+  THEME_MODES,
 } from '@/utils/themeMode';
 const runThemeBootstrapScript = () => {
   const script = buildThemeBootstrapScript([
@@ -19,10 +21,19 @@ describe('themeMode utilities', () => {
     delete document.documentElement.dataset.theme;
     document.documentElement.style.colorScheme = '';
   });
+  it('exports the supported theme mode tuple', () => {
+    expect(THEME_MODES).toEqual(['dark', 'light']);
+  });
+  it('detects valid theme modes', () => {
+    expect(isThemeMode('dark')).toBe(true);
+    expect(isThemeMode('light')).toBe(true);
+    expect(isThemeMode('system')).toBe(false);
+  });
   it('normalizes valid theme modes', () => {
     expect(normalizeThemeMode('dark')).toBe('dark');
     expect(normalizeThemeMode('light')).toBe('light');
     expect(normalizeThemeMode('sepia')).toBeNull();
+    expect(normalizeThemeMode(undefined)).toBeNull();
   });
   it('reads theme mode from bootstrap preferences state', () => {
     expect(getThemeModeFromBootstrapState({ themeMode: 'light' })).toBe('light');

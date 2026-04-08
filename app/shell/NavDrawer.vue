@@ -9,7 +9,7 @@
       v-if="belowMd && mobileExpanded"
       type="button"
       :aria-label="t('navigation_drawer.close_menu')"
-      class="fixed inset-0 z-40 bg-[var(--theme-overlay)] backdrop-blur-[1px]"
+      class="fixed inset-0 z-40 bg-[var(--theme-overlay)]"
       @click="closeMobileDrawer"
       @keydown.esc="closeMobileDrawer"
     />
@@ -41,7 +41,7 @@
             v-else
             src="/img/logos/tarkovtrackerlogo-light.webp"
             :alt="t('navigation_drawer.brand_name')"
-            class="border-border shadow-card h-auto w-full rounded-lg border bg-[color-mix(in_srgb,var(--color-inverted)_82%,var(--color-panel))] px-3 py-2"
+            class="h-auto w-full"
             preload
           />
         </div>
@@ -77,7 +77,7 @@
           <DrawerItem
             avatar="/img/logos/tarkovmonitorlogo.avif"
             locale-key="tarkovmonitor"
-            href="https://github.com/the-hideout/TarkovMonitor"
+            href="https://tarkov.dev/tarkov-monitor"
             :is-collapsed="isCollapsed"
           />
           <DrawerItem

@@ -1218,6 +1218,17 @@ describe('usePreferencesStore', () => {
       store.setThemeMode('light');
       expect(store.themeMode).toBe('light');
     });
+    it('ignores invalid theme mode values', () => {
+      const store = usePreferencesStore();
+      store.setThemeMode('light');
+      store.setThemeMode('system');
+      expect(store.themeMode).toBe('light');
+    });
+    it('keeps setThemeMode idempotent for unchanged values', () => {
+      const store = usePreferencesStore();
+      store.setThemeMode('dark');
+      expect(store.themeMode).toBe('dark');
+    });
   });
   describe('Actions - Task Filters', () => {
     it('should set show non-special tasks', () => {

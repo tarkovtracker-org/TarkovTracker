@@ -39,7 +39,7 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { normalizeThemeMode, type ThemeMode } from '@/utils/themeMode';
+  import { normalizeThemeMode, THEME_MODES, type ThemeMode } from '@/utils/themeMode';
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const normalizeThemeModeSelection = (value: unknown): ThemeMode => {
@@ -55,8 +55,14 @@
     get: () => preferencesStore.getThemeMode,
     set: (value: unknown) => preferencesStore.setThemeMode(normalizeThemeModeSelection(value)),
   });
-  const themeOptions = computed(() => [
-    { label: t('settings.interface.appearance.light'), value: 'light' as ThemeMode },
-    { label: t('settings.interface.appearance.dark'), value: 'dark' as ThemeMode },
-  ]);
+  const THEME_LABEL_KEYS: Record<ThemeMode, string> = {
+    dark: 'settings.interface.appearance.dark',
+    light: 'settings.interface.appearance.light',
+  };
+  const themeOptions = computed(() =>
+    THEME_MODES.map((mode) => ({
+      label: t(THEME_LABEL_KEYS[mode]),
+      value: mode,
+    }))
+  );
 </script>

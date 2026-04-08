@@ -35,18 +35,14 @@
           size="sm"
           class="leading-none"
           :disabled="primaryView === 'all'"
-          :aria-label="t('page.tasks.primary_views.all')"
+          :aria-label="t('page.tasks.primary_views.list')"
           :aria-pressed="primaryView === 'all'"
-          :class="
-            primaryView === 'all'
-              ? 'bg-selected-surface text-foreground'
-              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
-          "
+          :class="getPrimaryViewButtonClass(primaryView === 'all')"
           @click="setPrimaryView('all')"
         >
           <UIcon name="i-mdi-checkbox-multiple-marked" class="h-4 w-4 shrink-0 sm:mr-1.5" />
           <span class="hidden text-xs leading-none sm:inline">
-            {{ t('page.tasks.primary_views.all').toUpperCase() }}
+            {{ t('page.tasks.primary_views.list').toUpperCase() }}
           </span>
         </UButton>
         <UButton
@@ -57,11 +53,7 @@
           :disabled="primaryView === 'traders'"
           :aria-label="t('page.tasks.primary_views.traders')"
           :aria-pressed="primaryView === 'traders'"
-          :class="
-            primaryView === 'traders'
-              ? 'bg-selected-surface text-foreground'
-              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
-          "
+          :class="getPrimaryViewButtonClass(primaryView === 'traders')"
           @click="setPrimaryView('traders')"
         >
           <UIcon name="i-mdi-account-group" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -77,11 +69,7 @@
           :disabled="primaryView === 'maps'"
           :aria-label="t('page.tasks.primary_views.maps')"
           :aria-pressed="primaryView === 'maps'"
-          :class="
-            primaryView === 'maps'
-              ? 'bg-selected-surface text-foreground'
-              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
-          "
+          :class="getPrimaryViewButtonClass(primaryView === 'maps')"
           @click="setPrimaryView('maps')"
         >
           <UIcon name="i-mdi-map" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -97,11 +85,7 @@
           :disabled="primaryView === 'graph'"
           :aria-label="t('page.tasks.primary_views.graph')"
           :aria-pressed="primaryView === 'graph'"
-          :class="
-            primaryView === 'graph'
-              ? 'bg-selected-surface text-foreground'
-              : 'text-foreground-muted hover:bg-interactive hover:text-foreground'
-          "
+          :class="getPrimaryViewButtonClass(primaryView === 'graph')"
           @click="setPrimaryView('graph')"
         >
           <UIcon name="i-mdi-graph-outline" class="h-4 w-4 shrink-0 sm:mr-1.5" />
@@ -145,11 +129,7 @@
             icon="i-mdi-cog"
             :aria-label="t('page.tasks.settings.title')"
             :aria-pressed="isDrawerOpen"
-            :class="
-              isDrawerOpen
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getSegmentButtonClass(isDrawerOpen)"
             @click="toggleDrawer"
           />
         </AppTooltip>
@@ -168,11 +148,7 @@
             class="leading-none"
             :disabled="secondaryView === 'all'"
             :aria-pressed="secondaryView === 'all'"
-            :class="
-              secondaryView === 'all'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getStatusButtonClass('all', secondaryView === 'all')"
             @click="setSecondaryView('all')"
           >
             <UIcon
@@ -180,13 +156,13 @@
               class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block"
             />
             <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.primary_views.all').toUpperCase() }}
+              {{ t('page.tasks.secondary_views.all', 'All').toUpperCase() }}
             </span>
             <span
-              class="text-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
               :class="
                 displayStatusCounts.all > 0
-                  ? 'bg-selected-surface'
+                  ? 'bg-selected-surface text-foreground'
                   : 'bg-field text-foreground-muted'
               "
             >
@@ -206,11 +182,7 @@
             class="leading-none"
             :disabled="secondaryView === 'available'"
             :aria-pressed="secondaryView === 'available'"
-            :class="
-              secondaryView === 'available'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getStatusButtonClass('available', secondaryView === 'available')"
             @click="setSecondaryView('available')"
           >
             <UIcon name="i-mdi-clipboard-text" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -218,7 +190,7 @@
               {{ t('page.tasks.secondary_views.available').toUpperCase() }}
             </span>
             <span
-              class="text-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
               :class="
                 displayStatusCounts.available > 0
                   ? 'bg-info-500 text-white'
@@ -236,11 +208,7 @@
             class="leading-none"
             :disabled="secondaryView === 'locked'"
             :aria-pressed="secondaryView === 'locked'"
-            :class="
-              secondaryView === 'locked'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getStatusButtonClass('locked', secondaryView === 'locked')"
             @click="setSecondaryView('locked')"
           >
             <UIcon name="i-mdi-lock" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -248,9 +216,11 @@
               {{ t('page.tasks.secondary_views.locked').toUpperCase() }}
             </span>
             <span
-              class="text-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
               :class="
-                displayStatusCounts.locked > 0 ? 'bg-shell' : 'bg-field text-foreground-muted'
+                displayStatusCounts.locked > 0
+                  ? 'bg-shell text-foreground'
+                  : 'bg-field text-foreground-muted'
               "
             >
               {{ displayStatusCounts.locked }}
@@ -264,11 +234,7 @@
             class="leading-none"
             :disabled="secondaryView === 'completed'"
             :aria-pressed="secondaryView === 'completed'"
-            :class="
-              secondaryView === 'completed'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getStatusButtonClass('completed', secondaryView === 'completed')"
             @click="setSecondaryView('completed')"
           >
             <UIcon name="i-mdi-check-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -289,11 +255,7 @@
             class="leading-none"
             :disabled="secondaryView === 'failed'"
             :aria-pressed="secondaryView === 'failed'"
-            :class="
-              secondaryView === 'failed'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getStatusButtonClass('failed', secondaryView === 'failed')"
             @click="setSecondaryView('failed')"
           >
             <UIcon name="i-mdi-close-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
@@ -316,11 +278,7 @@
             class="leading-none"
             :disabled="preferencesStore.getTaskUserView === 'self'"
             :aria-pressed="preferencesStore.getTaskUserView === 'self'"
-            :class="
-              preferencesStore.getTaskUserView === 'self'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getSegmentButtonClass(preferencesStore.getTaskUserView === 'self')"
             @click="onUserViewSelect({ label: currentUserDisplayName, value: 'self' })"
           >
             <UIcon name="i-mdi-account-circle" class="h-4 w-4 shrink-0 sm:mr-1" />
@@ -339,12 +297,12 @@
               class="leading-none"
               :disabled="preferencesStore.getTaskUserView === teamId"
               :aria-pressed="preferencesStore.getTaskUserView === teamId"
-              :class="[
-                preferencesStore.getTaskUserView === teamId
-                  ? 'bg-selected-surface text-foreground'
-                  : 'text-foreground-subtle hover:bg-interactive hover:text-foreground',
-                isTeammateHidden(teamId) ? 'opacity-50' : '',
-              ]"
+              :class="
+                getSegmentButtonClass(
+                  preferencesStore.getTaskUserView === teamId,
+                  isTeammateHidden(teamId)
+                )
+              "
               @click="onUserViewSelect({ label: getTeammateDisplayName(teamId), value: teamId })"
             >
               <UIcon name="i-mdi-account" class="h-4 w-4 shrink-0 sm:mr-1" />
@@ -371,11 +329,7 @@
             class="leading-none"
             :disabled="preferencesStore.getTaskUserView === 'all'"
             :aria-pressed="preferencesStore.getTaskUserView === 'all'"
-            :class="
-              preferencesStore.getTaskUserView === 'all'
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:bg-interactive hover:text-foreground'
-            "
+            :class="getSegmentButtonClass(preferencesStore.getTaskUserView === 'all')"
             @click="onUserViewSelect({ label: t('page.tasks.user_views.all'), value: 'all' })"
           >
             <UIcon name="i-mdi-account-multiple" class="h-4 w-4 shrink-0 sm:mr-1" />
@@ -402,11 +356,8 @@
             :disabled="preferencesStore.getTaskMapView === mapOption.value"
             :aria-pressed="preferencesStore.getTaskMapView === mapOption.value"
             :class="[
-              'gap-1.5 transition-colors',
-              'hover:bg-interactive',
-              preferencesStore.getTaskMapView === mapOption.value
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:text-foreground',
+              'gap-1.5',
+              ...getSegmentButtonClass(preferencesStore.getTaskMapView === mapOption.value),
             ]"
             @click="onMapSelect(mapOption)"
           >
@@ -441,11 +392,8 @@
             :disabled="preferencesStore.getTaskTraderView === trader.id"
             :aria-pressed="preferencesStore.getTaskTraderView === trader.id"
             :class="[
-              'gap-2 transition-colors',
-              'hover:bg-interactive',
-              preferencesStore.getTaskTraderView === trader.id
-                ? 'bg-selected-surface text-foreground'
-                : 'text-foreground-subtle hover:text-foreground',
+              'gap-2',
+              ...getSegmentButtonClass(preferencesStore.getTaskTraderView === trader.id),
             ]"
             @click="onTraderSelect({ label: trader.name, value: trader.id })"
           >
@@ -526,9 +474,8 @@
   const traders = computed(() => {
     return metadataStore.sortedTraders.filter((trader) => (traderCounts.value[trader.id] ?? 0) > 0);
   });
-  // Get current user's display name
   const currentUserDisplayName = computed(() => {
-    return progressStore.getDisplayName('self');
+    return progressStore.getDisplayName('self') || t('page.tasks.user_views.yourself', 'You');
   });
   const teammates = computed(() => {
     return teamStore.teammates || [];
@@ -558,9 +505,42 @@
   const showFailedFilterButton = computed(() => {
     return !isGraphView.value && preferencesStore.getShowFailedFilter;
   });
-  // Helper to get teammate display name
+  type StatusToggleView = 'all' | 'available' | 'locked' | 'completed' | 'failed';
+  const toggleButtonBaseClass =
+    'border border-transparent font-medium transition-colors duration-150 disabled:cursor-default disabled:opacity-100';
+  const primaryToggleInactiveClass =
+    'text-foreground hover:border-border-muted hover:bg-interactive hover:text-foreground';
+  const secondaryToggleInactiveClass =
+    'text-foreground-muted hover:border-border-muted hover:bg-interactive hover:text-foreground';
+  const selectedToggleClass =
+    'border-primary-500/45 bg-primary-500/12 text-foreground ring-1 ring-primary-500/25';
+  const neutralSelectedToggleClass =
+    'border-border-muted bg-selected-surface text-foreground ring-1 ring-border';
+  const statusToggleSelectedClasses: Record<StatusToggleView, string> = {
+    all: selectedToggleClass,
+    available: 'border-info-500/45 bg-info-500/12 text-foreground ring-1 ring-info-500/25',
+    locked: neutralSelectedToggleClass,
+    completed: 'border-success-500/45 bg-success-500/12 text-foreground ring-1 ring-success-500/25',
+    failed: 'border-error-500/45 bg-error-500/12 text-foreground ring-1 ring-error-500/25',
+  };
+  const getPrimaryViewButtonClass = (isActive: boolean): string[] => {
+    return [toggleButtonBaseClass, isActive ? selectedToggleClass : primaryToggleInactiveClass];
+  };
+  const getStatusButtonClass = (view: StatusToggleView, isActive: boolean): string[] => {
+    return [
+      toggleButtonBaseClass,
+      isActive ? statusToggleSelectedClasses[view] : secondaryToggleInactiveClass,
+    ];
+  };
+  const getSegmentButtonClass = (isActive: boolean, isDimmed = false): string[] => {
+    return [
+      toggleButtonBaseClass,
+      isActive ? selectedToggleClass : secondaryToggleInactiveClass,
+      isDimmed ? 'opacity-50' : '',
+    ];
+  };
   const getTeammateDisplayName = (teamId: string): string => {
-    return progressStore.getDisplayName(teamId);
+    return progressStore.getDisplayName(teamId) || teamId;
   };
   const isTeammateHidden = (teamId: string): boolean => {
     return preferencesStore.teamIsHidden(teamId);
@@ -584,7 +564,6 @@
       preferencesStore.setTaskUserView('all');
     }
   };
-  // Calculate task counts for badges
   const statusCounts = computed(() => {
     const userView = preferencesStore.getTaskUserView;
     return calculateStatusCounts(userView);
@@ -663,7 +642,6 @@
       preferencesStore.getHideCompletedMapObjectives
     );
   });
-  // Primary view (all / maps / traders)
   const ensureSelectedTrader = (visibleTraders: Array<{ id: string }>) => {
     if (!visibleTraders.length) return;
     const hasSelectedTrader = visibleTraders.some(
@@ -689,13 +667,11 @@
       ensureSelectedTrader(traders.value);
     }
   };
-  // Secondary view (available / locked / completed)
   const setSecondaryView = (view: string) => {
     const normalizedView = getTaskSecondaryViewForPrimaryView(primaryView.value, view);
     if (preferencesStore.getTaskSecondaryView === normalizedView) return;
     preferencesStore.setTaskSecondaryView(normalizedView);
   };
-  // Map selection
   const mapOptions = computed(() => {
     const counts = mapTaskCounts.value;
     return maps.value.map((map) => ({
@@ -709,13 +685,11 @@
       preferencesStore.setTaskMapView(selected.value);
     }
   };
-  // Trader selection
   const onTraderSelect = (selected: { label: string; value: string }) => {
     if (selected?.value && preferencesStore.getTaskTraderView !== selected.value) {
       preferencesStore.setTaskTraderView(selected.value);
     }
   };
-  // User view selection (yourself / all team members)
   const onUserViewSelect = (selected: { label: string; value: string }) => {
     if (selected?.value) {
       const selectedUserView = selected.value;
