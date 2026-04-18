@@ -4,6 +4,7 @@ import {
 } from '@/composables/useAnalyticsConsent';
 import { getAnalyticsPageLocation, getAnalyticsPagePath } from '@/utils/analytics';
 import { logger } from '@/utils/logger';
+import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
 type Gtag = (...args: unknown[]) => void;
 declare global {
   interface Window {
@@ -19,7 +20,16 @@ export default defineNuxtPlugin(() => {
   if (import.meta.env.MODE === 'test') {
     return;
   }
-  const measurementId = String(useRuntimeConfig().public.googleAnalyticsMeasurementId || '').trim();
+  const runtimeConfig = useRuntimeConfig();
+  const analyticsEnabled = shouldEnableAnalyticsIntegrations({
+    appUrl: runtimeConfig.public.appUrl,
+    hostname: import.meta.client ? window.location.hostname : undefined,
+    isProduction: import.meta.env.PROD,
+  });
+  if (!analyticsEnabled) {
+    return;
+  }
+  const measurementId = String(runtimeConfig.public.googleAnalyticsMeasurementId || '').trim();
   if (!measurementId) {
     return;
   }

@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import { createDeferred } from '@/utils/test-helpers';
 import type { AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
+const shouldEnableAnalyticsIntegrations = vi.fn(() => true);
 const runtimeConfig = {
   public: {
+    appUrl: 'https://tarkovtracker.org',
     googleAnalyticsMeasurementId: 'G-ABCDEF1234',
   },
 };
@@ -51,6 +53,9 @@ vi.mock('@/utils/logger', () => ({
     error: vi.fn(),
     warn: vi.fn(),
   },
+}));
+vi.mock('@/utils/runtimeConfig', () => ({
+  shouldEnableAnalyticsIntegrations,
 }));
 const getNormalizedDataLayer = () => {
   return (window.dataLayer || []).map((entry) => {
@@ -108,6 +113,8 @@ describe('google analytics plugin', () => {
     afterEachHandler = null;
     routerIsReadyMock.mockReset();
     routerIsReadyMock.mockResolvedValue(undefined);
+    shouldEnableAnalyticsIntegrations.mockReset();
+    shouldEnableAnalyticsIntegrations.mockReturnValue(true);
     runtimeConfig.public.googleAnalyticsMeasurementId = 'G-ABCDEF1234';
     document.head.innerHTML = '';
     delete window.dataLayer;
@@ -177,6 +184,15 @@ describe('google analytics plugin', () => {
   });
   it('does not initialize analytics for an invalid measurement ID', async () => {
     runtimeConfig.public.googleAnalyticsMeasurementId = '';
+    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushAnalyticsSync();
+    expect(document.getElementById('tt-google-analytics')).toBeNull();
+    expect(window.dataLayer).toBeUndefined();
+    expect(window.gtag).toBeUndefined();
+  });
+  it('skips initialization when analytics runtime is disabled', async () => {
+    shouldEnableAnalyticsIntegrations.mockReturnValueOnce(false);
     const plugin = (await import('@/plugins/03.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();

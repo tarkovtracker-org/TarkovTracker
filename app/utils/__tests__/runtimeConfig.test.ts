@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   GITHUB_IMAGE_DOMAINS,
+  isPrimaryAppHostname,
   isPagesPreviewHostname,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
+  shouldEnableAnalyticsIntegrations,
   shouldUseOfflineSupabaseFallback,
   TARKOV_IMAGE_DOMAINS,
 } from '@/utils/runtimeConfig';
@@ -68,5 +70,46 @@ describe('shouldUseOfflineSupabaseFallback', () => {
         isProduction: true,
       })
     ).toBe(false);
+  });
+});
+describe('shouldEnableAnalyticsIntegrations', () => {
+  it('disables analytics outside production', () => {
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        appUrl: 'https://tarkovtracker.org',
+        hostname: 'tarkovtracker.org',
+        isProduction: false,
+      })
+    ).toBe(false);
+  });
+  it('disables analytics on preview hosts', () => {
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        appUrl: 'https://feature-branch.tarkovtrackernuxt.pages.dev',
+        hostname: 'feature-branch.tarkovtrackernuxt.pages.dev',
+        isProduction: true,
+      })
+    ).toBe(false);
+    expect(isPagesPreviewHostname('feature-branch.tarkovtrackernuxt.pages.dev')).toBe(true);
+  });
+  it('disables analytics on non-primary production hosts', () => {
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        appUrl: 'https://preview.example.com',
+        hostname: 'preview.example.com',
+        isProduction: true,
+      })
+    ).toBe(false);
+  });
+  it('enables analytics on primary production hosts', () => {
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        appUrl: 'https://tarkovtracker.org',
+        hostname: 'www.tarkovtracker.org',
+        isProduction: true,
+      })
+    ).toBe(true);
+    expect(isPrimaryAppHostname('tarkovtracker.org')).toBe(true);
+    expect(isPrimaryAppHostname('www.tarkovtracker.org')).toBe(true);
   });
 });

@@ -63,4 +63,3 @@
    - `TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`
    - `SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
-4. If Cloudflare reachability is regionally degraded (for example RU ISP resets), follow `docs/ru-fallback-host-rollout.md`.

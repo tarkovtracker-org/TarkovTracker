@@ -3,6 +3,7 @@ import {
   type AnalyticsConsentStatus,
 } from '@/composables/useAnalyticsConsent';
 import { logger } from '@/utils/logger';
+import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
 type Clarity = ((...args: unknown[]) => void) & { q?: unknown[][] };
 declare global {
   interface Window {
@@ -24,7 +25,16 @@ export default defineNuxtPlugin(() => {
   if (import.meta.env.MODE === 'test') {
     return;
   }
-  const projectId = String(useRuntimeConfig().public.microsoftClarityProjectId || '').trim();
+  const runtimeConfig = useRuntimeConfig();
+  const analyticsEnabled = shouldEnableAnalyticsIntegrations({
+    appUrl: runtimeConfig.public.appUrl,
+    hostname: import.meta.client ? window.location.hostname : undefined,
+    isProduction: import.meta.env.PROD,
+  });
+  if (!analyticsEnabled) {
+    return;
+  }
+  const projectId = String(runtimeConfig.public.microsoftClarityProjectId || '').trim();
   if (!projectId) {
     return;
   }

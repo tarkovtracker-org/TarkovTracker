@@ -51,13 +51,20 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   import { logger } from '@/utils/logger';
+  import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const appVersion = runtimeConfig.public.appVersion || 'dev';
-  const analyticsConfigured = [
-    runtimeConfig.public.googleAnalyticsMeasurementId,
-    runtimeConfig.public.microsoftClarityProjectId,
-  ].some((value) => String(value || '').trim().length > 0);
+  const analyticsConfigured =
+    shouldEnableAnalyticsIntegrations({
+      appUrl: runtimeConfig.public.appUrl,
+      hostname: import.meta.client ? window.location.hostname : undefined,
+      isProduction: import.meta.env.PROD,
+    }) &&
+    [
+      runtimeConfig.public.googleAnalyticsMeasurementId,
+      runtimeConfig.public.microsoftClarityProjectId,
+    ].some((value) => String(value || '').trim().length > 0);
   const analyticsConsentApi = shallowRef<ReturnType<typeof useAnalyticsConsent> | null>(null);
   try {
     const consentApi = useAnalyticsConsent();

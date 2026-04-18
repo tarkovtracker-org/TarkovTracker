@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import type { AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
 type ClarityApi = ((...args: unknown[]) => void) & { q?: unknown[][] };
+const shouldEnableAnalyticsIntegrations = vi.fn(() => true);
 const clarityAcceptedConsent = [
   'consentv2',
   {
@@ -21,6 +22,7 @@ const clarityDeclinedConsent = [
 ] as const;
 const runtimeConfig = {
   public: {
+    appUrl: 'https://tarkovtracker.org',
     microsoftClarityProjectId: 'abcdef1234',
   },
 };
@@ -41,6 +43,9 @@ vi.mock('@/utils/logger', () => ({
     warn: vi.fn(),
   },
 }));
+vi.mock('@/utils/runtimeConfig', () => ({
+  shouldEnableAnalyticsIntegrations,
+}));
 const flushClaritySync = async () => {
   await flushPromises();
 };
@@ -54,6 +59,8 @@ describe('microsoft clarity plugin', () => {
       status: 'accepted',
       updatedAt: '2026-03-09T00:00:00.000Z',
     };
+    shouldEnableAnalyticsIntegrations.mockReset();
+    shouldEnableAnalyticsIntegrations.mockReturnValue(true);
     runtimeConfig.public.microsoftClarityProjectId = 'abcdef1234';
     document.head.innerHTML = '';
     delete window.clarity;
@@ -162,6 +169,14 @@ describe('microsoft clarity plugin', () => {
   });
   it('does not initialize when project ID format is invalid', async () => {
     runtimeConfig.public.microsoftClarityProjectId = 'invalid-id-format';
+    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    plugin({} as Parameters<typeof plugin>[0]);
+    await flushClaritySync();
+    expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
+    expect(window.clarity).toBeUndefined();
+  });
+  it('skips initialization when analytics runtime is disabled', async () => {
+    shouldEnableAnalyticsIntegrations.mockReturnValueOnce(false);
     const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();

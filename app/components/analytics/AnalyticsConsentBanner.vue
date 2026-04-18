@@ -80,16 +80,23 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
   const { accept, closePreferences, decline, hasAnswered, isPromptOpen, state } =
     useAnalyticsConsent();
   const runtimeConfig = useRuntimeConfig();
   const consentDescriptionId = 'analytics-consent-description';
   const consentTitleId = 'analytics-consent-title';
-  const analyticsConfigured = [
-    runtimeConfig.public.googleAnalyticsMeasurementId,
-    runtimeConfig.public.microsoftClarityProjectId,
-  ].some((value) => String(value || '').trim().length > 0);
+  const analyticsConfigured =
+    shouldEnableAnalyticsIntegrations({
+      appUrl: runtimeConfig.public.appUrl,
+      hostname: import.meta.client ? window.location.hostname : undefined,
+      isProduction: import.meta.env.PROD,
+    }) &&
+    [
+      runtimeConfig.public.googleAnalyticsMeasurementId,
+      runtimeConfig.public.microsoftClarityProjectId,
+    ].some((value) => String(value || '').trim().length > 0);
   const isVisible = computed(() => analyticsConfigured && isPromptOpen.value);
   const consentTitle = computed(() => {
     if (state.value.status === 'unknown') {

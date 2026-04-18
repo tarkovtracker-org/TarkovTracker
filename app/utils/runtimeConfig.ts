@@ -1,7 +1,22 @@
 export const GITHUB_IMAGE_DOMAINS = ['avatars.githubusercontent.com', 'github.com'] as const;
 export const TARKOV_IMAGE_DOMAINS = ['assets.tarkov.dev'] as const;
+export const PRIMARY_APP_HOSTNAMES = ['tarkovtracker.org', 'www.tarkovtracker.org'] as const;
 const resolveEnvValue = (...values: Array<string | undefined>) =>
   values.find((value) => value?.trim())?.trim() || '';
+const resolveHostname = (value?: string): string => {
+  const trimmed = value?.trim().toLowerCase() || '';
+  if (!trimmed) {
+    return '';
+  }
+  if (!trimmed.includes('://') && !trimmed.includes('/')) {
+    return trimmed;
+  }
+  try {
+    return new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+};
 const normalizePublicAppUrl = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -48,8 +63,32 @@ export const resolvePublicAppUrl = (env: NodeJS.ProcessEnv): string => {
   return normalizePublicAppUrl(configuredUrl);
 };
 export const isPagesPreviewHostname = (hostname?: string): boolean => {
-  const normalizedHostname = hostname?.trim().toLowerCase() || '';
+  const normalizedHostname = resolveHostname(hostname);
   return normalizedHostname.endsWith('.pages.dev');
+};
+export const isPrimaryAppHostname = (hostname?: string): boolean => {
+  const normalizedHostname = resolveHostname(hostname);
+  return PRIMARY_APP_HOSTNAMES.includes(
+    normalizedHostname as (typeof PRIMARY_APP_HOSTNAMES)[number]
+  );
+};
+export const shouldEnableAnalyticsIntegrations = ({
+  appUrl,
+  hostname,
+  isProduction,
+}: {
+  appUrl?: string;
+  hostname?: string;
+  isProduction: boolean;
+}): boolean => {
+  if (!isProduction) {
+    return false;
+  }
+  const normalizedHostname = resolveHostname(hostname) || resolveHostname(appUrl);
+  if (!normalizedHostname || isPagesPreviewHostname(normalizedHostname)) {
+    return false;
+  }
+  return isPrimaryAppHostname(normalizedHostname);
 };
 export const shouldUseOfflineSupabaseFallback = ({
   hostname,
