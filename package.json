@@ -83,7 +83,7 @@
     "serve": {
       "brace-expansion": "^1.1.13"
     },
-    "fast-xml-parser": "^5.5.11",
+    "fast-xml-parser": "^5.7.1",
     "@nuxt/test-utils": {
       "h3-next": "npm:h3@2.0.1-rc.20",
       "srvx": "^0.11.15"
