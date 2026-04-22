@@ -37,6 +37,9 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      - name: Validate Supabase migrations
+        run: npm run supabase:check
+
       - name: Build
         run: npm run build
         env:

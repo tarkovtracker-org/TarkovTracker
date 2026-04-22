@@ -274,6 +274,15 @@ describe('DataManagementCard', () => {
     asVm<{ resetTarkovDevImport: () => void }>(wrapper.vm).resetTarkovDevImport();
     expect(tarkovDevFns.reset).toHaveBeenCalledTimes(1);
   });
+  it.each([
+    { expected: 'https://tarkov.dev/players/regular/123456', mode: 'pvp' as const },
+    { expected: 'https://tarkov.dev/players/pve/123456', mode: 'pve' as const },
+  ])('builds linked tarkov.dev url from the current mode ($mode)', ({ mode, expected }) => {
+    tarkovStoreState.currentMode = mode;
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    expect(asVm<{ tarkovDevProfileUrl: string }>(wrapper.vm).tarkovDevProfileUrl).toBe(expected);
+  });
   it('forwards EFT logs confirmation using current target mode', async () => {
     tarkovStoreState.currentMode = 'pve';
     const wrapper = createWrapper();

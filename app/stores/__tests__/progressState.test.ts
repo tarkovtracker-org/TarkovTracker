@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { actions, getters, type UserState } from '@/stores/progressState';
+import {
+  actions,
+  getters,
+  migrateToGameModeStructure,
+  type UserState,
+} from '@/stores/progressState';
 const createBaseState = (): UserState =>
   ({
     currentGameMode: 'pvp',
@@ -76,5 +81,33 @@ describe('progressState storyline timestamps', () => {
     } finally {
       nowSpy.mockRestore();
     }
+  });
+});
+describe('migrateToGameModeStructure', () => {
+  it('preserves linked uid while stripping legacy tarkov.dev payloads', () => {
+    const migrated = migrateToGameModeStructure({
+      currentGameMode: 'pvp',
+      gameEdition: 4,
+      tarkovUid: 67890,
+      pvp: {
+        level: 20,
+        pmcFaction: 'USEC',
+        tarkovDevProfile: {
+          aid: 12345,
+          importedAt: 111,
+        },
+      },
+      pve: {
+        level: 12,
+        pmcFaction: 'BEAR',
+        tarkovDevProfile: {
+          aid: 67890,
+          importedAt: 222,
+        },
+      },
+    });
+    expect(migrated.tarkovUid).toBe(67890);
+    expect(migrated.pvp).not.toHaveProperty('tarkovDevProfile');
+    expect(migrated.pve).not.toHaveProperty('tarkovDevProfile');
   });
 });

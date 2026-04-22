@@ -6,6 +6,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -37,8 +38,8 @@ export const buildUpsertPayload = (
   current_game_mode: state.currentGameMode || GAME_MODES.PVP,
   game_edition: state.gameEdition || defaultState.gameEdition,
   tarkov_uid: state.tarkovUid ?? null,
-  pvp_data: partial?.pvp_data ?? state.pvp ?? defaultState.pvp,
-  pve_data: partial?.pve_data ?? state.pve ?? defaultState.pve,
+  pvp_data: sanitizeOwnedProgressData(partial?.pvp_data ?? state.pvp ?? defaultState.pvp),
+  pve_data: sanitizeOwnedProgressData(partial?.pve_data ?? state.pve ?? defaultState.pve),
 });
 export const toProgressEpoch = (modeData: UserProgressData | undefined): number => {
   if (
@@ -279,18 +280,6 @@ export function mergeProgressData(
     if (!normalizedRemote) return normalizedLocal;
     return normalizedRemote.at >= normalizedLocal.at ? normalizedRemote : normalizedLocal;
   };
-  const resolveTarkovDevProfile = (
-    localProfile?: UserProgressData['tarkovDevProfile'],
-    remoteProfile?: UserProgressData['tarkovDevProfile']
-  ): UserProgressData['tarkovDevProfile'] => {
-    if (!localProfile) return remoteProfile;
-    if (!remoteProfile) return localProfile;
-    const localImportedAt =
-      typeof localProfile.importedAt === 'number' ? localProfile.importedAt : 0;
-    const remoteImportedAt =
-      typeof remoteProfile.importedAt === 'number' ? remoteProfile.importedAt : 0;
-    return remoteImportedAt >= localImportedAt ? remoteProfile : localProfile;
-  };
   const mergedState: UserProgressData = {
     ...local,
     ...remote,
@@ -302,7 +291,6 @@ export function mergeProgressData(
     xpOffset: remote.xpOffset !== undefined ? remote.xpOffset : local.xpOffset,
     lastApiUpdate: resolveApiUpdate(local.lastApiUpdate, remote.lastApiUpdate),
     apiUpdateHistory: mergeApiUpdateHistory(local, remote),
-    tarkovDevProfile: resolveTarkovDevProfile(local.tarkovDevProfile, remote.tarkovDevProfile),
     taskCompletions: (() => {
       const allKeys = new Set([
         ...Object.keys(local.taskCompletions || {}),

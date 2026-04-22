@@ -69,6 +69,7 @@ describe('parseTarkovDevProfile', () => {
     expect(result.data.pmcFaction).toBe('USEC');
     expect(result.data.totalXP).toBe(217726);
     expect(result.data.prestigeLevel).toBe(0);
+    expect(result.data).not.toHaveProperty('rawProfile');
   });
   it('computes skill levels from Progress / 100 floored', () => {
     const result = parseTarkovDevProfile(buildValidProfile());
@@ -225,48 +226,5 @@ describe('parseTarkovDevProfile', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBeTruthy();
-  });
-  it('includes rawProfile with importedAt timestamp', () => {
-    const before = Date.now();
-    const result = parseTarkovDevProfile(buildValidProfile());
-    const after = Date.now();
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.rawProfile.importedAt).toBeGreaterThanOrEqual(before);
-    expect(result.data.rawProfile.importedAt).toBeLessThanOrEqual(after);
-  });
-  it('handles missing optional rawProfile fields gracefully', () => {
-    const result = parseTarkovDevProfile(buildValidProfile());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.rawProfile.achievements).toEqual({});
-    expect(result.data.rawProfile.mastering).toEqual([]);
-  });
-  it('filters non-number values from achievements', () => {
-    const profile = buildValidProfile({
-      achievements: { valid: 1234567890, bad_string: 'not-a-number', bad_null: null },
-    });
-    const result = parseTarkovDevProfile(profile);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.rawProfile.achievements).toEqual({ valid: 1234567890 });
-  });
-  it('filters malformed mastering entries', () => {
-    const profile = buildValidProfile({
-      mastering: [
-        { Id: 'weapon1', Progress: 500 },
-        { bad: true },
-        'not-an-object',
-        { Id: 123, Progress: 100 },
-        { Id: 'weapon2', Progress: 200, Kills: 10 },
-      ],
-    });
-    const result = parseTarkovDevProfile(profile);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.rawProfile.mastering).toEqual([
-      { Id: 'weapon1', Progress: 500 },
-      { Id: 'weapon2', Progress: 200, Kills: 10 },
-    ]);
   });
 });

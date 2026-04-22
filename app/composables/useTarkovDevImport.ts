@@ -1,6 +1,6 @@
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
+import { useXpCalculation } from '@/composables/useXpCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
-import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 import { parseTarkovDevProfile, type TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
@@ -17,8 +17,8 @@ export interface UseTarkovDevImportReturn {
 export function useTarkovDevImport(): UseTarkovDevImportReturn {
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
-  const preferencesStore = usePreferencesStore();
   const { setTotalSkillLevel } = useSkillCalculation();
+  const { setTotalXP } = useXpCalculation();
   const importState = ref<ImportState>('idle');
   const previewData = ref<TarkovDevImportResult | null>(null);
   const importError = ref<string | null>(null);
@@ -55,10 +55,10 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     const originalMode = tarkovStore.getCurrentGameMode();
     const shouldRestoreMode = targetMode !== originalMode;
     try {
-      tarkovStore.setTarkovUid(data.tarkovUid);
       if (shouldRestoreMode) {
         await tarkovStore.switchGameMode(targetMode);
       }
+      tarkovStore.setTarkovUid(data.tarkovUid);
       tarkovStore.setPMCFaction(data.pmcFaction);
       tarkovStore.setDisplayName(data.displayName);
       tarkovStore.setPrestigeLevel(data.prestigeLevel);
@@ -71,7 +71,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
           break;
         }
       }
-      preferencesStore.setUseAutomaticLevelCalculation(false);
+      setTotalXP(data.totalXP);
       tarkovStore.setLevel(derivedLevel);
       for (const [skillId, level] of Object.entries(data.skills)) {
         setTotalSkillLevel(skillId, level);
@@ -80,7 +80,6 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
       if (edition !== null && edition !== undefined) {
         tarkovStore.setGameEdition(edition);
       }
-      tarkovStore.setTarkovDevProfile(data.rawProfile);
       importState.value = 'success';
     } catch (e) {
       importState.value = 'error';

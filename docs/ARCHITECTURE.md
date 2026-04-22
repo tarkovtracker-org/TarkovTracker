@@ -143,6 +143,19 @@ Manages user progress data with dual game mode support (PvP/PvE).
 - Multi-device conflict resolution
 - Data migration for legacy formats
 - Task repair mechanisms
+- Stores a single linked `tarkovUid` for tarkov.dev profiles
+- Treats import target mode as import-time UI state, not persisted account metadata
+
+#### Tarkov.dev Linking and Importing
+
+- A linked tarkov.dev account is represented by a single persisted `tarkovUid`.
+- The app does **not** persist a long-lived "linked mode" or "imported mode" field.
+- Tarkov.dev imports always ask the user which mode to write into and default that choice to the
+  current active mode.
+- Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
+  `regular` for PvP, `pve` for PvE.
+- Legacy embedded `tarkovDevProfile` payloads are sanitized out of stored progress data and should
+  not be reintroduced as long-lived state.
 
 #### useMetadataStore (Game Data)
 

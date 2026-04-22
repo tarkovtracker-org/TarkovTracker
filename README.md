@@ -91,6 +91,9 @@ The application will be available at `http://localhost:3000`.
 # Format code (Prettier + ESLint)
 npm run format
 
+# Validate Supabase migrations locally
+npm run supabase:check
+
 # Lint code
 npm run lint
 
@@ -103,6 +106,12 @@ npm run typecheck
 # Check for dependency updates
 npm run deps
 ```
+
+## Tarkov.dev Profile Cleanup
+
+The app now persists only the linked `tarkovUid` for tarkov.dev profiles. Legacy manual backups
+created before this cleanup may still contain imported profile snapshots. New imports ignore those
+legacy blobs, but regenerate backups after upgrading if you want future exports to be fully scrubbed.
 
 ## Production
 

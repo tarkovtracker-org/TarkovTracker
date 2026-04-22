@@ -128,6 +128,15 @@ const preferences = usePreferences();
 
 The app tracks PvP and PvE progress separately. Always consider both modes when working with progress data.
 
+### Tarkov.dev Import and Linking
+
+- Persist a single linked `tarkovUid` only.
+- Do not add or depend on a persisted linked-mode/imported-mode field.
+- Treat PvP/PvE choice for tarkov.dev imports as temporary UI state that decides where imported
+  progress is written.
+- Build tarkov.dev profile links from the currently viewed or selected mode to choose the
+  `regular` or `pve` URL slug.
+
 ### Team System
 
 Real-time sync via Supabase Broadcast. Team/token mutations run through Supabase Edge Functions.

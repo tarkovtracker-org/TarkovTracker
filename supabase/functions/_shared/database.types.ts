@@ -507,6 +507,7 @@ export type Database = {
           created_at: string | null
           current_game_mode: string | null
           game_edition: number | null
+          tarkov_uid: number | null
           pve_data: Json | null
           pvp_data: Json | null
           updated_at: string | null
@@ -516,6 +517,7 @@ export type Database = {
           created_at?: string | null
           current_game_mode?: string | null
           game_edition?: number | null
+          tarkov_uid?: number | null
           pve_data?: Json | null
           pvp_data?: Json | null
           updated_at?: string | null
@@ -525,6 +527,7 @@ export type Database = {
           created_at?: string | null
           current_game_mode?: string | null
           game_edition?: number | null
+          tarkov_uid?: number | null
           pve_data?: Json | null
           pvp_data?: Json | null
           updated_at?: string | null

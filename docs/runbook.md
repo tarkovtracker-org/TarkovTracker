@@ -26,18 +26,23 @@
 2. `npm run lint`
 3. `npm run typecheck`
 4. `npm run test`
-5. `npm run build`
-6. `npm audit --omit=dev`
+5. `npm run supabase:check`
+6. `npm run build`
+7. `npm audit --omit=dev`
+8. For the tarkov.dev profile cleanup rollout, snapshot `public.user_progress` before applying the
+   destructive cleanup migration.
 
 ## Deployment
 
-1. Merge to `main` and verify CI workflow `Validate` and `Workers` jobs are green.
+1. Merge to `main` and verify CI workflow `Validate`, `Supabase DB`, and `Workers` jobs are green.
 2. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
 3. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
 4. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
+5. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
+   contain historic imported profile snapshots until users regenerate them.
 
 ## Incident Triage
 

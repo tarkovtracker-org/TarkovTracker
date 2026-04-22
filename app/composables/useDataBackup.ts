@@ -14,8 +14,8 @@ import {
   usePreferencesStore,
 } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { MAX_SKILL_LEVEL } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { sanitizeOwnedProgressData, sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 const BACKUP_FORMAT = 'tarkovtracker-backup' as const;
@@ -136,30 +136,10 @@ const ALLOWED_PROGRESS_KEYS = new Set([
   'progressEpoch',
   'skillOffsets',
   'storyChapters',
-  'tarkovDevProfile',
 ]);
 const VALID_FACTIONS = new Set<Faction>(['USEC', 'BEAR']);
-const PII_DEBUG_KEYS = new Set([
-  'accountid',
-  'aid',
-  'avatarurl',
-  'displayname',
-  'email',
-  'memberid',
-  'nickname',
-  'photourl',
-  'picture',
-  'playerid',
-  'profileid',
-  'uid',
-  'userid',
-  'username',
-]);
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function normalizeDebugKey(key: string): string {
-  return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
 function getDefaultTaskFilterSettings(): TaskFilterSettings {
   return {
@@ -234,75 +214,9 @@ function sanitizeProgressData(
       stripped[key] = raw[key];
     }
   }
-  const level =
-    typeof stripped.level === 'number' && Number.isFinite(stripped.level)
-      ? Math.max(1, Math.trunc(stripped.level))
-      : 1;
-  const prestigeLevel =
-    typeof stripped.prestigeLevel === 'number' && Number.isFinite(stripped.prestigeLevel)
-      ? Math.max(0, Math.min(6, Math.trunc(stripped.prestigeLevel)))
-      : 0;
-  const progressEpoch =
-    typeof stripped.progressEpoch === 'number' && Number.isFinite(stripped.progressEpoch)
-      ? Math.max(0, Math.trunc(stripped.progressEpoch))
-      : 0;
-  const xpOffset =
-    typeof stripped.xpOffset === 'number' && Number.isFinite(stripped.xpOffset)
-      ? Math.trunc(stripped.xpOffset)
-      : 0;
-  const displayName =
-    typeof stripped.displayName === 'string'
-      ? stripped.displayName.trim().slice(0, 64) || null
-      : null;
-  const skills = isPlainObject(stripped.skills)
-    ? { ...(stripped.skills as Record<string, number>) }
-    : {};
-  for (const [key, val] of Object.entries(skills)) {
-    if (typeof val !== 'number' || !Number.isFinite(val)) {
-      skills[key] = 0;
-    } else {
-      skills[key] = Math.max(0, Math.min(MAX_SKILL_LEVEL, val));
-    }
-  }
   return {
     ok: true,
-    data: {
-      level,
-      pmcFaction: stripped.pmcFaction as Faction,
-      displayName,
-      xpOffset,
-      taskCompletions: isPlainObject(stripped.taskCompletions)
-        ? (stripped.taskCompletions as UserProgressData['taskCompletions'])
-        : {},
-      taskObjectives: isPlainObject(stripped.taskObjectives)
-        ? (stripped.taskObjectives as UserProgressData['taskObjectives'])
-        : {},
-      hideoutParts: isPlainObject(stripped.hideoutParts)
-        ? (stripped.hideoutParts as UserProgressData['hideoutParts'])
-        : {},
-      hideoutModules: isPlainObject(stripped.hideoutModules)
-        ? (stripped.hideoutModules as UserProgressData['hideoutModules'])
-        : {},
-      traders: isPlainObject(stripped.traders)
-        ? (stripped.traders as UserProgressData['traders'])
-        : {},
-      skills,
-      prestigeLevel,
-      progressEpoch,
-      skillOffsets: isPlainObject(stripped.skillOffsets)
-        ? (stripped.skillOffsets as UserProgressData['skillOffsets'])
-        : {},
-      storyChapters: isPlainObject(stripped.storyChapters)
-        ? (stripped.storyChapters as UserProgressData['storyChapters'])
-        : {},
-      ...(isPlainObject(stripped.tarkovDevProfile) &&
-      typeof (stripped.tarkovDevProfile as Record<string, unknown>).importedAt === 'number'
-        ? {
-            tarkovDevProfile:
-              stripped.tarkovDevProfile as unknown as UserProgressData['tarkovDevProfile'],
-          }
-        : {}),
-    },
+    data: sanitizeOwnedProgressData(stripped),
   };
 }
 function validateBackup(json: unknown):
@@ -373,7 +287,7 @@ function buildPreview(
 }
 function stripInternalSyncMetadata(data: UserProgressData): UserProgressData {
   const { apiUpdateHistory: _, lastApiUpdate: __, ...rest } = data;
-  return rest as UserProgressData;
+  return sanitizeOwnedProgressData(rest);
 }
 async function fingerprintValue(value: string | number | null | undefined): Promise<string | null> {
   if (value === null || value === undefined || value === '') {
@@ -397,22 +311,6 @@ async function fingerprintValue(value: string | number | null | undefined): Prom
     hash = Math.imul(hash, 16777619);
   }
   return `fnv1a:${(hash >>> 0).toString(16).padStart(8, '0')}`;
-}
-function sanitizeDebugObject<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map((item) => sanitizeDebugObject(item)) as T;
-  }
-  if (!isPlainObject(value)) {
-    return value;
-  }
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entryValue]) => {
-      if (PII_DEBUG_KEYS.has(normalizeDebugKey(key))) {
-        return [key, null];
-      }
-      return [key, sanitizeDebugObject(entryValue)];
-    })
-  ) as T;
 }
 async function sanitizeTaskUserView(value: string | null): Promise<string | null> {
   if (!value || value === 'all' || value === 'self') {
@@ -478,16 +376,13 @@ function normalizePreferencesForDebug(value: unknown): PersistedPreferencesState
 function sanitizeProgressForDebug(data: UserProgressData): UserProgressData {
   const sanitizedData = stripInternalSyncMetadata(cloneStateSnapshot(data));
   sanitizedData.displayName = null;
-  if (sanitizedData.tarkovDevProfile) {
-    sanitizedData.tarkovDevProfile = sanitizeDebugObject(sanitizedData.tarkovDevProfile);
-  }
   return sanitizedData;
 }
 async function sanitizeTarkovStateForDebug(state: unknown): Promise<UserState> {
   if (!isPlainObject(state)) {
     throw new Error('Persisted progress state must be an object');
   }
-  const clonedState = migrateToGameModeStructure(cloneStateSnapshot(state));
+  const clonedState = sanitizeOwnedUserState(migrateToGameModeStructure(cloneStateSnapshot(state)));
   clonedState.tarkovUid = null;
   clonedState.pvp = sanitizeProgressForDebug(clonedState.pvp);
   clonedState.pve = sanitizeProgressForDebug(clonedState.pve);

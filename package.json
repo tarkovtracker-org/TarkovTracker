@@ -4,7 +4,7 @@
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
-  "version": "1.31.0",
+  "version": "1.31.1",
   "dependencies": {
     "@iconify-json/mdi": "^1.2.3",
     "@nuxt/image": "^2.0.0",
@@ -115,6 +115,7 @@
     "prepare": "husky || true",
     "preview": "nuxt preview",
     "setup": "bash scripts/setup-dev-environment.sh",
+    "supabase:check": "bash scripts/check-supabase-db.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "test": "vitest run --reporter=default --maxWorkers=2",
     "test:watch": "vitest --watch",
