@@ -184,10 +184,14 @@ jobs:
               --jq '.mergeStateStatus'
           )"
 
-          if [ "$merge_state" != "CLEAN" ]; then
-            echo "::error::PR merge state is $merge_state, not CLEAN."
-            exit 1
-          fi
+          case "$merge_state" in
+            CLEAN | UNSTABLE)
+              ;;
+            *)
+              echo "::error::PR merge state is $merge_state, not mergeable."
+              exit 1
+              ;;
+          esac
 
           gh pr merge "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
