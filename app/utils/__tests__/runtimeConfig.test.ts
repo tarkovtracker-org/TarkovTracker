@@ -92,6 +92,20 @@ describe('shouldEnableAnalyticsIntegrations', () => {
     ).toBe(false);
     expect(isPagesPreviewHostname('feature-branch.tarkovtrackernuxt.pages.dev')).toBe(true);
   });
+  it('uses appUrl when hostname is unavailable', () => {
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        appUrl: 'https://tarkovtracker.org',
+        isProduction: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        appUrl: 'https://preview.tarkovtrackernuxt.pages.dev',
+        isProduction: true,
+      })
+    ).toBe(false);
+  });
   it('disables analytics on non-primary production hosts', () => {
     expect(
       shouldEnableAnalyticsIntegrations({
@@ -111,5 +125,14 @@ describe('shouldEnableAnalyticsIntegrations', () => {
     ).toBe(true);
     expect(isPrimaryAppHostname('tarkovtracker.org')).toBe(true);
     expect(isPrimaryAppHostname('www.tarkovtracker.org')).toBe(true);
+  });
+  it('normalizes bare hostnames with ports before checking primary hosts', () => {
+    expect(
+      shouldEnableAnalyticsIntegrations({
+        hostname: 'tarkovtracker.org:443',
+        isProduction: true,
+      })
+    ).toBe(true);
+    expect(isPrimaryAppHostname('www.tarkovtracker.org:443')).toBe(true);
   });
 });

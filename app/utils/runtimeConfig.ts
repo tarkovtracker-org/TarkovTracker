@@ -8,9 +8,6 @@ const resolveHostname = (value?: string): string => {
   if (!trimmed) {
     return '';
   }
-  if (!trimmed.includes('://') && !trimmed.includes('/')) {
-    return trimmed;
-  }
   try {
     return new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).hostname.toLowerCase();
   } catch {
@@ -85,10 +82,12 @@ export const shouldEnableAnalyticsIntegrations = ({
     return false;
   }
   const normalizedHostname = resolveHostname(hostname) || resolveHostname(appUrl);
-  if (!normalizedHostname || isPagesPreviewHostname(normalizedHostname)) {
+  if (!normalizedHostname || normalizedHostname.endsWith('.pages.dev')) {
     return false;
   }
-  return isPrimaryAppHostname(normalizedHostname);
+  return PRIMARY_APP_HOSTNAMES.includes(
+    normalizedHostname as (typeof PRIMARY_APP_HOSTNAMES)[number]
+  );
 };
 export const shouldUseOfflineSupabaseFallback = ({
   hostname,

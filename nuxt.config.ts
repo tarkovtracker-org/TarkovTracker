@@ -12,7 +12,6 @@ import {
   GITHUB_IMAGE_DOMAINS,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
-  shouldEnableAnalyticsIntegrations,
   TARKOV_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -24,10 +23,15 @@ const isNonProduction = process.env.NODE_ENV !== 'production';
 const CONFIGURED_NITRO_PRESET = process.env.NITRO_PRESET;
 const NITRO_PRESET = resolveNitroPreset(CONFIGURED_NITRO_PRESET);
 const PUBLIC_APP_URL = resolvePublicAppUrl(process.env);
-const ANALYTICS_INTEGRATIONS_ENABLED = shouldEnableAnalyticsIntegrations({
-  appUrl: PUBLIC_APP_URL,
-  isProduction: process.env.NODE_ENV === 'production',
-});
+const IS_PRODUCTION_BUILD = process.env.NODE_ENV === 'production';
+const GOOGLE_ANALYTICS_MEASUREMENT_ID =
+  process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID ||
+  process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID ||
+  '';
+const MICROSOFT_CLARITY_PROJECT_ID =
+  process.env.NUXT_PUBLIC_CLARITY_PROJECT_ID ||
+  process.env.NUXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID ||
+  '';
 const {
   privateAnonKey: PRIVATE_SUPABASE_ANON_KEY,
   privateUrl: PRIVATE_SUPABASE_URL,
@@ -52,16 +56,8 @@ if (
 }
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
-  clarityInstrumentationKey: ANALYTICS_INTEGRATIONS_ENABLED
-    ? process.env.NUXT_PUBLIC_CLARITY_PROJECT_ID ||
-      process.env.NUXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID ||
-      ''
-    : '',
-  gaMeasurementId: ANALYTICS_INTEGRATIONS_ENABLED
-    ? process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID ||
-      process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID ||
-      ''
-    : '',
+  clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
+  gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
 });
 const webApplicationSchema = {
@@ -166,16 +162,8 @@ export default defineNuxtConfig({
       VITE_LOG_LEVEL: process.env.NUXT_PUBLIC_LOG_LEVEL || process.env.VITE_LOG_LEVEL || '',
       appUrl: PUBLIC_APP_URL,
       appVersion,
-      googleAnalyticsMeasurementId: ANALYTICS_INTEGRATIONS_ENABLED
-        ? process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID ||
-          process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID ||
-          ''
-        : '',
-      microsoftClarityProjectId: ANALYTICS_INTEGRATIONS_ENABLED
-        ? process.env.NUXT_PUBLIC_CLARITY_PROJECT_ID ||
-          process.env.NUXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID ||
-          ''
-        : '',
+      googleAnalyticsMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
+      microsoftClarityProjectId: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
