@@ -1,6 +1,6 @@
 {
   "__pinnedNotes": {
-    "@nuxt/test-utils": "Pinned to 4.0.0 on 2026-04-09 because 4.0.1 publishes vitest-environment-nuxt as workspace:* and 4.0.2 requires vitest-environment-nuxt@2.0.0, which is not published on npm. Remove after Nuxt republishes a fixed 4.x release.",
+    "@nuxt/test-utils": "Unpinned to ^4.0.2 on 2026-04-23 after vitest-environment-nuxt@2.0.0 was published and the upstream workspace dependency issue was fixed.",
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
@@ -35,7 +35,7 @@
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@nuxt/eslint": "^1.15.2",
-    "@nuxt/test-utils": "4.0.2",
+    "@nuxt/test-utils": "^4.0.2",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/npm": "^13.1.5",
@@ -75,7 +75,7 @@
   "name": "tarkovtracker-nuxt",
   "overrides": {
     "npm": {
-      ".": "^11.12.1",
+      ".": "^11.13.0",
       "picomatch": "^4.0.4"
     },
     "@tiptap/core": "3.14.0",
@@ -84,6 +84,7 @@
       "brace-expansion": "^1.1.13"
     },
     "fast-xml-parser": "^5.7.1",
+    "vite": "^7.3.2",
     "@nuxt/test-utils": {
       "h3-next": "npm:h3@2.0.1-rc.20",
       "srvx": "^0.11.15"
@@ -96,7 +97,7 @@
     "tar": "^7.5.13",
     "yaml": "^2.8.3"
   },
-  "packageManager": "npm@11.12.1",
+  "packageManager": "npm@11.13.0",
   "private": true,
   "scripts": {
     "build": "nuxt build",

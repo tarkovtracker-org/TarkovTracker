@@ -12,6 +12,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Automated releases with semantic versioning
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
+- Conservative auto-merge for low-risk Dependabot updates
 
 ## GitHub Actions Workflows
 
@@ -69,7 +70,28 @@ Enhanced PR validation:
 - `conventional-commits` - Commit message validation
 - `lighthouse` - Performance checks (when `performance` label present)
 
-### 5. Stale Management (`.github/workflows/stale.yml`)
+### 5. Dependabot Auto Merge (`.github/workflows/dependabot-auto-merge.yml`)
+
+Merges known low-risk Dependabot PRs after the normal PR checks complete:
+
+**Auto-merged groups:**
+
+- lint and format tooling
+- testing tooling
+- tailwind tooling
+- release tooling
+- official GitHub Actions
+- third-party GitHub Actions minor/patch updates
+
+**Safety rules:**
+
+- Dependabot-only, `main`-targeted PRs only
+- No repository checkout in the privileged `pull_request_target` workflow
+- Only package lockfiles, package manifests, and workflow files are allowed
+- Runtime Nuxt, Cloudflare, TypeScript compiler, catch-all npm, and `.claude-plugin` updates stay manual
+- PR must be mergeable and all standard CI/security checks must finish without failures
+
+### 6. Stale Management (`.github/workflows/stale.yml`)
 
 Automatic stale issue/PR management:
 
@@ -78,7 +100,7 @@ Automatic stale issue/PR management:
 - Exempts issues: `pinned`, `security`, `enhancement` labels
 - Exempts PRs: `pinned`, `security`, `enhancement` labels
 
-### 6. Link Check (`.github/workflows/link-check.yml`)
+### 7. Link Check (`.github/workflows/link-check.yml`)
 
 Validates external links in documentation:
 
@@ -150,10 +172,11 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Monthly grouped GitHub Actions updates
 - Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
+- Patch cooldown is short so safe patch updates do not sit for a full week
 - Grouped minor/patch updates for low-risk tooling families
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
 - Maximum 3 concurrent npm PRs and 1 GitHub Actions PR
-- No automerge for version updates
+- Conservative auto-merge for allowlisted low-risk Dependabot groups after CI/security checks pass
 - Gitleaks runs via a pinned CLI download in CI with release checksum verification instead of the deprecated `gitleaks-action` runtime
 
 **Current package groups:**
@@ -171,9 +194,11 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Review strategy:**
 
 - Let Dependabot batch low-risk tooling updates for scheduled review windows
+- Let the auto-merge workflow clear allowlisted tooling/action PRs after checks pass
 - Keep major upgrades explicit
 - Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
+- Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, catch-all npm, and `.claude-plugin` updates manual
 - Keep `.claude-plugin` updates out of the main app queue; review them monthly as isolated tooling maintenance
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
 

@@ -24,6 +24,11 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Trigger:** PR opened/updated/reopened
 **Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes or `ui`/`performance` labels)
 
+### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
+
+**Trigger:** Dependabot PR opened/updated/reopened/ready for review
+**Jobs:** `Auto-merge safe Dependabot PR` (allowlist gate, wait for CI/security checks, squash merge)
+
 ### Stale (`stale.yml`)
 
 **Trigger:** Daily schedule
@@ -31,10 +36,11 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ## Check Count
 
-| Context   | Checks                                                                            |
-| --------- | --------------------------------------------------------------------------------- |
-| PR        | ~7 (Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Main push | ~6 (Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)               |
+| Context       | Checks                                                                            |
+| ------------- | --------------------------------------------------------------------------------- |
+| PR            | ~7 (Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
+| Dependabot PR | ~8 (standard PR checks plus Dependabot Auto Merge when allowlisted)               |
+| Main push     | ~6 (Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)               |
 
 \*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
 
