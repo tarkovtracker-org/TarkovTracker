@@ -30,7 +30,7 @@ jobs:
 
       - name: Calculate and apply size label
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const files = await github.paginate(github.rest.pulls.listFiles, {
@@ -87,7 +87,7 @@ jobs:
 
       - name: Detect Lighthouse scope
         id: lighthouse-gate
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const labels = context.payload.pull_request.labels.map(({ name }) => name);
@@ -107,7 +107,7 @@ jobs:
             console.log(`Lighthouse gate ${runLighthouse ? 'enabled' : 'skipped'}`);
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .nvmrc
           cache: 'npm'
@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .nvmrc
           cache: 'npm'
