@@ -32,14 +32,6 @@ export interface TraderProgress {
   level: number;
   reputation: number;
 }
-export interface TarkovDevProfileData {
-  pmcStats: Record<string, unknown> | null;
-  scavStats: Record<string, unknown> | null;
-  achievements: Record<string, number>;
-  mastering: Array<{ Id: string; Progress: number; Kills?: number }>;
-  importedAt: number;
-  profileUpdatedAt: number;
-}
 export interface UserProgressData {
   level: number;
   pmcFaction: 'USEC' | 'BEAR';
@@ -63,5 +55,4 @@ export interface UserProgressData {
   };
   lastApiUpdate?: ApiUpdateMeta;
   apiUpdateHistory?: ApiUpdateMeta[];
-  tarkovDevProfile?: TarkovDevProfileData;
 }

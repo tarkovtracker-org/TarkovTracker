@@ -9,14 +9,6 @@ export interface TarkovDevImportResult {
   prestigeLevel: number;
   skills: Record<string, number>;
   gameEditionGuess: number | null;
-  rawProfile: {
-    pmcStats: Record<string, unknown> | null;
-    scavStats: Record<string, unknown> | null;
-    achievements: Record<string, number>;
-    mastering: Array<{ Id: string; Progress: number; Kills?: number }>;
-    importedAt: number;
-    profileUpdatedAt: number;
-  };
 }
 export type ParseResult = { ok: true; data: TarkovDevImportResult } | { ok: false; error: string };
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -80,7 +72,6 @@ export function parseTarkovDevProfile(data: unknown): ParseResult {
   }
   const prestigeRaw = typeof data.info.prestigeLevel === 'number' ? data.info.prestigeLevel : 0;
   const prestigeLevel = Math.max(0, Math.min(6, Math.floor(prestigeRaw)));
-  const rawData = data as Record<string, unknown>;
   return {
     ok: true,
     data: {
@@ -91,26 +82,6 @@ export function parseTarkovDevProfile(data: unknown): ParseResult {
       prestigeLevel,
       skills,
       gameEditionGuess: mapMemberCategoryToEdition(data.info.memberCategory),
-      rawProfile: {
-        pmcStats: isRecord(rawData.pmcStats) ? (rawData.pmcStats as Record<string, unknown>) : null,
-        scavStats: isRecord(rawData.scavStats)
-          ? (rawData.scavStats as Record<string, unknown>)
-          : null,
-        achievements: isRecord(rawData.achievements)
-          ? (Object.fromEntries(
-              Object.entries(rawData.achievements).filter(([, v]) => typeof v === 'number')
-            ) as Record<string, number>)
-          : {},
-        mastering: Array.isArray(rawData.mastering)
-          ? rawData.mastering.filter(
-              (item): item is { Id: string; Progress: number; Kills?: number } =>
-                isRecord(item) && typeof item.Id === 'string' && typeof item.Progress === 'number'
-            )
-          : [],
-        importedAt: Date.now(),
-        profileUpdatedAt:
-          typeof rawData.profileUpdatedAt === 'number' ? rawData.profileUpdatedAt : Date.now(),
-      },
     },
   };
 }

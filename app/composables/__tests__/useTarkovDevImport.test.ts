@@ -3,6 +3,7 @@ import type { GameMode } from '@/utils/constants';
 import type { TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
 const mockParseTarkovDevProfile = vi.fn();
 const mockSetTotalSkillLevel = vi.fn();
+const mockSetTotalXP = vi.fn();
 const mockLogger = {
   debug: vi.fn(),
   error: vi.fn(),
@@ -17,7 +18,6 @@ const tarkovStore = {
   setPMCFaction: vi.fn(),
   setPrestigeLevel: vi.fn(),
   syncPvpPrestigeLevel: vi.fn(),
-  setTarkovDevProfile: vi.fn(),
   setTarkovUid: vi.fn(),
   switchGameMode: vi.fn(),
 };
@@ -28,19 +28,18 @@ const metadataStore = {
     { exp: 2500, level: 12 },
   ],
 };
-const preferencesStore = {
-  setUseAutomaticLevelCalculation: vi.fn(),
-};
 vi.mock('@/composables/useSkillCalculation', () => ({
   useSkillCalculation: () => ({
     setTotalSkillLevel: mockSetTotalSkillLevel,
   }),
 }));
+vi.mock('@/composables/useXpCalculation', () => ({
+  useXpCalculation: () => ({
+    setTotalXP: mockSetTotalXP,
+  }),
+}));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => metadataStore,
-}));
-vi.mock('@/stores/usePreferences', () => ({
-  usePreferencesStore: () => preferencesStore,
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStore,
@@ -58,14 +57,6 @@ const createImportData = (
   gameEditionGuess: 4,
   pmcFaction: 'USEC',
   prestigeLevel: 2,
-  rawProfile: {
-    achievements: {},
-    importedAt: 1,
-    mastering: [],
-    pmcStats: null,
-    profileUpdatedAt: 2,
-    scavStats: null,
-  },
   skills: {
     Endurance: 10,
     Strength: 15,
@@ -150,12 +141,11 @@ describe('useTarkovDevImport', () => {
     expect(switchModeOrder).toBeDefined();
     expect(setPrestigeOrder).toBeDefined();
     expect(switchModeOrder!).toBeLessThan(setPrestigeOrder!);
-    expect(preferencesStore.setUseAutomaticLevelCalculation).toHaveBeenCalledWith(false);
+    expect(mockSetTotalXP).toHaveBeenCalledWith(parsedData.totalXP);
     expect(tarkovStore.setLevel).toHaveBeenCalledWith(12);
     expect(mockSetTotalSkillLevel).toHaveBeenCalledWith('Endurance', 10);
     expect(mockSetTotalSkillLevel).toHaveBeenCalledWith('Strength', 15);
     expect(tarkovStore.setGameEdition).toHaveBeenCalledWith(6);
-    expect(tarkovStore.setTarkovDevProfile).toHaveBeenCalledWith(parsedData.rawProfile);
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
     expect(composable.importState.value).toBe('success');
     expect(composable.importError.value).toBeNull();
@@ -170,6 +160,18 @@ describe('useTarkovDevImport', () => {
     await composable.parseFile(createFile('{"aid":123}'));
     await composable.confirmImport('pvp');
     expect(tarkovStore.setGameEdition).toHaveBeenCalledWith(4);
+  });
+  it('defaults to level 1 when totalXP is zero', async () => {
+    const parsedData = createImportData({ totalXP: 0 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: parsedData,
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{"aid":123}'));
+    await composable.confirmImport('pvp');
+    expect(mockSetTotalXP).toHaveBeenCalledWith(0);
+    expect(tarkovStore.setLevel).toHaveBeenCalledWith(1);
   });
   it('sets error state when applying import data throws', async () => {
     const parsedData = createImportData();

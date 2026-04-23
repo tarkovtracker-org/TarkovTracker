@@ -10,4 +10,4 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.user_progress;
   END IF;
-END $$;;
+END $$;

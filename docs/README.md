@@ -4,7 +4,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 
 ## 1. Project Standards & Philosophy
 
-- **Framework**: Nuxt ^4.2.1 (SPA mode, `app/` directory, Node 22).
+- **Framework**: Nuxt ^4.2.1 (SPA mode, `app/` directory, Node >=24.12.0).
 - **Frontend**: Vue 3 SFCs (`<script setup lang="ts">`), Pinia state, @nuxt/ui v4, Tailwind CSS v4.
 - **Backend**: Supabase (Auth, DB, Realtime) + Cloudflare Workers (public API gateway).
 - **Styling**: Strictly use Tailwind v4 theme layer (`@theme {}`). No hex colors or legacy UI patterns.
@@ -24,17 +24,19 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 
 - **Team System**: Supabase Edge Functions handle team/token mutations with per-user rate limits. Real-time updates via Supabase Broadcast (<200ms). Teammate profiles are fetched via a Nitro server route using service roles to bypass RLS.
 - **XP & Level System**: Dynamic calculation from tasks. Stores `xpOffset` (difference between calculated and actual XP) to maintain accuracy across manual adjustments.
+- **Tarkov.dev Linking**: The app persists one linked `tarkovUid`. Import destination mode is chosen at import time and is not stored as durable account metadata. Profile URLs use the current/viewed mode only to switch between `regular` and `pve`.
 - **i18n**: 6 languages managed in [`app/locales/*.json5`](../app/locales/). Missing keys fallback to raw strings.
 
 ## 4. Security & Operations
 
 - **Security**: Origin-check middleware (`tarkovtracker.org`) + per-user mutation rate limiting in Supabase Edge Functions. Public API rate limiting stays at the Cloudflare edge. HMAC signing for critical endpoints.
-- **Commands**: `npm run dev` (dev), `npm run build` (prod), `npx vitest` (test), `npm run lint` (lint).
+- **Commands**: `npm run dev` (dev), `npm run build` (prod), `npx vitest` (test), `npm run lint` (lint), `npm run supabase:check` (local migration reset + lint).
 - **Runbook**: [`docs/runbook.md`](./runbook.md) contains required env vars, deploy checks, and incident recovery.
 - **Deployment**:
   - Frontend: Automated via Cloudflare Pages on push.
   - Functions: `supabase functions deploy [name]`.
   - Public API worker: `cd workers/api-gateway && npx wrangler deploy`.
+- **Release Note**: Legacy manual backups created before the tarkov.dev profile cleanup may still contain old imported profile snapshots. New imports ignore them, but users who want fully scrubbed backup files should regenerate exports after upgrading.
 - **Troubleshooting**: Check Supabase Dashboard for Edge Function logs and Cloudflare logs for the public API worker.
 
 --- DO NOT TOUCH ANY OF THIS FILE CONENT BELOW HERE, IT IS MANUALLY MAINTAINED ---

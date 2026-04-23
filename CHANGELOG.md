@@ -1,3 +1,13 @@
+## [1.31.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.31.0...v1.31.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* clean persisted tarkov.dev state and ci blockers ([43f8629](https://github.com/tarkovtracker-org/TarkovTracker/commit/43f8629354cda7a84873d9d64885594974b2ff21))
+* finalize tarkov profile cleanup rollout ([b0f5351](https://github.com/tarkovtracker-org/TarkovTracker/commit/b0f5351d2138acf6cc34fa54cc4c0851bb575053))
+* harden tarkov profile cleanup rollout ([2f01885](https://github.com/tarkovtracker-org/TarkovTracker/commit/2f018859c76edc28029501024ebd01d306a276e5))
+* **app:** remove persisted tarkov import mode ([3bd1246](https://github.com/tarkovtracker-org/TarkovTracker/commit/3bd12466be7a9142778b8ccbbbce5314446e50f6))
+
 # [1.31.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.30.0...v1.31.0) (2026-04-09)
 
 

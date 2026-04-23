@@ -423,22 +423,6 @@ describe('useDataBackup', () => {
   });
   describe('exportDebugSnapshot', () => {
     it('exports a sanitized debug snapshot without auth secrets or player identifiers', async () => {
-      tarkovStore.$state.pvp.tarkovDevProfile = {
-        achievements: {},
-        importedAt: 1700000010000,
-        mastering: [],
-        pmcStats: {
-          Avatar_URL: 'https://example.com/avatar.png',
-          NickName: 'SensitiveNick',
-          player_id: 'pmc-player-1',
-        },
-        profileUpdatedAt: 1700000011000,
-        scavStats: {
-          accountId: 'account-77',
-          display_name: 'SensitiveScav',
-          UserName: 'scav-user-1',
-        },
-      };
       localStorage.setItem(
         STORAGE_KEYS.progress,
         JSON.stringify({
@@ -541,11 +525,6 @@ describe('useDataBackup', () => {
         expect(debugText).not.toContain('token-secret');
         expect(debugText).not.toContain('user-123');
         expect(debugText).not.toContain('teammate-1');
-        expect(debugText).not.toContain('SensitiveNick');
-        expect(debugText).not.toContain('pmc-player-1');
-        expect(debugText).not.toContain('SensitiveScav');
-        expect(debugText).not.toContain('scav-user-1');
-        expect(debugText).not.toContain('account-77');
         expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-debug-url');
         expect(clickSpy).toHaveBeenCalledOnce();
       } finally {
@@ -1239,6 +1218,32 @@ describe('useDataBackup', () => {
       expect(mockState.tarkovUid).toBe(12345);
       expect(mockState.currentGameMode).toBe('pve');
     });
+    it.each(['pvp', 'pve'] as const)(
+      'ignores legacy tarkovUidMode=%s metadata in backup payloads',
+      async (legacyMode) => {
+        const legacyBackup = {
+          ...validBackup,
+          tarkovUidMode: legacyMode,
+        };
+        const { parseBackupFile, confirmBackupImport } = await loadComposable();
+        await parseBackupFile(createFile(JSON.stringify(legacyBackup)));
+        await confirmBackupImport({ pvp: true, pve: true });
+        const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+          state: Record<string, unknown>
+        ) => void;
+        const mockState = {
+          currentGameMode: 'pvp',
+          gameEdition: 1,
+          pvp: { level: 1, progressEpoch: 5 },
+          pve: { level: 1, progressEpoch: 7 },
+          tarkovUid: null,
+        };
+        patchFn(mockState);
+        expect(mockState.tarkovUid).toBe(12345);
+        expect(mockState.currentGameMode).toBe('pve');
+        expect(mockState).not.toHaveProperty('tarkovUidMode');
+      }
+    );
     it('does nothing when not in preview state', async () => {
       const { confirmBackupImport } = await loadComposable();
       await confirmBackupImport({ pvp: true, pve: true });

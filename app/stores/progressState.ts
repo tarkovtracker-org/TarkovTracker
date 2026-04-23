@@ -15,6 +15,7 @@
  * @module stores/userProgressState
  */
 import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
 import {
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
@@ -65,21 +66,12 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     'pve' in legacyData
   ) {
     const data = legacyData as Record<string, unknown>;
-    // Ensure the structure is complete
-    const pvpData = {
-      ...defaultProgressData,
-      ...(data.pvp as Record<string, unknown>),
-    };
-    const pveData = {
-      ...defaultProgressData,
-      ...(data.pve as Record<string, unknown>),
-    };
     return {
       currentGameMode: (data.currentGameMode as GameMode) || GAME_MODES.PVP,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
       tarkovUid: (data.tarkovUid as number | null) ?? null,
-      pvp: pvpData,
-      pve: pveData,
+      pvp: sanitizeOwnedProgressData(data.pvp),
+      pve: sanitizeOwnedProgressData(data.pve),
     };
   }
   // Handle partial migration case - has currentGameMode but missing pvp/pve structure
@@ -90,56 +82,21 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     !('pvp' in legacyData && !('pve' in legacyData))
   ) {
     const data = legacyData as Record<string, unknown>;
-    // This is a partially migrated state, use the existing data as legacy format
-    const migratedProgressData: UserProgressData = {
-      level: (data.level as number) || defaultProgressData.level,
-      pmcFaction: (data.pmcFaction as 'USEC' | 'BEAR') || defaultProgressData.pmcFaction,
-      displayName: (data.displayName as string) || defaultProgressData.displayName,
-      xpOffset: (data.xpOffset as number) || defaultProgressData.xpOffset,
-      taskCompletions: (data.taskCompletions as UserProgressData['taskCompletions']) || {},
-      taskObjectives: (data.taskObjectives as UserProgressData['taskObjectives']) || {},
-      hideoutParts: (data.hideoutParts as UserProgressData['hideoutParts']) || {},
-      hideoutModules: (data.hideoutModules as UserProgressData['hideoutModules']) || {},
-      traders: (data.traders as UserProgressData['traders']) || {},
-      skills: (data.skills as UserProgressData['skills']) || {},
-      prestigeLevel: (data.prestigeLevel as number) || defaultProgressData.prestigeLevel,
-      progressEpoch: (data.progressEpoch as number) || defaultProgressData.progressEpoch,
-      skillOffsets: (data.skillOffsets as UserProgressData['skillOffsets']) || {},
-      storyChapters: (data.storyChapters as UserProgressData['storyChapters']) || {},
-      apiUpdateHistory: (data.apiUpdateHistory as UserProgressData['apiUpdateHistory']) || [],
-    };
     return {
       currentGameMode: data.currentGameMode as GameMode,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
       tarkovUid: (data.tarkovUid as number | null) ?? null,
-      pvp: migratedProgressData,
+      pvp: sanitizeOwnedProgressData(data),
       pve: structuredClone(defaultProgressData),
     };
   }
   // Create new structure with migrated data from legacy format
   const data = (legacyData as Record<string, unknown>) || {};
-  const migratedProgressData: UserProgressData = {
-    level: (data.level as number) || defaultProgressData.level,
-    pmcFaction: (data.pmcFaction as 'USEC' | 'BEAR') || defaultProgressData.pmcFaction,
-    displayName: (data.displayName as string) || defaultProgressData.displayName,
-    xpOffset: (data.xpOffset as number) || defaultProgressData.xpOffset,
-    taskCompletions: (data.taskCompletions as UserProgressData['taskCompletions']) || {},
-    taskObjectives: (data.taskObjectives as UserProgressData['taskObjectives']) || {},
-    hideoutParts: (data.hideoutParts as UserProgressData['hideoutParts']) || {},
-    hideoutModules: (data.hideoutModules as UserProgressData['hideoutModules']) || {},
-    traders: (data.traders as UserProgressData['traders']) || {},
-    skills: (data.skills as UserProgressData['skills']) || {},
-    prestigeLevel: (data.prestigeLevel as number) || defaultProgressData.prestigeLevel,
-    progressEpoch: (data.progressEpoch as number) || defaultProgressData.progressEpoch,
-    skillOffsets: (data.skillOffsets as UserProgressData['skillOffsets']) || {},
-    storyChapters: (data.storyChapters as UserProgressData['storyChapters']) || {},
-    apiUpdateHistory: (data.apiUpdateHistory as UserProgressData['apiUpdateHistory']) || [],
-  };
   return {
     currentGameMode: GAME_MODES.PVP, // Default to PvP for existing users
     gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
-    tarkovUid: null,
-    pvp: migratedProgressData,
+    tarkovUid: (data.tarkovUid as number | null) ?? null,
+    pvp: sanitizeOwnedProgressData(data),
     pve: structuredClone(defaultProgressData),
   };
 }
@@ -221,7 +178,6 @@ export const getters = {
     getCurrentData(state)?.skillOffsets?.[skillName] ?? 0,
   getAllSkillOffsets: (state: UserState) => () => getCurrentData(state)?.skillOffsets ?? {},
   getTarkovUid: (state: UserState) => () => state.tarkovUid ?? null,
-  getTarkovDevProfile: (state: UserState) => () => getCurrentData(state)?.tarkovDevProfile ?? null,
   isStoryChapterComplete: (state: UserState) => (chapterId: string) =>
     getCurrentData(state)?.storyChapters?.[chapterId]?.complete ?? false,
   isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
@@ -421,10 +377,6 @@ export const actions = {
   },
   setTarkovUid(this: UserState, uid: number | null) {
     this.tarkovUid = uid;
-  },
-  setTarkovDevProfile(this: UserState, profile: UserProgressData['tarkovDevProfile']) {
-    const currentData = getCurrentData(this);
-    currentData.tarkovDevProfile = profile;
   },
   setStoryChapterComplete(this: UserState, chapterId: string) {
     updateObjective(this, 'storyChapters', chapterId, {

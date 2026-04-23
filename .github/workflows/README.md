@@ -7,7 +7,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 ### CI (`ci.yml`)
 
 **Trigger:** Push to main/develop/wip branches, PRs
-**Jobs:** `Validate` (lint, typecheck, format, test, build), `Workers` (validate api-gateway)
+**Jobs:** `Validate` (lint, typecheck, format, test, build), `Supabase DB` (reset + lint local migrations), `Workers` (validate api-gateway)
 
 ### Security (`security.yml`)
 
@@ -24,6 +24,11 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Trigger:** PR opened/updated/reopened
 **Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes or `ui`/`performance` labels)
 
+### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
+
+**Trigger:** Dependabot PR opened/updated/reopened/ready for review
+**Jobs:** `Auto-merge safe Dependabot PR` (allowlist gate, wait for CI/security checks, squash merge)
+
 ### Stale (`stale.yml`)
 
 **Trigger:** Daily schedule
@@ -31,12 +36,13 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ## Check Count
 
-| Context | Checks |
-|---------|--------|
-| PR | ~6 (Validate, Workers, PR Meta, Security Scan, CodeQL, Lighthouse*) |
-| Main push | ~5 (Validate, Workers, Security Scan, CodeQL, Release) |
+| Context       | Checks                                                                            |
+| ------------- | --------------------------------------------------------------------------------- |
+| PR            | ~7 (Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
+| Dependabot PR | ~8 (standard PR checks plus Dependabot Auto Merge when allowlisted)               |
+| Main push     | ~6 (Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)               |
 
-*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
+\*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
 
 ## Secrets
 
@@ -48,6 +54,7 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 gh run list              # List recent runs
 gh run view <run-id>     # View run details
 gh run watch             # Watch running workflow
+npm run supabase:check   # Validate local Supabase migration reset + lint
 ```
 
 ## Local Testing
@@ -56,6 +63,7 @@ Test workflows locally with [act](https://github.com/nektos/act):
 
 ```bash
 act -j validate
+act -j supabase-db
 act -j workers
 act -j pr-meta
 ```

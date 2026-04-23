@@ -688,6 +688,7 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const tarkovStore = useTarkovStore();
@@ -793,23 +794,8 @@
   );
   const tarkovUid = computed(() => tarkovStore.getTarkovUid());
   const isLinked = computed(() => tarkovUid.value !== null);
-  const linkedProfileMode = computed<GameMode | null>(() => {
-    const pvpImportedAt = tarkovStore.getPvPProgressData().tarkovDevProfile?.importedAt;
-    const pveImportedAt = tarkovStore.getPvEProgressData().tarkovDevProfile?.importedAt;
-    const hasPvpImport = typeof pvpImportedAt === 'number' && Number.isFinite(pvpImportedAt);
-    const hasPveImport = typeof pveImportedAt === 'number' && Number.isFinite(pveImportedAt);
-    if (hasPvpImport && hasPveImport) {
-      return pveImportedAt > pvpImportedAt ? GAME_MODES.PVE : GAME_MODES.PVP;
-    }
-    if (hasPvpImport) return GAME_MODES.PVP;
-    if (hasPveImport) return GAME_MODES.PVE;
-    return null;
-  });
   const tarkovDevProfileUrl = computed(() => {
-    const mode =
-      linkedProfileMode.value ?? tarkovStore.getCurrentGameMode() ?? tarkovDevTargetMode.value;
-    const modeSlug = mode === GAME_MODES.PVE ? 'pve' : 'regular';
-    return `https://tarkov.dev/players/${modeSlug}/${tarkovUid.value}`;
+    return buildTarkovDevProfileUrl(tarkovUid.value, tarkovStore.getCurrentGameMode());
   });
   const previewLevel = computed(() => {
     if (!tarkovDevPreview.value) return 1;

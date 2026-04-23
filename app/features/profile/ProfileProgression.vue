@@ -252,6 +252,7 @@
   import { logger } from '@/utils/logger';
   import { computeInvalidProgress } from '@/utils/progressInvalidation';
   import { orderedStoryObjectives } from '@/utils/storylineObjectives';
+  import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
@@ -576,11 +577,8 @@
   });
   const modeFaction = computed(() => modeData.value.pmcFaction ?? 'USEC');
   const tarkovDevProfileUrl = computed(() => {
-    if (isViewingSharedProfile.value) return null;
-    const uid = tarkovStore.getTarkovUid();
-    if (!uid) return null;
-    const modeSlug = selectedMode.value === GAME_MODES.PVE ? 'pve' : 'regular';
-    return `https://tarkov.dev/players/${modeSlug}/${uid}`;
+    if (isViewingSharedProfile.value) return undefined;
+    return buildTarkovDevProfileUrl(tarkovStore.getTarkovUid(), selectedMode.value);
   });
   const profileLevel = computed(() => {
     if (isViewingCurrentMode.value && preferencesStore.getUseAutomaticLevelCalculation) {

@@ -1,9 +1,14 @@
+import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { clearProgressStorage } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
+import {
+  hasDeprecatedTarkovDevProfileData,
+  sanitizeOwnedUserState,
+} from '@/utils/progressSanitizers';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
-import type { UserState } from '@/stores/progressState';
 export type PersistedProgressSnapshot = {
+  hadDeprecatedProgressData: boolean;
   state: UserState;
   storedUserId: string | null;
   timestamp: number | null;
@@ -74,18 +79,22 @@ export const parsePersistedProgressState = (
   }
   const wrapped = parseUserScopedStorage<UserState>(rawValue);
   if (wrapped) {
+    const hadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData(wrapped.data);
     if (wrapped._userId !== userId) {
       return null;
     }
     return {
-      state: wrapped.data,
+      hadDeprecatedProgressData,
+      state: sanitizeOwnedUserState(migrateToGameModeStructure(wrapped.data)),
       storedUserId: wrapped._userId,
       timestamp: wrapped._timestamp ?? null,
     };
   }
   try {
+    const parsed = JSON.parse(rawValue) as UserState;
     return {
-      state: JSON.parse(rawValue) as UserState,
+      hadDeprecatedProgressData: hasDeprecatedTarkovDevProfileData(parsed),
+      state: sanitizeOwnedUserState(migrateToGameModeStructure(parsed)),
       storedUserId: null,
       timestamp: null,
     };
@@ -112,11 +121,12 @@ export const patchStoreState = (
   store: { $patch: (fn: (state: UserState) => void) => void },
   snapshot: UserState
 ) => {
+  const sanitizedSnapshot = sanitizeOwnedUserState(snapshot);
   store.$patch((state) => {
-    state.currentGameMode = snapshot.currentGameMode;
-    state.gameEdition = snapshot.gameEdition;
-    state.tarkovUid = snapshot.tarkovUid;
-    state.pvp = snapshot.pvp;
-    state.pve = snapshot.pve;
+    state.currentGameMode = sanitizedSnapshot.currentGameMode;
+    state.gameEdition = sanitizedSnapshot.gameEdition;
+    state.tarkovUid = sanitizedSnapshot.tarkovUid;
+    state.pvp = sanitizedSnapshot.pvp;
+    state.pve = sanitizedSnapshot.pve;
   });
 };
