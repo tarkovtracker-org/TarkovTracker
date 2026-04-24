@@ -635,6 +635,8 @@
         no_task_details: '进度同步成功。',
         more_tasks: '+{count} 个更多',
         unknown_time: '未知时间',
+        collapse: '收起同步历史记录',
+        expand: '展开同步历史记录',
       },
       settings: {
         title: '任务设置',

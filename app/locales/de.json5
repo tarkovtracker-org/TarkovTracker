@@ -635,6 +635,8 @@
         no_task_details: 'Fortschritt erfolgreich synchronisiert.',
         more_tasks: '+{count} weitere',
         unknown_time: 'Unbekannte Zeit',
+        collapse: 'Synchronisationsverlauf einklappen',
+        expand: 'Synchronisationsverlauf ausklappen',
       },
       settings: {
         title: 'Aufgabeneinstellungen',

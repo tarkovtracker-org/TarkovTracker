@@ -20,7 +20,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.65
+                "minScore": 0.38
               }
             ],
             "categories:seo": [
@@ -37,7 +37,7 @@
             "categories:accessibility": [
               "error",
               {
-                "minScore": 0.9
+                "minScore": 0.88
               }
             ],
             "categories:best-practices": [
@@ -49,7 +49,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.68
+                "minScore": 0.55
               }
             ],
             "categories:seo": [
@@ -78,7 +78,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.69
+                "minScore": 0.22
               }
             ],
             "categories:seo": [

@@ -635,6 +635,8 @@
         no_task_details: 'Progress synced successfully.',
         more_tasks: '+{count} more',
         unknown_time: 'Unknown time',
+        collapse: 'Collapse sync history',
+        expand: 'Expand sync history',
       },
       settings: {
         title: 'Task Settings',

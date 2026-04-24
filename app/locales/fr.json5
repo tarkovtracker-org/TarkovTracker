@@ -635,6 +635,8 @@
         no_task_details: 'Progression synchronisée avec succès.',
         more_tasks: '+{count} de plus',
         unknown_time: 'Heure inconnue',
+        collapse: 'Réduire l’historique des synchronisations',
+        expand: 'Développer l’historique des synchronisations',
       },
       settings: {
         title: 'Paramètres de tâche',

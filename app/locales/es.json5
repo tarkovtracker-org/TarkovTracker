@@ -635,6 +635,8 @@
         no_task_details: 'Progreso sincronizado correctamente.',
         more_tasks: '+{count} más',
         unknown_time: 'Hora desconocida',
+        collapse: 'Contraer historial de sincronización',
+        expand: 'Expandir historial de sincronización',
       },
       settings: {
         title: 'Configuración de tareas',

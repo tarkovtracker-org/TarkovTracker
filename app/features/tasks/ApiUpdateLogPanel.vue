@@ -32,6 +32,11 @@
           size="xs"
           :aria-expanded="isExpanded"
           :aria-controls="panelContentId"
+          :aria-label="
+            isExpanded
+              ? translateApiUpdateLog('collapse', 'Collapse sync history')
+              : translateApiUpdateLog('expand', 'Expand sync history')
+          "
           :class="{ 'rotate-180': isExpanded }"
           class="transition-transform duration-200"
           @click="isExpanded = !isExpanded"
