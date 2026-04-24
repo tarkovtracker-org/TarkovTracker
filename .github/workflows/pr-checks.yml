@@ -139,8 +139,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build static site
-        run: npm run generate
+      - name: Build Cloudflare Pages app
+        run: npm run build
         env:
           NODE_ENV: production
           NUXT_PUBLIC_APP_URL: http://localhost:3000
@@ -149,10 +149,17 @@ jobs:
 
       - name: Start preview server
         run: |
-          npx serve dist -s -l 3000 &
+          npx wrangler pages dev dist \
+            --port 3000 \
+            --ip 127.0.0.1 \
+            --local-protocol http \
+            --show-interactive-dev-session=false \
+            --log-level error &
           echo $! > /tmp/server.pid
           npx wait-on \
             http-get://localhost:3000 \
+            http-get://localhost:3000/api/tarkov/cache-meta \
+            http-get://localhost:3000/api/tarkov/bootstrap?lang=en \
             http-get://localhost:3000/tasks \
             http-get://localhost:3000/hideout \
             --timeout 120000 \

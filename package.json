@@ -58,7 +58,6 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "semantic-release": "^25.0.3",
-    "serve": "^14.2.6",
     "supabase": "^2.88.1",
     "tailwindcss": "^4.2.2",
     "taze": "^19.11.0",
@@ -80,9 +79,6 @@
     },
     "@tiptap/core": "3.14.0",
     "@tiptap/pm": "3.14.0",
-    "serve": {
-      "brace-expansion": "^1.1.13"
-    },
     "fast-xml-parser": "^5.7.1",
     "vite": "^7.3.2",
     "@nuxt/test-utils": {
