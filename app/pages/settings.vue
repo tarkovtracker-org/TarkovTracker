@@ -64,6 +64,16 @@
             >
               <DataManagementCard />
             </section>
+            <section
+              v-if="visitedTabs.api"
+              v-show="activeTab === 'api'"
+              id="api"
+              class="scroll-mt-24 space-y-4"
+              role="tabpanel"
+              :aria-label="$t('settings.tabs.api')"
+            >
+              <ApiTokensCard />
+            </section>
           </div>
         </div>
       </div>
@@ -71,6 +81,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
@@ -88,12 +99,13 @@
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
-  type SettingsTabId = 'progression' | 'preferences' | 'data-management';
-  const settingsTabIds = ['progression', 'preferences', 'data-management'] as const;
+  type SettingsTabId = 'progression' | 'preferences' | 'data-management' | 'api';
+  const settingsTabIds = ['progression', 'preferences', 'data-management', 'api'] as const;
   const settingsTabHashes: Record<SettingsTabId, string> = {
     progression: '#settings-progression',
     preferences: '#settings-preferences',
     'data-management': '#settings-data-management',
+    api: '#api',
   };
   const nestedTabHashes: Record<string, SettingsTabId> = {
     '#settings-skills': 'progression',
@@ -125,11 +137,17 @@
       label: t('settings.tabs.data_management'),
       icon: 'i-mdi-database-cog-outline',
     },
+    {
+      value: 'api',
+      label: t('settings.tabs.api'),
+      icon: 'i-mdi-api',
+    },
   ]);
   const visitedTabs = reactive<Record<SettingsTabId, boolean>>({
     progression: false,
     preferences: false,
     'data-management': false,
+    api: false,
   });
   const mobileTabsUi: TabsProps['ui'] = {
     root: 'w-full',

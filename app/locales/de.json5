@@ -1398,6 +1398,7 @@
       progression: 'Fortschritt',
       preferences: 'Präferenzen',
       data_management: 'Datenverwaltung',
+      api: 'API',
     },
     density: {
       compact: 'Kompakt',

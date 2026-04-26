@@ -1398,6 +1398,7 @@
       progression: '进度',
       preferences: '偏好',
       data_management: '数据管理',
+      api: 'API',
     },
     density: {
       compact: '紧凑',

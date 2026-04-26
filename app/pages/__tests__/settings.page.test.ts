@@ -97,8 +97,8 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
+  ApiTokensCard: { template: '<div data-testid="api-tokens-card" />' },
   DataManagementCard: { template: '<div data-testid="data-management-card" />' },
-  ApiTokens: true,
   DisplayNameCard: {
     data: () => ({
       localValue: '',
@@ -240,6 +240,15 @@ describe('settings page', () => {
       expect(wrapper.find('[data-testid="data-management-card"]').exists()).toBe(true);
       expect(wrapper.find('#settings-progression').exists()).toBe(false);
     });
+    it('opens the api tab from the route hash', async () => {
+      configureMockState({ routeHash: '#api' });
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('[data-testid="api-tokens-card"]').exists()).toBe(true);
+      expect(wrapper.find('#settings-progression').exists()).toBe(false);
+    });
     it('keeps skill deep links on the progression tab', async () => {
       configureMockState({ routeHash: '#settings-skills' });
       const wrapper = mount(SettingsPage, {
@@ -256,6 +265,17 @@ describe('settings page', () => {
       await wrapper.get('[data-testid="tab-preferences"]').trigger('click');
       expect(mockFns.routerReplace).toHaveBeenCalledWith({
         hash: '#settings-preferences',
+        path: '/settings',
+        query: {},
+      });
+    });
+    it('updates the route hash when selecting the api tab', async () => {
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await wrapper.get('[data-testid="tab-api"]').trigger('click');
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        hash: '#api',
         path: '/settings',
         query: {},
       });

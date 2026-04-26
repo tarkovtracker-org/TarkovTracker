@@ -1398,6 +1398,7 @@
       progression: 'Прогресс',
       preferences: 'Предпочтения',
       data_management: 'Управление данными',
+      api: 'API',
     },
     density: {
       compact: 'Компактная',

@@ -56,17 +56,15 @@ describe('account page', () => {
         mocks: { $t: (key: string) => key },
         stubs: {
           AccountDeletionCard: true,
-          ApiTokens: true,
-          GenericCard: true,
           NuxtLink: { template: '<a><slot /></a>' },
           PrivacyCard: { template: '<div data-testid="privacy-card" />' },
           ProfileSharingCard: true,
-          UAlert: true,
           UIcon: true,
         },
       },
     });
     expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('page.settings.card.apitokens.title');
   });
   it('shows admin link when user is admin', () => {
     mockState.isAdmin = true;
@@ -76,12 +74,9 @@ describe('account page', () => {
         mocks: { $t: (key: string) => key },
         stubs: {
           AccountDeletionCard: true,
-          ApiTokens: true,
-          GenericCard: true,
           NuxtLink: { template: '<a><slot /></a>', props: ['to'] },
           PrivacyCard: true,
           ProfileSharingCard: true,
-          UAlert: true,
           UIcon: true,
         },
       },
@@ -96,12 +91,9 @@ describe('account page', () => {
         mocks: { $t: (key: string) => key },
         stubs: {
           AccountDeletionCard: true,
-          ApiTokens: true,
-          GenericCard: true,
           NuxtLink: { template: '<a><slot /></a>' },
           PrivacyCard: true,
           ProfileSharingCard: true,
-          UAlert: true,
           UIcon: true,
         },
       },

@@ -1398,6 +1398,7 @@
       progression: 'Прогрес',
       preferences: 'Параметри',
       data_management: 'Керування даними',
+      api: 'API',
     },
     density: {
       compact: 'Компактна',
