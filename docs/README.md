@@ -24,7 +24,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 
 - **Team System**: Supabase Edge Functions handle team/token mutations with per-user rate limits. Real-time updates via Supabase Broadcast (<200ms). Teammate profiles are fetched via a Nitro server route using service roles to bypass RLS.
 - **XP & Level System**: Dynamic calculation from tasks. Stores `xpOffset` (difference between calculated and actual XP) to maintain accuracy across manual adjustments.
-- **Tarkov.dev Linking**: The app persists one linked `tarkovUid`. Import destination mode is chosen at import time and is not stored as durable account metadata. Profile URLs use the current/viewed mode only to switch between `regular` and `pve`.
+- **Tarkov.dev Linking**: The app persists one linked `tarkovUid`. Import destination mode is chosen at import time and is not stored as durable account metadata. Imports accept a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetch the public `players.tarkov.dev/profile/{uid}.json` payload through a server route, then parse it with the same profile parser. Profile URLs use the current/viewed mode only to switch between `regular` and `pve`.
 - **i18n**: 6 languages managed in [`app/locales/*.json5`](../app/locales/). Missing keys fallback to raw strings.
 
 ## 4. Security & Operations

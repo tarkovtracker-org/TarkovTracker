@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameMode } from '@/utils/constants';
 import type { TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
+const mockFetch = vi.fn();
 const mockParseTarkovDevProfile = vi.fn();
 const mockSetTotalSkillLevel = vi.fn();
 const mockSetTotalXP = vi.fn();
@@ -76,6 +77,7 @@ const loadComposable = async () => {
 describe('useTarkovDevImport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     metadataStore.playerLevels = [
       { exp: 0, level: 1 },
@@ -114,6 +116,53 @@ describe('useTarkovDevImport', () => {
     expect(composable.importError.value).toBe('Failed to read or parse JSON file');
     expect(mockLogger.error).toHaveBeenCalledWith(
       '[TarkovDevImport] Parse error:',
+      expect.any(Error)
+    );
+  });
+  it('fetches and previews a tarkov.dev profile url', async () => {
+    const parsedData = createImportData({ tarkovUid: 8560316 });
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: parsedData,
+      ok: true,
+    });
+    const composable = await loadComposable();
+    const source = await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: { url: 'https://tarkov.dev/players/regular/8560316' },
+    });
+    expect(mockParseTarkovDevProfile).toHaveBeenCalledWith({ aid: 8560316 });
+    expect(source).toEqual({
+      mode: 'pvp',
+      profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+      tarkovUid: 8560316,
+    });
+    expect(composable.importState.value).toBe('preview');
+    expect(composable.previewData.value).toEqual(parsedData);
+    expect(composable.importError.value).toBeNull();
+  });
+  it('rejects invalid tarkov.dev profile urls before fetching', async () => {
+    const composable = await loadComposable();
+    const source = await composable.parseProfileUrl('https://example.com/players/regular/8560316');
+    expect(source).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(composable.importState.value).toBe('error');
+    expect(composable.previewData.value).toBeNull();
+    expect(composable.importError.value).toBe(
+      'Paste a Tarkov.dev player profile URL like https://tarkov.dev/players/regular/8560316.'
+    );
+  });
+  it('sets error state when profile url fetching fails', async () => {
+    mockFetch.mockRejectedValue(new Error('not found'));
+    const composable = await loadComposable();
+    const source = await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(source).toBeNull();
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importError.value).toBe(
+      'Unable to fetch Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.'
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      '[TarkovDevImport] Profile URL fetch error:',
       expect.any(Error)
     );
   });

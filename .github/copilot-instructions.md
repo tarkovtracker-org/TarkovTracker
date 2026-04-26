@@ -134,6 +134,10 @@ The app tracks PvP and PvE progress separately. Always consider both modes when 
 - Do not add or depend on a persisted linked-mode/imported-mode field.
 - Treat PvP/PvE choice for tarkov.dev imports as temporary UI state that decides where imported
   progress is written.
+- Accept full tarkov.dev player profile URLs for imports, fetch profile JSON through the local
+  `/api/tarkov-dev/profile` route, and reuse the canonical Tarkov.dev profile parser.
+- Remind users to open their tarkov.dev profile page before importing because that page visit
+  refreshes the public profile JSON.
 - Build tarkov.dev profile links from the currently viewed or selected mode to choose the
   `regular` or `pve` URL slug.
 

@@ -152,6 +152,11 @@ Manages user progress data with dual game mode support (PvP/PvE).
 - The app does **not** persist a long-lived "linked mode" or "imported mode" field.
 - Tarkov.dev imports always ask the user which mode to write into and default that choice to the
   current active mode.
+- The import UI accepts a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetches
+  `players.tarkov.dev/profile/{uid}.json` through `/api/tarkov-dev/profile`, and parses that JSON
+  with the existing Tarkov.dev profile parser.
+- Tarkov.dev only refreshes that public JSON after the user opens their profile page on tarkov.dev,
+  so the UI asks users to open the profile before importing.
 - Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
   `regular` for PvP, `pve` for PvE.
 - Legacy embedded `tarkovDevProfile` payloads are sanitized out of stored progress data and should

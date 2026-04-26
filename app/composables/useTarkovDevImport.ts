@@ -4,13 +4,18 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 import { parseTarkovDevProfile, type TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
+import {
+  resolveTarkovDevProfileSource,
+  type TarkovDevProfileSource,
+} from '@/utils/tarkovDevProfileSource';
 import type { GameMode } from '@/utils/constants';
-export type ImportState = 'idle' | 'preview' | 'success' | 'error';
+export type ImportState = 'idle' | 'loading' | 'preview' | 'success' | 'error';
 export interface UseTarkovDevImportReturn {
   importState: Ref<ImportState>;
   previewData: Ref<TarkovDevImportResult | null>;
   importError: Ref<string | null>;
   parseFile: (file: File) => Promise<void>;
+  parseProfileUrl: (profileUrl: string) => Promise<TarkovDevProfileSource | null>;
   confirmImport: (targetMode: GameMode, editionOverride?: number | null) => Promise<void>;
   reset: () => void;
 }
@@ -27,23 +32,53 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     previewData.value = null;
     importError.value = null;
   }
+  function applyProfilePayload(json: unknown): boolean {
+    const result = parseTarkovDevProfile(json);
+    if (!result.ok) {
+      importState.value = 'error';
+      previewData.value = null;
+      importError.value = result.error;
+      return false;
+    }
+    previewData.value = result.data;
+    importState.value = 'preview';
+    importError.value = null;
+    return true;
+  }
   async function parseFile(file: File): Promise<void> {
+    importState.value = 'loading';
+    previewData.value = null;
     importError.value = null;
     try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      const result = parseTarkovDevProfile(json);
-      if (!result.ok) {
-        importState.value = 'error';
-        importError.value = result.error;
-        return;
-      }
-      previewData.value = result.data;
-      importState.value = 'preview';
+      applyProfilePayload(JSON.parse(await file.text()));
     } catch (e) {
       importState.value = 'error';
       importError.value = 'Failed to read or parse JSON file';
       logger.error('[TarkovDevImport] Parse error:', e);
+    }
+  }
+  async function parseProfileUrl(profileUrl: string): Promise<TarkovDevProfileSource | null> {
+    importError.value = null;
+    const source = resolveTarkovDevProfileSource(profileUrl);
+    if (!source.ok) {
+      importState.value = 'error';
+      previewData.value = null;
+      importError.value = source.error;
+      return null;
+    }
+    importState.value = 'loading';
+    previewData.value = null;
+    try {
+      const json = await $fetch<unknown>('/api/tarkov-dev/profile', {
+        query: { url: profileUrl.trim() },
+      });
+      return applyProfilePayload(json) ? source.data : null;
+    } catch (e) {
+      importState.value = 'error';
+      importError.value =
+        'Unable to fetch Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.';
+      logger.error('[TarkovDevImport] Profile URL fetch error:', e);
+      return null;
     }
   }
   async function confirmImport(
@@ -100,6 +135,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     previewData,
     importError,
     parseFile,
+    parseProfileUrl,
     confirmImport,
     reset,
   };

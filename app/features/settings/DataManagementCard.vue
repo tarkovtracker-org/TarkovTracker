@@ -85,13 +85,6 @@
               @change="handleBackupFileChange"
             />
             <input
-              ref="tarkovDevFileInputRef"
-              type="file"
-              accept=".json"
-              class="hidden"
-              @change="handleTarkovDevFileChange"
-            />
-            <input
               ref="eftLogsFolderInputRef"
               type="file"
               webkitdirectory
@@ -102,7 +95,7 @@
             />
             <!-- Import buttons (shown when no import flow is active) -->
             <template v-if="!isAnyImportActive">
-              <div class="grid gap-3 md:grid-cols-3">
+              <div class="grid gap-3 md:grid-cols-2">
                 <UButton
                   icon="i-mdi-file-upload-outline"
                   block
@@ -112,16 +105,6 @@
                   @click="backupFileInputRef?.click()"
                 >
                   {{ $t('settings.data_management.import_backup_button') }}
-                </UButton>
-                <UButton
-                  icon="i-mdi-account-arrow-up"
-                  block
-                  :ui="{
-                    base: 'bg-info-900 hover:bg-info-800 active:bg-info-700 text-info-200 focus-visible:ring focus-visible:ring-info-500',
-                  }"
-                  @click="showTarkovDevFileInput"
-                >
-                  {{ $t('settings.data_management.import_tarkovdev_button') }}
                 </UButton>
                 <UButton
                   icon="i-mdi-folder-upload-outline"
@@ -134,6 +117,58 @@
                   {{ $t('settings.data_management.import_eft_logs_folder_button') }}
                 </UButton>
               </div>
+              <form
+                class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3"
+                @submit.prevent="handleTarkovDevProfileUrlSubmit"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="bg-info-900/70 text-info-200 border-info-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                  >
+                    <UIcon name="i-mdi-account-arrow-up" class="h-5 w-5" />
+                  </div>
+                  <div class="min-w-0 space-y-1">
+                    <p class="text-surface-100 text-sm font-semibold">
+                      {{ $t('settings.tarkov_dev_import.title') }}
+                    </p>
+                    <p class="text-surface-400 text-sm">
+                      {{ $t('settings.tarkov_dev_import.profile_url_hint_before_link') }}
+                      <a
+                        href="https://tarkov.dev/players"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-info-300 hover:text-info-200 underline"
+                      >
+                        {{ $t('settings.tarkov_dev_import.upload_hint_link') }}
+                      </a>
+                      {{ $t('settings.tarkov_dev_import.profile_url_hint_after_link') }}
+                    </p>
+                    <p class="text-surface-500 text-xs">
+                      {{ $t('settings.tarkov_dev_import.profile_url_refresh_hint') }}
+                    </p>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                  <UInput
+                    v-model="tarkovDevProfileUrlInput"
+                    type="url"
+                    icon="i-mdi-link-variant"
+                    class="min-w-0 flex-1"
+                    :aria-label="$t('settings.tarkov_dev_import.profile_url_label')"
+                    :placeholder="$t('settings.tarkov_dev_import.profile_url_placeholder')"
+                  />
+                  <UButton
+                    type="submit"
+                    icon="i-mdi-account-search"
+                    color="info"
+                    class="justify-center"
+                    :disabled="isTarkovDevProfileUrlBlank"
+                    :loading="isTarkovDevProfileUrlLoading"
+                  >
+                    {{ $t('settings.tarkov_dev_import.fetch_profile') }}
+                  </UButton>
+                </div>
+              </form>
               <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
                 <p class="text-surface-300 text-xs font-semibold">
                   {{ $t('settings.log_import.upload_hint') }}
@@ -759,12 +794,16 @@
     importState: tarkovDevImportState,
     previewData: tarkovDevPreview,
     importError: tarkovDevImportError,
-    parseFile: parseTarkovDevFile,
+    parseProfileUrl: parseTarkovDevProfileUrl,
     confirmImport: confirmTarkovDevImport,
     reset: resetTarkovDevImport,
   } = useTarkovDevImport();
-  const tarkovDevFileInputRef = ref<HTMLInputElement | null>(null);
+  const tarkovDevProfileUrlInput = ref('');
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
+  const isTarkovDevProfileUrlBlank = computed(
+    () => tarkovDevProfileUrlInput.value.trim().length === 0
+  );
+  const isTarkovDevProfileUrlLoading = computed(() => tarkovDevImportState.value === 'loading');
   const {
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
@@ -822,18 +861,14 @@
     );
   }
   const editionLabel = computed(() => getEditionLabel(tarkovDevPreview.value?.gameEditionGuess));
-  function showTarkovDevFileInput() {
-    tarkovDevFileInputRef.value?.click();
-  }
   function showEftLogsFolderInput() {
     eftLogsFolderInputRef.value?.click();
   }
-  async function handleTarkovDevFileChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    await parseTarkovDevFile(file);
-    input.value = '';
+  async function handleTarkovDevProfileUrlSubmit() {
+    const source = await parseTarkovDevProfileUrl(tarkovDevProfileUrlInput.value);
+    if (source?.mode) {
+      tarkovDevTargetMode.value = source.mode;
+    }
   }
   async function handleTarkovDevConfirm() {
     await confirmTarkovDevImport(tarkovDevTargetMode.value);

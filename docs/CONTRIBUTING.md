@@ -230,6 +230,10 @@ Recommended mappings:
 - Persist only the linked `tarkovUid`.
 - Do not add a persisted `tarkovUidMode`, linked-mode field, or imported-mode field.
 - Import target mode is chosen in the import UI and is temporary action state only.
+- Tarkov.dev imports should accept the full player profile URL, extract the numeric UID, fetch the
+  public JSON through `/api/tarkov-dev/profile`, and reuse the canonical profile parser.
+- Tell users to open their tarkov.dev profile page before importing because the public profile JSON
+  refreshes when that page is visited.
 - When generating tarkov.dev links, use the currently viewed or selected mode to choose the URL
   slug instead of storing import metadata.
 - Old backup files may still contain legacy import-mode metadata; new code should ignore it rather

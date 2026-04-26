@@ -32,6 +32,13 @@ const {
   tarkovDevFns: {
     confirmImport: vi.fn(async () => undefined),
     parseFile: vi.fn(async () => undefined),
+    parseProfileUrl: vi.fn<
+      (profileUrl: string) => Promise<{
+        mode: 'pvp' | 'pve' | null;
+        profileJsonUrl: string;
+        tarkovUid: number;
+      } | null>
+    >(async () => null),
     reset: vi.fn(),
   },
   tarkovDevState: {
@@ -39,7 +46,7 @@ const {
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
     importState: {
       __v_isRef: true as const,
-      value: 'idle' as 'idle' | 'preview' | 'success' | 'error',
+      value: 'idle' as 'idle' | 'loading' | 'preview' | 'success' | 'error',
     },
   },
   eftLogsFns: {
@@ -86,6 +93,7 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
     previewData: tarkovDevState.previewData,
     importError: tarkovDevState.importError,
     parseFile: tarkovDevFns.parseFile,
+    parseProfileUrl: tarkovDevFns.parseProfileUrl,
     confirmImport: tarkovDevFns.confirmImport,
     reset: tarkovDevFns.reset,
   }),
@@ -160,6 +168,7 @@ describe('DataManagementCard', () => {
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
     tarkovDevFns.parseFile.mockReset();
+    tarkovDevFns.parseProfileUrl.mockReset();
     tarkovDevFns.reset.mockReset();
     eftLogsFns.confirmImport.mockReset();
     eftLogsFns.parseFile.mockReset();
@@ -263,6 +272,25 @@ describe('DataManagementCard', () => {
         title: 'settings.data_management.import_success_title',
       })
     );
+  });
+  it('fetches tarkov.dev profile url and uses the url mode for import preview', async () => {
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: 'pve',
+      profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+      tarkovUid: 8560316,
+    });
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+      tarkovDevTargetMode: 'pvp' | 'pve';
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pve/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+      'https://tarkov.dev/players/pve/8560316'
+    );
+    expect(vm.tarkovDevTargetMode).toBe('pve');
   });
   it('forwards tarkov.dev confirmation using current target mode', async () => {
     tarkovStoreState.currentMode = 'pve';
