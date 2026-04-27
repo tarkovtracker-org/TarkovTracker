@@ -24,12 +24,12 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 
 - **Team System**: Supabase Edge Functions handle team/token mutations with per-user rate limits. Real-time updates via Supabase Broadcast (<200ms). Teammate profiles are fetched via a Nitro server route using service roles to bypass RLS.
 - **XP & Level System**: Dynamic calculation from tasks. Stores `xpOffset` (difference between calculated and actual XP) to maintain accuracy across manual adjustments.
-- **Tarkov.dev Linking**: The app persists one linked `tarkovUid`. Import destination mode is chosen at import time and is not stored as durable account metadata. Imports accept a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetch the public `players.tarkov.dev/profile/{uid}.json` payload through a server route, then parse it with the same profile parser. Profile URLs use the current/viewed mode only to switch between `regular` and `pve`.
+- **Tarkov.dev Linking**: The app persists one linked `tarkovUid`. Import destination mode is chosen at import time and is not stored as durable account metadata. Imports accept a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetch the public `players.tarkov.dev/profile/{uid}.json` payload through a no-store, rate-limited server route, then parse it with the same profile parser. Refetch uses the saved UID plus a user-selected profile mode because PvP, PvE, and future Arena profiles share the same account id but use different tarkov.dev routes. Unlink clears only the UID and leaves imported tracker data intact. The preview exposes parsed skill-id and level pairs behind a collapsed detail view.
 - **i18n**: 6 languages managed in [`app/locales/*.json5`](../app/locales/). Missing keys fallback to raw strings.
 
 ## 4. Security & Operations
 
-- **Security**: Origin-check middleware (`tarkovtracker.org`) + per-user mutation rate limiting in Supabase Edge Functions. Public API rate limiting stays at the Cloudflare edge. HMAC signing for critical endpoints.
+- **Security**: Origin-check middleware (`tarkovtracker.org`) + per-user mutation rate limiting in Supabase Edge Functions. Public profile routes use lightweight per-client rate limits, with Cloudflare as the outer abuse-control layer. HMAC signing for critical endpoints.
 - **Commands**: `npm run dev` (dev), `npm run build` (prod), `npx vitest` (test), `npm run lint` (lint), `npm run supabase:check` (local migration reset + lint).
 - **Runbook**: [`docs/runbook.md`](./runbook.md) contains required env vars, deploy checks, and incident recovery.
 - **Deployment**:

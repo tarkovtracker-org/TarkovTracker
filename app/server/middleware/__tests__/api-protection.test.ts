@@ -197,6 +197,20 @@ describe('API Protection Middleware', () => {
       await expect(middleware(mockEvent as H3Event)).resolves.toBeUndefined();
       process.env.NODE_ENV = originalEnv;
     });
+    it('should allow the Tarkov.dev profile proxy as a default public route', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      runtimeConfig.apiProtection.requireAuth = true;
+      runtimeConfig.apiProtection.publicRoutes = '   ';
+      mockGetRequestURL.mockReturnValue(new URL('http://localhost:3000/api/tarkov-dev/profile'));
+      mockGetRequestHeader.mockImplementation((_: unknown, header: string) => {
+        if (header === 'host') return 'localhost:3000';
+        return undefined;
+      });
+      const { default: middleware } = await import('../api-protection');
+      await expect(middleware(mockEvent as H3Event)).resolves.toBeUndefined();
+      process.env.NODE_ENV = originalEnv;
+    });
   });
   describe('Authentication requirement', () => {
     it('should allow all routes when requireAuth is false', async () => {

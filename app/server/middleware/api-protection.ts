@@ -1,13 +1,3 @@
-/**
- * API Protection Middleware
- *
- * Protects API endpoints with multiple layers of security:
- * 1. Host header validation against allowed domain whitelist
- * 2. Optional client IP validation against trusted ranges
- * 3. Authentication enforcement for protected routes
- *
- * Security principle: Fail closed - deny access when any required check fails.
- */
 import {
   createError,
   defineEventHandler,
@@ -35,19 +25,12 @@ export interface ApiProtectionConfig {
     appUrl?: string;
   };
 }
-/**
- * Parse a comma-separated string into an array of trimmed, non-empty values
- */
 function parseCommaSeparated(value: string): string[] {
   return value
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
-/**
- * Check if a route matches a pattern (supports * wildcard at end)
- * e.g., "/api/tarkov/*" matches "/api/tarkov/items" and "/api/tarkov/tasks-core"
- */
 function routeMatchesPattern(route: string, pattern: string): boolean {
   if (pattern.endsWith('/*')) {
     const prefix = pattern.slice(0, -1); // Remove the '*', keep the '/'
@@ -55,15 +38,9 @@ function routeMatchesPattern(route: string, pattern: string): boolean {
   }
   return route === pattern;
 }
-/**
- * Check if a route is in the public routes list
- */
 function isPublicRoute(pathname: string, publicRoutes: string[]): boolean {
   return publicRoutes.some((pattern) => routeMatchesPattern(pathname, pattern));
 }
-/**
- * Check if an IP is within a CIDR range or matches a single IP
- */
 function ipInRange(clientIp: string, range: string): boolean {
   try {
     const addr = ipaddr.process(clientIp);
@@ -101,48 +78,34 @@ function ipInRange(clientIp: string, range: string): boolean {
     return false;
   }
 }
-/**
- * Check if client IP is in any of the trusted ranges
- * Returns true if trustedRanges is empty (bypassed)
- */
 function isIpTrusted(clientIp: string | null, trustedRanges: string[]): boolean {
-  // If no trusted ranges configured, skip IP check
   if (trustedRanges.length === 0) {
     return true;
   }
-  // If we have ranges but no IP, it's not trusted
   if (!clientIp) {
     return false;
   }
   return trustedRanges.some((range) => ipInRange(clientIp, range));
 }
-/**
- * Validate the Host header against allowed hosts
- */
 function isHostAllowed(
   hostHeader: string | undefined,
   allowedHosts: string[],
   isDevelopment: boolean
 ): boolean {
-  // In development, always allow localhost variants
   if (isDevelopment) {
     if (!hostHeader) return true;
-    const host = hostHeader.split(':')[0]; // Remove port
+    const host = hostHeader.split(':')[0];
     if (host === 'localhost' || host === '127.0.0.1') return true;
   }
-  // If no allowed hosts configured, fail closed in production
   if (allowedHosts.length === 0) {
-    // In development without config, allow all
     return isDevelopment;
   }
   if (!hostHeader) {
-    // No Host header - fail closed
     return false;
   }
   const host = (hostHeader.split(':')[0] ?? '').toLowerCase();
   return allowedHosts.some((allowed) => {
     const allowedLower = allowed.toLowerCase();
-    // Exact match or subdomain match (e.g., "tarkovtracker.org" matches "www.tarkovtracker.org")
     return host === allowedLower || host.endsWith('.' + allowedLower);
   });
 }
@@ -171,10 +134,6 @@ function resolveAppUrlHosts(appUrl: string | undefined, isDevelopment: boolean):
     return [];
   }
 }
-/**
- * Validate authentication token
- * Returns user info if valid, null otherwise
- */
 async function validateAuthToken(
   authHeader: string | undefined,
   supabaseUrl: string,
@@ -214,9 +173,6 @@ async function validateAuthToken(
     clearTimeout(timeoutId);
   }
 }
-/**
- * Log security events for monitoring
- */
 function logSecurityEvent(
   level: 'warn' | 'info',
   message: string,
@@ -272,20 +228,19 @@ function applyCorsHeaders(
 export default defineEventHandler(async (event) => {
   const url = getRequestURL(event);
   const pathname = url.pathname;
-  // Only apply protection to /api/* routes
   if (!pathname.startsWith('/api/')) {
     return;
   }
   const config = useRuntimeConfig(event);
   const typedConfig = config as ApiProtectionConfig;
   const isDevelopment = process.env.NODE_ENV === 'development';
-  // Get API protection configuration
   const apiProtection: ApiProtectionSettings = typedConfig.apiProtection || {};
   const allowedHosts = parseCommaSeparated(apiProtection.allowedHosts || '');
   const trustedIpRanges = parseCommaSeparated(apiProtection.trustedIpRanges || '');
-  const requireAuth = apiProtection.requireAuth !== false; // Default to true
+  const requireAuth = apiProtection.requireAuth !== false;
   const defaultPublicRoutes = [
     '/api/tarkov/*',
+    '/api/tarkov-dev/profile',
     '/api/changelog',
     '/api/contributors',
     '/api/profile/*',
@@ -296,15 +251,12 @@ export default defineEventHandler(async (event) => {
     configuredPublicRoutesRaw && configuredPublicRoutesRaw.length > 0
       ? parseCommaSeparated(configuredPublicRoutesRaw)
       : defaultPublicRoutes;
-  // Add default allowed hosts for production
   const effectiveAllowedHosts = [...allowedHosts];
   if (allowedHosts.length === 0 && !isDevelopment) {
-    // Default production hosts
     effectiveAllowedHosts.push('tarkovtracker.org', 'www.tarkovtracker.org');
   }
   effectiveAllowedHosts.push(...resolveAppUrlHosts(typedConfig.public?.appUrl, isDevelopment));
   const uniqueAllowedHosts = [...new Set(effectiveAllowedHosts.map((host) => host.toLowerCase()))];
-  // === SECURITY CHECK 1: Host Header Validation ===
   const hostHeader = getRequestHeader(event, 'host');
   if (!isHostAllowed(hostHeader, uniqueAllowedHosts, isDevelopment)) {
     logSecurityEvent('warn', 'Blocked request - invalid host', {
@@ -318,7 +270,6 @@ export default defineEventHandler(async (event) => {
       message: 'Access denied - invalid host',
     });
   }
-  // === SECURITY CHECK 2: IP Validation (Optional) ===
   const clientIp = getClientAddress(event, apiProtection.trustProxy);
   if (trustedIpRanges.length > 0 && !isIpTrusted(clientIp, trustedIpRanges)) {
     logSecurityEvent('warn', 'Blocked request - untrusted IP', {
@@ -337,7 +288,6 @@ export default defineEventHandler(async (event) => {
     setResponseStatus(event, 204);
     return '';
   }
-  // === SECURITY CHECK 3: Authentication (for non-public routes) ===
   const isPublic = isPublicRoute(pathname, publicRoutes);
   if (requireAuth && !isPublic) {
     const authHeader = getRequestHeader(event, 'authorization');
@@ -356,7 +306,6 @@ export default defineEventHandler(async (event) => {
         message: 'Authentication required',
       });
     }
-    // Attach user info to event context for downstream handlers
     event.context.auth = { user };
   }
 });

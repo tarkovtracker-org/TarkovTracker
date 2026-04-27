@@ -150,11 +150,17 @@ Manages user progress data with dual game mode support (PvP/PvE).
 
 - A linked tarkov.dev account is represented by a single persisted `tarkovUid`.
 - The app does **not** persist a long-lived "linked mode" or "imported mode" field.
+- Unlinking a tarkov.dev account clears only the saved `tarkovUid`; it does not roll back imported
+  progress, profile, skill, level, edition, or prestige fields.
+- Refetching a linked profile asks for the profile mode first because PvP, PvE, and future Arena
+  profile JSON use the same account id but different tarkov.dev mode routes.
 - Tarkov.dev imports always ask the user which mode to write into and default that choice to the
   current active mode.
 - The import UI accepts a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetches
-  `players.tarkov.dev/profile/{uid}.json` through `/api/tarkov-dev/profile`, and parses that JSON
-  with the existing Tarkov.dev profile parser.
+  `players.tarkov.dev/profile/{uid}.json` through the public `/api/tarkov-dev/profile` proxy, and
+  parses that JSON with the existing Tarkov.dev profile parser.
+- The import preview keeps parsed skill values collapsed by default, but exposes the exact
+  skill-id and level pairs that will be applied.
 - Tarkov.dev only refreshes that public JSON after the user opens their profile page on tarkov.dev,
   so the UI asks users to open the profile before importing.
 - Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
@@ -348,7 +354,7 @@ runtimeConfig: {
     allowedHosts: process.env.API_ALLOWED_HOSTS,
     trustedIpRanges: process.env.API_TRUSTED_IP_RANGES,
     requireAuth: process.env.API_REQUIRE_AUTH !== 'false',
-    publicRoutes: '/api/tarkov/*',
+    publicRoutes: '/api/tarkov/*,/api/tarkov-dev/profile',
     trustProxy: resolveTrustProxySetting({
       API_TRUST_PROXY: process.env.API_TRUST_PROXY,
       NITRO_PRESET: process.env.NITRO_PRESET,
