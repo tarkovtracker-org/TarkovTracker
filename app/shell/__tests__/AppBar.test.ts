@@ -286,6 +286,12 @@ describe('AppBar account menu', () => {
     expect(mockSupabase.signOut).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('does not include a duplicate account settings menu item', async () => {
+    const wrapper = await mountAppBar();
+    expect(wrapper.find('[data-menu-item="settings.tabs.account"]').exists()).toBe(false);
+    expect(wrapper.find('[data-menu-item="navigation_drawer.settings"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
   it('logs out when selecting the logout menu item', async () => {
     const wrapper = await mountAppBar();
     const logoutMenuItem = wrapper.get('[data-menu-item="navigation_drawer.logout"]');

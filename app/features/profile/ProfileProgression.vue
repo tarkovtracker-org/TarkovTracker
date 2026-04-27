@@ -102,7 +102,7 @@
                   t('page.profile.share_private_intro', 'This mode is private. Enable sharing in ')
                 }}
                 <NuxtLink
-                  to="/account"
+                  to="/settings#account"
                   class="text-primary-300 hover:text-primary-200 underline underline-offset-2"
                 >
                   {{ t('page.profile.account_settings_link', 'Account Settings') }}

@@ -422,7 +422,7 @@
   };
   const getSkillRequirementLink = (requirement: SkillRequirement) => ({
     path: '/settings',
-    hash: '#settings-skills',
+    hash: '#skills',
     query: {
       skill: requirement.skill?.id || requirement.name,
     },

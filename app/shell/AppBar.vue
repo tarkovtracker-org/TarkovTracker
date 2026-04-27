@@ -183,11 +183,6 @@
         to: '/profile',
       },
       {
-        icon: 'i-mdi-account-cog-outline',
-        label: t('settings.tabs.account'),
-        to: '/account',
-      },
-      {
         icon: 'i-mdi-cog-outline',
         label: t('navigation_drawer.settings'),
         to: '/settings',

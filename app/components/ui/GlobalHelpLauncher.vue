@@ -294,7 +294,7 @@
     )
   );
   const accountActionRoute = computed<HelpRoute>(() => {
-    return isLoggedIn.value ? '/account' : '/login';
+    return isLoggedIn.value ? '/settings#account' : '/login';
   });
   const onboardingSteps = computed<OnboardingStep[]>(() => [
     {
@@ -304,7 +304,7 @@
           icon: 'i-mdi-database-import-outline',
           label: copy('page_help.onboarding.steps.import.actions.open', 'Open imports'),
           to: {
-            hash: '#settings-data-management',
+            hash: '#data-management',
             path: '/settings',
           },
         },

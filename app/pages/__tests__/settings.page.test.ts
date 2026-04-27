@@ -11,6 +11,7 @@ const mockState = {
   gameEdition: 1,
   prestigeLevel: 0,
   routeHash: '',
+  routePath: '/settings',
 };
 const mockFns = {
   setGameEdition: vi.fn(),
@@ -52,7 +53,9 @@ mockNuxtImport('useRouter', () => () => ({
   afterEach: vi.fn(),
 }));
 mockNuxtImport('useRoute', () => () => ({
-  path: '/settings',
+  get path() {
+    return mockState.routePath;
+  },
   query: {},
   get hash() {
     return mockState.routeHash;
@@ -97,6 +100,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
+  AccountDeletionCard: { template: '<div data-testid="account-deletion-card" />' },
   ApiTokensCard: { template: '<div data-testid="api-tokens-card" />' },
   DataManagementCard: { template: '<div data-testid="data-management-card" />' },
   DisplayNameCard: {
@@ -120,8 +124,9 @@ const defaultGlobalStubs = {
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
-  ProfileSharingCard: true,
-  SkillsCard: { template: '<div id="settings-skills" data-testid="skills-card" />' },
+  PrivacyCard: { template: '<div data-testid="privacy-card" />' },
+  ProfileSharingCard: { template: '<div data-testid="profile-sharing-card" />' },
+  SkillsCard: { template: '<div id="skills" data-testid="skills-card" />' },
   UAlert: true,
   UBadge: true,
   UButton: {
@@ -167,6 +172,7 @@ const configureMockState = (
     gameEdition?: number;
     prestigeLevel?: number;
     routeHash?: string;
+    routePath?: string;
   } = {}
 ) => {
   mockState.isLoggedIn = options.isLoggedIn ?? false;
@@ -174,6 +180,7 @@ const configureMockState = (
   mockState.gameEdition = options.gameEdition ?? 1;
   mockState.prestigeLevel = options.prestigeLevel ?? 0;
   mockState.routeHash = options.routeHash ?? '';
+  mockState.routePath = options.routePath ?? '/settings';
 };
 describe('settings page', () => {
   beforeEach(() => {
@@ -190,8 +197,8 @@ describe('settings page', () => {
       global: globalConfig,
     });
     expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="prestige-card"]').exists()).toBe(true);
-    expect(wrapper.find('#settings-progression').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(true);
+    expect(wrapper.find('#progression').exists()).toBe(true);
   });
   describe('user states', () => {
     it('renders logged out state', () => {
@@ -225,20 +232,21 @@ describe('settings page', () => {
       expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
     });
     it('renders with prestige level', () => {
-      configureMockState({ prestigeLevel: 3 });
+      configureMockState({ prestigeLevel: 3, routeHash: '#prestige' });
       const wrapper = mount(SettingsPage, {
         global: globalConfig,
       });
-      expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="prestige-card"]').exists()).toBe(true);
+      expect(wrapper.find('#prestige').exists()).toBe(true);
     });
     it('opens the data management tab from the route hash', async () => {
-      configureMockState({ routeHash: '#settings-data-management' });
+      configureMockState({ routeHash: '#data-management' });
       const wrapper = mount(SettingsPage, {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
       expect(wrapper.find('[data-testid="data-management-card"]').exists()).toBe(true);
-      expect(wrapper.find('#settings-progression').exists()).toBe(false);
+      expect(wrapper.find('#progression').exists()).toBe(false);
     });
     it('opens the api tab from the route hash', async () => {
       configureMockState({ routeHash: '#api' });
@@ -247,15 +255,60 @@ describe('settings page', () => {
       });
       await vi.dynamicImportSettled();
       expect(wrapper.find('[data-testid="api-tokens-card"]').exists()).toBe(true);
-      expect(wrapper.find('#settings-progression').exists()).toBe(false);
+      expect(wrapper.find('#progression').exists()).toBe(false);
     });
-    it('keeps skill deep links on the progression tab', async () => {
+    it('renders streamer mode on the preferences tab', async () => {
+      configureMockState({ routeHash: '#preferences' });
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+    });
+    it('opens the account tab from the route hash', async () => {
+      configureMockState({ routeHash: '#account' });
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('[data-testid="profile-sharing-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="account-deletion-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(false);
+    });
+    it('opens the account tab from the account route without a hash', async () => {
+      configureMockState({ routePath: '/account' });
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('[data-testid="profile-sharing-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="account-deletion-card"]').exists()).toBe(true);
+      expect(wrapper.find('#progression').exists()).toBe(false);
+    });
+    it('shows the admin link on the account tab for admins', async () => {
+      configureMockState({ isAdmin: true, isLoggedIn: true, routeHash: '#account' });
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.text()).toContain('settings.general.admin_panel');
+    });
+    it('keeps legacy skill deep links on the progression tab', async () => {
       configureMockState({ routeHash: '#settings-skills' });
       const wrapper = mount(SettingsPage, {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('#settings-progression').exists()).toBe(true);
+      expect(wrapper.find('#progression').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="skills-card"]').exists()).toBe(true);
+    });
+    it('keeps skill deep links on the progression tab', async () => {
+      configureMockState({ routeHash: '#skills' });
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('#progression').exists()).toBe(true);
       expect(wrapper.find('[data-testid="skills-card"]').exists()).toBe(true);
     });
     it('updates the route hash when selecting a tab', async () => {
@@ -264,7 +317,29 @@ describe('settings page', () => {
       });
       await wrapper.get('[data-testid="tab-preferences"]').trigger('click');
       expect(mockFns.routerReplace).toHaveBeenCalledWith({
-        hash: '#settings-preferences',
+        hash: '#preferences',
+        path: '/settings',
+        query: {},
+      });
+    });
+    it('uses the minimal prestige tab route hash', async () => {
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await wrapper.get('[data-testid="tab-prestige"]').trigger('click');
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        hash: '#prestige',
+        path: '/settings',
+        query: {},
+      });
+    });
+    it('uses the account tab route hash', async () => {
+      const wrapper = mount(SettingsPage, {
+        global: globalConfig,
+      });
+      await wrapper.get('[data-testid="tab-account"]').trigger('click');
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        hash: '#account',
         path: '/settings',
         query: {},
       });
@@ -287,7 +362,7 @@ describe('settings page', () => {
       await wrapper.get('[data-testid="display-name-input"]').setValue('cached-name');
       await wrapper.get('[data-testid="tab-preferences"]').trigger('click');
       await wrapper.vm.$nextTick();
-      expect(wrapper.find('#settings-progression').exists()).toBe(true);
+      expect(wrapper.find('#progression').exists()).toBe(true);
       await wrapper.get('[data-testid="tab-progression"]').trigger('click');
       await wrapper.vm.$nextTick();
       expect(

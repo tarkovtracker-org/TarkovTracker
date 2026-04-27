@@ -1,5 +1,5 @@
 <template>
-  <div id="settings-skills" class="scroll-mt-16">
+  <div id="skills" class="scroll-mt-16">
     <GenericCard
       icon="mdi-brain"
       icon-color="info"

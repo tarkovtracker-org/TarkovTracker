@@ -33,31 +33,61 @@
             <section
               v-if="visitedTabs.progression"
               v-show="activeTab === 'progression'"
-              id="settings-progression"
+              id="progression"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
               :aria-label="$t('settings.tabs.progression')"
             >
               <DisplayNameCard />
-              <PrestigeCard />
               <ExperienceCard />
               <SkillsCard />
             </section>
             <section
+              v-if="visitedTabs.prestige"
+              v-show="activeTab === 'prestige'"
+              id="prestige"
+              class="scroll-mt-24 space-y-4"
+              role="tabpanel"
+              :aria-label="$t('settings.tabs.prestige')"
+            >
+              <PrestigeCard />
+            </section>
+            <section
               v-if="visitedTabs.preferences"
               v-show="activeTab === 'preferences'"
-              id="settings-preferences"
+              id="preferences"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
               :aria-label="$t('settings.tabs.preferences')"
             >
+              <PrivacyCard />
               <TaskDisplayCard />
               <MapSettingsCard />
             </section>
             <section
+              v-if="visitedTabs.account"
+              v-show="activeTab === 'account'"
+              id="account"
+              class="scroll-mt-24 space-y-4"
+              role="tabpanel"
+              :aria-label="$t('settings.tabs.account')"
+            >
+              <ProfileSharingCard />
+              <AccountDeletionCard />
+              <div v-if="isAdmin" class="flex justify-center pt-4">
+                <NuxtLink
+                  to="/admin"
+                  class="hover:text-error-400 text-surface-500 flex items-center gap-1.5 text-xs transition-colors"
+                >
+                  <UIcon name="i-mdi-shield-crown" class="size-3.5" />
+                  {{ $t('settings.general.admin_panel') }}
+                </NuxtLink>
+              </div>
+            </section>
+            <section
               v-if="visitedTabs['data-management']"
               v-show="activeTab === 'data-management'"
-              id="settings-data-management"
+              id="data-management"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
               :aria-label="$t('settings.tabs.data_management')"
@@ -81,14 +111,18 @@
   </div>
 </template>
 <script setup lang="ts">
+  import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
+  import PrivacyCard from '@/features/settings/PrivacyCard.vue';
+  import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
+  import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import type { TabsProps } from '@nuxt/ui';
   useSeoMeta({
     title: 'Settings',
@@ -99,28 +133,67 @@
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
-  type SettingsTabId = 'progression' | 'preferences' | 'data-management' | 'api';
-  const settingsTabIds = ['progression', 'preferences', 'data-management', 'api'] as const;
+  const { hasInitiallyLoaded } = useSystemStoreWithSupabase();
+  const systemStore = useSystemStore();
+  type SettingsTabId =
+    | 'progression'
+    | 'prestige'
+    | 'preferences'
+    | 'account'
+    | 'data-management'
+    | 'api';
+  const settingsTabIds = [
+    'progression',
+    'prestige',
+    'preferences',
+    'account',
+    'data-management',
+    'api',
+  ] as const;
   const settingsTabHashes: Record<SettingsTabId, string> = {
-    progression: '#settings-progression',
-    preferences: '#settings-preferences',
-    'data-management': '#settings-data-management',
+    progression: '#progression',
+    prestige: '#prestige',
+    preferences: '#preferences',
+    account: '#account',
+    'data-management': '#data-management',
     api: '#api',
   };
   const nestedTabHashes: Record<string, SettingsTabId> = {
+    '#skills': 'progression',
+  };
+  const legacyTabHashes: Record<string, SettingsTabId> = {
+    '#settings-progression': 'progression',
+    '#settings-prestige': 'prestige',
+    '#settings-preferences': 'preferences',
+    '#settings-account': 'account',
+    '#settings-data-management': 'data-management',
     '#settings-skills': 'progression',
+  };
+  const hashTargetIds: Record<string, string> = {
+    '#settings-progression': 'progression',
+    '#settings-prestige': 'prestige',
+    '#settings-preferences': 'preferences',
+    '#settings-account': 'account',
+    '#settings-data-management': 'data-management',
+    '#settings-skills': 'skills',
   };
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
     return typeof value === 'string' && settingsTabIds.includes(value as SettingsTabId);
+  };
+  const getDefaultTabFromPath = (path: string): SettingsTabId => {
+    return path === '/account' ? 'account' : 'progression';
   };
   const resolveTabFromHash = (hash: string): SettingsTabId | null => {
     const topLevelMatch = Object.entries(settingsTabHashes).find(([, value]) => value === hash);
     if (topLevelMatch?.[0] && isSettingsTabId(topLevelMatch[0])) {
       return topLevelMatch[0];
     }
-    return nestedTabHashes[hash] ?? null;
+    return nestedTabHashes[hash] ?? legacyTabHashes[hash] ?? null;
   };
-  const activeTab = ref<SettingsTabId>(resolveTabFromHash(route.hash) ?? 'progression');
+  const resolveTabFromRoute = (path: string, hash: string): SettingsTabId => {
+    return resolveTabFromHash(hash) ?? getDefaultTabFromPath(path);
+  };
+  const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
   const settingsTabItems = computed(() => [
     {
       value: 'progression',
@@ -128,9 +201,19 @@
       icon: 'i-mdi-account-cog-outline',
     },
     {
+      value: 'prestige',
+      label: t('settings.tabs.prestige'),
+      icon: 'i-mdi-medal-outline',
+    },
+    {
       value: 'preferences',
       label: t('settings.tabs.preferences'),
       icon: 'i-mdi-tune-variant',
+    },
+    {
+      value: 'account',
+      label: t('settings.tabs.account'),
+      icon: 'i-mdi-account-circle-outline',
     },
     {
       value: 'data-management',
@@ -145,10 +228,13 @@
   ]);
   const visitedTabs = reactive<Record<SettingsTabId, boolean>>({
     progression: false,
+    prestige: false,
     preferences: false,
+    account: false,
     'data-management': false,
     api: false,
   });
+  const isAdmin = computed(() => hasInitiallyLoaded.value && systemStore.isAdmin);
   const mobileTabsUi: TabsProps['ui'] = {
     root: 'w-full',
     list: 'bg-surface-900 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 p-2 shadow-sm',
@@ -171,7 +257,7 @@
       return;
     }
     await nextTick();
-    const targetId = hash.startsWith('#') ? hash.slice(1) : hash;
+    const targetId = hashTargetIds[hash] ?? (hash.startsWith('#') ? hash.slice(1) : hash);
     if (!targetId) {
       return;
     }
@@ -207,12 +293,9 @@
     { immediate: true }
   );
   watch(
-    () => route.hash,
-    async (hash) => {
-      const nextTab = resolveTabFromHash(hash);
-      if (nextTab) {
-        activeTab.value = nextTab;
-      }
+    () => [route.path, route.hash] as const,
+    async ([path, hash]) => {
+      activeTab.value = resolveTabFromRoute(path, hash);
       if (hash) {
         await scrollToHashTarget(hash);
       }
