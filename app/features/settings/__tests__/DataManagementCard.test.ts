@@ -303,7 +303,7 @@ describe('DataManagementCard', () => {
   it('fetches tarkov.dev profile url and uses the url mode for import preview', async () => {
     tarkovDevFns.parseProfileUrl.mockResolvedValue({
       mode: 'pve',
-      profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+      profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
       tarkovUid: 8560316,
     });
     const wrapper = createWrapper();
@@ -365,7 +365,7 @@ describe('DataManagementCard', () => {
   it('refetches a linked tarkov.dev profile from the selected source mode', async () => {
     tarkovDevFns.parseProfileUrl.mockResolvedValue({
       mode: 'pve',
-      profileJsonUrl: 'https://players.tarkov.dev/profile/123456.json',
+      profileJsonUrl: 'https://players.tarkov.dev/pve/123456.json',
       tarkovUid: 123456,
     });
     tarkovStoreState.currentMode = 'pvp';
@@ -399,7 +399,7 @@ describe('DataManagementCard', () => {
     tarkovDevFns.parseProfileUrl.mockImplementation(async () => {
       return {
         mode: 'pve',
-        profileJsonUrl: 'https://players.tarkov.dev/profile/123456.json',
+        profileJsonUrl: 'https://players.tarkov.dev/pve/123456.json',
         tarkovUid: 123456,
       };
     });

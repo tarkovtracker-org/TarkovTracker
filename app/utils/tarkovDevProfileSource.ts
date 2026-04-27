@@ -1,5 +1,5 @@
 import { API_GAME_MODES, GAME_MODES, type GameMode } from '@/utils/constants';
-const PROFILE_JSON_BASE_URL = 'https://players.tarkov.dev/profile';
+const PROFILE_JSON_ORIGIN = 'https://players.tarkov.dev';
 const PROFILE_URL_ERROR =
   'Paste a Tarkov.dev player profile URL like https://tarkov.dev/players/regular/8560316.';
 const PROFILE_ID_ERROR = 'Tarkov.dev profile URL must include a valid numeric profile id.';
@@ -25,9 +25,10 @@ function modeFromProfileSlug(value: string | undefined): GameMode | null {
   return null;
 }
 function buildProfileSource(tarkovUid: number, mode: GameMode | null): TarkovDevProfileSource {
+  const profilePath = mode === GAME_MODES.PVE ? 'pve' : 'profile';
   return {
     mode,
-    profileJsonUrl: `${PROFILE_JSON_BASE_URL}/${tarkovUid}.json`,
+    profileJsonUrl: `${PROFILE_JSON_ORIGIN}/${profilePath}/${tarkovUid}.json`,
     tarkovUid,
   };
 }
@@ -51,7 +52,12 @@ export function resolveTarkovDevProfileSource(input: string): TarkovDevProfileSo
   if (host === 'players.tarkov.dev' && parts[0] === 'profile') {
     const tarkovUid = parseProfileId(parts[1]);
     if (tarkovUid === null) return { ok: false, error: PROFILE_ID_ERROR };
-    return { ok: true, data: buildProfileSource(tarkovUid, null) };
+    return { ok: true, data: buildProfileSource(tarkovUid, GAME_MODES.PVP) };
+  }
+  if (host === 'players.tarkov.dev' && parts[0] === 'pve') {
+    const tarkovUid = parseProfileId(parts[1]);
+    if (tarkovUid === null) return { ok: false, error: PROFILE_ID_ERROR };
+    return { ok: true, data: buildProfileSource(tarkovUid, GAME_MODES.PVE) };
   }
   return { ok: false, error: PROFILE_URL_ERROR };
 }

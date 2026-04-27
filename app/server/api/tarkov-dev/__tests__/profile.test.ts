@@ -97,6 +97,26 @@ describe('/api/tarkov-dev/profile', () => {
     );
     expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'Cache-Control': 'no-store' });
   });
+  it('fetches public pve profile json from a Tarkov.dev pve profile url', async () => {
+    getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/pve/8560316' });
+    fetchMock.mockResolvedValue({
+      json: async () => ({ aid: 8560316 }),
+      ok: true,
+      status: 200,
+    });
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual({ aid: 8560316 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://players.tarkov.dev/pve/8560316.json',
+      expect.objectContaining({
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'TarkovTracker/1.x (+https://tarkovtracker.org)',
+        },
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
   it('rejects requests when the profile proxy rate limit is exceeded', async () => {
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
     consumeSharedRateLimitMock.mockResolvedValue(false);

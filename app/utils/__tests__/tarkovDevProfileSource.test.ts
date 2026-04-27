@@ -15,15 +15,31 @@ describe('resolveTarkovDevProfileSource', () => {
     const result = resolveTarkovDevProfileSource('https://tarkov.dev/players/pve/8560316');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.mode).toBe('pve');
-    expect(result.data.tarkovUid).toBe(8560316);
+    expect(result.data).toEqual({
+      mode: 'pve',
+      profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
+      tarkovUid: 8560316,
+    });
   });
-  it('accepts the public profile json url', () => {
+  it('accepts the public pvp profile json url', () => {
     const result = resolveTarkovDevProfileSource('https://players.tarkov.dev/profile/8560316.json');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.mode).toBeNull();
-    expect(result.data.profileJsonUrl).toBe('https://players.tarkov.dev/profile/8560316.json');
+    expect(result.data).toEqual({
+      mode: 'pvp',
+      profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+      tarkovUid: 8560316,
+    });
+  });
+  it('accepts the public pve profile json url', () => {
+    const result = resolveTarkovDevProfileSource('https://players.tarkov.dev/pve/8560316.json');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual({
+      mode: 'pve',
+      profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
+      tarkovUid: 8560316,
+    });
   });
   it('rejects bare profile ids', () => {
     const result = resolveTarkovDevProfileSource('8560316');

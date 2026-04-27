@@ -144,6 +144,23 @@ describe('useTarkovDevImport', () => {
     expect(composable.previewData.value).toEqual(parsedData);
     expect(composable.importError.value).toBeNull();
   });
+  it('returns the pve public json source for a tarkov.dev pve profile url', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    const source = await composable.parseProfileUrl('https://tarkov.dev/players/pve/8560316');
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: { url: 'https://tarkov.dev/players/pve/8560316' },
+    });
+    expect(source).toEqual({
+      mode: 'pve',
+      profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
+      tarkovUid: 8560316,
+    });
+  });
   it('rejects invalid tarkov.dev profile urls before fetching', async () => {
     const composable = await loadComposable();
     const source = await composable.parseProfileUrl('https://example.com/players/regular/8560316');
