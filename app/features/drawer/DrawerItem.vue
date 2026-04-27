@@ -29,6 +29,7 @@
 </template>
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
+  import { isNavigationRouteActive } from '@/features/drawer/navigation';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const props = defineProps<{
@@ -41,12 +42,7 @@
     isCollapsed: boolean;
     badge?: string | null;
   }>();
-  const isActive = computed(() => {
-    if (props.to) {
-      return route.path === props.to;
-    }
-    return false;
-  });
+  const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
   const iconClasses = computed(() =>
     isActive.value ? 'text-white' : 'text-surface-300 group-hover:text-white'
   );

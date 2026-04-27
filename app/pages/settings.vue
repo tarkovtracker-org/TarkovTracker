@@ -41,6 +41,7 @@
               <DisplayNameCard />
               <ExperienceCard />
               <SkillsCard />
+              <ResetProgressCard />
             </section>
             <section
               v-if="visitedTabs.prestige"
@@ -85,14 +86,24 @@
               </div>
             </section>
             <section
-              v-if="visitedTabs['data-management']"
-              v-show="activeTab === 'data-management'"
-              id="data-management"
+              v-if="visitedTabs.imports"
+              v-show="activeTab === 'imports'"
+              id="imports"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.data_management')"
+              :aria-label="$t('settings.tabs.imports')"
             >
-              <DataManagementCard />
+              <DataManagementCard view="imports" />
+            </section>
+            <section
+              v-if="visitedTabs['backup-restore']"
+              v-show="activeTab === 'backup-restore'"
+              id="backup-restore"
+              class="scroll-mt-24 space-y-4"
+              role="tabpanel"
+              :aria-label="$t('settings.tabs.backup_restore')"
+            >
+              <DataManagementCard view="backup" />
             </section>
             <section
               v-if="visitedTabs.api"
@@ -120,16 +131,11 @@
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
   import PrivacyCard from '@/features/settings/PrivacyCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
+  import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
   import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import type { TabsProps } from '@nuxt/ui';
-  useSeoMeta({
-    title: 'Settings',
-    description:
-      'Customize your TarkovTracker experience. Manage preferences and gameplay settings.',
-    robots: 'noindex, nofollow',
-  });
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
@@ -140,22 +146,40 @@
     | 'prestige'
     | 'preferences'
     | 'account'
-    | 'data-management'
+    | 'imports'
+    | 'backup-restore'
     | 'api';
   const settingsTabIds = [
     'progression',
     'prestige',
     'preferences',
     'account',
-    'data-management',
+    'imports',
+    'backup-restore',
     'api',
   ] as const;
+  const settingsTabRoutes: Record<SettingsTabId, { path: string; hash: string }> = {
+    progression: { path: '/progression', hash: '' },
+    prestige: { path: '/prestige', hash: '' },
+    preferences: { path: '/preferences', hash: '' },
+    account: { path: '/account', hash: '' },
+    imports: { path: '/settings', hash: '#imports' },
+    'backup-restore': { path: '/settings', hash: '#backup-restore' },
+    api: { path: '/settings', hash: '#api' },
+  };
+  const settingsRouteTabs: Partial<Record<string, SettingsTabId>> = {
+    '/progression': 'progression',
+    '/prestige': 'prestige',
+    '/preferences': 'preferences',
+    '/account': 'account',
+  };
   const settingsTabHashes: Record<SettingsTabId, string> = {
     progression: '#progression',
     prestige: '#prestige',
     preferences: '#preferences',
     account: '#account',
-    'data-management': '#data-management',
+    imports: '#imports',
+    'backup-restore': '#backup-restore',
     api: '#api',
   };
   const nestedTabHashes: Record<string, SettingsTabId> = {
@@ -166,7 +190,10 @@
     '#settings-prestige': 'prestige',
     '#settings-preferences': 'preferences',
     '#settings-account': 'account',
-    '#settings-data-management': 'data-management',
+    '#data-management': 'imports',
+    '#settings-data-management': 'imports',
+    '#settings-imports': 'imports',
+    '#settings-backup-restore': 'backup-restore',
     '#settings-skills': 'progression',
   };
   const hashTargetIds: Record<string, string> = {
@@ -174,14 +201,17 @@
     '#settings-prestige': 'prestige',
     '#settings-preferences': 'preferences',
     '#settings-account': 'account',
-    '#settings-data-management': 'data-management',
+    '#data-management': 'imports',
+    '#settings-data-management': 'imports',
+    '#settings-imports': 'imports',
+    '#settings-backup-restore': 'backup-restore',
     '#settings-skills': 'skills',
   };
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
     return typeof value === 'string' && settingsTabIds.includes(value as SettingsTabId);
   };
   const getDefaultTabFromPath = (path: string): SettingsTabId => {
-    return path === '/account' ? 'account' : 'progression';
+    return settingsRouteTabs[path] ?? 'progression';
   };
   const resolveTabFromHash = (hash: string): SettingsTabId | null => {
     const topLevelMatch = Object.entries(settingsTabHashes).find(([, value]) => value === hash);
@@ -191,9 +221,52 @@
     return nestedTabHashes[hash] ?? legacyTabHashes[hash] ?? null;
   };
   const resolveTabFromRoute = (path: string, hash: string): SettingsTabId => {
-    return resolveTabFromHash(hash) ?? getDefaultTabFromPath(path);
+    return settingsRouteTabs[path] ?? resolveTabFromHash(hash) ?? getDefaultTabFromPath(path);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
+  const settingsTabSeo: Record<SettingsTabId, { title: string; description: string }> = {
+    progression: {
+      title: 'Progression Settings',
+      description: 'Manage TarkovTracker progression, display names, experience, and skills.',
+    },
+    prestige: {
+      title: 'Prestige Settings',
+      description: 'Review and manage TarkovTracker prestige tracking.',
+    },
+    preferences: {
+      title: 'Preferences',
+      description: 'Customize TarkovTracker display, privacy, task, and map preferences.',
+    },
+    account: {
+      title: 'Account',
+      description:
+        'Manage your TarkovTracker account options, sharing visibility, and data controls.',
+    },
+    imports: {
+      title: 'Import Settings',
+      description: 'Import TarkovTracker progress from Tarkov.dev profiles and EFT game logs.',
+    },
+    'backup-restore': {
+      title: 'Backup & Restore',
+      description: 'Export or restore TarkovTracker progress data and support snapshots.',
+    },
+    api: {
+      title: 'API Settings',
+      description: 'Manage TarkovTracker API tokens and account integrations.',
+    },
+  };
+  const indexableSettingsTabs: SettingsTabId[] = ['progression', 'prestige', 'preferences'];
+  const settingsSeo = computed(() => settingsTabSeo[activeTab.value]);
+  const settingsRobots = computed(() => {
+    return route.path !== '/settings' && indexableSettingsTabs.includes(activeTab.value)
+      ? 'index, follow'
+      : 'noindex, nofollow';
+  });
+  useSeoMeta({
+    title: computed(() => settingsSeo.value.title),
+    description: computed(() => settingsSeo.value.description),
+    robots: settingsRobots,
+  });
   const settingsTabItems = computed(() => [
     {
       value: 'progression',
@@ -216,9 +289,14 @@
       icon: 'i-mdi-account-circle-outline',
     },
     {
-      value: 'data-management',
-      label: t('settings.tabs.data_management'),
-      icon: 'i-mdi-database-cog-outline',
+      value: 'imports',
+      label: t('settings.tabs.imports'),
+      icon: 'i-mdi-database-import-outline',
+    },
+    {
+      value: 'backup-restore',
+      label: t('settings.tabs.backup_restore'),
+      icon: 'i-mdi-backup-restore',
     },
     {
       value: 'api',
@@ -231,7 +309,8 @@
     prestige: false,
     preferences: false,
     account: false,
-    'data-management': false,
+    imports: false,
+    'backup-restore': false,
     api: false,
   });
   const isAdmin = computed(() => hasInitiallyLoaded.value && systemStore.isAdmin);
@@ -275,13 +354,13 @@
       return;
     }
     activeTab.value = value;
-    const nextHash = settingsTabHashes[value];
-    if (route.hash === nextHash) {
+    const nextRoute = settingsTabRoutes[value];
+    if (route.path === nextRoute.path && route.hash === nextRoute.hash) {
       return;
     }
     void router.replace({
-      hash: nextHash,
-      path: route.path,
+      hash: nextRoute.hash,
+      path: nextRoute.path,
       query: route.query,
     });
   };

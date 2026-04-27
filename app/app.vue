@@ -49,6 +49,22 @@
   const { locale, t } = useI18n();
   const { public: publicConfig } = useRuntimeConfig();
   const siteUrl = (publicConfig.appUrl || 'https://tarkovtracker.org').replace(/\/$/, '');
+  const settingsHashCanonicalPaths: Record<string, string> = {
+    '#progression': '/progression',
+    '#settings-progression': '/progression',
+    '#prestige': '/prestige',
+    '#settings-prestige': '/prestige',
+    '#preferences': '/preferences',
+    '#settings-preferences': '/preferences',
+    '#account': '/account',
+    '#settings-account': '/account',
+  };
+  const canonicalPath = computed(() => {
+    if (route.path === '/settings') {
+      return settingsHashCanonicalPaths[route.hash] ?? route.path;
+    }
+    return route.path;
+  });
   useHeadSafe(() => ({
     htmlAttrs: {
       lang: locale.value,
@@ -65,12 +81,12 @@
       },
       {
         rel: 'canonical',
-        href: `${siteUrl}${route.path}`,
+        href: `${siteUrl}${canonicalPath.value}`,
       },
     ],
   }));
   useSeoMeta({
-    ogUrl: computed(() => `${siteUrl}${route.path}`),
+    ogUrl: computed(() => `${siteUrl}${canonicalPath.value}`),
     ogLocale: computed(() => locale.value),
   });
   const handlePageError = (error: unknown) => {

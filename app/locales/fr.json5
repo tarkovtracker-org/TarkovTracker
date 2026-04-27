@@ -1399,6 +1399,8 @@
       prestige: 'Prestige',
       preferences: 'Préférences',
       data_management: 'Gestion des données',
+      imports: 'Imports',
+      backup_restore: 'Sauvegarde et restauration',
       api: 'API',
     },
     density: {

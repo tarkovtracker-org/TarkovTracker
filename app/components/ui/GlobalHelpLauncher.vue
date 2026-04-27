@@ -304,7 +304,7 @@
           icon: 'i-mdi-database-import-outline',
           label: copy('page_help.onboarding.steps.import.actions.open', 'Open imports'),
           to: {
-            hash: '#data-management',
+            hash: '#imports',
             path: '/settings',
           },
         },

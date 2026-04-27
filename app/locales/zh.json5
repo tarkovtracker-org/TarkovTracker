@@ -1399,6 +1399,8 @@
       prestige: '声望',
       preferences: '偏好',
       data_management: '数据管理',
+      imports: '导入',
+      backup_restore: '备份和恢复',
       api: 'API',
     },
     density: {

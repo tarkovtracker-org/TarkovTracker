@@ -196,8 +196,9 @@ describe('DataManagementCard', () => {
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
   });
-  const createWrapper = () =>
+  const createWrapper = (props: { view?: 'all' | 'imports' | 'backup' } = {}) =>
     mount(DataManagementCard, {
+      props,
       global: {
         mocks: {
           $t: (key: string) => key,
@@ -230,6 +231,26 @@ describe('DataManagementCard', () => {
         },
       },
     });
+  it('limits the imports view to profile and log import actions', () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeTruthy();
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
+    ).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeUndefined();
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.debug_export_button')
+    ).toBeUndefined();
+  });
+  it('limits the backup view to backup and debug actions', () => {
+    const wrapper = createWrapper({ view: 'backup' });
+    expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.data_management.debug_export_button')).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
+    ).toBeUndefined();
+  });
   it('shows toast when export fails', async () => {
     backupState.exportError.value = 'Export failed';
     backupFns.exportProgress.mockImplementation(async () => {

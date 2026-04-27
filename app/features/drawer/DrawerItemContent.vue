@@ -65,6 +65,7 @@
   </span>
 </template>
 <script setup lang="ts">
+  import { isNavigationRouteActive } from '@/features/drawer/navigation';
   import { logger } from '@/utils/logger';
   const props = defineProps<{
     to?: string | null;
@@ -91,5 +92,5 @@
   const isDisabled = computed(() => props.disabled ?? (!props.to && !props.href));
   const isNuxtLink = computed(() => !isDisabled.value && !!props.to && !props.href);
   const isAnchor = computed(() => !isDisabled.value && !isNuxtLink.value && !!props.href);
-  const isActive = computed(() => (props.to ? route.path === props.to : false));
+  const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
 </script>
