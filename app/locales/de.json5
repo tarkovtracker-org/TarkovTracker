@@ -1828,6 +1828,7 @@
       skills_details_value: 'Stufe',
       edition_guess: 'Edition (erkannt)',
       import_to_mode: 'In Modus importieren',
+      import_target_notice: 'Diese Daten werden in dein {mode}-Profil importiert.',
       confirm: 'Import bestätigen',
       cancel: 'Abbrechen',
       success_title: 'Profil importiert',

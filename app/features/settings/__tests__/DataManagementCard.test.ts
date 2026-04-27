@@ -385,6 +385,38 @@ describe('DataManagementCard', () => {
       'pve'
     );
   });
+  it('shows the locked tarkov.dev target mode after refetching a mode-specific profile', async () => {
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'Tester',
+      gameEditionGuess: null,
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      skills: {},
+      tarkovUid: 123456,
+      totalXP: 0,
+    };
+    tarkovDevFns.parseProfileUrl.mockImplementation(async () => {
+      return {
+        mode: 'pve',
+        profileJsonUrl: 'https://players.tarkov.dev/profile/123456.json',
+        tarkovUid: 123456,
+      };
+    });
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    asVm<{ selectTarkovDevRefetchMode: (mode: 'pve') => void }>(
+      wrapper.vm
+    ).selectTarkovDevRefetchMode('pve');
+    await asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(
+      wrapper.vm
+    ).handleTarkovDevRefetch();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain(
+      'settings.tarkov_dev_import.import_target_notice:{"mode":"settings.game_settings.pve"}'
+    );
+    expect(wrapper.text()).not.toContain('settings.tarkov_dev_import.import_to_mode');
+  });
   it('shows arena as disabled for linked tarkov.dev refetches', () => {
     tarkovStoreState.tarkovUid = 123456;
     const wrapper = createWrapper();

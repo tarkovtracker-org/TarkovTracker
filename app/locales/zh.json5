@@ -1828,6 +1828,7 @@
       skills_details_value: '等级',
       edition_guess: '版本（已检测）',
       import_to_mode: '导入到模式',
+      import_target_notice: '此数据将导入到你的 {mode} 资料。',
       confirm: '确认导入',
       cancel: '取消',
       success_title: '资料已导入',

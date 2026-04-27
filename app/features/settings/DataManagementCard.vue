@@ -215,7 +215,18 @@
                 </div>
               </div>
             </div>
-            <div class="space-y-1">
+            <div
+              v-if="tarkovDevFixedTargetMode"
+              class="bg-surface-900/80 rounded-md border border-white/10 px-3 py-2"
+            >
+              <div class="flex items-start gap-2">
+                <UIcon name="i-mdi-target-account" class="text-info-300 mt-0.5 h-4 w-4 shrink-0" />
+                <p class="text-surface-200 text-sm">
+                  {{ tarkovDevImportTargetNotice }}
+                </p>
+              </div>
+            </div>
+            <div v-else class="space-y-1">
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.tarkov_dev_import.import_to_mode') }}
               </label>
@@ -915,9 +926,10 @@
     importError: tarkovDevImportError,
     parseProfileUrl: parseTarkovDevProfileUrl,
     confirmImport: confirmTarkovDevImport,
-    reset: resetTarkovDevImport,
+    reset: resetTarkovDevImportState,
   } = useTarkovDevImport();
   const tarkovDevProfileUrlInput = ref('');
+  const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
   const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(tarkovStore.getCurrentGameMode());
   const isTarkovDevProfileUrlBlank = computed(
@@ -1015,8 +1027,28 @@
     );
   }
   const editionLabel = computed(() => getEditionLabel(tarkovDevPreview.value?.gameEditionGuess));
+  const tarkovDevFixedTargetModeLabel = computed(() =>
+    tarkovDevFixedTargetMode.value === GAME_MODES.PVE
+      ? t('settings.game_settings.pve')
+      : t('settings.game_settings.pvp')
+  );
+  const tarkovDevImportTargetNotice = computed(() =>
+    t('settings.tarkov_dev_import.import_target_notice', {
+      mode: tarkovDevFixedTargetModeLabel.value,
+    })
+  );
   function showEftLogsFolderInput() {
     eftLogsFolderInputRef.value?.click();
+  }
+  function updateTarkovDevImportTarget(
+    sourceMode: GameMode | null | undefined,
+    fallbackMode?: GameMode
+  ) {
+    const targetMode = sourceMode ?? fallbackMode ?? null;
+    tarkovDevFixedTargetMode.value = targetMode;
+    if (!targetMode) return;
+    tarkovDevRefetchMode.value = targetMode;
+    tarkovDevTargetMode.value = targetMode;
   }
   function selectTarkovDevRefetchMode(mode: TarkovDevRefetchMode) {
     if (!isTarkovDevImportableMode(mode)) return;
@@ -1025,26 +1057,26 @@
   }
   async function handleTarkovDevProfileUrlSubmit() {
     const source = await parseTarkovDevProfileUrl(tarkovDevProfileUrlInput.value);
-    if (source?.mode) {
-      tarkovDevRefetchMode.value = source.mode;
-      tarkovDevTargetMode.value = source.mode;
-    }
+    updateTarkovDevImportTarget(source?.mode);
   }
   async function handleTarkovDevRefetch() {
-    if (!isTarkovDevImportableMode(tarkovDevRefetchMode.value)) return;
+    const refetchMode = tarkovDevRefetchMode.value;
+    if (!isTarkovDevImportableMode(refetchMode)) return;
     const linkedProfileUrl = tarkovDevProfileUrl.value;
     if (!linkedProfileUrl) return;
     const source = await parseTarkovDevProfileUrl(linkedProfileUrl);
-    if (source?.mode) {
-      tarkovDevRefetchMode.value = source.mode;
-      tarkovDevTargetMode.value = source.mode;
-    }
+    updateTarkovDevImportTarget(source?.mode, source ? refetchMode : undefined);
   }
   function handleTarkovDevUnlink() {
+    tarkovDevFixedTargetMode.value = null;
     tarkovStore.setTarkovUid(null);
   }
   async function handleTarkovDevConfirm() {
-    await confirmTarkovDevImport(tarkovDevTargetMode.value);
+    await confirmTarkovDevImport(tarkovDevFixedTargetMode.value ?? tarkovDevTargetMode.value);
+  }
+  function resetTarkovDevImport() {
+    tarkovDevFixedTargetMode.value = null;
+    resetTarkovDevImportState();
   }
   async function handleEftLogsFolderChange(event: Event) {
     const input = event.target as HTMLInputElement;

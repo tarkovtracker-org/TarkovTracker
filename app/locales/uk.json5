@@ -1828,6 +1828,7 @@
       skills_details_value: 'Рівень',
       edition_guess: 'Видання (визначено)',
       import_to_mode: 'Імпортувати в режим',
+      import_target_notice: 'Ці дані буде імпортовано у ваш профіль {mode}.',
       confirm: 'Підтвердити імпорт',
       cancel: 'Скасувати',
       success_title: 'Профіль імпортовано',

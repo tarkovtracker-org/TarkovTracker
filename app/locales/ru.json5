@@ -1828,6 +1828,7 @@
       skills_details_value: 'Уровень',
       edition_guess: 'Издание (определено)',
       import_to_mode: 'Импортировать в режим',
+      import_target_notice: 'Эти данные будут импортированы в ваш профиль {mode}.',
       confirm: 'Подтвердить импорт',
       cancel: 'Отмена',
       success_title: 'Профиль импортирован',

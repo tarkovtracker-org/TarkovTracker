@@ -1828,6 +1828,7 @@
       skills_details_value: 'Nivel',
       edition_guess: 'Edición (detectada)',
       import_to_mode: 'Importar al modo',
+      import_target_notice: 'Estos datos se importarán en tu perfil {mode}.',
       confirm: 'Confirmar importación',
       cancel: 'Cancelar',
       success_title: 'Perfil importado',
