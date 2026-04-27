@@ -11,6 +11,7 @@ const {
   tarkovDevState,
   toastAddMock,
   tarkovStoreState,
+  mockLogger,
 } = vi.hoisted(() => ({
   backupFns: {
     confirmBackupImport: vi.fn(async () => undefined),
@@ -40,6 +41,7 @@ const {
       } | null>
     >(async () => null),
     reset: vi.fn(),
+    setError: vi.fn<(message: string) => void>(),
   },
   tarkovDevState: {
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -65,6 +67,12 @@ const {
     },
   },
   toastAddMock: vi.fn(),
+  mockLogger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
   tarkovStoreState: {
     currentMode: 'pvp' as 'pvp' | 'pve',
     setTarkovUid: vi.fn<(uid: number | null) => void>(),
@@ -73,6 +81,9 @@ const {
 }));
 mockNuxtImport('useToast', () => () => ({
   add: toastAddMock,
+}));
+vi.mock('@/utils/logger', () => ({
+  logger: mockLogger,
 }));
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({
@@ -96,6 +107,7 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
     parseFile: tarkovDevFns.parseFile,
     parseProfileUrl: tarkovDevFns.parseProfileUrl,
     confirmImport: tarkovDevFns.confirmImport,
+    setError: tarkovDevFns.setError,
     reset: tarkovDevFns.reset,
   }),
 }));
@@ -172,6 +184,7 @@ describe('DataManagementCard', () => {
     tarkovDevFns.parseFile.mockReset();
     tarkovDevFns.parseProfileUrl.mockReset();
     tarkovDevFns.reset.mockReset();
+    tarkovDevFns.setError.mockReset();
     eftLogsFns.confirmImport.mockReset();
     eftLogsFns.parseFile.mockReset();
     eftLogsFns.parseFiles.mockReset();
@@ -182,6 +195,7 @@ describe('DataManagementCard', () => {
       tarkovStoreState.tarkovUid = uid;
     });
     toastAddMock.mockReset();
+    mockLogger.error.mockReset();
     backupState.debugExportError.value = null;
     backupState.exportError.value = null;
     backupState.importError.value = null;
@@ -195,6 +209,11 @@ describe('DataManagementCard', () => {
     eftLogsState.previewData.value = null;
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
+    tarkovDevFns.setError.mockImplementation((message: string) => {
+      tarkovDevState.importError.value = message;
+      tarkovDevState.importState.value = 'error';
+      tarkovDevState.previewData.value = null;
+    });
   });
   const createWrapper = (props: { view?: 'all' | 'imports' | 'backup' } = {}) =>
     mount(DataManagementCard, {
@@ -208,8 +227,14 @@ describe('DataManagementCard', () => {
           GenericCard: {
             template: '<div><slot name="content" /></div>',
           },
+          'i18n-t': {
+            template: '<p><slot name="link" /></p>',
+          },
           ResetProgressSection: true,
-          UAlert: true,
+          UAlert: {
+            props: ['description', 'title'],
+            template: '<div><span>{{ title }}</span><span>{{ description }}</span></div>',
+          },
           UButton,
           UIcon: true,
           UInput: {
@@ -362,6 +387,67 @@ describe('DataManagementCard', () => {
       false
     );
   });
+  it('blocks backup controls while a shared imports flow is loading', () => {
+    tarkovDevState.importState.value = 'loading';
+    const wrapper = createWrapper({ view: 'backup' });
+    expect(wrapper.text()).toContain('settings.data_management.active_flow_blocked_title');
+    expect(wrapper.text()).toContain(
+      'settings.data_management.active_flow_blocked_description:{"flow":"settings.data_management.flow_tarkov_dev"}'
+    );
+    expect(findButtonByText(wrapper, 'settings.data_management.import_backup_button')).toBe(
+      undefined
+    );
+  });
+  it('blocks imports controls while a shared backup restore is active', () => {
+    backupState.importState.value = 'preview';
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(wrapper.text()).toContain('settings.data_management.active_flow_blocked_title');
+    expect(wrapper.text()).toContain(
+      'settings.data_management.active_flow_blocked_description:{"flow":"settings.data_management.flow_backup"}'
+    );
+    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
+    ).toBeUndefined();
+  });
+  it('puts tarkov.dev submit failures into a safe error state', async () => {
+    tarkovDevFns.parseProfileUrl.mockRejectedValue(new Error('submit failed'));
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/regular/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.setError).toHaveBeenCalledWith(
+      'settings.tarkov_dev_import.errors.unexpected_profile_flow'
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'DataManagementCard: Tarkov.dev profile flow failed',
+      expect.objectContaining({
+        action: 'profile_url_submit',
+        feature: 'settings.data_management',
+      })
+    );
+  });
+  it('puts tarkov.dev refetch failures into a safe error state', async () => {
+    tarkovDevFns.parseProfileUrl.mockRejectedValue(new Error('refetch failed'));
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    await asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(
+      wrapper.vm
+    ).handleTarkovDevRefetch();
+    expect(tarkovDevFns.setError).toHaveBeenCalledWith(
+      'settings.tarkov_dev_import.errors.unexpected_profile_flow'
+    );
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'DataManagementCard: Tarkov.dev profile flow failed',
+      expect.objectContaining({
+        action: 'profile_refetch',
+        feature: 'settings.data_management',
+      })
+    );
+  });
   it('refetches a linked tarkov.dev profile from the selected source mode', async () => {
     tarkovDevFns.parseProfileUrl.mockResolvedValue({
       mode: 'pve',
@@ -431,6 +517,29 @@ describe('DataManagementCard', () => {
     expect(tarkovStoreState.tarkovUid).toBeNull();
     expect(backupFns.resetImport).not.toHaveBeenCalled();
     expect(tarkovDevFns.reset).not.toHaveBeenCalled();
+  });
+  it('unlink resets refetch mode back to the current game mode', () => {
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    asVm<{ selectTarkovDevRefetchMode: (mode: 'pve') => void }>(
+      wrapper.vm
+    ).selectTarkovDevRefetchMode('pve');
+    expect(tarkovStoreState.currentMode).toBe('pvp');
+    asVm<{ handleTarkovDevUnlink: () => void }>(wrapper.vm).handleTarkovDevUnlink();
+    // The unlink handler resets refetchMode to currentGameMode (pvp).
+    expect(tarkovStoreState.setTarkovUid).toHaveBeenCalledWith(null);
+  });
+  it('resetTarkovDevImport clears fixed target mode and resets import state', () => {
+    tarkovDevState.importState.value = 'preview';
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      tarkovDevFixedTargetMode: 'pvp' | 'pve' | null;
+      resetTarkovDevImport: () => void;
+    }>(wrapper.vm);
+    vm.tarkovDevFixedTargetMode = 'pve';
+    vm.resetTarkovDevImport();
+    expect(vm.tarkovDevFixedTargetMode).toBeNull();
+    expect(tarkovDevFns.reset).toHaveBeenCalled();
   });
   it('keeps parsed tarkov.dev skill values collapsed behind preview details', () => {
     tarkovDevState.importState.value = 'preview';

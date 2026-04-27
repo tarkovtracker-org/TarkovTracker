@@ -1403,6 +1403,10 @@
       backup_restore: 'Sauvegarde et restauration',
       api: 'API',
     },
+    tab_groups: {
+      game: 'Jeu',
+      account_advanced: 'Compte et avancé',
+    },
     density: {
       compact: 'Compact',
       comfortable: 'Confortable',
@@ -1526,6 +1530,12 @@
       import_tarkovdev_button: 'Importer un profil Tarkov.dev',
       import_eft_logs_folder_button: 'Importer le dossier de journaux EFT',
       recommended_badge: 'Recommandé',
+      active_flow_blocked_title: 'Terminez d’abord le flux de données en cours',
+      active_flow_blocked_description: 'Terminez ou annulez {flow} avant de lancer un autre import ou une restauration.',
+      flow_data: 'le flux de données en cours',
+      flow_tarkov_dev: 'l’import du profil Tarkov.dev',
+      flow_eft_logs: 'l’import des journaux EFT',
+      flow_backup: 'la restauration de sauvegarde',
       tarkov_dev_section_description: 'Importer les métadonnées du profil, notamment le niveau, la faction et les compétences',
       eft_logs_section_title: 'Importer les journaux du jeu EFT',
       eft_logs_section_description: 'Importer la progression des quêtes détectée dans les fichiers journaux du jeu',
@@ -1813,6 +1823,7 @@
       title: 'Import du profil Tarkov.dev',
       profile_url_label: 'URL du profil Tarkov.dev',
       profile_url_placeholder: 'https://tarkov.dev/players/regular/8560316',
+      profile_url_hint: 'Trouvez votre profil sur {link}, ouvrez le profil PvP ou PvE correspondant, puis collez ici l’URL de cette page.',
       profile_url_hint_before_link: 'Trouvez votre profil sur',
       profile_url_hint_link: 'tarkov.dev/players',
       profile_url_hint_after_link: ", ouvrez le profil PvP ou PvE correspondant, puis collez ici l'URL de cette page.",
@@ -1844,6 +1855,9 @@
       refetch_profile: 'Récupérer à nouveau',
       unlink_profile: 'Dissocier',
       view_profile: 'Voir sur Tarkov.dev',
+      errors: {
+        unexpected_profile_flow: 'Un problème est survenu pendant la récupération du profil Tarkov.dev. Réessayez.',
+      },
     },
   },
   hideout: {

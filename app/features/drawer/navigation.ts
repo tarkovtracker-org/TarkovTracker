@@ -1,4 +1,7 @@
-const SETTINGS_ROUTE_PATHS = new Set([
+// Central registry of all settings-related route paths.
+// Used by the navigation active-state logic and canonical URL resolution.
+// Must be kept in sync when adding/removing settings tabs.
+export const SETTINGS_ROUTE_PATHS = new Set([
   '/settings',
   '/account',
   '/progression',

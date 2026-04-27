@@ -1,7 +1,16 @@
 <template>
+  <UAlert
+    v-if="isBlockedByOtherDataFlow"
+    icon="i-mdi-progress-clock"
+    color="warning"
+    variant="soft"
+    :title="$t('settings.data_management.active_flow_blocked_title')"
+    :description="activeDataFlowBlockedDescription"
+    class="mb-4"
+  />
   <template v-if="showImportTools">
     <GenericCard
-      v-if="!isBackupOrEftLogsImportPreviewActive"
+      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive"
       icon="mdi-account-arrow-up"
       icon-color="info"
       highlight-color="info"
@@ -96,18 +105,22 @@
               class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3"
               @submit.prevent="handleTarkovDevProfileUrlSubmit"
             >
-              <p class="text-surface-400 text-sm">
-                {{ $t('settings.tarkov_dev_import.profile_url_hint_before_link') }}
-                <a
-                  href="https://tarkov.dev/players"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-info-300 hover:text-info-200 underline"
-                >
-                  {{ $t('settings.tarkov_dev_import.profile_url_hint_link') }}
-                </a>
-                {{ $t('settings.tarkov_dev_import.profile_url_hint_after_link') }}
-              </p>
+              <i18n-t
+                keypath="settings.tarkov_dev_import.profile_url_hint"
+                tag="p"
+                class="text-surface-400 text-sm"
+              >
+                <template #link>
+                  <a
+                    href="https://tarkov.dev/players"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-info-300 hover:text-info-200 underline"
+                  >
+                    {{ $t('settings.tarkov_dev_import.profile_url_hint_link') }}
+                  </a>
+                </template>
+              </i18n-t>
               <p class="text-surface-500 text-xs">
                 {{ $t('settings.tarkov_dev_import.profile_url_refresh_hint') }}
               </p>
@@ -283,7 +296,7 @@
       </template>
     </GenericCard>
     <GenericCard
-      v-if="!isTarkovDevImportPreviewActive"
+      v-if="!isBlockedByOtherDataFlow && !isTarkovDevImportPreviewActive"
       icon="mdi-folder-upload-outline"
       icon-color="info"
       highlight-color="info"
@@ -586,7 +599,7 @@
   </template>
   <template v-if="showBackupTools">
     <GenericCard
-      v-if="!isTarkovDevImportPreviewActive && !isEftLogsPreviewActive"
+      v-if="!isBlockedByOtherDataFlow && !isTarkovDevImportPreviewActive && !isEftLogsPreviewActive"
       icon="mdi-backup-restore"
       icon-color="primary"
       highlight-color="primary"
@@ -630,6 +643,7 @@
                   :ui="{
                     base: 'bg-primary-900 hover:bg-primary-800 active:bg-primary-700 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
+                  :disabled="isAnyImportActive"
                   @click="handleExportProgress"
                 >
                   {{ $t('settings.data_management.export_button') }}
@@ -798,6 +812,7 @@
       </template>
     </GenericCard>
     <GenericCard
+      v-if="!isBlockedByOtherDataFlow"
       icon="mdi-bug-outline"
       icon-color="warning"
       highlight-color="warning"
@@ -816,6 +831,7 @@
             :ui="{
               base: 'bg-warning-900 hover:bg-warning-800 active:bg-warning-700 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
             }"
+            :disabled="isAnyImportActive"
             @click="handleExportDebugSnapshot"
           >
             {{ $t('settings.data_management.debug_export_button') }}
@@ -827,10 +843,11 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
-  import { useDataBackup } from '@/composables/useDataBackup';
-  import { useEftLogsImport } from '@/composables/useEftLogsImport';
-  import { useTarkovDevImport } from '@/composables/useTarkovDevImport';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
+  import {
+    useDataManagementSession,
+    type DataManagementSession,
+  } from '@/features/settings/useDataManagementSession';
   import {
     useMetadataStore,
     type MetadataStore,
@@ -851,15 +868,18 @@
   const { t } = useI18n({ useScope: 'global' });
   const props = withDefaults(
     defineProps<{
+      session?: DataManagementSession;
       view?: DataManagementView;
     }>(),
     {
+      session: undefined,
       view: 'all',
     }
   );
   const toast = useToast();
   const tarkovStore = useTarkovStore();
   const metadataStore: MetadataStore = useMetadataStore();
+  const dataManagementSession = props.session ?? useDataManagementSession();
   const {
     exportProgress,
     exportError: backupExportError,
@@ -871,7 +891,7 @@
     parseBackupFile,
     confirmBackupImport,
     resetImport: resetBackupImport,
-  } = useDataBackup();
+  } = dataManagementSession.backup;
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
   const importTarget = ref<'pvp' | 'pve' | 'both'>('both');
   async function handleExportProgress() {
@@ -926,8 +946,9 @@
     importError: tarkovDevImportError,
     parseProfileUrl: parseTarkovDevProfileUrl,
     confirmImport: confirmTarkovDevImport,
+    setError: setTarkovDevImportError,
     reset: resetTarkovDevImportState,
-  } = useTarkovDevImport();
+  } = dataManagementSession.tarkovDev;
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
@@ -944,7 +965,7 @@
     setIncludedVersions: setEftLogsIncludedVersions,
     confirmImport: confirmEftLogsImport,
     reset: resetEftLogsImport,
-  } = useEftLogsImport();
+  } = dataManagementSession.eftLogs;
   const eftDefaultLogsPath = computed(() => t('settings.log_import.default_path_value'));
   const eftSessionFolderExamplePath = computed(() =>
     t('settings.log_import.session_folder_example_path')
@@ -1056,19 +1077,37 @@
     tarkovDevTargetMode.value = mode;
   }
   async function handleTarkovDevProfileUrlSubmit() {
-    const source = await parseTarkovDevProfileUrl(tarkovDevProfileUrlInput.value);
-    updateTarkovDevImportTarget(source?.mode);
+    try {
+      const source = await parseTarkovDevProfileUrl(tarkovDevProfileUrlInput.value);
+      updateTarkovDevImportTarget(source?.mode);
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_url_submit', err);
+    }
   }
   async function handleTarkovDevRefetch() {
-    const refetchMode = tarkovDevRefetchMode.value;
-    if (!isTarkovDevImportableMode(refetchMode)) return;
-    const linkedProfileUrl = tarkovDevProfileUrl.value;
-    if (!linkedProfileUrl) return;
-    const source = await parseTarkovDevProfileUrl(linkedProfileUrl);
-    updateTarkovDevImportTarget(source?.mode, source ? refetchMode : undefined);
+    try {
+      const refetchMode = tarkovDevRefetchMode.value;
+      if (!isTarkovDevImportableMode(refetchMode)) return;
+      const linkedProfileUrl = tarkovDevProfileUrl.value;
+      if (!linkedProfileUrl) return;
+      const source = await parseTarkovDevProfileUrl(linkedProfileUrl);
+      updateTarkovDevImportTarget(source?.mode, source ? refetchMode : undefined);
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_refetch', err);
+    }
+  }
+  function handleTarkovDevUnexpectedError(action: string, err: unknown) {
+    tarkovDevFixedTargetMode.value = null;
+    setTarkovDevImportError(t('settings.tarkov_dev_import.errors.unexpected_profile_flow'));
+    logger.error('DataManagementCard: Tarkov.dev profile flow failed', {
+      action,
+      error: err,
+      feature: 'settings.data_management',
+    });
   }
   function handleTarkovDevUnlink() {
     tarkovDevFixedTargetMode.value = null;
+    tarkovDevRefetchMode.value = tarkovStore.getCurrentGameMode();
     tarkovStore.setTarkovUid(null);
   }
   async function handleTarkovDevConfirm() {
@@ -1208,6 +1247,40 @@
   const showBackupTools = computed(() => props.view === 'all' || props.view === 'backup');
   const isTarkovDevImportPreviewActive = computed(() => tarkovDevImportState.value === 'preview');
   const isEftLogsPreviewActive = computed(() => eftLogsImportState.value === 'preview');
+  type ActiveDataFlow = 'backup' | 'eft-logs' | 'tarkov-dev';
+  const activeDataFlow = computed<ActiveDataFlow | null>(() => {
+    if (tarkovDevImportState.value === 'loading' || isTarkovDevImportPreviewActive.value) {
+      return 'tarkov-dev';
+    }
+    if (isEftLogsPreviewActive.value) {
+      return 'eft-logs';
+    }
+    if (backupImportState.value === 'preview') {
+      return 'backup';
+    }
+    return null;
+  });
+  const visibleDataFlows = computed<ActiveDataFlow[]>(() => {
+    if (props.view === 'imports') return ['eft-logs', 'tarkov-dev'];
+    if (props.view === 'backup') return ['backup'];
+    return ['backup', 'eft-logs', 'tarkov-dev'];
+  });
+  const isBlockedByOtherDataFlow = computed(
+    () => activeDataFlow.value !== null && !visibleDataFlows.value.includes(activeDataFlow.value)
+  );
+  const activeDataFlowLabel = computed(() => {
+    if (activeDataFlow.value === 'backup') return t('settings.data_management.flow_backup');
+    if (activeDataFlow.value === 'eft-logs') return t('settings.data_management.flow_eft_logs');
+    if (activeDataFlow.value === 'tarkov-dev') {
+      return t('settings.data_management.flow_tarkov_dev');
+    }
+    return t('settings.data_management.flow_data');
+  });
+  const activeDataFlowBlockedDescription = computed(() =>
+    t('settings.data_management.active_flow_blocked_description', {
+      flow: activeDataFlowLabel.value,
+    })
+  );
   const isBackupOrEftLogsImportPreviewActive = computed(
     () => backupImportState.value === 'preview' || isEftLogsPreviewActive.value
   );

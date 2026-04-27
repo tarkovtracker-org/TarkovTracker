@@ -1403,6 +1403,10 @@
       backup_restore: 'Backup & Restore',
       api: 'API',
     },
+    tab_groups: {
+      game: 'Game',
+      account_advanced: 'Account & Advanced',
+    },
     density: {
       compact: 'Compact',
       comfortable: 'Comfortable',
@@ -1507,6 +1511,12 @@
       import_tarkovdev_button: 'Import Tarkov.dev Profile',
       import_eft_logs_folder_button: 'Import EFT Logs Folder',
       recommended_badge: 'Recommended',
+      active_flow_blocked_title: 'Finish the current data flow first',
+      active_flow_blocked_description: 'Finish or cancel {flow} before starting another import or backup.',
+      flow_data: 'the current data flow',
+      flow_tarkov_dev: 'Tarkov.dev profile import',
+      flow_eft_logs: 'EFT logs import',
+      flow_backup: 'backup restore',
       tarkov_dev_section_description: 'Import profile metadata including level, faction, and skills',
       eft_logs_section_title: 'EFT Game Logs Import',
       eft_logs_section_description: 'Import quest progress detected from your game log files',
@@ -1813,6 +1823,7 @@
       title: 'Tarkov.dev Profile Import',
       profile_url_label: 'Tarkov.dev profile URL',
       profile_url_placeholder: 'https://tarkov.dev/players/regular/8560316',
+      profile_url_hint: 'Find your profile at {link}, open the matching PvP or PvE profile, then paste that page URL here.',
       profile_url_hint_before_link: 'Find your profile at',
       profile_url_hint_link: 'tarkov.dev/players',
       profile_url_hint_after_link: ', open the matching PvP or PvE profile, then paste that page URL here.',
@@ -1844,6 +1855,9 @@
       refetch_profile: 'Refetch Profile',
       unlink_profile: 'Unlink',
       view_profile: 'View on Tarkov.dev',
+      errors: {
+        unexpected_profile_flow: 'Something went wrong while fetching the Tarkov.dev profile. Try again.',
+      },
     },
   },
   hideout: {

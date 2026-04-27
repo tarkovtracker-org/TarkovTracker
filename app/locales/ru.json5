@@ -1403,6 +1403,10 @@
       backup_restore: 'Резервные копии',
       api: 'API',
     },
+    tab_groups: {
+      game: 'Игра',
+      account_advanced: 'Аккаунт и расширенное',
+    },
     density: {
       compact: 'Компактная',
       comfortable: 'Комфортная',
@@ -1526,6 +1530,12 @@
       import_tarkovdev_button: 'Импортировать профиль Tarkov.dev',
       import_eft_logs_folder_button: 'Импортировать папку логов EFT',
       recommended_badge: 'Рекомендуется',
+      active_flow_blocked_title: 'Сначала завершите текущий поток данных',
+      active_flow_blocked_description: 'Завершите или отмените {flow}, прежде чем начинать другой импорт или восстановление.',
+      flow_data: 'текущий поток данных',
+      flow_tarkov_dev: 'импорт профиля Tarkov.dev',
+      flow_eft_logs: 'импорт логов EFT',
+      flow_backup: 'восстановление из резервной копии',
       tarkov_dev_section_description: 'Импортировать метаданные профиля, включая уровень, фракцию и навыки',
       eft_logs_section_title: 'Импорт логов игры EFT',
       eft_logs_section_description: 'Импортировать прогресс заданий из файлов игровых логов',
@@ -1813,6 +1823,7 @@
       title: 'Импорт профиля Tarkov.dev',
       profile_url_label: 'URL профиля Tarkov.dev',
       profile_url_placeholder: 'https://tarkov.dev/players/regular/8560316',
+      profile_url_hint: 'Найдите свой профиль на {link}, откройте подходящий профиль PvP или PvE, затем вставьте URL этой страницы сюда.',
       profile_url_hint_before_link: 'Найдите свой профиль на',
       profile_url_hint_link: 'tarkov.dev/players',
       profile_url_hint_after_link: ', откройте подходящий профиль PvP или PvE, затем вставьте URL этой страницы сюда.',
@@ -1844,6 +1855,9 @@
       refetch_profile: 'Обновить профиль',
       unlink_profile: 'Отвязать',
       view_profile: 'Открыть на Tarkov.dev',
+      errors: {
+        unexpected_profile_flow: 'Что-то пошло не так при загрузке профиля Tarkov.dev. Попробуйте ещё раз.',
+      },
     },
   },
   hideout: {

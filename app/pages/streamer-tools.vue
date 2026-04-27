@@ -21,7 +21,7 @@
             color="neutral"
             variant="soft"
             size="sm"
-            to="/settings#account"
+            to="/account"
           >
             {{ t('streamer_tools.manage_sharing', 'Manage Sharing') }}
           </UButton>
@@ -62,12 +62,7 @@
         >
           <template #description>
             <div class="mt-2">
-              <UButton
-                icon="i-mdi-account-cog"
-                color="warning"
-                variant="solid"
-                to="/settings#account"
-              >
+              <UButton icon="i-mdi-account-cog" color="warning" variant="solid" to="/account">
                 {{ t('streamer_tools.open_account_settings', 'Open Account Settings') }}
               </UButton>
             </div>

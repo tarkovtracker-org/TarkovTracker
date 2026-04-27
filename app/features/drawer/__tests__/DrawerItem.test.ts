@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DrawerItem from '@/features/drawer/DrawerItem.vue';
 const routeState = {
   path: '/settings',
@@ -40,6 +40,13 @@ const mountSettingsDrawerItem = () => {
   });
 };
 describe('DrawerItem', () => {
+  const originalPath = routeState.path;
+  beforeEach(() => {
+    routeState.path = '/settings';
+  });
+  afterEach(() => {
+    routeState.path = originalPath;
+  });
   it.each(['/settings', '/account', '/prestige', '/preferences', '/progression'])(
     'marks settings active on %s',
     (path) => {

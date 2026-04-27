@@ -17,16 +17,39 @@
         >
           <aside class="hidden lg:block">
             <div class="sticky top-24">
-              <UTabs
-                :items="settingsTabItems"
-                :model-value="activeTab"
-                :content="false"
-                color="neutral"
-                variant="link"
-                orientation="vertical"
-                :ui="desktopTabsUi"
-                @update:model-value="onTabChange"
-              />
+              <nav
+                class="bg-surface-900/85 w-full rounded-xl border border-white/8 p-1.5 shadow-sm"
+                :aria-label="$t('settings.title')"
+              >
+                <div
+                  v-for="(group, groupIndex) in settingsTabGroups"
+                  :key="group.label"
+                  :class="groupIndex > 0 ? 'border-surface-700/70 mt-2 border-t pt-2' : ''"
+                >
+                  <p class="text-surface-500 px-3 py-1.5 text-xs font-semibold uppercase">
+                    {{ group.label }}
+                  </p>
+                  <div class="space-y-1">
+                    <button
+                      v-for="item in group.items"
+                      :key="item.value"
+                      type="button"
+                      :data-testid="`desktop-tab-${item.value}`"
+                      class="focus-visible:ring-primary-500/60 flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                      :class="
+                        activeTab === item.value
+                          ? 'bg-surface-800 text-white shadow-sm ring-1 ring-white/10'
+                          : 'text-surface-300 hover:bg-surface-800/80 hover:text-surface-100'
+                      "
+                      :aria-current="activeTab === item.value ? 'page' : undefined"
+                      @click="onTabChange(item.value)"
+                    >
+                      <UIcon :name="item.icon" class="h-4 w-4 shrink-0" />
+                      <span class="truncate">{{ item.label }}</span>
+                    </button>
+                  </div>
+                </div>
+              </nav>
             </div>
           </aside>
           <div class="min-w-0">
@@ -93,7 +116,7 @@
               role="tabpanel"
               :aria-label="$t('settings.tabs.imports')"
             >
-              <DataManagementCard view="imports" />
+              <DataManagementCard view="imports" :session="dataManagementSession" />
             </section>
             <section
               v-if="visitedTabs['backup-restore']"
@@ -103,7 +126,7 @@
               role="tabpanel"
               :aria-label="$t('settings.tabs.backup_restore')"
             >
-              <DataManagementCard view="backup" />
+              <DataManagementCard view="backup" :session="dataManagementSession" />
             </section>
             <section
               v-if="visitedTabs.api"
@@ -134,6 +157,7 @@
   import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
+  import { useDataManagementSession } from '@/features/settings/useDataManagementSession';
   import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import type { TabsProps } from '@nuxt/ui';
   const { t } = useI18n({ useScope: 'global' });
@@ -151,10 +175,10 @@
     | 'api';
   const settingsTabIds = [
     'progression',
-    'prestige',
     'preferences',
-    'account',
     'imports',
+    'prestige',
+    'account',
     'backup-restore',
     'api',
   ] as const;
@@ -207,8 +231,13 @@
     '#settings-backup-restore': 'backup-restore',
     '#settings-skills': 'skills',
   };
+  const legacyAccountHashes = new Set(['#account', '#settings-account']);
+  const dataManagementSession = useDataManagementSession();
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
     return typeof value === 'string' && settingsTabIds.includes(value as SettingsTabId);
+  };
+  const shouldRedirectLegacyAccountHash = (path: string, hash: string): boolean => {
+    return path === '/settings' && legacyAccountHashes.has(hash);
   };
   const getDefaultTabFromPath = (path: string): SettingsTabId => {
     return settingsRouteTabs[path] ?? 'progression';
@@ -221,6 +250,9 @@
     return nestedTabHashes[hash] ?? legacyTabHashes[hash] ?? null;
   };
   const resolveTabFromRoute = (path: string, hash: string): SettingsTabId => {
+    if (shouldRedirectLegacyAccountHash(path, hash)) {
+      return getDefaultTabFromPath(path);
+    }
     return settingsRouteTabs[path] ?? resolveTabFromHash(hash) ?? getDefaultTabFromPath(path);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
@@ -255,17 +287,11 @@
       description: 'Manage TarkovTracker API tokens and account integrations.',
     },
   };
-  const indexableSettingsTabs: SettingsTabId[] = ['progression', 'prestige', 'preferences'];
   const settingsSeo = computed(() => settingsTabSeo[activeTab.value]);
-  const settingsRobots = computed(() => {
-    return route.path !== '/settings' && indexableSettingsTabs.includes(activeTab.value)
-      ? 'index, follow'
-      : 'noindex, nofollow';
-  });
   useSeoMeta({
     title: computed(() => settingsSeo.value.title),
     description: computed(() => settingsSeo.value.description),
-    robots: settingsRobots,
+    robots: 'noindex, nofollow',
   });
   const settingsTabItems = computed(() => [
     {
@@ -274,24 +300,24 @@
       icon: 'i-mdi-account-cog-outline',
     },
     {
-      value: 'prestige',
-      label: t('settings.tabs.prestige'),
-      icon: 'i-mdi-medal-outline',
-    },
-    {
       value: 'preferences',
       label: t('settings.tabs.preferences'),
       icon: 'i-mdi-tune-variant',
     },
     {
-      value: 'account',
-      label: t('settings.tabs.account'),
-      icon: 'i-mdi-account-circle-outline',
-    },
-    {
       value: 'imports',
       label: t('settings.tabs.imports'),
       icon: 'i-mdi-database-import-outline',
+    },
+    {
+      value: 'prestige',
+      label: t('settings.tabs.prestige'),
+      icon: 'i-mdi-medal-outline',
+    },
+    {
+      value: 'account',
+      label: t('settings.tabs.account'),
+      icon: 'i-mdi-account-circle-outline',
     },
     {
       value: 'backup-restore',
@@ -302,6 +328,20 @@
       value: 'api',
       label: t('settings.tabs.api'),
       icon: 'i-mdi-api',
+    },
+  ]);
+  const settingsTabGroups = computed(() => [
+    {
+      label: t('settings.tab_groups.game'),
+      items: settingsTabItems.value.filter((item) =>
+        ['progression', 'preferences', 'imports', 'prestige'].includes(item.value)
+      ),
+    },
+    {
+      label: t('settings.tab_groups.account_advanced'),
+      items: settingsTabItems.value.filter((item) =>
+        ['account', 'backup-restore', 'api'].includes(item.value)
+      ),
     },
   ]);
   const visitedTabs = reactive<Record<SettingsTabId, boolean>>({
@@ -321,15 +361,6 @@
     trigger:
       'text-surface-300 data-[state=active]:bg-surface-800 data-[state=active]:text-white flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
     leadingIcon: 'h-4 w-4',
-  };
-  const desktopTabsUi: TabsProps['ui'] = {
-    root: 'w-full',
-    list: 'bg-surface-900/85 flex w-full flex-col gap-1.5 rounded-xl border border-white/8 p-1.5 shadow-sm',
-    indicator: 'hidden',
-    trigger:
-      'text-surface-300 hover:bg-surface-800/80 hover:text-surface-100 data-[state=active]:bg-surface-800 data-[state=active]:text-white data-[state=active]:ring-white/10 flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors data-[state=active]:shadow-sm data-[state=active]:ring-1',
-    leadingIcon: 'h-4 w-4 shrink-0',
-    label: 'truncate',
   };
   const scrollToHashTarget = async (hash: string) => {
     if (!import.meta.client || !hash) {
@@ -374,6 +405,14 @@
   watch(
     () => [route.path, route.hash] as const,
     async ([path, hash]) => {
+      if (shouldRedirectLegacyAccountHash(path, hash)) {
+        await router.replace({
+          hash: '',
+          path: '/account',
+          query: route.query,
+        });
+        return;
+      }
       activeTab.value = resolveTabFromRoute(path, hash);
       if (hash) {
         await scrollToHashTarget(hash);

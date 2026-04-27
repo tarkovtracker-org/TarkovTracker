@@ -294,7 +294,7 @@
     )
   );
   const accountActionRoute = computed<HelpRoute>(() => {
-    return isLoggedIn.value ? '/settings#account' : '/login';
+    return isLoggedIn.value ? '/account' : '/login';
   });
   const onboardingSteps = computed<OnboardingStep[]>(() => [
     {

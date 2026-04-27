@@ -17,6 +17,7 @@ export interface UseTarkovDevImportReturn {
   parseFile: (file: File) => Promise<void>;
   parseProfileUrl: (profileUrl: string) => Promise<TarkovDevProfileSource | null>;
   confirmImport: (targetMode: GameMode, editionOverride?: number | null) => Promise<void>;
+  setError: (message: string) => void;
   reset: () => void;
 }
 export function useTarkovDevImport(): UseTarkovDevImportReturn {
@@ -31,6 +32,11 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     importState.value = 'idle';
     previewData.value = null;
     importError.value = null;
+  }
+  function setError(message: string): void {
+    importState.value = 'error';
+    previewData.value = null;
+    importError.value = message;
   }
   function applyProfilePayload(json: unknown): boolean {
     const result = parseTarkovDevProfile(json);
@@ -137,6 +143,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     parseFile,
     parseProfileUrl,
     confirmImport,
+    setError,
     reset,
   };
 }

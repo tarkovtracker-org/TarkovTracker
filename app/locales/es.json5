@@ -1403,6 +1403,10 @@
       backup_restore: 'Copia y restauración',
       api: 'API',
     },
+    tab_groups: {
+      game: 'Juego',
+      account_advanced: 'Cuenta y avanzado',
+    },
     density: {
       compact: 'Compacta',
       comfortable: 'Cómoda',
@@ -1526,6 +1530,12 @@
       import_tarkovdev_button: 'Importar perfil de Tarkov.dev',
       import_eft_logs_folder_button: 'Importar carpeta de registros de EFT',
       recommended_badge: 'Recomendado',
+      active_flow_blocked_title: 'Termina primero el flujo de datos actual',
+      active_flow_blocked_description: 'Termina o cancela {flow} antes de iniciar otra importación o restauración.',
+      flow_data: 'el flujo de datos actual',
+      flow_tarkov_dev: 'la importación del perfil de Tarkov.dev',
+      flow_eft_logs: 'la importación de registros de EFT',
+      flow_backup: 'la restauración de copia',
       tarkov_dev_section_description: 'Importar metadatos del perfil incluyendo nivel, facción y habilidades',
       eft_logs_section_title: 'Importar registros del juego EFT',
       eft_logs_section_description: 'Importar progreso de misiones detectado en los archivos de registro del juego',
@@ -1813,6 +1823,7 @@
       title: 'Importación de perfil de Tarkov.dev',
       profile_url_label: 'URL del perfil de Tarkov.dev',
       profile_url_placeholder: 'https://tarkov.dev/players/regular/8560316',
+      profile_url_hint: 'Encuentra tu perfil en {link}, abre el perfil PvP o PvE correspondiente y pega aquí la URL de esa página.',
       profile_url_hint_before_link: 'Encuentra tu perfil en',
       profile_url_hint_link: 'tarkov.dev/players',
       profile_url_hint_after_link: ', abre el perfil PvP o PvE correspondiente y pega aquí la URL de esa página.',
@@ -1844,6 +1855,9 @@
       refetch_profile: 'Volver a obtener perfil',
       unlink_profile: 'Desvincular',
       view_profile: 'Ver en Tarkov.dev',
+      errors: {
+        unexpected_profile_flow: 'Algo salió mal al obtener el perfil de Tarkov.dev. Inténtalo de nuevo.',
+      },
     },
   },
   hideout: {

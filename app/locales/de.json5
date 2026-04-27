@@ -1403,6 +1403,10 @@
       backup_restore: 'Backup & Wiederherstellung',
       api: 'API',
     },
+    tab_groups: {
+      game: 'Spiel',
+      account_advanced: 'Konto & Erweitert',
+    },
     density: {
       compact: 'Kompakt',
       comfortable: 'Komfortabel',
@@ -1526,6 +1530,12 @@
       import_tarkovdev_button: 'Tarkov.dev-Profil importieren',
       import_eft_logs_folder_button: 'EFT-Protokoll-Ordner importieren',
       recommended_badge: 'Empfohlen',
+      active_flow_blocked_title: 'Schließe zuerst den aktuellen Datenvorgang ab',
+      active_flow_blocked_description: 'Schließe {flow} ab oder brich ihn ab, bevor du einen weiteren Import oder eine Wiederherstellung startest.',
+      flow_data: 'den aktuellen Datenvorgang',
+      flow_tarkov_dev: 'den Tarkov.dev-Profilimport',
+      flow_eft_logs: 'den EFT-Logs-Import',
+      flow_backup: 'die Backup-Wiederherstellung',
       tarkov_dev_section_description: 'Profilmetadaten importieren, einschließlich Level, Fraktion und Fähigkeiten',
       eft_logs_section_title: 'EFT-Spielprotokolle importieren',
       eft_logs_section_description: 'Questfortschritt aus deinen Spielprotokolldateien importieren',
@@ -1813,6 +1823,7 @@
       title: 'Tarkov.dev-Profilimport',
       profile_url_label: 'Tarkov.dev-Profil-URL',
       profile_url_placeholder: 'https://tarkov.dev/players/regular/8560316',
+      profile_url_hint: 'Finde dein Profil unter {link}, öffne das passende PvP- oder PvE-Profil und füge dann die URL dieser Seite hier ein.',
       profile_url_hint_before_link: 'Finde dein Profil unter',
       profile_url_hint_link: 'tarkov.dev/players',
       profile_url_hint_after_link: ', öffne das passende PvP- oder PvE-Profil und füge dann die URL dieser Seite hier ein.',
@@ -1844,6 +1855,9 @@
       refetch_profile: 'Profil erneut abrufen',
       unlink_profile: 'Verknüpfung entfernen',
       view_profile: 'Auf Tarkov.dev anzeigen',
+      errors: {
+        unexpected_profile_flow: 'Beim Abrufen des Tarkov.dev-Profils ist etwas schiefgelaufen. Versuche es erneut.',
+      },
     },
   },
   hideout: {

@@ -1403,6 +1403,10 @@
       backup_restore: '备份和恢复',
       api: 'API',
     },
+    tab_groups: {
+      game: '游戏',
+      account_advanced: '账户和高级',
+    },
     density: {
       compact: '紧凑',
       comfortable: '舒适',
@@ -1526,6 +1530,12 @@
       import_tarkovdev_button: '导入 Tarkov.dev 档案',
       import_eft_logs_folder_button: '导入 EFT 日志文件夹',
       recommended_badge: '推荐',
+      active_flow_blocked_title: '请先完成当前数据流程',
+      active_flow_blocked_description: '请先完成或取消{flow}，再开始其他导入或恢复。',
+      flow_data: '当前数据流程',
+      flow_tarkov_dev: 'Tarkov.dev 资料导入',
+      flow_eft_logs: 'EFT 日志导入',
+      flow_backup: '备份恢复',
       tarkov_dev_section_description: '导入档案元数据，包括等级、阵营和技能',
       eft_logs_section_title: '导入 EFT 游戏日志',
       eft_logs_section_description: '从游戏日志文件中导入检测到的任务进度',
@@ -1813,6 +1823,7 @@
       title: 'Tarkov.dev 资料导入',
       profile_url_label: 'Tarkov.dev 资料 URL',
       profile_url_placeholder: 'https://tarkov.dev/players/regular/8560316',
+      profile_url_hint: '在 {link} 找到你的资料，打开对应的 PvP 或 PvE 资料页，然后将该页面 URL 粘贴到这里。',
       profile_url_hint_before_link: '在以下位置找到你的资料',
       profile_url_hint_link: 'tarkov.dev/players',
       profile_url_hint_after_link: '，打开对应的 PvP 或 PvE 资料页，然后将该页面 URL 粘贴到这里。',
@@ -1844,6 +1855,9 @@
       refetch_profile: '重新获取资料',
       unlink_profile: '取消关联',
       view_profile: '在 Tarkov.dev 查看',
+      errors: {
+        unexpected_profile_flow: '获取 Tarkov.dev 资料时出错。请重试。',
+      },
     },
   },
   hideout: {
