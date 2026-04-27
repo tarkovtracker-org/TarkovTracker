@@ -67,6 +67,7 @@ const {
   toastAddMock: vi.fn(),
   tarkovStoreState: {
     currentMode: 'pvp' as 'pvp' | 'pve',
+    setTarkovUid: vi.fn<(uid: number | null) => void>(),
     tarkovUid: null as number | null,
   },
 }));
@@ -137,6 +138,7 @@ vi.mock('@/stores/useTarkov', () => ({
     getPvEProgressData: () => ({}),
     getPvPProgressData: () => ({}),
     getTarkovUid: () => tarkovStoreState.tarkovUid,
+    setTarkovUid: tarkovStoreState.setTarkovUid,
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -152,7 +154,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 }));
 const UButton = {
   template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
-  props: ['disabled', 'href', 'target', 'rel'],
+  props: ['disabled', 'href', 'loading', 'target', 'rel'],
   emits: ['click'],
 };
 const findButtonByText = (wrapper: ReturnType<typeof mount>, text: string) => {
@@ -175,6 +177,10 @@ describe('DataManagementCard', () => {
     eftLogsFns.parseFiles.mockReset();
     eftLogsFns.reset.mockReset();
     eftLogsFns.setIncludedVersions.mockReset();
+    tarkovStoreState.setTarkovUid.mockClear();
+    tarkovStoreState.setTarkovUid.mockImplementation((uid: number | null) => {
+      tarkovStoreState.tarkovUid = uid;
+    });
     toastAddMock.mockReset();
     backupState.debugExportError.value = null;
     backupState.exportError.value = null;
@@ -207,8 +213,8 @@ describe('DataManagementCard', () => {
           UIcon: true,
           UInput: {
             template:
-              '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ['modelValue'],
+              '<input :value="modelValue" :disabled="disabled" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            props: ['disabled', 'modelValue'],
             emits: ['update:modelValue'],
           },
           UTooltip: {
@@ -291,6 +297,112 @@ describe('DataManagementCard', () => {
       'https://tarkov.dev/players/pve/8560316'
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
+  });
+  it('keeps the current tarkov.dev target mode when the fetched source has no mode', async () => {
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: null,
+      profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+      tarkovUid: 8560316,
+    });
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+      tarkovDevTargetMode: 'pvp' | 'pve';
+    }>(wrapper.vm);
+    vm.tarkovDevTargetMode = 'pve';
+    vm.tarkovDevProfileUrlInput = 'https://players.tarkov.dev/profile/8560316.json';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+      'https://players.tarkov.dev/profile/8560316.json'
+    );
+    expect(vm.tarkovDevTargetMode).toBe('pve');
+  });
+  it('disables import actions while tarkov.dev profile fetch is loading', () => {
+    tarkovDevState.importState.value = 'loading';
+    const wrapper = createWrapper();
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.import_backup_button')?.attributes(
+        'disabled'
+      )
+    ).toBeDefined();
+    expect(
+      findButtonByText(
+        wrapper,
+        'settings.data_management.import_eft_logs_folder_button'
+      )?.attributes('disabled')
+    ).toBeDefined();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')?.attributes('disabled')
+    ).toBeDefined();
+    expect(wrapper.find('input:not([type="file"])').attributes('disabled')).toBeDefined();
+    expect(asVm<{ isAnyImportActive: boolean }>(wrapper.vm).isAnyImportActive).toBe(true);
+    expect(asVm<{ isAnyImportPreviewActive: boolean }>(wrapper.vm).isAnyImportPreviewActive).toBe(
+      false
+    );
+  });
+  it('refetches a linked tarkov.dev profile from the selected source mode', async () => {
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: 'pve',
+      profileJsonUrl: 'https://players.tarkov.dev/profile/123456.json',
+      tarkovUid: 123456,
+    });
+    tarkovStoreState.currentMode = 'pvp';
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
+    await findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_mode_pve')!.trigger(
+      'click'
+    );
+    await asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(
+      wrapper.vm
+    ).handleTarkovDevRefetch();
+    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+      'https://tarkov.dev/players/pve/123456'
+    );
+    expect(asVm<{ tarkovDevTargetMode: 'pvp' | 'pve' }>(wrapper.vm).tarkovDevTargetMode).toBe(
+      'pve'
+    );
+  });
+  it('shows arena as disabled for linked tarkov.dev refetches', () => {
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    const arenaButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_mode_arena');
+    expect(arenaButton?.attributes('disabled')).toBeDefined();
+  });
+  it('unlinks a tarkov.dev profile without resetting imported tracker data', () => {
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper();
+    asVm<{ handleTarkovDevUnlink: () => void }>(wrapper.vm).handleTarkovDevUnlink();
+    expect(tarkovStoreState.setTarkovUid).toHaveBeenCalledWith(null);
+    expect(tarkovStoreState.tarkovUid).toBeNull();
+    expect(backupFns.resetImport).not.toHaveBeenCalled();
+    expect(tarkovDevFns.reset).not.toHaveBeenCalled();
+  });
+  it('keeps parsed tarkov.dev skill values collapsed behind preview details', () => {
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'Tester',
+      gameEditionGuess: null,
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      skills: {
+        Strength: 12,
+        Endurance: 5,
+        MyUnknownSkill: 2,
+      },
+      tarkovUid: 123456,
+      totalXP: 0,
+    };
+    const wrapper = createWrapper();
+    const skillDetails = wrapper.find('details');
+    expect(skillDetails.exists()).toBe(true);
+    expect(skillDetails.attributes('open')).toBeUndefined();
+    expect(wrapper.text()).toContain('settings.tarkov_dev_import.skills_details_toggle');
+    expect(wrapper.text()).toContain('Endurance');
+    expect(wrapper.text()).toContain('Strength');
+    expect(wrapper.text()).toContain('MyUnknownSkill');
+    expect(wrapper.text()).toContain('12');
   });
   it('forwards tarkov.dev confirmation using current target mode', async () => {
     tarkovStoreState.currentMode = 'pve';

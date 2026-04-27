@@ -25,6 +25,14 @@ describe('resolveTarkovDevProfileSource', () => {
     expect(result.data.mode).toBeNull();
     expect(result.data.profileJsonUrl).toBe('https://players.tarkov.dev/profile/8560316.json');
   });
+  it('rejects bare profile ids', () => {
+    const result = resolveTarkovDevProfileSource('8560316');
+    expect(result.ok).toBe(false);
+  });
+  it('rejects bare profile json filenames', () => {
+    const result = resolveTarkovDevProfileSource('8560316.json');
+    expect(result.ok).toBe(false);
+  });
   it('rejects non-player urls', () => {
     const result = resolveTarkovDevProfileSource('https://example.com/players/regular/8560316');
     expect(result.ok).toBe(false);

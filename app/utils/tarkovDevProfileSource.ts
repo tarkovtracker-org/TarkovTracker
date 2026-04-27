@@ -34,9 +34,6 @@ function buildProfileSource(tarkovUid: number, mode: GameMode | null): TarkovDev
 export function resolveTarkovDevProfileSource(input: string): TarkovDevProfileSourceResult {
   const trimmed = input.trim();
   if (!trimmed) return { ok: false, error: PROFILE_URL_ERROR };
-  const directProfileId = parseProfileId(trimmed);
-  if (directProfileId !== null)
-    return { ok: true, data: buildProfileSource(directProfileId, null) };
   let url: URL;
   try {
     url = new URL(trimmed);

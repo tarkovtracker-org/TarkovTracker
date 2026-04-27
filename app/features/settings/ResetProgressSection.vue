@@ -1,39 +1,34 @@
 <template>
-  <div class="space-y-2">
-    <p class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-      {{ $t('settings.data_management.reset_title') }}
-    </p>
-    <div class="grid gap-3 md:grid-cols-3">
-      <UButton
-        icon="i-mdi-shield-sword"
-        block
-        :ui="{
-          base: 'bg-pvp-900 hover:bg-pvp-800 active:bg-pvp-700 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
-        }"
-        @click="showResetPvPDialog = true"
-      >
-        {{ $t('settings.data_management.reset_pvp_data') }}
-      </UButton>
-      <UButton
-        icon="i-mdi-account-group"
-        block
-        :ui="{
-          base: 'bg-pve-900 hover:bg-pve-800 active:bg-pve-700 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
-        }"
-        @click="showResetPvEDialog = true"
-      >
-        {{ $t('settings.data_management.reset_pve_data') }}
-      </UButton>
-      <UButton
-        color="error"
-        variant="soft"
-        icon="i-mdi-delete-sweep"
-        block
-        @click="showResetAllDialog = true"
-      >
-        {{ $t('settings.data_management.reset_all_data') }}
-      </UButton>
-    </div>
+  <div class="grid gap-3 md:grid-cols-3">
+    <UButton
+      icon="i-mdi-shield-sword"
+      block
+      :ui="{
+        base: 'bg-pvp-900 hover:bg-pvp-800 active:bg-pvp-700 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
+      }"
+      @click="showResetPvPDialog = true"
+    >
+      {{ $t('settings.data_management.reset_pvp_data') }}
+    </UButton>
+    <UButton
+      icon="i-mdi-account-group"
+      block
+      :ui="{
+        base: 'bg-pve-900 hover:bg-pve-800 active:bg-pve-700 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
+      }"
+      @click="showResetPvEDialog = true"
+    >
+      {{ $t('settings.data_management.reset_pve_data') }}
+    </UButton>
+    <UButton
+      color="error"
+      variant="soft"
+      icon="i-mdi-delete-sweep"
+      block
+      @click="showResetAllDialog = true"
+    >
+      {{ $t('settings.data_management.reset_all_data') }}
+    </UButton>
   </div>
   <UModal v-model:open="showResetPvPDialog">
     <template #header>

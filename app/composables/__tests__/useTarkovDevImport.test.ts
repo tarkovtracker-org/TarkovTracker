@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameMode } from '@/utils/constants';
 import type { TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
 const mockFetch = vi.fn();
@@ -76,7 +76,7 @@ const loadComposable = async () => {
 };
 describe('useTarkovDevImport', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     metadataStore.playerLevels = [
@@ -84,6 +84,9 @@ describe('useTarkovDevImport', () => {
       { exp: 1000, level: 5 },
       { exp: 2500, level: 12 },
     ];
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
   it('sets preview state when file parses successfully', async () => {
     const parsedData = createImportData();
