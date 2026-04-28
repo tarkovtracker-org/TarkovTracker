@@ -90,8 +90,7 @@ const uiConfig = {
       trailing: 'shrink-0 text-surface-400',
       value: 'text-surface-100',
       placeholder: 'text-surface-500',
-      content:
-        'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] !w-[var(--reka-combobox-trigger-width)]',
+      content: 'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-fit',
       viewport: 'p-1 max-h-60 overflow-y-auto',
       group: '',
       empty: 'px-3 py-2 text-sm text-surface-500 text-center',

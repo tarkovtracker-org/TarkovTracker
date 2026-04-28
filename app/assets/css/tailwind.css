@@ -706,37 +706,6 @@ html.no-smooth-scroll {
 }
 /* Text colors now use warm surface tokens (see @theme --color-surface-*) */
 
-/* Nuxt UI v4 USelectMenu (Reka combobox) locks content width to the trigger; override to fit widest option. */
-/* TODO: Remove these overrides when Nuxt UI v4 fixes trigger-width content sizing.
-   Track: https://github.com/tarkovtracker-org/TarkovTracker/issues/157
-   Condition: Remove once Nuxt UI v4 stops forcing trigger-width sizing (fix or opt-out prop). */
-[id^='reka-combobox-content'][data-slot='content'] {
-  --reka-combobox-trigger-width: max-content !important;
-  min-width: var(--reka-popper-anchor-width);
-  max-width: none;
-}
-
-[id^='reka-combobox-content'][data-slot='content'] [data-slot='viewport'] {
-  width: max-content;
-  min-width: 100%;
-  max-width: none;
-  overflow-x: visible;
-}
-
-[id^='reka-combobox-content'][data-slot='content'] [data-slot='group'] {
-  width: max-content;
-  min-width: 100%;
-}
-
-[id^='reka-combobox-content'][data-slot='content'] [data-slot='item'] {
-  white-space: nowrap;
-}
-
-[id^='reka-combobox-content'][data-slot='content'] [data-slot='itemLabel'] {
-  white-space: nowrap;
-  display: inline-block;
-}
-
 /* Restore pointer cursor on interactive elements (reset by Tailwind preflight) */
 button:not(:disabled),
 [role='button']:not([disabled]):not([aria-disabled='true']),

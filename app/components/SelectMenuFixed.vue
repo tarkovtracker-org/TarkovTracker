@@ -56,8 +56,7 @@
     trailing: 'shrink-0 text-surface-400',
     value: 'text-surface-100',
     placeholder: 'text-surface-500',
-    content:
-      'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] !w-[var(--reka-combobox-trigger-width)]',
+    content: 'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-fit',
     viewport: 'p-1 max-h-60 overflow-y-auto',
     item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
     itemLabel: 'whitespace-nowrap',
