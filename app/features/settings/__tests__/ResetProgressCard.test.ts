@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment nuxt
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';

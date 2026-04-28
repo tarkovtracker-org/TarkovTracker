@@ -27,7 +27,6 @@
 </template>
 <script setup lang="ts">
   import { useAppInitialization } from '@/composables/useAppInitialization';
-  import { isNavigationRouteActive, SETTINGS_ROUTE_PATHS } from '@/features/drawer/navigation';
   import { logger } from '@/utils/logger';
   const CHUNK_ERROR_PATTERNS = [
     /ChunkLoadError/i,
@@ -71,15 +70,12 @@
   };
   const canonicalPath = computed(() => {
     if (route.path === '/settings') {
-      // Strip leading '#' so both '#progression' and 'progression' map correctly.
-      const normalizedHash = route.hash.startsWith('#') ? route.hash : `#${route.hash}`;
+      const normalizedHash =
+        route.hash === '' ? '' : route.hash.startsWith('#') ? route.hash : `#${route.hash}`;
       return settingsHashCanonicalPaths[normalizedHash] ?? route.path;
     }
     if (route.path === '/account') {
-      // /account is a standalone canonical route but shares navigation state with settings.
-      if (SETTINGS_ROUTE_PATHS.has(route.path)) {
-        return '/account';
-      }
+      return '/account';
     }
     return route.path;
   });
