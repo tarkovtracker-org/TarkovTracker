@@ -90,7 +90,8 @@ const uiConfig = {
       trailing: 'shrink-0 text-surface-400',
       value: 'text-surface-100',
       placeholder: 'text-surface-500',
-      content: 'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-fit',
+      content:
+        'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] max-w-[90vw] min-w-fit overflow-auto',
       viewport: 'p-1 max-h-60 overflow-y-auto',
       group: '',
       empty: 'px-3 py-2 text-sm text-surface-500 text-center',
@@ -100,7 +101,7 @@ const uiConfig = {
       itemLeadingIcon: 'text-surface-400 shrink-0',
       itemLeadingAvatar: 'shrink-0',
       itemLeadingChip: 'shrink-0',
-      itemLabel: 'whitespace-nowrap',
+      itemLabel: 'break-words whitespace-normal',
       itemTrailing: 'ms-auto',
       itemTrailingIcon: 'text-surface-400 shrink-0',
     },
