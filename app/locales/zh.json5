@@ -1407,6 +1407,36 @@
       game: '游戏',
       account_advanced: '账户和高级',
     },
+    tab_seo: {
+      progression: {
+        title: '进度设置',
+        description: '管理 TarkovTracker 进度、显示名称、经验和技能。',
+      },
+      prestige: {
+        title: '声望设置',
+        description: '查看并管理 TarkovTracker 声望追踪。',
+      },
+      preferences: {
+        title: '偏好',
+        description: '自定义 TarkovTracker 的显示、隐私、任务和地图偏好。',
+      },
+      account: {
+        title: '账户',
+        description: '管理 TarkovTracker 账户选项、分享可见性和数据控制。',
+      },
+      imports: {
+        title: '导入设置',
+        description: '从 Tarkov.dev 个人资料和 EFT 游戏日志导入 TarkovTracker 进度。',
+      },
+      backup_restore: {
+        title: '备份和恢复',
+        description: '导出或恢复 TarkovTracker 进度数据和支持快照。',
+      },
+      api: {
+        title: 'API 设置',
+        description: '管理 TarkovTracker API 令牌和账户集成。',
+      },
+    },
     density: {
       compact: '紧凑',
       comfortable: '舒适',

@@ -1407,6 +1407,36 @@
       game: 'Jeu',
       account_advanced: 'Compte et avancé',
     },
+    tab_seo: {
+      progression: {
+        title: 'Paramètres de progression',
+        description: 'Gérez la progression TarkovTracker, les pseudos, l’expérience et les compétences.',
+      },
+      prestige: {
+        title: 'Paramètres de prestige',
+        description: 'Consultez et gérez le suivi du prestige TarkovTracker.',
+      },
+      preferences: {
+        title: 'Préférences',
+        description: 'Personnalisez l’affichage, la confidentialité, les tâches et les cartes dans TarkovTracker.',
+      },
+      account: {
+        title: 'Compte',
+        description: 'Gérez les options de votre compte TarkovTracker, la visibilité du partage et les contrôles de données.',
+      },
+      imports: {
+        title: 'Paramètres d’import',
+        description: 'Importez la progression TarkovTracker depuis les profils Tarkov.dev et les journaux EFT.',
+      },
+      backup_restore: {
+        title: 'Sauvegarde et restauration',
+        description: 'Exportez ou restaurez les données de progression TarkovTracker et les instantanés de support.',
+      },
+      api: {
+        title: 'Paramètres API',
+        description: 'Gérez les tokens API TarkovTracker et les intégrations de compte.',
+      },
+    },
     density: {
       compact: 'Compact',
       comfortable: 'Confortable',

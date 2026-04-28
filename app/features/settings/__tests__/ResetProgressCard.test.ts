@@ -1,6 +1,5 @@
 // @vitest-environment nuxt
-import { mockNuxtImport } from '@nuxt/test-utils/runtime';
-import { mount } from '@vue/test-utils';
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it, vi } from 'vitest';
 import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';
 mockNuxtImport('useRoute', () => () => ({
@@ -13,8 +12,8 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('ResetProgressCard', () => {
-  it('renders GenericCard with the reset title', () => {
-    const wrapper = mount(ResetProgressCard, {
+  it('renders GenericCard with the reset title', async () => {
+    const wrapper = await mountSuspended(ResetProgressCard, {
       global: {
         mocks: {
           $t: (key: string) => key,

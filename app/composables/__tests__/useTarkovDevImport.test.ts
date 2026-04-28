@@ -132,7 +132,7 @@ describe('useTarkovDevImport', () => {
     const composable = await loadComposable();
     const source = await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
     expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
-      query: { url: 'https://tarkov.dev/players/regular/8560316' },
+      query: { url: 'https://players.tarkov.dev/profile/8560316.json' },
     });
     expect(mockParseTarkovDevProfile).toHaveBeenCalledWith({ aid: 8560316 });
     expect(source).toEqual({
@@ -153,7 +153,7 @@ describe('useTarkovDevImport', () => {
     const composable = await loadComposable();
     const source = await composable.parseProfileUrl('https://tarkov.dev/players/pve/8560316');
     expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
-      query: { url: 'https://tarkov.dev/players/pve/8560316' },
+      query: { url: 'https://players.tarkov.dev/pve/8560316.json' },
     });
     expect(source).toEqual({
       mode: 'pve',

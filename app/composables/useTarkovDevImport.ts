@@ -76,7 +76,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     previewData.value = null;
     try {
       const json = await $fetch<unknown>('/api/tarkov-dev/profile', {
-        query: { url: profileUrl.trim() },
+        query: { url: source.data.profileJsonUrl },
       });
       return applyProfilePayload(json) ? source.data : null;
     } catch (e) {

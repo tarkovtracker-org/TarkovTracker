@@ -1407,6 +1407,36 @@
       game: 'Игра',
       account_advanced: 'Аккаунт и расширенное',
     },
+    tab_seo: {
+      progression: {
+        title: 'Настройки прогресса',
+        description: 'Управляйте прогрессом TarkovTracker, отображаемыми именами, опытом и навыками.',
+      },
+      prestige: {
+        title: 'Настройки престижа',
+        description: 'Просматривайте и управляйте отслеживанием престижа TarkovTracker.',
+      },
+      preferences: {
+        title: 'Предпочтения',
+        description: 'Настройте отображение, приватность, задания и карты в TarkovTracker.',
+      },
+      account: {
+        title: 'Аккаунт',
+        description: 'Управляйте параметрами аккаунта TarkovTracker, видимостью профиля и контролем данных.',
+      },
+      imports: {
+        title: 'Настройки импорта',
+        description: 'Импортируйте прогресс TarkovTracker из профилей Tarkov.dev и игровых логов EFT.',
+      },
+      backup_restore: {
+        title: 'Резервные копии',
+        description: 'Экспортируйте или восстанавливайте данные прогресса TarkovTracker и снимки для поддержки.',
+      },
+      api: {
+        title: 'Настройки API',
+        description: 'Управляйте API-токенами TarkovTracker и интеграциями аккаунта.',
+      },
+    },
     density: {
       compact: 'Компактная',
       comfortable: 'Комфортная',

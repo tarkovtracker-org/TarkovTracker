@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   consumeSharedRateLimitMock,
@@ -16,9 +18,7 @@ const {
   setResponseHeadersMock: vi.fn(),
   useRuntimeConfigMock: vi.fn(),
 }));
-vi.mock('#imports', () => ({
-  useRuntimeConfig: useRuntimeConfigMock,
-}));
+mockNuxtImport('useRuntimeConfig', () => useRuntimeConfigMock);
 vi.mock('h3', () => ({
   createError: (options: { statusCode: number; statusMessage: string }) =>
     Object.assign(new Error(options.statusMessage), options),
@@ -28,6 +28,7 @@ vi.mock('h3', () => ({
 }));
 vi.mock('@/server/utils/logger', () => ({
   createLogger: () => ({
+    error: vi.fn(),
     warn: vi.fn(),
   }),
 }));

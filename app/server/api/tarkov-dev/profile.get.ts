@@ -33,6 +33,9 @@ function isAbortError(error: unknown): boolean {
     (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError'))
   );
 }
+function readErrorForLog(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 async function consumeRateLimit(handle: SharedCacheHandle, key: string): Promise<boolean> {
   return consumeSharedRateLimit(
     handle,
@@ -77,13 +80,35 @@ export default defineEventHandler(async (event) => {
       signal: AbortSignal.timeout(PROFILE_FETCH_TIMEOUT_MS),
     });
   } catch (error) {
+    logger.error('Tarkov.dev profile fetch failed', {
+      error: readErrorForLog(error),
+      profileJsonUrl: source.data.profileJsonUrl,
+      statusCode: isAbortError(error) ? 504 : 502,
+    });
     throw createProfileFetchError(isAbortError(error) ? 504 : 502);
   }
-  if (response.status === 404) throw createProfileFetchError(404);
-  if (!response.ok) throw createProfileFetchError();
+  if (response.status === 404) {
+    logger.error('Tarkov.dev profile returned 404', {
+      profileJsonUrl: source.data.profileJsonUrl,
+      status: response.status,
+    });
+    throw createProfileFetchError(404);
+  }
+  if (!response.ok) {
+    logger.error('Tarkov.dev profile returned an upstream error', {
+      profileJsonUrl: source.data.profileJsonUrl,
+      status: response.status,
+    });
+    throw createProfileFetchError();
+  }
   try {
     return (await response.json()) as unknown;
-  } catch {
+  } catch (error) {
+    logger.error('Tarkov.dev profile JSON parse failed', {
+      error: readErrorForLog(error),
+      profileJsonUrl: source.data.profileJsonUrl,
+      status: response.status,
+    });
     throw createProfileFetchError();
   }
 });

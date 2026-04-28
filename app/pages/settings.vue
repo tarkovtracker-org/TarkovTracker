@@ -160,6 +160,9 @@
   import { useDataManagementSession } from '@/features/settings/useDataManagementSession';
   import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import type { TabsProps } from '@nuxt/ui';
+  definePageMeta({
+    alias: ['/progression', '/prestige', '/preferences'],
+  });
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
@@ -182,15 +185,6 @@
     'backup-restore',
     'api',
   ] as const;
-  const settingsTabRoutes: Record<SettingsTabId, { path: string; hash: string }> = {
-    progression: { path: '/progression', hash: '' },
-    prestige: { path: '/prestige', hash: '' },
-    preferences: { path: '/preferences', hash: '' },
-    account: { path: '/account', hash: '' },
-    imports: { path: '/settings', hash: '#imports' },
-    'backup-restore': { path: '/settings', hash: '#backup-restore' },
-    api: { path: '/settings', hash: '#api' },
-  };
   const settingsRouteTabs: Partial<Record<string, SettingsTabId>> = {
     '/progression': 'progression',
     '/prestige': 'prestige',
@@ -231,7 +225,16 @@
     '#settings-backup-restore': 'backup-restore',
     '#settings-skills': 'skills',
   };
-  const legacyAccountHashes = new Set(['#account', '#settings-account']);
+  const legacyAccountHashes = new Set(['#settings-account']);
+  const settingsSeoKeys: Record<SettingsTabId, string> = {
+    progression: 'progression',
+    prestige: 'prestige',
+    preferences: 'preferences',
+    account: 'account',
+    imports: 'imports',
+    'backup-restore': 'backup_restore',
+    api: 'api',
+  };
   const dataManagementSession = useDataManagementSession();
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
     return typeof value === 'string' && settingsTabIds.includes(value as SettingsTabId);
@@ -253,41 +256,16 @@
     if (shouldRedirectLegacyAccountHash(path, hash)) {
       return getDefaultTabFromPath(path);
     }
-    return settingsRouteTabs[path] ?? resolveTabFromHash(hash) ?? getDefaultTabFromPath(path);
+    return resolveTabFromHash(hash) ?? settingsRouteTabs[path] ?? getDefaultTabFromPath(path);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
-  const settingsTabSeo: Record<SettingsTabId, { title: string; description: string }> = {
-    progression: {
-      title: 'Progression Settings',
-      description: 'Manage TarkovTracker progression, display names, experience, and skills.',
-    },
-    prestige: {
-      title: 'Prestige Settings',
-      description: 'Review and manage TarkovTracker prestige tracking.',
-    },
-    preferences: {
-      title: 'Preferences',
-      description: 'Customize TarkovTracker display, privacy, task, and map preferences.',
-    },
-    account: {
-      title: 'Account',
-      description:
-        'Manage your TarkovTracker account options, sharing visibility, and data controls.',
-    },
-    imports: {
-      title: 'Import Settings',
-      description: 'Import TarkovTracker progress from Tarkov.dev profiles and EFT game logs.',
-    },
-    'backup-restore': {
-      title: 'Backup & Restore',
-      description: 'Export or restore TarkovTracker progress data and support snapshots.',
-    },
-    api: {
-      title: 'API Settings',
-      description: 'Manage TarkovTracker API tokens and account integrations.',
-    },
-  };
-  const settingsSeo = computed(() => settingsTabSeo[activeTab.value]);
+  const settingsSeo = computed(() => {
+    const seoKey = settingsSeoKeys[activeTab.value];
+    return {
+      title: t(`settings.tab_seo.${seoKey}.title`),
+      description: t(`settings.tab_seo.${seoKey}.description`),
+    };
+  });
   useSeoMeta({
     title: computed(() => settingsSeo.value.title),
     description: computed(() => settingsSeo.value.description),
@@ -385,13 +363,12 @@
       return;
     }
     activeTab.value = value;
-    const nextRoute = settingsTabRoutes[value];
-    if (route.path === nextRoute.path && route.hash === nextRoute.hash) {
+    const nextHash = settingsTabHashes[value];
+    if (route.hash === nextHash) {
       return;
     }
     void router.replace({
-      hash: nextRoute.hash,
-      path: nextRoute.path,
+      hash: nextHash,
       query: route.query,
     });
   };

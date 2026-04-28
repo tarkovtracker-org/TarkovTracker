@@ -1,6 +1,5 @@
 <template>
   <UApp :tooltip="{ delayDuration: 300 }">
-    <!-- Loading Screen (shows while initial data is loading) -->
     <LoadingScreen />
     <NuxtRouteAnnouncer />
     <NuxtLayout>
@@ -21,12 +20,12 @@
         </template>
       </NuxtErrorBoundary>
     </NuxtLayout>
-    <!-- Portal target for modals -->
     <div id="modals"></div>
   </UApp>
 </template>
 <script setup lang="ts">
   import { useAppInitialization } from '@/composables/useAppInitialization';
+  import { SETTINGS_ROUTE_PATHS } from '@/features/drawer/navigation';
   import { logger } from '@/utils/logger';
   const CHUNK_ERROR_PATTERNS = [
     /ChunkLoadError/i,
@@ -49,11 +48,7 @@
   const { locale, t } = useI18n();
   const { public: publicConfig } = useRuntimeConfig();
   const siteUrl = (publicConfig.appUrl || 'https://tarkovtracker.org').replace(/\/$/, '');
-  // Maps fragment identifiers on /settings to canonical URL paths.
-  // Legacy hash variants are included so bookmarks and old links still resolve correctly.
-  // A bare hash (`''`) on /settings defaults to /progression (the first tab).
   const settingsHashCanonicalPaths: Record<string, string> = {
-    '': '/progression',
     '#progression': '/progression',
     '#settings-progression': '/progression',
     '#prestige': '/prestige',
@@ -69,13 +64,12 @@
     '#api': '/settings',
   };
   const canonicalPath = computed(() => {
-    if (route.path === '/settings') {
-      const normalizedHash =
-        route.hash === '' ? '' : route.hash.startsWith('#') ? route.hash : `#${route.hash}`;
+    if (SETTINGS_ROUTE_PATHS.has(route.path)) {
+      if (!route.hash) {
+        return route.path === '/settings' ? '/progression' : route.path;
+      }
+      const normalizedHash = route.hash.startsWith('#') ? route.hash : `#${route.hash}`;
       return settingsHashCanonicalPaths[normalizedHash] ?? route.path;
-    }
-    if (route.path === '/account') {
-      return '/account';
     }
     return route.path;
   });
