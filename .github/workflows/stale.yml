@@ -6,23 +6,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  stale:
+  stale-reminder:
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f
+      - name: Mark inactive issues and PRs
+        uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f
         with:
-          stale-issue-message: 'This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs. Thank you for your contributions.'
-          stale-pr-message: 'This PR has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs.'
-          close-issue-message: 'This issue was closed because it has been stalled for 14 days with no activity.'
-          close-pr-message: 'This PR was closed because it has been stalled for 14 days with no activity.'
-          days-before-issue-stale: -1
-          days-before-issue-close: -1
-          days-before-pr-stale: 60
-          days-before-pr-close: 14
+          stale-issue-message: 'This issue has been inactive for 60 days. Please review whether it is already addressed, should be prioritized, or needs a status update. Add the `never-stale` label if it should remain open without auto-close.'
+          stale-pr-message: 'This PR has been inactive for 60 days. Please review whether it is still needed, blocked, ready to close, or needs a status update. Add the `never-stale` label if it should remain open without auto-close.'
+          days-before-stale: 60
+          days-before-close: -1
           operations-per-run: 100
           stale-issue-label: 'stale'
           stale-pr-label: 'stale'
-          exempt-pr-labels: 'pinned,security,enhancement'
+          exempt-issue-labels: 'pinned,security'
+          exempt-pr-labels: 'pinned,security'
+
+  stale-close:
+    runs-on: ubuntu-latest
+    needs: stale-reminder
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Close stale items unless protected
+        uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f
+        with:
+          close-issue-message: 'This issue was closed because it has been stalled for 14 days with no activity after being marked stale.'
+          close-pr-message: 'This PR was closed because it has been stalled for 14 days with no activity after being marked stale.'
+          days-before-stale: -1
+          days-before-close: 14
+          operations-per-run: 100
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          any-of-issue-labels: 'stale'
+          any-of-pr-labels: 'stale'
+          exempt-issue-labels: 'pinned,security,never-stale'
+          exempt-pr-labels: 'pinned,security,never-stale'

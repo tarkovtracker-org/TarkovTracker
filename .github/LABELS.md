@@ -24,32 +24,33 @@ GitHub's native **Issue Types** feature replaces type labels. Each issue must ha
 
 All area labels use `#c2e0c6` (light green) for visual grouping.
 
-| Label | Description | Examples |
-|-------|-------------|----------|
-| `area:ui` | Vue components, pages, styling | Component bugs, layout issues, Tailwind CSS, responsive design |
-| `area:api` | Nitro server routes, workers, API endpoints | Server routes in `app/server/api/`, Cloudflare Workers, GraphQL proxy |
-| `area:database` | Supabase schema, migrations, queries | Database schema, Postgres queries, migrations, RLS policies |
-| `area:auth` | Authentication and authorization | Login/logout, Supabase Auth, permissions, session management |
-| `area:realtime` | Team sync, Supabase broadcasts | Team features, real-time sync, Supabase Realtime, broadcasts |
-| `area:i18n` | Translations and localization | Language files, translation keys, i18n system, locale switching |
+| Label           | Description                                 | Examples                                                              |
+| --------------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| `area:ui`       | Vue components, pages, styling              | Component bugs, layout issues, Tailwind CSS, responsive design        |
+| `area:api`      | Nitro server routes, workers, API endpoints | Server routes in `app/server/api/`, Cloudflare Workers, GraphQL proxy |
+| `area:database` | Supabase schema, migrations, queries        | Database schema, Postgres queries, migrations, RLS policies           |
+| `area:auth`     | Authentication and authorization            | Login/logout, Supabase Auth, permissions, session management          |
+| `area:realtime` | Team sync, Supabase broadcasts              | Team features, real-time sync, Supabase Realtime, broadcasts          |
+| `area:i18n`     | Translations and localization               | Language files, translation keys, i18n system, locale switching       |
 
 **Note:** Issues can have multiple area labels if they affect multiple systems (e.g., `area:ui` + `area:realtime` for team page display issues).
 
 ### Priority Labels (How urgent)
 
-| Label | Color | Description | When to Use |
-|-------|-------|-------------|-------------|
-| `priority:high` | `#d93f0b` | Important features/bugs | Critical bugs, security issues, data loss, blocking issues, important features |
-| `priority:medium` | `#fbca04` | Normal priority | Standard bugs and features (default) |
-| `priority:low` | `#0e8a16` | Nice to have | Minor improvements, edge cases, quality-of-life enhancements |
+| Label             | Color     | Description             | When to Use                                                                    |
+| ----------------- | --------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `priority:high`   | `#d93f0b` | Important features/bugs | Critical bugs, security issues, data loss, blocking issues, important features |
+| `priority:medium` | `#fbca04` | Normal priority         | Standard bugs and features (default)                                           |
+| `priority:low`    | `#0e8a16` | Nice to have            | Minor improvements, edge cases, quality-of-life enhancements                   |
 
 ### Special Labels
 
-| Label | Color | Description | When to Use |
-|-------|-------|-------------|-------------|
-| `good-first-issue` | `#7057ff` | Good for newcomers | Simple, well-defined issues that can be completed in isolation without deep knowledge |
-| `help-wanted` | `#008672` | Community help needed | Well-scoped issues that welcome community contributions but may require broader context or experience |
-| `upstream` | `#e99695` | Issue belongs in data-overlay repo | Quest/item data issues that need fixes in the data-overlay repository |
+| Label              | Color     | Description                        | When to Use                                                                                           |
+| ------------------ | --------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `good-first-issue` | `#7057ff` | Good for newcomers                 | Simple, well-defined issues that can be completed in isolation without deep knowledge                 |
+| `help-wanted`      | `#008672` | Community help needed              | Well-scoped issues that welcome community contributions but may require broader context or experience |
+| `never-stale`      | `#5319e7` | Keep open when stale               | Long-lived backlog issues/PRs that should receive stale reminders but never be auto-closed            |
+| `upstream`         | `#e99695` | Issue belongs in data-overlay repo | Quest/item data issues that need fixes in the data-overlay repository                                 |
 
 ## Label Usage Guidelines
 
@@ -144,14 +145,14 @@ Labels: (none needed, Dependabot handles these)
 
 These are **NOT** labels - they're handled by GitHub Project columns:
 
-| ❌ Don't Use Label | ✅ Use Project Column Instead |
-|-------------------|-------------------------------|
-| ~~needs-info~~ | **Waiting for Info** column |
-| ~~blocked~~ | **Blocked** column |
-| ~~in-progress~~ | **In Progress** column |
-| ~~ready-for-review~~ | **In Review** column |
-| ~~duplicate~~ | Close with comment linking to original |
-| ~~wontfix~~ | Close with explanation in comment |
+| ❌ Don't Use Label   | ✅ Use Project Column Instead          |
+| -------------------- | -------------------------------------- |
+| ~~needs-info~~       | **Waiting for Info** column            |
+| ~~blocked~~          | **Blocked** column                     |
+| ~~in-progress~~      | **In Progress** column                 |
+| ~~ready-for-review~~ | **In Review** column                   |
+| ~~duplicate~~        | Close with comment linking to original |
+| ~~wontfix~~          | Close with explanation in comment      |
 
 ### Automated Labeling
 
@@ -177,6 +178,7 @@ These are **NOT** labels - they're handled by GitHub Project columns:
 5. Add special labels if appropriate:
    - `good-first-issue` for simple, well-defined issues
    - `help-wanted` for community contributions
+   - `never-stale` for long-lived backlog work that should not auto-close
    - `upstream` if it's a data issue → close with comment
 
    **Note**: Prefer `help-wanted` over `good-first-issue` unless the issue is truly first-time contributor safe.
@@ -207,17 +209,20 @@ When someone reports incorrect quest requirements, missing items, wrong item pro
 
 ## Quick Reference
 
-**Total Labels: 12** (down from 31!)
+**Total Labels: 13** (down from 31!)
 
 **By Category:**
+
 - Area: 6 labels (area:ui, area:api, area:database, area:auth, area:realtime, area:i18n)
 - Priority: 3 labels (priority:high, priority:medium, priority:low)
-- Special: 3 labels (good-first-issue, help-wanted, upstream)
+- Special: 4 labels (good-first-issue, help-wanted, never-stale, upstream)
 
 **Issue Types (not labels): 5**
+
 - bug, feature, enhancement, dependencies, documentation
 
 **Most Common Patterns:**
+
 - Issue Type: `bug` + Labels: `area:ui, priority:medium`
 - Issue Type: `enhancement` + Labels: `area:ui, priority:low`
 - Issue Type: `feature` + Labels: `area:api, priority:high`
