@@ -282,15 +282,6 @@
       }
     }
   },
-  "import_confirm": {
-    "title": "Confirm Data Import",
-    "description": "This will import your progress data into your PvP profile:",
-    "target_mode": "Target Game Mode: PvP",
-    "notice": "Data will be imported to your PvP (standard multiplayer) progress",
-    "list_title": "Data to be imported:",
-    "warning": "Warning: This action cannot be undone!",
-    "confirm": "Confirm Import"
-  },
   "maps": {
     "zoom_speed": "Zoom speed",
     "pan_speed": "Pan speed",

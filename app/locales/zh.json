@@ -282,15 +282,6 @@
       }
     }
   },
-  "import_confirm": {
-    "title": "确认数据导入",
-    "description": "这将把你的进度数据导入到你的 PvP 档案中：",
-    "target_mode": "目标游戏模式：PvP",
-    "notice": "数据将导入到你的 PvP（标准多人）进度中",
-    "list_title": "将导入的数据：",
-    "warning": "警告：此操作无法撤销！",
-    "confirm": "确认导入"
-  },
   "maps": {
     "zoom_speed": "缩放速度",
     "pan_speed": "平移速度",
