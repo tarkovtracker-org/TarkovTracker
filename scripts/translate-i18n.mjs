@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import JSON5 from 'json5';
 const LOCALES_DIR = join(process.cwd(), 'app', 'locales');
 const SOURCE_LOCALE = 'en';
+const LOCALE_EXTENSION = '.json';
 const TARGETS = ['de', 'es', 'fr', 'ru', 'uk', 'zh'];
 const TARGET_CODE_MAP = {
   zh: 'zh-CN',
@@ -56,16 +56,8 @@ function rebuildFromSource(source, flat, prefix = '') {
   }
   return flat[prefix];
 }
-function getLeadingCommentBlock(raw) {
-  const match = raw.match(/^\{\n((?:\s*\/\/.*\n)+)/);
-  return match?.[1] ?? '';
-}
-function stringifyLocale(localeObject, commentBlock) {
-  const content = JSON5.stringify(localeObject, null, 2);
-  if (!commentBlock) {
-    return `${content}\n`;
-  }
-  return `${content.replace('{\n', `{\n${commentBlock}`)}\n`;
+function stringifyLocale(localeObject) {
+  return `${JSON.stringify(localeObject, null, 2)}\n`;
 }
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -185,10 +177,9 @@ async function mapWithConcurrency(items, worker) {
   return results;
 }
 async function translateLocale(sourceLocale, localeCode) {
-  const filePath = join(LOCALES_DIR, `${localeCode}.json5`);
+  const filePath = join(LOCALES_DIR, `${localeCode}${LOCALE_EXTENSION}`);
   const raw = readFileSync(filePath, 'utf-8');
-  const commentBlock = getLeadingCommentBlock(raw);
-  const locale = JSON5.parse(raw);
+  const locale = JSON.parse(raw);
   const sourceFlat = flatten(sourceLocale);
   const localeFlat = flatten(locale);
   const keys = Object.keys(sourceFlat);
@@ -221,7 +212,7 @@ async function translateLocale(sourceLocale, localeCode) {
     }
   });
   const rebuilt = rebuildFromSource(sourceLocale, localeFlat);
-  const output = stringifyLocale(rebuilt, commentBlock);
+  const output = stringifyLocale(rebuilt);
   writeFileSync(filePath, output, 'utf-8');
   return {
     localeCode,
@@ -230,8 +221,8 @@ async function translateLocale(sourceLocale, localeCode) {
   };
 }
 async function main() {
-  const sourcePath = join(LOCALES_DIR, `${SOURCE_LOCALE}.json5`);
-  const sourceLocale = JSON5.parse(readFileSync(sourcePath, 'utf-8'));
+  const sourcePath = join(LOCALES_DIR, `${SOURCE_LOCALE}${LOCALE_EXTENSION}`);
+  const sourceLocale = JSON.parse(readFileSync(sourcePath, 'utf-8'));
   const summary = [];
   for (const localeCode of TARGETS) {
     summary.push(await translateLocale(sourceLocale, localeCode));

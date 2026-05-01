@@ -313,7 +313,7 @@ export default defineNuxtConfig({
     defaultLocale: 'en',
     restructureDir: 'app',
     langDir: 'locales',
-    locales: SUPPORTED_LOCALES.map((code) => ({ code, file: `${code}.json5` })),
+    locales: SUPPORTED_LOCALES.map((code) => ({ code, file: `${code}.json` })),
     vueI18n: 'i18n.config.ts',
   },
   hooks: {

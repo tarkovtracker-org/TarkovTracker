@@ -39,7 +39,7 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 │   │   ├── tasks/           # Task/quest tracking
 │   │   └── team/            # Team collaboration
 │   ├── layouts/             # Page layouts
-│   ├── locales/             # i18n translations (JSON5)
+│   ├── locales/             # i18n translations (JSON)
 │   ├── pages/               # File-based routing
 │   ├── plugins/             # Nuxt plugins
 │   ├── server/              # Nitro server routes

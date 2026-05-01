@@ -25,7 +25,7 @@ app/                    # Nuxt 4 source directory
 ├── stores/             # Pinia stores with persistence
 ├── composables/        # Reusable composition functions
 ├── server/api/         # Nitro server routes
-├── locales/            # i18n JSON5 files (en, de, es, fr, ru, uk)
+├── locales/            # i18n JSON files (en, de, es, fr, ru, uk)
 ├── plugins/            # Nuxt plugins
 ├── utils/              # Utility functions
 └── types/              # TypeScript type definitions
@@ -192,7 +192,7 @@ describe('ComponentName', () => {
 
 ## Localization
 
-- Locale files: `app/locales/*.json5`
+- Locale files: `app/locales/*.json`
 - Add keys consistently with existing namespace patterns
 - Never hard-code user-facing strings in components
 - Provide safe fallback strings

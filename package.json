@@ -52,7 +52,6 @@
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
-    "json5": "^2.2.3",
     "lint-staged": "^16.4.0",
     "postcss": "^8.5.9",
     "prettier": "^3.8.1",
@@ -99,8 +98,8 @@
     "build": "nuxt build",
     "deps": "taze --r --I",
     "dev": "nuxt dev",
-    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,json5,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,json5,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
+    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:sync": "node scripts/sync-i18n.mjs",
@@ -125,10 +124,10 @@
       "prettier --write",
       "eslint --fix"
     ],
-    "app/**/*.{json,json5,css,md}": [
+    "app/**/*.{json,css,md}": [
       "prettier --write"
     ],
-    "app/locales/*.json5": [
+    "app/locales/*.json": [
       "node scripts/lint-i18n.mjs"
     ],
     "docs/**/*.{md,markdown}": [
