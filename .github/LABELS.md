@@ -49,7 +49,7 @@ All area labels use `#c2e0c6` (light green) for visual grouping.
 | ------------------ | --------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `good-first-issue` | `#7057ff` | Good for newcomers                 | Simple, well-defined issues that can be completed in isolation without deep knowledge                 |
 | `help-wanted`      | `#008672` | Community help needed              | Well-scoped issues that welcome community contributions but may require broader context or experience |
-| `never-stale`      | `#5319e7` | Keep open when stale               | Long-lived backlog issues/PRs that should receive stale reminders but never be auto-closed            |
+| `never-stale`      | `#5319e7` | Never auto-close from stale        | Long-lived backlog issues/PRs that may be marked stale for review but must not be auto-closed         |
 | `upstream`         | `#e99695` | Issue belongs in data-overlay repo | Quest/item data issues that need fixes in the data-overlay repository                                 |
 
 ## Label Usage Guidelines
