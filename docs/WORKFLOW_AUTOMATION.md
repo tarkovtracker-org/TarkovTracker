@@ -93,11 +93,11 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
 
-Automatic stale issue/PR management:
+Automatic stale PR management:
 
-- Marks issues/PRs stale after 60 days
-- Closes stale items after 14 days
-- Exempts issues: `pinned`, `security`, `enhancement` labels
+- Does not mark or close issues as stale
+- Marks PRs stale after 60 days
+- Closes stale PRs after 14 days
 - Exempts PRs: `pinned`, `security`, `enhancement` labels
 
 ### 7. Link Check (`.github/workflows/link-check.yml`)
