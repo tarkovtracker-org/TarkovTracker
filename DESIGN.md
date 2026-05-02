@@ -131,10 +131,24 @@ slot defaults in `app/app.config.ts`.
 Use the Tailwind v4 theme tokens already defined in `app/assets/css/tailwind.css`. Do not put hex
 colors in Vue templates.
 
+The front matter uses sRGB hex values because the `DESIGN.md` token schema validates colors as hex.
+Treat those values as agent-readable representatives of the runtime Tailwind tokens, not a separate
+CSS source of truth.
+
 Primary actions use the tan `primary` palette. Secondary accents use `secondary` or `accent`.
 Surfaces follow the `surface` ladder: page canvas at `surface-950`, shell chrome at `surface-900`,
 content panels at `surface-850` or `surface-900`, raised controls at `surface-800`, hover states at
 `surface-700`, and dividers at `surface-600`.
+
+Surface token mapping:
+
+- `canvas` -> `surface-950`
+- `shell` -> `surface-900`
+- `panel` -> `surface-850` for content panels, or `surface-900` where matching existing shell
+  panels
+- `raised` -> `surface-800`
+- hover states -> `surface-700`
+- dividers -> `surface-600`
 
 State colors are semantic: `success`, `warning`, `error`, and `info`. Game-mode color should use
 `pvp` and `pve`, not ad hoc tan or blue classes.
