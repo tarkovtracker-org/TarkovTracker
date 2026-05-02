@@ -289,7 +289,7 @@ describe('AppBar theme switching', () => {
   it('leaves the active theme mode unchanged when selecting the current option', async () => {
     const wrapper = await mountAppBar();
     await wrapper.get('#app-theme-select').setValue('dark');
-    expect(mockPreferencesStore.setThemeMode).toHaveBeenCalledWith('dark');
+    expect(mockPreferencesStore.setThemeMode).not.toHaveBeenCalled();
     expect(mockPreferencesStore.getThemeMode).toBe('dark');
     wrapper.unmount();
   });
