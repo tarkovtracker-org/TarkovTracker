@@ -191,65 +191,65 @@
       },
       "actions": {
         "tasks": "Apri missioni",
-        "needed_items": "Open needed items"
+        "needed_items": "Oggetti necessari"
       }
     },
     "tasks": {
-      "title": "Tasks guide",
-      "summary": "Use the tasks page to browse available work, switch perspectives, and narrow the list to exactly what you want to focus on.",
-      "hint": "Get a quick explanation of task views, filters, and where the important settings live.",
+      "title": "Guida alle missioni",
+      "summary": "Usa la pagina missioni per sfogliare il lavoro disponibile, cambiare prospettiva e restringere la lista su ciò a cui vuoi concentrarti.",
+      "hint": "Ottieni una rapida spiegazione di missioni, filtri e impostazioni importanti.",
       "sections": {
         "views": {
-          "title": "Pick a view",
-          "description": "The top row changes how tasks are grouped so you can browse by list, trader, map, or graph.",
-          "bullet_one": "List view is best for normal progression checks and quick search.",
-          "bullet_two": "Trader, map, and graph views are better when you already know the angle you want to review."
+          "title": "Scegli una vista",
+          "description": "Il menu superiore cambia il modo in cui le missioni sono raggruppate: per lista, mercante e mappa, o apri un grafico.",
+          "bullet_one": "La modalità Lista è la migliore per la normale progressione e per una ricerca rapida.",
+          "bullet_two": "Mercante, mappa e grafico sono più adatte quando sai già come muoverti nella lista."
         },
         "filters": {
-          "title": "Trim the list",
-          "description": "Status filters let you focus on what is available now, locked, completed, or failed without leaving the page.",
-          "bullet_one": "Search works across task names and helps when the list feels too large.",
-          "bullet_two": "If a count looks lower than expected, one of the status or teammate filters is usually hiding results."
+          "title": "Raffina la lista",
+          "description": "I filtri ti consentono di concentrarti su ciò che è disponibile, bloccato, completato o fallito senza lasciare la pagina.",
+          "bullet_one": "Quando la lista è molto vasta, puoi cercare una missione specifica con la funzione ricerca.",
+          "bullet_two": "Se un conteggio sembra inferiore al previsto, di solito uno dei filtri di stato o del compagno di squadra sta nascondendo i risultati."
         },
         "settings": {
-          "title": "Adjust behavior",
-          "description": "The cog opens display and filtering preferences that change how the task list behaves across sessions.",
-          "bullet_one": "Use settings when you want different default filters, team visibility, or map behavior.",
-          "bullet_two": "If the page feels off, settings are the first place to check before assuming data is missing."
+          "title": "Affina la vista della pagina",
+          "description": "L'icona ingranaggio apre preferenze di visualizzazione e filtri missione specifici, e cambia il comportamento dell'elenco nelle varie sessioni.",
+          "bullet_one": "Utilizza le impostazioni quando desideri modificare filtri specifici, visibilità missioni di squadra o comportamento nella sezione mappa.",
+          "bullet_two": "Se la lista sembra errata, le impostazioni sono il punto di partenza da controllare prima di assumere che i dati siano sbagliati."
         }
       },
       "actions": {
-        "needed_items": "Task items",
-        "hideout": "Open hideout"
+        "needed_items": "Oggetti necessari",
+        "hideout": "Apri il rifugio"
       }
     },
     "needed_items": {
-      "title": "Needed items guide",
-      "summary": "Use needed items to combine task and hideout materials, then narrow the list to the exact items you still care about.",
-      "hint": "Get a quick explanation of the tabs, view modes, and the filters behind the cog.",
+      "title": "Guida agli oggetti necessari",
+      "summary": "Utilizza la pagina per combinare gli oggetti di cui hai bisogno per missioni e rifugio, quindi restringi l'elenco agli oggetti di cui hai bisogno.",
+      "hint": "Ottieni una rapida spiegazione delle schede, delle modalità di visualizzazione e dei filtri.",
       "sections": {
         "scopes": {
-          "title": "Choose a scope",
-          "description": "Tabs at the top switch between all items, task-only, hideout-only, and completed needs.",
-          "bullet_one": "Use task-only when you are questing and do not want hideout materials mixed in.",
-          "bullet_two": "Use completed when you want to review what you already satisfied instead of what is still missing."
+          "title": "Scegli un ambito",
+          "description": "Con le schede in alto puoi visualizzare un elenco di tutti gli oggetti richiesti, oppure solo quelli inerenti a missioni e rifugio, e quelli già raccolti.",
+          "bullet_one": "Selezionando la voce missioni vedrai solo gli oggetti richiesti per le missioni attualmente attive.",
+          "bullet_two": "Seleziona la voce completati quando vuoi dare un occhio agli oggetti già consegnati rispetto a quelli che ancora ti mancano."
         },
         "views": {
-          "title": "Change the layout",
-          "description": "List, grid, and combined views all show the same data but are optimized for different browsing styles.",
-          "bullet_one": "List view is fastest for scanning counts and names.",
-          "bullet_two": "Combined view groups repeated items together when you care more about totals than individual sources."
+          "title": "Cambia il layout",
+          "description": "Puoi modificare lo stile di visualizzazione con le viste a elenco, griglia e combinata.",
+          "bullet_one": "La vista a elenco è la più rapida per dare un'occhiata a conteggi e nomi.",
+          "bullet_two": "La vista combinata ti permette di raggruppare insieme oggetti ripetuti più volte, quando ti preoccupa più il totale rispetto alle singole missioni."
         },
         "filters": {
-          "title": "Refine the list",
-          "description": "The settings drawer controls owned-item visibility, FIR rules, team needs, and other high-impact filters.",
-          "bullet_one": "If an item disappears unexpectedly, a drawer filter is usually the reason.",
-          "bullet_two": "Sorting by priority is best when you want the highest-impact items first."
+          "title": "Affina l'elenco",
+          "description": "Le impostazioni ti permettono di controllare visibilità, regole FIR \"Trovato in raid\", esigenze del team e altri filtri.",
+          "bullet_one": "Se un oggetto non appare, probabilmente qualche filtro è attivo.",
+          "bullet_two": "Ordinare per priorità è la scelta migliore quando vuoi collezionare prima gli oggetti di maggiore impatto."
         }
       },
       "actions": {
         "tasks": "Apri missioni",
-        "hideout": "Open hideout"
+        "hideout": "Apri il rifugio"
       }
     },
     "hideout": {
