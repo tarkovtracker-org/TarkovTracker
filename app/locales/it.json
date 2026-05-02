@@ -75,16 +75,16 @@
       "guest": "Questo browser aveva progressi salvati in modalità ospite da prima dell'accesso, quindi il progresso nel cloud è stato mantenuto."
     },
     "progress_merged": {
-      "title": "Progresso cloud sincronizzato",
-      "description": "Progressi da altre schede/browser sincronizzati, unite {count} differenze."
+      "title": "Progressi cloud sincronizzati",
+      "description": "Progressi da altre schede/browser sincronizzati, {count} differenze unite."
     },
     "load_failed": {
       "title": "Impossibile caricare i progressi",
-      "description": "Abbiamo rilevato un problema nel caricamento dei dati del tuo account. Si prega di aggiornare la pagina o contattare il supporto se il problema persiste."
+      "description": "C'è stato nel caricamento dati del tuo account. Aggiorna la pagina o contatta il supporto se il problema persiste."
     },
     "count_edit_updated": {
       "title": "Bozza aggiornata",
-      "description": "Your in-progress value was updated to {value}."
+      "description": "Il tuo progresso è stato aggiornato a {value}."
     },
     "clipboard_copied": {
       "title": "Copiato!",
@@ -114,50 +114,50 @@
     "launcher": {
       "title": "Aiuto e onboarding",
       "summary": "Scegli una guida rapida per questa pagina o il setup completo.",
-      "page_guide": "Guide this page",
-      "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
-      "onboarding": "New user onboarding",
-      "onboarding_description": "Start with imports, finish the basics, then verify tasks."
+      "page_guide": "Guida rapida",
+      "page_guide_unavailable": "Guida rapida non disponibile. Utilizza l'onboarding.",
+      "onboarding": "Onboarding completo",
+      "onboarding_description": "Comincia con gli inport, le basi e poi verifica le missioni."
     },
     "onboarding": {
-      "title": "Getting set up",
-      "summary": "This is the recommended first pass for new or returning users. Use the action buttons to jump into the real pages.",
+      "title": "Setup",
+      "summary": "Questo è il primo passaggio consigliato per i nuovi utenti o per chi ritorna. Usa i pulsanti per passare alle relative pagine.",
       "actions": {
-        "account": "Open account",
-        "login": "Sign in"
+        "account": "Apri account",
+        "login": "Accedi"
       },
       "steps": {
         "import": {
-          "title": "Import progress first",
-          "description": "Use imports before touching manual setup. They are the fastest way to get most of your tracker into a usable state.",
+          "title": "Importa i tuoi progressi",
+          "description": "Importa i progressi prima di passare al setup manuale. Sono il modo più veloce per rendere il tracker subito operativo.",
           "bullets": {
-            "one": "Import your Tarkov.dev profile first when you have it. That usually fills most of the account basics and tracked progress.",
-            "two": "Import your EFT logs next. That can backfill quests and other progress with almost no manual clicking.",
-            "three": "If both imports land cleanly, manual setup becomes a quick verification pass instead of rebuilding everything by hand."
+            "one": "Importa il tuo profilo Tarkov.dev. Solitamente compila gran parte delle info di base e dei progressi tracciati.",
+            "two": "Importa i log EFT. Questo sincronizzerà progressi e missioni completate.",
+            "three": "Se entrambi vanno a buon fine, sarà necessaria solo una rapida verifica."
           },
           "actions": {
-            "open": "Open imports"
+            "open": "Apri \"Importa\""
           }
         },
         "profile": {
-          "title": "Finish the basics",
-          "description": "After imports, lock in the core profile fields and decide whether you want your progress synced to an account.",
+          "title": "Termina le basi",
+          "description": "Dopo le importazioni, termina il setup del profilo e decidi se vuoi sincronizzare i progressi con un account.",
           "bullets": {
-            "one": "Set your game mode, edition, level, faction, and display name so filters and unlock requirements line up with your real account.",
-            "two": "Signing in unlocks teams, API-backed features, and cloud storage so progress is easier to keep across devices.",
-            "three": "If you are not ready to sign in yet, you can still track locally first and attach that progress to an account later."
+            "one": "Imposta la modalità di gioco, edizione, livello, fazione e username, così filtri e requisiti saranno allineati al tuo account di gioco.",
+            "two": "Accedere sblocca squadre, funzionalità con API, e archiviazione cloud per mantenere i tuoi progressi sincronizzati.",
+            "three": "Se non sei ancora pronto ad accedere, i progressi saranno tracciati localmente e in futuro saranno sincronizzati tramite l'account."
           },
           "actions": {
-            "settings": "Open settings"
+            "settings": "Apri impostazioni"
           }
         },
         "tasks": {
-          "title": "Sanity-check tasks",
-          "description": "The last high-impact cleanup step is task availability. Once that is accurate, the rest of the site becomes much more reliable.",
+          "title": "Ultimo controllo Missioni",
+          "description": "L'ultimo step è il controllo delle Missioni. Una volta fatto questo, i dati saranno molto più precisi.",
           "bullets": {
-            "one": "On the tasks page, mark the quests you currently have available in-game for each trader. That backfills prerequisite chains much faster than manually completing old tasks one by one.",
-            "two": "When something looks wrong, use the task card menu to report a data issue instead of forcing your tracker into a bad state.",
-            "three": "After this pass, use the app-bar help button on any supported page to reopen the page guide or this onboarding flow."
+            "one": "Nella pagina Missioni, segna le missioni che hai attualmente disponibili in gioco per ogni mercante. Questo riempie automaticamente le catene di prerequisiti molto più velocemente rispetto a completare manualmente le vecchie missioni una per una.",
+            "two": "Quando qualcosa sembra sbagliato, utilizza il menu della scheda missione per segnalare un problema di dati invece di forzare il tracker in uno stato errato.",
+            "three": "Puoi utilizzare il pulsante di aiuto nella barra in alto su qualsiasi pagina supportata per riaprire la guida della pagina o questo flusso di onboarding."
           },
           "actions": {
             "open": "Apri missioni"
@@ -168,25 +168,25 @@
     "dashboard": {
       "title": "Guida alla dashboard",
       "summary": "Utilizza la dashboard per individuare il miglior passo successivo, rivedere i progressi e accedere alle pagine che richiedono attenzione.",
-      "hint": "Ottieni una rapida panoramica di ciò che la dashboard sta mostrando e dove fare clic successivo.",
+      "hint": "Ottieni una rapida panoramica di ciò che la dashboard sta mostrando.",
       "sections": {
         "focus": {
           "title": "Miglior passo successivo",
           "description": "La scheda superiore evidenzia i progressi immediati più chiari in base ai filtri attuali e ai progressi monitorati.",
-          "bullet_one": "Usalo quando vuoi ricevere una raccomandazione invece di sfogliare l'elenco delle missioni.",
-          "bullet_two": "Se sembra sbagliato, controllare prima i filtri delle missioni perché le missioni nascoste possono cambiare la raccomandazione."
+          "bullet_one": "Usala quando vuoi ricevere una raccomandazione invece di sfogliare l'elenco delle missioni.",
+          "bullet_two": "Se sembra sbagliata, controlla prima i filtri delle missioni: le missioni nascoste possono cambiare le raccomandazioni."
         },
         "progress": {
           "title": "Schede di avanzamento",
           "description": "Le schede di avanzamento sono scorciatoie di missioni e oggetti richiesti con i totali già considerati.",
-          "bullet_one": "Task and objective cards jump back into your quest list.",
-          "bullet_two": "Item cards jump straight to the matching needed-items view for tasks or hideout."
+          "bullet_one": "Le schede missioni e obiettivi ti riportano alla lista missioni.",
+          "bullet_two": "Le schede oggetti ti portano alla lista di oggetti necessari per missioni e rifugio."
         },
         "review": {
-          "title": "Longer-term review",
-          "description": "Trader and milestone sections are for checking broader progression, not just your next click.",
-          "bullet_one": "Use traders to see which quest lines still have the most work left.",
-          "bullet_two": "Use milestones to check Kappa, Lightkeeper, and overall completion pace at a glance."
+          "title": "Progresso a lungo termine",
+          "description": "Le sezioni Mercanti e Traguardi servono a monitorare la progressione generale, non solo il prossimo clic.",
+          "bullet_one": "Usa la sezione Mercanti per vedere quali questline hanno ancora il maggior lavoro rimanente.",
+          "bullet_two": "La sezione Traguardi invece mostra i progressi verso Kappa, Lightkeeper e il completamento generale in un colpo d'occhio."
         }
       },
       "actions": {
