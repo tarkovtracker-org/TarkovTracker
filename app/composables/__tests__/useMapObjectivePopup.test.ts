@@ -15,13 +15,22 @@ const createMetadataStore = (
   objectiveMaps,
 });
 const createPreferencesStore = (mapView = 'customs') => {
-  let taskMapView = mapView;
+  const normalizeMapView = (value: unknown): string => {
+    const candidate =
+      typeof value === 'string'
+        ? value
+        : value && typeof value === 'object' && 'value' in value
+          ? (value as { value?: unknown }).value
+          : null;
+    return typeof candidate === 'string' && candidate.length > 0 ? candidate : 'all';
+  };
+  let taskMapView = normalizeMapView(mapView);
   return {
     get getTaskMapView() {
-      return taskMapView;
+      return normalizeMapView(taskMapView);
     },
     setTaskMapView: vi.fn((nextMapView: string) => {
-      taskMapView = nextMapView;
+      taskMapView = normalizeMapView(nextMapView);
     }),
   };
 };
