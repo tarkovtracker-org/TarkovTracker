@@ -1,53 +1,53 @@
 {
   "admin": {
-    "title": "Panel Administracyjny"
+    "title": "Admin Panel"
   },
   "alerts": {
-    "no_map_data": "Brak danych mapy dla tego wyboru."
+    "no_map_data": "No map data available for this selection."
   },
   "app_bar": {
-    "error_loading": "Błąd wczytywania danych Tarkova",
-    "loading": "Wczytywanie danych Tarkova",
-    "logout_failed": "Nie udało się wylogować. Spróbuj ponownie.",
-    "hidden_label": "Ukryte",
-    "user_label": "Użytkownik",
-    "user_avatar_alt": "Awatar użytkownika"
+    "error_loading": "Error Loading Tarkov Data",
+    "loading": "Loading Tarkov Data",
+    "logout_failed": "Unable to log out. Please try again.",
+    "hidden_label": "Hidden",
+    "user_label": "User",
+    "user_avatar_alt": "User avatar"
   },
   "buttons": {
-    "retry": "Ponów"
+    "retry": "Retry"
   },
   "errors": {
-    "generic_fallback": "Nieoczekiwany błąd. Spróbuj ponownie.",
-    "chunk_load_blocked": "Wymagany plik aplikacji nie mógł zostać załadowany. Spróbuj ponownie. Jeśli błąd się powtarza, twój dostawca usług internetu lub region mogą blokować dostęp.",
-    "network_access_denied": "Wymagane żądanie sieciowe zostało zablokowane. Spróbuj ponownie. Jeśli wciąż nie działa, spróbuj VPN lub Cloudflare WARP."
+    "generic_fallback": "Unexpected error. Please try again.",
+    "chunk_load_blocked": "A required app file could not load. Please retry. If this keeps happening, your ISP or region may be blocking access.",
+    "network_access_denied": "A required network request was blocked. Please retry. If it keeps failing, try VPN or Cloudflare WARP."
   },
   "error": {
-    "return_home": "Powrót do strony głównej",
-    "show_details": "Pokaż szczegóły",
-    "hide_details": "Ukryj szczegóły",
-    "technical_details": "Szczegóły techniczne",
-    "copy_details": "Kopiuj szczegóły",
-    "copy_success": "Skopiowano",
-    "status_prefix": "Błąd",
-    "page_not_found": "Strona nie znaleziona",
-    "page_not_found_description": "Strona, której szukasz, nie istnieje.",
-    "access_blocked": "Dostęp zablokowany",
-    "service_unavailable": "Usługa niedostępna",
-    "something_went_wrong": "Coś poszło nie tak",
-    "unexpected_description": "Wystąpił nieoczekiwany błąd podczas przetwarzania żądania.",
+    "return_home": "Return Home",
+    "show_details": "Show details",
+    "hide_details": "Hide details",
+    "technical_details": "Technical details",
+    "copy_details": "Copy details",
+    "copy_success": "Copied",
+    "status_prefix": "Error",
+    "page_not_found": "Page Not Found",
+    "page_not_found_description": "The page you are looking for does not exist.",
+    "access_blocked": "Access Blocked",
+    "service_unavailable": "Service Unavailable",
+    "something_went_wrong": "Something Went Wrong",
+    "unexpected_description": "An unexpected error occurred while processing your request.",
     "invalid_host_hint": "This preview host is blocked by API host validation. Add the preview hostname to API_ALLOWED_HOSTS or derive it from CF_PAGES_URL.",
     "supabase_config_hint": "This deployment is missing public Supabase configuration. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.",
     "request_blocked_hint": "A request required to render this page was blocked. Open the technical details and include the failing request URL when reporting the issue."
   },
   "loading_screen": {
-    "title": "Wczytywanie Tarkov Tracker",
-    "title_error": "Błąd wczytywania",
-    "subtitle": "Pobieranie wymaganych danych gry...",
-    "subtitle_error": "Niektóre dane nie zostały załadowane",
-    "first_load_info": "Pierwsze wczytywanie może chwilę zająć. Dane zostaną zapisane w pamięci podręcznej na potrzeby przyszłych wizyt.",
+    "title": "Loading Tarkov Tracker",
+    "title_error": "Loading Issue",
+    "subtitle": "Downloading required game data...",
+    "subtitle_error": "Some data failed to load",
+    "first_load_info": "This may take a moment on first load. Data will be cached for future visits.",
     "partial_data_info": "The app can still work with partial data. You can retry or continue anyway.",
-    "retry": "Ponów",
-    "continue_anyway": "Kontynuuj mimo to"
+    "retry": "Retry",
+    "continue_anyway": "Continue Anyway"
   },
   "toast": {
     "hideout_updated": {
@@ -87,30 +87,30 @@
       "description": "Your in-progress value was updated to {value}."
     },
     "clipboard_copied": {
-      "title": "Skopiowano!",
+      "title": "Copied!",
       "description": "{value}"
     },
     "clipboard_error": {
-      "title": "Kopiowanie nieudane",
-      "description": "Nie można skopiować \"{value}\" do schowka."
+      "title": "Copy failed",
+      "description": "Unable to copy \"{value}\" to clipboard."
     }
   },
   "common": {
-    "cancel": "Anuluj",
-    "close": "Zamknij",
+    "cancel": "Cancel",
+    "close": "Close",
     "click": "Click",
-    "previous": "Poprzedni",
-    "next": "Następny",
-    "finish": "Zakończ",
-    "back_to_top": "Powrót na górę",
-    "refresh_button": "Spróbuj ponownie",
+    "previous": "Previous",
+    "next": "Next",
+    "finish": "Finish",
+    "back_to_top": "Back to top",
+    "refresh_button": "Try again",
     "opens_in_new_tab": "Opens in new tab",
     "note": "Note"
   },
   "page_help": {
-    "button": "Pomoc",
-    "hint_title": "Nowy tutaj?",
-    "dismiss": "Odrzuć",
+    "button": "Help",
+    "hint_title": "New here?",
+    "dismiss": "Dismiss",
     "launcher": {
       "title": "Help and onboarding",
       "summary": "Pick a quick guide for this page or the full setup path.",
@@ -124,7 +124,7 @@
       "summary": "This is the recommended first pass for new or returning users. Use the action buttons to jump into the real pages.",
       "actions": {
         "account": "Open account",
-        "login": "Zaloguj się"
+        "login": "Sign in"
       },
       "steps": {
         "import": {
@@ -321,11 +321,11 @@
     },
     "aria": {
       "zoom_speed": "Zoom speed",
-      "pan_speed": "Prędkość przesuwania",
-      "zone_opacity": "Przezroczystość strefy"
+      "pan_speed": "Pan speed",
+      "zone_opacity": "Zone opacity"
     },
     "tooltip": {
-      "go_to": "Przejdź do celu",
+      "go_to": "Go to objective",
       "go_to_in_task_list": "Go to objective in task list",
       "complete": "Complete objective",
       "uncomplete": "Uncomplete objective",
@@ -344,7 +344,7 @@
         "hide": "Hide updates",
         "loading": "Loading updates...",
         "error": "Unable to load updates.",
-        "retry": "Ponów",
+        "retry": "Retry",
         "empty": "No updates yet.",
         "view_all": "View all"
       },
@@ -512,7 +512,7 @@
       "back": "Back to Dashboard",
       "loading": "Loading changelog...",
       "error": "Unable to load changelog.",
-      "retry": "Spróbuj ponownie",
+      "retry": "Try again",
       "empty": "No changelog entries yet.",
       "load_more": "Load more",
       "types": {
@@ -616,7 +616,7 @@
         "aria_label": "Sort tasks"
       },
       "filters": {
-        "close": "Zamknij"
+        "close": "Close"
       },
       "api_update_log": {
         "title": "Recent Sync History",
@@ -672,7 +672,7 @@
           "repair_failed_done": "Cleared failed status for {count} tasks.",
           "repair_failed_error": "Failed to repair tasks",
           "repair_failed_action": "Repair",
-          "repair_failed_cancel": "Anuluj"
+          "repair_failed_cancel": "Cancel"
         }
       },
       "no_tasks_found": "No tasks found. Try changing your filters or updating your level.",
@@ -848,7 +848,7 @@
         "trader_loyalty": "Require trader loyalty",
         "confirm_title": "Enable availability requirement?",
         "confirm_description": "Enabling {requirement} may remove hideout upgrades that no longer meet prerequisites.",
-        "confirm_cancel": "Anuluj",
+        "confirm_cancel": "Cancel",
         "confirm_confirm": "Enable"
       },
       "primary_views": {
@@ -895,7 +895,7 @@
       "items": "items",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
-      "retry": "Spróbuj ponownie",
+      "retry": "Try again",
       "filters": {
         "all": "All",
         "label": "Filters",
@@ -980,7 +980,7 @@
             "permissions_title": "Permissions",
             "note_label": "Label or note",
             "note_placeholder": "e.g. streamer overlay, clan bot, personal app",
-            "cancel": "Anuluj"
+            "cancel": "Cancel"
           }
         }
       }
@@ -1062,7 +1062,7 @@
       "contributors": {
         "loading": "Loading contributors...",
         "error": "Unable to load contributors right now.",
-        "retry": "Ponów",
+        "retry": "Retry",
         "empty": "No contributors found yet.",
         "contributions": "{count} contributions"
       }
@@ -1191,7 +1191,7 @@
       "kappa_remaining": "{count} remaining"
     },
     "not_found": {
-      "title": "Strona nie znaleziona",
+      "title": "Page Not Found",
       "not_found_description": "Sorry, that page could not be found!"
     },
     "terms_of_service": {
@@ -1442,7 +1442,7 @@
     "general": {
       "privacy_mode": "Streamer Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming.",
-      "admin_panel": "Panel Administracyjny"
+      "admin_panel": "Admin Panel"
     },
     "interface": {
       "title": "Interface Customization",
@@ -1520,7 +1520,7 @@
       "prestige_pvp_data": "Prestige PvP",
       "prestige_pvp_confirmation": "Are you sure you want to prestige your PvP profile?",
       "prestige_pvp_warning": "Your current PvP run will be archived, then PvP progression will reset for the next prestige level. PvE data is not affected.",
-      "reset_cancel": "Anuluj",
+      "reset_cancel": "Cancel",
       "reset_confirm": "Reset Data",
       "export_title": "Export & Backup",
       "export_description": "Download a backup of your progress data for both PvP and PvE modes.",
@@ -1558,7 +1558,7 @@
       "import_target_pve": "PvE Only",
       "import_target_both": "Both PvP & PvE",
       "import_confirm": "Confirm Import",
-      "import_cancel": "Anuluj",
+      "import_cancel": "Cancel",
       "import_success_title": "Backup Imported",
       "import_success_description": "Your progress data has been restored successfully.",
       "import_error_title": "Import Failed",
@@ -1817,7 +1817,7 @@
       "mode_summary_both": "PvP + PvE (auto)",
       "mode_summary_unknown": "Unknown",
       "confirm": "Confirm Import",
-      "cancel": "Anuluj",
+      "cancel": "Cancel",
       "success_title": "EFT Logs Imported",
       "success_description": "Marked {complete_count} tasks completed and {active_count} tasks active from game logs.",
       "error_title": "EFT Logs Import Failed",
@@ -1862,7 +1862,7 @@
       "import_to_mode": "Import to Mode",
       "import_target_notice": "This data will be imported into your {mode} profile.",
       "confirm": "Confirm Import",
-      "cancel": "Anuluj",
+      "cancel": "Cancel",
       "success_title": "Profile Imported",
       "success_description": "Your Tarkov.dev profile has been imported successfully.",
       "error_title": "Import Failed",
@@ -1981,13 +1981,13 @@
       "requesting_access": "is requesting access to your TarkovTracker account.",
       "requested_permissions": "Requested Permissions:",
       "redirect_to": "Will redirect to:",
-      "approve": "Zatwierdź",
-      "deny": "Odmów"
+      "approve": "Approve",
+      "deny": "Deny"
     }
   },
   "analytics_consent": {
     "eyebrow": "Analytics",
-    "title": "Pomóż ulepszyć Tarkov Tracker",
+    "title": "Help make Tarkov Tracker better",
     "title_answered": "Help improve Tarkov Tracker",
     "description": "Allow usage analytics so we can understand what works, fix pain points, and improve Tarkov Tracker.",
     "accepted": "You are helping improve Tarkov Tracker with usage analytics on this browser.",
@@ -1996,15 +1996,15 @@
     "badge_usage_stats": "Usage stats",
     "badge_analytics_only": "Analytics only",
     "change_anytime": "Change this anytime from the footer.",
-    "review_details": "Przejrzyj szczegóły polityki prywatności",
+    "review_details": "Review details in Privacy Policy",
     "allow": "Help us improve",
     "decline": "Keep analytics off"
   },
   "prestige": {
-    "no_prestige": "Brak Prestiżu",
-    "prestige_n": "Prestiż {n}"
+    "no_prestige": "No Prestige",
+    "prestige_n": "Prestige {n}"
   },
   "generic": {
-    "close_button": "Zamknij"
+    "close_button": "Close"
   }
 }
