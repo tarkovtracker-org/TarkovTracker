@@ -1,119 +1,119 @@
 {
   "admin": {
-    "title": "Pannello Admin"
+    "title": "Admin Panel"
   },
   "alerts": {
-    "no_map_data": "Nessun dato della mappa disponibile per questa selezione."
+    "no_map_data": "No map data available for this selection."
   },
   "app_bar": {
-    "error_loading": "Errore caricamento dati Tarkov",
-    "loading": "Caricamento dati Tarkov",
-    "logout_failed": "Impossibile disconnettersi. Riprova.",
-    "hidden_label": "Nascosto",
-    "user_label": "Utente",
-    "user_avatar_alt": "Avatar utente"
+    "error_loading": "Error Loading Tarkov Data",
+    "loading": "Loading Tarkov Data",
+    "logout_failed": "Unable to log out. Please try again.",
+    "hidden_label": "Hidden",
+    "user_label": "User",
+    "user_avatar_alt": "User avatar"
   },
   "buttons": {
-    "retry": "Riprova"
+    "retry": "Retry"
   },
   "errors": {
-    "generic_fallback": "Errore imprevisto. Riprova.",
-    "chunk_load_blocked": "Un file app richiesto non può essere caricato. Riprova. Il tuo ISP o la regione potrebbero bloccare l'accesso.",
-    "network_access_denied": "Una richiesta di rete è stata bloccata. Riprova. Se continua a fallire, prova VPN o Cloudflare WARP."
+    "generic_fallback": "Unexpected error. Please try again.",
+    "chunk_load_blocked": "A required app file could not load. Please retry. If this keeps happening, your ISP or region may be blocking access.",
+    "network_access_denied": "A required network request was blocked. Please retry. If it keeps failing, try VPN or Cloudflare WARP."
   },
   "error": {
-    "return_home": "Torna alla Home",
-    "show_details": "Mostra dettagli",
-    "hide_details": "Nascondi dettagli",
-    "technical_details": "Dettagli tecnici",
-    "copy_details": "Copia dettagli",
-    "copy_success": "Copiato",
-    "status_prefix": "Errore",
-    "page_not_found": "Pagina non trovata",
-    "page_not_found_description": "La pagina che stai cercando non esiste.",
-    "access_blocked": "Accesso bloccato",
-    "service_unavailable": "Servizio non disponibile",
-    "something_went_wrong": "Qualcosa è andato storto",
-    "unexpected_description": "Si è verificato un errore imprevisto durante l'elaborazione della richiesta.",
-    "invalid_host_hint": "Questo host di anteprima è bloccato dalla convalida dell'host API. Aggiungi il nome dell'host di anteprima a API_ALLOWED_HOSTS o derivalo da CF_PAGES_URL.",
-    "supabase_config_hint": "Questa distribuzione manca della configurazione pubblica di Supabase. Imposta NUXT_PUBLIC_SUPABASE_URL e NUXT_PUBLIC_SUPABASE_ANON_KEY per le anteprime, o consente alle build di anteprima di funzionare in modalità offline.",
-    "request_blocked_hint": "Una richiesta necessaria per visualizzare questa pagina è stata bloccata. Aprire i dettagli tecnici e includere l'URL della richiesta fallita quando si segnala il problema."
+    "return_home": "Return Home",
+    "show_details": "Show details",
+    "hide_details": "Hide details",
+    "technical_details": "Technical details",
+    "copy_details": "Copy details",
+    "copy_success": "Copied",
+    "status_prefix": "Error",
+    "page_not_found": "Page Not Found",
+    "page_not_found_description": "The page you are looking for does not exist.",
+    "access_blocked": "Access Blocked",
+    "service_unavailable": "Service Unavailable",
+    "something_went_wrong": "Something Went Wrong",
+    "unexpected_description": "An unexpected error occurred while processing your request.",
+    "invalid_host_hint": "This preview host is blocked by API host validation. Add the preview hostname to API_ALLOWED_HOSTS or derive it from CF_PAGES_URL.",
+    "supabase_config_hint": "This deployment is missing public Supabase configuration. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.",
+    "request_blocked_hint": "A request required to render this page was blocked. Open the technical details and include the failing request URL when reporting the issue."
   },
   "loading_screen": {
-    "title": "Caricamento Tarkov Tracker",
-    "title_error": "Caricamento Problema",
-    "subtitle": "Download dei dati necessari...",
-    "subtitle_error": "Caricamento di alcuni dati non riuscito",
-    "first_load_info": "Questo potrebbe richiedere un momento al primo carico. I dati saranno memorizzati nella cache per le visite future.",
-    "partial_data_info": "L'applicazione può ancora funzionare con dati parziali. È possibile riprovare o continuare comunque.",
-    "retry": "Riprova",
-    "continue_anyway": "Continua comunque"
+    "title": "Loading Tarkov Tracker",
+    "title_error": "Loading Issue",
+    "subtitle": "Downloading required game data...",
+    "subtitle_error": "Some data failed to load",
+    "first_load_info": "This may take a moment on first load. Data will be cached for future visits.",
+    "partial_data_info": "The app can still work with partial data. You can retry or continue anyway.",
+    "retry": "Retry",
+    "continue_anyway": "Continue Anyway"
   },
   "toast": {
     "hideout_updated": {
-      "title": "Rifugio aggiornato",
-      "description": "Rimossi {count} moduli che non soddisfano i requisiti."
+      "title": "Hideout updated",
+      "description": "Removed {count} station upgrades that no longer meet prerequisites."
     },
     "api_updated": {
-      "title": "Aggiorna da API",
-      "description_fallback": "I tuoi progressi sono stati aggiornati tramite API.",
+      "title": "Update from API",
+      "description_fallback": "Your progress was updated via API.",
       "label": {
-        "single": "Missione aggiornata",
-        "plural": "Missioni aggiornate"
+        "single": "Task updated",
+        "plural": "Tasks updated"
       },
       "state": {
-        "completed": "completato",
-        "failed": "fallito",
-        "uncompleted": "incompleto"
+        "completed": "completed",
+        "failed": "failed",
+        "uncompleted": "uncompleted"
       },
-      "more": ", +{count} altro"
+      "more": ", +{count} more"
     },
     "local_ignored": {
-      "title": "Progresso locale ignorato",
-      "other_account": "Il browser ha salvato i progressi da un account diverso, quindi è stato ignorato per evitare di sovrascrivere i progressi nel cloud.",
-      "unsaved": "Questa scheda ha progressi temporanei salvati in memoria ma nessuna copia salvata sul browser (solitamente dopo refresh/crash), quindi il progresso del cloud è stato mantenuto.",
-      "guest": "Questo browser aveva progressi salvati in modalità ospite da prima dell'accesso, quindi il progresso nel cloud è stato mantenuto."
+      "title": "Local browser progress skipped",
+      "other_account": "This browser has saved progress from a different account, so it was skipped to avoid overwriting your cloud progress.",
+      "unsaved": "This tab had temporary progress in memory but no saved browser copy (usually after refresh/crash), so cloud progress was kept.",
+      "guest": "This browser still had guest-mode progress from before sign-in, so your cloud progress was kept."
     },
     "progress_merged": {
-      "title": "Progresso cloud sincronizzato",
-      "description": "Progressi da altre schede/browser sincronizzati, unite {count} differenze."
+      "title": "Cloud progress synced",
+      "description": "Synced progress from another tab/device and merged {count} local differences."
     },
     "load_failed": {
-      "title": "Impossibile caricare i progressi",
-      "description": "Abbiamo rilevato un problema nel caricamento dei dati del tuo account. Si prega di aggiornare la pagina o contattare il supporto se il problema persiste."
+      "title": "Unable to load progress",
+      "description": "We detected an issue loading your account data. Please refresh the page or contact support if this persists."
     },
     "count_edit_updated": {
-      "title": "Bozza aggiornata",
+      "title": "Draft updated",
       "description": "Your in-progress value was updated to {value}."
     },
     "clipboard_copied": {
-      "title": "Copiato!",
+      "title": "Copied!",
       "description": "{value}"
     },
     "clipboard_error": {
-      "title": "Copia non riuscita",
-      "description": "Impossibile copiare \"{value}\" negli appunti."
+      "title": "Copy failed",
+      "description": "Unable to copy \"{value}\" to clipboard."
     }
   },
   "common": {
-    "cancel": "Annulla",
-    "close": "Chiudi",
+    "cancel": "Cancel",
+    "close": "Close",
     "click": "Click",
-    "previous": "Precedente",
-    "next": "Successivo",
-    "finish": "Termina",
-    "back_to_top": "Torna in alto",
-    "refresh_button": "Riprova",
-    "opens_in_new_tab": "Apri in una nuova scheda",
-    "note": "Nota"
+    "previous": "Previous",
+    "next": "Next",
+    "finish": "Finish",
+    "back_to_top": "Back to top",
+    "refresh_button": "Try again",
+    "opens_in_new_tab": "Opens in new tab",
+    "note": "Note"
   },
   "page_help": {
-    "button": "Aiuto",
-    "hint_title": "Nuovo qui?",
-    "dismiss": "Ignora",
+    "button": "Help",
+    "hint_title": "New here?",
+    "dismiss": "Dismiss",
     "launcher": {
-      "title": "Aiuto e onboarding",
-      "summary": "Scegli una guida rapida per questa pagina o il percorso completo di configurazione.",
+      "title": "Help and onboarding",
+      "summary": "Pick a quick guide for this page or the full setup path.",
       "page_guide": "Guide this page",
       "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
       "onboarding": "New user onboarding",
@@ -160,25 +160,25 @@
             "three": "After this pass, use the app-bar help button on any supported page to reopen the page guide or this onboarding flow."
           },
           "actions": {
-            "open": "Apri missioni"
+            "open": "Open tasks"
           }
         }
       }
     },
     "dashboard": {
-      "title": "Guida alla dashboard",
-      "summary": "Utilizzare la dashboard per individuare il miglior passo successivo, rivedere i progressi e accedere alle pagine che richiedono attenzione.",
-      "hint": "Ottieni una rapida panoramica di ciò che la dashboard sta mostrando e dove fare clic successivo.",
+      "title": "Dashboard guide",
+      "summary": "Use the dashboard to spot your best next step, review progress, and jump into the pages that need attention.",
+      "hint": "Get a quick overview of what the dashboard is showing and where to click next.",
       "sections": {
         "focus": {
-          "title": "Miglior passo successivo",
-          "description": "La scheda superiore evidenzia i progressi immediati più chiari in base ai filtri attuali e ai progressi monitorati.",
-          "bullet_one": "Usalo quando vuoi ricevere una raccomandazione invece di sfogliare l'elenco delle missioni.",
-          "bullet_two": "Se sembra sbagliato, controllare prima i filtri delle missioni perché le missioni nascoste possono cambiare la raccomandazione."
+          "title": "Best next step",
+          "description": "The top card highlights the clearest immediate progress based on your current filters and tracked progress.",
+          "bullet_one": "Use it when you want one strong recommendation instead of browsing the full task list.",
+          "bullet_two": "If it looks wrong, check your task filters first because hidden tasks can change the recommendation."
         },
         "progress": {
-          "title": "Schede di avanzamento",
-          "description": "Le schede di avanzamento sono scorciatoie di missioni e oggetti richiesti con i totali già considerati.",
+          "title": "Progress cards",
+          "description": "The progress cards are shortcuts into tasks and needed items with your current totals already in context.",
           "bullet_one": "Task and objective cards jump back into your quest list.",
           "bullet_two": "Item cards jump straight to the matching needed-items view for tasks or hideout."
         },
@@ -190,7 +190,7 @@
         }
       },
       "actions": {
-        "tasks": "Apri missioni",
+        "tasks": "Open tasks",
         "needed_items": "Open needed items"
       }
     },
@@ -248,7 +248,7 @@
         }
       },
       "actions": {
-        "tasks": "Apri missioni",
+        "tasks": "Open tasks",
         "hideout": "Open hideout"
       }
     },
@@ -278,7 +278,7 @@
       },
       "actions": {
         "needed_items": "Hideout items",
-        "tasks": "Apri missioni"
+        "tasks": "Open tasks"
       }
     }
   },
@@ -344,7 +344,7 @@
         "hide": "Hide updates",
         "loading": "Loading updates...",
         "error": "Unable to load updates.",
-        "retry": "Riprova",
+        "retry": "Retry",
         "empty": "No updates yet.",
         "view_all": "View all"
       },
@@ -512,7 +512,7 @@
       "back": "Back to Dashboard",
       "loading": "Loading changelog...",
       "error": "Unable to load changelog.",
-      "retry": "Riprova",
+      "retry": "Try again",
       "empty": "No changelog entries yet.",
       "load_more": "Load more",
       "types": {
@@ -616,7 +616,7 @@
         "aria_label": "Sort tasks"
       },
       "filters": {
-        "close": "Chiudi"
+        "close": "Close"
       },
       "api_update_log": {
         "title": "Recent Sync History",
@@ -672,7 +672,7 @@
           "repair_failed_done": "Cleared failed status for {count} tasks.",
           "repair_failed_error": "Failed to repair tasks",
           "repair_failed_action": "Repair",
-          "repair_failed_cancel": "Annulla"
+          "repair_failed_cancel": "Cancel"
         }
       },
       "no_tasks_found": "No tasks found. Try changing your filters or updating your level.",
@@ -775,8 +775,8 @@
         "copy_equipment_name": "Copy Equipment Name",
         "requirement_status_active": "active/accepted",
         "requirement_status_available": "available",
-        "requirement_status_completed": "completato",
-        "requirement_status_failed": "fallito",
+        "requirement_status_completed": "completed",
+        "requirement_status_failed": "failed",
         "requirement_status_not_started": "not started",
         "requires_must_be": "must be {status}",
         "requires_currently": "currently {status}",
@@ -848,7 +848,7 @@
         "trader_loyalty": "Require trader loyalty",
         "confirm_title": "Enable availability requirement?",
         "confirm_description": "Enabling {requirement} may remove hideout upgrades that no longer meet prerequisites.",
-        "confirm_cancel": "Annulla",
+        "confirm_cancel": "Cancel",
         "confirm_confirm": "Enable"
       },
       "primary_views": {
@@ -895,7 +895,7 @@
       "items": "items",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
-      "retry": "Riprova",
+      "retry": "Try again",
       "filters": {
         "all": "All",
         "label": "Filters",
@@ -980,7 +980,7 @@
             "permissions_title": "Permissions",
             "note_label": "Label or note",
             "note_placeholder": "e.g. streamer overlay, clan bot, personal app",
-            "cancel": "Annulla"
+            "cancel": "Cancel"
           }
         }
       }
@@ -1062,7 +1062,7 @@
       "contributors": {
         "loading": "Loading contributors...",
         "error": "Unable to load contributors right now.",
-        "retry": "Riprova",
+        "retry": "Retry",
         "empty": "No contributors found yet.",
         "contributions": "{count} contributions"
       }
@@ -1191,7 +1191,7 @@
       "kappa_remaining": "{count} remaining"
     },
     "not_found": {
-      "title": "Pagina non trovata",
+      "title": "Page Not Found",
       "not_found_description": "Sorry, that page could not be found!"
     },
     "terms_of_service": {
@@ -1442,7 +1442,7 @@
     "general": {
       "privacy_mode": "Streamer Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming.",
-      "admin_panel": "Pannello Admin"
+      "admin_panel": "Admin Panel"
     },
     "interface": {
       "title": "Interface Customization",
@@ -1520,7 +1520,7 @@
       "prestige_pvp_data": "Prestige PvP",
       "prestige_pvp_confirmation": "Are you sure you want to prestige your PvP profile?",
       "prestige_pvp_warning": "Your current PvP run will be archived, then PvP progression will reset for the next prestige level. PvE data is not affected.",
-      "reset_cancel": "Annulla",
+      "reset_cancel": "Cancel",
       "reset_confirm": "Reset Data",
       "export_title": "Export & Backup",
       "export_description": "Download a backup of your progress data for both PvP and PvE modes.",
@@ -1558,7 +1558,7 @@
       "import_target_pve": "PvE Only",
       "import_target_both": "Both PvP & PvE",
       "import_confirm": "Confirm Import",
-      "import_cancel": "Annulla",
+      "import_cancel": "Cancel",
       "import_success_title": "Backup Imported",
       "import_success_description": "Your progress data has been restored successfully.",
       "import_error_title": "Import Failed",
@@ -1817,7 +1817,7 @@
       "mode_summary_both": "PvP + PvE (auto)",
       "mode_summary_unknown": "Unknown",
       "confirm": "Confirm Import",
-      "cancel": "Annulla",
+      "cancel": "Cancel",
       "success_title": "EFT Logs Imported",
       "success_description": "Marked {complete_count} tasks completed and {active_count} tasks active from game logs.",
       "error_title": "EFT Logs Import Failed",
@@ -1862,7 +1862,7 @@
       "import_to_mode": "Import to Mode",
       "import_target_notice": "This data will be imported into your {mode} profile.",
       "confirm": "Confirm Import",
-      "cancel": "Annulla",
+      "cancel": "Cancel",
       "success_title": "Profile Imported",
       "success_description": "Your Tarkov.dev profile has been imported successfully.",
       "error_title": "Import Failed",
@@ -2005,6 +2005,6 @@
     "prestige_n": "Prestige {n}"
   },
   "generic": {
-    "close_button": "Chiudi"
+    "close_button": "Close"
   }
 }
