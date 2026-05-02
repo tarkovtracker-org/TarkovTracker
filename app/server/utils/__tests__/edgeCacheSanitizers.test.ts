@@ -13,13 +13,23 @@ describe('edge cache sanitizers', () => {
   });
   it('redacts sensitive keys recursively', () => {
     const result = sanitizeVariables({
+      accessToken: 'abc',
+      apiKey: 'abc',
+      clientSecret: 'abc',
+      idToken: 'abc',
       nested: {
+        privateKey: 'abc',
         token: 'abc',
       },
       userId: '42',
     });
     expect(result).toEqual({
+      accessToken: '[redacted]',
+      apiKey: '[redacted]',
+      clientSecret: '[redacted]',
+      idToken: '[redacted]',
       nested: {
+        privateKey: '[redacted]',
         token: '[redacted]',
       },
       userId: '[redacted]',

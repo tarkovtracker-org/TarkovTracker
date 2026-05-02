@@ -40,10 +40,15 @@ describe('nuxt.config CSP', () => {
     const localSources = getConnectSrcSources({
       supabaseUrl: 'http://localhost:54321/auth/v1',
     });
+    const ipv6Sources = getConnectSrcSources({
+      supabaseUrl: 'http://[::1]:54321/auth/v1',
+    });
     expect(remoteSources).toContain('http://db.example.com');
     expect(remoteSources).not.toContain('ws://db.example.com');
     expect(localSources).toContain('http://localhost:54321');
     expect(localSources).toContain('ws://localhost:54321');
+    expect(ipv6Sources).toContain('http://[::1]:54321');
+    expect(ipv6Sources).toContain('ws://[::1]:54321');
   });
   it('allows remote https images for oauth avatars and map fallbacks', () => {
     const imageSources = getImgSrcSources();
