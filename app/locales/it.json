@@ -113,7 +113,7 @@
     "dismiss": "Ignora",
     "launcher": {
       "title": "Aiuto e onboarding",
-      "summary": "Scegli una guida rapida per questa pagina o il percorso completo di configurazione.",
+      "summary": "Scegli una guida rapida per questa pagina o il setup completo.",
       "page_guide": "Guide this page",
       "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
       "onboarding": "New user onboarding",
@@ -167,7 +167,7 @@
     },
     "dashboard": {
       "title": "Guida alla dashboard",
-      "summary": "Utilizzare la dashboard per individuare il miglior passo successivo, rivedere i progressi e accedere alle pagine che richiedono attenzione.",
+      "summary": "Utilizza la dashboard per individuare il miglior passo successivo, rivedere i progressi e accedere alle pagine che richiedono attenzione.",
       "hint": "Ottieni una rapida panoramica di ciò che la dashboard sta mostrando e dove fare clic successivo.",
       "sections": {
         "focus": {
@@ -1192,10 +1192,10 @@
     },
     "not_found": {
       "title": "Pagina non trovata",
-      "not_found_description": "Sorry, that page could not be found!"
+      "not_found_description": "Siamo spiacenti, questa pagina non è stata trovata!"
     },
     "terms_of_service": {
-      "title": "Terms of Service"
+      "title": "Termini di Servizio"
     },
     "privacy": {
       "title": "Privacy Policy"
@@ -1433,19 +1433,19 @@
       "comfortable": "Comfortable"
     },
     "account_moved": {
-      "message": "Looking for API tokens or account settings?",
-      "link": "Go to Account"
+      "message": "Stai cercando token API o impostazioni account?",
+      "link": "Vai all'Account"
     },
     "account": {
-      "begin_deletion": "Begin Account Deletion"
+      "begin_deletion": "Inizia Cancellazione Account"
     },
     "general": {
-      "privacy_mode": "Streamer Mode",
-      "privacy_mode_hint": "Hides sensitive information while you're streaming.",
+      "privacy_mode": "Modalità Streamer",
+      "privacy_mode_hint": "Nasconde informazioni sensibili durante lo streaming.",
       "admin_panel": "Pannello Admin"
     },
     "interface": {
-      "title": "Interface Customization",
+      "title": "Personalizzazione interfaccia",
       "tasks": {
         "title": "Task Cards",
         "show_required": "Show Required Labels",
@@ -1515,17 +1515,17 @@
       "reset_all_title": "Reset All Data",
       "reset_all_data": "Reset All Data",
       "reset_all_confirmation": "Are you sure you want to reset ALL your progress?",
-      "reset_all_warning": "This will permanently delete ALL your progress for PvP and PvE modes. This action cannot be undone!",
+      "reset_all_warning": "Questo eliminerà definitivamente TUTTI i progressi per le modalità PvP e PvE. Questa azione non può essere annullata!",
       "prestige_pvp_title": "Prestige PvP Profile",
       "prestige_pvp_data": "Prestige PvP",
       "prestige_pvp_confirmation": "Are you sure you want to prestige your PvP profile?",
       "prestige_pvp_warning": "Your current PvP run will be archived, then PvP progression will reset for the next prestige level. PvE data is not affected.",
       "reset_cancel": "Annulla",
-      "reset_confirm": "Reset Data",
-      "export_title": "Export & Backup",
-      "export_description": "Download a backup of your progress data for both PvP and PvE modes.",
-      "export_button": "Export Progress Backup",
-      "debug_export_button": "Export Debug Snapshot",
+      "reset_confirm": "Reimposta dati",
+      "export_title": "Esporta & Backup",
+      "export_description": "Scarica un backup dei tuoi dati di avanzamento per le modalità PvP e PvE.",
+      "export_button": "Esporta Backup",
+      "debug_export_button": "Esporta istantanea di Debug",
       "debug_export_description": "Download a sanitized account snapshot for debugging signed-in issues. This excludes auth tokens, email, and profile images.",
       "import_title": "Import",
       "import_backup_button": "Import TarkovTracker Backup",
@@ -1553,11 +1553,11 @@
       "import_preview_pvp_tasks": "PvP Tasks",
       "import_preview_pve_level": "PvE Level",
       "import_preview_pve_tasks": "PvE Tasks",
-      "import_target_label": "Import Target",
-      "import_target_pvp": "PvP Only",
-      "import_target_pve": "PvE Only",
-      "import_target_both": "Both PvP & PvE",
-      "import_confirm": "Confirm Import",
+      "import_target_label": "Target importazione",
+      "import_target_pvp": "Solo PvP",
+      "import_target_pve": "Solo PvE",
+      "import_target_both": "PvP & PvE",
+      "import_confirm": "Conferma importazione",
       "import_cancel": "Annulla",
       "import_success_title": "Backup Imported",
       "import_success_description": "Your progress data has been restored successfully.",
@@ -1816,7 +1816,7 @@
       "mode_summary_pve": "PvE (auto)",
       "mode_summary_both": "PvP + PvE (auto)",
       "mode_summary_unknown": "Unknown",
-      "confirm": "Confirm Import",
+      "confirm": "Conferma importazione",
       "cancel": "Annulla",
       "success_title": "EFT Logs Imported",
       "success_description": "Marked {complete_count} tasks completed and {active_count} tasks active from game logs.",
@@ -1861,7 +1861,7 @@
       "edition_guess": "Edition (detected)",
       "import_to_mode": "Import to Mode",
       "import_target_notice": "This data will be imported into your {mode} profile.",
-      "confirm": "Confirm Import",
+      "confirm": "Conferma importazione",
       "cancel": "Annulla",
       "success_title": "Profile Imported",
       "success_description": "Your Tarkov.dev profile has been imported successfully.",
@@ -1974,35 +1974,35 @@
   },
   "oauth": {
     "consent": {
-      "authorize": "Authorize Application",
-      "loading": "Loading...",
+      "authorize": "Autorizza Applicazione",
+      "loading": "Caricamento...",
       "error": "{error}",
-      "unknown": "Unknown Application",
-      "requesting_access": "is requesting access to your TarkovTracker account.",
-      "requested_permissions": "Requested Permissions:",
+      "unknown": "Applicazione Sconosciuta",
+      "requesting_access": "sta richiedendo l'accesso al tuo account TarkovTracker.",
+      "requested_permissions": "Permessi Richiesti:",
       "redirect_to": "Will redirect to:",
-      "approve": "Approve",
-      "deny": "Deny"
+      "approve": "Approva",
+      "deny": "Rifiuta"
     }
   },
   "analytics_consent": {
     "eyebrow": "Analytics",
-    "title": "Help make Tarkov Tracker better",
-    "title_answered": "Help improve Tarkov Tracker",
-    "description": "Allow usage analytics so we can understand what works, fix pain points, and improve Tarkov Tracker.",
-    "accepted": "You are helping improve Tarkov Tracker with usage analytics on this browser.",
-    "declined": "Usage analytics are off on this browser.",
-    "badge_default_off": "Off by default",
-    "badge_usage_stats": "Usage stats",
-    "badge_analytics_only": "Analytics only",
-    "change_anytime": "Change this anytime from the footer.",
-    "review_details": "Review details in Privacy Policy",
-    "allow": "Help us improve",
-    "decline": "Keep analytics off"
+    "title": "Aiuta a migliorare Tarkov Tracker",
+    "title_answered": "Aiuta a migliorare Tarkov Tracker",
+    "description": "Consenti analisi di utilizzo in modo da poter capire cosa funziona, correggere i punti deboli e migliorare Tarkov Tracker.",
+    "accepted": "Stai aiutando a migliorare Tarkov Tracker con analisi di utilizzo su questo browser.",
+    "declined": "Gli analytics di utilizzo sono disattivati su questo browser.",
+    "badge_default_off": "Spento di default",
+    "badge_usage_stats": "Statistiche di utilizzo",
+    "badge_analytics_only": "Solo analisi",
+    "change_anytime": "Cambia in qualsiasi momento in fondo alla pagina.",
+    "review_details": "Rivedi i dettagli nella Privacy Policy",
+    "allow": "Aiutaci a migliorare",
+    "decline": "Mantieni disattivata l'analisi"
   },
   "prestige": {
-    "no_prestige": "No Prestige",
-    "prestige_n": "Prestige {n}"
+    "no_prestige": "Nessun Prestigio",
+    "prestige_n": "Prestigio {n}"
   },
   "generic": {
     "close_button": "Chiudi"
