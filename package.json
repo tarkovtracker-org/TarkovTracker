@@ -34,6 +34,7 @@
     "@cloudflare/workers-types": "^4.20260409.1",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
+    "@google/design.md": "^0.1.1",
     "@nuxt/eslint": "^1.15.2",
     "@nuxt/test-utils": "^4.0.2",
     "@semantic-release/changelog": "^6.0.3",
@@ -96,15 +97,16 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
+    "design:lint": "design.md lint DESIGN.md",
     "deps": "taze --r --I",
     "dev": "nuxt dev",
-    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
+    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"vitest.happy-dom.config.ts\" \"vitest.nuxt.config.ts\" \"vitest.shared.ts\" \"tests/test-setup.ts\"",
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:sync": "node scripts/sync-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",
-    "lint": "NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
+    "lint": "npm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
     "typecheck": "nuxt typecheck",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix",
     "postinstall": "nuxt prepare",
@@ -133,6 +135,10 @@
     ],
     "docs/**/*.{md,markdown}": [
       "prettier --write"
+    ],
+    "DESIGN.md": [
+      "prettier --write",
+      "design.md lint"
     ],
     "tests/test-setup.ts": [
       "prettier --write"
