@@ -26,6 +26,7 @@ export function useMapObjectivePopup({
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const isMounted = ref(true);
+  let mapJumpRequestId = 0;
   let jumpToMapTimeoutId: ReturnType<typeof setTimeout> | null = null;
   const popupActivateTimers = ref<ReturnType<typeof setTimeout>[]>([]);
   const clearPopupActivateTimers = () => {
@@ -79,6 +80,7 @@ export function useMapObjectivePopup({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const jumpToMapObjective = async (objectiveId: string) => {
+    const requestId = (mapJumpRequestId += 1);
     if (jumpToMapTimeoutId) {
       clearTimeout(jumpToMapTimeoutId);
       jumpToMapTimeoutId = null;
@@ -88,11 +90,11 @@ export function useMapObjectivePopup({
     if (targetMapId && targetMapId !== currentMapId) {
       preferencesStore.setTaskMapView(targetMapId);
       await nextTick();
-      if (!isMounted.value) return;
+      if (!isMounted.value || requestId !== mapJumpRequestId) return;
       await new Promise((resolve) => {
         setTimeout(resolve, MAP_POPUP_POST_RERENDER_DELAY);
       });
-      if (!isMounted.value) return;
+      if (!isMounted.value || requestId !== mapJumpRequestId) return;
     }
     const isNearTop = window.scrollY < NEAR_TOP_SCROLL_THRESHOLD;
     if (!isNearTop) {
@@ -104,7 +106,7 @@ export function useMapObjectivePopup({
     }
     jumpToMapTimeoutId = setTimeout(() => {
       jumpToMapTimeoutId = null;
-      if (!isMounted.value) return;
+      if (!isMounted.value || requestId !== mapJumpRequestId) return;
       activateObjectivePopupWithRetry(objectiveId);
     }, SCROLL_TO_MAP_POPUP_DELAY);
   };
