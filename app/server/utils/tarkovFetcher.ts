@@ -34,7 +34,12 @@ export function createTarkovFetcher<T = unknown>(
   const { maxRetries = 3, timeoutMs = 30000, allowPartialData = false, deps } = options;
   const fetcher = deps?.fetcher ?? ($fetch as TarkovFetcherRequest);
   const fetcherLogger = deps?.logger ?? logger;
-  const sleep = deps?.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const sleep =
+    deps?.sleep ??
+    ((ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      }));
   const safeMaxRetries = Number.isFinite(maxRetries) ? Math.max(1, Math.floor(maxRetries)) : 3;
   const safeTimeoutMs = Number.isFinite(timeoutMs) ? Math.max(1000, Math.floor(timeoutMs)) : 30000;
   return async () => {

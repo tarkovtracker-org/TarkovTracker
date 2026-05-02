@@ -57,7 +57,10 @@ interface TypedSupabaseClient {
   rpc(fn: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const getErrorMessage = (error: unknown) => {
   if (typeof error === 'string') return error;

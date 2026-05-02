@@ -149,7 +149,9 @@ export function useTaskDeepLink({
         return true;
       }
       if (attempt < maxAttempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 25);
+        });
       }
     }
     return filteredTasks.value.some((task) => task.id === taskId);
@@ -162,7 +164,9 @@ export function useTaskDeepLink({
         return taskElement;
       }
       if (attempt < maxAttempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 25);
+        });
       }
     }
     return document.getElementById(`task-${taskId}`);

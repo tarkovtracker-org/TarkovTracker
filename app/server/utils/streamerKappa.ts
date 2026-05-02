@@ -155,7 +155,6 @@ export const computeStreamerKappaMetrics = ({
     taskCompletions: normalizeTaskCompletionsForInvalidation(taskCompletions),
     tasks: relevantTasks,
   });
-  const eligibleKappaTaskIds = new Set<string>();
   const eligibleCollectorTaskIds = new Set<string>();
   let totalKappaTasks = 0;
   let completedKappaTasks = 0;
@@ -172,14 +171,12 @@ export const computeStreamerKappaMetrics = ({
     if (successful) {
       totalKappaTasks += 1;
       completedKappaTasks += 1;
-      eligibleKappaTaskIds.add(task.id);
       continue;
     }
     if (failed || invalid) {
       continue;
     }
     totalKappaTasks += 1;
-    eligibleKappaTaskIds.add(task.id);
   }
   const mergedKappaItems = mergeKappaItemRequirements(
     neededItemTaskObjectives,

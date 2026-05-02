@@ -75,7 +75,9 @@ const mountComponent = async (steps: HelpStep[] = defaultSteps) => {
 };
 const flushUi = async (wrapper: Awaited<ReturnType<typeof mountComponent>>) => {
   await wrapper.vm.$nextTick();
-  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
   await wrapper.vm.$nextTick();
 };
 const findBodyButton = (label: string) =>

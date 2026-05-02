@@ -61,7 +61,10 @@ interface ReconcileRequest {
   dryRun?: boolean;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const getErrorMessage = (error: unknown) => {
   if (typeof error === 'string') return error;
@@ -161,7 +164,9 @@ const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) =>
     promise
       .then(({ error }) => ({ tableKey, error }))
       .catch((error) => {
-        throw { tableKey, error };
+        const tableError = new Error(`Failed to delete ${tableKey} rows`);
+        Object.assign(tableError, { cause: error, tableKey });
+        throw tableError;
       })
   );
 
@@ -173,10 +178,10 @@ const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) =>
       }
       continue;
     }
-    const reason = result.reason as { tableKey?: string; error?: unknown };
+    const reason = result.reason as { cause?: unknown; tableKey?: string };
     const tableKey = typeof reason?.tableKey === 'string' ? reason.tableKey : 'unknown';
     const error =
-      reason && typeof reason === 'object' && 'error' in reason ? reason.error : reason;
+      reason && typeof reason === 'object' && 'cause' in reason ? reason.cause : reason;
     cleanupErrors[tableKey] = getErrorMessage(error);
   }
 

@@ -92,7 +92,9 @@
           callbackError.message
         );
       }
-      await new Promise((resolve) => setTimeout(resolve, AUTH_CALLBACK_HASH_SETTLE_TIMEOUT_MS));
+      await new Promise((resolve) => {
+        setTimeout(resolve, AUTH_CALLBACK_HASH_SETTLE_TIMEOUT_MS);
+      });
       await $supabase.ready();
       if ($supabase.user.loggedIn) {
         return { authenticated: true as const };

@@ -89,7 +89,9 @@ export function useMapObjectivePopup({
       preferencesStore.setTaskMapView(targetMapId);
       await nextTick();
       if (!isMounted.value) return;
-      await new Promise((resolve) => setTimeout(resolve, MAP_POPUP_POST_RERENDER_DELAY));
+      await new Promise((resolve) => {
+        setTimeout(resolve, MAP_POPUP_POST_RERENDER_DELAY);
+      });
       if (!isMounted.value) return;
     }
     const isNearTop = window.scrollY < NEAR_TOP_SCROLL_THRESHOLD;

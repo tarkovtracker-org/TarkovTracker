@@ -47,7 +47,9 @@ export default defineNuxtPlugin((nuxtApp) => {
           `[MetadataPlugin] Background initialization failed (attempt ${attempt}/${MAX_ATTEMPTS}). Retrying in ${delay}ms...`,
           err
         );
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise((resolve) => {
+          setTimeout(resolve, delay);
+        });
         return initializeWithRetry(attempt + 1);
       }
       // Final failure handling after all retries
