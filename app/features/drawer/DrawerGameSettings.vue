@@ -1,13 +1,13 @@
 <template>
   <div class="flex flex-col gap-1.5 px-3 py-1">
     <div
-      class="border-border flex w-full overflow-hidden rounded-md border"
+      class="border-border bg-field/85 shadow-card flex w-full overflow-hidden rounded-md border"
       role="group"
       :aria-label="t('game_settings.toggle_mode')"
     >
       <button
         type="button"
-        class="focus:ring-pvp-400 flex min-h-8 flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
+        class="focus:ring-pvp-400 [&:not(:last-child)]:border-border-muted flex min-h-8 flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-[background-color,color,box-shadow] focus:z-10 focus:ring-2 focus:outline-none [&:not(:last-child)]:border-r"
         :class="pvpClasses"
         :disabled="dataLoading"
         :aria-pressed="currentGameMode === GAME_MODES.PVP"
@@ -18,7 +18,7 @@
       </button>
       <button
         type="button"
-        class="focus:ring-pve-400 flex min-h-8 flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
+        class="focus:ring-pve-400 [&:not(:last-child)]:border-border-muted flex min-h-8 flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-[background-color,color,box-shadow] focus:z-10 focus:ring-2 focus:outline-none [&:not(:last-child)]:border-r"
         :class="pveClasses"
         :disabled="dataLoading"
         :aria-pressed="currentGameMode === GAME_MODES.PVE"
@@ -32,20 +32,20 @@
       {{ switchModeError }}
     </div>
     <div
-      class="border-border flex w-full overflow-hidden rounded-md border"
+      class="border-border bg-field/85 shadow-card flex w-full overflow-hidden rounded-md border"
       role="group"
       :aria-label="t('game_settings.select_faction')"
     >
       <button
         v-for="faction in factions"
         :key="faction"
-        class="focus:ring-border-strong/50 flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
+        class="focus:ring-border-strong/50 [&:not(:last-child)]:border-border-muted relative flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-[background-color,color,box-shadow] focus:z-10 focus:ring-2 focus:outline-none [&:not(:last-child)]:border-r"
         :class="[
           faction === currentFaction
-            ? 'bg-interactive text-foreground'
+            ? 'bg-primary-500/16 ring-primary-500/45 shadow-card after:bg-primary-400 text-[color-mix(in_srgb,var(--color-primary-500)_82%,var(--color-foreground))] ring-1 ring-inset after:absolute after:right-2 after:bottom-1 after:left-2 after:h-px after:rounded-full'
             : dataLoading
               ? 'text-foreground-disabled bg-transparent'
-              : 'text-foreground-subtle hover:bg-interactive hover:text-foreground',
+              : 'text-foreground-subtle hover:bg-interactive hover:text-foreground bg-transparent',
           dataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         ]"
         :disabled="dataLoading"
@@ -77,13 +77,13 @@
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
   const pveClasses = computed(() =>
     currentGameMode.value === GAME_MODES.PVE
-      ? 'bg-pve-500/16 text-pve-700 ring-pve-500/25 ring-inset ring-1'
-      : 'bg-transparent text-pve-700 hover:bg-pve-500/8 hover:text-pve-800'
+      ? 'bg-pve-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+      : 'bg-transparent text-pve-700 hover:bg-pve-500/12 hover:text-pve-600'
   );
   const pvpClasses = computed(() =>
     currentGameMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-500/16 text-pvp-700 ring-pvp-500/25 ring-inset ring-1'
-      : 'bg-transparent text-pvp-700 hover:bg-pvp-500/8 hover:text-pvp-800'
+      ? 'bg-pvp-800 text-pvp-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
+      : 'bg-transparent text-pvp-700 hover:bg-pvp-500/12 hover:text-pvp-600'
   );
   const { loading: dataLoading } = storeToRefs(metadataStore);
   async function switchMode(mode: GameMode) {

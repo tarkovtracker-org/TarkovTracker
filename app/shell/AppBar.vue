@@ -200,6 +200,13 @@
       ? '/img/default-avatar.svg'
       : $supabase.user.photoURL;
   });
+  type AccountMenuItem = {
+    color?: 'error';
+    icon: string;
+    label: string;
+    onSelect?: (event: Event) => void;
+    to?: string;
+  };
   const userDisplayName = computed(() => {
     const fallbackLabel = t('app_bar.user_label');
     const hiddenLabel = t('app_bar.hidden_label');
@@ -210,7 +217,7 @@
     }
     return $supabase.user.displayName || $supabase.user.username || fallbackLabel;
   });
-  const accountMenuItems = computed(() => [
+  const accountMenuItems = computed<AccountMenuItem[][]>(() => [
     [
       {
         icon: 'i-mdi-account-outline',
