@@ -18,7 +18,7 @@
   },
   "errors": {
     "generic_fallback": "Error inesperado. Inténtalo de nuevo.",
-    "chunk_load_blocked": "No se pudo cargar un archivo requerido de la aplicación. Inténtalo de nuevo. Si sigue ocurriendo, tu proveedor o región podría estar bloqueando el acceso.",
+    "chunk_load_blocked": "No se pudo cargar un archivo requerido de la aplicación. Inténtalo de nuevo. Si sigue ocurriendo, tu PSI región podría estar bloqueando el acceso.",
     "network_access_denied": "Se bloqueó una solicitud de red necesaria. Inténtalo de nuevo. Si continúa, usa VPN o Cloudflare WARP."
   },
   "error": {
@@ -471,7 +471,7 @@
         "filtered_warning_tooltip": "Estas cifras siguen tus filtros de tareas (Kappa, Guardafaro y no especiales)."
       },
       "progress_card": {
-        "view_details": "View details for {label}",
+        "view_details": "Ver detalles de {label}",
         "progress_label": "{label} progress"
       },
       "milestones": {
@@ -496,7 +496,7 @@
         "reputation": "Reputación",
         "reputation_input_label": "Entrada de reputación",
         "set_loyalty_level": "Establecer nivel de lealtad {level}",
-        "rep_progress_label": "→ LL{level}",
+        "rep_progress_label": "Nivel {level}",
         "scav_karma": "Karma de Scav",
         "unlock_required": "Se requiere desbloqueo:"
       },
@@ -543,7 +543,7 @@
       "route_blocked_by": "Blocked by: {objectives}",
       "route_decision": "Decision {index}",
       "route_choose_one": "Choose one",
-      "route_optional": "Optional",
+      "route_optional": "Opcional",
       "route_required_steps": "Required steps",
       "route_optional_steps": "Optional steps",
       "route_selected_hint": "This route is active.",
