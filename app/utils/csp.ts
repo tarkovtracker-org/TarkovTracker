@@ -7,6 +7,9 @@ export type ContentSecurityPolicyOptions = {
 };
 const GITHUB_IMAGE_ORIGINS = ['https://avatars.githubusercontent.com', 'https://github.com'];
 const hasConfiguredValue = (value: string | undefined): boolean => Boolean(value?.trim());
+const isLocalHttpHost = (hostname: string): boolean => {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+};
 const getCspOrigin = (value: string | undefined): string | null => {
   const trimmedValue = value?.trim();
   if (!trimmedValue) {
@@ -32,7 +35,7 @@ const getWebSocketCspOrigin = (value: string | undefined): string | null => {
     if (parsedUrl.protocol === 'https:') {
       return `wss://${parsedUrl.host}`;
     }
-    if (parsedUrl.protocol === 'http:') {
+    if (parsedUrl.protocol === 'http:' && isLocalHttpHost(parsedUrl.hostname)) {
       return `ws://${parsedUrl.host}`;
     }
     if (parsedUrl.protocol === 'ws:' || parsedUrl.protocol === 'wss:') {

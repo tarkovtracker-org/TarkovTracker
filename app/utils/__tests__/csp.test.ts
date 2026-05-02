@@ -33,6 +33,18 @@ describe('nuxt.config CSP', () => {
     expect(connectSources).not.toContain('https://logs.example.com/v1/collect');
     expect(connectSources).not.toContain('https://db.example.com/auth/v1');
   });
+  it('limits insecure websocket origins to local http backends', () => {
+    const remoteSources = getConnectSrcSources({
+      supabaseUrl: 'http://db.example.com/auth/v1',
+    });
+    const localSources = getConnectSrcSources({
+      supabaseUrl: 'http://localhost:54321/auth/v1',
+    });
+    expect(remoteSources).toContain('http://db.example.com');
+    expect(remoteSources).not.toContain('ws://db.example.com');
+    expect(localSources).toContain('http://localhost:54321');
+    expect(localSources).toContain('ws://localhost:54321');
+  });
   it('allows remote https images for oauth avatars and map fallbacks', () => {
     const imageSources = getImgSrcSources();
     expect(imageSources).toContain('https:');
