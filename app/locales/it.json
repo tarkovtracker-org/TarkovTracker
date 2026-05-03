@@ -1,6 +1,6 @@
 {
   "admin": {
-    "title": "Pannello Admin"
+    "title": "Pannello admin"
   },
   "alerts": {
     "no_map_data": "Nessun dato della mappa disponibile per questa selezione."
@@ -41,10 +41,10 @@
   },
   "loading_screen": {
     "title": "Caricamento Tarkov Tracker",
-    "title_error": "Caricamento Problema",
+    "title_error": "Problema di caricamento",
     "subtitle": "Download dei dati necessari...",
     "subtitle_error": "Caricamento di alcuni dati non riuscito",
-    "first_load_info": "Questo potrebbe richiedere un momento al primo carico. I dati saranno memorizzati nella cache per le visite future.",
+    "first_load_info": "Questo potrebbe richiedere un momento la prima volta. I dati saranno memorizzati nella cache per le visite future.",
     "partial_data_info": "L'applicazione può ancora funzionare con dati parziali. È possibile riprovare o continuare comunque.",
     "retry": "Riprova",
     "continue_anyway": "Continua comunque"
@@ -112,11 +112,11 @@
     "hint_title": "Nuovo qui?",
     "dismiss": "Ignora",
     "launcher": {
-      "title": "Aiuto e onboarding",
-      "summary": "Scegli una guida rapida per questa pagina o il setup completo.",
+      "title": "Aiuto e setup iniziale",
+      "summary": "Scegli una guida rapida per questa pagina o il setup iniziale.",
       "page_guide": "Guida rapida",
       "page_guide_unavailable": "Guida rapida non disponibile. Utilizza l'onboarding.",
-      "onboarding": "Onboarding completo",
+      "onboarding": "Setup iniziale",
       "onboarding_description": "Comincia con gli inport, le basi e poi verifica le missioni."
     },
     "onboarding": {
@@ -136,7 +136,7 @@
             "three": "Se entrambi vanno a buon fine, sarà necessaria solo una rapida verifica."
           },
           "actions": {
-            "open": "Apri \"Importa\""
+            "open": "Importa"
           }
         },
         "profile": {
@@ -148,19 +148,19 @@
             "three": "Se non sei ancora pronto ad accedere, i progressi saranno tracciati localmente e in futuro saranno sincronizzati tramite l'account."
           },
           "actions": {
-            "settings": "Apri impostazioni"
+            "settings": "Impostazioni"
           }
         },
         "tasks": {
           "title": "Ultimo controllo Missioni",
-          "description": "L'ultimo step è il controllo delle Missioni. Una volta fatto questo, i dati saranno molto più precisi.",
+          "description": "L'ultimo step è il controllo delle missioni. Una volta fatto questo, i dati saranno molto più precisi.",
           "bullets": {
-            "one": "Nella pagina Missioni, segna le missioni che hai attualmente disponibili in gioco per ogni mercante. Questo riempie automaticamente le catene di prerequisiti molto più velocemente rispetto a completare manualmente le vecchie missioni una per una.",
+            "one": "Nella pagina missioni, segna le missioni che hai attualmente disponibili in gioco per ogni mercante. Questo riempie automaticamente le catene di prerequisiti molto più velocemente rispetto a completare manualmente le vecchie missioni una per una.",
             "two": "Quando qualcosa sembra sbagliato, utilizza il menu della scheda missione per segnalare un problema di dati invece di forzare il tracker in uno stato errato.",
-            "three": "Puoi utilizzare il pulsante di aiuto nella barra in alto su qualsiasi pagina supportata per riaprire la guida della pagina o questo flusso di onboarding."
+            "three": "Puoi utilizzare il pulsante di aiuto nella barra in alto su qualsiasi pagina supportata per riaprire la guida della pagina o questo setup."
           },
           "actions": {
-            "open": "Apri missioni"
+            "open": "Missioni"
           }
         }
       }
@@ -190,7 +190,7 @@
         }
       },
       "actions": {
-        "tasks": "Apri missioni",
+        "tasks": "Missioni",
         "needed_items": "Oggetti necessari"
       }
     },
@@ -248,43 +248,43 @@
         }
       },
       "actions": {
-        "tasks": "Apri missioni",
+        "tasks": "Missioni",
         "hideout": "Apri il rifugio"
       }
     },
     "hideout": {
-      "title": "Hideout guide",
-      "summary": "Use the hideout page to see what stations are ready, what is blocked, and what materials still matter for upcoming upgrades.",
-      "hint": "Get a quick explanation of hideout statuses, availability rules, and where to find the linked materials.",
+      "title": "Guida al rifugio",
+      "summary": "Usa la pagina del rifugio per vedere quali moduli sono pronti, cosa è bloccato e quali materiali sono ancora necessari per i prossimi aggiornamenti.",
+      "hint": "Ottieni una breve spiegazione dei moduli del rifugio, aggiornamenti e dove trovare i materiali necessari.",
       "sections": {
         "statuses": {
-          "title": "Read the statuses",
-          "description": "The main filters split stations into all, available, locked, and maxed so you can focus on the right stage.",
-          "bullet_one": "Available is the fastest way to see what you can build right now.",
-          "bullet_two": "Locked is useful when you want to understand what requirements are still missing."
+          "title": "Leggi gli stati",
+          "description": "I filtri principali suddividono le postazioni in tutte, disponibili, bloccate e livello massimo, così puoi concentrarti sulla fase giusta.",
+          "bullet_one": "Disponibile è il modo più veloce per vedere cosa puoi costruire in questo momento.",
+          "bullet_two": "Bloccato è utile quando vuoi capire quali requisiti mancano."
         },
         "requirements": {
-          "title": "Control blockers",
-          "description": "The settings menu can enforce station, skill, and trader requirements so availability matches how strict you want the page to be.",
-          "bullet_one": "Turn requirement filters on when you only want upgrades that are fully buildable right now.",
-          "bullet_two": "Turn them off when you want a broader planning view of what is coming soon."
+          "title": "Filtri",
+          "description": "Il menu impostazioni può applicare i requisiti di stazione, abilità e mercante in modo che la disponibilità corrisponda alle tue preferenze.",
+          "bullet_one": "Attiva i filtri dei requisiti quando vuoi mostrare le stazioni pronte ad essere costruite in questo momento.",
+          "bullet_two": "Disattivali quando vuoi una visione più ampia delle stazioni disponibili."
         },
         "materials": {
-          "title": "Follow the materials",
-          "description": "Each station card shows the items and prerequisites behind the next upgrade, with links back to the broader item workflow.",
-          "bullet_one": "Use station cards when you want upgrade details without leaving the page.",
-          "bullet_two": "Jump to needed items when you want the full cross-station shopping list for hideout progress."
+          "title": "Materiali richiesti",
+          "description": "La scheda di ogni stazione mostra oggetti e prerequisiti richiesti per il suo aggiornamento.",
+          "bullet_one": "Utilizza le schede stazione quando desideri vedere i dettagli di aggiornamento senza lasciare la pagina.",
+          "bullet_two": "Vai alla pagina degli oggetti necessari quando vuoi controllare tutti gli oggetti richiesti per il rifugio."
         }
       },
       "actions": {
-        "needed_items": "Hideout items",
-        "tasks": "Apri missioni"
+        "needed_items": "Oggetti per il rifugio",
+        "tasks": "Missioni"
       }
     }
   },
   "maps": {
-    "zoom_speed": "Zoom speed",
-    "pan_speed": "Pan speed",
+    "zoom_speed": "Velocità zoom",
+    "pan_speed": "Velocità movimento",
     "zone_opacity": "Zone opacity",
     "map_settings": "Map settings",
     "not_available_title": "Map Not Available",
@@ -320,8 +320,8 @@
       }
     },
     "aria": {
-      "zoom_speed": "Zoom speed",
-      "pan_speed": "Pan speed",
+      "zoom_speed": "Velocità zoom",
+      "pan_speed": "Velocità movimento",
       "zone_opacity": "Zone opacity"
     },
     "tooltip": {
@@ -1442,7 +1442,7 @@
     "general": {
       "privacy_mode": "Modalità Streamer",
       "privacy_mode_hint": "Nasconde informazioni sensibili durante lo streaming.",
-      "admin_panel": "Pannello Admin"
+      "admin_panel": "Pannello admin"
     },
     "interface": {
       "title": "Personalizzazione interfaccia",
