@@ -1078,6 +1078,8 @@
       "terms_of_service": "Podmínky služby",
       "popup_blocked_title": "Blokované vyskakovací okno",
       "popup_blocked_description": "Váš prohlížeč zablokoval přihlašovací okno. Probíhá přesměrování nyní...",
+      "authenticating": "Authenticating...",
+      "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Přihlášení se nezdařilo",
       "error_description": "Ověření bylo zrušeno nebo se nezdařilo. Zkuste to prosím znovu.",
       "success_title": "Přihlášen",
