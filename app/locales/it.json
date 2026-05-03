@@ -185,8 +185,8 @@
         "review": {
           "title": "Progresso a lungo termine",
           "description": "Le sezioni Mercanti e Traguardi servono a monitorare la progressione generale, non solo il prossimo clic.",
-          "bullet_one": "Usa la sezione Mercanti per vedere quali questline hanno ancora il maggior lavoro rimanente.",
-          "bullet_two": "La sezione Traguardi invece mostra i progressi verso Kappa, Lightkeeper e il completamento generale in un colpo d'occhio."
+          "bullet_one": "Usa la sezione mercanti per vedere quali questline richiedono ancora del lavoro.",
+          "bullet_two": "La sezione traguardi invece mostra i progressi verso Kappa, Lightkeeper e il completamento generale in un colpo d'occhio."
         }
       },
       "actions": {
@@ -285,52 +285,52 @@
   "maps": {
     "zoom_speed": "Velocità zoom",
     "pan_speed": "Velocità movimento",
-    "zone_opacity": "Zone opacity",
-    "map_settings": "Map settings",
-    "not_available_title": "Map Not Available",
-    "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
-    "placeholder": "this location",
-    "floors": "Floors",
+    "zone_opacity": "Opacità obiettivo",
+    "map_settings": "Settaggi mappa",
+    "not_available_title": "Mappa non disponibile",
+    "not_available_description": "La mappa interattiva di {mapName} non è disponibile. Siamo in attesa di una versione compatibile.",
+    "placeholder": "questa posizione",
+    "floors": "Piani",
     "reset": "Reset",
-    "reset_title": "Reset view to default",
+    "reset_title": "Vista predefinita",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
     },
     "layers": {
-      "pmc_spawns": "PMC Spawns"
+      "pmc_spawns": "Spawn PMC"
     },
     "legend": {
-      "your_objectives": "Your Objectives",
-      "team_objectives": "Team Objectives",
-      "pmc_spawn": "PMC Spawn",
-      "pmc_extract": "PMC Extract",
-      "scav_extract": "Scav Extract",
-      "shared_extract": "Shared Extract (Either Faction)",
-      "coop_extract": "Co-op Extract (PMC + Scav)"
+      "your_objectives": "Tuoi obiettivi",
+      "team_objectives": "Obiettivi Team",
+      "pmc_spawn": "Spawn PMC",
+      "pmc_extract": "Estrazione PMC",
+      "scav_extract": "Estrazione Scav",
+      "shared_extract": "Estrazione PMC/Scav",
+      "coop_extract": "Estrazione Co-Op"
     },
     "controls": {
       "keyboard": {
-        "pan": "to Pan",
-        "zoom_keys": "to Zoom",
-        "click": "to Click at Cursor",
-        "reset": "to Reset View",
-        "cycle_floors": "+ Scroll to Cycle Floors",
-        "zoom": "+ Scroll to Zoom"
+        "pan": "per muovere",
+        "zoom_keys": "per zoomare",
+        "click": "per cliccare sul cursore",
+        "reset": "per resettare la vista",
+        "cycle_floors": "+ rotella per cambiare piano",
+        "zoom": "+ rotella per zoom"
       }
     },
     "aria": {
       "zoom_speed": "Velocità zoom",
       "pan_speed": "Velocità movimento",
-      "zone_opacity": "Zone opacity"
+      "zone_opacity": "Opacità obiettivo"
     },
     "tooltip": {
-      "go_to": "Go to objective",
-      "go_to_in_task_list": "Go to objective in task list",
-      "complete": "Complete objective",
-      "uncomplete": "Uncomplete objective",
-      "objective_unavailable": "Objective unavailable.",
-      "task_fallback": "Task"
+      "go_to": "Vai all'obiettivo",
+      "go_to_in_task_list": "Vai all'obiettivo nell'elenco missioni",
+      "complete": "Completa obiettivo",
+      "uncomplete": "Obiettivo incompleto",
+      "objective_unavailable": "Obiettivo non disponibile.",
+      "task_fallback": "Missione"
     }
   },
   "page": {
@@ -339,26 +339,26 @@
     },
     "dashboard": {
       "changelog": {
-        "title": "What's new",
-        "show": "Show updates",
-        "hide": "Hide updates",
-        "loading": "Loading updates...",
-        "error": "Unable to load updates.",
+        "title": "Cosa c'è di nuovo",
+        "show": "Mostra aggiornamenti",
+        "hide": "Nascondi aggiornamenti",
+        "loading": "Caricamento aggiornamenti...",
+        "error": "Impossibile caricare gli aggiornamenti.",
         "retry": "Riprova",
-        "empty": "No updates yet.",
-        "view_all": "View all"
+        "empty": "Nessun aggiornamento.",
+        "view_all": "Vedi tutti"
       },
       "focus": {
         "title": {
-          "default": "What should I do next?",
-          "multiple": "Several good next steps",
-          "blocked": "Nothing is ready right now",
-          "complete": "You are caught up"
+          "default": "Cosa dovrei fare?",
+          "multiple": "Diversi buoni passi successivi",
+          "blocked": "Niente è pronto al momento",
+          "complete": "Sei in linea"
         },
         "heading": {
-          "start": "Start {task}",
-          "continue": "Continue {task}",
-          "finish": "Finish {task}",
+          "start": "Inizia {task}",
+          "continue": "Continua {task}",
+          "finish": "Termina {task}",
           "review_filters": "Review your task filters",
           "closest_unlock": "Closest unlock: {task}",
           "caught_up": "Everything visible is done"
@@ -826,7 +826,7 @@
         "previous_tasks": "Previous Task(s):",
         "progress": "Progress {completed}/{total}",
         "rewards": "Rewards",
-        "task": "Task",
+        "task": "Missione",
         "unlocks_count": "{count} unlocks"
       }
     },
@@ -1147,7 +1147,7 @@
       "unknown_trader": "Unknown Trader",
       "level_prefix": "Lv.",
       "no_tasks": "No tasks available for this profile.",
-      "task_fallback": "Task",
+      "task_fallback": "Missione",
       "section_available": "Available",
       "section_locked": "Locked",
       "section_completed": "Completed",
@@ -1470,11 +1470,11 @@
           "self_objective": "Your Objective",
           "team_objective": "Team Objective",
           "selected": "Pinned Objective",
-          "pmc_extract": "PMC Extract",
-          "scav_extract": "Scav Extract",
+          "pmc_extract": "Estrazione PMC",
+          "scav_extract": "Estrazione Scav",
           "shared_extract": "Shared Extract",
           "coop_extract": "Co-op Extract",
-          "pmc_spawn": "PMC Spawn"
+          "pmc_spawn": "Spawn PMC"
         }
       },
       "misc": {
@@ -1987,11 +1987,11 @@
   },
   "analytics_consent": {
     "eyebrow": "Analytics",
-    "title": "Aiuta a migliorare Tarkov Tracker",
+    "title": "Aiuta a rendere Tarkov Tracker migliore",
     "title_answered": "Aiuta a migliorare Tarkov Tracker",
-    "description": "Consenti analisi di utilizzo in modo da poter capire cosa funziona, correggere i punti deboli e migliorare Tarkov Tracker.",
+    "description": "Consenti analisi di utilizzo così possiamo capire cosa funziona, correggere i punti deboli e migliorare Tarkov Tracker.",
     "accepted": "Stai aiutando a migliorare Tarkov Tracker con analisi di utilizzo su questo browser.",
-    "declined": "Gli analytics di utilizzo sono disattivati su questo browser.",
+    "declined": "Le analisi di utilizzo sono disattivate su questo browser.",
     "badge_default_off": "Spento di default",
     "badge_usage_stats": "Statistiche di utilizzo",
     "badge_analytics_only": "Solo analisi",
