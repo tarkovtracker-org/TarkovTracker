@@ -386,11 +386,12 @@ describe('tarkov JSON adapters', () => {
       hideoutPayload,
       tradersPayload,
     }).data.tasks[0];
-    expect(objectives?.objectives?.[0]).toMatchObject({
-      __typename: 'TaskObjectiveItem',
-      maps: [{ id: 'map1' }],
-      requiredKeys: [[{ id: 'item1' }], [{ id: 'item2' }, { id: 'missing-item' }]],
-    });
+    expect(objectives?.objectives?.[0]?.maps).toEqual([{ id: 'map1' }]);
+    expect(objectives?.objectives?.[0]?.requiredKeys).toEqual([
+      [{ id: 'item1' }],
+      [{ id: 'item2' }, { id: 'missing-item' }],
+    ]);
+    expect(objectives?.objectives?.[0]?.__typename).toBe('TaskObjectiveItem');
     expect(objectives?.objectives?.[0]?.items?.[0]).toEqual({ id: 'item1' });
     expect(objectives?.objectives?.[0]?.items?.[24]).toEqual({ id: 'bulk-item-23' });
     expect(objectives?.objectives?.[0]?.items?.[25]).toEqual({ id: 'bulk-item-24' });
