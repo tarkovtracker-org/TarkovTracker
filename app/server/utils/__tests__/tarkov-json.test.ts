@@ -426,7 +426,7 @@ describe('tarkov JSON adapters', () => {
       items: expect.arrayContaining([expect.objectContaining({ id: 'item1', name: 'Salewa' })]),
     });
   });
-  it('adapts hideout without items lookup and prestige with item lookup', () => {
+  it('adapts hideout and prestige data without items lookup', () => {
     const hideout = adaptHideoutResponse(hideoutPayload, { tradersPayload }).data;
     expect(hideout.hideoutStations[0]?.levels[0]?.itemRequirements[0]).toMatchObject({
       item: { id: 'item1' },
@@ -447,7 +447,6 @@ describe('tarkov JSON adapters', () => {
     });
     const prestige = adaptPrestigeResponse(tasksPayload, {
       hideoutPayload,
-      itemsPayload,
       tradersPayload,
     }).data.prestige[0];
     expect(prestige?.conditions?.map((condition) => condition.__typename)).toEqual([
@@ -457,9 +456,5 @@ describe('tarkov JSON adapters', () => {
       'TaskObjectiveItem',
     ]);
     expect(prestige?.conditions?.[1]?.task).toMatchObject({ id: 'task1', name: 'Debut' });
-    expect(prestige?.conditions?.[3]?.items?.[0]).toMatchObject({
-      id: 'item1',
-      name: 'Salewa',
-    });
   });
 });

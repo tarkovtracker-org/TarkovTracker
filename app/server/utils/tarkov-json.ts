@@ -1010,15 +1010,14 @@ export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptio
   const regularOptions: TarkovJsonOptions = { ...options, gameMode: PRESTIGE_SOURCE_GAME_MODE };
   return async () => {
     try {
-      const [tasksPayload, hideoutPayload, itemsPayload, tradersPayload] = await Promise.all([
+      const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
         fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', regularOptions),
         fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
-        fetchTarkovJsonEndpoint<JsonItemsPayload>('items', regularOptions),
         fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
       ]);
-      return adaptPrestigeResponse(tasksPayload, { hideoutPayload, itemsPayload, tradersPayload });
+      return adaptPrestigeResponse(tasksPayload, { hideoutPayload, tradersPayload });
     } catch (error) {
-      logger.error('Failed to build prestige payload from tasks, hideout, items, and traders', {
+      logger.error('Failed to build prestige payload from tasks, hideout, and traders', {
         error,
       });
       throw error;
