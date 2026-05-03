@@ -1,6 +1,46 @@
 {
   "admin": {
-    "title": "Admin panel"
+    "title": "Admin panel",
+    "verifying_access": "Verifying admin access...",
+    "error_title": "Connection Error",
+    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
+    "no_reference": "N/A",
+    "access_warning_title": "Admin Access",
+    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
+    "unknown_user": "Neznámý",
+    "cache_management_title": "Cache Management",
+    "last_purge_description": "Last purge: {type} at {timestamp}",
+    "tarkov_data_cache_label": "Tarkov Data Cache",
+    "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
+    "purge_game_data_button": "Purge Game Data",
+    "full_cache_purge_label": "Full Cache Purge",
+    "full_cache_purge_description": "Clears ALL cached content including static assets. Use sparingly - increases load on origin.",
+    "purge_everything_button": "Purge Everything",
+    "cache_behavior_title": "Cache Behavior",
+    "cache_info_description": "After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.",
+    "confirm_full_cache_purge_title": "Confirm Full Cache Purge",
+    "confirm_full_cache_purge_description": "This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.",
+    "confirm_purge_button": "Confirm Purge",
+    "all_cache_label": "All Cache",
+    "tarkov_data_label": "Tarkov Data",
+    "unauthorized_title": "Unauthorized",
+    "admin_privileges_required": "Admin privileges required for this action.",
+    "permission_denied": "You do not have permission to perform this action.",
+    "cache_purged_title": "Cache Purged",
+    "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
+    "full_cache_purged_title": "Full Cache Purged",
+    "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
+    "purge_failed_title": "Purge Failed",
+    "purge_failed_description": "Failed to purge cache",
+    "audit_log_title": "Admin Audit Log",
+    "refresh_button": "Refresh",
+    "audit_log_login_required": "Unauthorized: Please log in to continue.",
+    "audit_log_admin_required": "Unauthorized: Admin privileges required to view audit logs.",
+    "audit_log_table_not_found": "Audit log table not found.",
+    "audit_log_table_not_found_description": "Run the SQL migration to create admin_audit_log.",
+    "audit_log_fetch_failed": "Failed to fetch audit logs",
+    "no_actions_recorded": "No admin actions recorded yet",
+    "audit_log_by": "by"
   },
   "alerts": {
     "no_map_data": "Pro tento výběr nejsou k dispozici žádná mapová data."
@@ -104,8 +144,7 @@
     "finish": "Dokončit",
     "back_to_top": "Zpět nahoru",
     "refresh_button": "Zkuste to znovu",
-    "opens_in_new_tab": "Otevře se v nové kartě",
-    "note": "Poznámka"
+    "opens_in_new_tab": "Otevře se v nové kartě"
   },
   "page_help": {
     "button": "Nápověda",
@@ -291,8 +330,6 @@
     "not_available_description": "Interaktivní mapa pro {mapName} ještě není k dispozici. Čekáme na vytvoření kompatibilní mapy.",
     "placeholder": "tato poloha",
     "floors": "Podlahy",
-    "reset": "Reset",
-    "reset_title": "Obnovit zobrazení na výchozí",
     "factions": {
       "pmc": "PMC",
       "scav": "Šcav"
@@ -1197,7 +1234,9 @@
       "not_found_description": "Omlouváme se, tuto stránku nelze najít!"
     },
     "terms_of_service": {
-      "title": "Podmínky služby"
+      "title": "Podmínky služby",
+      "table_of_contents": "Table of contents",
+      "index_button": "Index"
     },
     "privacy": {
       "title": "Ochrana osobních údajů"
@@ -1281,7 +1320,6 @@
     "background_opacity": "Neprůhlednost",
     "background_transparent": "Průhledný",
     "background_custom": "Vlastní barva",
-    "transparent_background": "Průhledný",
     "show_percent": "Zobrazit procenta",
     "show_remaining": "Zobrazit zbývající",
     "custom_label": "Vlastní popisek",
@@ -1295,10 +1333,6 @@
     "open_json": "Otevřít JSON",
     "setup_title": "Nastavení platformy",
     "setup_subtitle": "Nastavení zdroje prohlížeče, které jsou v souladu s OBS a hlavními streamovacími nástroji.",
-    "platform_instructions": "Zobrazit pokyny specifické pro platformu",
-    "obs_steps": "Přidejte zdroj prohlížeče, vložte URL, nastavte šířku/výšku scény, povolte \"Vypnout zdroj, pokud není viditelný\", a v případě potřeby použijte \"Obnovit prohlížeč když se scéna aktivuje\".",
-    "streamlabs_steps": "Používejte zdroj prohlížeče se stejnými URL a dimenzemi. Při skrytí si zapněte FPS a ponechte zdroj vypnutý.",
-    "other_steps": "Přidejte webovou stránku/vstup prohlížeče, vložte URL, ponechte zapnutou průhlednost a nastavte rozměry odpovídající vašemu rozvržení scény.",
     "preview_dim_self": "Pouze widget",
     "preview_help_self": "Zobrazí widget ve své přirozené velikosti. Umístěte tento zdroj kdekoli na scéně OBS/Streamlabs přetažením.",
     "preview_help_canvas": "Zobrazuje, jak se překryv zobrazí ve zdroji prohlížeče přes celou obrazovku. Kontrolovaný vzor představuje průhlednost — nebude se zobrazovat na streamu.",
@@ -1320,8 +1354,6 @@
     "setup_scaling_warning_title": "Vyhněte se změně velikosti zdroje v OBS",
     "setup_scaling_warning": "Přetažením zdrojových rukojetí, aby byly větší v OBS, se roztáhne obrázek a způsobí těžké rozostření. Chcete-li změnit velikost widgetu, použijte raději nastavení rozlišení, velikosti textu nebo vlastního měřítka - přeskakování překrytí v nativní kvalitě.",
     "setup_transparency_note": "Pozadí překrytí je ve výchozím nastavení průhledné. Není potřeba žádné vlastní CSS nebo barevné filtry – OBS a Streamlaby podporují transparentní zdroje prohlížeče.",
-    "interval_15s": "Každých 15 sekund",
-    "interval_30s": "Každých 30 sekund",
     "interval_60s": "Každých 60 sekund",
     "interval_120s": "Každé 2 minuty",
     "interval_300s": "Každých 5 minut",
@@ -1904,7 +1936,6 @@
     "view_on_dev": "Zobrazit {name} na Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Filtrovat podle typu položky",
     "total": "Celkem:",
     "progress_format": "{current}/{total}",
     "tasks": "Úkoly",
@@ -1972,7 +2003,9 @@
   },
   "game_settings": {
     "pvp": "PvP",
-    "pve": "PvE"
+    "pve": "PvE",
+    "toggle_game_mode_label": "Toggle game mode",
+    "select_faction_label": "Select faction"
   },
   "oauth": {
     "consent": {
