@@ -261,6 +261,7 @@ describe('tarkov JSON adapters', () => {
         image512pxLink: 'image.webp',
         backgroundColor: 'blue',
         categories: ['cat1'],
+        properties: { cures: ['LightBleeding'], useTime: 3 },
       },
       item2: { id: 'item2', name: 'Roubles' },
     },
@@ -331,7 +332,7 @@ describe('tarkov JSON adapters', () => {
           {
             id: 'objective1',
             type: 'giveItem',
-            items: ['item1'],
+            items: ['item1', ...Array.from({ length: 25 }, (_, index) => `bulk-item-${index}`)],
             maps: ['map1'],
             count: 1,
             requiredKeys: [['item1'], ['item2', 'missing-item']],
@@ -389,13 +390,16 @@ describe('tarkov JSON adapters', () => {
     }).data.tasks[0];
     expect(objectives?.objectives?.[0]).toMatchObject({
       __typename: 'TaskObjectiveItem',
-      items: [{ id: 'item1', name: 'Salewa' }],
       maps: [{ id: 'map1', name: 'Customs' }],
       requiredKeys: [
         [{ id: 'item1', name: 'Salewa' }],
         [{ id: 'item2', name: 'Roubles' }, { id: 'missing-item' }],
       ],
     });
+    expect(objectives?.objectives?.[0]?.items?.[0]).toMatchObject({ id: 'item1', name: 'Salewa' });
+    expect(objectives?.objectives?.[0]?.items?.[0]).not.toHaveProperty('properties.cures');
+    expect(objectives?.objectives?.[0]?.items?.[24]).toEqual({ id: 'bulk-item-23' });
+    expect(objectives?.objectives?.[0]?.items?.[25]).toEqual({ id: 'bulk-item-24' });
     expect(objectives?.objectives?.[1]).toMatchObject({
       __typename: 'TaskObjectiveQuestItem',
       questItem: { id: 'questItem1', name: 'Bronze pocket watch' },

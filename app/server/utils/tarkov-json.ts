@@ -28,6 +28,7 @@ const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_RETRIES = 3;
 const ENGLISH_LANGUAGE = 'en';
 const PRESTIGE_SOURCE_GAME_MODE = 'regular';
+const MAX_DETAILED_OBJECTIVE_ITEMS = 24;
 type JsonRecord = Record<string, unknown>;
 type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'tasks' | 'traders';
 type TarkovJsonEnvelope<T = unknown> = {
@@ -352,6 +353,58 @@ function adaptItemRef(value: unknown, context: AdapterContext): TarkovItem {
     properties: rawProperties,
   }) as TarkovItem;
 }
+function adaptObjectiveItemRef(value: unknown, context: AdapterContext): TarkovItem {
+  const id = stringId(value) ?? '';
+  const raw = readRecordRef(value, context.itemsById, context.questItemsById);
+  if (!raw) return { id };
+  const rawProperties = isRecord(raw.properties) ? raw.properties : undefined;
+  const rawDefaultPreset = isRecord(rawProperties?.defaultPreset)
+    ? rawProperties.defaultPreset
+    : readRecordRef(rawProperties?.defaultPreset, context.itemsById);
+  const defaultPreset = rawDefaultPreset
+    ? compactObject({
+        id: stringId(rawDefaultPreset),
+        iconLink:
+          typeof rawDefaultPreset.iconLink === 'string' ? rawDefaultPreset.iconLink : undefined,
+        image512pxLink:
+          typeof rawDefaultPreset.image512pxLink === 'string'
+            ? rawDefaultPreset.image512pxLink
+            : undefined,
+        backgroundColor:
+          typeof rawDefaultPreset.backgroundColor === 'string'
+            ? rawDefaultPreset.backgroundColor
+            : undefined,
+      })
+    : undefined;
+  return compactObject({
+    id: typeof raw.id === 'string' ? raw.id : id,
+    shortName: typeof raw.shortName === 'string' ? raw.shortName : undefined,
+    name: typeof raw.name === 'string' ? raw.name : undefined,
+    normalizedName: typeof raw.normalizedName === 'string' ? raw.normalizedName : undefined,
+    link: typeof raw.link === 'string' ? raw.link : undefined,
+    wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
+    image512pxLink: typeof raw.image512pxLink === 'string' ? raw.image512pxLink : undefined,
+    image8xLink: typeof raw.image8xLink === 'string' ? raw.image8xLink : undefined,
+    gridImageLink: typeof raw.gridImageLink === 'string' ? raw.gridImageLink : undefined,
+    baseImageLink: typeof raw.baseImageLink === 'string' ? raw.baseImageLink : undefined,
+    iconLink: typeof raw.iconLink === 'string' ? raw.iconLink : undefined,
+    backgroundColor: typeof raw.backgroundColor === 'string' ? raw.backgroundColor : undefined,
+    properties: defaultPreset ? { defaultPreset } : undefined,
+  }) as TarkovItem;
+}
+function adaptObjectiveItemRefs(
+  values: unknown,
+  context: AdapterContext
+): TarkovItem[] | undefined {
+  if (!Array.isArray(values)) return undefined;
+  return values
+    .map((item, index) => {
+      if (index < MAX_DETAILED_OBJECTIVE_ITEMS) return adaptObjectiveItemRef(item, context);
+      const id = stringId(item);
+      return id ? ({ id } as TarkovItem) : undefined;
+    })
+    .filter((item): item is TarkovItem => Boolean(item?.id));
+}
 function adaptItem(raw: JsonRecord, context: AdapterContext, lite = false): TarkovItem {
   const categories = Array.isArray(raw.categories)
     ? raw.categories.map((category) => adaptCategoryRef(category, context)).filter(Boolean)
@@ -432,7 +485,7 @@ function adaptRequiredKeys(value: unknown, context: AdapterContext): TarkovItem[
   return value
     .map((group) => {
       const rawGroup = Array.isArray(group) ? group : [group];
-      return rawGroup.map((item) => adaptItemRef(item, context)).filter((item) => item.id);
+      return rawGroup.map((item) => adaptObjectiveItemRef(item, context)).filter((item) => item.id);
     })
     .filter((group) => group.length > 0);
 }
@@ -467,27 +520,25 @@ function adaptObjective(raw: JsonRecord, context: AdapterContext): TaskObjective
       ? raw.possibleLocations.map((location) => adaptMapWithPositions(location, context))
       : undefined,
     requiredKeys: adaptRequiredKeys(raw.requiredKeys, context),
-    item: raw.item ? adaptItemRef(raw.item, context) : undefined,
-    items: Array.isArray(raw.items)
-      ? raw.items.map((item) => adaptItemRef(item, context))
-      : undefined,
-    markerItem: raw.markerItem ? adaptItemRef(raw.markerItem, context) : undefined,
+    item: raw.item ? adaptObjectiveItemRef(raw.item, context) : undefined,
+    items: adaptObjectiveItemRefs(raw.items, context),
+    markerItem: raw.markerItem ? adaptObjectiveItemRef(raw.markerItem, context) : undefined,
     questItem: raw.questItem ? adaptItemRef(raw.questItem, context) : undefined,
     containsAll: Array.isArray(raw.containsAll)
-      ? raw.containsAll.map((item) => adaptItemRef(item, context))
+      ? raw.containsAll.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
     useAny: Array.isArray(raw.useAny)
-      ? raw.useAny.map((item) => adaptItemRef(item, context))
+      ? raw.useAny.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
-    usingWeapon: raw.usingWeapon ? adaptItemRef(raw.usingWeapon, context) : undefined,
+    usingWeapon: raw.usingWeapon ? adaptObjectiveItemRef(raw.usingWeapon, context) : undefined,
     usingWeaponMods: Array.isArray(raw.usingWeaponMods)
-      ? raw.usingWeaponMods.map((item) => adaptItemRef(item, context))
+      ? raw.usingWeaponMods.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
     wearing: Array.isArray(raw.wearing)
-      ? raw.wearing.map((item) => adaptItemRef(item, context))
+      ? raw.wearing.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
     notWearing: Array.isArray(raw.notWearing)
-      ? raw.notWearing.map((item) => adaptItemRef(item, context))
+      ? raw.notWearing.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
     hideoutStation: stationValue ? adaptHideoutRef(stationValue, context) : undefined,
     skillLevel:

@@ -270,7 +270,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-objectives-json-v1-en-regular',
+      'tasks-objectives-json-v2-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }
