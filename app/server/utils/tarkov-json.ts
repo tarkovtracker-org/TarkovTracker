@@ -960,60 +960,68 @@ export function createTarkovJsonMapSpawnsFetcher(options: TarkovJsonOptions) {
 }
 export function createTarkovJsonTaskObjectivesFetcher(options: TarkovJsonOptions) {
   return async () => {
-    const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
-      fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
-      fetchTarkovJsonEndpoint<unknown>('hideout', options),
-      fetchTarkovJsonEndpoint<unknown>('traders', options),
-    ]).catch((error: unknown) => {
+    try {
+      const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
+        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
+        fetchTarkovJsonEndpoint<unknown>('hideout', options),
+        fetchTarkovJsonEndpoint<unknown>('traders', options),
+      ]);
+      return adaptTaskObjectivesResponse(tasksPayload, {
+        hideoutPayload,
+        tradersPayload,
+      });
+    } catch (error) {
       logger.error('Failed to build task objectives payload from tasks, hideout, and traders', {
         error,
       });
       throw error;
-    });
-    return adaptTaskObjectivesResponse(tasksPayload, {
-      hideoutPayload,
-      tradersPayload,
-    });
+    }
   };
 }
 export function createTarkovJsonTaskRewardsFetcher(options: TarkovJsonOptions) {
   return async () => {
-    const [tasksPayload, tradersPayload] = await Promise.all([
-      fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
-      fetchTarkovJsonEndpoint<unknown>('traders', options),
-    ]).catch((error: unknown) => {
+    try {
+      const [tasksPayload, tradersPayload] = await Promise.all([
+        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
+        fetchTarkovJsonEndpoint<unknown>('traders', options),
+      ]);
+      return adaptTaskRewardsResponse(tasksPayload, { tradersPayload });
+    } catch (error) {
       logger.error('Failed to build task rewards payload from tasks and traders', { error });
       throw error;
-    });
-    return adaptTaskRewardsResponse(tasksPayload, { tradersPayload });
+    }
   };
 }
 export function createTarkovJsonHideoutFetcher(options: TarkovJsonOptions) {
   return async () => {
-    const [hideoutPayload, tradersPayload] = await Promise.all([
-      fetchTarkovJsonEndpoint<unknown>('hideout', options),
-      fetchTarkovJsonEndpoint<unknown>('traders', options),
-    ]).catch((error: unknown) => {
+    try {
+      const [hideoutPayload, tradersPayload] = await Promise.all([
+        fetchTarkovJsonEndpoint<unknown>('hideout', options),
+        fetchTarkovJsonEndpoint<unknown>('traders', options),
+      ]);
+      return adaptHideoutResponse(hideoutPayload, { tradersPayload });
+    } catch (error) {
       logger.error('Failed to build hideout payload from hideout and traders', { error });
       throw error;
-    });
-    return adaptHideoutResponse(hideoutPayload, { tradersPayload });
+    }
   };
 }
 export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptions) {
   const regularOptions: TarkovJsonOptions = { ...options, gameMode: PRESTIGE_SOURCE_GAME_MODE };
   return async () => {
-    const [tasksPayload, hideoutPayload, itemsPayload, tradersPayload] = await Promise.all([
-      fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', regularOptions),
-      fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
-      fetchTarkovJsonEndpoint<JsonItemsPayload>('items', regularOptions),
-      fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
-    ]).catch((error: unknown) => {
+    try {
+      const [tasksPayload, hideoutPayload, itemsPayload, tradersPayload] = await Promise.all([
+        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', regularOptions),
+        fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
+        fetchTarkovJsonEndpoint<JsonItemsPayload>('items', regularOptions),
+        fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
+      ]);
+      return adaptPrestigeResponse(tasksPayload, { hideoutPayload, itemsPayload, tradersPayload });
+    } catch (error) {
       logger.error('Failed to build prestige payload from tasks, hideout, items, and traders', {
         error,
       });
       throw error;
-    });
-    return adaptPrestigeResponse(tasksPayload, { hideoutPayload, itemsPayload, tradersPayload });
+    }
   };
 }
