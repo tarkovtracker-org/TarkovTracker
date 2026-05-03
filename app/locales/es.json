@@ -1,6 +1,46 @@
 {
   "admin": {
-    "title": "Panel de administración"
+    "title": "Panel de administración",
+    "verifying_access": "Verifying admin access...",
+    "error_title": "Connection Error",
+    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
+    "no_reference": "N/A",
+    "access_warning_title": "Admin Access",
+    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
+    "unknown_user": "Desconocida",
+    "cache_management_title": "Cache Management",
+    "last_purge_description": "Last purge: {type} at {timestamp}",
+    "tarkov_data_cache_label": "Tarkov Data Cache",
+    "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
+    "purge_game_data_button": "Purge Game Data",
+    "full_cache_purge_label": "Full Cache Purge",
+    "full_cache_purge_description": "Clears ALL cached content including static assets. Use sparingly - increases load on origin.",
+    "purge_everything_button": "Purge Everything",
+    "cache_behavior_title": "Cache Behavior",
+    "cache_info_description": "After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.",
+    "confirm_full_cache_purge_title": "Confirm Full Cache Purge",
+    "confirm_full_cache_purge_description": "This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.",
+    "confirm_purge_button": "Confirm Purge",
+    "all_cache_label": "All Cache",
+    "tarkov_data_label": "Tarkov Data",
+    "unauthorized_title": "Unauthorized",
+    "admin_privileges_required": "Admin privileges required for this action.",
+    "permission_denied": "You do not have permission to perform this action.",
+    "cache_purged_title": "Cache Purged",
+    "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
+    "full_cache_purged_title": "Full Cache Purged",
+    "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
+    "purge_failed_title": "Purge Failed",
+    "purge_failed_description": "Failed to purge cache",
+    "audit_log_title": "Admin Audit Log",
+    "refresh_button": "Refresh",
+    "audit_log_login_required": "Unauthorized: Please log in to continue.",
+    "audit_log_admin_required": "Unauthorized: Admin privileges required to view audit logs.",
+    "audit_log_table_not_found": "Audit log table not found.",
+    "audit_log_table_not_found_description": "Run the SQL migration to create admin_audit_log.",
+    "audit_log_fetch_failed": "Failed to fetch audit logs",
+    "no_actions_recorded": "No admin actions recorded yet",
+    "audit_log_by": "by"
   },
   "alerts": {
     "no_map_data": "No hay datos de mapa disponibles para esta selección."
@@ -104,8 +144,7 @@
     "finish": "Finalizar",
     "back_to_top": "Volver arriba",
     "refresh_button": "Intentar de nuevo",
-    "opens_in_new_tab": "Abrir en una pestaña nueva",
-    "note": "Nota"
+    "opens_in_new_tab": "Abrir en una pestaña nueva"
   },
   "page_help": {
     "button": "Ayuda",
@@ -291,8 +330,6 @@
     "not_available_description": "El mapa interactivo de {mapName} aún no está disponible. Estamos esperando a que se cree un mapa compatible.",
     "placeholder": "esta ubicación",
     "floors": "Pisos",
-    "reset": "Restablecer",
-    "reset_title": "Restablecer vista por defecto",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1197,7 +1234,9 @@
       "not_found_description": "Lo sentimos, no se ha encontrado la página."
     },
     "terms_of_service": {
-      "title": "Términos de Servicio"
+      "title": "Términos de Servicio",
+      "table_of_contents": "Table of contents",
+      "index_button": "Index"
     },
     "privacy": {
       "title": "Política de Privacidad"
@@ -1281,7 +1320,6 @@
     "background_opacity": "Opacidad",
     "background_transparent": "Transparente",
     "background_custom": "Color personalizado",
-    "transparent_background": "Transparente",
     "show_percent": "Mostrar porcentaje",
     "show_remaining": "Mostrar restantes",
     "custom_label": "Etiqueta personalizada",
@@ -1295,10 +1333,6 @@
     "open_json": "Abrir JSON",
     "setup_title": "Configuración de plataforma",
     "setup_subtitle": "Configuraciones de fuente de navegador compatibles con OBS y las principales herramientas de streaming.",
-    "platform_instructions": "Ver instrucciones por plataforma",
-    "obs_steps": "Agregar fuente de navegador, pegar URL, establecer ancho/alto de escena, habilitar \"Apagar fuente cuando no sea visible\" y usar \"Actualizar navegador cuando la escena se active\" cuando sea necesario.",
-    "streamlabs_steps": "Usar fuente de navegador con la misma URL y dimensiones. Ajustar FPS al perfil de stream y mantener la fuente apagada cuando esté oculta.",
-    "other_steps": "Agregar entrada de página web/navegador, pegar URL, mantener transparencia habilitada y ajustar dimensiones al diseño de escena.",
     "preview_dim_self": "Solo widget",
     "preview_help_self": "Muestra el widget en su tamaño natural. Posiciona esta fuente en cualquier lugar de tu escena OBS/Streamlabs arrastrándola.",
     "preview_help_canvas": "Muestra cómo aparece el overlay dentro de una fuente de navegador en pantalla completa. El patrón de cuadrícula representa la transparencia — no aparecerá en el stream.",
@@ -1320,8 +1354,6 @@
     "setup_scaling_warning_title": "Evita redimensionar la fuente en OBS",
     "setup_scaling_warning": "Arrastrar las esquinas de la fuente para hacerla más grande en OBS estira la imagen y causa mucho desenfoque. Para cambiar el tamaño del widget, usa los ajustes de Resolución, Tamaño de texto o Escala personalizada en esta página — el overlay se re-renderiza en calidad nativa.",
     "setup_transparency_note": "El fondo del overlay es transparente por defecto. No se necesita CSS personalizado ni filtros de clave de color — OBS y Streamlabs soportan fuentes de navegador transparentes de forma nativa.",
-    "interval_15s": "Cada 15 segundos",
-    "interval_30s": "Cada 30 segundos",
     "interval_60s": "Cada 60 segundos",
     "interval_120s": "Cada 2 minutos",
     "interval_300s": "Cada 5 minutos",
@@ -1904,7 +1936,6 @@
     "view_on_dev": "Ver {name} en Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Filtrar por tipo de artículo",
     "total": "Total:",
     "progress_format": "{current}/{total}",
     "tasks": "Tareas",
@@ -1972,7 +2003,9 @@
   },
   "game_settings": {
     "pvp": "PvP",
-    "pve": "PvE"
+    "pve": "PvE",
+    "toggle_game_mode_label": "Toggle game mode",
+    "select_faction_label": "Select faction"
   },
   "oauth": {
     "consent": {
