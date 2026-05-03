@@ -144,8 +144,7 @@
     "finish": "Dokončit",
     "back_to_top": "Zpět nahoru",
     "refresh_button": "Zkuste to znovu",
-    "opens_in_new_tab": "Otevře se v nové kartě",
-    "note": "Poznámka"
+    "opens_in_new_tab": "Otevře se v nové kartě"
   },
   "page_help": {
     "button": "Nápověda",
@@ -331,8 +330,6 @@
     "not_available_description": "Interaktivní mapa pro {mapName} ještě není k dispozici. Čekáme na vytvoření kompatibilní mapy.",
     "placeholder": "tato poloha",
     "floors": "Podlahy",
-    "reset": "Reset",
-    "reset_title": "Obnovit zobrazení na výchozí",
     "factions": {
       "pmc": "PMC",
       "scav": "Šcav"
@@ -1323,7 +1320,6 @@
     "background_opacity": "Neprůhlednost",
     "background_transparent": "Průhledný",
     "background_custom": "Vlastní barva",
-    "transparent_background": "Průhledný",
     "show_percent": "Zobrazit procenta",
     "show_remaining": "Zobrazit zbývající",
     "custom_label": "Vlastní popisek",
@@ -1337,10 +1333,6 @@
     "open_json": "Otevřít JSON",
     "setup_title": "Nastavení platformy",
     "setup_subtitle": "Nastavení zdroje prohlížeče, které jsou v souladu s OBS a hlavními streamovacími nástroji.",
-    "platform_instructions": "Zobrazit pokyny specifické pro platformu",
-    "obs_steps": "Přidejte zdroj prohlížeče, vložte URL, nastavte šířku/výšku scény, povolte \"Vypnout zdroj, pokud není viditelný\", a v případě potřeby použijte \"Obnovit prohlížeč když se scéna aktivuje\".",
-    "streamlabs_steps": "Používejte zdroj prohlížeče se stejnými URL a dimenzemi. Při skrytí si zapněte FPS a ponechte zdroj vypnutý.",
-    "other_steps": "Přidejte webovou stránku/vstup prohlížeče, vložte URL, ponechte zapnutou průhlednost a nastavte rozměry odpovídající vašemu rozvržení scény.",
     "preview_dim_self": "Pouze widget",
     "preview_help_self": "Zobrazí widget ve své přirozené velikosti. Umístěte tento zdroj kdekoli na scéně OBS/Streamlabs přetažením.",
     "preview_help_canvas": "Zobrazuje, jak se překryv zobrazí ve zdroji prohlížeče přes celou obrazovku. Kontrolovaný vzor představuje průhlednost — nebude se zobrazovat na streamu.",
@@ -1362,8 +1354,6 @@
     "setup_scaling_warning_title": "Vyhněte se změně velikosti zdroje v OBS",
     "setup_scaling_warning": "Přetažením zdrojových rukojetí, aby byly větší v OBS, se roztáhne obrázek a způsobí těžké rozostření. Chcete-li změnit velikost widgetu, použijte raději nastavení rozlišení, velikosti textu nebo vlastního měřítka - přeskakování překrytí v nativní kvalitě.",
     "setup_transparency_note": "Pozadí překrytí je ve výchozím nastavení průhledné. Není potřeba žádné vlastní CSS nebo barevné filtry – OBS a Streamlaby podporují transparentní zdroje prohlížeče.",
-    "interval_15s": "Každých 15 sekund",
-    "interval_30s": "Každých 30 sekund",
     "interval_60s": "Každých 60 sekund",
     "interval_120s": "Každé 2 minuty",
     "interval_300s": "Každých 5 minut",
@@ -1946,7 +1936,6 @@
     "view_on_dev": "Zobrazit {name} na Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Filtrovat podle typu položky",
     "total": "Celkem:",
     "progress_format": "{current}/{total}",
     "tasks": "Úkoly",

@@ -144,8 +144,7 @@
     "finish": "Fertig",
     "back_to_top": "Zurück nach oben",
     "refresh_button": "Erneut versuchen",
-    "opens_in_new_tab": "Öffnet in neuem Tab",
-    "note": "Hinweis"
+    "opens_in_new_tab": "Öffnet in neuem Tab"
   },
   "page_help": {
     "button": "Hilfe",
@@ -331,8 +330,6 @@
     "not_available_description": "Die interaktive Karte für {mapName} ist noch nicht verfügbar. Wir warten auf eine kompatible Karte.",
     "placeholder": "diesen Ort",
     "floors": "Stockwerke",
-    "reset": "Zurücksetzen",
-    "reset_title": "Ansicht auf Standard zurücksetzen",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1323,7 +1320,6 @@
     "background_opacity": "Deckkraft",
     "background_transparent": "Transparent",
     "background_custom": "Benutzerdefinierte Farbe",
-    "transparent_background": "Transparent",
     "show_percent": "Prozent anzeigen",
     "show_remaining": "Verbleibende anzeigen",
     "custom_label": "Benutzerdefiniertes Label",
@@ -1337,10 +1333,6 @@
     "open_json": "JSON öffnen",
     "setup_title": "Plattform-Setup",
     "setup_subtitle": "Browser-Source-Einstellungen, die mit OBS und den wichtigsten Streaming-Tools kompatibel sind.",
-    "platform_instructions": "Plattform-spezifische Anweisungen anzeigen",
-    "obs_steps": "Browser-Quelle hinzufügen, URL einfügen, Szenenbreite/-höhe einstellen, „Quelle ausschalten, wenn nicht sichtbar\" aktivieren und „Browser aktualisieren, wenn Szene aktiv wird\" bei Bedarf verwenden.",
-    "streamlabs_steps": "Browser-Quelle mit der gleichen URL und den gleichen Abmessungen verwenden. FPS an das Streamprofil anpassen und Quelle bei Ausblenden ausschalten.",
-    "other_steps": "Webseiten-/Browser-Eingabe hinzufügen, URL einfügen, Transparenz aktiviert lassen und Abmessungen an das Szenenlayout anpassen.",
     "preview_dim_self": "Nur Widget",
     "preview_help_self": "Zeigt das Widget in seiner natürlichen Größe. Positioniere diese Quelle beliebig in deiner OBS/Streamlabs-Szene durch Ziehen.",
     "preview_help_canvas": "Zeigt, wie das Overlay in einer Vollbild-Browserquelle erscheint. Das Schachbrettmuster steht für Transparenz — es erscheint nicht im Stream.",
@@ -1362,8 +1354,6 @@
     "setup_scaling_warning_title": "Vermeide das Skalieren der Quelle in OBS",
     "setup_scaling_warning": "Das Vergrößern der Quelle durch Ziehen der Griffe in OBS streckt das Bild und verursacht starke Unschärfe. Verwende stattdessen die Einstellungen für Auflösung, Textgröße oder Benutzerdefinierte Skalierung auf dieser Seite — das Overlay wird in nativer Qualität neu gerendert.",
     "setup_transparency_note": "Der Overlay-Hintergrund ist standardmäßig transparent. Kein benutzerdefiniertes CSS oder Farbschlüssel-Filter nötig — OBS und Streamlabs unterstützen transparente Browserquellen nativ.",
-    "interval_15s": "Alle 15 Sekunden",
-    "interval_30s": "Alle 30 Sekunden",
     "interval_60s": "Alle 60 Sekunden",
     "interval_120s": "Alle 2 Minuten",
     "interval_300s": "Alle 5 Minuten",
@@ -1946,7 +1936,6 @@
     "view_on_dev": "{name} auf Tarkov.dev ansehen"
   },
   "needed_items": {
-    "filter_type_label": "Filtern Sie nach Artikeltyp",
     "total": "Gesamt:",
     "progress_format": "{current}/{total}",
     "tasks": "Aufgaben",

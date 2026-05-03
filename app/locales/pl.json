@@ -144,8 +144,7 @@
     "finish": "Zakończ",
     "back_to_top": "Powrót na górę",
     "refresh_button": "Spróbuj ponownie",
-    "opens_in_new_tab": "Opens in new tab",
-    "note": "Note"
+    "opens_in_new_tab": "Opens in new tab"
   },
   "page_help": {
     "button": "Pomoc",
@@ -331,8 +330,6 @@
     "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
     "placeholder": "this location",
     "floors": "Floors",
-    "reset": "Reset",
-    "reset_title": "Reset view to default",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1323,7 +1320,6 @@
     "background_opacity": "Opacity",
     "background_transparent": "Transparent",
     "background_custom": "Custom Color",
-    "transparent_background": "Transparent",
     "show_percent": "Show percent",
     "show_remaining": "Show remaining",
     "custom_label": "Custom Label",
@@ -1337,10 +1333,6 @@
     "open_json": "Open JSON",
     "setup_title": "Platform Setup",
     "setup_subtitle": "Browser-source settings that align with OBS and major streaming tools.",
-    "platform_instructions": "View platform-specific instructions",
-    "obs_steps": "Add Browser Source, paste URL, set your scene width/height, enable \"Shutdown source when not visible\", and use \"Refresh browser when scene becomes active\" when needed.",
-    "streamlabs_steps": "Use Browser Source with the same URL and dimensions. Match FPS to your stream profile and keep source shutdown enabled when hidden.",
-    "other_steps": "Add a webpage/browser input, paste URL, keep transparency enabled, and set dimensions to match your scene layout.",
     "preview_dim_self": "Widget only",
     "preview_help_self": "Shows the widget at its natural size. Position this source anywhere in your OBS/Streamlabs scene by dragging it.",
     "preview_help_canvas": "Shows how the overlay appears within a full-screen browser source. The checkered pattern represents transparency — it will not appear on stream.",
@@ -1362,8 +1354,6 @@
     "setup_scaling_warning_title": "Avoid resizing the source in OBS",
     "setup_scaling_warning": "Dragging the source handles to make it larger in OBS will stretch the image and cause heavy blur. To change the widget size, use the Resolution, Text Size, or Custom Scale settings on this page instead — the overlay re-renders at native quality.",
     "setup_transparency_note": "The overlay background is transparent by default. No Custom CSS or color-key filters are needed — OBS and Streamlabs support transparent browser sources natively.",
-    "interval_15s": "Every 15 seconds",
-    "interval_30s": "Every 30 seconds",
     "interval_60s": "Every 60 seconds",
     "interval_120s": "Every 2 minutes",
     "interval_300s": "Every 5 minutes",
@@ -1946,7 +1936,6 @@
     "view_on_dev": "View {name} on Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Filter by item type",
     "total": "Total:",
     "progress_format": "{current}/{total}",
     "tasks": "Tasks",

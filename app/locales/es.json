@@ -144,8 +144,7 @@
     "finish": "Finalizar",
     "back_to_top": "Volver arriba",
     "refresh_button": "Intentar de nuevo",
-    "opens_in_new_tab": "Abrir en una pestaña nueva",
-    "note": "Nota"
+    "opens_in_new_tab": "Abrir en una pestaña nueva"
   },
   "page_help": {
     "button": "Ayuda",
@@ -331,8 +330,6 @@
     "not_available_description": "El mapa interactivo de {mapName} aún no está disponible. Estamos esperando a que se cree un mapa compatible.",
     "placeholder": "esta ubicación",
     "floors": "Pisos",
-    "reset": "Restablecer",
-    "reset_title": "Restablecer vista por defecto",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1323,7 +1320,6 @@
     "background_opacity": "Opacidad",
     "background_transparent": "Transparente",
     "background_custom": "Color personalizado",
-    "transparent_background": "Transparente",
     "show_percent": "Mostrar porcentaje",
     "show_remaining": "Mostrar restantes",
     "custom_label": "Etiqueta personalizada",
@@ -1337,10 +1333,6 @@
     "open_json": "Abrir JSON",
     "setup_title": "Configuración de plataforma",
     "setup_subtitle": "Configuraciones de fuente de navegador compatibles con OBS y las principales herramientas de streaming.",
-    "platform_instructions": "Ver instrucciones por plataforma",
-    "obs_steps": "Agregar fuente de navegador, pegar URL, establecer ancho/alto de escena, habilitar \"Apagar fuente cuando no sea visible\" y usar \"Actualizar navegador cuando la escena se active\" cuando sea necesario.",
-    "streamlabs_steps": "Usar fuente de navegador con la misma URL y dimensiones. Ajustar FPS al perfil de stream y mantener la fuente apagada cuando esté oculta.",
-    "other_steps": "Agregar entrada de página web/navegador, pegar URL, mantener transparencia habilitada y ajustar dimensiones al diseño de escena.",
     "preview_dim_self": "Solo widget",
     "preview_help_self": "Muestra el widget en su tamaño natural. Posiciona esta fuente en cualquier lugar de tu escena OBS/Streamlabs arrastrándola.",
     "preview_help_canvas": "Muestra cómo aparece el overlay dentro de una fuente de navegador en pantalla completa. El patrón de cuadrícula representa la transparencia — no aparecerá en el stream.",
@@ -1362,8 +1354,6 @@
     "setup_scaling_warning_title": "Evita redimensionar la fuente en OBS",
     "setup_scaling_warning": "Arrastrar las esquinas de la fuente para hacerla más grande en OBS estira la imagen y causa mucho desenfoque. Para cambiar el tamaño del widget, usa los ajustes de Resolución, Tamaño de texto o Escala personalizada en esta página — el overlay se re-renderiza en calidad nativa.",
     "setup_transparency_note": "El fondo del overlay es transparente por defecto. No se necesita CSS personalizado ni filtros de clave de color — OBS y Streamlabs soportan fuentes de navegador transparentes de forma nativa.",
-    "interval_15s": "Cada 15 segundos",
-    "interval_30s": "Cada 30 segundos",
     "interval_60s": "Cada 60 segundos",
     "interval_120s": "Cada 2 minutos",
     "interval_300s": "Cada 5 minutos",
@@ -1946,7 +1936,6 @@
     "view_on_dev": "Ver {name} en Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Filtrar por tipo de artículo",
     "total": "Total:",
     "progress_format": "{current}/{total}",
     "tasks": "Tareas",

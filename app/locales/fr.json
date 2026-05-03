@@ -144,8 +144,7 @@
     "finish": "Terminer",
     "back_to_top": "Retour en haut",
     "refresh_button": "Actualiser",
-    "opens_in_new_tab": "Ouvre dans un nouvel onglet",
-    "note": "Remarque"
+    "opens_in_new_tab": "Ouvre dans un nouvel onglet"
   },
   "page_help": {
     "button": "Aide",
@@ -331,8 +330,6 @@
     "not_available_description": "La carte interactive de {mapName} n'est pas encore disponible. Nous attendons la création d'une carte compatible.",
     "placeholder": "cet endroit",
     "floors": "Étages",
-    "reset": "Réinitialiser",
-    "reset_title": "Réinitialiser la vue par défaut",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1323,7 +1320,6 @@
     "background_opacity": "Opacité",
     "background_transparent": "Transparent",
     "background_custom": "Couleur personnalisée",
-    "transparent_background": "Transparent",
     "show_percent": "Afficher le pourcentage",
     "show_remaining": "Afficher les restants",
     "custom_label": "Étiquette personnalisée",
@@ -1337,10 +1333,6 @@
     "open_json": "Ouvrir JSON",
     "setup_title": "Configuration de plateforme",
     "setup_subtitle": "Paramètres de source navigateur compatibles avec OBS et les principaux outils de streaming.",
-    "platform_instructions": "Voir les instructions par plateforme",
-    "obs_steps": "Ajouter une source navigateur, coller l'URL, définir la largeur/hauteur de scène, activer « Éteindre la source quand non visible » et utiliser « Rafraîchir le navigateur quand la scène devient active » si nécessaire.",
-    "streamlabs_steps": "Utiliser une source navigateur avec la même URL et les mêmes dimensions. Adapter les FPS au profil de stream et garder la source éteinte quand masquée.",
-    "other_steps": "Ajouter une entrée page web/navigateur, coller l'URL, garder la transparence activée et ajuster les dimensions à la disposition de la scène.",
     "preview_dim_self": "Widget uniquement",
     "preview_help_self": "Affiche le widget à sa taille naturelle. Positionnez cette source n'importe où dans votre scène OBS/Streamlabs en la faisant glisser.",
     "preview_help_canvas": "Montre comment l'overlay apparaît dans une source navigateur plein écran. Le motif en damier représente la transparence — il n'apparaîtra pas sur le stream.",
@@ -1362,8 +1354,6 @@
     "setup_scaling_warning_title": "Évitez de redimensionner la source dans OBS",
     "setup_scaling_warning": "Agrandir la source en tirant les poignées dans OBS étire l'image et provoque un flou important. Pour modifier la taille du widget, utilisez les paramètres Résolution, Taille du texte ou Échelle personnalisée sur cette page — l'overlay est re-rendu en qualité native.",
     "setup_transparency_note": "L'arrière-plan de l'overlay est transparent par défaut. Aucun CSS personnalisé ni filtre de clé chromatique n'est nécessaire — OBS et Streamlabs prennent en charge les sources navigateur transparentes nativement.",
-    "interval_15s": "Toutes les 15 secondes",
-    "interval_30s": "Toutes les 30 secondes",
     "interval_60s": "Toutes les 60 secondes",
     "interval_120s": "Toutes les 2 minutes",
     "interval_300s": "Toutes les 5 minutes",
@@ -1946,7 +1936,6 @@
     "view_on_dev": "Voir {name} sur Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Filtrer par type d'article",
     "total": "Total:",
     "progress_format": "{current}/{total}",
     "tasks": "Tâches",

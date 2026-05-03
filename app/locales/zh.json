@@ -144,8 +144,7 @@
     "finish": "完成",
     "back_to_top": "回到顶部",
     "refresh_button": "重试",
-    "opens_in_new_tab": "在新选项卡中打开",
-    "note": "注意"
+    "opens_in_new_tab": "在新选项卡中打开"
   },
   "page_help": {
     "button": "帮助",
@@ -331,8 +330,6 @@
     "not_available_description": "\"{mapName}\"的互动地图尚不可用。我们正在等待兼容地图的制作。",
     "placeholder": "该地点",
     "floors": "楼层",
-    "reset": "重置",
-    "reset_title": "重置为默认视图",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1323,7 +1320,6 @@
     "background_opacity": "不透明度",
     "background_transparent": "透明",
     "background_custom": "自定义颜色",
-    "transparent_background": "透明",
     "show_percent": "显示百分比",
     "show_remaining": "显示剩余",
     "custom_label": "自定义标签",
@@ -1337,10 +1333,6 @@
     "open_json": "打开 JSON",
     "setup_title": "平台设置",
     "setup_subtitle": "与 OBS 及主流直播工具兼容的浏览器源设置。",
-    "platform_instructions": "查看各平台说明",
-    "obs_steps": "添加浏览器源，粘贴 URL，设置场景宽度/高度，启用\"不可见时关闭源\"，必要时使用\"场景激活时刷新浏览器\"。",
-    "streamlabs_steps": "使用相同 URL 和尺寸的浏览器源。将 FPS 匹配到直播配置文件，隐藏时关闭源。",
-    "other_steps": "添加网页/浏览器输入，粘贴 URL，保持透明度启用，并调整尺寸以匹配场景布局。",
     "preview_dim_self": "仅小部件",
     "preview_help_self": "以自然大小显示小部件。在 OBS/Streamlabs 场景中拖动此源以定位。",
     "preview_help_canvas": "展示叠加层在全屏浏览器源中的显示效果。棋盘格图案代表透明区域——不会出现在直播中。",
@@ -1362,8 +1354,6 @@
     "setup_scaling_warning_title": "避免在 OBS 中缩放源",
     "setup_scaling_warning": "在 OBS 中拖动源边框放大会拉伸图像并导致严重模糊。要更改小部件大小，请使用此页面上的分辨率、文字大小或自定义缩放设置——叠加层将以原生质量重新渲染。",
     "setup_transparency_note": "叠加层背景默认为透明。无需自定义 CSS 或色键滤镜——OBS 和 Streamlabs 原生支持透明浏览器源。",
-    "interval_15s": "每 15 秒",
-    "interval_30s": "每 30 秒",
     "interval_60s": "每 60 秒",
     "interval_120s": "每 2 分钟",
     "interval_300s": "每 5 分钟",
@@ -1946,7 +1936,6 @@
     "view_on_dev": "在 Tarkov.dev 查看{name}"
   },
   "needed_items": {
-    "filter_type_label": "按项目类型过滤",
     "total": "全部的：",
     "progress_format": "{current}/{total}",
     "tasks": "任务",
