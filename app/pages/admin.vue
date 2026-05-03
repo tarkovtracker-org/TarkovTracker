@@ -60,10 +60,11 @@
         :title="t('admin.access_warning_title')"
       >
         <template #description>
-          {{ t('admin.access_warning_description') }}
-          <span class="font-medium">
-            {{ $supabase.user?.email || $supabase.user?.displayName || t('admin.unknown_user') }}
-          </span>
+          {{
+            t('admin.access_warning_description', {
+              user: $supabase.user?.email || $supabase.user?.displayName || t('admin.unknown_user'),
+            })
+          }}
         </template>
       </UAlert>
       <div class="grid gap-6 lg:grid-cols-2">

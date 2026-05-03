@@ -6,7 +6,7 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "access_warning_title": "Admin Access",
-    "access_warning_description": "Actions performed here affect all users. Logged in as",
+    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "unknown_user": "Unknown",
     "cache_management_title": "Cache Management",
     "last_purge_description": "Last purge: {type} at {timestamp}",
