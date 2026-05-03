@@ -1,6 +1,46 @@
 {
   "admin": {
-    "title": "管理面板"
+    "title": "管理面板",
+    "verifying_access": "Verifying admin access...",
+    "error_title": "Connection Error",
+    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
+    "no_reference": "N/A",
+    "access_warning_title": "Admin Access",
+    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
+    "unknown_user": "未知",
+    "cache_management_title": "Cache Management",
+    "last_purge_description": "Last purge: {type} at {timestamp}",
+    "tarkov_data_cache_label": "Tarkov Data Cache",
+    "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
+    "purge_game_data_button": "Purge Game Data",
+    "full_cache_purge_label": "Full Cache Purge",
+    "full_cache_purge_description": "Clears ALL cached content including static assets. Use sparingly - increases load on origin.",
+    "purge_everything_button": "Purge Everything",
+    "cache_behavior_title": "Cache Behavior",
+    "cache_info_description": "After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.",
+    "confirm_full_cache_purge_title": "Confirm Full Cache Purge",
+    "confirm_full_cache_purge_description": "This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.",
+    "confirm_purge_button": "Confirm Purge",
+    "all_cache_label": "All Cache",
+    "tarkov_data_label": "Tarkov Data",
+    "unauthorized_title": "Unauthorized",
+    "admin_privileges_required": "Admin privileges required for this action.",
+    "permission_denied": "You do not have permission to perform this action.",
+    "cache_purged_title": "Cache Purged",
+    "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
+    "full_cache_purged_title": "Full Cache Purged",
+    "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
+    "purge_failed_title": "Purge Failed",
+    "purge_failed_description": "Failed to purge cache",
+    "audit_log_title": "Admin Audit Log",
+    "refresh_button": "Refresh",
+    "audit_log_login_required": "Unauthorized: Please log in to continue.",
+    "audit_log_admin_required": "Unauthorized: Admin privileges required to view audit logs.",
+    "audit_log_table_not_found": "Audit log table not found.",
+    "audit_log_table_not_found_description": "Run the SQL migration to create admin_audit_log.",
+    "audit_log_fetch_failed": "Failed to fetch audit logs",
+    "no_actions_recorded": "No admin actions recorded yet",
+    "audit_log_by": "by"
   },
   "alerts": {
     "no_map_data": "此选择没有可用地图数据。"
@@ -104,8 +144,7 @@
     "finish": "完成",
     "back_to_top": "回到顶部",
     "refresh_button": "重试",
-    "opens_in_new_tab": "在新选项卡中打开",
-    "note": "注意"
+    "opens_in_new_tab": "在新选项卡中打开"
   },
   "page_help": {
     "button": "帮助",
@@ -291,8 +330,6 @@
     "not_available_description": "\"{mapName}\"的互动地图尚不可用。我们正在等待兼容地图的制作。",
     "placeholder": "该地点",
     "floors": "楼层",
-    "reset": "重置",
-    "reset_title": "重置为默认视图",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1197,7 +1234,9 @@
       "not_found_description": "抱歉，该页面不存在！"
     },
     "terms_of_service": {
-      "title": "服务条款"
+      "title": "服务条款",
+      "table_of_contents": "Table of contents",
+      "index_button": "Index"
     },
     "privacy": {
       "title": "隐私政策"
@@ -1281,7 +1320,6 @@
     "background_opacity": "不透明度",
     "background_transparent": "透明",
     "background_custom": "自定义颜色",
-    "transparent_background": "透明",
     "show_percent": "显示百分比",
     "show_remaining": "显示剩余",
     "custom_label": "自定义标签",
@@ -1295,10 +1333,6 @@
     "open_json": "打开 JSON",
     "setup_title": "平台设置",
     "setup_subtitle": "与 OBS 及主流直播工具兼容的浏览器源设置。",
-    "platform_instructions": "查看各平台说明",
-    "obs_steps": "添加浏览器源，粘贴 URL，设置场景宽度/高度，启用\"不可见时关闭源\"，必要时使用\"场景激活时刷新浏览器\"。",
-    "streamlabs_steps": "使用相同 URL 和尺寸的浏览器源。将 FPS 匹配到直播配置文件，隐藏时关闭源。",
-    "other_steps": "添加网页/浏览器输入，粘贴 URL，保持透明度启用，并调整尺寸以匹配场景布局。",
     "preview_dim_self": "仅小部件",
     "preview_help_self": "以自然大小显示小部件。在 OBS/Streamlabs 场景中拖动此源以定位。",
     "preview_help_canvas": "展示叠加层在全屏浏览器源中的显示效果。棋盘格图案代表透明区域——不会出现在直播中。",
@@ -1320,8 +1354,6 @@
     "setup_scaling_warning_title": "避免在 OBS 中缩放源",
     "setup_scaling_warning": "在 OBS 中拖动源边框放大会拉伸图像并导致严重模糊。要更改小部件大小，请使用此页面上的分辨率、文字大小或自定义缩放设置——叠加层将以原生质量重新渲染。",
     "setup_transparency_note": "叠加层背景默认为透明。无需自定义 CSS 或色键滤镜——OBS 和 Streamlabs 原生支持透明浏览器源。",
-    "interval_15s": "每 15 秒",
-    "interval_30s": "每 30 秒",
     "interval_60s": "每 60 秒",
     "interval_120s": "每 2 分钟",
     "interval_300s": "每 5 分钟",
@@ -1904,7 +1936,6 @@
     "view_on_dev": "在 Tarkov.dev 查看{name}"
   },
   "needed_items": {
-    "filter_type_label": "按项目类型过滤",
     "total": "全部的：",
     "progress_format": "{current}/{total}",
     "tasks": "任务",
@@ -1972,7 +2003,9 @@
   },
   "game_settings": {
     "pvp": "PvP",
-    "pve": "PvE"
+    "pve": "PvE",
+    "toggle_game_mode_label": "Toggle game mode",
+    "select_faction_label": "Select faction"
   },
   "oauth": {
     "consent": {
