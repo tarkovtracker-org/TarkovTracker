@@ -293,7 +293,15 @@ describe('tarkov JSON adapters', () => {
             { id: 'req1', item: 'item1', count: 1, attributes: { foundInRaid: true } },
           ],
           stationLevelRequirements: [],
-          skillRequirements: [{ id: '5d494a0e5b56502f18c98a02-1-2', level: 5 }],
+          skillRequirements: [
+            { id: '5d494a0e5b56502f18c98a02-1-2', level: 5 },
+            {
+              id: 'skill-req2',
+              level: 3,
+              name: 'Skill requirement label',
+              skill: { id: 'Strength', name: 'Strength' },
+            },
+          ],
           traderRequirements: [{ id: 'trader-req1', trader: 'trader1', value: 1 }],
         },
       ],
@@ -430,6 +438,12 @@ describe('tarkov JSON adapters', () => {
       level: 5,
       name: 'Hideout Management',
       skill: { id: 'HideoutManagement', name: 'Hideout Management' },
+    });
+    expect(hideout.hideoutStations[0]?.levels[0]?.skillRequirements[1]).toMatchObject({
+      id: 'skill-req2',
+      level: 3,
+      name: 'Strength',
+      skill: { id: 'Strength', name: 'Strength' },
     });
     const prestige = adaptPrestigeResponse(tasksPayload, {
       hideoutPayload,

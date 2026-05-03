@@ -704,12 +704,12 @@ function adaptHideoutRequirement(raw: unknown, context: AdapterContext) {
   const skillFallback =
     typeof raw.id === 'string' ? HIDEOUT_SKILL_REQUIREMENT_SKILLS[raw.id] : undefined;
   const skillName =
-    typeof raw.name === 'string'
-      ? raw.name
-      : isRecord(skillValue) && typeof skillValue.name === 'string'
-        ? skillValue.name
-        : typeof skillValue === 'string'
-          ? skillValue
+    isRecord(skillValue) && typeof skillValue.name === 'string'
+      ? skillValue.name
+      : typeof skillValue === 'string'
+        ? skillValue
+        : typeof raw.name === 'string'
+          ? raw.name
           : skillFallback?.name;
   const skillId =
     isRecord(skillValue) && typeof skillValue.id === 'string'
