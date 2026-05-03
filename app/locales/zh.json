@@ -1078,6 +1078,8 @@
       "terms_of_service": "服务条款",
       "popup_blocked_title": "弹出窗口被阻止",
       "popup_blocked_description": "你的浏览器阻止了登录窗口。正在为你重定向...",
+      "authenticating": "Authenticating...",
+      "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Sign-in failed",
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "已登录",
