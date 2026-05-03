@@ -12,7 +12,7 @@ const isStoryObjectiveCompleteMock = vi.fn((chapterId: string, objectiveId: stri
   return objectiveCompletionState[`${chapterId}:${objectiveId}`] === true;
 });
 mockNuxtImport('definePageMeta', () => () => {});
-mockNuxtImport('useHead', () => () => {});
+mockNuxtImport('useSeoMeta', () => () => {});
 vi.mock('@/composables/useStorylineChapters', () => ({
   useStorylineChapters: () => ({
     chapters: ref([
