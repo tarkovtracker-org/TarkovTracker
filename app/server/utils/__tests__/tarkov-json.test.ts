@@ -293,7 +293,7 @@ describe('tarkov JSON adapters', () => {
             { id: 'req1', item: 'item1', count: 1, attributes: { foundInRaid: true } },
           ],
           stationLevelRequirements: [],
-          skillRequirements: [],
+          skillRequirements: [{ id: '5d494a0e5b56502f18c98a02-1-2', level: 5 }],
           traderRequirements: [{ id: 'trader-req1', trader: 'trader1', value: 1 }],
         },
       ],
@@ -418,15 +418,22 @@ describe('tarkov JSON adapters', () => {
       items: expect.arrayContaining([expect.objectContaining({ id: 'item1', name: 'Salewa' })]),
     });
   });
-  it('adapts hideout and prestige data without items lookup', () => {
+  it('adapts hideout without items lookup and prestige with item lookup', () => {
     const hideout = adaptHideoutResponse(hideoutPayload, { tradersPayload }).data;
     expect(hideout.hideoutStations[0]?.levels[0]?.itemRequirements[0]).toMatchObject({
       item: { id: 'item1' },
       quantity: 1,
       attributes: [{ name: 'foundInRaid', type: 'foundInRaid', value: 'true' }],
     });
+    expect(hideout.hideoutStations[0]?.levels[0]?.skillRequirements[0]).toMatchObject({
+      id: '5d494a0e5b56502f18c98a02-1-2',
+      level: 5,
+      name: 'Hideout Management',
+      skill: { id: 'HideoutManagement', name: 'Hideout Management' },
+    });
     const prestige = adaptPrestigeResponse(tasksPayload, {
       hideoutPayload,
+      itemsPayload,
       tradersPayload,
     }).data.prestige[0];
     expect(prestige?.conditions?.map((condition) => condition.__typename)).toEqual([
@@ -436,5 +443,9 @@ describe('tarkov JSON adapters', () => {
       'TaskObjectiveItem',
     ]);
     expect(prestige?.conditions?.[1]?.task).toMatchObject({ id: 'task1', name: 'Debut' });
+    expect(prestige?.conditions?.[3]?.items?.[0]).toMatchObject({
+      id: 'item1',
+      name: 'Salewa',
+    });
   });
 });
