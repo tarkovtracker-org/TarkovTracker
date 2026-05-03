@@ -536,9 +536,9 @@
       "completed": "Completado",
       "endings": "Endings",
       "route_choice": "Route choice",
-      "route_available": "Available",
+      "route_available": "Disponible",
       "route_chosen": "Route selected",
-      "route_blocked": "Blocked",
+      "route_blocked": "Bloqueado",
       "route_blocks": "Blocks: {objectives}",
       "route_blocked_by": "Blocked by: {objectives}",
       "route_decision": "Decision {index}",
@@ -1091,19 +1091,19 @@
       "shared_view": "Shared View",
       "loading_shared_profile": "Loading shared profile...",
       "loading_data": "Loading progression metadata...",
-      "shared_private": "This shared profile is private.",
-      "shared_not_found": "Shared profile not found.",
-      "shared_unavailable": "Shared profile is unavailable right now.",
+      "shared_private": "El perfil compartido es privado.",
+      "shared_not_found": "El perfil compartido no se encontró.",
+      "shared_unavailable": "El perfil compartido no está disponible en este momento.",
       "shared_load_failed": "Failed to load shared profile.",
       "shared_mode_notice": "Viewing shared progression for this mode.",
       "share_private_intro": "Este modo es privado. Activa el uso compartido en ",
       "account_settings_link": "Configuración de cuenta",
       "share_private_outro": " para hacer este enlace público.",
       "share_public_enabled": "This mode is public. Anyone with the link can view it.",
-      "share_private_enabled": "This mode is private.",
+      "share_private_enabled": "Este modo es privado.",
       "mode_toggle_label": "Seleccionar modo de perfil",
-      "copy_snapshot": "Copy Snapshot",
-      "view_tasks": "Open Tasks",
+      "copy_snapshot": "Copiar Snapshot",
+      "view_tasks": "Abrir tareas",
       "tab_overview": "Resumen",
       "tab_tasks": "Misiones",
       "tab_hideout": "Escondite",
@@ -1118,7 +1118,7 @@
       "story_paragraph": "{name} has been active in {mode} for about {active_days} days, with {journey_days} days between first and latest tracked progress.",
       "next_milestone_done": "All task completion milestones reached.",
       "next_milestone_value": "{remaining}% left to reach {milestone}% task completion.",
-      "no_date": "No data yet",
+      "no_date": "Aún no hay datos",
       "level_meta": "{mode} profile level and active faction ({faction})",
       "tasks_meta": "{remaining} remaining, {failed} failed branches",
       "objectives_meta": "{completion_pct}% completion across tracked objectives",
@@ -1768,7 +1768,7 @@
     },
     "danger_zone": {
       "confirm_delete_instruction": "Escriba {word} para confirmar:",
-      "confirm_word": "DELETE"
+      "confirm_word": "ELIMINAR"
     },
     "log_import": {
       "upload_hint": "Selecciona la carpeta Logs de Escape from Tarkov para importar el progreso de misiones.",
@@ -1963,7 +1963,7 @@
   },
   "skills": {
     "req": "Requiere",
-    "lv": "Lv",
+    "lv": "Nl",
     "required_for": "Requerido para: {items}",
     "required_levels": "Niveles requeridos: {items}",
     "elite_level": "Nivel ÉLITE"
@@ -1975,7 +1975,7 @@
   "oauth": {
     "consent": {
       "authorize": "Authorize Application",
-      "loading": "Loading...",
+      "loading": "Cargando...",
       "error": "{error}",
       "unknown": "Unknown Application",
       "requesting_access": "is requesting access to your TarkovTracker account.",
