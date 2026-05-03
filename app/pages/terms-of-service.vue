@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
     title: 'Terms of Service',
     description: 'TarkovTracker terms of service and usage guidelines.',
@@ -88,7 +89,7 @@
       <!-- Fixed sidebar (stays in viewport, accounts for drawer + container) -->
       <aside class="fixed left-[calc(max(15rem,(100vw-100rem)/2+15rem))] hidden w-75 xl:block">
         <UCard class="border-surface-700/50 bg-surface-900/90 border backdrop-blur">
-          <nav aria-label="Table of contents">
+          <nav :aria-label="t('page.terms_of_service.table_of_contents')">
             <ol class="space-y-2 text-sm leading-relaxed">
               <li v-for="item in toc" :key="item.id">
                 <button
@@ -870,7 +871,12 @@
     <ClientOnly>
       <div class="fixed right-6 bottom-6 z-40 xl:hidden">
         <UPopover>
-          <UButton icon="i-heroicons-list-bullet" color="primary" variant="solid" label="Index" />
+          <UButton
+            icon="i-heroicons-list-bullet"
+            color="primary"
+            variant="solid"
+            :label="t('page.terms_of_service.index_button')"
+          />
           <template #content>
             <div class="max-h-96 w-64 space-y-1 overflow-y-auto p-2">
               <button

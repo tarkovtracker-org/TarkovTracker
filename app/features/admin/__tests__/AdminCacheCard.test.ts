@@ -33,6 +33,13 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
     locale: ref('en'),
+    t: (key: string) =>
+      (
+        ({
+          'admin.confirm_full_cache_purge_title': 'Confirm Full Cache Purge',
+          'admin.purge_everything_button': 'Purge Everything',
+        }) as Record<string, string>
+      )[key] ?? key,
   }),
 }));
 vi.mock('#imports', async (importOriginal) => ({
