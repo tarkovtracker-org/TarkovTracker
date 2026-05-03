@@ -1493,6 +1493,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.itemsFullLoaded = false;
           this.hydrateTaskItems();
           this.hydrateHideoutItems();
+          this.hydratePrestigeItems();
         },
         onEmpty: () => {
           if (this.languageCode !== requestLanguage || this.getApiGameMode() !== requestGameMode) {
@@ -1544,6 +1545,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.itemsFullLoaded = true;
           this.hydrateTaskItems();
           this.hydrateHideoutItems();
+          this.hydratePrestigeItems();
         },
         onEmpty: () => {
           if (this.languageCode !== requestLanguage || this.getApiGameMode() !== requestGameMode) {
@@ -1599,6 +1601,7 @@ export const useMetadataStore = defineStore('metadata', {
         errorKey: 'prestigeError',
         processData: (data) => {
           this.prestigeLevels = markRaw(data.prestige || []);
+          this.hydratePrestigeItems();
         },
         onEmpty: () => {
           this.prestigeLevels = markRaw([]);
@@ -1722,6 +1725,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       if (!this.prestigeLevels.length) {
         this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
+        this.hydratePrestigeItems();
       }
       if (!this.editions.length) {
         this.editions = markRaw(cachedData.editions.editions || []);
@@ -2155,6 +2159,28 @@ export const useMetadataStore = defineStore('metadata', {
       // Rebuild hideout-derived data now that items are hydrated
       this.processHideoutData({ hideoutStations: this.hideoutStations });
       perfEnd(perfTimer, { stations: this.hideoutStations.length });
+    },
+    hydratePrestigeItems() {
+      if (!this.items.length || !this.prestigeLevels.length) return;
+      const itemsById = this.itemsById.size
+        ? this.itemsById
+        : new Map(this.items.map((item) => [item.id, item]));
+      const { pickItemLite, pickItemArray } = createItemPicker(itemsById);
+      this.prestigeLevels = markRaw(
+        this.prestigeLevels.map((prestige) => ({
+          ...prestige,
+          conditions: prestige.conditions?.map((condition) => {
+            const objective = condition as ObjectiveWithItems;
+            return {
+              ...objective,
+              item: pickItemLite(objective.item),
+              items: pickItemArray(objective.items),
+              containsAll: pickItemArray(objective.containsAll),
+              useAny: pickItemArray(objective.useAny),
+            } as TaskObjective;
+          }),
+        }))
+      );
     },
     /**
      * Process tasks data and build derived structures using the graph builder composable
