@@ -923,51 +923,43 @@ export function createTarkovJsonMapSpawnsFetcher(options: TarkovJsonOptions) {
 }
 export function createTarkovJsonTaskObjectivesFetcher(options: TarkovJsonOptions) {
   return async () => {
-    const [tasksPayload, itemsPayload, mapsPayload, hideoutPayload, tradersPayload] =
-      await Promise.all([
-        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
-        fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options),
-        fetchTarkovJsonEndpoint<JsonMapsPayload>('maps', options),
-        fetchTarkovJsonEndpoint<unknown>('hideout', options),
-        fetchTarkovJsonEndpoint<unknown>('traders', options),
-      ]);
+    const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
+      fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
+      fetchTarkovJsonEndpoint<unknown>('hideout', options),
+      fetchTarkovJsonEndpoint<unknown>('traders', options),
+    ]);
     return adaptTaskObjectivesResponse(tasksPayload, {
       hideoutPayload,
-      itemsPayload,
-      mapsPayload,
       tradersPayload,
     });
   };
 }
 export function createTarkovJsonTaskRewardsFetcher(options: TarkovJsonOptions) {
   return async () => {
-    const [tasksPayload, itemsPayload, tradersPayload] = await Promise.all([
+    const [tasksPayload, tradersPayload] = await Promise.all([
       fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', options),
-      fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options),
       fetchTarkovJsonEndpoint<unknown>('traders', options),
     ]);
-    return adaptTaskRewardsResponse(tasksPayload, { itemsPayload, tradersPayload });
+    return adaptTaskRewardsResponse(tasksPayload, { tradersPayload });
   };
 }
 export function createTarkovJsonHideoutFetcher(options: TarkovJsonOptions) {
   return async () => {
-    const [hideoutPayload, itemsPayload, tradersPayload] = await Promise.all([
+    const [hideoutPayload, tradersPayload] = await Promise.all([
       fetchTarkovJsonEndpoint<unknown>('hideout', options),
-      fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options),
       fetchTarkovJsonEndpoint<unknown>('traders', options),
     ]);
-    return adaptHideoutResponse(hideoutPayload, { itemsPayload, tradersPayload });
+    return adaptHideoutResponse(hideoutPayload, { tradersPayload });
   };
 }
 export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptions) {
   const regularOptions: TarkovJsonOptions = { ...options, gameMode: PRESTIGE_SOURCE_GAME_MODE };
   return async () => {
-    const [tasksPayload, itemsPayload, hideoutPayload, tradersPayload] = await Promise.all([
+    const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
       fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', regularOptions),
-      fetchTarkovJsonEndpoint<JsonItemsPayload>('items', regularOptions),
       fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
       fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
     ]);
-    return adaptPrestigeResponse(tasksPayload, { hideoutPayload, itemsPayload, tradersPayload });
+    return adaptPrestigeResponse(tasksPayload, { hideoutPayload, tradersPayload });
   };
 }

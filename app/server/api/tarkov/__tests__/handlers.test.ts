@@ -148,7 +148,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'hideout-json-v1-en-regular',
+      'hideout-json-v2-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }
@@ -214,7 +214,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'prestige-json-v1-en',
+      'prestige-json-v2-en',
       expect.any(Function),
       222,
       {
@@ -270,7 +270,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-objectives-json-v2-en-regular',
+      'tasks-objectives-json-v3-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }
@@ -290,7 +290,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-rewards-json-v1-en-regular',
+      'tasks-rewards-json-v2-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov' }

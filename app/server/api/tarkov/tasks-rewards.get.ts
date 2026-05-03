@@ -6,7 +6,7 @@ import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache
 import { createTarkovJsonTaskRewardsFetcher } from '~/server/utils/tarkov-json';
 import { sanitizeTaskRewards } from '~/server/utils/tarkov-sanitization';
 const logger = createLogger('TarkovTaskRewards');
-const TASK_REWARDS_CACHE_VERSION = 'json-v1';
+const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const bypassCache = shouldBypassCache(event);
