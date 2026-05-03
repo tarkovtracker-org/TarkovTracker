@@ -1078,6 +1078,8 @@
       "terms_of_service": "Условия использования",
       "popup_blocked_title": "Всплывающее окно заблокировано",
       "popup_blocked_description": "Ваш браузер заблокировал окно входа. Перенаправляем...",
+      "authenticating": "Authenticating...",
+      "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Не удалось войти",
       "error_description": "Авторизация была отменена или не удалась. Пожалуйста, попробуйте снова.",
       "success_title": "Вход выполнен",
