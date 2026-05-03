@@ -115,7 +115,7 @@
       "title": "Aiuto e setup iniziale",
       "summary": "Scegli una guida rapida per questa pagina o il setup iniziale.",
       "page_guide": "Guida rapida",
-      "page_guide_unavailable": "Guida rapida non disponibile. Utilizza l'onboarding.",
+      "page_guide_unavailable": "Guida rapida non disponibile.",
       "onboarding": "Setup iniziale",
       "onboarding_description": "Comincia con gli inport, le basi e poi verifica le missioni."
     },
@@ -155,7 +155,7 @@
           "title": "Ultimo controllo Missioni",
           "description": "L'ultimo step è il controllo delle missioni. Una volta fatto questo, i dati saranno molto più precisi.",
           "bullets": {
-            "one": "Nella pagina missioni, segna le missioni che hai attualmente disponibili in gioco per ogni mercante. Questo riempie automaticamente le catene di prerequisiti molto più velocemente rispetto a completare manualmente le vecchie missioni una per una.",
+            "one": "Nella pagina missioni, segna le missioni che hai attualmente disponibili in gioco per ogni trader. Questo riempie automaticamente le catene di prerequisiti molto più velocemente rispetto a completare manualmente le vecchie missioni una per una.",
             "two": "Quando qualcosa sembra sbagliato, utilizza il menu della scheda missione per segnalare un problema di dati invece di forzare il tracker in uno stato errato.",
             "three": "Puoi utilizzare il pulsante di aiuto nella barra in alto su qualsiasi pagina supportata per riaprire la guida della pagina o questo setup."
           },
@@ -184,8 +184,8 @@
         },
         "review": {
           "title": "Progresso a lungo termine",
-          "description": "Le sezioni Mercanti e Traguardi servono a monitorare la progressione generale, non solo il prossimo clic.",
-          "bullet_one": "Usa la sezione mercanti per vedere quali questline richiedono ancora del lavoro.",
+          "description": "Le sezioni Trader e Traguardi servono a monitorare la progressione generale, non solo il prossimo clic.",
+          "bullet_one": "Usa la sezione trader per vedere quali questline richiedono ancora del lavoro.",
           "bullet_two": "La sezione traguardi invece mostra i progressi verso Kappa, Lightkeeper e il completamento generale in un colpo d'occhio."
         }
       },
@@ -201,9 +201,9 @@
       "sections": {
         "views": {
           "title": "Scegli una vista",
-          "description": "Il menu superiore cambia il modo in cui le missioni sono raggruppate: per lista, mercante e mappa, o apri un grafico.",
+          "description": "Il menu superiore cambia il modo in cui le missioni sono raggruppate: per lista, trader e mappa, o apri un grafico.",
           "bullet_one": "La modalità Lista è la migliore per la normale progressione e per una ricerca rapida.",
-          "bullet_two": "Mercante, mappa e grafico sono più adatte quando sai già come muoverti nella lista."
+          "bullet_two": "Trader, mappa e grafico sono più adatte quando sai già come muoverti nella lista."
         },
         "filters": {
           "title": "Raffina la lista",
@@ -265,7 +265,7 @@
         },
         "requirements": {
           "title": "Filtri",
-          "description": "Il menu impostazioni può applicare i requisiti di stazione, abilità e mercante in modo che la disponibilità corrisponda alle tue preferenze.",
+          "description": "Il menu impostazioni può applicare i requisiti di stazione, abilità e trader in modo che la disponibilità corrisponda alle tue preferenze.",
           "bullet_one": "Attiva i filtri dei requisiti quando vuoi mostrare le stazioni pronte ad essere costruite in questo momento.",
           "bullet_two": "Disattivali quando vuoi una visione più ampia delle stazioni disponibili."
         },
@@ -350,7 +350,7 @@
       },
       "focus": {
         "title": {
-          "default": "Cosa dovrei fare?",
+          "default": "Che c'è da fare?",
           "multiple": "Diversi buoni passi successivi",
           "blocked": "Niente è pronto al momento",
           "complete": "Sei in linea"
@@ -376,7 +376,7 @@
           "blocked_level_other": "{task} è il tuo sblocco più vicino, ma hai ancora bisogno di {count} livelli in più.",
           "blocked_prerequisite": "{task} è vicina, ma è ancora bloccata da altre missioni.",
           "blocked_fence": "{task} è in attesa di maggior reputazione Fence.",
-          "blocked_trader_unlock": "{task} è bloccata da un'altra missione di un mercante.",
+          "blocked_trader_unlock": "{task} è bloccata da un'altra missione di un trader.",
           "complete": "Hai completato ogni missione visibile in dashboard."
         },
         "stat": {
@@ -1078,6 +1078,8 @@
       "terms_of_service": "Terms of Service",
       "popup_blocked_title": "Popup Blocked",
       "popup_blocked_description": "Your browser blocked the sign-in window. Redirecting you now...",
+      "authenticating": "Authenticating...",
+      "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Sign-in failed",
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "Signed in",
