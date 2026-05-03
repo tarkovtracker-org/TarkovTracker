@@ -29,6 +29,20 @@ const DEFAULT_MAX_RETRIES = 3;
 const ENGLISH_LANGUAGE = 'en';
 const PRESTIGE_SOURCE_GAME_MODE = 'regular';
 const MAX_DETAILED_OBJECTIVE_ITEMS = 24;
+const HIDEOUT_SKILL_REQUIREMENT_SKILLS: Record<string, { id: string; name: string }> = {
+  '5d388e97081959000a123acf-2-3': { id: 'Endurance', name: 'Endurance' },
+  '5d473c1e081959000e530190-3-5': { id: 'Strength', name: 'Strength' },
+  '5d484fb3654e7600681d9314-2-1': { id: 'Endurance', name: 'Endurance' },
+  '5d484fc8654e760065037abf-2-3': { id: 'Attention', name: 'Attention' },
+  '5d484fcd654e7668ec2ec322-2-2': { id: 'Health', name: 'Health' },
+  '5d484fcd654e7668ec2ec322-3-8': { id: 'Vitality', name: 'Vitality' },
+  '5d484fd1654e76006732bf2e-3-4': { id: 'Metabolism', name: 'Metabolism' },
+  '5d484fdf654e7600691aadf8-2-7': { id: 'Attention', name: 'Attention' },
+  '5d494a0e5b56502f18c98a02-1-2': {
+    id: 'HideoutManagement',
+    name: 'Hideout Management',
+  },
+};
 type JsonRecord = Record<string, unknown>;
 type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'tasks' | 'traders';
 type TarkovJsonEnvelope<T = unknown> = {
@@ -686,11 +700,34 @@ function adaptHideoutRequirement(raw: unknown, context: AdapterContext) {
         value: String(value),
       }))
     : raw.attributes;
+  const skillValue = raw.skill;
+  const skillFallback =
+    typeof raw.id === 'string' ? HIDEOUT_SKILL_REQUIREMENT_SKILLS[raw.id] : undefined;
+  const skillName =
+    typeof raw.name === 'string'
+      ? raw.name
+      : isRecord(skillValue) && typeof skillValue.name === 'string'
+        ? skillValue.name
+        : typeof skillValue === 'string'
+          ? skillValue
+          : skillFallback?.name;
+  const skillId =
+    isRecord(skillValue) && typeof skillValue.id === 'string'
+      ? skillValue.id
+      : skillFallback?.id || skillName;
   return compactObject({
     ...raw,
     attributes,
     item: raw.item ? adaptItemRef(raw.item, context) : undefined,
+    name: skillName,
     quantity: typeof raw.quantity === 'number' ? raw.quantity : raw.count,
+    skill:
+      skillName && skillId
+        ? {
+            id: skillId,
+            name: skillName,
+          }
+        : undefined,
     station: raw.station ? adaptHideoutRef(raw.station, context) : undefined,
     trader: raw.trader ? adaptTraderRef(raw.trader, context) : undefined,
   });

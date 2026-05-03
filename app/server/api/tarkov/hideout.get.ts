@@ -5,7 +5,7 @@ import { applyOverlay } from '~/server/utils/overlay';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
 import { createTarkovJsonHideoutFetcher } from '~/server/utils/tarkov-json';
 const logger = createLogger('TarkovHideout');
-const HIDEOUT_CACHE_VERSION = 'json-v2';
+const HIDEOUT_CACHE_VERSION = 'json-v3';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const bypassCache = shouldBypassCache(event);
