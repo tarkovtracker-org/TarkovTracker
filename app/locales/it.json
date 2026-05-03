@@ -359,7 +359,7 @@
           "start": "Inizia {task}",
           "continue": "Continua {task}",
           "finish": "Termina {task}",
-          "review_filters": "Review your task filters",
+          "review_filters": "Rivedi i filtri missione",
           "closest_unlock": "Closest unlock: {task}",
           "caught_up": "Everything visible is done"
         },
