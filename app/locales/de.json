@@ -1078,6 +1078,8 @@
       "terms_of_service": "Nutzungsbedingungen",
       "popup_blocked_title": "Popup blockiert",
       "popup_blocked_description": "Dein Browser hat das Anmeldefenster blockiert. Du wirst jetzt weitergeleitet...",
+      "authenticating": "Authenticating...",
+      "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Sign-in failed",
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "Angemeldet",
