@@ -64,7 +64,7 @@
     "region_label": "Promoted Twitch stream for {streamer}",
     "shrink": "Shrink stream",
     "title": "{streamer} live",
-    "unmute": "Unmute stream"
+    "unmute": "Réactiver le son du stream"
   },
   "buttons": {
     "retry": "Réessayer"
