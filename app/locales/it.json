@@ -476,72 +476,72 @@
         },
         "contribution": {
           "unlock_trader": "Sblocca la serie missioni di {trader}.",
-          "impact_one": "Crea 1 nuova missione successiva.",
-          "impact_other": "Crea {count} nuove missioni successive.",
+          "impact_one": "Sblocca 1 missione successiva.",
+          "impact_other": "Sblocca {count} missioni successive.",
           "kappa": "Conta verso la serie missioni Kappa.",
           "lightkeeper": "Conta verso la serie missioni Lightkeeper.",
           "trader": "Progredisce la serie missioni di {trader}.",
           "filters": "Mostra le missioni già eseguibili.",
           "complete": "Il resto della dashboard sta ora supportando il contesto.",
-          "default": "Keeps your visible dashboard progress moving."
+          "default": "Mantiene i progressi della dashboard in movimento."
         },
         "status": {
-          "ready_one": "Ready now. 1 objective left.",
-          "ready_other": "Ready now. {count} objectives left.",
-          "ready_no_objectives": "Ready now.",
-          "filters": "Adjust your task filters to reveal the hidden options.",
-          "level_one": "Reach level {required} (1 more level to go).",
-          "level_other": "Reach level {required} ({count} more levels to go).",
-          "prerequisite": "Complete {tasks}.",
-          "fence_positive": "Meet the Fence reputation requirement ({required}).",
-          "fence_negative": "Meet the Fence reputation requirement ({required}).",
-          "trader_unlock": "Complete {task} to unlock {trader}.",
-          "complete": "No blockers. Nothing visible is left undone."
+          "ready_one": "Pronta. 1 obiettivo rimasto.",
+          "ready_other": "Pronta. {count} obiettivi rimasti.",
+          "ready_no_objectives": "Pronta.",
+          "filters": "Regola i filtri per rivelare le opzioni nascoste.",
+          "level_one": "Raggiungi il livello {required} (1 in più).",
+          "level_other": "Raggiungi il livello {required} ({count} in più).",
+          "prerequisite": "Completa {tasks}.",
+          "fence_positive": "Soddisfa la reputazione di Fence ({required}).",
+          "fence_negative": "Soddisfa la reputazione di Fence ({required}).",
+          "trader_unlock": "Completa {task} per sbloccare {trader}.",
+          "complete": "Nessun blocco. Nulla di visibile è incompleto."
         },
         "badge": {
-          "based_on_filters": "Based on current filters",
-          "hidden_available_one": "Filters hide 1 available task",
-          "hidden_available_other": "Filters hide {count} available tasks"
+          "based_on_filters": "Sulla base dei filtri attuali",
+          "hidden_available_one": "I filtri nascondono 1 missione disponibile",
+          "hidden_available_other": "I filtri nascondono {count} missioni disponibili"
         },
         "cta": {
-          "open_task": "Open task",
-          "open_tasks": "Open task list"
+          "open_task": "Apri la missione",
+          "open_tasks": "Apri elenco missioni"
         }
       },
       "progress": {
-        "title": "Progress Breakdown",
-        "tasks": "Tasks",
-        "objectives": "Objectives",
-        "items": "Task Items",
-        "hideout_items": "Hideout Items",
-        "kappa": "Kappa Tasks",
-        "lightkeeper": "Lightkeeper",
-        "filtered_status_active": "Filtered by task settings",
-        "filtered_status_inactive": "Using all task types",
-        "filtered_warning_tooltip": "These stats follow your task filter settings (Kappa, Lightkeeper, and non-special tasks)."
+        "title": "Progressi generali",
+        "tasks": "Missioni",
+        "objectives": "Obiettivi",
+        "items": "Oggetti missioni",
+        "hideout_items": "Oggetti per il rifugio",
+        "kappa": "Missioni Kappa",
+        "lightkeeper": "Missioni Lightkeeper",
+        "filtered_status_active": "Filtro missioni attivo",
+        "filtered_status_inactive": "Filtro missioni disattivato",
+        "filtered_warning_tooltip": "Le statistiche seguono i filtri missione impostati (Kappa, Lightkeeper, e missioni non speciali)."
       },
       "progress_card": {
-        "view_details": "View details for {label}",
-        "progress_label": "{label} progress"
+        "view_details": "Visualizza i dettagli per {label}",
+        "progress_label": "Progresso {label}"
       },
       "milestones": {
-        "title": "Milestones",
-        "starter": "Getting Started",
-        "halfway": "Halfway There",
-        "veteran": "Almost Done",
+        "title": "Traguardi",
+        "starter": "Primi passi",
+        "halfway": "A metà strada",
+        "veteran": "Quasi completato",
         "kappa": {
           "title": "Kappa",
-          "subtitle": "Container Earned"
+          "subtitle": "Contenitore ottenuto"
         },
         "lightkeeper": {
           "title": "Lightkeeper",
-          "subtitle": "Trader Unlocked"
+          "subtitle": "Trader sbloccato"
         }
       },
       "traders": {
-        "title": "Trader Progress",
-        "view_tasks": "View tasks from {name}",
-        "tasks": "tasks",
+        "title": "Progressi trader",
+        "view_tasks": "Visualizza missioni di {name}",
+        "tasks": "missioni",
         "loyalty_level": "Loyalty Level",
         "reputation": "Reputation",
         "reputation_input_label": "Reputation input",
@@ -606,7 +606,7 @@
       "route_unlock_reward": "Reward: {name}"
     },
     "tasks": {
-      "title": "Tasks",
+      "title": "Missioni",
       "primary_views": {
         "all": "List",
         "list": "List",
@@ -871,7 +871,7 @@
         "location_tooltip": "Quest objectives are on {map}",
         "next_tasks": "Next Task(s):",
         "objective": "Objective",
-        "objectives": "Objectives",
+        "objectives": "Obiettivi",
         "open_item_on_tarkov_dev": "Open {name} on tarkov.dev",
         "previous_tasks": "Previous Task(s):",
         "progress": "Progress {completed}/{total}",
@@ -1054,7 +1054,7 @@
         },
         "teamoptions": {
           "title": "Team Integration Options",
-          "section_tasks": "Tasks",
+          "section_tasks": "Missioni",
           "section_items": "Items",
           "section_maps": "Maps",
           "toggle_tasks": "Hide team members' tasks",
@@ -1157,7 +1157,7 @@
       "copy_snapshot": "Copy Snapshot",
       "view_tasks": "Open Tasks",
       "tab_overview": "Overview",
-      "tab_tasks": "Tasks",
+      "tab_tasks": "Missioni",
       "tab_hideout": "Hideout",
       "tab_storyline": "Storyline",
       "story_no_tasks": "Waiting for task metadata to build your story.",
@@ -1280,7 +1280,7 @@
     "level": "Level",
     "team": "Team",
     "storyline": "Storyline",
-    "tasks": "Tasks",
+    "tasks": "Missioni",
     "hideout": "Hideout",
     "needed_items": "Needed Items",
     "streamer_tools": "Streamer Tools",
@@ -1372,7 +1372,7 @@
     "interval_300s": "Every 5 minutes",
     "interval_600s": "Every 10 minutes",
     "metric_tasks_desc": "Completed and remaining Kappa-required tasks.",
-    "metric_tasks": "Kappa Tasks",
+    "metric_tasks": "Missioni Kappa",
     "metric_items_desc": "Collected and remaining Kappa task items.",
     "metric_items": "Kappa Items",
     "metric_summary_desc": "Tasks and items in one overlay widget.",
@@ -1951,7 +1951,7 @@
   "needed_items": {
     "total": "Total:",
     "progress_format": "{current}/{total}",
-    "tasks": "Tasks",
+    "tasks": "Missioni",
     "hideout_label": "Hideout",
     "fir": "FIR",
     "non": "Non",
@@ -1971,7 +1971,7 @@
     "locked_before": "{count} before",
     "filters": {
       "all": "All",
-      "tasks": "Tasks",
+      "tasks": "Missioni",
       "hideout": "Hideout",
       "completed": "Completed"
     },
