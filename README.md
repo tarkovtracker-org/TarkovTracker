@@ -166,3 +166,4 @@ This repository includes both **contribution workflow guidance** and **technical
 ## License
 
 This project remains licensed under the GNU General Public License v3.0. See [LICENSE.md](LICENSE.md) for the full license text.
+
