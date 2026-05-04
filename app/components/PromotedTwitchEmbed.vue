@@ -18,6 +18,7 @@
           color="neutral"
           variant="ghost"
           size="xs"
+          :aria-label="isMuted ? t('promoted_stream.unmute') : t('promoted_stream.mute')"
           @click="toggleMute"
         />
         <UButton
@@ -25,6 +26,7 @@
           color="neutral"
           variant="ghost"
           size="xs"
+          :aria-label="isExpanded ? t('promoted_stream.shrink') : t('promoted_stream.expand')"
           @click="isExpanded = !isExpanded"
         />
         <UButton
@@ -32,6 +34,7 @@
           color="neutral"
           variant="ghost"
           size="xs"
+          :aria-label="t('promoted_stream.open_channel')"
           :to="`https://www.twitch.tv/${channel}`"
           target="_blank"
           rel="noopener noreferrer"
@@ -41,6 +44,7 @@
           color="neutral"
           variant="ghost"
           size="xs"
+          :aria-label="t('promoted_stream.close')"
           @click="isVisible = false"
         />
       </div>
@@ -49,12 +53,10 @@
           v-if="playerUrl"
           :src="playerUrl"
           :title="t('promoted_stream.player_title', { streamer: displayName })"
-          class="h-[360px] w-full min-w-[400px]"
+          class="h-[360px] w-full min-w-[400px] border-0"
           allow="autoplay; encrypted-media; fullscreen"
           allowfullscreen
-          frameborder="0"
           height="360"
-          scrolling="no"
           width="640"
         ></iframe>
       </div>
