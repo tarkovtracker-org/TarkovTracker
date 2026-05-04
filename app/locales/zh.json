@@ -53,6 +53,19 @@
     "user_label": "用户",
     "user_avatar_alt": "用户头像"
   },
+  "promoted_stream": {
+    "close": "Close stream",
+    "expand": "Open stream",
+    "mute": "Mute stream",
+    "open_channel": "Go to Twitch channel",
+    "pause": "Pause stream",
+    "player_title": "{streamer} Twitch stream",
+    "play": "Play stream",
+    "region_label": "Promoted Twitch stream for {streamer}",
+    "shrink": "Shrink stream",
+    "title": "{streamer} live",
+    "unmute": "Unmute stream"
+  },
   "buttons": {
     "retry": "重试"
   },
