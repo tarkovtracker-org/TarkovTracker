@@ -542,29 +542,29 @@
         "title": "Progressi trader",
         "view_tasks": "Visualizza missioni di {name}",
         "tasks": "missioni",
-        "loyalty_level": "Loyalty Level",
-        "reputation": "Reputation",
-        "reputation_input_label": "Reputation input",
-        "set_loyalty_level": "Set loyalty level {level}",
-        "rep_progress_label": "→ LL{level}",
+        "loyalty_level": "Livello di fedeltà (LF)",
+        "reputation": "Reputazione",
+        "reputation_input_label": "Input reputazione",
+        "set_loyalty_level": "Imposta il livello di fedeltà a {level}",
+        "rep_progress_label": "→ LF{level}",
         "scav_karma": "Scav Karma",
-        "unlock_required": "Unlock required:"
+        "unlock_required": "Sblocco richiesto:"
       },
       "stats": {
         "failed": {
-          "stat": "Failed"
+          "stat": "Fallito"
         }
       }
     },
     "changelog": {
       "title": "Changelog",
-      "description": "View the latest updates and changes to TarkovTracker.",
-      "back": "Back to Dashboard",
-      "loading": "Loading changelog...",
-      "error": "Unable to load changelog.",
+      "description": "Visualizza gli ultimi aggiornamenti e modifiche di TarkovTracker.",
+      "back": "Torna alla Dashboard",
+      "loading": "Caricamento modifiche...",
+      "error": "Impossibile caricare il changelog.",
       "retry": "Riprova",
       "empty": "No changelog entries yet.",
-      "load_more": "Load more",
+      "load_more": "Carica altro",
       "types": {
         "added": "Added",
         "fixed": "Fixed",
@@ -625,7 +625,7 @@
         "completed": "Completed",
         "available": "Available",
         "locked": "Locked",
-        "failed": "Failed",
+        "failed": "Fallito",
         "legend": "Legend",
         "flow_start": "Start (no prereqs)",
         "flow_end": "End (no follow-ups)",
@@ -642,7 +642,7 @@
         "available": "Available",
         "completed": "Completed",
         "locked": "Locked",
-        "failed": "Failed"
+        "failed": "Fallito"
       },
       "user_views": {
         "all": "All",
