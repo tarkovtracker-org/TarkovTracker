@@ -53,6 +53,19 @@
     "user_label": "Benutzer",
     "user_avatar_alt": "Benutzer-Avatar"
   },
+  "promoted_stream": {
+    "close": "Close stream",
+    "expand": "Open stream",
+    "mute": "Mute stream",
+    "open_channel": "Go to Twitch channel",
+    "pause": "Pause stream",
+    "player_title": "{streamer} Twitch stream",
+    "play": "Play stream",
+    "region_label": "Promoted Twitch stream for {streamer}",
+    "shrink": "Shrink stream",
+    "title": "{streamer} live",
+    "unmute": "Unmute stream"
+  },
   "buttons": {
     "retry": "Erneut versuchen"
   },
