@@ -40,7 +40,11 @@ const runIdleQueue = () => {
   if (!scheduler) {
     while (idleQueue.length) {
       const next = idleQueue.shift()!;
-      Promise.resolve(next.task()).then(next.resolve).catch(next.reject);
+      try {
+        Promise.resolve(next.task()).then(next.resolve).catch(next.reject);
+      } catch (err) {
+        next.reject(err);
+      }
     }
     idleRunnerActive = false;
     return;
@@ -94,4 +98,8 @@ export const queueIdleTask = (
     }
     runIdleQueue();
   });
+};
+export const resetIdleQueue = () => {
+  idleQueue.length = 0;
+  idleRunnerActive = false;
 };

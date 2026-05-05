@@ -20,7 +20,7 @@ export type PromiseRequestContext = {
   requestIds: Partial<Record<PromiseKey, symbol>>;
   requestKeys: Partial<Record<PromiseKey, string>>;
 };
-export type MutablePromiseStore = {
+type MutablePromiseStore = {
   -readonly [K in keyof PromiseStore]: PromiseStore[K];
 };
 const storePromises = new WeakMap<object, MutablePromiseStore>();

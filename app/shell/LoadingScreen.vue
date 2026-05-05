@@ -189,7 +189,7 @@
     userDismissed.value = false;
     isRetrying.value = true;
     try {
-      await metadataStore.fetchAllData(true);
+      await metadataStore.initialize();
     } catch (error) {
       logger.error('[LoadingScreen] Metadata retry failed:', error);
     } finally {

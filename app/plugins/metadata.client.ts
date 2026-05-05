@@ -65,12 +65,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     }
   }
   const ensureMetadataInitialized = async (path: string): Promise<void> => {
-    if (
-      metadataStore.initializationFailed ||
-      !shouldInitializeForPath(path) ||
-      metadataStore.hasInitialized ||
-      initPromise
-    ) {
+    if (!shouldInitializeForPath(path) || metadataStore.hasInitialized || initPromise) {
       return initPromise ?? Promise.resolve();
     }
     initPromise = initializeWithRetry().finally(() => {

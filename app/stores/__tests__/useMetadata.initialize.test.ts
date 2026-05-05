@@ -33,6 +33,23 @@ describe('useMetadataStore initialize', () => {
     await expect(store.fetchTasksCoreData(true)).rejects.toThrow('task core offline');
     expect(store.error).toBeInstanceOf(Error);
   });
+  it('processes successful promise-keyed task core fetches', async () => {
+    const store = useMetadataStore();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({
+        data: {
+          maps: [],
+          tasks: [{ id: 'task-1', name: 'Task One' }],
+          traders: [],
+        },
+      })
+    );
+    await store.fetchTasksCoreData(true);
+    expect(store.tasks).toHaveLength(1);
+    expect(store.loading).toBe(false);
+    expect(store.error).toBeNull();
+  });
   it('keeps initialization failed when hideout fetch fails', async () => {
     const store = useMetadataStore();
     vi.spyOn(store, 'updateLanguageAndGameMode').mockImplementation(() => undefined);
