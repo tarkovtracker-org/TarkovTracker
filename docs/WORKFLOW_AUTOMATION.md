@@ -152,7 +152,7 @@ npm run prepare
 
 _Note: `wip` is a project-specific extension and is not part of the Conventional Commits spec._
 
-**Scopes:** app, workers, api, ui, tasks, hideout, maps, team, settings, admin, i18n, deps, config, ci
+**Scopes:** app, workers, api, ui, tasks, hideout, maps, team, settings, admin, i18n, deps, config, ci, test, docs, release
 
 **Examples:**
 
@@ -217,7 +217,7 @@ npm run setup
 1. Prerequisites check (Node.js, npm, git)
 2. Install dependencies
 3. Setup git hooks (Husky)
-4. Create `.env.local` from template
+4. Create `.env.local` with local development defaults
 5. Install worker dependencies
 
 **Manual steps after setup:**
@@ -313,7 +313,7 @@ npm run lint:fix
 **Quality job:**
 
 - Run `npm run lint` locally
-- Check type errors with `npx nuxt typecheck`
+- Check type errors with `npm run typecheck`
 
 **Test job:**
 

@@ -12,7 +12,7 @@ A comprehensive Escape from Tarkov progress tracker built with Nuxt 4, featuring
 - **Hideout Progress**: Track module upgrades and parts
 - **Player Level Progress**: Monitor leveling across different factions
 - **Real-time Sync**: Automatic synchronization via Supabase
-- **Multi-language Support**: Available in English, German, Spanish, French, Russian, Ukrainian, and Chinese. Community translations are available through [translate.tarkovtracker.org](https://translate.tarkovtracker.org).
+- **Multi-language Support**: Available in English, German, Spanish, French, Russian, Ukrainian, and Chinese. API data can be fetched in additional tarkov.dev-supported languages. Community translations are available through [translate.tarkovtracker.org](https://translate.tarkovtracker.org).
 
 ## Tech Stack
 
@@ -38,8 +38,8 @@ Copy `.env.example` to `.env` and fill in your values:
 
 ```env
 # Required for login/sync features
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anonymous_key
+NUXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NUXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anonymous_key
 
 # Optional: App configuration
 # NUXT_PUBLIC_APP_URL=http://localhost:3000
@@ -138,7 +138,9 @@ npm run preview
 - `app/stores/` - Pinia stores for state management
 - `app/composables/` - Reusable composition functions
 - `app/pages/` - File-based routing
-- `app/server/api/` - Nuxt server routes for API proxying
+- `app/server/api/` - Nuxt server routes for API proxying and app APIs
+- `app/shell/` - Shared app chrome components
+- `app/utils/` - Client/shared utilities
 - `workers/` - Cloudflare Workers (api-gateway)
 - `docs/` - Project documentation and migration guides
 
