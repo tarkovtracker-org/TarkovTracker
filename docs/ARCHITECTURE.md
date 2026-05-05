@@ -6,19 +6,18 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 
 ## Technology Stack
 
-| Layer             | Technology       | Version |
-| ----------------- | ---------------- | ------- |
-| Framework         | Nuxt             | ^4.3.0  |
-| UI Library        | Vue 3            | ^3.5.27 |
-| Component Library | @nuxt/ui         | ^4.4.0  |
-| Styling           | Tailwind CSS     | ^4.1.18 |
-| State Management  | Pinia            | ^3.0.4  |
-| Backend           | Supabase         | ^2.93.2 |
-| Deployment        | Cloudflare Pages | -       |
-| Maps              | Leaflet          | ^1.9.4  |
-| Graphs            | Graphology       | ^0.26.0 |
-| Visualization     | D3               | ^7.9.0  |
-| i18n              | Vue I18n         | ^11.2.8 |
+| Layer             | Technology       | Version  |
+| ----------------- | ---------------- | -------- |
+| Framework         | Nuxt             | ^4.4.2   |
+| UI Library        | Vue 3            | ^3.5.32  |
+| Component Library | @nuxt/ui         | ^4.6.1   |
+| Styling           | Tailwind CSS     | ^4.2.2   |
+| State Management  | Pinia            | ^3.0.4   |
+| Backend           | Supabase         | ^2.103.0 |
+| Deployment        | Cloudflare Pages | -        |
+| Maps              | Leaflet          | ^1.9.4   |
+| Graphs            | Vue Flow         | ^1.48.2  |
+| i18n              | Vue I18n         | ^11.3.2  |
 
 ## Project Structure
 
@@ -32,10 +31,14 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 │   ├── features/            # Feature modules (domain slices)
 │   │   ├── admin/           # Admin dashboard
 │   │   ├── dashboard/       # Main dashboard
+│   │   ├── drawer/          # Side-drawer and help UI
 │   │   ├── hideout/         # Hideout tracking
 │   │   ├── maps/            # Interactive maps
 │   │   ├── neededitems/     # Required items tracker
+│   │   ├── profile/         # Profile and shared progress views
 │   │   ├── settings/        # User settings
+│   │   ├── storyline/       # Storyline progression
+│   │   ├── streamer-tools/  # Streamer overlay tooling
 │   │   ├── tasks/           # Task/quest tracking
 │   │   └── team/            # Team collaboration
 │   ├── layouts/             # Page layouts
@@ -369,7 +372,7 @@ runtimeConfig: {
 2. **Idle Task Scheduling**: Defer non-critical fetches
 3. **Graph Building**: O(1) task dependency lookups
 4. **Memoization**: Cache computed values
-5. **Virtual Scrolling**: Handle large lists
+5. **Incremental List Loading**: Load long item/task lists progressively
 6. **Manual Chunks**: Separate vendor bundles
 
 ## Testing
@@ -378,10 +381,10 @@ runtimeConfig: {
 
 ```bash
 # Run all tests
-npx vitest run
+npm run test
 
-# Watch mode (default)
-npx vitest
+# Watch mode
+npm run test:watch
 
 # API Gateway tests
 npm run test:api-gateway
@@ -408,20 +411,24 @@ Node.js version: 24.x
 
 **Client-side (browser):**
 
-| Variable                 | Description                            | Required |
-| ------------------------ | -------------------------------------- | -------- |
-| `VITE_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
+| Variable                        | Description                            | Required |
+| ------------------------------- | -------------------------------------- | -------- |
+| `NUXT_PUBLIC_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
+| `NUXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
 
-> **¹ Yes:** Required in production; optional for local development. Without `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, authentication, multi-device sync, real-time collaboration, and team features will be unavailable. The app will function in offline mode with localStorage persistence only.
+> **¹ Yes:** Required in production; optional for local development. Legacy `VITE_SUPABASE_URL`
+> and `VITE_SUPABASE_ANON_KEY` still work as build-time fallbacks. Without public Supabase
+> configuration, authentication, multi-device sync, real-time collaboration, and team features will
+> be unavailable. The app will function in offline mode with localStorage persistence only.
 
 **Server-side (Nuxt/Workers):**
 
 | Variable                    | Description                                                                | Required    |
 | --------------------------- | -------------------------------------------------------------------------- | ----------- |
-| `SUPABASE_URL`              | Supabase project URL                                                       | Yes (prod)² |
-| `SUPABASE_ANON_KEY`         | Supabase anon key                                                          | Yes (prod)² |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key                                                           | Yes (prod)² |
+| `NUXT_SUPABASE_URL`         | Private Supabase project URL                                               | Yes (prod)² |
+| `NUXT_SUPABASE_ANON_KEY`    | Private Supabase anon key                                                  | Yes (prod)² |
+| `NUXT_SUPABASE_SERVICE_KEY` | Service role key                                                           | Yes (prod)² |
+| `SUPABASE_SERVICE_ROLE_KEY` | Legacy service role key fallback                                           | Yes (prod)² |
 | `SB_SERVICE_ROLE_KEY`       | Service role key alias                                                     | Yes (prod)² |
 | `NUXT_PUBLIC_APP_URL`       | Application URL                                                            | Yes (prod)² |
 | `NUXT_TARKOV_JSON_BASE_URL` | Static game-data JSON base URL override                                    | No          |
