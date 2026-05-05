@@ -2,6 +2,14 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
+import { type FetchResponse, isFetchError, isFetchSuccess } from '@/stores/tarkov/fetchResponse';
+import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemPicker';
+import {
+  type PromiseKey,
+  getPromiseRequestIdStore,
+  getPromiseRequestKeyStore,
+  getPromiseStore,
+} from '@/stores/tarkov/promiseStore';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
@@ -19,6 +27,7 @@ import {
   isTaskAvailableForEdition as checkTaskEdition,
 } from '@/utils/editionHelpers';
 import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
+import { queueIdleTask } from '@/utils/idleScheduler';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -60,15 +69,6 @@ import type {
   TaskObjective,
   Trader,
 } from '@/types/tarkov';
-type IdleCallback = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
-type IdleTask = {
-  task: () => void | Promise<void>;
-  timeout: number;
-  minTime: number;
-  resolve: () => void;
-  reject: (error: unknown) => void;
-  expiresAt: number;
-};
 const BOOTSTRAP_CACHE_VERSION = 'json-v1';
 const TASKS_CORE_CACHE_VERSION = 'json-v1';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
@@ -77,228 +77,21 @@ const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 const HIDEOUT_CACHE_VERSION = 'json-v3';
 const PRESTIGE_CACHE_VERSION = 'json-v2';
-const idleQueue: IdleTask[] = [];
-let idleRunnerActive = false;
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
 const CACHE_PURGE_CHECK_STORAGE_KEY = STORAGE_KEYS.cachePurgeCheckAt;
-const getIdleScheduler = () => {
-  if (typeof window === 'undefined') return null;
-  if ('requestIdleCallback' in window) {
-    return window.requestIdleCallback.bind(window) as (
-      cb: IdleCallback,
-      opts?: { timeout?: number }
-    ) => number;
-  }
-  return (cb: IdleCallback, opts?: { timeout?: number }) =>
-    window.setTimeout(
-      () =>
-        cb({
-          didTimeout: true,
-          timeRemaining: () => 0,
-        }),
-      opts?.timeout ?? 0
-    );
-};
-const getIdleNow = () => {
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
-};
-const runIdleQueue = () => {
-  if (idleRunnerActive) return;
-  idleRunnerActive = true;
-  const scheduler = getIdleScheduler();
-  if (!scheduler) {
-    while (idleQueue.length) {
-      const next = idleQueue.shift()!;
-      Promise.resolve(next.task()).then(next.resolve).catch(next.reject);
-    }
-    idleRunnerActive = false;
-    return;
-  }
-  const scheduleNext = () => {
-    if (!idleQueue.length) {
-      idleRunnerActive = false;
-      return;
-    }
-    const next = idleQueue[0]!;
-    const remainingTimeout = Math.max(0, next.expiresAt - getIdleNow());
-    scheduler(
-      (deadline) => {
-        if (!idleQueue.length) {
-          idleRunnerActive = false;
-          return;
-        }
-        const current = idleQueue[0]!;
-        const now = getIdleNow();
-        const timedOut = deadline.didTimeout || now >= current.expiresAt;
-        const hasTime = deadline.timeRemaining() >= current.minTime;
-        if (!timedOut && !hasTime) {
-          scheduleNext();
-          return;
-        }
-        const next = idleQueue.shift()!;
-        Promise.resolve(next.task())
-          .then(next.resolve)
-          .catch(next.reject)
-          .finally(() => {
-            scheduleNext();
-          });
-      },
-      { timeout: remainingTimeout }
-    );
-  };
-  scheduleNext();
-};
-const queueIdleTask = (
-  task: () => void | Promise<void>,
-  options: { timeout?: number; minTime?: number; priority?: 'normal' | 'high' } = {}
-) => {
-  const { timeout = 2000, minTime = 12, priority = 'normal' } = options;
-  return new Promise<void>((resolve, reject) => {
-    const now = getIdleNow();
-    const entry: IdleTask = { task, timeout, minTime, resolve, reject, expiresAt: now + timeout };
-    if (priority === 'high') {
-      idleQueue.unshift(entry);
-    } else {
-      idleQueue.push(entry);
-    }
-    runIdleQueue();
-  });
-};
 // Exported type for craft sources used by components
 export type CraftSource = { stationId: string; stationName: string; stationLevel: number };
 export interface MetadataStoreTaskLookup {
   getTaskById?: (id: string) => { name?: string } | undefined;
   tasks?: Array<{ id: string; name?: string }>;
 }
-// Per-instance promise storage to avoid cross-request/state leakage in SSR/testing
-// Using a WeakMap keyed by store instance maintains per-instance deduplication
-// Includes initPromise and isInitializing to avoid module-level leakage
-interface PromiseStore {
-  readonly bootstrapPromise: Promise<void> | null;
-  readonly tasksCorePromise: Promise<void> | null;
-  readonly hideoutPromise: Promise<void> | null;
-  readonly itemsFullPromise: Promise<void> | null;
-  readonly itemsLitePromise: Promise<void> | null;
-  readonly mapSpawnsPromise: Promise<void> | null;
-  readonly objectiveModeCountDifferencesPromise: Promise<void> | null;
-  readonly taskObjectivesPromise: Promise<void> | null;
-  readonly taskRewardsPromise: Promise<void> | null;
-  readonly prestigePromise: Promise<void> | null;
-  readonly editionsPromise: Promise<void> | null;
-  readonly initPromise: Promise<void> | null;
-  readonly isInitializing: boolean;
-}
-type PromiseKey = {
-  [K in keyof PromiseStore]: PromiseStore[K] extends Promise<void> | null ? K : never;
-}[keyof PromiseStore];
-type MutablePromiseStore = {
-  -readonly [K in keyof PromiseStore]: PromiseStore[K];
-};
-const storePromises = new WeakMap<object, MutablePromiseStore>();
-const storePromiseRequestKeys = new WeakMap<object, Partial<Record<PromiseKey, string>>>();
-const storePromiseRequestIds = new WeakMap<object, Partial<Record<PromiseKey, symbol>>>();
-function getPromiseStore(storeInstance: object): MutablePromiseStore {
-  let promises = storePromises.get(storeInstance);
-  if (!promises) {
-    promises = {
-      bootstrapPromise: null,
-      tasksCorePromise: null,
-      hideoutPromise: null,
-      itemsFullPromise: null,
-      itemsLitePromise: null,
-      mapSpawnsPromise: null,
-      objectiveModeCountDifferencesPromise: null,
-      taskObjectivesPromise: null,
-      taskRewardsPromise: null,
-      prestigePromise: null,
-      editionsPromise: null,
-      initPromise: null,
-      isInitializing: false,
-    };
-    storePromises.set(storeInstance, promises);
-  }
-  return promises;
-}
-function getPromiseRequestKeyStore(storeInstance: object): Partial<Record<PromiseKey, string>> {
-  let keys = storePromiseRequestKeys.get(storeInstance);
-  if (!keys) {
-    keys = {};
-    storePromiseRequestKeys.set(storeInstance, keys);
-  }
-  return keys;
-}
-function getPromiseRequestIdStore(storeInstance: object): Partial<Record<PromiseKey, symbol>> {
-  let ids = storePromiseRequestIds.get(storeInstance);
-  if (!ids) {
-    ids = {};
-    storePromiseRequestIds.set(storeInstance, ids);
-  }
-  return ids;
-}
-// Helper type to safely access item properties that might be missing in older type definitions
-type ObjectiveWithItems = TaskObjective & {
-  item?: TarkovItem;
-  items?: TarkovItem[];
-  markerItem?: TarkovItem;
-  questItem?: TarkovItem;
-  requiredKeys?: TarkovItem[][];
-  containsAll?: TarkovItem[];
-  useAny?: TarkovItem[];
-  usingWeapon?: TarkovItem;
-  usingWeaponMods?: TarkovItem[];
-  wearing?: TarkovItem[];
-  notWearing?: TarkovItem[];
-};
 const hasRenderableCriticalMetadata = (
   state: Pick<MetadataState, 'hideoutStations' | 'tasks'>
 ): boolean => {
   return state.tasks.length > 0 && state.hideoutStations.length > 0;
 };
-type FetchSuccess<T> = { data: T };
-type FetchError = { error: string | Record<string, unknown> };
-type FetchResponse<T> = FetchSuccess<T> | FetchError;
-const isFetchError = (value: unknown): value is FetchError => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (!Object.prototype.hasOwnProperty.call(value, 'error')) return false;
-  const error = (value as { error?: unknown }).error;
-  // error must be a string or a plain object (not null, not array)
-  return (
-    typeof error === 'string' ||
-    (error !== null && typeof error === 'object' && !Array.isArray(error))
-  );
-};
-const isFetchSuccess = <T>(value: unknown): value is FetchSuccess<T> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (Object.prototype.hasOwnProperty.call(value, 'error')) return false;
-  return Object.prototype.hasOwnProperty.call(value, 'data');
-};
-function createItemPicker(itemsById: Map<string, TarkovItem>) {
-  const pickItemLite = (item?: TarkovItem | null): TarkovItem | undefined => {
-    if (!item?.id) return item ?? undefined;
-    const fullItem = itemsById.get(item.id);
-    if (!fullItem) return item;
-    const mergedProperties = item.properties
-      ? { ...(fullItem.properties ?? {}), ...item.properties }
-      : fullItem.properties;
-    const merged = { ...item, ...fullItem };
-    if (mergedProperties) merged.properties = mergedProperties;
-    return merged;
-  };
-  const pickItemArray = (items?: TarkovItem[] | null): TarkovItem[] | undefined => {
-    if (!Array.isArray(items)) return items ?? undefined;
-    return items.map((i) => pickItemLite(i) ?? i);
-  };
-  const pickItemMatrix = (items?: TarkovItem[][] | null): TarkovItem[][] | undefined => {
-    if (!Array.isArray(items)) return items ?? undefined;
-    return items.map((group) => pickItemArray(group) ?? []);
-  };
-  return { pickItemLite, pickItemArray, pickItemMatrix };
-}
 interface MetadataState {
   // Initialization and loading states
   initialized: boolean;
