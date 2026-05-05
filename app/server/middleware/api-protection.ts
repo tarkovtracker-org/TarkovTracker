@@ -41,6 +41,9 @@ function routeMatchesPattern(route: string, pattern: string): boolean {
 function isPublicRoute(pathname: string, publicRoutes: string[]): boolean {
   return publicRoutes.some((pattern) => routeMatchesPattern(pathname, pattern));
 }
+function isAlwaysProtectedRoute(_pathname: string): boolean {
+  return false;
+}
 function ipInRange(clientIp: string, range: string): boolean {
   try {
     const addr = ipaddr.process(clientIp);
@@ -288,7 +291,7 @@ export default defineEventHandler(async (event) => {
     setResponseStatus(event, 204);
     return '';
   }
-  const isPublic = isPublicRoute(pathname, publicRoutes);
+  const isPublic = !isAlwaysProtectedRoute(pathname) && isPublicRoute(pathname, publicRoutes);
   if (requireAuth && !isPublic) {
     const authHeader = getRequestHeader(event, 'authorization');
     const supabaseUrl = config.supabaseUrl as string;

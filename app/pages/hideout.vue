@@ -233,12 +233,12 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { breakpointsTailwind, useBreakpoints, useDebounceFn } from '@vueuse/core';
+  import { useBreakpoints, useDebounceFn } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import { type HideoutPrimaryView, useHideoutFiltering } from '@/composables/useHideoutFiltering';
-  import { useHideoutSettingsDrawer } from '@/composables/useHideoutSettingsDrawer';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { usePrereqModal, type PrereqType } from '@/composables/usePrereqModal';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -263,8 +263,7 @@
   const router = useRouter();
   const { t } = useI18n({ useScope: 'global' });
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('hideout');
-  const { isOpen: isSettingsOpen, toggle: toggleSettingsDrawer } = useHideoutSettingsDrawer();
-  const breakpoints = useBreakpoints(breakpointsTailwind);
+  const { isOpen: isSettingsOpen, toggle: toggleSettingsDrawer } = usePageSettingsDrawer('hideout');
   const dockedDrawerBreakpoints = useBreakpoints({ dockedHideoutDrawer: 1768 });
   const isWideEnoughForDockedDrawer = dockedDrawerBreakpoints.greaterOrEqual('dockedHideoutDrawer');
   const { getPageHelpContent } = usePageHelpContent();

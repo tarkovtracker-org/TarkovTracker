@@ -65,6 +65,7 @@ export const getScriptSrcSources = (options: ContentSecurityPolicyOptions = {}):
     "'self'",
     options.allowUnsafeInlineScripts ? "'unsafe-inline'" : null,
     'https://static.cloudflareinsights.com',
+    'https://player.twitch.tv',
     hasGoogleAnalytics ? 'https://*.googletagmanager.com' : null,
     hasMicrosoftClarity ? 'https://*.clarity.ms' : null,
     hasMicrosoftClarity ? 'https://c.bing.com' : null,
@@ -108,6 +109,9 @@ export const getImgSrcSources = (options: ContentSecurityPolicyOptions = {}): st
     'https://assets.tarkov.dev',
   ]);
 };
+export const getFrameSrcSources = (): string[] => {
+  return getUniqueSources(["'self'", 'https://player.twitch.tv']);
+};
 const getStyleSrcSources = (): string[] => {
   return getUniqueSources(["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com']);
 };
@@ -117,6 +121,7 @@ export const buildContentSecurityPolicy = (options: ContentSecurityPolicyOptions
     `script-src ${getScriptSrcSources(options).join(' ')}`,
     `connect-src ${getConnectSrcSources(options).join(' ')}`,
     `img-src ${getImgSrcSources(options).join(' ')}`,
+    `frame-src ${getFrameSrcSources().join(' ')}`,
     `style-src ${getStyleSrcSources().join(' ')}`,
     `font-src ${getFontSrcSources().join(' ')}`,
   ].join('; ');

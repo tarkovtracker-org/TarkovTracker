@@ -410,8 +410,8 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
-  import { useTaskSettingsDrawer } from '@/composables/useTaskSettingsDrawer';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -438,7 +438,7 @@
   const progressStore = useProgressStore();
   const teamStore = useTeamStore();
   const { hasInitiallyLoaded: hasSystemInitiallyLoaded, hasTeam } = useSystemStoreWithSupabase();
-  const { isOpen: isDrawerOpen, toggle: toggleDrawer } = useTaskSettingsDrawer();
+  const { isOpen: isDrawerOpen, toggle: toggleDrawer } = usePageSettingsDrawer('tasks');
   const { calculateMapTaskTotals, calculateStatusCounts, calculateTraderCounts } =
     useTaskFiltering();
   const primaryView = computed(() => preferencesStore.getTaskPrimaryView);

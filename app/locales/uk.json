@@ -1,6 +1,46 @@
 {
   "admin": {
-    "title": "Панель адміністратора"
+    "title": "Панель адміністратора",
+    "verifying_access": "Verifying admin access...",
+    "error_title": "Connection Error",
+    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
+    "no_reference": "N/A",
+    "access_warning_title": "Admin Access",
+    "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
+    "unknown_user": "Unknown",
+    "cache_management_title": "Cache Management",
+    "last_purge_description": "Last purge: {type} at {timestamp}",
+    "tarkov_data_cache_label": "Tarkov Data Cache",
+    "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
+    "purge_game_data_button": "Purge Game Data",
+    "full_cache_purge_label": "Full Cache Purge",
+    "full_cache_purge_description": "Clears ALL cached content including static assets. Use sparingly - increases load on origin.",
+    "purge_everything_button": "Purge Everything",
+    "cache_behavior_title": "Cache Behavior",
+    "cache_info_description": "After purging, the next user request will trigger a fresh fetch from tarkov.dev. This new data will then be cached for all users.",
+    "confirm_full_cache_purge_title": "Confirm Full Cache Purge",
+    "confirm_full_cache_purge_description": "This will clear ALL cached content from Cloudflare, including static assets, fonts, and JavaScript bundles. This may temporarily increase load times for all users.",
+    "confirm_purge_button": "Confirm Purge",
+    "all_cache_label": "All Cache",
+    "tarkov_data_label": "Tarkov Data",
+    "unauthorized_title": "Unauthorized",
+    "admin_privileges_required": "Admin privileges required for this action.",
+    "permission_denied": "You do not have permission to perform this action.",
+    "cache_purged_title": "Cache Purged",
+    "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
+    "full_cache_purged_title": "Full Cache Purged",
+    "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
+    "purge_failed_title": "Purge Failed",
+    "purge_failed_description": "Failed to purge cache",
+    "audit_log_title": "Admin Audit Log",
+    "refresh_button": "Refresh",
+    "audit_log_login_required": "Unauthorized: Please log in to continue.",
+    "audit_log_admin_required": "Unauthorized: Admin privileges required to view audit logs.",
+    "audit_log_table_not_found": "Audit log table not found.",
+    "audit_log_table_not_found_description": "Run the SQL migration to create admin_audit_log.",
+    "audit_log_fetch_failed": "Failed to fetch audit logs",
+    "no_actions_recorded": "No admin actions recorded yet",
+    "audit_log_by": "by"
   },
   "alerts": {
     "no_map_data": "Для цього вибору немає даних мапи."
@@ -12,6 +52,19 @@
     "hidden_label": "Приховано",
     "user_label": "Користувач",
     "user_avatar_alt": "Аватар користувача"
+  },
+  "promoted_stream": {
+    "close": "Close stream",
+    "expand": "Open stream",
+    "mute": "Mute stream",
+    "open_channel": "Go to Twitch channel",
+    "pause": "Pause stream",
+    "player_title": "{streamer} Twitch stream",
+    "play": "Play stream",
+    "region_label": "Promoted Twitch stream for {streamer}",
+    "shrink": "Shrink stream",
+    "title": "{streamer} live",
+    "unmute": "Unmute stream"
   },
   "buttons": {
     "retry": "Повторити"
@@ -104,8 +157,7 @@
     "finish": "Завершити",
     "back_to_top": "Нагору",
     "refresh_button": "Спробувати знову",
-    "opens_in_new_tab": "Відкрити в новій вкладці",
-    "note": "Примітка"
+    "opens_in_new_tab": "Відкрити в новій вкладці"
   },
   "page_help": {
     "button": "Довідка",
@@ -291,8 +343,6 @@
     "not_available_description": "Інтерактивна карта для {mapName} поки недоступна. Ми чекаємо на створення сумісної карти.",
     "placeholder": "цієї локації",
     "floors": "Поверхи",
-    "reset": "Скинути",
-    "reset_title": "Скинути вигляд за замовчуванням",
     "factions": {
       "pmc": "PMC",
       "scav": "Scav"
@@ -1078,6 +1128,8 @@
       "terms_of_service": "Умови використання",
       "popup_blocked_title": "Спливаюче вікно заблоковано",
       "popup_blocked_description": "Ваш браузер заблокував вікно входу. Перенаправляємо...",
+      "authenticating": "Authenticating...",
+      "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Sign-in failed",
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "Вхід виконано",
@@ -1195,7 +1247,9 @@
       "not_found_description": "Вибачте, ця сторінка не може бути знайдена!"
     },
     "terms_of_service": {
-      "title": "Умови використання"
+      "title": "Умови використання",
+      "table_of_contents": "Table of contents",
+      "index_button": "Index"
     },
     "privacy": {
       "title": "Політика конфіденційності"
@@ -1279,7 +1333,6 @@
     "background_opacity": "Прозорість",
     "background_transparent": "Прозорий",
     "background_custom": "Свій колір",
-    "transparent_background": "Прозорий",
     "show_percent": "Показати відсотки",
     "show_remaining": "Показати залишок",
     "custom_label": "Свій підпис",
@@ -1293,10 +1346,6 @@
     "open_json": "Відкрити JSON",
     "setup_title": "Налаштування платформи",
     "setup_subtitle": "Налаштування джерела браузера, сумісні з OBS та основними інструментами стримінгу.",
-    "platform_instructions": "Переглянути інструкції для платформи",
-    "obs_steps": "Додайте джерело браузера, вставте URL, задайте ширину/висоту сцени, увімкніть «Вимикати джерело, коли не видно» та за потреби використовуйте «Оновлювати браузер при активації сцени».",
-    "streamlabs_steps": "Використовуйте джерело браузера з тією ж URL та розмірами. Узгодьте FPS з профілем потоку та вимикайте джерело при приховуванні.",
-    "other_steps": "Додайте вхід веб-сторінки/браузера, вставте URL, залиште прозорість увімкненою та підберіть розміри під макет сцени.",
     "preview_dim_self": "Лише віджет",
     "preview_help_self": "Показує віджет у натуральному розмірі. Перетягніть це джерело в будь-яке місце сцени OBS/Streamlabs.",
     "preview_help_canvas": "Показує, як оверлей виглядає у повноекранному джерелі браузера. Клітчастий фон означає прозорість — на стрімі він не відображається.",
@@ -1318,8 +1367,6 @@
     "setup_scaling_warning_title": "Не масштабуйте джерело в OBS",
     "setup_scaling_warning": "Розтягування джерела за ручки в OBS розтягне зображення та спричинить сильне розмиття. Щоб змінити розмір віджету, використовуйте налаштування Роздільності, Розміру тексту або Користувацького масштабу на цій сторінці — оверлей перемальовується в нативній якості.",
     "setup_transparency_note": "Фон оверлею за замовчуванням прозорий. Користувацький CSS або фільтри кольорового ключа не потрібні — OBS та Streamlabs нативно підтримують прозорі джерела браузера.",
-    "interval_15s": "Кожні 15 секунд",
-    "interval_30s": "Кожні 30 секунд",
     "interval_60s": "Кожні 60 секунд",
     "interval_120s": "Кожні 2 хвилини",
     "interval_300s": "Кожні 5 хвилин",
@@ -1902,7 +1949,6 @@
     "view_on_dev": "Відкрити {name} на Tarkov.dev"
   },
   "needed_items": {
-    "filter_type_label": "Фільтрувати за типом елемента",
     "total": "Всього:",
     "progress_format": "{current}/{total}",
     "tasks": "завдання",
@@ -1970,7 +2016,9 @@
   },
   "game_settings": {
     "pvp": "PvP",
-    "pve": "PvE"
+    "pve": "PvE",
+    "toggle_game_mode_label": "Toggle game mode",
+    "select_faction_label": "Select faction"
   },
   "oauth": {
     "consent": {

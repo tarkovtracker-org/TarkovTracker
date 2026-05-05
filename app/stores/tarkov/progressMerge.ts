@@ -10,6 +10,7 @@ import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
+type HideoutModuleEntry = UserProgressData['hideoutModules'][string];
 type StoryChapterEntry = UserProgressData['storyChapters'][string];
 type StoryObjectiveEntry = NonNullable<StoryChapterEntry['objectives']>[string];
 type TimestampedCompletionEntry = { complete?: boolean; timestamp?: number };
@@ -109,6 +110,23 @@ export const mergeStoryChapterProgress = (
       mergedChapter.objectives = mergedObjectives;
     }
     merged[chapterId] = mergedChapter;
+  }
+  return merged;
+};
+const mergeHideoutModules = (
+  local: UserProgressData['hideoutModules'] | undefined,
+  remote: UserProgressData['hideoutModules'] | undefined
+): UserProgressData['hideoutModules'] => {
+  const allModuleIds = new Set([...Object.keys(local || {}), ...Object.keys(remote || {})]);
+  const merged: UserProgressData['hideoutModules'] = {};
+  for (const moduleId of allModuleIds) {
+    const resolved = mergeTimestampedCompletion<HideoutModuleEntry>(
+      local?.[moduleId],
+      remote?.[moduleId]
+    );
+    if (resolved) {
+      merged[moduleId] = resolved;
+    }
   }
   return merged;
 };
@@ -239,15 +257,15 @@ export function mergeProgressData(
   remote: UserProgressData | undefined
 ): UserProgressData {
   if (!local && !remote) return {} as UserProgressData;
-  if (!local) return remote!;
-  if (!remote) return local;
+  if (!local) return structuredClone(remote!);
+  if (!remote) return structuredClone(local);
   const localEpoch = toProgressEpoch(local);
   const remoteEpoch = toProgressEpoch(remote);
   if (remoteEpoch > localEpoch) {
-    return { ...remote, progressEpoch: remoteEpoch };
+    return { ...structuredClone(remote), progressEpoch: remoteEpoch };
   }
   if (localEpoch > remoteEpoch) {
-    return { ...local, progressEpoch: localEpoch };
+    return { ...structuredClone(local), progressEpoch: localEpoch };
   }
   const mergeTaskCompletion = (
     localComp: RawTaskCompletion,
@@ -309,7 +327,7 @@ export function mergeProgressData(
       return merged;
     })(),
     taskObjectives: mergeCountableObjects(local.taskObjectives, remote.taskObjectives),
-    hideoutModules: { ...local.hideoutModules, ...remote.hideoutModules },
+    hideoutModules: mergeHideoutModules(local.hideoutModules, remote.hideoutModules),
     hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts),
     storyChapters: mergeStoryChapterProgress(local.storyChapters, remote.storyChapters),
     traders: {

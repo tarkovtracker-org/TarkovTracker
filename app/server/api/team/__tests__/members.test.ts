@@ -122,9 +122,7 @@ describe('Team Members API', () => {
       runtimeConfig.supabaseUrl = '';
       mockGetQuery.mockReturnValue({ teamId: 'team-456' });
       const { default: handler } = await import('@/server/api/team/members');
-      await expect(handler(mockEvent as H3Event)).rejects.toThrow(
-        'Missing required environment variables'
-      );
+      await expect(handler(mockEvent as H3Event)).rejects.toThrow('Service configuration error');
     });
     it('should allow missing supabaseServiceKey when auth header exists', async () => {
       runtimeConfig.supabaseServiceKey = '';
@@ -161,9 +159,7 @@ describe('Team Members API', () => {
       runtimeConfig.supabaseAnonKey = '';
       mockGetQuery.mockReturnValue({ teamId: 'team-456' });
       const { default: handler } = await import('@/server/api/team/members');
-      await expect(handler(mockEvent as H3Event)).rejects.toThrow(
-        'Missing required environment variables'
-      );
+      await expect(handler(mockEvent as H3Event)).rejects.toThrow('Service configuration error');
     });
   });
   describe('Team membership validation', () => {

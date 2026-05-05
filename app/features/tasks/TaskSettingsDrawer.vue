@@ -105,9 +105,8 @@
   </aside>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { useTaskRepair } from '@/composables/useTaskRepair';
-  import { useTaskSettingsDrawer } from '@/composables/useTaskSettingsDrawer';
   import AdvancedTasksSection from '@/features/tasks/AdvancedTasksSection.vue';
   import CardDisplaySection from '@/features/tasks/CardDisplaySection.vue';
   import FilterBarSection from '@/features/tasks/FilterBarSection.vue';
@@ -122,7 +121,7 @@
   });
   const isOverlayMode = computed(() => props.mode === 'overlay');
   const { t } = useI18n({ useScope: 'global' });
-  const { close } = useTaskSettingsDrawer();
+  const { close } = usePageSettingsDrawer('tasks');
   const preferencesStore = usePreferencesStore();
   const teamStore = useTeamStore();
   const drawerRef = ref<HTMLElement | null>(null);

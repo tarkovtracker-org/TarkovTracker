@@ -5,7 +5,6 @@
 </template>
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import { useMetadataStore } from '@/stores/useMetadata';
   const { t } = useI18n({ useScope: 'global' });
   const metadataStore = useMetadataStore();

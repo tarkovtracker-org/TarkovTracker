@@ -1,7 +1,8 @@
 language: en-US
 reviews:
   auto_review:
-    enabled: true
+    enabled: false
+    auto_incremental_review: false
   path_filters:
     - '!app/locales/de.json'
     - '!app/locales/es.json'

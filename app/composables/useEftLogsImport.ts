@@ -193,6 +193,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const selectedVersions = ref<string[]>([]);
   const sourceFileName = ref(t('settings.log_import.selected_files'));
   const scannedEntriesCount = ref(0);
+  let parseFilesRequestId = 0;
   function getTaskIds(): string[] {
     return metadataStore.tasks.map((task) => task.id);
   }
@@ -217,6 +218,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     importError.value = null;
   }
   function reset(): void {
+    parseFilesRequestId++;
     importState.value = 'idle';
     previewData.value = null;
     importError.value = null;
@@ -226,6 +228,8 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     scannedEntriesCount.value = 0;
   }
   async function parseFiles(files: File[]): Promise<void> {
+    const requestId = ++parseFilesRequestId;
+    const isActiveRequest = () => requestId === parseFilesRequestId;
     importState.value = 'idle';
     previewData.value = null;
     importError.value = null;
@@ -246,6 +250,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         ensureImportFileSize(file);
         if (isZipFile(file)) {
           const zipSource = await readZipLogs(file);
+          if (!isActiveRequest()) return;
           scannedEntries += zipSource.scanned;
           importFiles.push(...zipSource.files);
           continue;
@@ -255,14 +260,17 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       if (rawLogFiles.length > 0) {
         if (rawLogFiles.length === 1) {
           const singleSource = await readSingleLogFile(rawLogFiles[0]!);
+          if (!isActiveRequest()) return;
           scannedEntries += singleSource.scanned;
           importFiles.push(...singleSource.files);
         } else {
           const rawSource = await readRawImportLogFiles(rawLogFiles);
+          if (!isActiveRequest()) return;
           scannedEntries += rawSource.scanned;
           importFiles.push(...rawSource.files);
         }
       }
+      if (!isActiveRequest()) return;
       if (importFiles.length === 0) {
         importState.value = 'error';
         importError.value = t('settings.log_import.errors.no_notification_logs_found');
@@ -299,6 +307,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       previewData.value = buildPreviewData(taskIds);
       importState.value = 'preview';
     } catch (error) {
+      if (!isActiveRequest()) return;
       importState.value = 'error';
       importError.value = normalizeErrorMessage(error, t);
       logger.error('[EftLogsImport] Parse error:', error);

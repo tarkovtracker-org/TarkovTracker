@@ -1,16 +1,16 @@
-import type { TarkovBootstrapQueryResult } from '~/types/tarkov';
 import { edgeCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
-import { CACHE_TTL_DEFAULT } from '~/server/utils/tarkov-cache-config';
-import { TARKOV_BOOTSTRAP_QUERY } from '~/server/utils/tarkov-queries';
-import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
+import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
+import { createTarkovJsonBootstrapFetcher } from '~/server/utils/tarkov-json';
 const logger = createLogger('TarkovBootstrap');
+const BOOTSTRAP_CACHE_VERSION = 'json-v1';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const lang = getValidatedLanguage(query);
-  const cacheKey = `bootstrap-${lang}`;
-  const fetcher = createTarkovFetcher<TarkovBootstrapQueryResult>(TARKOV_BOOTSTRAP_QUERY, {});
+  const gameMode = validateGameMode(query.gameMode);
+  const cacheKey = `bootstrap-${BOOTSTRAP_CACHE_VERSION}-${lang}-${gameMode}`;
+  const fetcher = createTarkovJsonBootstrapFetcher({ gameMode, lang });
   try {
     return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, {
       cacheKeyPrefix: 'tarkov',

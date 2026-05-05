@@ -237,13 +237,13 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useDashboardFilters } from '@/features/dashboard/composables/useDashboardFilters';
+  import { useDashboardFilters } from '@/composables/useDashboardFilters';
   import { calculatePercentageNum } from '@/utils/formatters';
   import { getQueryString } from '@/utils/routeHelpers';
   const { isOpen: isHelpOpen } = usePageHelpState('dashboard');
-  const { lgAndUp } = useSharedBreakpoints();
-  const isDesktopHelpPanelOpen = computed(() => isHelpOpen.value && lgAndUp.value);
-  const isMobileHelpPanelOpen = computed(() => isHelpOpen.value && !lgAndUp.value);
+  const { isDesktopHelpPanelOpen, isMobileHelpPanelOpen } = usePageSideRailState({
+    helpOpen: isHelpOpen,
+  });
   const route = useRoute();
   const progressSectionCollapsed = ref(false);
   const tradersSectionCollapsed = ref(false);

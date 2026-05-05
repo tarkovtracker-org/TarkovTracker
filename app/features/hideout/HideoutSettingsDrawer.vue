@@ -100,7 +100,7 @@
   </aside>
 </template>
 <script setup lang="ts">
-  import { useHideoutSettingsDrawer } from '@/composables/useHideoutSettingsDrawer';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   interface Props {
     collapseCompleted: boolean;
     isHelpTourActive?: boolean;
@@ -122,7 +122,7 @@
     'update:sortReadyFirst': [value: boolean];
   }>();
   const { t } = useI18n({ useScope: 'global' });
-  const { close } = useHideoutSettingsDrawer();
+  const { close } = usePageSettingsDrawer('hideout');
   const drawerRef = ref<HTMLElement | null>(null);
   const isOverlayMode = computed(() => props.mode === 'overlay');
   const { restoreTriggerFocus, trapFocus } = useOverlayFocusTrap({

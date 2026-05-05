@@ -1,3 +1,76 @@
+## [1.35.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.0...v1.35.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **ui:** disable promoted Twitch embed popup ([9f2ea01](https://github.com/tarkovtracker-org/TarkovTracker/commit/9f2ea018aee8dca01b28c6e219b53ba3602590c2))
+
+# [1.35.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.34.5...v1.35.0) (2026-05-04)
+
+
+### Features
+
+* **ui:** add promoted Twitch embed for Glorious_E ([a1856b7](https://github.com/tarkovtracker-org/TarkovTracker/commit/a1856b7d90b0c6e6d5b312e42503647681883888))
+
+## [1.34.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.34.4...v1.34.5) (2026-05-03)
+
+
+### Bug Fixes
+
+* **app:** migrate storyline page from useHead to useSeoMeta ([e2da075](https://github.com/tarkovtracker-org/TarkovTracker/commit/e2da0754561b210c3993a41d718fe14339f21fc3))
+
+## [1.34.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.34.3...v1.34.4) (2026-05-03)
+
+
+### Bug Fixes
+
+* **app:** address architecture review feedback ([20cfc5b](https://github.com/tarkovtracker-org/TarkovTracker/commit/20cfc5b739a1e1e69deed56d163ff1ede89573c1))
+* **app:** address architecture review feedback ([82bf641](https://github.com/tarkovtracker-org/TarkovTracker/commit/82bf6419733d98308e1f0368bf97f69c8228acf5))
+* **app:** address PR [#343](https://github.com/tarkovtracker-org/TarkovTracker/issues/343) review feedback ([f988b69](https://github.com/tarkovtracker-org/TarkovTracker/commit/f988b694c9e1113da49bb16d0c11badcc8e3c7e1))
+* **api:** allow unauthenticated access to cache-meta endpoint ([f5e2a75](https://github.com/tarkovtracker-org/TarkovTracker/commit/f5e2a75e70a5c4c1634a3d79944fc0b7c0ca47af))
+* **app:** tighten map objective review fixes ([07ba4ea](https://github.com/tarkovtracker-org/TarkovTracker/commit/07ba4ea0908c2fd830b99a790143a7deadf4c24a))
+
+## [1.34.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.34.2...v1.34.3) (2026-05-03)
+
+
+### Bug Fixes
+
+* **app:** address PR [#341](https://github.com/tarkovtracker-org/TarkovTracker/issues/341) review feedback ([585ec1c](https://github.com/tarkovtracker-org/TarkovTracker/commit/585ec1c0eb130525599f9b39ad44c38e36d61284))
+* **app:** address production review blockers ([3a60844](https://github.com/tarkovtracker-org/TarkovTracker/commit/3a608448d39ad6a45be1c97e8401edc8e9a08782))
+* address review feedback hardening ([63d5fb0](https://github.com/tarkovtracker-org/TarkovTracker/commit/63d5fb0a1a29f14a64ed0953845f0a952fbd671d))
+* **app:** guard auth migration generations ([de01967](https://github.com/tarkovtracker-org/TarkovTracker/commit/de019677505ae83c75e01385c74bbb2ec72722cc))
+
+## [1.34.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.34.1...v1.34.2) (2026-05-03)
+
+
+### Bug Fixes
+
+* **api:** reduce task objective payload size ([2d02562](https://github.com/tarkovtracker-org/TarkovTracker/commit/2d02562152476bce80cb50e914915208f40ecffc))
+
+## [1.34.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.34.0...v1.34.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* **api:** slim task objectives payload ([#339](https://github.com/tarkovtracker-org/TarkovTracker/issues/339)) ([8601e9b](https://github.com/tarkovtracker-org/TarkovTracker/commit/8601e9b08dbde50c0689a89f5854b7b01aa34077))
+
+# [1.34.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.33.4...v1.34.0) (2026-05-03)
+
+
+### Bug Fixes
+
+* **app:** address follow-up review feedback ([477f78b](https://github.com/tarkovtracker-org/TarkovTracker/commit/477f78bcfbe12e1530934a9c3b19f7ef15ce1a5b))
+* **api:** address json migration review feedback ([166d85d](https://github.com/tarkovtracker-org/TarkovTracker/commit/166d85d09319e54d4b6efd1d8042525415b0995e))
+* **api:** address json migration review follow-ups ([b118c47](https://github.com/tarkovtracker-org/TarkovTracker/commit/b118c471cf0d47dfe6fb8c01b6522f8b7f56f100))
+* **app:** address pr review feedback ([3528e9c](https://github.com/tarkovtracker-org/TarkovTracker/commit/3528e9c22f2cd4180e0d997c072d21ac29e7a459))
+* **app:** guard stale metadata responses ([92c9d4b](https://github.com/tarkovtracker-org/TarkovTracker/commit/92c9d4b2cc000165585ba7efb99ded51514c81d8))
+* **app:** refine metadata request cleanup ([ece772a](https://github.com/tarkovtracker-org/TarkovTracker/commit/ece772a638ddfdbfb4c828563063b73b6452a75b))
+
+
+### Features
+
+* **api:** migrate tarkov static data to json ([a27cce4](https://github.com/tarkovtracker-org/TarkovTracker/commit/a27cce4e3cdfe72cf93be224b75af8f5776e37ab))
+
 ## [1.33.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.33.3...v1.33.4) (2026-05-02)
 
 

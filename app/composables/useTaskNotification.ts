@@ -1,4 +1,3 @@
-import { useI18n } from 'vue-i18n';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';

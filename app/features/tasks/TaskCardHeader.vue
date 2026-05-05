@@ -101,7 +101,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { getFactionIconPath } from '@/utils/factionIcons';
   import type { Task } from '@/types/tarkov';
   const props = defineProps<{

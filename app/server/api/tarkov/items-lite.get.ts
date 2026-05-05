@@ -1,18 +1,20 @@
-import type { TarkovItemsQueryResult } from '~/types/tarkov';
-import { edgeCache } from '~/server/utils/edgeCache';
+import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
-import { CACHE_TTL_EXTENDED } from '~/server/utils/tarkov-cache-config';
-import { createValidatedTarkovProxyFetcher } from '~/server/utils/tarkov-proxy';
-import { TARKOV_ITEMS_LITE_QUERY } from '~/server/utils/tarkov-queries';
+import { applyOverlay } from '~/server/utils/overlay';
+import { CACHE_TTL_EXTENDED, validateGameMode } from '~/server/utils/tarkov-cache-config';
+import { createTarkovJsonItemsFetcher } from '~/server/utils/tarkov-json';
+const ITEMS_LITE_CACHE_VERSION = 'json-v1';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
+  const bypassCache = shouldBypassCache(event);
   const lang = getValidatedLanguage(query);
-  const cacheKey = `items-lite-${lang}`;
-  const fetcher = createValidatedTarkovProxyFetcher<TarkovItemsQueryResult>(
-    'TarkovItemsLite',
-    TARKOV_ITEMS_LITE_QUERY,
-    { lang }
-  );
+  const gameMode = validateGameMode(query.gameMode);
+  const cacheKey = `items-lite-${ITEMS_LITE_CACHE_VERSION}-${lang}-${gameMode}`;
+  const baseFetcher = createTarkovJsonItemsFetcher({ gameMode, lang }, { lite: true });
+  const fetcher = async () => {
+    const response = await baseFetcher();
+    return await applyOverlay(response, { bypassCache, gameMode });
+  };
   return edgeCache(event, cacheKey, fetcher, CACHE_TTL_EXTENDED, {
     cacheKeyPrefix: 'tarkov',
   });

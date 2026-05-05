@@ -13,8 +13,8 @@
   definePageMeta({
     layout: 'default',
   });
-  useHead(() => ({
+  useSeoMeta({
     title: t('page.not_found.title'),
-    meta: [{ name: 'robots', content: 'noindex, nofollow' }],
-  }));
+    robots: 'noindex, nofollow',
+  });
 </script>

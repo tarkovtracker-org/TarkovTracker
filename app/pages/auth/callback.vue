@@ -6,8 +6,8 @@
     >
       <div class="flex flex-col items-center space-y-3 text-center">
         <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-10 w-10 animate-spin" />
-        <h2 class="text-surface-50 text-lg font-semibold">Authenticating...</h2>
-        <p class="text-surface-300 text-sm">Please wait while we complete your sign in.</p>
+        <h2 class="text-surface-50 text-lg font-semibold">{{ t('page.login.authenticating') }}</h2>
+        <p class="text-surface-300 text-sm">{{ t('page.login.authenticating_description') }}</p>
       </div>
     </UCard>
   </div>

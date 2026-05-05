@@ -155,7 +155,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import type { Task, TraderRequirement, TraderLevelRequirementWithMet } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;

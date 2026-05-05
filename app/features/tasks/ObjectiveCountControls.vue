@@ -86,7 +86,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useCountEditController } from '@/composables/useCountEditController';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   const props = withDefaults(

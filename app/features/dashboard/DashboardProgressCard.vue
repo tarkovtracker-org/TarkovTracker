@@ -31,7 +31,6 @@
   </button>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { ProgressCardColor } from '@/features/dashboard/progressCard';
   const props = defineProps<{

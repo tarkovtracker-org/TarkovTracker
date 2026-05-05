@@ -175,7 +175,7 @@ export const sanitizeStoryChaptersMap = (value: unknown): UserProgressData['stor
   return sanitized;
 };
 const API_UPDATE_HISTORY_LIMIT = 50;
-const createDefaultOwnedProgressData = (): UserProgressData => ({
+export const createDefaultOwnedProgressData = (): UserProgressData => ({
   level: 1,
   pmcFaction: 'USEC',
   displayName: null,
@@ -241,7 +241,7 @@ export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] => {
 const sanitizeGameMode = (value: unknown): GameMode => {
   return value === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
 };
-const sanitizeGameEdition = (value: unknown): number => {
+export const sanitizeGameEdition = (value: unknown): number => {
   const edition =
     typeof value === 'string' && value.trim() !== ''
       ? toFiniteNumber(Number(value))
@@ -251,7 +251,7 @@ const sanitizeGameEdition = (value: unknown): number => {
   }
   return Math.max(1, Math.min(6, Math.trunc(edition)));
 };
-const sanitizeTarkovUid = (value: unknown): number | null => {
+export const sanitizeTarkovUid = (value: unknown): number | null => {
   const uid = toFiniteNumber(value);
   if (uid === null) {
     return null;

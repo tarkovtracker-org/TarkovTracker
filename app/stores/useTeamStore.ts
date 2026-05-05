@@ -79,6 +79,20 @@ interface TeamStoreInstance {
   isSubscribed: Ref<boolean>;
   cleanup: () => void;
 }
+type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
+function cloneTaskCompletions(
+  taskCompletions: TaskCompletionSnapshot | undefined
+): TaskCompletionSnapshot {
+  return Object.fromEntries(
+    Object.entries(taskCompletions ?? {}).map(([taskId, completion]) => [
+      taskId,
+      {
+        complete: completion?.complete,
+        failed: completion?.failed,
+      },
+    ])
+  );
+}
 // Singleton instance to prevent multiple listener setups
 let teamStoreInstance: TeamStoreInstance | null = null;
 export function useTeamStoreWithSupabase(): TeamStoreInstance {
@@ -101,7 +115,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     level: number | null;
     tasksCompleted: number;
   } | null = null;
-  let prevTaskCompletions: Record<string, { complete?: boolean; failed?: boolean }> = {};
+  let prevTaskCompletions: TaskCompletionSnapshot = {};
   let taskBroadcastInitialized = false;
   const pendingTaskUpdates = new Map<
     string,
@@ -388,13 +402,13 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     },
     (newVal) => {
       if (!taskBroadcastInitialized) {
-        prevTaskCompletions = { ...newVal.taskCompletions };
+        prevTaskCompletions = cloneTaskCompletions(newVal.taskCompletions);
         taskBroadcastInitialized = true;
         return;
       }
       const currentTeamId = getTeamIdFromSystemStore(systemStore);
       if (!currentTeamId || !teamChannel.value || !$supabase.user?.id) {
-        prevTaskCompletions = { ...newVal.taskCompletions };
+        prevTaskCompletions = cloneTaskCompletions(newVal.taskCompletions);
         return;
       }
       const scheduleBroadcastFlush = () => {
@@ -427,7 +441,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       if (pendingTaskUpdates.size > 0) {
         scheduleBroadcastFlush();
       }
-      prevTaskCompletions = { ...newVal.taskCompletions };
+      prevTaskCompletions = cloneTaskCompletions(newVal.taskCompletions);
     },
     { deep: true }
   );

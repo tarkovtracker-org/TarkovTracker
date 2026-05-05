@@ -1,36 +1,26 @@
-import type { TarkovTaskRewardsQueryResult } from '~/types/tarkov';
 import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
-import { validateAndThrow } from '~/server/utils/graphql-validation';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { applyOverlay } from '~/server/utils/overlay';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
-import { TARKOV_TASKS_REWARDS_QUERY } from '~/server/utils/tarkov-queries';
+import { createTarkovJsonTaskRewardsFetcher } from '~/server/utils/tarkov-json';
 import { sanitizeTaskRewards } from '~/server/utils/tarkov-sanitization';
-import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
 const logger = createLogger('TarkovTaskRewards');
+const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const bypassCache = shouldBypassCache(event);
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
-  const cacheKey = `tasks-rewards-${lang}-${gameMode}`;
-  const baseFetcher = createTarkovFetcher(
-    TARKOV_TASKS_REWARDS_QUERY,
-    { lang, gameMode },
-    {
-      allowPartialData: true,
-    }
-  );
+  const cacheKey = `tasks-rewards-${TASK_REWARDS_CACHE_VERSION}-${lang}-${gameMode}`;
+  const baseFetcher = createTarkovJsonTaskRewardsFetcher({ gameMode, lang });
   const fetcher = async () => {
-    const rawResponse = await baseFetcher();
-    validateAndThrow<TarkovTaskRewardsQueryResult>(rawResponse, logger, true);
-    const sanitizedResponse = sanitizeTaskRewards(rawResponse);
     try {
+      const sanitizedResponse = sanitizeTaskRewards(await baseFetcher());
       return await applyOverlay(sanitizedResponse, { bypassCache, gameMode });
-    } catch (overlayError) {
-      logger.error('Failed to apply overlay:', overlayError);
-      throw overlayError;
+    } catch (error) {
+      logger.error('Failed to build tasks rewards response:', error);
+      throw error;
     }
   };
   return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, { cacheKeyPrefix: 'tarkov' });

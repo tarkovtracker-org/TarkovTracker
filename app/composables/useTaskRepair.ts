@@ -1,4 +1,3 @@
-import { useI18n } from 'vue-i18n';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { MANUAL_FAIL_TASK_IDS } from '@/utils/constants';

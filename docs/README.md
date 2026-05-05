@@ -20,7 +20,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 - [`app/shell/`](../app/shell/): "Chrome" components (AppBar, NavDrawer, AppFooter).
 - [`app/features/`](../app/features/): Domain-specific logic slices (tasks, team, hideout, maps).
 - [`app/stores/`](../app/stores/): Pinia domain stores with localStorage persistence and Supabase sync.
-- [`app/server/api/`](../app/server/api/): Nitro routes proxying and caching `tarkov.dev` GraphQL data.
+- [`app/server/api/`](../app/server/api/): Nitro routes proxying and caching `json.tarkov.dev` static data.
 
 ## 3. Key Feature Architectures
 

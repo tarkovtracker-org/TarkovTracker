@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { reactive } from 'vue';
-import {
-  isDashboardFilterActive,
-  useDashboardFilters,
-} from '@/features/dashboard/composables/useDashboardFilters';
+import { isDashboardFilterActive, useDashboardFilters } from '@/composables/useDashboardFilters';
 const createPreferencesStore = (
   overrides: Partial<{
     getHideNonKappaTasks: boolean;

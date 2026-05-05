@@ -55,9 +55,18 @@ const OVERLAY_CACHE_TTL = 3600000; // 1 hour in milliseconds
 const FETCH_TIMEOUT_MS = 5000; // 5 seconds
 // GitHub raw URL for the overlay
 // Note: Using raw.githubusercontent.com directly until jsDelivr cache propagates
-const OVERLAY_URL =
-  process.env.OVERLAY_URL?.trim() ||
+const DEFAULT_OVERLAY_URL =
   'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
+function resolveOverlayUrl(value: string | undefined): string {
+  const candidate = value?.trim() || DEFAULT_OVERLAY_URL;
+  try {
+    const url = new URL(candidate);
+    return url.protocol === 'https:' ? url.toString() : DEFAULT_OVERLAY_URL;
+  } catch {
+    return DEFAULT_OVERLAY_URL;
+  }
+}
+const OVERLAY_URL = resolveOverlayUrl(process.env.OVERLAY_URL);
 const OVERLAY_CACHE_BUSTER = process.env.OVERLAY_CACHE_BUSTER?.trim();
 const OVERLAY_URL_WITH_BUSTER = OVERLAY_CACHE_BUSTER
   ? `${OVERLAY_URL}${OVERLAY_URL.includes('?') ? '&' : '?'}v=${encodeURIComponent(

@@ -37,7 +37,7 @@
   <div v-if="!hasInitiallyLoaded" class="flex min-h-[50vh] items-center justify-center">
     <div class="text-center">
       <UIcon name="i-mdi-loading" class="text-primary-400 h-12 w-12 animate-spin" />
-      <p class="text-surface-400 mt-4">Verifying admin access...</p>
+      <p class="text-surface-400 mt-4">{{ t('admin.verifying_access') }}</p>
     </div>
   </div>
   <div v-else-if="loadError" class="flex min-h-[50vh] items-center justify-center px-4">
@@ -45,18 +45,26 @@
       icon="i-mdi-alert-circle"
       color="error"
       variant="soft"
-      title="Connection Error"
-      :description="`Failed to load admin data. Please refresh or contact support. Reference: ${errorReference ?? 'N/A'}`"
+      :title="t('admin.error_title')"
+      :description="
+        t('admin.load_error_description', { reference: errorReference ?? t('admin.no_reference') })
+      "
     />
   </div>
   <div v-else-if="systemStore.isAdmin" class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-[1400px] space-y-6">
-      <UAlert icon="i-mdi-alert" color="warning" variant="soft" title="Admin Access">
+      <UAlert
+        icon="i-mdi-alert"
+        color="warning"
+        variant="soft"
+        :title="t('admin.access_warning_title')"
+      >
         <template #description>
-          Actions performed here affect all users. Logged in as
-          <span class="font-medium">
-            {{ $supabase.user?.email || $supabase.user?.displayName || 'Unknown' }}
-          </span>
+          {{
+            t('admin.access_warning_description', {
+              user: $supabase.user?.email || $supabase.user?.displayName || t('admin.unknown_user'),
+            })
+          }}
         </template>
       </UAlert>
       <div class="grid gap-6 lg:grid-cols-2">

@@ -112,7 +112,6 @@
   </GenericCard>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';

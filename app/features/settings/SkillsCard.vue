@@ -183,8 +183,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
-  import { useI18n } from 'vue-i18n';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useSkillCalculation } from '@/composables/useSkillCalculation';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -205,11 +203,11 @@
   };
   const toast = useToast();
   const skillLimitToastShown = ref(false);
-  const breakpoints = useBreakpoints(breakpointsTailwind);
+  const { lgAndUp, smAndUp, xlAndUp } = useSharedBreakpoints();
   const columnsPerRow = computed(() => {
-    if (breakpoints.greaterOrEqual('xl').value) return 4;
-    if (breakpoints.greaterOrEqual('lg').value) return 3;
-    if (breakpoints.greaterOrEqual('sm').value) return 2;
+    if (xlAndUp.value) return 4;
+    if (lgAndUp.value) return 3;
+    if (smAndUp.value) return 2;
     return 1;
   });
   const skillsWithRequirementsCount = computed(() => {

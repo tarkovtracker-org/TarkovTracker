@@ -112,7 +112,10 @@ export default defineNuxtConfig({
       ) || 1800000,
     githubTimeoutMs:
       Number(process.env.NUXT_GITHUB_TIMEOUT_MS || process.env.GITHUB_TIMEOUT_MS || '8000') || 8000,
+    tarkovJsonBaseUrl:
+      process.env.NUXT_TARKOV_JSON_BASE_URL || process.env.TARKOV_JSON_BASE_URL || '',
     logSinkUrl: process.env.NUXT_LOG_SINK_URL || process.env.LOG_SINK_URL || '',
+    publicCacheBypassEnabled: process.env.NUXT_PUBLIC_CACHE_BYPASS_ENABLED === 'true',
     teamMembersCacheTtlMs:
       Number(
         process.env.NUXT_TEAM_MEMBERS_CACHE_TTL_MS ||
@@ -173,6 +176,12 @@ export default defineNuxtConfig({
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,
       githubOwner: process.env.GITHUB_OWNER || 'tarkovtracker-org',
       githubRepo: process.env.GITHUB_REPO || 'TarkovTracker',
+      promotedTwitch: {
+        channel: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_CHANNEL || 'glorious_e',
+        displayName: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_DISPLAY_NAME || 'Glorious_E',
+        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED !== 'false',
+        endsAt: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENDS_AT || '2026-05-04T13:30:00+00:00',
+      },
     },
   },
   devtools: {

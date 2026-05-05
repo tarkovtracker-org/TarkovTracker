@@ -14,13 +14,14 @@ import { perfEnabled, perfEnd, perfStart } from './perf';
 // Cache configuration
 export const CACHE_CONFIG = {
   DB_NAME: 'tarkov-tracker-cache',
-  DB_VERSION: 5, // Bumped to force cache clear after trimming item payloads
+  DB_VERSION: 7,
   STORE_NAME: 'tarkov-data',
   // 12 hours in milliseconds
   DEFAULT_TTL: 12 * 60 * 60 * 1000,
   // 24 hours max TTL
   MAX_TTL: 24 * 60 * 60 * 1000,
 } as const;
+const DB_OPEN_BLOCKED_TIMEOUT_MS = 3000;
 export type CacheType =
   | 'bootstrap'
   | 'tasks-core'
@@ -55,11 +56,38 @@ function openDatabase(): Promise<IDBDatabase> {
       return;
     }
     const request = indexedDB.open(CACHE_CONFIG.DB_NAME, CACHE_CONFIG.DB_VERSION);
+    let settled = false;
+    const blockedTimeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(
+        new Error(
+          'IndexedDB upgrade blocked by another open TarkovTracker tab. Close other tabs and retry.'
+        )
+      );
+    }, DB_OPEN_BLOCKED_TIMEOUT_MS);
+    const settle = () => {
+      settled = true;
+      clearTimeout(blockedTimeout);
+    };
+    request.onblocked = () => {
+      logger.warn('[TarkovCache] Database upgrade blocked by another open connection', {
+        dbName: CACHE_CONFIG.DB_NAME,
+        dbVersion: CACHE_CONFIG.DB_VERSION,
+      });
+    };
     request.onerror = () => {
+      if (settled) return;
+      settle();
       logger.error('[TarkovCache] Failed to open database:', request.error);
       reject(request.error);
     };
     request.onsuccess = () => {
+      if (settled) {
+        request.result.close();
+        return;
+      }
+      settle();
       resolve(request.result);
     };
     request.onupgradeneeded = (event) => {

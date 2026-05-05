@@ -341,7 +341,6 @@
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
   import { createApp } from 'vue';
-  import { useI18n } from 'vue-i18n';
   import { useLeafletMap } from '@/composables/useLeafletMap';
   import {
     MAP_BUTTON_ACTIVE_CLASS,

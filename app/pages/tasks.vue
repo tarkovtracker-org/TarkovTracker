@@ -346,23 +346,23 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import {
     type DashboardFocusProgressInteraction,
     useDashboardFocusAnalytics,
   } from '@/composables/useDashboardFocusAnalytics';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
+  import { useMapObjectiveMarks } from '@/composables/useMapObjectiveMarks';
   import { useMapObjectivePopup } from '@/composables/useMapObjectivePopup';
   import { useMapResize } from '@/composables/useMapResize';
+  import { useMapTime } from '@/composables/useMapTime';
   import { usePageHelpState } from '@/composables/usePageHelpState';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { useTarkovTime } from '@/composables/useTarkovTime';
   import { useTaskDeepLink } from '@/composables/useTaskDeepLink';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
-  import { useTaskSettingsDrawer } from '@/composables/useTaskSettingsDrawer';
   import ApiUpdateLogPanel from '@/features/tasks/ApiUpdateLogPanel.vue';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
@@ -382,7 +382,6 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
-  import { STATIC_TIME_MAPS, resolveStaticDisplayTime } from '@/utils/mapTime';
   import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { TaskActionPayload } from '@/composables/useTaskActions';
@@ -442,85 +441,24 @@
   const userGameEdition = computed(() => tarkovStore.getGameEdition());
   const { tarkovTime } = useTarkovTime();
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('tasks');
-  const { close: closeSettingsDrawer, isOpen: isSettingsDrawerOpen } = useTaskSettingsDrawer();
-  const breakpoints = useBreakpoints(breakpointsTailwind);
-  const isLgAndUp = breakpoints.greaterOrEqual('lg');
-  type MapObjectiveZone = { map: { id: string }; outline: { x: number; z: number }[] };
-  type MapObjectiveLocation = {
-    map: { id: string };
-    positions?: Array<{ x: number; y?: number; z: number }>;
-  };
-  type MapObjectiveMark = {
-    id?: string;
-    zones: MapObjectiveZone[];
-    possibleLocations?: MapObjectiveLocation[];
-    users?: string[];
-  };
-  type MapTimePeriod = 'dawn' | 'day' | 'dusk' | 'night' | 'default';
-  type MapTimeStyle = {
-    badgeClass: string;
-    iconClass: string;
-    labelClass: string;
-    valueClass: string;
-  };
-  const MAP_TIME_ICONS: Record<MapTimePeriod, string> = {
-    dawn: 'i-mdi-weather-sunset-up',
-    day: 'i-mdi-weather-sunny',
-    dusk: 'i-mdi-weather-sunset-down',
-    night: 'i-mdi-moon-waxing-crescent',
-    default: 'i-mdi-clock-time-four-outline',
-  };
-  const MAP_TIME_STYLES: Record<MapTimePeriod, MapTimeStyle> = {
-    dawn: {
-      badgeClass: 'border-primary-500/35 bg-primary-500/10',
-      iconClass: 'text-primary-300',
-      labelClass: 'text-primary-200/90',
-      valueClass: 'text-primary-100',
-    },
-    day: {
-      badgeClass: 'border-warning-500/35 bg-warning-500/10',
-      iconClass: 'text-warning-300',
-      labelClass: 'text-warning-200/90',
-      valueClass: 'text-warning-100',
-    },
-    dusk: {
-      badgeClass: 'border-error-500/35 bg-error-500/10',
-      iconClass: 'text-error-300',
-      labelClass: 'text-error-200/90',
-      valueClass: 'text-error-100',
-    },
-    night: {
-      badgeClass: 'border-info-500/35 bg-info-500/10',
-      iconClass: 'text-info-300',
-      labelClass: 'text-info-200/90',
-      valueClass: 'text-info-100',
-    },
-    default: {
-      badgeClass: 'bg-surface-900/60 border-surface-700',
-      iconClass: 'text-surface-300',
-      labelClass: 'text-surface-300',
-      valueClass: 'text-surface-100',
-    },
-  };
-  const resolveMapTimePeriod = (hour: number): MapTimePeriod => {
-    if (hour >= 5 && hour < 7) return 'dawn';
-    if (hour >= 7 && hour < 18) return 'day';
-    if (hour >= 18 && hour < 20) return 'dusk';
-    return 'night';
-  };
+  const { close: closeSettingsDrawer, isOpen: isSettingsDrawerOpen } =
+    usePageSettingsDrawer('tasks');
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });
-  const isDesktopSettingsDrawerOpen = computed(() => isSettingsDrawerOpen.value && isLgAndUp.value);
-  const isMobileSettingsDrawerOpen = computed(() => isSettingsDrawerOpen.value && !isLgAndUp.value);
-  const isDesktopHelpPanelOpen = computed(() => isHelpOpen.value && isLgAndUp.value);
-  const isMobileHelpPanelOpen = computed(() => isHelpOpen.value && !isLgAndUp.value);
-  const isDesktopSideRailOpen = computed(
-    () => isLgAndUp.value && (isHelpOpen.value || isSettingsDrawerOpen.value)
-  );
+  const {
+    isDesktopHelpPanelOpen,
+    isDesktopSettingsDrawerOpen,
+    isDesktopSideRailOpen,
+    isMobileHelpPanelOpen,
+    isMobileSettingsDrawerOpen,
+  } = usePageSideRailState({
+    helpOpen: isHelpOpen,
+    settingsOpen: isSettingsDrawerOpen,
+  });
   const shouldShowCompletedObjectives = computed(() => {
     return ['completed', 'all'].includes(getTaskSecondaryView.value);
   });
@@ -529,39 +467,8 @@
     if (!mapId || mapId === 'all') return null;
     return maps.value.find((m) => m.id === mapId) || null;
   });
-  const displayTime = computed(() => {
-    const mapId = getTaskMapView.value;
-    if (!mapId) return tarkovTime.value;
-    const staticTime = STATIC_TIME_MAPS[mapId];
-    if (!staticTime) return tarkovTime.value;
-    return resolveStaticDisplayTime(staticTime, tarkovTime.value);
-  });
-  const getMapTimeLabel = (period: MapTimePeriod): string => {
-    return t(`page.tasks.map.time_period.${period}`);
-  };
-  const mapTimeEntries = computed(() => {
-    return displayTime.value
-      .split('/')
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0)
-      .map((value) => {
-        const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value);
-        if (!match) {
-          return {
-            value,
-            period: 'default' as MapTimePeriod,
-            icon: MAP_TIME_ICONS.default,
-            ...MAP_TIME_STYLES.default,
-          };
-        }
-        const hour = Number(match[1]);
-        const period =
-          Number.isInteger(hour) && hour >= 0 && hour <= 23
-            ? resolveMapTimePeriod(hour)
-            : 'default';
-        return { value, period, icon: MAP_TIME_ICONS[period], ...MAP_TIME_STYLES[period] };
-      });
-  });
+  const selectedMapId = computed(() => selectedMapData.value?.id ?? null);
+  const { getMapTimeLabel, mapTimeEntries } = useMapTime(getTaskMapView, tarkovTime);
   const {
     mapHeight,
     mapHeightMax,
@@ -579,105 +486,13 @@
     }
     isMapPanelExpanded.value = !isMapPanelExpanded.value;
   };
-  const mapObjectiveMarks = computed(() => {
-    if (!selectedMapData.value) return [];
-    const mapId = selectedMapData.value.id;
-    const marks: MapObjectiveMark[] = [];
-    const objCompletions = objectiveCompletions.value;
-    const taskCompletions = tasksCompletions.value;
-    const includeTeammates = !preferencesStore.mapTeamAllHidden;
-    const teammateIds = includeTeammates
-      ? Object.keys(progressStore.visibleTeamStores).filter((id) => id !== 'self')
-      : [];
-    const sourceTasks = isSearchActive.value ? filteredTasks.value : visibleTasks.value;
-    sourceTasks.forEach((task) => {
-      if (!task.objectives) return;
-      const objectiveMaps = metadataStore.objectiveMaps?.[task.id] ?? [];
-      const objectiveGps = metadataStore.objectiveGPS?.[task.id] ?? [];
-      task.objectives.forEach((obj) => {
-        const selfComplete = tarkovStore.isTaskObjectiveComplete(obj.id);
-        const selfTaskComplete = tarkovStore.isTaskComplete(task.id);
-        const selfTaskFailed = tarkovStore.isTaskFailed(task.id);
-        const selfTaskUnlocked = unlockedTasks.value[task.id]?.self === true;
-        const selfNeedsObjective =
-          selfTaskUnlocked && !selfTaskComplete && !selfTaskFailed && !selfComplete;
-        const users: string[] = [];
-        const teammateUsers: string[] = [];
-        if (selfNeedsObjective) {
-          users.push('self');
-        }
-        for (const tmId of teammateIds) {
-          const objDone = objCompletions[obj.id]?.[tmId] === true;
-          const taskDone = taskCompletions[task.id]?.[tmId] === true;
-          const taskFailed = tasksFailed.value[task.id]?.[tmId] === true;
-          if (!objDone && !taskDone && !taskFailed) {
-            teammateUsers.push(tmId);
-          }
-        }
-        if (teammateUsers.length > 0) {
-          users.push(...teammateUsers);
-        } else if (
-          selfComplete &&
-          selfTaskComplete &&
-          !selfTaskFailed &&
-          shouldShowCompletedObjectives.value
-        ) {
-          users.push('self');
-        }
-        if (users.length === 0) return;
-        const zones: MapObjectiveZone[] = [];
-        const possibleLocations: MapObjectiveLocation[] = [];
-        if (Array.isArray(obj.zones)) {
-          obj.zones.forEach((zone) => {
-            if (zone?.map?.id !== mapId) return;
-            const outline = Array.isArray(zone.outline)
-              ? zone.outline.map((point) => ({ x: point.x, z: point.z }))
-              : [];
-            if (outline.length >= 3) {
-              zones.push({ map: { id: mapId }, outline });
-            } else if (zone.position) {
-              possibleLocations.push({
-                map: { id: mapId },
-                positions: [{ x: zone.position.x, y: zone.position.y, z: zone.position.z }],
-              });
-            }
-          });
-        }
-        if (Array.isArray(obj.possibleLocations)) {
-          obj.possibleLocations.forEach((location) => {
-            if (location?.map?.id !== mapId) return;
-            const positions = Array.isArray(location.positions)
-              ? location.positions.map((pos) => ({ x: pos.x, y: pos.y, z: pos.z }))
-              : [];
-            if (positions.length > 0) {
-              possibleLocations.push({
-                map: { id: mapId },
-                positions,
-              });
-            }
-          });
-        }
-        const gpsInfo = objectiveGps.find((gps) => gps.objectiveID === obj.id);
-        const isOnThisMap = objectiveMaps.some(
-          (mapInfo) => mapInfo.objectiveID === obj.id && mapInfo.mapID === mapId
-        );
-        if (isOnThisMap && gpsInfo && (gpsInfo.x !== undefined || gpsInfo.y !== undefined)) {
-          possibleLocations.push({
-            map: { id: mapId },
-            positions: [{ x: gpsInfo.x ?? 0, y: 0, z: gpsInfo.y ?? 0 }],
-          });
-        }
-        if (zones.length > 0 || possibleLocations.length > 0) {
-          marks.push({
-            id: obj.id,
-            zones,
-            possibleLocations,
-            users,
-          });
-        }
-      });
-    });
-    return marks;
+  const sourceMapTasks = computed(() =>
+    isSearchActive.value ? filteredTasks.value : visibleTasks.value
+  );
+  const { mapObjectiveMarks } = useMapObjectiveMarks({
+    mapId: selectedMapId,
+    shouldShowCompletedObjectives,
+    tasks: sourceMapTasks,
   });
   const impactEligibleTaskIds = computed<Set<string> | undefined>(() => {
     if (!getRespectTaskFiltersForImpact.value) return undefined;

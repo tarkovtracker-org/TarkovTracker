@@ -2,6 +2,7 @@
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   const { $supabase } = useNuxtApp();
   const { systemStore, hasInitiallyLoaded } = useSystemStoreWithSupabase();
+  const { locale, t } = useI18n({ useScope: 'global' });
   interface AuditLogEntry {
     id: string;
     admin_user_id: string;
@@ -44,14 +45,14 @@
     errorDescription.value = null;
     // Defensive check: Ensure user is logged in
     if (!$supabase.user.loggedIn) {
-      error.value = 'Unauthorized: Please log in to continue.';
+      error.value = t('admin.audit_log_login_required');
       isLoading.value = false;
       return;
     }
     // Wait for system store to load and verify admin status
     const loaded = await waitForSystemLoad();
     if (!loaded || !systemStore.isAdmin) {
-      error.value = 'Unauthorized: Admin privileges required to view audit logs.';
+      error.value = t('admin.audit_log_admin_required');
       isLoading.value = false;
       return;
     }
@@ -63,12 +64,12 @@
         .limit(50);
       if (fetchError) {
         if (fetchError.code === '42P01') {
-          error.value = 'Audit log table not found.';
-          errorDescription.value = 'Run the SQL migration to create admin_audit_log.';
+          error.value = t('admin.audit_log_table_not_found');
+          errorDescription.value = t('admin.audit_log_table_not_found_description');
           return;
         }
         if (fetchError.code === '42501') {
-          error.value = 'Unauthorized: Admin privileges required to view audit logs.';
+          error.value = t('admin.audit_log_admin_required');
           return;
         }
         throw fetchError;
@@ -76,7 +77,7 @@
       const entries = data || [];
       logs.value = entries;
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to fetch audit logs';
+      error.value = e instanceof Error ? e.message : t('admin.audit_log_fetch_failed');
     } finally {
       isLoading.value = false;
     }
@@ -96,7 +97,7 @@
     return adminDisplayName || adminEmail || adminId;
   };
   const formatDate = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString(undefined, {
+    return new Date(timestamp).toLocaleString(locale.value, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -121,7 +122,7 @@
     icon-color="info"
     highlight-color="secondary"
     :fill-height="false"
-    title="Admin Audit Log"
+    :title="t('admin.audit_log_title')"
     title-classes="text-lg font-semibold"
   >
     <template #title-right>
@@ -133,7 +134,7 @@
         :loading="isLoading"
         @click="fetchLogs"
       >
-        Refresh
+        {{ t('admin.refresh_button') }}
       </UButton>
     </template>
     <template #content>
@@ -154,7 +155,7 @@
         <!-- Empty state -->
         <div v-else-if="logs.length === 0" class="text-surface-400 py-8 text-center">
           <UIcon name="i-mdi-clipboard-text-off" class="mb-2 size-8" />
-          <p>No admin actions recorded yet</p>
+          <p>{{ t('admin.no_actions_recorded') }}</p>
         </div>
         <!-- Log entries -->
         <div v-else class="space-y-2">
@@ -169,7 +170,7 @@
                   <UIcon :name="getActionIcon(log.action)" class="mr-1 size-3" />
                   {{ log.action }}
                 </UBadge>
-                <span class="text-surface-400 text-xs">by</span>
+                <span class="text-surface-400 text-xs">{{ t('admin.audit_log_by') }}</span>
                 <UBadge color="neutral" variant="outline" size="xs" class="font-mono">
                   {{ getAdminDisplay(log) }}
                 </UBadge>

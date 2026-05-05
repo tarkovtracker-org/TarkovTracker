@@ -37,38 +37,6 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
 
-      - name: Check CodeAnt token
-        id: codeant-token
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          if [ -n "$CODEANT_ACCESS_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          CODEANT_ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Upload coverage to CodeAnt AI
-        if: steps.codeant-token.outputs.available == 'true'
-        env:
-          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-          COVERAGE_FILE: coverage/cobertura-coverage.xml
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          curl -sS -X GET "https://api.codeant.ai/pr/analysis/coverage/script/get" \
-            --output upload_coverage.sh.b64
-          base64 -d upload_coverage.sh.b64 > upload_coverage.sh
-          chmod +x upload_coverage.sh
-          commit_id="${PR_HEAD_SHA:-$GITHUB_SHA}"
-          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          bash upload_coverage.sh \
-            -t "$ACCESS_TOKEN" \
-            -r "$GITHUB_REPOSITORY" \
-            -c "$commit_id" \
-            -f "$COVERAGE_FILE" \
-            -p github \
-            -b "$branch" \
-            -u "https://github.com"
-
       - name: Build
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         run: npm run build

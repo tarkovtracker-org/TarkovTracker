@@ -397,7 +397,6 @@
   </UCard>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import ContextMenu from '@/components/ui/ContextMenu.vue';
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';

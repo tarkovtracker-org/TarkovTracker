@@ -21,7 +21,7 @@ A comprehensive Escape from Tarkov progress tracker built with Nuxt 4, featuring
 - **Styling**: Tailwind CSS v4
 - **State Management**: Pinia with three-store architecture
 - **Backend**: Supabase (authentication, database, real-time)
-- **API**: Nuxt server-side proxy to tarkov.dev GraphQL API
+- **API**: Nuxt server-side proxy to json.tarkov.dev static data
 - **Deployment**: Cloudflare Pages
 
 ## Setup
@@ -43,6 +43,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anonymous_key
 
 # Optional: App configuration
 # NUXT_PUBLIC_APP_URL=http://localhost:3000
+# NUXT_TARKOV_JSON_BASE_URL=https://json.tarkov.dev
 # NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=false
 # NUXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 # NUXT_PUBLIC_CLARITY_PROJECT_ID=xxxxxxxxxx

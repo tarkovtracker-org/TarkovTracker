@@ -13,6 +13,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
+- AI review bots are manual-only; CodeRabbit is disabled in repo config, while CodeAnt and Kilo Code must stay disabled in their GitHub App dashboards unless explicitly requested.
 
 ## GitHub Actions Workflows
 

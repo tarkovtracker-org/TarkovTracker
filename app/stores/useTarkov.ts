@@ -62,6 +62,8 @@ import {
   hasDeprecatedTarkovDevProfileData,
   sanitizeOwnedProgressData,
   sanitizeOwnedUserState,
+  sanitizeGameEdition,
+  sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
@@ -1396,8 +1398,8 @@ export async function initializeTarkovSync() {
       const normalizedRemote = data
         ? sanitizeOwnedUserState({
             currentGameMode: coerceGameMode(data.current_game_mode),
-            gameEdition: data.game_edition || defaultState.gameEdition,
-            tarkovUid: data.tarkov_uid ?? null,
+            gameEdition: sanitizeGameEdition(data.game_edition),
+            tarkovUid: sanitizeTarkovUid(data.tarkov_uid),
             pvp: data.pvp_data,
             pve: data.pve_data,
           })
@@ -1592,7 +1594,9 @@ export async function initializeTarkovSync() {
           // SAFETY CHECK: Prevent syncing completely empty state for existing accounts
           // This protects against accidental data overwrites during edge cases
           const stateHasProgress = hasProgress(userState);
-          if (!stateHasProgress && loadResult.hadRemoteData) {
+          const hasIntentionalResetEpoch =
+            toProgressEpoch(userState.pvp) > 0 || toProgressEpoch(userState.pve) > 0;
+          if (!stateHasProgress && loadResult.hadRemoteData && !hasIntentionalResetEpoch) {
             logger.warn(
               '[TarkovStore] Blocking sync of empty state - account had remote data on load'
             );
@@ -1639,6 +1643,7 @@ export async function initializeTarkovSync() {
 // Realtime channel for multi-device sync
 let realtimeChannel: unknown = null;
 let lastLocalSyncTime = 0; // Track when we last synced locally to filter self-origin updates
+let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let deprecatedRemoteCleanupInFlight = false;
 let lastDeprecatedRemoteCleanupAttemptAt = 0;
 let deprecatedRemoteCleanupFailureCount = 0;
@@ -1866,16 +1871,21 @@ function setupRealtimeListener() {
           currentGameMode: remoteData.current_game_mode
             ? coerceGameMode(remoteData.current_game_mode)
             : localState.currentGameMode,
-          gameEdition: remoteData.game_edition || localState.gameEdition,
+          gameEdition:
+            remoteData.game_edition === undefined
+              ? localState.gameEdition
+              : sanitizeGameEdition(remoteData.game_edition),
+          tarkovUid:
+            remoteData.tarkov_uid === undefined
+              ? localState.tarkovUid
+              : sanitizeTarkovUid(remoteData.tarkov_uid),
           pvp: mergeProgressData(localState.pvp, sanitizeOwnedProgressData(remoteData.pvp_data)),
           pve: mergeProgressData(localState.pve, sanitizeOwnedProgressData(remoteData.pve_data)),
         };
         const nextState: UserState = {
           currentGameMode: merged.currentGameMode ?? localState.currentGameMode,
           gameEdition: merged.gameEdition ?? localState.gameEdition,
-          tarkovUid: Object.prototype.hasOwnProperty.call(remoteData, 'tarkov_uid')
-            ? (remoteData.tarkov_uid ?? null)
-            : (localState.tarkovUid ?? null),
+          tarkovUid: merged.tarkovUid ?? null,
           pvp: merged.pvp ?? localState.pvp,
           pve: merged.pve ?? localState.pve,
         };
@@ -1965,7 +1975,11 @@ function setupRealtimeListener() {
           state.pvp = nextState.pvp;
           state.pve = nextState.pve;
         });
-        setTimeout(() => {
+        if (syncResumeTimer) {
+          clearTimeout(syncResumeTimer);
+        }
+        syncResumeTimer = setTimeout(() => {
+          syncResumeTimer = null;
           const currentController = getSyncController();
           if (currentController && currentController === controller) {
             currentController.resume();
@@ -1995,5 +2009,9 @@ function cleanupRealtimeListener() {
     );
     realtimeChannel = null;
     logger.debug('[TarkovStore] Cleaned up realtime listener');
+  }
+  if (syncResumeTimer) {
+    clearTimeout(syncResumeTimer);
+    syncResumeTimer = null;
   }
 }

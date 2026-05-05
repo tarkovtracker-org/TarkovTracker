@@ -2,9 +2,7 @@
   import { Controls } from '@vue-flow/controls';
   import { VueFlow, useVueFlow } from '@vue-flow/core';
   import { MiniMap } from '@vue-flow/minimap';
-  import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
-  import { useI18n } from 'vue-i18n';
   import { useMapResize } from '@/composables/useMapResize';
   import { useTaskGraphData } from '@/composables/useTaskGraphData';
   import TaskGraphNode from '@/features/tasks/TaskGraphNode.vue';
@@ -22,8 +20,7 @@
   const router = useRouter();
   const preferencesStore = usePreferencesStore();
   const { getTaskTraderView } = storeToRefs(preferencesStore);
-  const breakpoints = useBreakpoints(breakpointsTailwind);
-  const isLgAndUp = breakpoints.greaterOrEqual('lg');
+  const { lgAndUp: isLgAndUp } = useSharedBreakpoints();
   const focusedTaskId = ref<string | null>(null);
   const isFocusChainIsolated = ref(false);
   const traderId = computed(() => getTaskTraderView.value || '');

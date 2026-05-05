@@ -181,7 +181,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import {
     normalizeNeededItemsFilterType,
     normalizeNeededItemsSortBy,
@@ -282,7 +282,7 @@
     return count;
   });
   const { isOpen: isSettingsDrawerOpen, toggle: toggleSettingsDrawer } =
-    useNeededItemsSettingsDrawer();
+    usePageSettingsDrawer('needed_items');
   const sortOptions = computed(() => [
     {
       label: t('page.needed_items.sort.priority'),

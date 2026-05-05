@@ -186,8 +186,7 @@ export default defineEventHandler(async (event) => {
   ) {
     throw createError({
       statusCode: 500,
-      statusMessage:
-        '[team/members] Missing required environment variables: SUPABASE_URL and SUPABASE_ANON_KEY must both be set',
+      statusMessage: 'Service configuration error',
     });
   }
   const teamId = (getQuery(event).teamId as string | undefined)?.trim();

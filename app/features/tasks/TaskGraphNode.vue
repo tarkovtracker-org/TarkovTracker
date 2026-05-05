@@ -1,6 +1,5 @@
 <script setup lang="ts">
   import { Handle, Position } from '@vue-flow/core';
-  import { useI18n } from 'vue-i18n';
   import type { TaskNodeData } from '@/composables/useTaskGraphData';
   const props = defineProps<{
     data: TaskNodeData;

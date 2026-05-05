@@ -115,6 +115,7 @@ const setup = async (
   vi.doMock('@/composables/useSharedBreakpoints', () => ({
     useSharedBreakpoints: () => ({
       belowMd: ref(false),
+      lgAndUp: ref(true),
       xs: ref(false),
     }),
   }));

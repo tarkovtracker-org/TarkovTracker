@@ -2,7 +2,8 @@
 
 ## Overview
 
-TarkovTracker provides internal API routes for fetching game data and team information. All game data is proxied through Nuxt server routes to the tarkov.dev GraphQL API with caching and overlay corrections applied.
+TarkovTracker provides internal API routes for fetching game data and team information. Game data is proxied through Nuxt server routes to `json.tarkov.dev` with caching and overlay corrections applied.
+Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatible `json.tarkov.dev` mirror.
 
 ## Base URL
 
@@ -133,9 +134,10 @@ Fetches lightweight item data (id, name, shortName, image).
 
 **Query Parameters:**
 
-| Parameter | Type   | Default | Description   |
-| --------- | ------ | ------- | ------------- |
-| `lang`    | string | `en`    | Language code |
+| Parameter  | Type   | Default   | Description                    |
+| ---------- | ------ | --------- | ------------------------------ |
+| `lang`     | string | `en`      | Language code                  |
+| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
 
 **Cache TTL:** 24 hours
 
@@ -147,9 +149,10 @@ Fetches full item data including properties.
 
 **Query Parameters:**
 
-| Parameter | Type   | Default | Description   |
-| --------- | ------ | ------- | ------------- |
-| `lang`    | string | `en`    | Language code |
+| Parameter  | Type   | Default   | Description                    |
+| ---------- | ------ | --------- | ------------------------------ |
+| `lang`     | string | `en`      | Language code                  |
+| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
 
 **Cache TTL:** 24 hours
 
@@ -164,6 +167,9 @@ Fetches prestige level requirements.
 | Parameter | Type   | Default | Description   |
 | --------- | ------ | ------- | ------------- |
 | `lang`    | string | `en`    | Language code |
+
+Prestige is intentionally sourced from `regular/tasks` and cached by language only because
+`json.tarkov.dev` currently has no PvE prestige data.
 
 **Cache TTL:** 24 hours
 
@@ -251,9 +257,10 @@ All endpoints return errors in this format:
 
 The client caches API responses in IndexedDB with keys like:
 
-- `tasks-core-en-regular`
-- `hideout-de-pve`
-- `items-lite-en`
+- `tasks-core-json-v1-regular-en`
+- `hideout-json-v1-pve-de`
+- `items-lite-json-v1-regular-en`
+- `prestige-all-json-v1-en`
 
 ### Server-Side (Edge)
 

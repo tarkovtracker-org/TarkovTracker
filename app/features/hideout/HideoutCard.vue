@@ -317,7 +317,6 @@
   </GenericCard>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { useToast } from '#imports';
   import { useAnalyticsEvents } from '@/composables/useAnalyticsEvents';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';

@@ -193,10 +193,8 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { breakpointsTailwind, useBreakpoints } from '@vueuse/core';
-  import { useI18n } from 'vue-i18n';
-  import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
   import { usePageHelpState } from '@/composables/usePageHelpState';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { useProductAnalytics } from '@/composables/useProductAnalytics';
   import NeededItem from '@/features/neededitems/NeededItem.vue';
   import NeededItemGroupedCard from '@/features/neededitems/NeededItemGroupedCard.vue';
@@ -220,16 +218,17 @@
   const { trackNeededItemsView } = useProductAnalytics();
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('needed_items');
   const { close: closeSettingsDrawer, isOpen: isSettingsDrawerOpen } =
-    useNeededItemsSettingsDrawer();
-  const breakpoints = useBreakpoints(breakpointsTailwind);
-  const isLgAndUp = breakpoints.greaterOrEqual('lg');
-  const isDesktopSettingsDrawerOpen = computed(() => isSettingsDrawerOpen.value && isLgAndUp.value);
-  const isMobileSettingsDrawerOpen = computed(() => isSettingsDrawerOpen.value && !isLgAndUp.value);
-  const isDesktopHelpPanelOpen = computed(() => isHelpOpen.value && isLgAndUp.value);
-  const isMobileHelpPanelOpen = computed(() => isHelpOpen.value && !isLgAndUp.value);
-  const isDesktopSideRailOpen = computed(
-    () => isLgAndUp.value && (isHelpOpen.value || isSettingsDrawerOpen.value)
-  );
+    usePageSettingsDrawer('needed_items');
+  const {
+    isDesktopHelpPanelOpen,
+    isDesktopSettingsDrawerOpen,
+    isDesktopSideRailOpen,
+    isMobileHelpPanelOpen,
+    isMobileSettingsDrawerOpen,
+  } = usePageSideRailState({
+    helpOpen: isHelpOpen,
+    settingsOpen: isSettingsDrawerOpen,
+  });
   useSeoMeta({
     title: () => t('page.needed_items.title'),
     description: () => t('page.needed_items.meta_description'),

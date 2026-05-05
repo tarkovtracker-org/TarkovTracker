@@ -96,7 +96,7 @@ export const API_SUPPORTED_LANGUAGES = [
 export const LOCALE_TO_API_MAPPING: Record<string, string> = {
   uk: 'en', // Ukrainian -> English (Not supported by API)
 };
-// Mapping from GraphQL map names to static data keys (kept for backward compatibility)
+// Mapping from tarkov.dev map names to static data keys (kept for backward compatibility)
 export const MAP_NAME_MAPPING: Record<string, string> = {
   'night factory': 'factory',
   'the lab': 'lab',

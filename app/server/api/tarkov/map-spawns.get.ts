@@ -1,30 +1,22 @@
-import type { TarkovMapSpawnsQueryResult } from '~/types/tarkov';
 import { edgeCache } from '~/server/utils/edgeCache';
-import { validateAndThrow } from '~/server/utils/graphql-validation';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
-import { TARKOV_MAP_SPAWNS_QUERY } from '~/server/utils/tarkov-queries';
-import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
+import { createTarkovJsonMapSpawnsFetcher } from '~/server/utils/tarkov-json';
 const logger = createLogger('TarkovMapSpawns');
+const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
-  const cacheKey = `map-spawns-${lang}-${gameMode}`;
-  const baseFetcher = createTarkovFetcher(
-    TARKOV_MAP_SPAWNS_QUERY,
-    { lang, gameMode },
-    {
-      allowPartialData: true,
-    }
-  );
-  const fetcher = async () => {
-    const rawResponse = await baseFetcher();
-    validateAndThrow<TarkovMapSpawnsQueryResult>(rawResponse, logger, true);
-    return rawResponse;
-  };
-  return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, {
-    cacheKeyPrefix: 'tarkov',
-  });
+  const cacheKey = `map-spawns-${MAP_SPAWNS_CACHE_VERSION}-${lang}-${gameMode}`;
+  const fetcher = createTarkovJsonMapSpawnsFetcher({ gameMode, lang });
+  try {
+    return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_DEFAULT, {
+      cacheKeyPrefix: 'tarkov',
+    });
+  } catch (error) {
+    logger.error('Failed to fetch map spawns data:', { cacheKey, error });
+    throw error;
+  }
 });

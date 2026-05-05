@@ -108,7 +108,6 @@
   </UContainer>
 </template>
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { logger } from '@/utils/logger';
   import type {
     ChangelogBullet,

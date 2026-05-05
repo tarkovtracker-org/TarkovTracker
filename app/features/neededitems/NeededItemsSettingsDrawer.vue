@@ -173,7 +173,7 @@
   </aside>
 </template>
 <script setup lang="ts">
-  import { useNeededItemsSettingsDrawer } from '@/composables/useNeededItemsSettingsDrawer';
+  import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   type FilterType = 'all' | 'tasks' | 'hideout' | 'completed';
   type ViewMode = 'list' | 'grid';
   type FirFilter = 'all' | 'fir' | 'non-fir';
@@ -204,7 +204,7 @@
     'update:cardStyle': [value: CardStyle];
   }>();
   const { t } = useI18n({ useScope: 'global' });
-  const { close } = useNeededItemsSettingsDrawer();
+  const { close } = usePageSettingsDrawer('needed_items');
   const isOverlayMode = computed(() => props.mode === 'overlay');
   const drawerRef = ref<HTMLElement | null>(null);
   const { restoreTriggerFocus, trapFocus } = useOverlayFocusTrap({

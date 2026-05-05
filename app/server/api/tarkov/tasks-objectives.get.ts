@@ -1,32 +1,28 @@
-import type { TarkovTaskObjectivesQueryResult } from '~/types/tarkov';
 import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
-import { validateAndThrow } from '~/server/utils/graphql-validation';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { applyOverlay } from '~/server/utils/overlay';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
-import { TARKOV_TASKS_OBJECTIVES_QUERY } from '~/server/utils/tarkov-queries';
-import { createTarkovFetcher } from '~/server/utils/tarkovFetcher';
+import { createTarkovJsonTaskObjectivesFetcher } from '~/server/utils/tarkov-json';
 const logger = createLogger('TarkovTaskObjectives');
-const TASK_OBJECTIVES_CACHE_VERSION = 'v3';
+const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const bypassCache = shouldBypassCache(event);
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
   const cacheKey = `tasks-objectives-${TASK_OBJECTIVES_CACHE_VERSION}-${lang}-${gameMode}`;
-  const baseFetcher = createTarkovFetcher(
-    TARKOV_TASKS_OBJECTIVES_QUERY,
-    { lang, gameMode },
-    {
-      allowPartialData: true,
-    }
-  );
+  const baseFetcher = createTarkovJsonTaskObjectivesFetcher({ gameMode, lang });
   const fetcher = async () => {
-    const rawResponse = await baseFetcher();
-    validateAndThrow<TarkovTaskObjectivesQueryResult>(rawResponse, logger, true);
+    let baseResponse: Awaited<ReturnType<typeof baseFetcher>>;
     try {
-      return await applyOverlay(rawResponse, { bypassCache, gameMode });
+      baseResponse = await baseFetcher();
+    } catch (error) {
+      logger.error('Failed to fetch task objectives data:', error);
+      throw error;
+    }
+    try {
+      return await applyOverlay(baseResponse, { bypassCache, gameMode });
     } catch (overlayError) {
       logger.error('Failed to apply overlay:', overlayError);
       throw overlayError;

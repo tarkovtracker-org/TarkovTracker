@@ -68,4 +68,5 @@
    - `TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`
    - `SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`
    - For `/api/tarkov-dev/profile`, add or tighten a Cloudflare rule; the app route also has a fixed per-IP limiter.
+   - Cache API-backed shared rate limits are best-effort under concurrent bursts; use Cloudflare or Durable Objects for hard enforcement.
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.

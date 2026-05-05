@@ -74,8 +74,8 @@ vi.mock('@/composables/useHideoutStationStatus', () => ({
     getStationStatus: () => 'available',
   }),
 }));
-vi.mock('@/composables/useHideoutSettingsDrawer', () => ({
-  useHideoutSettingsDrawer: () => ({
+vi.mock('@/composables/usePageSettingsDrawer', () => ({
+  usePageSettingsDrawer: () => ({
     isOpen: hideoutSettingsDrawerState,
     open: vi.fn(),
     close: vi.fn(),

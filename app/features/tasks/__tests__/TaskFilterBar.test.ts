@@ -145,8 +145,8 @@ const setup = async (options: SetupOptions = {}) => {
       t: (key: string, fallback?: string) => fallback ?? key.split('.').pop() ?? key,
     }),
   }));
-  vi.doMock('@/composables/useTaskSettingsDrawer', () => ({
-    useTaskSettingsDrawer: () => ({
+  vi.doMock('@/composables/usePageSettingsDrawer', () => ({
+    usePageSettingsDrawer: () => ({
       isOpen: ref(false),
       open: vi.fn(),
       close: vi.fn(),

@@ -1,4 +1,4 @@
-import { useDashboardFilters } from '@/features/dashboard/composables/useDashboardFilters';
+import { useDashboardFilters } from '@/composables/useDashboardFilters';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
