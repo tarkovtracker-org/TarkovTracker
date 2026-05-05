@@ -1,0 +1,41 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "app/i18n.config.ts",
+    "app/server/api/**/*.{js,ts}",
+    "app/server/routes/**/*.{js,ts}",
+    "supabase/functions/**/*.ts",
+    "vitest.config.ts",
+    "vitest.*.config.ts",
+    "vitest.shared.ts"
+  ],
+  "ignoreDependencies": [
+    "@iconify-json/mdi",
+    "@semantic-release/npm",
+    "@tailwindcss/postcss",
+    "autoprefixer",
+    "defu",
+    "lru-cache",
+    "postcss",
+    "vitest-environment-nuxt",
+    "vue-tsc"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".claude-plugin/mcp/eft-wiki": {
+      "entry": ["src/index.ts"]
+    },
+    ".claude-plugin/mcp/tarkov-dev": {
+      "entry": ["src/index.ts"]
+    },
+    "workers/api-gateway": {
+      "entry": [
+        "scripts/validate-openapi.ts",
+        "src/**/__tests__/**/*.test.ts",
+        "src/index.ts",
+        "vitest.config.ts"
+      ],
+      "project": ["scripts/**/*.ts", "src/**/*.ts", "vitest.config.ts"]
+    }
+  }
+}

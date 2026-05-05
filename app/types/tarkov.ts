@@ -1,6 +1,4 @@
-import type { UserState } from '@/stores/progressState';
-import type { TaskGraph } from '@/utils/graphHelpers';
-import type { _GettersTree, StateTree, Store } from 'pinia';
+import type { _GettersTree, StateTree } from 'pinia';
 /**
  * Type definitions for Tarkov data structures
  * This file defines the structure for:
@@ -217,11 +215,6 @@ export interface FinishRewards {
   skillLevelReward?: SkillLevelReward[];
   traderUnlock?: TraderUnlock;
 }
-export interface FinishReward {
-  __typename?: string;
-  status?: string;
-  quest?: { id: string };
-}
 export interface RequiredKeyGroup {
   keys: TarkovItem[];
   maps?: { id: string; name?: string }[];
@@ -396,9 +389,6 @@ export interface MemberProfile {
   gameMode?: 'pvp' | 'pve';
 }
 // Query Result Types
-export interface LanguageQueryResult {
-  __type?: { enumValues: { name: string }[] };
-}
 export interface TarkovDataQueryResult {
   tasks: Task[];
   maps: TarkovMap[];
@@ -446,7 +436,6 @@ export interface NeededItemHideoutModule extends NeededItemBase {
   needType: 'hideoutModule';
   hideoutModule: HideoutModule;
 }
-export type Need = NeededItemTaskObjective | NeededItemHideoutModule;
 export type GroupedItemInfo = Pick<
   TarkovItem,
   'id' | 'iconLink' | 'image512pxLink' | 'wikiLink' | 'link'
@@ -537,41 +526,4 @@ export interface TeamGetters extends _GettersTree<TeamState> {
   inviteCode: (state: TeamState) => string | null;
   teamMembers: (state: TeamState) => string[];
   teammates: (state: TeamState) => string[];
-}
-// Composable Return Types
-export interface TarkovDataComposable {
-  availableLanguages: Ref<string[] | null>;
-  languageCode: ComputedRef<string>;
-  queryErrors: Ref<Error | null | undefined>;
-  queryResults: Ref<TarkovDataQueryResult | null>;
-  lastQueryTime: Ref<number | null>;
-  loading: Ref<boolean>;
-  hideoutLoading: Ref<boolean>;
-  queryHideoutErrors: Ref<Error | null | undefined>;
-  queryHideoutResults: Ref<TarkovHideoutQueryResult | null>;
-  lastHideoutQueryTime: Ref<number | null>;
-  hideoutStations: Ref<HideoutStation[]>;
-  hideoutModules: Ref<HideoutModule[]>;
-  hideoutGraph: Ref<TaskGraph>;
-  tasks: Ref<Task[]>;
-  taskGraph: Ref<TaskGraph>;
-  objectiveMaps: Ref<{ [taskId: string]: ObjectiveMapInfo[] }>;
-  alternativeTasks: Ref<{ [taskId: string]: string[] }>;
-  objectiveGPS: Ref<{ [taskId: string]: ObjectiveGPSInfo[] }>;
-  mapTasks: Ref<{ [mapId: string]: string[] }>;
-  objectives: ComputedRef<TaskObjective[]>;
-  maps: ComputedRef<TarkovMap[]>;
-  traders: ComputedRef<Trader[]>;
-  neededItemTaskObjectives: Ref<NeededItemTaskObjective[]>;
-  neededItemHideoutModules: Ref<NeededItemHideoutModule[]>;
-  playerLevels: ComputedRef<PlayerLevel[]>;
-  minPlayerLevel: ComputedRef<number>;
-  maxPlayerLevel: ComputedRef<number>;
-}
-export interface LiveDataComposable {
-  useTeamStore: () => Store<string, TeamState, TeamGetters>;
-  useSystemStore: () => Store<string, SystemState, SystemGetters>;
-  useProgressStore: () => Store<string, UserState>;
-  teammateStores: Ref<Record<string, Store<string, UserState>>>;
-  tarkovStore: Store<string, UserState>;
 }

@@ -35,15 +35,6 @@ export interface TaskFilterAndSortOptions extends TaskFilterOptions {
   sortDirection: import('@/types/taskSort').TaskSortDirection;
 }
 /**
- * Type guard to check if a view is available (unlocked, not completed)
- */
-export const isAvailableView = (view: TaskSecondaryView): boolean => view === 'available';
-/**
- * Type guard to check if a view shows completion states
- */
-export const isCompletionView = (view: TaskSecondaryView): boolean =>
-  view === 'completed' || view === 'failed';
-/**
  * Type guard to check if viewing all team members
  */
 export const isAllUsersView = (userView: string): boolean => userView === TASK_USER_VIEWS.ALL;
