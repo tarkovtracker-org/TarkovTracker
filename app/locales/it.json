@@ -542,10 +542,10 @@
         "title": "Progressi trader",
         "view_tasks": "Visualizza missioni di {name}",
         "tasks": "missioni",
-        "loyalty_level": "Livello di fedeltà (LF)",
+        "loyalty_level": "Livello fedeltà (LF)",
         "reputation": "Reputazione",
         "reputation_input_label": "Input reputazione",
-        "set_loyalty_level": "Imposta il livello di fedeltà a {level}",
+        "set_loyalty_level": "Imposta il livello fedeltà a {level}",
         "rep_progress_label": "→ LF{level}",
         "scav_karma": "Scav Karma",
         "unlock_required": "Sblocco richiesto:"
@@ -757,7 +757,7 @@
         "level_badge": "Lv {count}",
         "fence_rep_badge": "Fence {rep}",
         "fence_rep_tooltip": "Requires Fence reputation of {rep}",
-        "trader_level_tooltip": "Requires {trader} Loyalty Level {level}",
+        "trader_level_tooltip": "{trader} richiede il livello fedeltà {level}",
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "Wiki page",
         "locked_before": "Tasks Before: {count}",
@@ -895,7 +895,7 @@
         "title": "Availability requirements",
         "station_levels": "Require station levels",
         "skill_levels": "Require skill levels",
-        "trader_loyalty": "Require trader loyalty",
+        "trader_loyalty": "Richiede livello fedeltà",
         "confirm_title": "Enable availability requirement?",
         "confirm_description": "Enabling {requirement} may remove hideout upgrades that no longer meet prerequisites.",
         "confirm_cancel": "Annulla",
@@ -917,7 +917,7 @@
         "requirements": {
           "station": "{stationname} level {level}",
           "skill": "{skillname} level {level}",
-          "trader": "{tradername} LL{loyaltylevel}"
+          "trader": "{tradername} LF{loyaltylevel}"
         },
         "game_edition_description": "The base level of the stash is determined by the game edition you own. You can change this in the Tracker settings.",
         "settings_button": "Visit Settings",
