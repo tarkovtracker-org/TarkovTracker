@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runApiUpdateHandlers } from '@/stores/useTarkov';
+import { runApiUpdateHandlers } from '@/stores/tarkov/apiUpdateNotifier';
 describe('runApiUpdateHandlers', () => {
   it('evaluates all handlers even when the first one returns true', () => {
     const first = vi.fn(() => true);
