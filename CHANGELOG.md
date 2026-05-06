@@ -1,3 +1,10 @@
+## [1.35.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.1...v1.35.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* **app:** restore metadata hydration in dev ([#352](https://github.com/tarkovtracker-org/TarkovTracker/issues/352)) ([bc5352d](https://github.com/tarkovtracker-org/TarkovTracker/commit/bc5352d59ed43fbe474e9db283cc80330f57350d))
+
 ## [1.35.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.0...v1.35.1) (2026-05-05)
 
 

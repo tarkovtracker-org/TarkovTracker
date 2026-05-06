@@ -199,13 +199,28 @@ type PromiseKey = {
 type MutablePromiseStore = {
   -readonly [K in keyof PromiseStore]: PromiseStore[K];
 };
-const storePromises = new WeakMap<object, MutablePromiseStore>();
-const storePromiseRequestKeys = new WeakMap<object, Partial<Record<PromiseKey, string>>>();
-const storePromiseRequestIds = new WeakMap<object, Partial<Record<PromiseKey, symbol>>>();
+const PROMISE_STORE_KEY = Symbol('metadataPromiseStore');
+const PROMISE_REQUEST_KEYS_KEY = Symbol('metadataPromiseRequestKeys');
+const PROMISE_REQUEST_IDS_KEY = Symbol('metadataPromiseRequestIds');
+type PromiseStoreHost = object & {
+  [PROMISE_REQUEST_IDS_KEY]?: Partial<Record<PromiseKey, symbol>>;
+  [PROMISE_REQUEST_KEYS_KEY]?: Partial<Record<PromiseKey, string>>;
+  [PROMISE_STORE_KEY]?: MutablePromiseStore;
+};
+function setHiddenStoreValue<T>(storeInstance: PromiseStoreHost, key: symbol, value: T): T {
+  Object.defineProperty(storeInstance, key, {
+    configurable: true,
+    enumerable: false,
+    value,
+    writable: true,
+  });
+  return value;
+}
 function getPromiseStore(storeInstance: object): MutablePromiseStore {
-  let promises = storePromises.get(storeInstance);
+  const host = storeInstance as PromiseStoreHost;
+  let promises = host[PROMISE_STORE_KEY];
   if (!promises) {
-    promises = {
+    promises = setHiddenStoreValue(host, PROMISE_STORE_KEY, {
       bootstrapPromise: null,
       tasksCorePromise: null,
       hideoutPromise: null,
@@ -219,24 +234,23 @@ function getPromiseStore(storeInstance: object): MutablePromiseStore {
       editionsPromise: null,
       initPromise: null,
       isInitializing: false,
-    };
-    storePromises.set(storeInstance, promises);
+    });
   }
   return promises;
 }
 function getPromiseRequestKeyStore(storeInstance: object): Partial<Record<PromiseKey, string>> {
-  let keys = storePromiseRequestKeys.get(storeInstance);
+  const host = storeInstance as PromiseStoreHost;
+  let keys = host[PROMISE_REQUEST_KEYS_KEY];
   if (!keys) {
-    keys = {};
-    storePromiseRequestKeys.set(storeInstance, keys);
+    keys = setHiddenStoreValue(host, PROMISE_REQUEST_KEYS_KEY, {});
   }
   return keys;
 }
 function getPromiseRequestIdStore(storeInstance: object): Partial<Record<PromiseKey, symbol>> {
-  let ids = storePromiseRequestIds.get(storeInstance);
+  const host = storeInstance as PromiseStoreHost;
+  let ids = host[PROMISE_REQUEST_IDS_KEY];
   if (!ids) {
-    ids = {};
-    storePromiseRequestIds.set(storeInstance, ids);
+    ids = setHiddenStoreValue(host, PROMISE_REQUEST_IDS_KEY, {});
   }
   return ids;
 }
