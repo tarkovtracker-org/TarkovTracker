@@ -8,7 +8,7 @@
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "unknown_user": "Неизвестно",
-    "cache_management_title": "Cache Management",
+    "cache_management_title": "Управление кешированием",
     "last_purge_description": "Last purge: {type} at {timestamp}",
     "tarkov_data_cache_label": "Tarkov Data Cache",
     "tarkov_data_cache_description": "Clears cached game data (tasks, hideout, items). Users will fetch fresh data from tarkov.dev API.",
@@ -348,12 +348,12 @@
       "scav": "Дикие"
     },
     "layers": {
-      "pmc_spawns": "Места появления ЧВК"
+      "pmc_spawns": "Спавны ЧВК"
     },
     "legend": {
       "your_objectives": "Ваши цели",
       "team_objectives": "Цели команды",
-      "pmc_spawn": "Место появления ЧВК",
+      "pmc_spawn": "Спавн ЧВК",
       "pmc_extract": "Выход ЧВК",
       "scav_extract": "Выход Диких",
       "shared_extract": "Общий выход (любая фракция)",
@@ -425,7 +425,7 @@
           "blocked_level_one": "{task} — ваша ближайшая разблокировка, но вам не хватает ещё 1 уровня.",
           "blocked_level_other": "{task} — ваша ближайшая разблокировка, но вам не хватает ещё {count} уровней.",
           "blocked_prerequisite": "{task} близко, но всё ещё заблокировано предыдущими заданиями.",
-          "blocked_fence": "{task} ждёт репутацию Fence.",
+          "blocked_fence": "{task} ждёт репутацию Скупщика.",
           "blocked_trader_unlock": "{task} заблокировано другой задачей на разблокировку торговца.",
           "complete": "Вы завершили все видимые задания в этой области панели."
         },
@@ -493,8 +493,8 @@
           "level_one": "Достигните уровня {required} (остался 1 уровень).",
           "level_other": "Достигните уровня {required} (осталось {count} уровней).",
           "prerequisite": "Выполните {tasks}.",
-          "fence_positive": "Достигните требования по репутации Fence ({required}).",
-          "fence_negative": "Достигните требования по репутации Fence ({required}).",
+          "fence_positive": "Достигните требования по репутации Скупщика ({required}).",
+          "fence_negative": "Достигните требования по репутации Скупщика ({required}).",
           "trader_unlock": "Выполните {task}, чтобы открыть {trader}.",
           "complete": "Блокеров нет. Всё видимое уже выполнено."
         },
@@ -525,7 +525,7 @@
         "progress_label": "{label} progress"
       },
       "milestones": {
-        "title": "Вехи",
+        "title": "Ключевые этапы",
         "starter": "Начало пути",
         "halfway": "Половина пути",
         "veteran": "Почти готово",
@@ -597,7 +597,7 @@
       "route_required_steps": "Required steps",
       "route_optional_steps": "Optional steps",
       "route_selected_hint": "This route is active.",
-      "route_switch_hint": "To switch routes, uncheck the selected route first.",
+      "route_switch_hint": "Чтобы изменить путь, сначала снимите галочку с выбранного пути.",
       "route_unlocks_here": "Unlocks here",
       "route_unlocks_chapter": "Chapter unlocks",
       "route_unlocks_estimated": "Estimated timing",
@@ -917,7 +917,7 @@
         "requirements": {
           "station": "{stationname} ур. {level}",
           "skill": "{skillname} ур. {level}",
-          "trader": "{tradername} LL{loyaltylevel}"
+          "trader": "{tradername} УЛ{loyaltylevel}"
         },
         "game_edition_description": "Базовый уровень схрона определяется изданием игры, которым вы владеете. Вы можете изменить это в настройках трекера.",
         "settings_button": "Перейти в Настройки",
@@ -1128,7 +1128,7 @@
       "terms_of_service": "Условия использования",
       "popup_blocked_title": "Всплывающее окно заблокировано",
       "popup_blocked_description": "Ваш браузер заблокировал окно входа. Перенаправляем...",
-      "authenticating": "Authenticating...",
+      "authenticating": "Авторизация...",
       "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Не удалось войти",
       "error_description": "Авторизация была отменена или не удалась. Пожалуйста, попробуйте снова.",
@@ -1151,11 +1151,11 @@
       "share_private_intro": "Этот режим приватный. Включите общий доступ в ",
       "account_settings_link": "Настройки аккаунта",
       "share_private_outro": ", чтобы сделать эту ссылку публичной.",
-      "share_public_enabled": "This mode is public. Anyone with the link can view it.",
+      "share_public_enabled": "Это общедоступный режим. Кто угодно может посмотреть его по ссылке.",
       "share_private_enabled": "This mode is private.",
       "mode_toggle_label": "Выберите режим профиля",
       "copy_snapshot": "Copy Snapshot",
-      "view_tasks": "Open Tasks",
+      "view_tasks": "Открыть Задания",
       "tab_overview": "Обзор",
       "tab_tasks": "Задания",
       "tab_hideout": "Убежище",
@@ -1697,7 +1697,7 @@
       "team_transfer_description": "Если вы являетесь лидером команд, лидерство будет автоматически передано самому старшему участнику каждой команды. Команды без других участников будут удалены.",
       "security_confirmation_title": "Подтверждение безопасности",
       "security_confirmation_description": "Для удаления аккаунта требуется ввести точную фразу подтверждения ниже. Это действие окончательно и не может быть отменено.",
-      "confirm_phrase_value": "DELETE MY ACCOUNT",
+      "confirm_phrase_value": "УДАЛИТЬ МОЙ АККАУНТ",
       "confirm_phrase_label": "Введите \"{phrase}\" для подтверждения:",
       "confirm_phrase_error": "Пожалуйста, введите: {phrase}",
       "delete_forever": "Удалить аккаунт навсегда",
@@ -1815,7 +1815,7 @@
     },
     "danger_zone": {
       "confirm_delete_instruction": "Введите {word} для подтверждения:",
-      "confirm_word": "DELETE"
+      "confirm_word": "УДАЛИТЬ"
     },
     "log_import": {
       "upload_hint": "Выберите папку Logs игры Escape from Tarkov, чтобы импортировать прогресс заданий.",
@@ -2029,7 +2029,7 @@
       "requesting_access": "is requesting access to your TarkovTracker account.",
       "requested_permissions": "Requested Permissions:",
       "redirect_to": "Will redirect to:",
-      "approve": "Approve",
+      "approve": "Разрешить",
       "deny": "Deny"
     }
   },
