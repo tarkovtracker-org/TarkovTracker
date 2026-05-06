@@ -96,14 +96,24 @@ export const API_SUPPORTED_LANGUAGES = [
 export const LOCALE_TO_API_MAPPING: Record<string, string> = {
   uk: 'en', // Ukrainian -> English (Not supported by API)
 };
-// Mapping from tarkov.dev map names to static data keys (kept for backward compatibility)
+// Mapping from tarkov.dev map names to static data keys (fallback when normalizedName is absent)
 export const MAP_NAME_MAPPING: Record<string, string> = {
   'night factory': 'factory',
   'the lab': 'lab',
   'ground zero 21+': 'groundzero',
-  'ground zero tutorial': 'groundzero', // Tutorial uses same map as Ground Zero
+  'ground zero tutorial': 'groundzero',
   'the labyrinth': 'labyrinth',
   terminal: 'terminal',
+};
+// Mapping from tarkov.dev normalizedName to static data keys (locale-independent, preferred)
+export const MAP_NORMALIZED_NAME_MAPPING: Record<string, string> = {
+  'night-factory': 'factory',
+  'the-lab': 'lab',
+  'ground-zero': 'groundzero',
+  'ground-zero-21': 'groundzero',
+  'ground-zero-tutorial': 'groundzero',
+  'the-labyrinth': 'labyrinth',
+  'streets-of-tarkov': 'streetsoftarkov',
 };
 // API Permissions
 export const API_PERMISSIONS: Record<string, { title: string; description: string }> = {

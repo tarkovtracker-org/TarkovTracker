@@ -4,7 +4,7 @@
 
 - Project: Nuxt 4 SPA for TarkovTracker.
 - Node >=24.12.0, npm >=11.6.2 (see `package.json` engines).
-- Package manager: npm (`packageManager` is `npm@11.8.0`).
+- Package manager: npm (`packageManager` is `npm@11.13.0`).
 - SSR is disabled (`ssr: false`), treat the app as client-only.
 - API + proxy handlers live in Nuxt server routes.
 - Supabase is the primary backend/data layer.
@@ -18,9 +18,12 @@
 - `app/features/` feature slices and domain modules.
 - `app/stores/` Pinia stores.
 - `app/composables/` composables (Nuxt auto-import).
-- `app/plugins/` Nuxt plugins (Supabase, i18n, Vuetify, store init).
+- `app/plugins/` Nuxt plugins (Supabase, i18n, analytics, store init).
 - `app/server/api/` server API routes.
 - `app/server/api/tarkov/` tarkov.dev proxy handlers.
+- `app/server/middleware/` server middleware.
+- `app/server/utils/` server utilities.
+- `app/shell/` app chrome components.
 - `app/locales/` JSON locale files.
 - `app/assets/` shared styles/assets (if present).
 - `public/` static assets served as-is.
@@ -42,6 +45,13 @@
 - `npm run preview` serves the built bundle locally.
 - `npm run generate` generates static output for edge/CDN hosting.
 - `npm run deps` runs `taze` to check dependency updates.
+- `npm run test` runs the full unit test suite.
+- `npm run test:watch` runs Vitest in watch mode.
+- `npm run test:coverage` runs coverage.
+- `npm run test:api-gateway` runs Worker tests.
+- `npm run validate:openapi` validates the Worker OpenAPI contract.
+- `npm run i18n:check` validates locale keys.
+- `npm run i18n:sync` syncs locale file structure.
 - `npm run supabase:types` regenerates Supabase TS types.
 
 ## Lint & Format Commands
@@ -67,7 +77,11 @@
 
 ## Test Commands
 
-- `npx vitest` runs the full unit test suite.
+- `npm run test` runs the full unit test suite.
+- `npm run test:watch` runs Vitest in watch mode.
+- `npm run test:coverage` outputs coverage reports.
+- `npm run test:api-gateway` runs the API gateway tests.
+- `npx vitest` runs Vitest directly when you need ad hoc options.
 - `npx vitest --ui` opens the Vitest UI dashboard.
 - `npx vitest --coverage` outputs coverage reports.
 - `npx vitest path/to/file.test.ts` runs a single test file.

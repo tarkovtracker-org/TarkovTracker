@@ -18,6 +18,7 @@ import {
   GAME_MODES,
   LOCALE_TO_API_MAPPING,
   MAP_NAME_MAPPING,
+  MAP_NORMALIZED_NAME_MAPPING,
   sortMapsByGameOrder,
   sortTradersByGameOrder,
 } from '@/utils/constants';
@@ -87,6 +88,7 @@ export interface MetadataStoreTaskLookup {
   getTaskById?: (id: string) => { name?: string } | undefined;
   tasks?: Array<{ id: string; name?: string }>;
 }
+
 const hasRenderableCriticalMetadata = (
   state: Pick<MetadataState, 'hideoutStations' | 'tasks'>
 ): boolean => {
@@ -170,6 +172,13 @@ const inferNewBeginningPrestigeLevel = (task: Task): number | null => {
   if (!idMatch?.[1]) return null;
   const parsed = Number.parseInt(idMatch[1], 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+const deriveStaticMapKey = (mapName: string, normalizedName?: string): string => {
+  if (normalizedName) {
+    return MAP_NORMALIZED_NAME_MAPPING[normalizedName] ?? normalizedName.replace(/-/g, '');
+  }
+  const lower = mapName.toLowerCase();
+  return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
 };
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
@@ -287,8 +296,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       const mapGroups: Record<string, TarkovMap[]> = {};
       state.maps.forEach((map) => {
-        const lowerCaseName = map.name.toLowerCase();
-        const mapKey = MAP_NAME_MAPPING[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
+        const mapKey = deriveStaticMapKey(map.name, map.normalizedName);
         if (!mapGroups[mapKey]) {
           mapGroups[mapKey] = [];
         }
@@ -296,8 +304,7 @@ export const useMetadataStore = defineStore('metadata', {
       });
       const mergedMaps = Object.entries(mapGroups)
         .map(([mapKey, maps]) => {
-          const primaryMap =
-            maps.find((map) => map.name.toLowerCase() === 'ground zero') ?? maps[0];
+          const primaryMap = maps.find((map) => map.normalizedName === 'ground-zero') ?? maps[0];
           if (!primaryMap) return null;
           const staticData = state.staticMapData?.[mapKey];
           const mergedIds = maps.map((map) => map.id);
@@ -325,10 +332,9 @@ export const useMetadataStore = defineStore('metadata', {
         })
         .filter((map): map is NonNullable<typeof map> => map !== null);
       // Sort maps by task progression order using the mapKey for lookup
-      return sortMapsByGameOrder(mergedMaps, (map) => {
-        const lowerCaseName = map.name.toLowerCase();
-        return MAP_NAME_MAPPING[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
-      });
+      return sortMapsByGameOrder(mergedMaps, (map) =>
+        deriveStaticMapKey(map.name, map.normalizedName)
+      );
     },
     // Computed properties for traders (sorted by in-game order)
     sortedTraders: (state): Trader[] => sortTradersByGameOrder(state.traders),
@@ -2185,9 +2191,8 @@ export const useMetadataStore = defineStore('metadata', {
           map.normalizedName?.toLowerCase() === lowerCaseName
       );
     },
-    getStaticMapKey(mapName: string): string {
-      const lowerCaseName = mapName.toLowerCase();
-      return MAP_NAME_MAPPING[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
+    getStaticMapKey(mapName: string, normalizedName?: string): string {
+      return deriveStaticMapKey(mapName, normalizedName);
     },
     hasMapSvg(mapId: string): boolean {
       const map = this.getMapById(mapId);

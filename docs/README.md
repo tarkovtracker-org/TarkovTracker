@@ -4,7 +4,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 
 ## 1. Project Standards & Philosophy
 
-- **Framework**: Nuxt ^4.2.1 (SPA mode, `app/` directory, Node >=24.12.0).
+- **Framework**: Nuxt ^4.4.2 (SPA mode, `app/` directory, Node >=24.12.0).
 - **Frontend**: Vue 3 SFCs (`<script setup lang="ts">`), Pinia state, @nuxt/ui v4, Tailwind CSS v4.
 - **Backend**: Supabase (Auth, DB, Realtime) + Cloudflare Workers (public API gateway).
 - **Styling**: Strictly use Tailwind v4 theme layer (`@theme {}`). No hex colors or legacy UI patterns.
@@ -18,21 +18,33 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 - [`app/app.vue`](../app/app.vue): Global providers and minimal app-wide initialization.
 - [`app/layouts/`](../app/layouts/): Composition of structural shell components.
 - [`app/shell/`](../app/shell/): "Chrome" components (AppBar, NavDrawer, AppFooter).
-- [`app/features/`](../app/features/): Domain-specific logic slices (tasks, team, hideout, maps).
+- [`app/features/`](../app/features/): Domain-specific logic slices (admin, dashboard, drawer,
+  hideout, maps, neededitems, profile, settings, storyline, streamer-tools, tasks, team).
 - [`app/stores/`](../app/stores/): Pinia domain stores with localStorage persistence and Supabase sync.
-- [`app/server/api/`](../app/server/api/): Nitro routes proxying and caching `json.tarkov.dev` static data.
+- [`app/server/api/`](../app/server/api/): Nitro routes for app APIs plus proxying and caching
+  `json.tarkov.dev` static data.
+- [`app/server/middleware/`](../app/server/middleware/): Nitro API protection middleware.
+- [`app/server/utils/`](../app/server/utils/): Server-side cache, request, and data helpers.
+- [`workers/api-gateway/`](../workers/api-gateway/): Cloudflare Worker public API gateway.
 
 ## 3. Key Feature Architectures
 
 - **Team System**: Supabase Edge Functions handle team/token mutations with per-user rate limits. Real-time updates via Supabase Broadcast (<200ms). Teammate profiles are fetched via a Nitro server route using service roles to bypass RLS.
 - **XP & Level System**: Dynamic calculation from tasks. Stores `xpOffset` (difference between calculated and actual XP) to maintain accuracy across manual adjustments.
 - **Tarkov.dev Linking**: The app persists one linked `tarkovUid`. Import destination mode is chosen at import time and is not stored as durable account metadata. Imports accept a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetch the public `players.tarkov.dev/profile/{uid}.json` payload through a no-store, rate-limited server route, then parse it with the same profile parser. Refetch uses the saved UID plus a user-selected profile mode because PvP, PvE, and future Arena profiles share the same account id but use different tarkov.dev routes. Unlink clears only the UID and leaves imported tracker data intact. The preview exposes parsed skill-id and level pairs behind a collapsed detail view.
-- **i18n**: 6 enabled languages managed in [`app/locales/*.json`](../app/locales/). Missing keys fallback to raw strings. Community translation links can use [`translate.tarkovtracker.org`](https://translate.tarkovtracker.org), a CNAME-backed Crowdin subdomain.
+- **i18n**: 7 enabled UI locales are defined in [`app/utils/locales.ts`](../app/utils/locales.ts)
+  and loaded from [`app/locales/*.json`](../app/locales/). Extra locale JSON files may exist for
+  Crowdin/API work but are not enabled until added to `SUPPORTED_LOCALES`. Missing keys fallback to
+  raw strings. Community translation links can use
+  [`translate.tarkovtracker.org`](https://translate.tarkovtracker.org), a CNAME-backed Crowdin
+  subdomain.
 
 ## 4. Security & Operations
 
 - **Security**: Origin-check middleware (`tarkovtracker.org`) + per-user mutation rate limiting in Supabase Edge Functions. Public profile routes use lightweight per-client rate limits, with Cloudflare as the outer abuse-control layer. HMAC signing for critical endpoints.
-- **Commands**: `npm run dev` (dev), `npm run build` (prod), `npx vitest` (test), `npm run lint` (lint), `npm run supabase:check` (local migration reset + lint).
+- **Commands**: `npm run dev` (dev), `npm run build` (prod), `npm run test` (unit tests),
+  `npm run lint` (lint + design lint), `npm run typecheck` (Nuxt/Vue TS), `npm run supabase:check`
+  (local migration reset + lint), `npm run test:api-gateway` (Worker tests).
 - **Runbook**: [`docs/runbook.md`](./runbook.md) contains required env vars, deploy checks, and incident recovery.
 - **Deployment**:
   - Frontend: Automated via Cloudflare Pages on push.

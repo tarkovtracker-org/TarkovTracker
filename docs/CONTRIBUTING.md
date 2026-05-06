@@ -48,15 +48,16 @@ Create a `.env` file in the project root:
 
 ```env
 # Client-side (for browser auth)
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
+NUXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NUXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
 # Server-side (for API routes - production only)
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-# Optional alias (either key name works)
-SB_SERVICE_ROLE_KEY=your_service_role_key
+NUXT_SUPABASE_URL=your_supabase_url
+NUXT_SUPABASE_ANON_KEY=your_anon_key
+NUXT_SUPABASE_SERVICE_KEY=your_service_role_key
+# Legacy service role aliases (either key name works)
+# SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# SB_SERVICE_ROLE_KEY=your_service_role_key
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
@@ -66,12 +67,18 @@ NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 ```text
 app/
+├── assets/          # Shared CSS/assets
 ├── components/      # Global UI components
 ├── composables/     # Reusable composition functions
+├── data/            # Static map/story data
 ├── features/        # Feature modules (tasks, hideout, team, etc.)
-├── stores/          # Pinia stores
+├── layouts/         # Page layouts
+├── locales/         # Locale JSON files
 ├── pages/           # File-based routing
+├── plugins/         # Nuxt client plugins
 ├── server/          # API routes
+├── shell/           # App chrome
+├── stores/          # Pinia stores
 ├── types/           # TypeScript definitions
 └── utils/           # Utility functions
 ```
@@ -144,10 +151,10 @@ npm run supabase:check
 
 ```bash
 # Run all tests
-npx vitest run
+npm run test
 
-# Watch mode (default)
-npx vitest
+# Watch mode
+npm run test:watch
 
 # Validate local Supabase migrations
 npm run supabase:check
@@ -246,8 +253,10 @@ Recommended mappings:
 
 ### Adding Translations
 
-1. Add keys to all locale files in `app/locales/`
-2. Use in components with `$t('key.path')`
+1. Add source keys to `app/locales/en.json`
+2. Run `npm run i18n:check`
+3. If locale structures need syncing for Crowdin, run `npm run i18n:sync`
+4. Use in components with `$t('key.path')`
 
 ## Debugging
 

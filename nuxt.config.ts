@@ -428,6 +428,7 @@ export default defineNuxtConfig({
     base: '/',
     optimizeDeps: {
       exclude: ['better-sqlite3'],
+      include: ['leaflet'],
     },
     define: {
       // Suppress Suspense experimental feature warning
