@@ -54,8 +54,8 @@ const runIdleQueue = () => {
       idleRunnerActive = false;
       return;
     }
-    const next = idleQueue[0]!;
-    const remainingTimeout = Math.max(0, next.expiresAt - getIdleNow());
+    const peeked = idleQueue[0]!;
+    const remainingTimeout = Math.max(0, peeked.expiresAt - getIdleNow());
     scheduler(
       (deadline) => {
         if (!idleQueue.length) {
@@ -70,13 +70,18 @@ const runIdleQueue = () => {
           scheduleNext();
           return;
         }
-        const next = idleQueue.shift()!;
-        Promise.resolve(next.task())
-          .then(next.resolve)
-          .catch(next.reject)
-          .finally(() => {
-            scheduleNext();
-          });
+        const dequeued = idleQueue.shift()!;
+        try {
+          Promise.resolve(dequeued.task())
+            .then(dequeued.resolve)
+            .catch(dequeued.reject)
+            .finally(() => {
+              scheduleNext();
+            });
+        } catch (err) {
+          dequeued.reject(err);
+          scheduleNext();
+        }
       },
       { timeout: remainingTimeout }
     );

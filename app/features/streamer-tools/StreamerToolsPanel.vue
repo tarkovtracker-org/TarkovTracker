@@ -778,6 +778,7 @@
 </template>
 <script setup lang="ts">
   import { useStreamerToolsOverlay } from '@/features/streamer-tools/composables/useStreamerToolsOverlay';
+  import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });
   const { copyToClipboard } = useCopyToClipboard();
   const toast = useToast();
@@ -845,11 +846,19 @@
   } = useStreamerToolsOverlay();
   const copyOverlayUrl = async () => {
     if (!overlayUrl.value) return;
-    await copyToClipboard(overlayUrl.value);
-    toast.add({
-      color: 'success',
-      title: t('streamer_tools.copy_success', 'Overlay URL copied'),
-    });
+    try {
+      await copyToClipboard(overlayUrl.value);
+      toast.add({
+        color: 'success',
+        title: t('streamer_tools.copy_success', 'Overlay URL copied'),
+      });
+    } catch (err) {
+      logger.error('[StreamerTools] Failed to copy overlay URL:', err);
+      toast.add({
+        color: 'error',
+        title: t('streamer_tools.copy_failed', 'Failed to copy overlay URL'),
+      });
+    }
   };
   const resetStreamerToolsSettings = () => {
     resetSettings();

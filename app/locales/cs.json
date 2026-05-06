@@ -1399,6 +1399,7 @@
     "align_bottom_center": "Dolní střed",
     "align_bottom_right": "Vpravo dole",
     "copy_success": "URL překrytí zkopírováno",
+    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Obnovení nastavení streameru",
     "resolution_label": "Rozlišení",
     "resolution_1080": "1080p",

@@ -88,7 +88,6 @@ export interface MetadataStoreTaskLookup {
   getTaskById?: (id: string) => { name?: string } | undefined;
   tasks?: Array<{ id: string; name?: string }>;
 }
-
 const hasRenderableCriticalMetadata = (
   state: Pick<MetadataState, 'hideoutStations' | 'tasks'>
 ): boolean => {
