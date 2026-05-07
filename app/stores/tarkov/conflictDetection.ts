@@ -8,60 +8,48 @@ export function detectDataConflicts(
   let conflictCount = 0;
   const localTasks = local.taskCompletions || {};
   const remoteTasks = remote.taskCompletions || {};
-  for (const taskId of Object.keys(remoteTasks)) {
-    const localTask = localTasks[taskId] as RawTaskCompletion;
-    const remoteTask = remoteTasks[taskId] as RawTaskCompletion;
-    if (
-      localTask !== undefined &&
-      localTask !== null &&
-      remoteTask !== undefined &&
-      remoteTask !== null
-    ) {
-      const localFlags = getCompletionFlags(localTask);
-      const remoteFlags = getCompletionFlags(remoteTask);
-      if (
-        localFlags.complete !== remoteFlags.complete ||
-        localFlags.failed !== remoteFlags.failed
-      ) {
-        conflictCount++;
-      }
+  const taskIds = new Set([...Object.keys(localTasks), ...Object.keys(remoteTasks)]);
+  for (const taskId of taskIds) {
+    const localFlags = getCompletionFlags(localTasks[taskId] as RawTaskCompletion);
+    const remoteFlags = getCompletionFlags(remoteTasks[taskId] as RawTaskCompletion);
+    if (localFlags.complete !== remoteFlags.complete || localFlags.failed !== remoteFlags.failed) {
+      conflictCount++;
     }
   }
   const localObjectives = local.taskObjectives || {};
   const remoteObjectives = remote.taskObjectives || {};
-  for (const objId of Object.keys(remoteObjectives)) {
+  const objectiveIds = new Set([...Object.keys(localObjectives), ...Object.keys(remoteObjectives)]);
+  for (const objId of objectiveIds) {
     const localObj = localObjectives[objId];
     const remoteObj = remoteObjectives[objId];
-    if (localObj && remoteObj) {
-      if (
-        (localObj.count ?? 0) !== (remoteObj.count ?? 0) ||
-        (localObj.complete ?? false) !== (remoteObj.complete ?? false)
-      ) {
-        conflictCount++;
-      }
+    if (
+      (localObj?.count ?? 0) !== (remoteObj?.count ?? 0) ||
+      (localObj?.complete ?? false) !== (remoteObj?.complete ?? false)
+    ) {
+      conflictCount++;
     }
   }
   const localModules = local.hideoutModules || {};
   const remoteModules = remote.hideoutModules || {};
-  for (const modId of Object.keys(remoteModules)) {
+  const moduleIds = new Set([...Object.keys(localModules), ...Object.keys(remoteModules)]);
+  for (const modId of moduleIds) {
     const localMod = localModules[modId];
     const remoteMod = remoteModules[modId];
-    if (localMod && remoteMod && (localMod.complete ?? false) !== (remoteMod.complete ?? false)) {
+    if ((localMod?.complete ?? false) !== (remoteMod?.complete ?? false)) {
       conflictCount++;
     }
   }
   const localParts = local.hideoutParts || {};
   const remoteParts = remote.hideoutParts || {};
-  for (const partId of Object.keys(remoteParts)) {
+  const partIds = new Set([...Object.keys(localParts), ...Object.keys(remoteParts)]);
+  for (const partId of partIds) {
     const localPart = localParts[partId];
     const remotePart = remoteParts[partId];
-    if (localPart && remotePart) {
-      if (
-        (localPart.count ?? 0) !== (remotePart.count ?? 0) ||
-        (localPart.complete ?? false) !== (remotePart.complete ?? false)
-      ) {
-        conflictCount++;
-      }
+    if (
+      (localPart?.count ?? 0) !== (remotePart?.count ?? 0) ||
+      (localPart?.complete ?? false) !== (remotePart?.complete ?? false)
+    ) {
+      conflictCount++;
     }
   }
   return { hasConflict: conflictCount > 0, conflictCount };
