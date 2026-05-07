@@ -78,12 +78,21 @@
           <template #content>
             <div class="space-y-4 p-4">
               <article class="space-y-2">
-                <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                <p
+                  :id="modeGroupLabelId"
+                  class="text-surface-300 text-xs font-semibold tracking-wider uppercase"
+                >
                   {{ t('streamer_tools.mode_label', 'Game Mode') }}
                 </p>
-                <div class="flex rounded-md border border-white/10 p-1">
+                <div
+                  role="radiogroup"
+                  :aria-labelledby="modeGroupLabelId"
+                  class="flex rounded-md border border-white/10 p-1"
+                >
                   <button
                     type="button"
+                    role="radio"
+                    :aria-checked="selectedMode === GAME_MODES.PVP"
                     class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
                     :class="
                       selectedMode === GAME_MODES.PVP
@@ -96,6 +105,8 @@
                   </button>
                   <button
                     type="button"
+                    role="radio"
+                    :aria-checked="selectedMode === GAME_MODES.PVE"
                     class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
                     :class="
                       selectedMode === GAME_MODES.PVE
@@ -109,14 +120,23 @@
                 </div>
               </article>
               <article class="space-y-2">
-                <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                <p
+                  :id="metricGroupLabelId"
+                  class="text-surface-300 text-xs font-semibold tracking-wider uppercase"
+                >
                   {{ t('streamer_tools.metric_label', 'Widget') }}
                 </p>
-                <div class="grid gap-3 sm:grid-cols-3">
+                <div
+                  role="radiogroup"
+                  :aria-labelledby="metricGroupLabelId"
+                  class="grid gap-3 sm:grid-cols-3"
+                >
                   <button
                     v-for="option in metricOptions"
                     :key="option.value"
                     type="button"
+                    role="radio"
+                    :aria-checked="selectedMetric === option.value"
                     class="rounded-md border px-3 py-2 text-left transition-colors"
                     :class="
                       selectedMetric === option.value
@@ -494,6 +514,7 @@
           </template>
         </GenericCard>
         <GenericCard
+          v-if="isModePublic"
           icon="i-mdi-monitor-eye"
           highlight-color="kappa"
           :fill-height="false"
@@ -844,8 +865,10 @@
     previewHelpText,
     resetSettings,
   } = useStreamerToolsOverlay();
+  const modeGroupLabelId = useId();
+  const metricGroupLabelId = useId();
   const copyOverlayUrl = async () => {
-    if (!overlayUrl.value) return;
+    if (!isModePublic.value || !overlayUrl.value) return;
     try {
       await copyToClipboard(overlayUrl.value);
       toast.add({

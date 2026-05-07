@@ -11,10 +11,10 @@ export function useTaskCounts() {
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
-  const isTaskInvalid = (taskId: string, userView: string): boolean => {
+  const isTaskInvalid = (taskId: string, userView: string, teamIds?: string[]): boolean => {
     if (isAllUsersView(userView)) {
-      const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-      return teamIds.every((teamId) => progressStore.invalidTasks?.[taskId]?.[teamId] === true);
+      const ids = teamIds ?? Object.keys(progressStore.visibleTeamStores || {});
+      return ids.every((teamId) => progressStore.invalidTasks?.[taskId]?.[teamId] === true);
     }
     return progressStore.invalidTasks?.[taskId]?.[userView] === true;
   };
@@ -39,6 +39,8 @@ export function useTaskCounts() {
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
     const userEdition = tarkovStore.getGameEdition();
     const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
+    const isAllUsers = isAllUsersView(userView);
+    const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
     for (const task of taskList) {
       if (excludedTaskIds.has(task.id)) continue;
       if (prestigeTaskMap.has(task.id)) {
@@ -58,9 +60,8 @@ export function useTaskCounts() {
       if (onlyTasksWithRequiredKeys && !taskHasRequiredKeys(task)) {
         continue;
       }
-      if (isAllUsersView(userView)) {
-        const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-        const relevantTeamIds = teamIds.filter((teamId) => {
+      if (isAllUsers) {
+        const relevantTeamIds = visibleTeamIds.filter((teamId) => {
           const teamFaction = progressStore.playerFaction[teamId];
           const taskFaction = task.factionName;
           return taskFaction === 'Any' || taskFaction === teamFaction;
@@ -86,9 +87,9 @@ export function useTaskCounts() {
           counts.failed++;
         } else if (isCompletedByAll) {
           counts.completed++;
-        } else if (isAvailableForAny && !isTaskInvalid(task.id, 'all')) {
+        } else if (isAvailableForAny && !isTaskInvalid(task.id, 'all', visibleTeamIds)) {
           counts.available++;
-        } else if (!isTaskInvalid(task.id, 'all')) {
+        } else if (!isTaskInvalid(task.id, 'all', visibleTeamIds)) {
           counts.locked++;
         }
       } else {
@@ -133,6 +134,8 @@ export function useTaskCounts() {
     const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
     const userEdition = tarkovStore.getGameEdition();
     const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
+    const isAllUsers = isAllUsersView(userView);
+    const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
     const isAvailableStatus = (status: {
       isUnlocked: boolean;
       isCompleted: boolean;
@@ -161,9 +164,8 @@ export function useTaskCounts() {
       if (!traderId) continue;
       if (!counts[traderId]) counts[traderId] = 0;
       const taskFaction = task.factionName;
-      if (isAllUsersView(userView)) {
-        const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-        const relevantTeamIds = teamIds.filter((teamId) => {
+      if (isAllUsers) {
+        const relevantTeamIds = visibleTeamIds.filter((teamId) => {
           const teamFaction = progressStore.playerFaction[teamId];
           return taskFaction === 'Any' || taskFaction === teamFaction;
         });
@@ -179,11 +181,11 @@ export function useTaskCounts() {
             shouldCount = true;
             break;
           case 'available':
-            if (isTaskInvalid(task.id, 'all')) continue;
+            if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
             shouldCount = taskStatuses.some(isAvailableStatus);
             break;
           case 'locked':
-            if (isTaskInvalid(task.id, 'all')) continue;
+            if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
             shouldCount =
               !taskStatuses.some(isAvailableStatus) &&
               !taskStatuses.every(({ isCompleted }) => isCompleted) &&

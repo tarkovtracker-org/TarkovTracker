@@ -258,7 +258,11 @@ export const parseLegacyPersistedPreferencesState = (
     const parsed = JSON.parse(rawPersistedState) as unknown;
     return isPersistedPreferencesStateRecord(parsed) ? parsed : null;
   } catch (error) {
-    logger.warn('[PreferencesStore] Failed to parse local preferences:', error);
+    logger.error('[PreferencesStore] Failed to parse local preferences', {
+      feature: 'preferences',
+      action: 'parseLegacyPersistedPreferencesState',
+      error,
+    });
     return null;
   }
 };
