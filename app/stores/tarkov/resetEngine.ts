@@ -128,7 +128,6 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
       throw new Error(`Failed to reset remote progress: ${error.message}`);
     }
   }
-  clearProgressStorage();
   store.$patch((state) => {
     if (mode === 'all' || mode === 'pvp') state.pvp = freshState.pvp;
     if (mode === 'all' || mode === 'pve') state.pve = freshState.pve;
@@ -138,4 +137,5 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
       state.tarkovUid = freshState.tarkovUid;
     }
   });
+  clearProgressStorage();
 };

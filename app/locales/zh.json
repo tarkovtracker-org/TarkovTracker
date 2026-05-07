@@ -1473,10 +1473,6 @@
       "api": {
         "title": "API 设置",
         "description": "管理 TarkovTracker API 令牌和账户集成。"
-      },
-      "streamer_tools": {
-        "title": "Streamer Tools",
-        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1541,8 +1537,6 @@
       "description": "控制哪些游戏模式的个人资料可以通过分享链接查看。",
       "public": "公开",
       "private": "私密",
-      "mode_pvp": "PvP",
-      "mode_pve": "PvE",
       "copy_link": "复制个人资料链接",
       "login_required": "登录以管理个人资料分享的可见性。"
     },

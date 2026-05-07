@@ -4,7 +4,6 @@
     "app/i18n.config.ts",
     "app/server/api/**/*.{js,ts}",
     "app/server/routes/**/*.{js,ts}",
-    "supabase/functions/**/*.ts",
     "vitest.config.ts",
     "vitest.*.config.ts",
     "vitest.shared.ts"

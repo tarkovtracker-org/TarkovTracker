@@ -1473,10 +1473,6 @@
       "api": {
         "title": "API-Einstellungen",
         "description": "Verwalte TarkovTracker-API-Token und Kontointegrationen."
-      },
-      "streamer_tools": {
-        "title": "Streamer Tools",
-        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1541,8 +1537,6 @@
       "description": "Lege fest, welche Spielmodus-Profile über einen geteilten Link sichtbar sind.",
       "public": "Öffentlich",
       "private": "Privat",
-      "mode_pvp": "PvP",
-      "mode_pve": "PvE",
       "copy_link": "Profillink kopieren",
       "login_required": "Melde dich an, um die Profilfreigabe zu verwalten."
     },

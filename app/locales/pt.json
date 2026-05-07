@@ -1399,7 +1399,6 @@
     "align_bottom_center": "Bottom Center",
     "align_bottom_right": "Bottom Right",
     "copy_success": "Overlay URL copied",
-    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Streamer settings reset",
     "resolution_label": "Resolution",
     "resolution_1080": "1080p",
@@ -1474,10 +1473,6 @@
       "api": {
         "title": "API Settings",
         "description": "Manage TarkovTracker API tokens and account integrations."
-      },
-      "streamer_tools": {
-        "title": "Streamer Tools",
-        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1542,8 +1537,6 @@
       "description": "Control which game mode profiles can be viewed from a shared link.",
       "public": "Public",
       "private": "Private",
-      "mode_pvp": "PvP",
-      "mode_pve": "PvE",
       "copy_link": "Copy profile link",
       "login_required": "Log in to manage profile sharing visibility."
     },
