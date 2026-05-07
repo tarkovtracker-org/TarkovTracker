@@ -21,6 +21,7 @@ export default defineProject(async () => {
         exclude: [
           ...configDefaults.exclude,
           'workers/**',
+          '**/.codex/**',
           'app/pages/**/__tests__/**/*.test.ts',
           'app/server/**/__tests__/**/*.test.ts',
         ],
