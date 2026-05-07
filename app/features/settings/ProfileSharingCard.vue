@@ -44,7 +44,9 @@
                       color="neutral"
                       variant="ghost"
                       size="xs"
-                      :aria-label="t('settings.profile_sharing.copy_link', 'Copy profile link')"
+                      :aria-label="
+                        t('settings.profile_sharing.copy_pvp_link', 'Copy PvP profile link')
+                      "
                       @click="copyShareUrl(pvpShareUrl)"
                     />
                   </div>
@@ -80,7 +82,9 @@
                       color="neutral"
                       variant="ghost"
                       size="xs"
-                      :aria-label="t('settings.profile_sharing.copy_link', 'Copy profile link')"
+                      :aria-label="
+                        t('settings.profile_sharing.copy_pve_link', 'Copy PvE profile link')
+                      "
                       @click="copyShareUrl(pveShareUrl)"
                     />
                   </div>

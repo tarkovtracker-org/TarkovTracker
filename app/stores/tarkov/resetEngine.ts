@@ -27,10 +27,10 @@ export const shouldPreferLocalStartupMetadata = (
     return localTimestamp > remoteUpdatedAt;
   }
   if (localTimestamp && !remoteUpdatedAt) {
-    return localScore > remoteScore;
+    return localScore >= remoteScore;
   }
   if (!localTimestamp && !remoteUpdatedAt) {
-    return localScore > remoteScore;
+    return localScore >= remoteScore;
   }
   return false;
 };
@@ -122,11 +122,11 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
       pve: mode === 'all' || mode === 'pve' ? freshState.pve : store.$state.pve,
     };
     const payload = buildUpsertPayload($supabase.user.id, nextRemoteState);
-    recordLocalSyncTime();
     const { error } = await $supabase.client.from('user_progress').upsert(payload);
     if (error) {
       throw new Error(`Failed to reset remote progress: ${error.message}`);
     }
+    recordLocalSyncTime();
   }
   store.$patch((state) => {
     if (mode === 'all' || mode === 'pvp') state.pvp = freshState.pvp;

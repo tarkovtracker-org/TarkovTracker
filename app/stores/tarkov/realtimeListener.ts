@@ -51,14 +51,14 @@ const getDeprecatedRemoteCleanupCooldownMs = () =>
   deprecatedRemoteCleanupFailureCount >= DEPRECATED_REMOTE_CLEANUP_FAST_RETRY_LIMIT
     ? DEPRECATED_REMOTE_CLEANUP_FAILURE_BACKOFF_MS
     : SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS;
-export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
+export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const toastI18n = useToastI18n();
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
   if (realtimeChannel) {
-    cleanupRealtimeListener();
+    await cleanupRealtimeListener();
   }
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
@@ -233,10 +233,10 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
       logger.debug(`[TarkovStore] Realtime subscription status: ${status}`);
     });
 }
-export function cleanupRealtimeListener(): void {
+export async function cleanupRealtimeListener(): Promise<void> {
   if (realtimeChannel) {
     const { $supabase } = useNuxtApp();
-    $supabase.client.removeChannel(
+    await $supabase.client.removeChannel(
       realtimeChannel as Parameters<typeof $supabase.client.removeChannel>[0]
     );
     realtimeChannel = null;
