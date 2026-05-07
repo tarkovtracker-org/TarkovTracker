@@ -84,7 +84,7 @@ describe('idleScheduler', () => {
   });
   it('resetIdleQueue clears pending tasks', async () => {
     const fn = vi.fn();
-    queueIdleTask(fn);
+    queueIdleTask(fn).catch(() => {});
     resetIdleQueue();
     await vi.runAllTimersAsync();
     await vi.advanceTimersByTimeAsync(5000);

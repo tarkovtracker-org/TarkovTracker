@@ -105,6 +105,9 @@ export const queueIdleTask = (
   });
 };
 export const resetIdleQueue = () => {
+  for (const task of idleQueue) {
+    task.reject(new Error('Idle queue was reset'));
+  }
   idleQueue.length = 0;
   idleRunnerActive = false;
 };

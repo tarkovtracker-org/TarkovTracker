@@ -49,7 +49,12 @@
                     />
                   </div>
                 </div>
-                <USwitch v-model="pvpPublic" />
+                <USwitch
+                  v-model="pvpPublic"
+                  :aria-label="
+                    t('settings.profile_sharing.toggle_pvp_label', 'Toggle PvP profile sharing')
+                  "
+                />
               </div>
               <div
                 class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
@@ -80,7 +85,12 @@
                     />
                   </div>
                 </div>
-                <USwitch v-model="pvePublic" />
+                <USwitch
+                  v-model="pvePublic"
+                  :aria-label="
+                    t('settings.profile_sharing.toggle_pve_label', 'Toggle PvE profile sharing')
+                  "
+                />
               </div>
             </div>
           </div>

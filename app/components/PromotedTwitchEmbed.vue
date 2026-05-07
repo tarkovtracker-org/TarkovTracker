@@ -18,7 +18,11 @@
           color="neutral"
           variant="ghost"
           size="xs"
-          :aria-label="isMuted ? t('promoted_stream.unmute') : t('promoted_stream.mute')"
+          :aria-label="
+            isMuted
+              ? t('promoted_stream.unmute', 'Unmute stream')
+              : t('promoted_stream.mute', 'Mute stream')
+          "
           @click="toggleMute"
         />
         <UButton
@@ -26,7 +30,11 @@
           color="neutral"
           variant="ghost"
           size="xs"
-          :aria-label="isExpanded ? t('promoted_stream.shrink') : t('promoted_stream.expand')"
+          :aria-label="
+            isExpanded
+              ? t('promoted_stream.shrink', 'Shrink player')
+              : t('promoted_stream.expand', 'Expand player')
+          "
           @click="isExpanded = !isExpanded"
         />
         <UButton
@@ -34,7 +42,7 @@
           color="neutral"
           variant="ghost"
           size="xs"
-          :aria-label="t('promoted_stream.open_channel')"
+          :aria-label="t('promoted_stream.open_channel', 'Open channel')"
           :to="`https://www.twitch.tv/${channel}`"
           target="_blank"
           rel="noopener noreferrer"
@@ -44,7 +52,7 @@
           color="neutral"
           variant="ghost"
           size="xs"
-          :aria-label="t('promoted_stream.close')"
+          :aria-label="t('promoted_stream.close', 'Close player')"
           @click="isVisible = false"
         />
       </div>

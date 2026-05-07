@@ -101,7 +101,7 @@
                     "
                     @click="selectedMode = GAME_MODES.PVP"
                   >
-                    PvP
+                    {{ t('streamer_tools.mode_pvp', 'PvP') }}
                   </button>
                   <button
                     type="button"
@@ -115,7 +115,7 @@
                     "
                     @click="selectedMode = GAME_MODES.PVE"
                   >
-                    PvE
+                    {{ t('streamer_tools.mode_pve', 'PvE') }}
                   </button>
                 </div>
               </article>
@@ -327,10 +327,14 @@
                   />
                 </article>
                 <article v-if="isCustomAccent" class="space-y-2">
-                  <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+                  <label
+                    :for="customAccentColorId"
+                    class="text-surface-300 block text-xs font-semibold tracking-wider uppercase"
+                  >
                     {{ t('streamer_tools.custom_accent', 'Custom Accent') }}
-                  </p>
+                  </label>
                   <input
+                    :id="customAccentColorId"
                     v-model="customAccentColor"
                     type="color"
                     class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
@@ -342,23 +346,31 @@
                   </p>
                   <div class="grid gap-4 sm:grid-cols-2">
                     <div class="space-y-1">
-                      <label class="text-surface-200 block text-xs font-medium">
+                      <label
+                        :for="customBackgroundColorId"
+                        class="text-surface-200 block text-xs font-medium"
+                      >
                         {{ t('streamer_tools.background_color', 'Color') }}
                       </label>
                       <input
+                        :id="customBackgroundColorId"
                         v-model="customBackgroundColor"
                         type="color"
                         class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
                       />
                     </div>
                     <div class="space-y-1">
-                      <label class="text-surface-200 block text-xs font-medium">
+                      <label
+                        :for="customBackgroundOpacityId"
+                        class="text-surface-200 block text-xs font-medium"
+                      >
                         {{
                           t('streamer_tools.background_opacity', 'Opacity') +
                           ` (${normalizedCustomBackgroundOpacity}%)`
                         }}
                       </label>
                       <input
+                        :id="customBackgroundOpacityId"
                         v-model.number="customBackgroundOpacity"
                         type="range"
                         min="0"
@@ -374,13 +386,17 @@
                     {{ t('streamer_tools.custom_scale', 'Custom Scale') }}
                   </p>
                   <div class="max-w-sm space-y-1">
-                    <label class="text-surface-200 block text-xs font-medium">
+                    <label
+                      :for="customScalePercentId"
+                      class="text-surface-200 block text-xs font-medium"
+                    >
                       {{
                         t('streamer_tools.custom_scale_percent', 'Scale') +
                         ` (${normalizedCustomScalePercent}%)`
                       }}
                     </label>
                     <input
+                      :id="customScalePercentId"
                       v-model.number="customScalePercent"
                       type="range"
                       min="50"
@@ -399,10 +415,11 @@
                       {{ t('streamer_tools.colors_text', 'Text') }}
                     </p>
                     <div class="space-y-1">
-                      <label class="text-surface-200 block text-xs font-medium">
+                      <label :for="textColorId" class="text-surface-200 block text-xs font-medium">
                         {{ t('streamer_tools.text_color', 'Text Color') }}
                       </label>
                       <input
+                        :id="textColorId"
                         v-model="textColor"
                         type="color"
                         class="border-surface-700 bg-surface-850 h-9 w-full max-w-xs cursor-pointer rounded border px-1"
@@ -415,23 +432,31 @@
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label
+                          :for="cardColorId"
+                          class="text-surface-200 block text-xs font-medium"
+                        >
                           {{ t('streamer_tools.card_color', 'Card Color') }}
                         </label>
                         <input
+                          :id="cardColorId"
                           v-model="cardColor"
                           type="color"
                           class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label
+                          :for="cardOpacityId"
+                          class="text-surface-200 block text-xs font-medium"
+                        >
                           {{
                             t('streamer_tools.card_opacity', 'Card Opacity') +
                             ` (${normalizedCardOpacity}%)`
                           }}
                         </label>
                         <input
+                          :id="cardOpacityId"
                           v-model.number="cardOpacity"
                           type="range"
                           min="0"
@@ -448,23 +473,31 @@
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label
+                          :for="borderColorId"
+                          class="text-surface-200 block text-xs font-medium"
+                        >
                           {{ t('streamer_tools.border_color', 'Border Color') }}
                         </label>
                         <input
+                          :id="borderColorId"
                           v-model="borderColor"
                           type="color"
                           class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label
+                          :for="borderOpacityId"
+                          class="text-surface-200 block text-xs font-medium"
+                        >
                           {{
                             t('streamer_tools.border_opacity', 'Border Opacity') +
                             ` (${normalizedBorderOpacity}%)`
                           }}
                         </label>
                         <input
+                          :id="borderOpacityId"
                           v-model.number="borderOpacity"
                           type="range"
                           min="0"
@@ -481,23 +514,31 @@
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label
+                          :for="trackColorId"
+                          class="text-surface-200 block text-xs font-medium"
+                        >
                           {{ t('streamer_tools.track_color', 'Progress Track') }}
                         </label>
                         <input
+                          :id="trackColorId"
                           v-model="trackColor"
                           type="color"
                           class="border-surface-700 bg-surface-850 h-9 w-full cursor-pointer rounded border px-1"
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-surface-200 block text-xs font-medium">
+                        <label
+                          :for="trackOpacityId"
+                          class="text-surface-200 block text-xs font-medium"
+                        >
                           {{
                             t('streamer_tools.track_opacity', 'Track Opacity') +
                             ` (${normalizedTrackOpacity}%)`
                           }}
                         </label>
                         <input
+                          :id="trackOpacityId"
                           v-model.number="trackOpacity"
                           type="range"
                           min="0"
@@ -655,7 +696,7 @@
               </div>
               <details open class="text-sm">
                 <summary class="text-surface-300 cursor-pointer text-sm font-semibold select-none">
-                  OBS Studio / Streamlabs Desktop
+                  {{ t('streamer_tools.platform_obs', 'OBS Studio / Streamlabs Desktop') }}
                 </summary>
                 <ol class="text-surface-400 mt-3 list-inside list-decimal space-y-2 pl-1">
                   <li>
@@ -728,7 +769,7 @@
               </details>
               <details class="text-sm">
                 <summary class="text-surface-300 cursor-pointer text-sm font-semibold select-none">
-                  XSplit / vMix
+                  {{ t('streamer_tools.platform_xsplit', 'XSplit / vMix') }}
                 </summary>
                 <ol class="text-surface-400 mt-3 list-inside list-decimal space-y-2 pl-1">
                   <li>
@@ -867,6 +908,17 @@
   } = useStreamerToolsOverlay();
   const modeGroupLabelId = useId();
   const metricGroupLabelId = useId();
+  const customAccentColorId = useId();
+  const customBackgroundColorId = useId();
+  const customBackgroundOpacityId = useId();
+  const customScalePercentId = useId();
+  const textColorId = useId();
+  const cardColorId = useId();
+  const cardOpacityId = useId();
+  const borderColorId = useId();
+  const borderOpacityId = useId();
+  const trackColorId = useId();
+  const trackOpacityId = useId();
   const copyOverlayUrl = async () => {
     if (!isModePublic.value || !overlayUrl.value) return;
     try {
