@@ -1552,6 +1552,8 @@
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_link": "Copy profile link",
+      "copy_pvp_link": "Copy PvP profile link",
+      "copy_pve_link": "Copy PvE profile link",
       "login_required": "Log in to manage profile sharing visibility."
     },
     "game_settings": {
