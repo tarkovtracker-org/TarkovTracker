@@ -75,6 +75,9 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
         filter: `user_id=eq.${currentUserId}`,
       },
       (payload: { new: unknown; old: unknown }) => {
+        if (!$supabase.user.loggedIn || $supabase.user.id !== currentUserId) {
+          return;
+        }
         const remoteData = payload.new as {
           current_game_mode?: string;
           game_edition?: number;
@@ -150,6 +153,16 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
             deprecatedRemoteCleanupFailureCount = 0;
             lastDeprecatedRemoteCleanupAttemptAt = 0;
             logger.debug('[TarkovStore] Cleaned deprecated remote progress payload');
+          } catch (error: unknown) {
+            deprecatedRemoteCleanupFailureCount += 1;
+            logger.error(
+              '[TarkovStore] Failed to clean deprecated remote progress payload:',
+              {
+                cooldownMs: getDeprecatedRemoteCleanupCooldownMs(),
+                failureCount: deprecatedRemoteCleanupFailureCount,
+              },
+              error
+            );
           } finally {
             deprecatedRemoteCleanupInFlight = false;
           }
