@@ -88,6 +88,14 @@ export default defineNuxtConfig({
   ssr: false,
   spaLoadingTemplate: true,
   srcDir: 'app',
+  experimental: {
+    // Workaround for Nuxt 4.4.4 SPA dev server bug (nuxt/nuxt#34957).
+    // Why: with ssr:false the SSR Vite server is never created, so the
+    // vite-node IPC socketPath env var is never set, breaking client-manifest
+    // fetches in dev. Maintainer-recommended workaround until the fix in
+    // nuxt/nuxt#34959 ships in a patched release.
+    viteEnvironmentApi: true,
+  },
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
     // Server-only (private) runtime config
