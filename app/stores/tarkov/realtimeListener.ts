@@ -58,10 +58,7 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
   if (realtimeChannel) {
-    $supabase.client.removeChannel(
-      realtimeChannel as Parameters<typeof $supabase.client.removeChannel>[0]
-    );
-    realtimeChannel = null;
+    cleanupRealtimeListener();
   }
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
