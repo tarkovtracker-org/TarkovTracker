@@ -365,11 +365,15 @@ export default defineNuxtConfig({
       ).href;
       const nitroConfig = nitro.options as unknown as {
         virtual?: Record<string, string>;
-        _config: { virtual?: Record<string, string> };
+        _config?: { virtual?: Record<string, string> };
       };
       nitroConfig.virtual ||= {};
-      nitroConfig._config.virtual ||= {};
-      for (const virtual of [nitroConfig.virtual, nitroConfig._config.virtual]) {
+      const virtualTargets: Record<string, string>[] = [nitroConfig.virtual];
+      if (nitroConfig._config) {
+        nitroConfig._config.virtual ||= {};
+        virtualTargets.push(nitroConfig._config.virtual);
+      }
+      for (const virtual of virtualTargets) {
         virtual['#build/dist/server/server.mjs'] = 'export default () => {}';
         virtual['#build/dist/server/client.manifest.mjs'] =
           `export { default } from ${JSON.stringify(clientManifestPath)}`;
@@ -452,7 +456,15 @@ export default defineNuxtConfig({
     base: '/',
     optimizeDeps: {
       exclude: ['better-sqlite3'],
-      include: ['leaflet'],
+      include: [
+        '@supabase/supabase-js',
+        '@vue/devtools-core',
+        '@vue/devtools-kit',
+        '@vueuse/core',
+        'fflate',
+        'leaflet',
+        'pinia-plugin-persistedstate',
+      ],
     },
     define: {
       // Suppress Suspense experimental feature warning
