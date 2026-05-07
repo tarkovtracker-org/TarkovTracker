@@ -1474,6 +1474,10 @@
       "api": {
         "title": "Налаштування API",
         "description": "Керуйте API-токенами TarkovTracker та інтеграціями облікового запису."
+      },
+      "streamer_tools": {
+        "title": "Streamer Tools",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1538,6 +1542,8 @@
       "description": "Керуйте видимістю профілів ігрових режимів за спільним посиланням.",
       "public": "Публічний",
       "private": "Приватний",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
       "copy_link": "Копіювати посилання на профіль",
       "login_required": "Увійдіть, щоб керувати видимістю спільного профілю."
     },

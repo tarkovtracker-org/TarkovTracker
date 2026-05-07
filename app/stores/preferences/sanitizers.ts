@@ -97,6 +97,9 @@ const cloneSerializablePreferencesValue = (
     const clonedRecord: Record<string, unknown> = {};
     seen.set(rawValue, clonedRecord);
     for (const [key, nestedValue] of Object.entries(rawValue)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
       const clonedValue = cloneSerializablePreferencesValue(nestedValue, seen);
       if (clonedValue !== undefined) {
         clonedRecord[key] = clonedValue;

@@ -179,6 +179,7 @@ export function useTaskCounts() {
             shouldCount = true;
             break;
           case 'available':
+            if (isTaskInvalid(task.id, 'all')) continue;
             shouldCount = taskStatuses.some(isAvailableStatus);
             break;
           case 'locked':
@@ -210,6 +211,7 @@ export function useTaskCounts() {
             shouldCount = true;
             break;
           case 'available':
+            if (isTaskInvalid(task.id, userView)) continue;
             shouldCount = isUnlocked && !isCompleted && !isFailed;
             break;
           case 'locked':

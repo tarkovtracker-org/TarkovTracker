@@ -1474,6 +1474,10 @@
       "api": {
         "title": "Nastavení API",
         "description": "Správa TarkovTracker API tokenů a integrace účtu."
+      },
+      "streamer_tools": {
+        "title": "Streamer Tools",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1538,6 +1542,8 @@
       "description": "Nastavte, který herní mód profil lze zobrazit ze sdíleného odkazu.",
       "public": "Veřejnost",
       "private": "Soukromé",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
       "copy_link": "Kopírovat odkaz na profil",
       "login_required": "Přihlaste se pro správu viditelnosti sdílení profilu."
     },

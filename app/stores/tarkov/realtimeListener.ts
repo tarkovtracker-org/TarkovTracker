@@ -38,6 +38,7 @@ type TarkovStoreLike = {
 let syncControllerGetter: SyncControllerGetter = () => null;
 let realtimeChannel: unknown = null;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
+let pausedSyncController: SyncControllerHandle | null = null;
 let deprecatedRemoteCleanupInFlight = false;
 let lastDeprecatedRemoteCleanupAttemptAt = 0;
 let deprecatedRemoteCleanupFailureCount = 0;
@@ -187,6 +188,7 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
         const controller = getRegisteredSyncController();
         if (controller) {
           controller.pause();
+          pausedSyncController = controller;
         }
         tarkovStore.$patch((state) => {
           state.currentGameMode = nextState.currentGameMode;
@@ -200,10 +202,8 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): void {
         }
         syncResumeTimer = setTimeout(() => {
           syncResumeTimer = null;
-          const currentController = getRegisteredSyncController();
-          if (currentController && currentController === controller) {
-            currentController.resume();
-          }
+          pausedSyncController?.resume();
+          pausedSyncController = null;
         }, SYNC_RESUME_DELAY_MS);
         if (hasRealConflict && !apiUpdateHandled && !isLikelySelfOrigin) {
           toastI18n.showProgressMerged(totalConflicts);
@@ -226,6 +226,10 @@ export function cleanupRealtimeListener(): void {
   if (syncResumeTimer) {
     clearTimeout(syncResumeTimer);
     syncResumeTimer = null;
+  }
+  if (pausedSyncController) {
+    pausedSyncController.resume();
+    pausedSyncController = null;
   }
 }
 export function resetRealtimeState(): void {

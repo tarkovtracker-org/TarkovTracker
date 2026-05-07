@@ -1474,6 +1474,10 @@
       "api": {
         "title": "Paramètres API",
         "description": "Gérez les tokens API TarkovTracker et les intégrations de compte."
+      },
+      "streamer_tools": {
+        "title": "Streamer Tools",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1538,6 +1542,8 @@
       "description": "Contrôlez quels profils de mode de jeu sont visibles via un lien partagé.",
       "public": "Public",
       "private": "Privé",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
       "copy_link": "Copier le lien du profil",
       "login_required": "Connectez-vous pour gérer la visibilité du partage de profil."
     },

@@ -7,6 +7,7 @@ import {
   toProgressEpoch,
 } from '@/stores/tarkov/progressMerge';
 import { getRegisteredSyncController } from '@/stores/tarkov/realtimeListener';
+import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { clearProgressStorage } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
@@ -94,12 +95,12 @@ export const executeWithSyncPause = async <T>(operation: () => Promise<T>): Prom
   try {
     const result = await operation();
     await delay(RESET_SETTLE_DELAY_MS);
-    controller?.resume();
     return result;
   } catch (error) {
     logger.error('[TarkovStore] Reset operation failed:', error);
-    getRegisteredSyncController()?.resume();
     throw error;
+  } finally {
+    controller?.resume();
   }
 };
 export const performReset = async (mode: ResetMode, store: ResetTargetStore): Promise<void> => {
@@ -112,12 +113,16 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
     freshState.pve.progressEpoch = getNextProgressEpoch(store.$state.pve);
   }
   if ($supabase.user.loggedIn && $supabase.user.id) {
-    const payload =
-      mode === 'all'
-        ? buildUpsertPayload($supabase.user.id, freshState)
-        : mode === 'pvp'
-          ? { user_id: $supabase.user.id, pvp_data: freshState.pvp }
-          : { user_id: $supabase.user.id, pve_data: freshState.pve };
+    const nextRemoteState: UserState = {
+      ...store.$state,
+      currentGameMode: mode === 'all' ? freshState.currentGameMode : store.$state.currentGameMode,
+      gameEdition: mode === 'all' ? freshState.gameEdition : store.$state.gameEdition,
+      tarkovUid: mode === 'all' ? freshState.tarkovUid : store.$state.tarkovUid,
+      pvp: mode === 'all' || mode === 'pvp' ? freshState.pvp : store.$state.pvp,
+      pve: mode === 'all' || mode === 'pve' ? freshState.pve : store.$state.pve,
+    };
+    const payload = buildUpsertPayload($supabase.user.id, nextRemoteState);
+    recordLocalSyncTime();
     const { error } = await $supabase.client.from('user_progress').upsert(payload);
     if (error) {
       throw new Error(`Failed to reset remote progress: ${error.message}`);
