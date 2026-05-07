@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { useNitro } from '@nuxt/kit';
+import { useNitro, useNuxt } from '@nuxt/kit';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
@@ -356,8 +356,9 @@ export default defineNuxtConfig({
     // With ssr:false the SSR Vite server is never created, so vite-node IPC is
     // never wired up and `/` returns 500. This stubs the SSR manifest virtuals
     // and points the client manifest at its built file. Drop after v4.5.0.
-    ready: (nuxt) => {
-      if (!nuxt.options.dev || nuxt.options.ssr) return;
+    'vite:extendConfig': (_config, context) => {
+      const nuxt = useNuxt();
+      if (!nuxt.options.dev || nuxt.options.ssr || !context.isClient) return;
       const nitro = useNitro();
       const clientManifestPath = pathToFileURL(
         resolve(nuxt.options.buildDir, 'dist/server/client.manifest.mjs')
