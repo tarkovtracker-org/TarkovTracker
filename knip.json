@@ -5,7 +5,18 @@
     "app/server/api/**/*.{js,ts}",
     "app/server/routes/**/*.{js,ts}",
     "vitest.config.ts",
-    "vitest.*.config.ts",
+    "vitest.happy-dom.config.ts",
+    "vitest.nuxt.config.ts",
+    "vitest.shared.ts"
+  ],
+  "ignore": [
+    "supabase/functions/**",
+    "app/components/PromotedTwitchEmbed.vue",
+    "app/i18n.config.ts",
+    "app/server/api/changelog.get.ts",
+    "app/server/api/contributors.get.ts",
+    "vitest.happy-dom.config.ts",
+    "vitest.nuxt.config.ts",
     "vitest.shared.ts"
   ],
   "ignoreDependencies": [
@@ -17,7 +28,8 @@
     "lru-cache",
     "postcss",
     "vitest-environment-nuxt",
-    "vue-tsc"
+    "vue-tsc",
+    "@nuxt/kit"
   ],
   "ignoreExportsUsedInFile": true,
   "workspaces": {
