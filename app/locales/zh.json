@@ -1399,7 +1399,6 @@
     "align_bottom_center": "下方居中",
     "align_bottom_right": "右下",
     "copy_success": "叠加层 URL 已复制",
-    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "主播设置已重置",
     "resolution_label": "分辨率",
     "resolution_1080": "1080p",

@@ -253,10 +253,10 @@ Recommended mappings:
 
 ### Adding Translations
 
-1. Add source keys to `app/locales/en.json`
-2. Run `npm run i18n:check`
-3. If locale structures need syncing for Crowdin, run `npm run i18n:sync`
-4. Use in components with `$t('key.path')`
+1. Add source keys to `app/locales/en.json` (the source locale).
+2. Run `npm run i18n:check`. Missing keys in non-English locales are non-fatal — vue-i18n falls back to `en` at runtime via `fallbackLocale: 'en'`.
+3. Use in components with `$t('key.path', 'Fallback string')` — pass a fallback for resilience.
+4. Crowdin propagates and translates new keys to the other locale files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) on its sync cycle. Do not edit those files manually.
 
 ## Debugging
 

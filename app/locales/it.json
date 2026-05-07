@@ -1399,7 +1399,6 @@
     "align_bottom_center": "Bottom Center",
     "align_bottom_right": "Bottom Right",
     "copy_success": "Overlay URL copied",
-    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Streamer settings reset",
     "resolution_label": "Resolution",
     "resolution_1080": "1080p",

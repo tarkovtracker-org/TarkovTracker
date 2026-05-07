@@ -50,8 +50,7 @@
 - `npm run test:coverage` runs coverage.
 - `npm run test:api-gateway` runs Worker tests.
 - `npm run validate:openapi` validates the Worker OpenAPI contract.
-- `npm run i18n:check` validates locale keys.
-- `npm run i18n:sync` syncs locale file structure.
+- `npm run i18n:check` validates locale keys (missing keys are non-fatal; extras and naming violations fail).
 - `npm run supabase:types` regenerates Supabase TS types.
 
 ## Lint & Format Commands
@@ -180,13 +179,14 @@
 
 - Locale files live in `app/locales/*.json`.
 - `app/locales/en.json` is the source locale and the only locale file developers/AI should edit during normal feature work.
-- Crowdin owns non-English locale files (`de`, `es`, `fr`, `ru`, `uk`, `zh`); do not manually translate or bulk-edit them unless explicitly fixing a Crowdin export PR.
-- When adding or changing user-facing copy, update `en.json`, keep keys stable, then run `npm run i18n:check`.
-- If source keys changed and target files need matching structure, run `npm run i18n:sync`; this may add English fallback values for Crowdin to translate later and should not be treated as final translation work.
+- vue-i18n is configured with `fallbackLocale: 'en'` (`app/i18n.config.ts`), so any missing key automatically renders the English value at runtime. Never copy English text into non-English locales as a "fallback" — it is redundant and can register in Crowdin as a completed translation.
+- Crowdin owns non-English locale files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`); do not manually translate or bulk-edit them unless explicitly fixing a Crowdin export PR.
+- When adding or changing user-facing copy, add the key only to `en.json`, keep it stable, then run `npm run i18n:check`. Crowdin handles propagation and translation on its sync cycle.
+- `npm run i18n:check` reports extras and naming violations as failures; missing keys are non-fatal informational output (they fall back to English at runtime).
 - Treat PRs that add unsupported locale files or replace translated values with English source text as broken Crowdin exports.
 - Add keys consistently with existing namespace patterns.
 - Locale keys must be snake_case.
-- Provide safe fallback strings where appropriate.
+- Provide a fallback string in `t('key', 'Fallback')` calls for user-visible strings, matching surrounding component patterns.
 - Keep locale keys stable to avoid churn.
 - Avoid hard-coded user-facing strings in components.
 

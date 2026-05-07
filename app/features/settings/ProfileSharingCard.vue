@@ -102,7 +102,7 @@
               to="/login"
               class="text-warning-300 hover:text-warning-200 underline transition-colors"
             >
-              {{ t('navigation_drawer.login') }}
+              {{ t('navigation_drawer.login', 'Log in') }}
             </NuxtLink>
           </template>
         </UAlert>
