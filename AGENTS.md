@@ -50,7 +50,7 @@
 - `npm run test:coverage` runs coverage.
 - `npm run test:api-gateway` runs Worker tests.
 - `npm run validate:openapi` validates the Worker OpenAPI contract.
-- `npm run i18n:check` validates locale keys (missing keys are non-fatal; extras and naming violations fail).
+- `npm run i18n:check` validates locale keys against `app/locales/en.json`; it is fatal **only** for snake_case naming violations in `en.json`. Missing or orphaned keys in non-English locales are reported informationally and do not fail the check (Crowdin reconciles them on its sync cycle).
 - `npm run supabase:types` regenerates Supabase TS types.
 
 ## Lint & Format Commands
@@ -177,13 +177,11 @@
 
 ## Localization
 
-- Locale files live in `app/locales/*.json`.
-- `app/locales/en.json` is the source locale and the only locale file developers/AI should edit during normal feature work.
-- vue-i18n is configured with `fallbackLocale: 'en'` (`app/i18n.config.ts`), so any missing key automatically renders the English value at runtime. Never copy English text into non-English locales as a "fallback" — it is redundant and can register in Crowdin as a completed translation.
-- Crowdin owns non-English locale files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`); do not manually translate or bulk-edit them unless explicitly fixing a Crowdin export PR.
+- **Only edit `app/locales/en.json`.** Do not add, remove, rename, or reformat keys in any non-English locale file (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) — Crowdin owns those and reconciles adds/removes on its sync cycle.
+- vue-i18n is configured with `fallbackLocale: 'en'` (`app/i18n.config.ts`), so any key missing from a non-English locale automatically renders the English value at runtime. Never copy English text into non-English locales as a "fallback" — it is redundant and can register in Crowdin as a completed translation.
 - When adding or changing user-facing copy, add the key only to `en.json`, keep it stable, then run `npm run i18n:check`. Crowdin handles propagation and translation on its sync cycle.
-- `npm run i18n:check` reports extras and naming violations as failures; missing keys are non-fatal informational output (they fall back to English at runtime).
-- Treat PRs that add unsupported locale files or replace translated values with English source text as broken Crowdin exports.
+- `npm run i18n:check` is intentionally lenient on the non-English files: missing keys and orphaned/extra keys are reported as informational only (the runtime fallback or the next Crowdin sync handles them). The check is fatal **only** for snake_case naming violations in `en.json`.
+- The sole exception is fixing a broken Crowdin export PR — and even then, only touch the file(s) Crowdin produced.
 - Add keys consistently with existing namespace patterns.
 - Locale keys must be snake_case.
 - Provide a fallback string in `t('key', 'Fallback')` calls for user-visible strings, matching surrounding component patterns.
