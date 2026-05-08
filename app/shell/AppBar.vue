@@ -87,9 +87,19 @@
             <UIcon name="i-mdi-translate" class="text-surface-300 h-4 w-4 shrink-0" />
           </template>
         </SelectMenuFixed>
-        <!-- Account section -->
+        <NuxtLink
+          to="/supporter"
+          class="border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500 inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-semibold text-white shadow-sm shadow-black/30 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm"
+          :aria-label="t('footer.support_button')"
+        >
+          <UIcon name="i-mdi-heart" class="text-error-300 h-3.5 w-3.5 shrink-0" />
+          <span class="hidden sm:inline">{{ t('footer.support_button') }}</span>
+        </NuxtLink>
         <div class="bg-surface-700/50 mx-1 h-5 w-px" />
-        <div class="flex min-w-[2.75rem] items-center justify-end sm:min-w-[10rem]">
+        <div
+          class="flex items-center justify-end"
+          :class="isLoggedIn ? 'min-w-[2.75rem] sm:min-w-[10rem]' : ''"
+        >
           <template v-if="isLoggedIn">
             <UDropdownMenu :items="accountMenuItems" :content="{ align: 'end', sideOffset: 8 }">
               <button

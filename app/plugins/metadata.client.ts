@@ -24,6 +24,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     '/not-found',
     '/oauth/',
     '/privacy',
+    '/supporter',
     '/terms-of-service',
   ];
   // Initialize the metadata store and fetch data (non-blocking)
