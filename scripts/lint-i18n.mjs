@@ -85,22 +85,26 @@ function main() {
     }
   }
   console.log('');
-  const failingParts = [];
-  if (totalExtra > 0) failingParts.push(`${totalExtra} extra`);
-  if (caseViolations.length > 0) failingParts.push(`${caseViolations.length} naming`);
-  if (failingParts.length === 0) {
-    if (totalMissing > 0) {
-      console.log(
-        `i18n check: ${totalMissing} missing key(s) — non-fatal, runtime falls back to ${SOURCE_LOCALE}`
-      );
-    } else {
-      console.log(
-        `All ${targetCodes.length} locale(s) are in sync with ${SOURCE_LOCALE}${LOCALE_EXTENSION}`
-      );
-    }
-    process.exit(0);
+  if (caseViolations.length > 0) {
+    console.log(
+      `i18n check: ${caseViolations.length} naming violation(s) in ${SOURCE_LOCALE}${LOCALE_EXTENSION}`
+    );
+    process.exit(1);
   }
-  console.log(`i18n check: ${failingParts.join(', ')} issue(s) found`);
-  process.exit(1);
+  const informational = [];
+  if (totalMissing > 0) {
+    informational.push(`${totalMissing} missing (fallback to ${SOURCE_LOCALE} at runtime)`);
+  }
+  if (totalExtra > 0) {
+    informational.push(`${totalExtra} extra (Crowdin will reconcile on next sync)`);
+  }
+  if (informational.length > 0) {
+    console.log(`i18n check: ${informational.join(', ')} — non-fatal`);
+  } else {
+    console.log(
+      `All ${targetCodes.length} locale(s) are in sync with ${SOURCE_LOCALE}${LOCALE_EXTENSION}`
+    );
+  }
+  process.exit(0);
 }
 main();
