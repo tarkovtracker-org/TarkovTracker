@@ -109,7 +109,7 @@
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",
     "lint": "npm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
-    "typecheck": "nuxt typecheck",
+    "typecheck": "NODE_ENV=development nuxt typecheck",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix",
     "lint:unused": "knip --reporter compact",
     "postinstall": "nuxt prepare",

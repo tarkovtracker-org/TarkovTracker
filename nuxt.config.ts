@@ -55,6 +55,26 @@ if (
 ) {
   console.warn('[Config] Conflicting Clarity project IDs - using NUXT_PUBLIC_CLARITY_PROJECT_ID');
 }
+const STRIPE_PUBLIC_URL_KEYS = [
+  'STRIPE_SCAV_MONTHLY_URL',
+  'STRIPE_SCAV_6MONTH_URL',
+  'STRIPE_SCAV_YEARLY_URL',
+  'STRIPE_TIMMY_MONTHLY_URL',
+  'STRIPE_TIMMY_6MONTH_URL',
+  'STRIPE_TIMMY_YEARLY_URL',
+  'STRIPE_CHAD_MONTHLY_URL',
+  'STRIPE_CHAD_6MONTH_URL',
+  'STRIPE_CHAD_YEARLY_URL',
+  'STRIPE_ONE_TIME_URL',
+] as const;
+if (IS_PRODUCTION_BUILD) {
+  const missingStripeUrls = STRIPE_PUBLIC_URL_KEYS.filter((key) => !process.env[key]?.trim());
+  if (missingStripeUrls.length > 0) {
+    throw new Error(
+      `[Config] Missing required Stripe checkout URL env vars: ${missingStripeUrls.join(', ')}`
+    );
+  }
+}
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
