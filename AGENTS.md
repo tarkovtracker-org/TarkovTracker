@@ -50,7 +50,7 @@
 - `npm run test:coverage` runs coverage.
 - `npm run test:api-gateway` runs Worker tests.
 - `npm run validate:openapi` validates the Worker OpenAPI contract.
-- `npm run i18n:check` validates locale keys (missing keys are non-fatal; extras and naming violations fail).
+- `npm run i18n:check` validates locale keys against `app/locales/en.json`; it is fatal **only** for snake_case naming violations in `en.json`. Missing or orphaned keys in non-English locales are reported informationally and do not fail the check (Crowdin reconciles them on its sync cycle).
 - `npm run supabase:types` regenerates Supabase TS types.
 
 ## Lint & Format Commands

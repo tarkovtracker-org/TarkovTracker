@@ -2,7 +2,7 @@
   definePageMeta({
     middleware: [
       () => {
-        return navigateTo('/settings#streamer-tools', { redirectCode: 301, replace: true });
+        return navigateTo('/settings#streamer-tools', { replace: true });
       },
     ],
   });
