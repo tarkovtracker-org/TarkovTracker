@@ -138,6 +138,16 @@
             >
               <ApiTokensCard />
             </section>
+            <section
+              v-if="visitedTabs['streamer-tools']"
+              v-show="activeTab === 'streamer-tools'"
+              id="streamer-tools"
+              class="scroll-mt-24 space-y-4"
+              role="tabpanel"
+              :aria-label="$t('settings.tabs.streamer_tools')"
+            >
+              <StreamerToolsPanel />
+            </section>
           </div>
         </div>
       </div>
@@ -158,6 +168,7 @@
   import SkillsCard from '@/features/settings/SkillsCard.vue';
   import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
   import { useDataManagementSession } from '@/features/settings/useDataManagementSession';
+  import StreamerToolsPanel from '@/features/streamer-tools/StreamerToolsPanel.vue';
   import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import type { TabsProps } from '@nuxt/ui';
   definePageMeta({
@@ -175,7 +186,8 @@
     | 'account'
     | 'imports'
     | 'backup-restore'
-    | 'api';
+    | 'api'
+    | 'streamer-tools';
   const settingsTabIds = [
     'progression',
     'preferences',
@@ -184,6 +196,7 @@
     'account',
     'backup-restore',
     'api',
+    'streamer-tools',
   ] as const;
   const settingsRouteTabs: Partial<Record<string, SettingsTabId>> = {
     '/progression': 'progression',
@@ -199,6 +212,7 @@
     imports: '#imports',
     'backup-restore': '#backup-restore',
     api: '#api',
+    'streamer-tools': '#streamer-tools',
   };
   const nestedTabHashes: Record<string, SettingsTabId> = {
     '#skills': 'progression',
@@ -234,6 +248,7 @@
     imports: 'imports',
     'backup-restore': 'backup_restore',
     api: 'api',
+    'streamer-tools': 'streamer_tools',
   };
   const dataManagementSession = useDataManagementSession();
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
@@ -307,6 +322,11 @@
       label: t('settings.tabs.api'),
       icon: 'i-mdi-api',
     },
+    {
+      value: 'streamer-tools',
+      label: t('settings.tabs.streamer_tools'),
+      icon: 'i-heroicons-video-camera',
+    },
   ]);
   const settingsTabGroups = computed(() => [
     {
@@ -318,7 +338,7 @@
     {
       label: t('settings.tab_groups.account_advanced'),
       items: settingsTabItems.value.filter((item) =>
-        ['account', 'backup-restore', 'api'].includes(item.value)
+        ['account', 'backup-restore', 'api', 'streamer-tools'].includes(item.value)
       ),
     },
   ]);
@@ -330,6 +350,7 @@
     imports: false,
     'backup-restore': false,
     api: false,
+    'streamer-tools': false,
   });
   const isAdmin = computed(() => hasInitiallyLoaded.value && systemStore.isAdmin);
   const mobileTabsUi: TabsProps['ui'] = {

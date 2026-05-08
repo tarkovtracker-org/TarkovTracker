@@ -81,6 +81,8 @@ describe('nuxt.config CSP', () => {
       'data:',
       'https://fonts.gstatic.com',
     ]);
+    expect(getDirectiveSources(csp, 'worker-src')).toContain('blob:');
+    expect(getDirectiveSources(csp, 'worker-src')).toContain("'self'");
   });
   it('allows unsafe-inline scripts only when explicitly enabled', () => {
     const csp = buildContentSecurityPolicy({ allowUnsafeInlineScripts: true });

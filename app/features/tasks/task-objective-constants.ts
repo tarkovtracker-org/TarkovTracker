@@ -25,7 +25,3 @@ export const OBJECTIVE_ICON_MAP = {
   warning: 'mdi-alert-circle',
   useItem: 'mdi-hand-heart',
 } as const;
-/** Type for the objective icon map */
-export type ObjectiveIconMap = typeof OBJECTIVE_ICON_MAP;
-/** Union type of valid objective icon keys */
-export type ObjectiveIconKey = keyof ObjectiveIconMap;

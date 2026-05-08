@@ -2,6 +2,14 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
+import { type FetchResponse, isFetchError, isFetchSuccess } from '@/stores/tarkov/fetchResponse';
+import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemPicker';
+import {
+  type PromiseKey,
+  getPromiseRequestIdStore,
+  getPromiseRequestKeyStore,
+  getPromiseStore,
+} from '@/stores/tarkov/promiseStore';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
@@ -10,6 +18,7 @@ import {
   GAME_MODES,
   LOCALE_TO_API_MAPPING,
   MAP_NAME_MAPPING,
+  MAP_NORMALIZED_NAME_MAPPING,
   sortMapsByGameOrder,
   sortTradersByGameOrder,
 } from '@/utils/constants';
@@ -19,6 +28,7 @@ import {
   isTaskAvailableForEdition as checkTaskEdition,
 } from '@/utils/editionHelpers';
 import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
+import { queueIdleTask } from '@/utils/idleScheduler';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -60,15 +70,6 @@ import type {
   TaskObjective,
   Trader,
 } from '@/types/tarkov';
-type IdleCallback = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
-type IdleTask = {
-  task: () => void | Promise<void>;
-  timeout: number;
-  minTime: number;
-  resolve: () => void;
-  reject: (error: unknown) => void;
-  expiresAt: number;
-};
 const BOOTSTRAP_CACHE_VERSION = 'json-v1';
 const TASKS_CORE_CACHE_VERSION = 'json-v1';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
@@ -77,242 +78,21 @@ const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 const HIDEOUT_CACHE_VERSION = 'json-v3';
 const PRESTIGE_CACHE_VERSION = 'json-v2';
-const idleQueue: IdleTask[] = [];
-let idleRunnerActive = false;
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
 const CACHE_PURGE_CHECK_STORAGE_KEY = STORAGE_KEYS.cachePurgeCheckAt;
-const getIdleScheduler = () => {
-  if (typeof window === 'undefined') return null;
-  if ('requestIdleCallback' in window) {
-    return window.requestIdleCallback.bind(window) as (
-      cb: IdleCallback,
-      opts?: { timeout?: number }
-    ) => number;
-  }
-  return (cb: IdleCallback, opts?: { timeout?: number }) =>
-    window.setTimeout(
-      () =>
-        cb({
-          didTimeout: true,
-          timeRemaining: () => 0,
-        }),
-      opts?.timeout ?? 0
-    );
-};
-const getIdleNow = () => {
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
-};
-const runIdleQueue = () => {
-  if (idleRunnerActive) return;
-  idleRunnerActive = true;
-  const scheduler = getIdleScheduler();
-  if (!scheduler) {
-    while (idleQueue.length) {
-      const next = idleQueue.shift()!;
-      Promise.resolve(next.task()).then(next.resolve).catch(next.reject);
-    }
-    idleRunnerActive = false;
-    return;
-  }
-  const scheduleNext = () => {
-    if (!idleQueue.length) {
-      idleRunnerActive = false;
-      return;
-    }
-    const next = idleQueue[0]!;
-    const remainingTimeout = Math.max(0, next.expiresAt - getIdleNow());
-    scheduler(
-      (deadline) => {
-        if (!idleQueue.length) {
-          idleRunnerActive = false;
-          return;
-        }
-        const current = idleQueue[0]!;
-        const now = getIdleNow();
-        const timedOut = deadline.didTimeout || now >= current.expiresAt;
-        const hasTime = deadline.timeRemaining() >= current.minTime;
-        if (!timedOut && !hasTime) {
-          scheduleNext();
-          return;
-        }
-        const next = idleQueue.shift()!;
-        Promise.resolve(next.task())
-          .then(next.resolve)
-          .catch(next.reject)
-          .finally(() => {
-            scheduleNext();
-          });
-      },
-      { timeout: remainingTimeout }
-    );
-  };
-  scheduleNext();
-};
-const queueIdleTask = (
-  task: () => void | Promise<void>,
-  options: { timeout?: number; minTime?: number; priority?: 'normal' | 'high' } = {}
-) => {
-  const { timeout = 2000, minTime = 12, priority = 'normal' } = options;
-  return new Promise<void>((resolve, reject) => {
-    const now = getIdleNow();
-    const entry: IdleTask = { task, timeout, minTime, resolve, reject, expiresAt: now + timeout };
-    if (priority === 'high') {
-      idleQueue.unshift(entry);
-    } else {
-      idleQueue.push(entry);
-    }
-    runIdleQueue();
-  });
-};
 // Exported type for craft sources used by components
 export type CraftSource = { stationId: string; stationName: string; stationLevel: number };
 export interface MetadataStoreTaskLookup {
   getTaskById?: (id: string) => { name?: string } | undefined;
   tasks?: Array<{ id: string; name?: string }>;
 }
-// Per-instance promise storage to avoid cross-request/state leakage in SSR/testing
-// Using a WeakMap keyed by store instance maintains per-instance deduplication
-// Includes initPromise and isInitializing to avoid module-level leakage
-interface PromiseStore {
-  readonly bootstrapPromise: Promise<void> | null;
-  readonly tasksCorePromise: Promise<void> | null;
-  readonly hideoutPromise: Promise<void> | null;
-  readonly itemsFullPromise: Promise<void> | null;
-  readonly itemsLitePromise: Promise<void> | null;
-  readonly mapSpawnsPromise: Promise<void> | null;
-  readonly objectiveModeCountDifferencesPromise: Promise<void> | null;
-  readonly taskObjectivesPromise: Promise<void> | null;
-  readonly taskRewardsPromise: Promise<void> | null;
-  readonly prestigePromise: Promise<void> | null;
-  readonly editionsPromise: Promise<void> | null;
-  readonly initPromise: Promise<void> | null;
-  readonly isInitializing: boolean;
-}
-type PromiseKey = {
-  [K in keyof PromiseStore]: PromiseStore[K] extends Promise<void> | null ? K : never;
-}[keyof PromiseStore];
-type MutablePromiseStore = {
-  -readonly [K in keyof PromiseStore]: PromiseStore[K];
-};
-const PROMISE_STORE_KEY = Symbol('metadataPromiseStore');
-const PROMISE_REQUEST_KEYS_KEY = Symbol('metadataPromiseRequestKeys');
-const PROMISE_REQUEST_IDS_KEY = Symbol('metadataPromiseRequestIds');
-type PromiseStoreHost = object & {
-  [PROMISE_REQUEST_IDS_KEY]?: Partial<Record<PromiseKey, symbol>>;
-  [PROMISE_REQUEST_KEYS_KEY]?: Partial<Record<PromiseKey, string>>;
-  [PROMISE_STORE_KEY]?: MutablePromiseStore;
-};
-function setHiddenStoreValue<T>(storeInstance: PromiseStoreHost, key: symbol, value: T): T {
-  Object.defineProperty(storeInstance, key, {
-    configurable: true,
-    enumerable: false,
-    value,
-    writable: true,
-  });
-  return value;
-}
-function getPromiseStore(storeInstance: object): MutablePromiseStore {
-  const host = storeInstance as PromiseStoreHost;
-  let promises = host[PROMISE_STORE_KEY];
-  if (!promises) {
-    promises = setHiddenStoreValue(host, PROMISE_STORE_KEY, {
-      bootstrapPromise: null,
-      tasksCorePromise: null,
-      hideoutPromise: null,
-      itemsFullPromise: null,
-      itemsLitePromise: null,
-      mapSpawnsPromise: null,
-      objectiveModeCountDifferencesPromise: null,
-      taskObjectivesPromise: null,
-      taskRewardsPromise: null,
-      prestigePromise: null,
-      editionsPromise: null,
-      initPromise: null,
-      isInitializing: false,
-    });
-  }
-  return promises;
-}
-function getPromiseRequestKeyStore(storeInstance: object): Partial<Record<PromiseKey, string>> {
-  const host = storeInstance as PromiseStoreHost;
-  let keys = host[PROMISE_REQUEST_KEYS_KEY];
-  if (!keys) {
-    keys = setHiddenStoreValue(host, PROMISE_REQUEST_KEYS_KEY, {});
-  }
-  return keys;
-}
-function getPromiseRequestIdStore(storeInstance: object): Partial<Record<PromiseKey, symbol>> {
-  const host = storeInstance as PromiseStoreHost;
-  let ids = host[PROMISE_REQUEST_IDS_KEY];
-  if (!ids) {
-    ids = setHiddenStoreValue(host, PROMISE_REQUEST_IDS_KEY, {});
-  }
-  return ids;
-}
-// Helper type to safely access item properties that might be missing in older type definitions
-type ObjectiveWithItems = TaskObjective & {
-  item?: TarkovItem;
-  items?: TarkovItem[];
-  markerItem?: TarkovItem;
-  questItem?: TarkovItem;
-  requiredKeys?: TarkovItem[][];
-  containsAll?: TarkovItem[];
-  useAny?: TarkovItem[];
-  usingWeapon?: TarkovItem;
-  usingWeaponMods?: TarkovItem[];
-  wearing?: TarkovItem[];
-  notWearing?: TarkovItem[];
-};
 const hasRenderableCriticalMetadata = (
   state: Pick<MetadataState, 'hideoutStations' | 'tasks'>
 ): boolean => {
   return state.tasks.length > 0 && state.hideoutStations.length > 0;
 };
-type FetchSuccess<T> = { data: T };
-type FetchError = { error: string | Record<string, unknown> };
-type FetchResponse<T> = FetchSuccess<T> | FetchError;
-const isFetchError = (value: unknown): value is FetchError => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (!Object.prototype.hasOwnProperty.call(value, 'error')) return false;
-  const error = (value as { error?: unknown }).error;
-  // error must be a string or a plain object (not null, not array)
-  return (
-    typeof error === 'string' ||
-    (error !== null && typeof error === 'object' && !Array.isArray(error))
-  );
-};
-const isFetchSuccess = <T>(value: unknown): value is FetchSuccess<T> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (Object.prototype.hasOwnProperty.call(value, 'error')) return false;
-  return Object.prototype.hasOwnProperty.call(value, 'data');
-};
-function createItemPicker(itemsById: Map<string, TarkovItem>) {
-  const pickItemLite = (item?: TarkovItem | null): TarkovItem | undefined => {
-    if (!item?.id) return item ?? undefined;
-    const fullItem = itemsById.get(item.id);
-    if (!fullItem) return item;
-    const mergedProperties = item.properties
-      ? { ...(fullItem.properties ?? {}), ...item.properties }
-      : fullItem.properties;
-    const merged = { ...item, ...fullItem };
-    if (mergedProperties) merged.properties = mergedProperties;
-    return merged;
-  };
-  const pickItemArray = (items?: TarkovItem[] | null): TarkovItem[] | undefined => {
-    if (!Array.isArray(items)) return items ?? undefined;
-    return items.map((i) => pickItemLite(i) ?? i);
-  };
-  const pickItemMatrix = (items?: TarkovItem[][] | null): TarkovItem[][] | undefined => {
-    if (!Array.isArray(items)) return items ?? undefined;
-    return items.map((group) => pickItemArray(group) ?? []);
-  };
-  return { pickItemLite, pickItemArray, pickItemMatrix };
-}
 interface MetadataState {
   // Initialization and loading states
   initialized: boolean;
@@ -391,6 +171,13 @@ const inferNewBeginningPrestigeLevel = (task: Task): number | null => {
   if (!idMatch?.[1]) return null;
   const parsed = Number.parseInt(idMatch[1], 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+const deriveStaticMapKey = (mapName: string, normalizedName?: string): string => {
+  if (normalizedName) {
+    return MAP_NORMALIZED_NAME_MAPPING[normalizedName] ?? normalizedName.replace(/-/g, '');
+  }
+  const lower = mapName.toLowerCase();
+  return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
 };
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
@@ -508,8 +295,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       const mapGroups: Record<string, TarkovMap[]> = {};
       state.maps.forEach((map) => {
-        const lowerCaseName = map.name.toLowerCase();
-        const mapKey = MAP_NAME_MAPPING[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
+        const mapKey = deriveStaticMapKey(map.name, map.normalizedName);
         if (!mapGroups[mapKey]) {
           mapGroups[mapKey] = [];
         }
@@ -517,8 +303,7 @@ export const useMetadataStore = defineStore('metadata', {
       });
       const mergedMaps = Object.entries(mapGroups)
         .map(([mapKey, maps]) => {
-          const primaryMap =
-            maps.find((map) => map.name.toLowerCase() === 'ground zero') ?? maps[0];
+          const primaryMap = maps.find((map) => map.normalizedName === 'ground-zero') ?? maps[0];
           if (!primaryMap) return null;
           const staticData = state.staticMapData?.[mapKey];
           const mergedIds = maps.map((map) => map.id);
@@ -546,10 +331,9 @@ export const useMetadataStore = defineStore('metadata', {
         })
         .filter((map): map is NonNullable<typeof map> => map !== null);
       // Sort maps by task progression order using the mapKey for lookup
-      return sortMapsByGameOrder(mergedMaps, (map) => {
-        const lowerCaseName = map.name.toLowerCase();
-        return MAP_NAME_MAPPING[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
-      });
+      return sortMapsByGameOrder(mergedMaps, (map) =>
+        deriveStaticMapKey(map.name, map.normalizedName)
+      );
     },
     // Computed properties for traders (sorted by in-game order)
     sortedTraders: (state): Trader[] => sortTradersByGameOrder(state.traders),
@@ -2406,9 +2190,8 @@ export const useMetadataStore = defineStore('metadata', {
           map.normalizedName?.toLowerCase() === lowerCaseName
       );
     },
-    getStaticMapKey(mapName: string): string {
-      const lowerCaseName = mapName.toLowerCase();
-      return MAP_NAME_MAPPING[lowerCaseName] || lowerCaseName.replace(/\s+|\+/g, '');
+    getStaticMapKey(mapName: string, normalizedName?: string): string {
+      return deriveStaticMapKey(mapName, normalizedName);
     },
     hasMapSvg(mapId: string): boolean {
       const map = this.getMapById(mapId);

@@ -119,6 +119,7 @@ export const buildContentSecurityPolicy = (options: ContentSecurityPolicyOptions
   return [
     `default-src ${getDefaultSrcSources().join(' ')}`,
     `script-src ${getScriptSrcSources(options).join(' ')}`,
+    `worker-src blob: 'self'`,
     `connect-src ${getConnectSrcSources(options).join(' ')}`,
     `img-src ${getImgSrcSources(options).join(' ')}`,
     `frame-src ${getFrameSrcSources().join(' ')}`,

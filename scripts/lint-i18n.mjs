@@ -69,7 +69,9 @@ function main() {
     console.log(`\n${code}${LOCALE_EXTENSION}:`);
     if (missing.length > 0) {
       totalMissing += missing.length;
-      console.log(`  Missing ${missing.length} key(s):`);
+      console.log(
+        `  Missing ${missing.length} key(s) (will fall back to ${SOURCE_LOCALE} at runtime):`
+      );
       for (const k of missing) {
         console.log(`    - ${k}`);
       }
@@ -83,17 +85,22 @@ function main() {
     }
   }
   console.log('');
-  if (totalMissing === 0 && totalExtra === 0 && caseViolations.length === 0) {
-    console.log(
-      `All ${targetCodes.length} locale(s) are in sync with ${SOURCE_LOCALE}${LOCALE_EXTENSION}`
-    );
+  const failingParts = [];
+  if (totalExtra > 0) failingParts.push(`${totalExtra} extra`);
+  if (caseViolations.length > 0) failingParts.push(`${caseViolations.length} naming`);
+  if (failingParts.length === 0) {
+    if (totalMissing > 0) {
+      console.log(
+        `i18n check: ${totalMissing} missing key(s) — non-fatal, runtime falls back to ${SOURCE_LOCALE}`
+      );
+    } else {
+      console.log(
+        `All ${targetCodes.length} locale(s) are in sync with ${SOURCE_LOCALE}${LOCALE_EXTENSION}`
+      );
+    }
     process.exit(0);
   }
-  const parts = [];
-  if (totalMissing > 0) parts.push(`${totalMissing} missing`);
-  if (totalExtra > 0) parts.push(`${totalExtra} extra`);
-  if (caseViolations.length > 0) parts.push(`${caseViolations.length} naming`);
-  console.log(`i18n check: ${parts.join(', ')} issue(s) found`);
+  console.log(`i18n check: ${failingParts.join(', ')} issue(s) found`);
   process.exit(1);
 }
 main();

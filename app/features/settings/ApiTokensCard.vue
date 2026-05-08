@@ -16,7 +16,16 @@
           variant="soft"
           icon="i-mdi-lock"
           :title="$t('page.settings.card.apitokens.not_logged_in')"
-        />
+        >
+          <template #description>
+            <NuxtLink
+              to="/login"
+              class="text-warning-300 hover:text-warning-200 underline transition-colors"
+            >
+              {{ $t('navigation_drawer.login', 'Log In') }}
+            </NuxtLink>
+          </template>
+        </UAlert>
       </div>
     </template>
   </GenericCard>

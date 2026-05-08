@@ -8,7 +8,7 @@ type MetadataStoreMock = {
   editionsError: Error | null;
   editionsLoading: boolean;
   error: Error | null;
-  fetchAllData: ReturnType<typeof vi.fn>;
+  initialize: ReturnType<typeof vi.fn>;
   hasInitialized: boolean;
   hideoutError: Error | null;
   hideoutLoading: boolean;
@@ -21,7 +21,7 @@ const createMetadataStore = (overrides: Partial<MetadataStoreMock> = {}) =>
     editionsError: null,
     editionsLoading: false,
     error: null,
-    fetchAllData: vi.fn(),
+    initialize: vi.fn(),
     hasInitialized: false,
     hideoutError: null,
     hideoutLoading: false,
@@ -87,7 +87,7 @@ describe('LoadingScreen', () => {
   });
   it('prevents duplicate retries while fetch is in flight', async () => {
     let resolveRetry: (() => void) | null = null;
-    const fetchAllData = vi.fn(
+    const initialize = vi.fn(
       () =>
         new Promise<void>((resolve) => {
           resolveRetry = resolve;
@@ -95,13 +95,12 @@ describe('LoadingScreen', () => {
     );
     const { metadataStore, wrapper } = await setup({
       error: new Error('Failed to load metadata'),
-      fetchAllData,
+      initialize,
     });
     const retryButton = wrapper.findAll('button')[0]!;
     await retryButton.trigger('click');
     await retryButton.trigger('click');
-    expect(metadataStore.fetchAllData).toHaveBeenCalledTimes(1);
-    expect(metadataStore.fetchAllData).toHaveBeenCalledWith(true);
+    expect(metadataStore.initialize).toHaveBeenCalledTimes(1);
     expect(retryButton.attributes('disabled')).toBeDefined();
     expect(retryButton.attributes('data-loading')).toBe('true');
     resolveRetry!();
@@ -110,15 +109,15 @@ describe('LoadingScreen', () => {
   });
   it('logs retry failures without throwing out of the overlay', async () => {
     const retryError = new Error('retry failed');
-    const fetchAllData = vi.fn().mockRejectedValue(retryError);
+    const initialize = vi.fn().mockRejectedValue(retryError);
     const { wrapper } = await setup({
       error: new Error('Failed to load metadata'),
-      fetchAllData,
+      initialize,
     });
     const retryButton = wrapper.findAll('button')[0]!;
     await retryButton.trigger('click');
     await flushPromises();
-    expect(fetchAllData).toHaveBeenCalledWith(true);
+    expect(initialize).toHaveBeenCalled();
     expect(loggerMock.error).toHaveBeenCalledWith(
       '[LoadingScreen] Metadata retry failed:',
       retryError

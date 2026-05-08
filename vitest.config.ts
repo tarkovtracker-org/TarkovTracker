@@ -15,7 +15,7 @@ export default defineVitestConfig({
     environment: 'nuxt',
     globals: true,
     setupFiles: ['./tests/test-setup.ts'],
-    exclude: [...configDefaults.exclude, 'workers/**', '**/node_modules/**'],
+    exclude: [...configDefaults.exclude, 'workers/**', '**/node_modules/**', '**/.codex/**'],
     clearMocks: true,
     restoreMocks: true,
     isolate: true,

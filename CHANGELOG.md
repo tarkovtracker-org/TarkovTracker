@@ -1,3 +1,21 @@
+## [1.35.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.3...v1.35.4) (2026-05-06)
+
+
+### Bug Fixes
+
+* **maps:** add worker-src CSP directive and pre-bundle leaflet ([d5cf813](https://github.com/tarkovtracker-org/TarkovTracker/commit/d5cf8130c4e096844e749c85dd00bae99cbede96))
+* **app:** clarify getStaticMapKey signature to accept separate normalizedName ([ae05ec7](https://github.com/tarkovtracker-org/TarkovTracker/commit/ae05ec7b01633ddb9dbc28203e91acb1f2dca494))
+* **app:** extract deriveStaticMapKey helper to unify map key normalization ([0a7392c](https://github.com/tarkovtracker-org/TarkovTracker/commit/0a7392cea20f0d0e2aaaaad7ba4d93792002c49c))
+* **app:** use normalizedName for locale-independent map key derivation ([955125b](https://github.com/tarkovtracker-org/TarkovTracker/commit/955125b98cb4f55cf7f91037d65e738c318785b2))
+* **app:** use normalizedName to select primary Ground Zero map variant ([d398526](https://github.com/tarkovtracker-org/TarkovTracker/commit/d3985262c84554264f0db81bfe3e15fa17be51dc))
+
+## [1.35.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.2...v1.35.3) (2026-05-06)
+
+
+### Bug Fixes
+
+* **app:** use normalizedName for locale-independent map key derivation ([effdaf6](https://github.com/tarkovtracker-org/TarkovTracker/commit/effdaf68df3aae031d3e87be8216aff35274c92a))
+
 ## [1.35.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.1...v1.35.2) (2026-05-06)
 
 

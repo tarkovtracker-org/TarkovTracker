@@ -282,7 +282,24 @@
     >
       <template #content>
         <div class="p-4">
-          <template v-if="isLoggedIn">
+          <template v-if="!isLoggedIn">
+            <UAlert
+              color="warning"
+              variant="soft"
+              icon="i-mdi-lock"
+              :title="$t('settings.account_data.login_required_delete')"
+            >
+              <template #description>
+                <NuxtLink
+                  to="/login"
+                  class="text-warning-300 hover:text-warning-200 underline transition-colors"
+                >
+                  {{ $t('navigation_drawer.login') }}
+                </NuxtLink>
+              </template>
+            </UAlert>
+          </template>
+          <template v-else>
             <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
               <div class="mb-3 text-base font-bold">
                 {{ $t('settings.account_data.account_info_title') }}
@@ -437,47 +454,26 @@
                 </AppTooltip>
               </div>
             </div>
-          </template>
-          <div
-            :class="{
-              'border-surface-700 border-t pt-6': isLoggedIn,
-              'pt-0': !isLoggedIn,
-            }"
-          >
-            <div class="text-surface-300 mb-3 text-sm font-semibold">
-              {{ $t('settings.account_data.account_deletion_title') }}
-            </div>
-            <div class="flex justify-center">
-              <AppTooltip
-                v-if="!isLoggedIn"
-                :text="$t('settings.account_data.login_required_delete')"
-              >
+            <div class="border-surface-700 border-t pt-6">
+              <div class="text-surface-300 mb-3 text-sm font-semibold">
+                {{ $t('settings.account_data.account_deletion_title') }}
+              </div>
+              <div class="flex justify-center">
                 <UButton
                   color="error"
                   variant="solid"
                   size="lg"
                   icon="i-mdi-delete-forever"
-                  disabled
-                  class="px-6 py-3 font-semibold"
+                  :loading="isDeleting"
+                  :disabled="isDeleting"
+                  class="px-6 py-3 font-semibold shadow-lg transition-all hover:scale-105 hover:shadow-xl"
+                  @click="showConfirmationDialog = true"
                 >
                   {{ $t('settings.account.begin_deletion') }}
                 </UButton>
-              </AppTooltip>
-              <UButton
-                v-else
-                color="error"
-                variant="solid"
-                size="lg"
-                icon="i-mdi-delete-forever"
-                :loading="isDeleting"
-                :disabled="isDeleting"
-                class="px-6 py-3 font-semibold shadow-lg transition-all hover:scale-105 hover:shadow-xl"
-                @click="showConfirmationDialog = true"
-              >
-                {{ $t('settings.account.begin_deletion') }}
-              </UButton>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </template>
     </GenericCard>

@@ -355,6 +355,7 @@ describe('settings page', () => {
           'settings.tabs.account',
           'settings.tabs.backup_restore',
           'settings.tabs.api',
+          'settings.tabs.streamer_tools',
         ]
       );
     });

@@ -8,79 +8,99 @@
     title-classes="text-lg font-semibold"
   >
     <template #content>
-      <div class="space-y-4 px-4 py-4">
-        <p class="text-surface-400 text-sm">
-          {{
-            t(
-              'settings.profile_sharing.description',
-              'Control which game mode profiles can be viewed from a shared link.'
-            )
-          }}
-        </p>
-        <div class="space-y-3">
-          <div
-            class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-          >
-            <div class="min-w-0 space-y-1">
-              <div class="flex items-center gap-2">
-                <UBadge color="pvp" variant="soft" size="sm">PvP</UBadge>
-                <span class="text-surface-300 text-xs">{{ pvpVisibilityLabel }}</span>
+      <div class="relative px-4 py-4">
+        <template v-if="isLoggedIn">
+          <div class="space-y-4">
+            <p class="text-surface-400 text-sm">
+              {{
+                t(
+                  'settings.profile_sharing.description',
+                  'Control which game mode profiles can be viewed from a shared link.'
+                )
+              }}
+            </p>
+            <div class="space-y-3">
+              <div
+                class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+              >
+                <div class="min-w-0 space-y-1">
+                  <div class="flex items-center gap-2">
+                    <UBadge color="pvp" variant="soft" size="sm">
+                      {{ t('settings.profile_sharing.mode_pvp', 'PvP') }}
+                    </UBadge>
+                    <span class="text-surface-300 text-xs">{{ pvpVisibilityLabel }}</span>
+                  </div>
+                  <div class="flex min-w-0 items-center gap-1.5">
+                    <a
+                      :href="pvpShareUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-info-300 hover:text-info-200 truncate text-[11px] transition-colors"
+                    >
+                      {{ pvpShareUrl }}
+                    </a>
+                    <UButton
+                      icon="i-mdi-content-copy"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      :aria-label="
+                        t('settings.profile_sharing.copy_pvp_link', 'Copy PvP profile link')
+                      "
+                      @click="copyShareUrl(pvpShareUrl)"
+                    />
+                  </div>
+                </div>
+                <USwitch
+                  v-model="pvpPublic"
+                  :aria-label="
+                    t('settings.profile_sharing.toggle_pvp_label', 'Toggle PvP profile sharing')
+                  "
+                />
               </div>
-              <div class="flex min-w-0 items-center gap-1.5">
-                <a
-                  :href="pvpShareUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-info-300 hover:text-info-200 truncate text-[11px] transition-colors"
-                >
-                  {{ pvpShareUrl }}
-                </a>
-                <UButton
-                  icon="i-mdi-content-copy"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  :disabled="!isLoggedIn"
-                  :aria-label="t('settings.profile_sharing.copy_link', 'Copy profile link')"
-                  @click="copyShareUrl(pvpShareUrl)"
+              <div
+                class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+              >
+                <div class="min-w-0 space-y-1">
+                  <div class="flex items-center gap-2">
+                    <UBadge color="pve" variant="soft" size="sm">
+                      {{ t('settings.profile_sharing.mode_pve', 'PvE') }}
+                    </UBadge>
+                    <span class="text-surface-300 text-xs">{{ pveVisibilityLabel }}</span>
+                  </div>
+                  <div class="flex min-w-0 items-center gap-1.5">
+                    <a
+                      :href="pveShareUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-info-300 hover:text-info-200 truncate text-[11px] transition-colors"
+                    >
+                      {{ pveShareUrl }}
+                    </a>
+                    <UButton
+                      icon="i-mdi-content-copy"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      :aria-label="
+                        t('settings.profile_sharing.copy_pve_link', 'Copy PvE profile link')
+                      "
+                      @click="copyShareUrl(pveShareUrl)"
+                    />
+                  </div>
+                </div>
+                <USwitch
+                  v-model="pvePublic"
+                  :aria-label="
+                    t('settings.profile_sharing.toggle_pve_label', 'Toggle PvE profile sharing')
+                  "
                 />
               </div>
             </div>
-            <USwitch v-model="pvpPublic" :disabled="!isLoggedIn" />
           </div>
-          <div
-            class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-          >
-            <div class="min-w-0 space-y-1">
-              <div class="flex items-center gap-2">
-                <UBadge color="pve" variant="soft" size="sm">PvE</UBadge>
-                <span class="text-surface-300 text-xs">{{ pveVisibilityLabel }}</span>
-              </div>
-              <div class="flex min-w-0 items-center gap-1.5">
-                <a
-                  :href="pveShareUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-info-300 hover:text-info-200 truncate text-[11px] transition-colors"
-                >
-                  {{ pveShareUrl }}
-                </a>
-                <UButton
-                  icon="i-mdi-content-copy"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  :disabled="!isLoggedIn"
-                  :aria-label="t('settings.profile_sharing.copy_link', 'Copy profile link')"
-                  @click="copyShareUrl(pveShareUrl)"
-                />
-              </div>
-            </div>
-            <USwitch v-model="pvePublic" :disabled="!isLoggedIn" />
-          </div>
-        </div>
+        </template>
         <UAlert
-          v-if="!isLoggedIn"
+          v-else
           icon="i-mdi-lock"
           color="warning"
           variant="soft"
@@ -90,7 +110,16 @@
               'Log in to manage profile sharing visibility.'
             )
           "
-        />
+        >
+          <template #description>
+            <NuxtLink
+              to="/login"
+              class="text-warning-300 hover:text-warning-200 underline transition-colors"
+            >
+              {{ t('navigation_drawer.login', 'Log in') }}
+            </NuxtLink>
+          </template>
+        </UAlert>
       </div>
     </template>
   </GenericCard>

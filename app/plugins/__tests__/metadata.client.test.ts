@@ -40,7 +40,8 @@ describe('metadata plugin', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
-  it('does not retry metadata initialization after a permanent failure', async () => {
+  it('retries metadata initialization after a previous failure', async () => {
+    metadataStoreMock.initialize.mockResolvedValue(undefined);
     const plugin = (await import('@/plugins/metadata.client')).default;
     const hooks = new Map<string, () => void>();
     plugin({
@@ -50,8 +51,7 @@ describe('metadata plugin', () => {
     } as Parameters<typeof plugin>[0]);
     hooks.get('app:mounted')?.();
     await flushPromises();
-    expect(metadataStoreMock.initialize).not.toHaveBeenCalled();
-    expect(toastAdd).not.toHaveBeenCalled();
+    expect(metadataStoreMock.initialize).toHaveBeenCalled();
   });
   it('waits until app mount before starting metadata initialization', async () => {
     metadataStoreMock.initializationFailed = false;

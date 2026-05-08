@@ -4,7 +4,7 @@ type InvalidationInput = {
   taskCompletions: Record<string, TaskCompletion>;
   pmcFaction: string;
 };
-export type InvalidationResult = {
+type InvalidationResult = {
   invalidTasks: Record<string, boolean>;
   invalidObjectives: Record<string, boolean>;
 };

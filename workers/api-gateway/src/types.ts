@@ -36,10 +36,6 @@ export interface ApiUpdateMeta {
   source: 'api';
   tasks?: ApiTaskUpdate[];
 }
-// Request body for single task update
-export interface TaskUpdateBody {
-  state: TaskState;
-}
 // Request body for batch task update
 export interface BatchTaskUpdate {
   id: string;
@@ -91,11 +87,6 @@ export interface UserProgressRow {
   pve_data: UserProgressData | null;
   created_at?: string | null;
   updated_at?: string | null;
-}
-// API Response types (matching TarkovMonitor expectations)
-export interface TokenResponse {
-  permissions: string[];
-  token: string;
 }
 // Legacy token response format (matching old API)
 export interface LegacyTokenResponse {
