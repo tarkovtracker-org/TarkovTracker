@@ -1319,6 +1319,10 @@
     "content_title": "Contenido",
     "mode_label": "Modo de juego",
     "metric_label": "Widget",
+    "mode_pvp": "PvP",
+    "mode_pve": "PvE",
+    "platform_obs": "OBS Studio / Streamlabs Desktop",
+    "platform_xsplit": "XSplit / vMix",
     "appearance_title": "Apariencia",
     "customize_options": "Personalizar opciones de overlay",
     "reset_defaults": "Restablecer",
@@ -1399,6 +1403,7 @@
     "align_bottom_center": "Abajo Centro",
     "align_bottom_right": "Abajo Derecha",
     "copy_success": "URL de overlay copiada",
+    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Configuración de streamer restablecida",
     "resolution_label": "Resolución",
     "resolution_1080": "1080p",
@@ -1439,7 +1444,8 @@
       "data_management": "Gestión de datos",
       "imports": "Importaciones",
       "backup_restore": "Copia y restauración",
-      "api": "API"
+      "api": "API",
+      "streamer_tools": "Herramientas de Streamer"
     },
     "tab_groups": {
       "game": "Juego",
@@ -1473,6 +1479,10 @@
       "api": {
         "title": "Configuración de API",
         "description": "Gestiona tokens de API de TarkovTracker e integraciones de cuenta."
+      },
+      "streamer_tools": {
+        "title": "Herramientas de Streamer",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1537,7 +1547,13 @@
       "description": "Controla qué perfiles de modo de juego se pueden ver desde un enlace compartido.",
       "public": "Público",
       "private": "Privado",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
+      "toggle_pvp_label": "Toggle PvP profile sharing",
+      "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_link": "Copiar enlace del perfil",
+      "copy_pvp_link": "Copy PvP profile link",
+      "copy_pve_link": "Copy PvE profile link",
       "login_required": "Inicia sesión para gestionar la visibilidad del perfil compartido."
     },
     "game_settings": {
