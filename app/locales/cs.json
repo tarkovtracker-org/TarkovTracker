@@ -1319,6 +1319,10 @@
     "content_title": "Obsah",
     "mode_label": "Herní režim",
     "metric_label": "Widget",
+    "mode_pvp": "PvP",
+    "mode_pve": "PvE",
+    "platform_obs": "OBS Studio / Streamlabs Desktop",
+    "platform_xsplit": "XSplit / vMix",
     "appearance_title": "Vzhled",
     "customize_options": "Přizpůsobit možnosti překrytí",
     "reset_defaults": "Obnovit výchozí hodnoty",
@@ -1399,6 +1403,7 @@
     "align_bottom_center": "Dolní střed",
     "align_bottom_right": "Vpravo dole",
     "copy_success": "URL překrytí zkopírováno",
+    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Obnovení nastavení streameru",
     "resolution_label": "Rozlišení",
     "resolution_1080": "1080p",
@@ -1439,7 +1444,8 @@
       "data_management": "Správa dat",
       "imports": "Dovoz",
       "backup_restore": "Zálohování a obnovení",
-      "api": "API"
+      "api": "API",
+      "streamer_tools": "Nástroje pro streamování"
     },
     "tab_groups": {
       "game": "Hra",
@@ -1473,6 +1479,10 @@
       "api": {
         "title": "Nastavení API",
         "description": "Správa TarkovTracker API tokenů a integrace účtu."
+      },
+      "streamer_tools": {
+        "title": "Nástroje pro streamování",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1537,7 +1547,13 @@
       "description": "Nastavte, který herní mód profil lze zobrazit ze sdíleného odkazu.",
       "public": "Veřejnost",
       "private": "Soukromé",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
+      "toggle_pvp_label": "Toggle PvP profile sharing",
+      "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_link": "Kopírovat odkaz na profil",
+      "copy_pvp_link": "Copy PvP profile link",
+      "copy_pve_link": "Copy PvE profile link",
       "login_required": "Přihlaste se pro správu viditelnosti sdílení profilu."
     },
     "game_settings": {
