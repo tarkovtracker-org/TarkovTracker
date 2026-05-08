@@ -2,12 +2,15 @@ export const OPENAPI_SPEC = {
   openapi: '3.1.0',
   info: {
     title: 'TarkovTracker API Gateway',
-    version: '2.0.0',
+    version: '2.1.0',
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
       'Tokens use prefixes `PVP_` or `PVE_`.\n\n' +
-      'Rate limits: enforced per IP + token. Read endpoints are ~60/min, write endpoints are ~30/min.\n\n' +
+      'Rate limits: enforced per IP + token. Read endpoints are ~60/min, write endpoints are ~30/min. ' +
+      'Every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` ' +
+      '(unix seconds). On `429` responses a `Retry-After` header (seconds) is also returned, so clients ' +
+      'should queue and retry after that delay rather than busy-looping.\n\n' +
       'Docs: https://api.tarkovtracker.org/docs (or / on the api subdomain).',
     contact: {
       name: 'TarkovTracker',
@@ -83,6 +86,24 @@ export const OPENAPI_SPEC = {
       },
       RateLimited: {
         description: 'Rate limit exceeded',
+        headers: {
+          'Retry-After': {
+            description: 'Seconds the client should wait before retrying.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+          'X-RateLimit-Limit': {
+            description: 'Maximum requests permitted in the current window.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+          'X-RateLimit-Remaining': {
+            description: 'Requests remaining in the current window (0 on a 429).',
+            schema: { type: 'integer', minimum: 0 },
+          },
+          'X-RateLimit-Reset': {
+            description: 'Unix timestamp (seconds) when the current window resets.',
+            schema: { type: 'integer', minimum: 0 },
+          },
+        },
         content: {
           'application/json': {
             schema: { $ref: '#/components/schemas/ErrorResponse' },

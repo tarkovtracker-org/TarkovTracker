@@ -2,16 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../index';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
-const makeLimiter = () =>
+const makeLimiter = (
+  payload: { allowed: boolean; remaining: number; resetAt?: number } = {
+    allowed: true,
+    remaining: 10,
+  }
+) =>
   ({
     idFromName: (name: string) => name,
     get: () => ({
       fetch: async () =>
         new Response(
           JSON.stringify({
-            allowed: true,
-            remaining: 10,
-            resetAt: Date.now() + 60000,
+            allowed: payload.allowed,
+            remaining: payload.remaining,
+            resetAt: payload.resetAt ?? Date.now() + 60000,
           }),
           {
             status: 200,
@@ -19,7 +24,7 @@ const makeLimiter = () =>
           }
         ),
     }),
-  }) as unknown as DurableObjectNamespace;
+  }) as unknown as Env['API_GATEWAY_LIMITER'];
 const BASE_ENV: Env = {
   API_GATEWAY_LIMITER: makeLimiter(),
   SUPABASE_URL: 'https://supabase.example',
@@ -50,7 +55,8 @@ const createBaseFetchMock = ({
   },
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.url;
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes('/rest/v1/api_tokens')) {
       return jsonResponse([
         {
@@ -129,7 +135,8 @@ describe('api-gateway', () => {
   });
   it('returns token info for valid token', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.url;
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/rest/v1/api_tokens')) {
         return jsonResponse([
           {
@@ -163,6 +170,90 @@ describe('api-gateway', () => {
     expect(body.success).toBe(true);
     expect(body.token).toBe('PVP_abc123');
     expect(body.owner).toBe('user-1');
+  });
+  it('exposes rate-limit headers on successful responses', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/rest/v1/api_tokens')) {
+        return jsonResponse([
+          {
+            token_id: 'token-1',
+            user_id: 'user-1',
+            token_hash: 'hash',
+            permissions: ['GP'],
+            game_mode: 'pvp',
+            note: 'test',
+            is_active: true,
+            usage_count: 0,
+            expires_at: null,
+          },
+        ]);
+      }
+      if (url.includes('/rest/v1/rpc/increment_token_usage')) {
+        return jsonResponse({ ok: true });
+      }
+      return new Response('Not Found', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123' },
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('60');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
+    expect(res.headers.get('Retry-After')).toBeNull();
+    expect(res.headers.get('Access-Control-Expose-Headers')).toContain('X-RateLimit-Remaining');
+  });
+  it('returns Retry-After and rate-limit headers on 429', async () => {
+    const resetAt = Date.now() + 30_000;
+    const env: Env = {
+      ...BASE_ENV,
+      API_GATEWAY_LIMITER: makeLimiter({ allowed: false, remaining: 0, resetAt }),
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/rest/v1/api_tokens')) {
+        return jsonResponse([
+          {
+            token_id: 'token-1',
+            user_id: 'user-1',
+            token_hash: 'hash',
+            permissions: ['GP'],
+            game_mode: 'pvp',
+            note: 'test',
+            is_active: true,
+            usage_count: 0,
+            expires_at: null,
+          },
+        ]);
+      }
+      if (url.includes('/rest/v1/rpc/increment_token_usage')) {
+        return jsonResponse({ ok: true });
+      }
+      return new Response('Not Found', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123' },
+      }),
+      env
+    );
+    expect(res.status).toBe(429);
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('60');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
+    expect(res.headers.get('X-RateLimit-Reset')).toBe(String(Math.ceil(resetAt / 1000)));
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(31);
   });
   it('updates dependent and alternative tasks for single update', async () => {
     let patchBody: Record<string, unknown> | null = null;
@@ -200,8 +291,9 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     expect(patchBody).not.toBeNull();
-    const dataField = (patchBody as { pvp_data?: { taskCompletions?: Record<string, unknown> } })
-      .pvp_data;
+    const dataField = (
+      patchBody as unknown as { pvp_data?: { taskCompletions?: Record<string, unknown> } }
+    ).pvp_data;
     const taskCompletions = dataField?.taskCompletions as
       | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
       | undefined;
@@ -248,7 +340,7 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     expect(patchBody).not.toBeNull();
-    const pvpData = (patchBody as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
+    const pvpData = (patchBody as unknown as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
     expect(pvpData.lastApiUpdate).toBeUndefined();
   });
   it('preserves explicit dependent task states in batch updates', async () => {
@@ -290,8 +382,9 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     expect(patchBody).not.toBeNull();
-    const pvpData = (patchBody as { pvp_data?: { taskCompletions?: Record<string, unknown> } })
-      .pvp_data;
+    const pvpData = (
+      patchBody as unknown as { pvp_data?: { taskCompletions?: Record<string, unknown> } }
+    ).pvp_data;
     const taskCompletions = pvpData?.taskCompletions as
       | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
       | undefined;
@@ -349,12 +442,13 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    const pvpData = (patchBody as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
+    const pvpData = (patchBody as unknown as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
     expect(pvpData.lastApiUpdate).toBeUndefined();
   });
   it('returns progress for valid token', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.url;
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/rest/v1/api_tokens')) {
         return jsonResponse([
           {

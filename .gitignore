@@ -8,6 +8,7 @@ coverage
 dist
 .wrangler
 .claude
+.codegraph
 .codex
 node_modules
 .DS_Store
