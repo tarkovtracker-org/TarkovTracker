@@ -1319,6 +1319,10 @@
     "content_title": "Inhalt",
     "mode_label": "Spielmodus",
     "metric_label": "Widget",
+    "mode_pvp": "PvP",
+    "mode_pve": "PvE",
+    "platform_obs": "OBS Studio / Streamlabs Desktop",
+    "platform_xsplit": "XSplit / vMix",
     "appearance_title": "Aussehen",
     "customize_options": "Overlay-Optionen anpassen",
     "reset_defaults": "Zurücksetzen",
@@ -1399,6 +1403,7 @@
     "align_bottom_center": "Unten Mitte",
     "align_bottom_right": "Unten Rechts",
     "copy_success": "Overlay-URL kopiert",
+    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Streamer-Einstellungen zurückgesetzt",
     "resolution_label": "Auflösung",
     "resolution_1080": "1080p",
@@ -1439,7 +1444,8 @@
       "data_management": "Datenverwaltung",
       "imports": "Importe",
       "backup_restore": "Backup & Wiederherstellung",
-      "api": "API"
+      "api": "API",
+      "streamer_tools": "Streamer Tools"
     },
     "tab_groups": {
       "game": "Spiel",
@@ -1473,6 +1479,10 @@
       "api": {
         "title": "API-Einstellungen",
         "description": "Verwalte TarkovTracker-API-Token und Kontointegrationen."
+      },
+      "streamer_tools": {
+        "title": "Streamer Tools",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1537,7 +1547,13 @@
       "description": "Lege fest, welche Spielmodus-Profile über einen geteilten Link sichtbar sind.",
       "public": "Öffentlich",
       "private": "Privat",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
+      "toggle_pvp_label": "Toggle PvP profile sharing",
+      "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_link": "Profillink kopieren",
+      "copy_pvp_link": "Copy PvP profile link",
+      "copy_pve_link": "Copy PvE profile link",
       "login_required": "Melde dich an, um die Profilfreigabe zu verwalten."
     },
     "game_settings": {
