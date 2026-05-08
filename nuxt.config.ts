@@ -205,6 +205,7 @@ export default defineNuxtConfig({
   },
   routeRules: {
     '/neededitems': { redirect: { to: '/needed-items', statusCode: 301 } },
+    '/streamer-tools': { redirect: { to: '/settings#streamer-tools', statusCode: 301 } },
     // Explicit long-term caching for build assets
     '/_nuxt/**': {
       headers: { 'cache-control': 'public,max-age=31536000,immutable' },
