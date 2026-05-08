@@ -58,6 +58,9 @@ type RateLimitResult = {
   allowed: boolean;
   status?: number;
   message?: string;
+  limit?: number;
+  remaining?: number;
+  resetAt?: number;
 };
 const RATE_LIMIT_TIMEOUT_MS = 3000;
 const RATE_LIMIT_SLOW_MS = 200;
@@ -142,9 +145,9 @@ async function rateLimit(
         message: 'Rate limiter unavailable',
       };
     }
-    let data: { allowed?: boolean } = {};
+    let data: { allowed?: boolean; remaining?: number; resetAt?: number } = {};
     try {
-      data = (await res.json()) as { allowed?: boolean };
+      data = (await res.json()) as { allowed?: boolean; remaining?: number; resetAt?: number };
     } catch {
       return {
         allowed: false,
@@ -152,14 +155,19 @@ async function rateLimit(
         message: 'Rate limiter unavailable',
       };
     }
+    const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
+    const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
     if (data.allowed === false) {
       return {
         allowed: false,
         status: 429,
         message: 'Rate limit exceeded',
+        limit,
+        remaining: remaining ?? 0,
+        resetAt,
       };
     }
-    return { allowed: true };
+    return { allowed: true, limit, remaining, resetAt };
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     if (error instanceof Error && error.name === 'AbortError') {
@@ -191,7 +199,25 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
     'Access-Control-Allow-Origin': resolveOrigin(envOrigin, requestOrigin),
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Expose-Headers':
+      'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };
+}
+function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (typeof rl.limit === 'number') {
+    headers['X-RateLimit-Limit'] = String(rl.limit);
+  }
+  if (typeof rl.remaining === 'number') {
+    headers['X-RateLimit-Remaining'] = String(rl.remaining);
+  }
+  if (typeof rl.resetAt === 'number') {
+    headers['X-RateLimit-Reset'] = String(Math.ceil(rl.resetAt / 1000));
+    if (!rl.allowed) {
+      headers['Retry-After'] = String(Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)));
+    }
+  }
+  return headers;
 }
 function docsResponse(envOrigin?: string, requestOrigin?: string): Response {
   const html = `<!doctype html>
@@ -241,7 +267,8 @@ function openApiResponse(envOrigin?: string, requestOrigin?: string): Response {
 function tokenFlatResponse(
   tokenData: LegacyTokenResponse,
   envOrigin?: string,
-  requestOrigin?: string
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
 ): Response {
   const body = { success: true, ...tokenData };
   return new Response(JSON.stringify(body), {
@@ -250,6 +277,7 @@ function tokenFlatResponse(
       'Content-Type': 'application/json',
       ...corsHeaders(envOrigin, requestOrigin),
       'Cache-Control': 'no-store',
+      ...(extraHeaders ?? {}),
     },
   });
 }
@@ -261,7 +289,8 @@ function successResponse(
   meta?: Record<string, unknown>,
   status = 200,
   envOrigin?: string,
-  requestOrigin?: string
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
 ): Response {
   const body: Record<string, unknown> = { success: true };
   // If data has its own data/meta structure, flatten it
@@ -278,6 +307,7 @@ function successResponse(
       'Content-Type': 'application/json',
       ...corsHeaders(envOrigin, requestOrigin),
       'Cache-Control': 'no-store',
+      ...(extraHeaders ?? {}),
     },
   });
 }
@@ -288,7 +318,8 @@ function errorResponse(
   error: string,
   status = 500,
   envOrigin?: string,
-  requestOrigin?: string
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
 ): Response {
   return new Response(JSON.stringify({ success: false, error }), {
     status,
@@ -296,6 +327,7 @@ function errorResponse(
       'Content-Type': 'application/json',
       ...corsHeaders(envOrigin, requestOrigin),
       'Cache-Control': 'no-store',
+      ...(extraHeaders ?? {}),
     },
   });
 }
@@ -379,16 +411,18 @@ export default {
           RATE_LIMITS['token-info'].limit,
           RATE_LIMITS['token-info'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const tokenResponse = handleGetToken(validation.token, rawToken);
-        return tokenFlatResponse(tokenResponse, origin, reqOrigin);
+        return tokenFlatResponse(tokenResponse, origin, reqOrigin, rlHeaders);
       }
       // GET /progress - Player progress
       if (apiPath === '/progress' && request.method === 'GET') {
@@ -404,17 +438,19 @@ export default {
           RATE_LIMITS['progress-read'].limit,
           RATE_LIMITS['progress-read'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const effectiveGameMode = validation.token.game_mode;
         const progress = await handleGetProgress(env, validation.token, effectiveGameMode);
-        return successResponse(progress, undefined, 200, origin, reqOrigin);
+        return successResponse(progress, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // GET /team/progress - Team progress (requires TP permission)
       if (apiPath === '/team/progress' && request.method === 'GET') {
@@ -430,17 +466,19 @@ export default {
           RATE_LIMITS['progress-read'].limit,
           RATE_LIMITS['progress-read'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const effectiveGameMode = validation.token.game_mode;
         const teamProgress = await handleGetTeamProgress(env, validation.token, effectiveGameMode);
-        return successResponse(teamProgress, undefined, 200, origin, reqOrigin);
+        return successResponse(teamProgress, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/level/:levelValue - Update player level
       const levelMatch = apiPath.match(/^\/progress\/level\/(\d+)$/);
@@ -457,21 +495,29 @@ export default {
           RATE_LIMITS['progress-write'].limit,
           RATE_LIMITS['progress-write'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const level = parseInt(levelMatch[1], 10);
         if (isNaN(level) || level < 1 || level > 79) {
-          return errorResponse('Invalid level value (must be 1-79)', 400, origin, reqOrigin);
+          return errorResponse(
+            'Invalid level value (must be 1-79)',
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
         }
         const effectiveGameMode = validation.token.game_mode;
         const result = await handleUpdateLevel(env, validation.token, level, effectiveGameMode);
-        return successResponse(result, undefined, 200, origin, reqOrigin);
+        return successResponse(result, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/task/objective/:objectiveId - Update task objective
       const objectiveMatch = apiPath.match(/^\/progress\/task\/objective\/([^/]+)$/);
@@ -488,24 +534,33 @@ export default {
           RATE_LIMITS['progress-write'].limit,
           RATE_LIMITS['progress-write'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const body = (await request.json()) as { state?: string; count?: number };
         if (!body.state && body.count === undefined) {
-          return errorResponse('Must provide state or count', 400, origin, reqOrigin);
+          return errorResponse(
+            'Must provide state or count',
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
         }
         if (body.state && !['completed', 'uncompleted'].includes(body.state)) {
           return errorResponse(
             'Invalid state (must be completed or uncompleted)',
             400,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const effectiveGameMode = validation.token.game_mode;
@@ -516,7 +571,7 @@ export default {
           body,
           effectiveGameMode
         );
-        return successResponse(result, undefined, 200, origin, reqOrigin);
+        return successResponse(result, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/task/:taskId - Update single task
       const taskMatch = apiPath.match(/^\/progress\/task\/([^/]+)$/);
@@ -533,18 +588,20 @@ export default {
           RATE_LIMITS['progress-write'].limit,
           RATE_LIMITS['progress-write'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const body = (await request.json()) as { state?: string };
         const state = body.state as TaskState;
         if (!state || !['completed', 'uncompleted', 'failed'].includes(state)) {
-          return errorResponse('Invalid state', 400, origin, reqOrigin);
+          return errorResponse('Invalid state', 400, origin, reqOrigin, rlHeaders);
         }
         const effectiveGameMode = validation.token.game_mode;
         const result = await handleUpdateTask(
@@ -554,7 +611,7 @@ export default {
           state,
           effectiveGameMode
         );
-        return successResponse(result, undefined, 200, origin, reqOrigin);
+        return successResponse(result, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/tasks - Batch update tasks
       if (apiPath === '/progress/tasks' && request.method === 'POST') {
@@ -570,23 +627,25 @@ export default {
           RATE_LIMITS['progress-write'].limit,
           RATE_LIMITS['progress-write'].windowSec
         );
+        const rlHeaders = rateLimitHeaders(rl);
         if (!rl.allowed) {
           return errorResponse(
             rl.message || 'Rate limit exceeded',
             rl.status || 429,
             origin,
-            reqOrigin
+            reqOrigin,
+            rlHeaders
           );
         }
         const body = await request.json();
         // Support both legacy object format and new array format
         const updates = normalizeTaskUpdates(body);
         if (!updates) {
-          return errorResponse('Invalid request body', 400, origin, reqOrigin);
+          return errorResponse('Invalid request body', 400, origin, reqOrigin, rlHeaders);
         }
         const effectiveGameMode = validation.token.game_mode;
         const result = await handleUpdateTasks(env, validation.token, updates, effectiveGameMode);
-        return successResponse(result, undefined, 200, origin, reqOrigin);
+        return successResponse(result, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // Route not found
       return errorResponse('Not Found', 404, origin, reqOrigin);

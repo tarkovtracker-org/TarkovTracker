@@ -49,12 +49,6 @@
         to="/settings"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
-      <DrawerItem
-        icon="i-heroicons-video-camera"
-        locale-key="streamer_tools"
-        to="/streamer-tools"
-        :is-collapsed="props.isCollapsed"
-      ></DrawerItem>
     </ul>
   </div>
 </template>
