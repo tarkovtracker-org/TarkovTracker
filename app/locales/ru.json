@@ -1319,6 +1319,10 @@
     "content_title": "Контент",
     "mode_label": "Режим игры",
     "metric_label": "Виджет",
+    "mode_pvp": "PvP",
+    "mode_pve": "PvE",
+    "platform_obs": "OBS Studio / Streamlabs Desktop",
+    "platform_xsplit": "XSplit / vMix",
     "appearance_title": "Внешний вид",
     "customize_options": "Настроить параметры оверлея",
     "reset_defaults": "Сбросить",
@@ -1399,6 +1403,7 @@
     "align_bottom_center": "Снизу по центру",
     "align_bottom_right": "Снизу справа",
     "copy_success": "URL оверлея скопирован",
+    "copy_failed": "Failed to copy overlay URL",
     "settings_reset": "Настройки стримера сброшены",
     "resolution_label": "Разрешение",
     "resolution_1080": "1080p",
@@ -1439,7 +1444,8 @@
       "data_management": "Управление данными",
       "imports": "Импорт",
       "backup_restore": "Резервные копии",
-      "api": "API"
+      "api": "API",
+      "streamer_tools": "Инструменты стримера"
     },
     "tab_groups": {
       "game": "Игра",
@@ -1473,6 +1479,10 @@
       "api": {
         "title": "Настройки API",
         "description": "Управляйте API-токенами TarkovTracker и интеграциями аккаунта."
+      },
+      "streamer_tools": {
+        "title": "Инструменты стримера",
+        "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
@@ -1537,7 +1547,13 @@
       "description": "Управляйте видимостью профилей игровых режимов по общей ссылке.",
       "public": "Публичный",
       "private": "Приватный",
+      "mode_pvp": "PvP",
+      "mode_pve": "PvE",
+      "toggle_pvp_label": "Toggle PvP profile sharing",
+      "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_link": "Копировать ссылку на профиль",
+      "copy_pvp_link": "Copy PvP profile link",
+      "copy_pve_link": "Copy PvE profile link",
       "login_required": "Войдите, чтобы управлять видимостью общего профиля."
     },
     "game_settings": {
