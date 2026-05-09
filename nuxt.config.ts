@@ -67,7 +67,9 @@ const STRIPE_PUBLIC_URL_KEYS = [
   'STRIPE_CHAD_YEARLY_URL',
   'STRIPE_ONE_TIME_URL',
 ] as const;
-if (IS_PRODUCTION_BUILD) {
+const IS_BUILD_COMMAND = process.argv.some((a) => a === 'build' || a === 'generate');
+const IS_CF_PREVIEW = process.env.CF_PAGES === '1' && process.env.CF_PAGES_BRANCH !== 'main';
+if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW) {
   const missingStripeUrls = STRIPE_PUBLIC_URL_KEYS.filter((key) => !process.env[key]?.trim());
   if (missingStripeUrls.length > 0) {
     throw new Error(
