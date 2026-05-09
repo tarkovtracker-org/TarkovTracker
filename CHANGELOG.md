@@ -1,3 +1,10 @@
+# [1.36.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.4...v1.36.0) (2026-05-08)
+
+
+### Features
+
+* **api:** expose rate-limit headers on every response ([a633dc8](https://github.com/tarkovtracker-org/TarkovTracker/commit/a633dc8770b5dd63746d06dccf5c9f600203077e))
+
 ## [1.35.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.35.3...v1.35.4) (2026-05-06)
 
 
