@@ -4,6 +4,7 @@
       v-for="opt in options"
       :key="opt.value"
       type="button"
+      :aria-pressed="modelValue === opt.value"
       class="relative flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-200"
       :class="
         modelValue === opt.value
