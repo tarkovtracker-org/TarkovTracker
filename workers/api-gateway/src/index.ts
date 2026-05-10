@@ -576,6 +576,10 @@ export default {
       // POST /progress/task/:taskId - Update single task
       const taskMatch = apiPath.match(/^\/progress\/task\/([^/]+)$/);
       if (taskMatch && request.method === 'POST') {
+        const taskId = taskMatch[1]?.trim();
+        if (!taskId) {
+          return errorResponse('Missing task ID in URL', 400, origin, reqOrigin);
+        }
         const validation = await validateToken(env, rawToken, 'WP');
         if (!validation.valid) {
           return errorResponse(validation.error, validation.status, origin, reqOrigin);
@@ -598,16 +602,27 @@ export default {
             rlHeaders
           );
         }
-        const body = (await request.json()) as { state?: string };
+        let body: { state?: string };
+        try {
+          body = (await request.json()) as { state?: string };
+        } catch {
+          return errorResponse('Invalid JSON body', 400, origin, reqOrigin, rlHeaders);
+        }
         const state = body.state as TaskState;
         if (!state || !['completed', 'uncompleted', 'failed'].includes(state)) {
-          return errorResponse('Invalid state', 400, origin, reqOrigin, rlHeaders);
+          return errorResponse(
+            `Invalid state "${body.state ?? ''}" (must be completed, uncompleted, or failed)`,
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
         }
         const effectiveGameMode = validation.token.game_mode;
         const result = await handleUpdateTask(
           env,
           validation.token,
-          taskMatch[1],
+          taskId,
           state,
           effectiveGameMode
         );
