@@ -124,6 +124,15 @@
       />
     </AppTooltip>
     <AppTooltip
+      v-if="task.alternatives && task.alternatives.length > 0"
+      :text="t('page.tasks.questcard.alternatives_tooltip', { count: task.alternatives.length })"
+    >
+      <UBadge size="xs" color="warning" variant="soft" class="shrink-0 cursor-help text-[11px]">
+        <UIcon name="i-mdi-swap-horizontal" class="mr-0.5 h-3 w-3" aria-hidden="true" />
+        {{ t('page.tasks.questcard.alternatives_badge', { count: task.alternatives.length }) }}
+      </UBadge>
+    </AppTooltip>
+    <AppTooltip
       v-if="showRequiredLabels && exclusiveEditionBadge"
       :text="
         t(

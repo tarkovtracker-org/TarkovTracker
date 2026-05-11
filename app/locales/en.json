@@ -867,6 +867,8 @@
         "kappa_required": "KAPPA REQUIRED",
         "level_badge_tooltip": "Minimum player level {level} required to unlock this quest",
         "lightkeeper_tooltip": "This quest is required to unlock the Lightkeeper trader",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "LIGHTKEEPER REQUIRED",
         "location_tooltip": "Quest objectives are on {map}",
         "next_tasks": "Next Task(s):",
