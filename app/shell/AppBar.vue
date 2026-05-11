@@ -1,6 +1,11 @@
 <template>
   <header
-    class="border-surface-700/50 bg-surface-900 fixed top-0 right-0 z-40 h-11 border-b shadow-[0_1px_0_rgba(0,0,0,0.4)]"
+    class="fixed top-0 right-0 z-40 h-11 border-b shadow-[0_1px_0_rgba(0,0,0,0.4)]"
+    :class="
+      currentMode === 'pve'
+        ? 'border-pve-700/60 bg-surface-900'
+        : 'border-pvp-700/60 bg-surface-900'
+    "
   >
     <div class="flex h-full items-center gap-1 px-2 sm:gap-2 sm:px-3">
       <!-- Left: Toggle Button -->
@@ -155,6 +160,7 @@
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
+  const currentMode = computed(() => tarkovStore.getCurrentGameMode());
   const skillCalculation = useSkillCalculation();
   const route = useRoute();
   const { $supabase } = useNuxtApp();

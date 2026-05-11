@@ -16,8 +16,8 @@
   </Transition>
   <nav
     :aria-label="t('navigation_drawer.main_navigation')"
-    class="bg-sidebar border-surface-700/50 shadow-nav-drawer fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
-    :class="[sidebarWidth]"
+    class="bg-sidebar shadow-nav-drawer fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
+    :class="[sidebarWidth, currentMode === 'pve' ? 'border-pve-700/50' : 'border-pvp-700/50']"
   >
     <div
       class="scrollbar-thin relative z-10 flex h-full flex-col overflow-x-hidden overflow-y-auto"
@@ -99,9 +99,12 @@
 </template>
 <script setup lang="ts">
   import { useAppStore } from '@/stores/useApp';
+  import { useTarkovStore } from '@/stores/useTarkov';
   const { t } = useI18n({ useScope: 'global' });
   const { belowMd } = useSharedBreakpoints();
   const appStore = useAppStore();
+  const tarkovStore = useTarkovStore();
+  const currentMode = computed(() => tarkovStore.getCurrentGameMode());
   const mobileExpanded = computed(() => appStore.mobileDrawerExpanded);
   watch(belowMd, (isMobile) => {
     if (!isMobile) {
