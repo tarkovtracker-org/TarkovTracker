@@ -6,20 +6,30 @@
         {{ t('page.tasks.settings.tabs.filter_bar') }}
       </h3>
     </div>
-    <p class="text-surface-500 mb-2 text-xs">
+    <p class="text-surface-500 mb-3 text-xs">
       {{ t('page.tasks.settings.filter_bar.hint') }}
     </p>
-    <div class="space-y-1">
-      <label
+    <div class="space-y-2">
+      <div
         v-for="filter in filters"
         :key="filter.key"
-        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        class="flex items-center justify-between gap-3 rounded px-2 py-1.5"
       >
-        <UCheckbox v-model="filter.model.value" />
-        <span class="text-surface-200 text-sm">
-          {{ t(`page.tasks.settings.filter_bar.${filter.key}`, filter.key) }}
-        </span>
-      </label>
+        <div class="min-w-0 flex-1">
+          <span class="text-surface-200 text-sm font-medium">
+            {{ t(`page.tasks.settings.filter_bar.${filter.key}`, filter.key) }}
+          </span>
+          <p class="text-surface-500 mt-0.5 text-xs leading-snug">
+            {{ t(`page.tasks.settings.filter_bar.${filter.key}_hint`, '') }}
+          </p>
+        </div>
+        <USwitch
+          :model-value="filter.model.value"
+          size="sm"
+          color="primary"
+          @update:model-value="filter.model.value = $event"
+        />
+      </div>
     </div>
   </section>
 </template>

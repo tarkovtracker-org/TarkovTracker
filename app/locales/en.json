@@ -707,12 +707,17 @@
           "collapse_completed_objectives": "Collapse Objectives on Completed Tasks"
         },
         "filter_bar": {
-          "hint": "Show or hide status filters.",
-          "all_filter": "All Filter",
-          "available_filter": "Available Filter",
-          "locked_filter": "Locked Filter",
-          "completed_filter": "Completed Filter",
-          "failed_filter": "Failed Filter"
+          "hint": "Toggle task status filters on or off to control which tasks are visible.",
+          "all_filter": "Show All Tasks",
+          "all_filter_hint": "Display every task regardless of status.",
+          "available_filter": "Show Available",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
+          "locked_filter": "Show Locked",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
+          "completed_filter": "Show Completed",
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Show Failed",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Manual Fail Actions",
