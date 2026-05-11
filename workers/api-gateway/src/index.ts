@@ -522,6 +522,10 @@ export default {
       // POST /progress/task/objective/:objectiveId - Update task objective
       const objectiveMatch = apiPath.match(/^\/progress\/task\/objective\/([^/]+)$/);
       if (objectiveMatch && request.method === 'POST') {
+        const objectiveId = objectiveMatch[1]?.trim();
+        if (!objectiveId) {
+          return errorResponse('Missing objectiveId', 404, origin, reqOrigin);
+        }
         const validation = await validateToken(env, rawToken, 'WP');
         if (!validation.valid) {
           return errorResponse(validation.error, validation.status, origin, reqOrigin);
@@ -556,7 +560,7 @@ export default {
         }
         if (body.state && !['completed', 'uncompleted'].includes(body.state)) {
           return errorResponse(
-            'Invalid state (must be completed or uncompleted)',
+            `Invalid state: received "${body.state}" (must be completed or uncompleted)`,
             400,
             origin,
             reqOrigin,
@@ -567,7 +571,7 @@ export default {
         const result = await handleUpdateObjective(
           env,
           validation.token,
-          objectiveMatch[1],
+          objectiveId,
           body,
           effectiveGameMode
         );
@@ -576,6 +580,10 @@ export default {
       // POST /progress/task/:taskId - Update single task
       const taskMatch = apiPath.match(/^\/progress\/task\/([^/]+)$/);
       if (taskMatch && request.method === 'POST') {
+        const taskId = taskMatch[1]?.trim();
+        if (!taskId) {
+          return errorResponse('Missing taskId', 404, origin, reqOrigin);
+        }
         const validation = await validateToken(env, rawToken, 'WP');
         if (!validation.valid) {
           return errorResponse(validation.error, validation.status, origin, reqOrigin);
@@ -601,13 +609,19 @@ export default {
         const body = (await request.json()) as { state?: string };
         const state = body.state as TaskState;
         if (!state || !['completed', 'uncompleted', 'failed'].includes(state)) {
-          return errorResponse('Invalid state', 400, origin, reqOrigin, rlHeaders);
+          return errorResponse(
+            `Invalid state: received "${state}" (must be completed, uncompleted, or failed)`,
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
         }
         const effectiveGameMode = validation.token.game_mode;
         const result = await handleUpdateTask(
           env,
           validation.token,
-          taskMatch[1],
+          taskId,
           state,
           effectiveGameMode
         );
