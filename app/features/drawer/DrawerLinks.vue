@@ -49,6 +49,12 @@
         to="/settings"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
+      <DrawerItem
+        icon="i-mdi-trophy"
+        locale-key="kappa"
+        to="/kappa"
+        :is-collapsed="props.isCollapsed"
+      ></DrawerItem>
     </ul>
   </div>
 </template>

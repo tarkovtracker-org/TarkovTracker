@@ -605,6 +605,22 @@
       "route_unlock_trader": "Trader: {name}",
       "route_unlock_reward": "Reward: {name}"
     },
+    "kappa": {
+      "title": "Kappa & Lightkeeper Tracker",
+      "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
+      "tabs": {
+        "kappa": "Kappa",
+        "lightkeeper": "Lightkeeper"
+      },
+      "stats": {
+        "total": "Kappa Tasks",
+        "completed": "Kappa Done",
+        "lightkeeper_total": "Lightkeeper Tasks",
+        "lightkeeper_completed": "Lightkeeper Done"
+      },
+      "progress_label": "complete",
+      "all_complete": "All tasks complete! Well done, PMC."
+    },
     "tasks": {
       "title": "Tasks",
       "primary_views": {
@@ -1298,6 +1314,7 @@
     "credits": "Credits",
     "settings": "Settings",
     "profile": "Profile",
+    "kappa": "Kappa & Lightkeeper",
     "section_navigation": "Navigation",
     "section_game_settings": "Game Settings",
     "section_external": "External Tools",
