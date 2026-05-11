@@ -53,6 +53,11 @@
       </NuxtLink>
       <template v-if="!isCollapsed">
         <DrawerLevel :is-collapsed="false" />
+        <div class="px-4 py-1">
+          <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
+            {{ t('navigation_drawer.section_game_settings') }}
+          </h3>
+        </div>
         <DrawerGameSettings />
       </template>
       <template v-else>
