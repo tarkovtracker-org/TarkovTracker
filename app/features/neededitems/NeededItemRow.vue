@@ -1,7 +1,11 @@
 <template>
   <KeepAlive>
-    <div ref="cardRef" class="mb-1 rounded" :class="itemRowClasses">
-      <div class="px-3 py-2">
+    <div
+      ref="cardRef"
+      class="mb-1.5 rounded-md border-l-2 transition-colors"
+      :class="[itemRowClasses, rarityBorderClass]"
+    >
+      <div class="px-3 py-2.5">
         <div class="mx-0 flex flex-nowrap items-center">
           <div class="flex min-w-0 flex-1 items-center p-0">
             <span class="block h-12 w-12 shrink-0 md:h-16 md:w-16">
@@ -18,7 +22,7 @@
               />
             </span>
             <span class="ml-3 flex min-w-0 flex-1 flex-col overflow-hidden">
-              <span class="flex items-center truncate text-base font-semibold">
+              <span class="flex items-center truncate text-sm font-semibold">
                 <span class="truncate">{{ item?.name ?? '' }}</span>
                 <ItemIndicators
                   :found-in-raid="isFoundInRaid"
@@ -40,7 +44,7 @@
                   </span>
                   <span class="mt-1 flex">
                     <span
-                      class="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                      class="rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
                       :class="itemStatusClasses"
                     >
                       {{ $t(itemStatusKey) }}
@@ -132,7 +136,7 @@
                           </span>
                           <span class="mt-1 flex">
                             <span
-                              class="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                              class="rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
                               :class="itemStatusClasses"
                             >
                               {{ $t(itemStatusKey) }}
@@ -338,6 +342,7 @@
   import RequirementInfo from '@/features/neededitems/RequirementInfo.vue';
   import TeamNeedsDisplay from '@/features/neededitems/TeamNeedsDisplay.vue';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { GAME_MODES } from '@/utils/constants';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
   const TaskLink = defineAsyncComponent(() => import('@/features/tasks/TaskLink.vue'));
@@ -386,11 +391,34 @@
     initialVisible: props.initiallyVisible,
   });
   const itemRowClasses = computed(() => {
+    const mode = tarkovStore.getCurrentGameMode();
+    const modeAccent =
+      mode === GAME_MODES.PVE ? 'border-r-2 border-r-pve-400/30' : 'border-r-2 border-r-pvp-400/30';
     return {
       'bg-gradient-to-l from-complete to-surface':
         selfCompletedNeed.value || currentCount.value >= neededCount.value,
       'bg-surface-800': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
+      [modeAccent]: true,
     };
+  });
+  const RARITY_BORDER_MAP: Record<string, string> = {
+    violet: 'border-l-rarity-violet',
+    grey: 'border-l-rarity-grey',
+    yellow: 'border-l-rarity-yellow',
+    orange: 'border-l-rarity-orange',
+    green: 'border-l-rarity-green',
+    red: 'border-l-rarity-red',
+    black: 'border-l-rarity-black',
+    blue: 'border-l-rarity-blue',
+  };
+  const REQUIREMENT_BORDER_MAP: Record<string, string> = {
+    taskObjective: 'border-l-kappa-400',
+    hideoutModule: 'border-l-lightkeeper-400',
+  };
+  const rarityBorderClass = computed(() => {
+    const bg = imageItem.value?.backgroundColor?.toLowerCase();
+    if (bg && bg in RARITY_BORDER_MAP) return RARITY_BORDER_MAP[bg];
+    return REQUIREMENT_BORDER_MAP[props.need.needType] ?? 'border-l-surface-600';
   });
   const isSingleItem = computed(() => neededCount.value === 1);
   const isCollected = computed(() => currentCount.value >= neededCount.value);
@@ -411,12 +439,12 @@
   });
   const itemStatusClasses = computed(() => {
     if (isHandedOver.value) {
-      return 'bg-success-500/20 text-success-300';
+      return 'bg-success-500/25 text-success-300 ring-1 ring-success-500/20';
     }
     if (isCollected.value) {
-      return 'bg-info-500/20 text-info-300';
+      return 'bg-info-500/25 text-info-300 ring-1 ring-info-500/20';
     }
-    return 'bg-surface-700 text-surface-300';
+    return 'bg-surface-700/80 text-surface-300 ring-1 ring-white/5';
   });
   defineEmits<{
     (event: 'decreaseCount' | 'increaseCount' | 'toggleCount'): void;

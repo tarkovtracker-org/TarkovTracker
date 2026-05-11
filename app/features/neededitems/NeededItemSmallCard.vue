@@ -10,9 +10,10 @@
       "
     >
       <div
-        class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-full flex-col rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-full flex-col rounded-lg border-l-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         :class="[
           itemCardClasses,
+          rarityBorderClass,
           {
             'cursor-pointer transition-all active:scale-[0.98]':
               hasItem && isSingleItem && !selfCompletedNeed,
@@ -29,7 +30,7 @@
           <div :class="imageContainerClasses">
             <div class="absolute top-0 left-0 z-10">
               <div
-                class="flex items-center gap-1 rounded-br-lg px-2 py-1 text-sm font-bold shadow-lg"
+                class="flex items-center gap-1.5 rounded-br-lg px-2.5 py-1 text-sm font-bold shadow-lg backdrop-blur-sm"
                 :class="itemCountTagClasses"
               >
                 {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
@@ -74,7 +75,7 @@
               aria-hidden="true"
             >
               <div
-                class="bg-success-600 flex h-6 w-6 items-center justify-center rounded-full shadow-md"
+                class="bg-success-600/90 ring-success-400/30 flex h-7 w-7 items-center justify-center rounded-full shadow-md ring-2"
               >
                 <UIcon name="i-mdi-check" class="h-4 w-4 text-white" />
               </div>
@@ -95,7 +96,7 @@
               />
             </div>
           </div>
-          <div v-if="cardStyle === 'expanded'" class="flex flex-1 flex-col p-2">
+          <div v-if="cardStyle === 'expanded'" class="flex flex-1 flex-col p-2.5">
             <div class="flex min-h-10 items-start justify-center">
               <span
                 class="line-clamp-2 text-center text-[clamp(0.7rem,2.5vw,0.875rem)] leading-snug font-medium"
@@ -103,7 +104,7 @@
                 {{ item?.name ?? '' }}
               </span>
             </div>
-            <div class="flex min-h-7 w-full items-center justify-center overflow-hidden">
+            <div class="mt-0.5 flex min-h-7 w-full items-center justify-center overflow-hidden">
               <template v-if="props.need.needType == 'taskObjective' && relatedTask">
                 <TaskLink
                   :task="relatedTask"
@@ -125,7 +126,7 @@
               </template>
             </div>
             <div
-              class="text-surface-400 flex min-h-10 flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[clamp(0.625rem,1.8vw,0.75rem)]"
+              class="text-surface-400 flex min-h-10 flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-t border-white/5 pt-1.5 text-[clamp(0.625rem,1.8vw,0.75rem)]"
             >
               <span
                 v-if="levelRequired > 0 && levelRequired > playerLevel"
@@ -245,6 +246,25 @@
         selfCompletedNeed.value || currentCount.value >= neededCount.value,
       'bg-surface-800': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
     };
+  });
+  const RARITY_BORDER_MAP: Record<string, string> = {
+    violet: 'border-l-rarity-violet',
+    grey: 'border-l-rarity-grey',
+    yellow: 'border-l-rarity-yellow',
+    orange: 'border-l-rarity-orange',
+    green: 'border-l-rarity-green',
+    red: 'border-l-rarity-red',
+    black: 'border-l-rarity-black',
+    blue: 'border-l-rarity-blue',
+  };
+  const REQUIREMENT_BORDER_MAP: Record<string, string> = {
+    taskObjective: 'border-l-kappa-400',
+    hideoutModule: 'border-l-lightkeeper-400',
+  };
+  const rarityBorderClass = computed(() => {
+    const bg = imageItem.value?.backgroundColor?.toLowerCase();
+    if (bg && bg in RARITY_BORDER_MAP) return RARITY_BORDER_MAP[bg];
+    return REQUIREMENT_BORDER_MAP[props.need.needType] ?? 'border-l-surface-600';
   });
   const imageContainerClasses = computed(() => {
     const baseLayoutClasses =
