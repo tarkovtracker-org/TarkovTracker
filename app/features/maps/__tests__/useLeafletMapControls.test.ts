@@ -43,6 +43,10 @@ const createPreferencesStore = () => {
     setMapZoomSpeed: (value: number) => {
       state.mapZoomSpeed = value;
     },
+    get getMapTooltipDensity() {
+      return 'default' as 'default' | 'compact';
+    },
+    setMapTooltipDensity: () => {},
   };
 };
 describe('useLeafletMapControls', () => {
