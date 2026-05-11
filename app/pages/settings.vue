@@ -97,6 +97,7 @@
               :aria-label="$t('settings.tabs.account')"
             >
               <ProfileSharingCard />
+              <DebugStateCard />
               <AccountDeletionCard />
               <div v-if="isAdmin" class="flex justify-center pt-4">
                 <NuxtLink
@@ -158,6 +159,7 @@
   import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
+  import DebugStateCard from '@/features/settings/DebugStateCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';

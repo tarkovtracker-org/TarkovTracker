@@ -1503,6 +1503,11 @@
     "account": {
       "begin_deletion": "Begin Account Deletion"
     },
+    "debug_state": {
+      "title": "Debug State",
+      "description": "Capture a JSON snapshot of your current tracker state for bug reports. Includes game mode, level, task completion states, and prerequisite chains.",
+      "copy_button": "Copy Debug State"
+    },
     "general": {
       "privacy_mode": "Streamer Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming.",
