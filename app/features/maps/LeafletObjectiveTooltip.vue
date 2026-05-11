@@ -1,5 +1,5 @@
 <template>
-  <div class="min-w-55">
+  <div :class="isCompact ? 'min-w-40' : 'min-w-55'">
     <div class="flex items-center justify-between gap-2">
       <div class="flex min-w-0 flex-1 items-center gap-1">
         <component
@@ -37,18 +37,23 @@
       <div class="flex shrink-0 gap-1">
         <button
           type="button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200 hover:bg-white/10"
+          :class="isCompact ? compactButtonClass : defaultButtonClass"
           :aria-label="translate('maps.tooltip.go_to_in_task_list')"
           :title="translate('maps.tooltip.go_to')"
           @click.stop="scrollToObjective"
         >
-          <UIcon name="i-mdi-arrow-down-circle-outline" class="h-4 w-4" />
+          <UIcon
+            name="i-mdi-arrow-down-circle-outline"
+            :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'"
+          />
         </button>
         <button
           v-if="!readOnly"
           type="button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200"
-          :class="isToggleDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
+          :class="[
+            isCompact ? compactButtonClass : defaultButtonClass,
+            isToggleDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10',
+          ]"
           :aria-label="
             isComplete ? translate('maps.tooltip.uncomplete') : translate('maps.tooltip.complete')
           "
@@ -58,25 +63,26 @@
         >
           <UIcon
             :name="isComplete ? 'i-mdi-check-circle' : 'i-mdi-circle-outline'"
-            class="h-4 w-4"
+            :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'"
           />
         </button>
         <button
           type="button"
           data-testid="objective-close-button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-300 hover:bg-white/10"
+          class="inline-flex items-center justify-center rounded-md text-gray-300 hover:bg-white/10"
+          :class="isCompact ? 'h-5 w-5' : 'h-7 w-7'"
           :aria-label="translate('generic.close_button')"
           @click.stop="emitClose"
         >
-          <UIcon name="i-mdi-close" class="h-4 w-4" />
+          <UIcon name="i-mdi-close" :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'" />
         </button>
       </div>
     </div>
-    <div class="mt-1">
+    <div :class="isCompact ? 'mt-0.5' : 'mt-1'">
       <div v-if="!objective" class="text-xs text-gray-400">
         {{ translate('maps.tooltip.objective_unavailable') }}
       </div>
-      <div v-else class="text-sm text-gray-200">
+      <div v-else :class="isCompact ? 'text-xs text-gray-200' : 'text-sm text-gray-200'">
         <div class="text-gray-300">{{ objective.description }}</div>
         <div v-if="!readOnly && requiredCount > 1" class="mt-1 text-[11px] text-gray-400">
           {{ currentCount }}/{{ requiredCount }}
@@ -88,6 +94,7 @@
 <script setup lang="ts">
   import { useI18n, type Composer } from 'vue-i18n';
   import { useMetadataStore } from '@/stores/useMetadata';
+  import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
   import type { Router } from 'vue-router';
@@ -133,6 +140,12 @@
   const router = inject<Router>('router');
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
+  const preferencesStore = usePreferencesStore();
+  const isCompact = computed(() => preferencesStore.getMapTooltipDensity === 'compact');
+  const defaultButtonClass =
+    'inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200';
+  const compactButtonClass =
+    'inline-flex h-5 w-5 items-center justify-center rounded border border-white/10 bg-white/5 text-gray-200';
   const objective = computed(() => {
     return metadataStore.objectives.find((o) => o.id === props.objectiveId);
   });

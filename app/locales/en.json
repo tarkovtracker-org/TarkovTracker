@@ -338,6 +338,9 @@
     "zoom_speed": "Zoom speed",
     "pan_speed": "Pan speed",
     "zone_opacity": "Zone opacity",
+    "tooltip_density": "Tooltips",
+    "tooltip_density_default": "Default",
+    "tooltip_density_compact": "Compact",
     "map_settings": "Map settings",
     "not_available_title": "Map Not Available",
     "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
@@ -372,7 +375,8 @@
     "aria": {
       "zoom_speed": "Zoom speed",
       "pan_speed": "Pan speed",
-      "zone_opacity": "Zone opacity"
+      "zone_opacity": "Zone opacity",
+      "tooltip_density": "Tooltip density"
     },
     "tooltip": {
       "go_to": "Go to objective",

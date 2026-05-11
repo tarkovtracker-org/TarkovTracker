@@ -6,11 +6,13 @@ type UseLeafletMapControlsOptions = {
   map: RefLike<TarkovMap>;
   preferencesStore: {
     getMapMarkerColors: Record<MapMarkerColorKey, string>;
+    getMapTooltipDensity: 'default' | 'compact';
     getMapZoneOpacity: number;
     getMapZoomSpeed: number;
     mapPanSpeed?: number;
     setMapMarkerColor: (key: MapMarkerColorKey, value: string) => void;
     setMapPanSpeed: (value: number) => void;
+    setMapTooltipDensity: (density: 'default' | 'compact') => void;
     setMapZoneOpacity: (value: number) => void;
     setMapZoomSpeed: (value: number) => void;
   };
@@ -97,6 +99,12 @@ export function useLeafletMapControls({
   const zoomSpeedLabel = computed(() => `${mapZoomSpeed.value.toFixed(1)}x`);
   const panSpeedLabel = computed(() => `${mapPanSpeed.value.toFixed(1)}x`);
   const zoneOpacityLabel = computed(() => `${Math.round(mapZoneOpacity.value * 100)}%`);
+  const mapTooltipDensity = computed({
+    get: () => preferencesStore.getMapTooltipDensity,
+    set: (value: 'default' | 'compact') => {
+      preferencesStore.setMapTooltipDensity(value);
+    },
+  });
   return {
     hasCoopExtracts,
     hasPmcSpawns,
@@ -106,6 +114,7 @@ export function useLeafletMapControls({
     mapExtracts,
     mapPanSpeed,
     mapPmcSpawns,
+    mapTooltipDensity,
     mapZoneOpacity,
     mapZoomSpeed,
     onMapColorInput,

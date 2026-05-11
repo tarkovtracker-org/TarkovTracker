@@ -217,6 +217,30 @@
                     :aria-label="t('maps.aria.zone_opacity')"
                   />
                 </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-surface-400 text-[10px] font-semibold uppercase">
+                    {{ t('maps.tooltip_density') }}
+                  </span>
+                  <button
+                    type="button"
+                    class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
+                    :class="
+                      mapTooltipDensity === 'compact'
+                        ? 'bg-surface-600 text-surface-100'
+                        : 'bg-surface-800 text-surface-400 hover:text-surface-200'
+                    "
+                    :aria-label="t('maps.aria.tooltip_density')"
+                    @click="
+                      mapTooltipDensity = mapTooltipDensity === 'compact' ? 'default' : 'compact'
+                    "
+                  >
+                    {{
+                      mapTooltipDensity === 'compact'
+                        ? t('maps.tooltip_density_compact')
+                        : t('maps.tooltip_density_default')
+                    }}
+                  </button>
+                </div>
               </div>
             </div>
           </template>
@@ -476,6 +500,7 @@
     mapExtracts,
     mapPanSpeed,
     mapPmcSpawns,
+    mapTooltipDensity,
     mapZoneOpacity,
     mapZoomSpeed,
     onMapColorInput,

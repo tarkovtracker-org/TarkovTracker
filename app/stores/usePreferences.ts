@@ -146,6 +146,7 @@ export interface PreferencesState {
   mapZoomSpeed: number;
   mapPanSpeed: number;
   mapZoneOpacity: number;
+  mapTooltipDensity: 'default' | 'compact';
   pinnedTaskIds: string[];
   // Skills settings
   skillSortMode: SkillSortMode | null;
@@ -226,6 +227,7 @@ export const preferencesDefaultState: PreferencesState = {
   mapZoomSpeed: 1,
   mapPanSpeed: 1,
   mapZoneOpacity: 0.24,
+  mapTooltipDensity: 'default',
   pinnedTaskIds: [],
   // Skills settings
   skillSortMode: null,
@@ -531,6 +533,9 @@ export const usePreferencesStore = defineStore('preferences', {
     getMapZoneOpacity: (state) => {
       return state.mapZoneOpacity ?? 0.24;
     },
+    getMapTooltipDensity: (state) => {
+      return state.mapTooltipDensity ?? 'default';
+    },
     getLocaleOverride: (state) => {
       return state.localeOverride ?? null;
     },
@@ -675,6 +680,9 @@ export const usePreferencesStore = defineStore('preferences', {
       }
       const clamped = Math.min(0.5, Math.max(0.05, opacity));
       this.mapZoneOpacity = clamped;
+    },
+    setMapTooltipDensity(density: 'default' | 'compact') {
+      this.mapTooltipDensity = density;
     },
     setTaskMapView(view: string) {
       this.taskMapView = normalizeOptionalStringSelection(view) ?? 'all';
