@@ -79,6 +79,9 @@
       ".": "^11.13.0",
       "picomatch": "^4.0.4"
     },
+    "@intlify/vue-i18n-extensions": {
+      "vue-i18n": "$vue-i18n"
+    },
     "@tiptap/core": "3.14.0",
     "@tiptap/pm": "3.14.0",
     "fast-xml-parser": "^5.7.1",
