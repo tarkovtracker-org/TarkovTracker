@@ -3,23 +3,23 @@ version: alpha
 name: TarkovTracker
 description: Agent-facing design contract for the TarkovTracker Nuxt 4 SPA.
 colors:
-  canvas: '#0a0a0a'
-  shell: '#171717'
-  panel: '#1f1f1f'
+  canvas: '#090909'
+  shell: '#161616'
+  panel: '#1d1d1d'
   raised: '#262626'
-  text: '#e5e5e5'
-  text-secondary: '#d4d4d4'
-  text-muted: '#a3a3a3'
-  primary: '#ad7a3d'
-  primary-strong: '#c08b48'
-  secondary: '#339299'
-  accent: '#3f6870'
-  success: '#22b981'
-  warning: '#cea617'
-  error: '#b83333'
-  info: '#3f98d0'
-  pvp: '#b8aa96'
-  pve: '#5c9ab7'
+  text: '#e6e6e6'
+  text-secondary: '#b7bcc2'
+  text-muted: '#9da2aa'
+  primary: '#9a8866'
+  primary-strong: '#a99366'
+  secondary: '#1e7777'
+  accent: '#3b6268'
+  success: '#009365'
+  warning: '#bc9200'
+  error: '#b13346'
+  info: '#197cb3'
+  pvp: '#c9bfaa'
+  pve: '#5a99b0'
 typography:
   body:
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace'
@@ -80,7 +80,7 @@ components:
     typography: '{typography.body}'
   badge-secondary:
     backgroundColor: '{colors.secondary}'
-    textColor: '{colors.canvas}'
+    textColor: '#ffffff'
     rounded: '{rounded.sm}'
     padding: '{spacing.xs}'
   badge-accent:
@@ -102,7 +102,7 @@ components:
     rounded: '{rounded.sm}'
   status-info:
     backgroundColor: '{colors.info}'
-    textColor: '{colors.canvas}'
+    textColor: '#ffffff'
     rounded: '{rounded.sm}'
   mode-pvp:
     backgroundColor: '{colors.pvp}'
@@ -131,11 +131,13 @@ slot defaults in `app/app.config.ts`.
 Use the Tailwind v4 theme tokens already defined in `app/assets/css/tailwind.css`. Do not put hex
 colors in Vue templates.
 
-The front matter uses sRGB hex values because the `DESIGN.md` token schema validates colors as hex.
-Treat those values as agent-readable representatives of the runtime Tailwind tokens, not a separate
-CSS source of truth.
+The color system uses a two-layer architecture: HSL values in `@theme static` provide browser
+fallbacks, while OKLCH overrides in an `@supports (color: oklch(...))` block provide the
+perceptually tuned production colors. Modern browsers use the OKLCH values, which produce better
+uniformity across hues (equal chroma steps look equal) and more natural desaturation at low
+lightness. The front matter hex values represent the rendered OKLCH output, not the HSL fallbacks.
 
-Primary actions use the tan `primary` palette. Secondary accents use `secondary` or `accent`.
+Primary actions use the golden-tan `primary` palette. Secondary accents use `secondary` or `accent`.
 Surfaces follow the `surface` ladder: page canvas at `surface-950`, shell chrome at `surface-900`,
 content panels at `surface-850` or `surface-900`, raised controls at `surface-800`, hover states at
 `surface-700`, and dividers at `surface-600`.
@@ -150,8 +152,12 @@ Surface token mapping:
 - hover states -> `surface-700`
 - dividers -> `surface-600`
 
-State colors are semantic: `success`, `warning`, `error`, and `info`. Game-mode color should use
+State colors are semantic: `success`, `warning`, `error`, and `info`. Game-mode colors should use
 `pvp` and `pve`, not ad hoc tan or blue classes.
+
+Note: Nuxt UI maps its semantic `info` color to the `accent` (teal) palette in `app.config.ts`, so
+`<UButton color="info">` renders teal, while the CSS `text-info-500` class renders blue. This is
+intentional — the teal accent is the primary informational tone in the UI.
 
 ## Typography
 
