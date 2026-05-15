@@ -101,6 +101,9 @@ jobs:
           set -euo pipefail
 
           expected_checks=(
+            "Lint & Format"
+            "Type Check"
+            "Test"
             "Validate"
             "Supabase DB"
             "Workers"

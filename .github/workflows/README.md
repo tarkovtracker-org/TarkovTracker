@@ -7,7 +7,16 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 ### CI (`ci.yml`)
 
 **Trigger:** Push to main/develop/wip branches, PRs
-**Jobs:** `Validate` (lint, typecheck, format, coverage, build), `Supabase DB` (reset + lint local migrations), `Workers` (validate api-gateway)
+**Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
+**Jobs:**
+- `Lint & Format` — ESLint + Prettier checks
+- `Type Check` — `vue-tsc` / Nuxt type checking
+- `Test` — Vitest with coverage
+- `Validate` — Production Nuxt build + artifact upload (main branch only)
+- `Supabase DB` — Reset + lint local migrations
+- `Workers` — Validate api-gateway (typecheck, OpenAPI, tests)
+
+All jobs run in parallel; the `Workers` job no longer waits for `Validate` to finish.
 
 ### Security (`security.yml`)
 
@@ -41,11 +50,11 @@ the current floors as long-term targets.
 
 ## Check Count
 
-| Context       | Checks                                                                            |
-| ------------- | --------------------------------------------------------------------------------- |
-| PR            | ~7 (Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Dependabot PR | ~8 (standard PR checks plus Dependabot Auto Merge when allowlisted)               |
-| Main push     | ~6 (Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)               |
+| Context       | Checks                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| PR            | ~10 (Lint & Format, Type Check, Test, Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
+| Dependabot PR | ~11 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                    |
+| Main push     | ~9 (Lint & Format, Type Check, Test, Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)    |
 
 \*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
 
@@ -71,6 +80,9 @@ npm run supabase:check   # Validate local Supabase migration reset + lint
 Test workflows locally with [act](https://github.com/nektos/act):
 
 ```bash
+act -j lint-format
+act -j typecheck
+act -j test
 act -j validate
 act -j supabase-db
 act -j workers
