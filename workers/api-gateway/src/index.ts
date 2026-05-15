@@ -546,13 +546,7 @@ export default {
         }
         const body = (await request.json()) as { state?: string; count?: number };
         if (!body.state && body.count === undefined) {
-          return errorResponse(
-            'Must provide state or count',
-            400,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
+          return errorResponse('Must provide state or count', 400, origin, reqOrigin, rlHeaders);
         }
         if (body.state && !['completed', 'uncompleted'].includes(body.state)) {
           return errorResponse(
@@ -576,7 +570,16 @@ export default {
       // POST /progress/task/:taskId - Update single task
       const taskMatch = apiPath.match(/^\/progress\/task\/([^/]+)$/);
       if (taskMatch && request.method === 'POST') {
-        const taskId = taskMatch[1]?.trim();
+        const rawTaskId = taskMatch[1];
+        if (!rawTaskId) {
+          return errorResponse('Missing task ID in URL', 400, origin, reqOrigin);
+        }
+        let taskId: string;
+        try {
+          taskId = decodeURIComponent(rawTaskId).trim();
+        } catch {
+          return errorResponse('Invalid task ID in URL', 400, origin, reqOrigin);
+        }
         if (!taskId) {
           return errorResponse('Missing task ID in URL', 400, origin, reqOrigin);
         }
@@ -602,22 +605,35 @@ export default {
             rlHeaders
           );
         }
-        let body: { state?: string };
+        let parsedBody: unknown;
         try {
-          body = (await request.json()) as { state?: string };
+          parsedBody = await request.json();
         } catch {
           return errorResponse('Invalid JSON body', 400, origin, reqOrigin, rlHeaders);
         }
-        const state = body.state as TaskState;
-        if (!state || !['completed', 'uncompleted', 'failed'].includes(state)) {
+        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
           return errorResponse(
-            `Invalid state "${body.state ?? ''}" (must be completed, uncompleted, or failed)`,
+            'Invalid request body (expected object)',
             400,
             origin,
             reqOrigin,
             rlHeaders
           );
         }
+        const rawState = (parsedBody as { state?: unknown }).state;
+        if (
+          typeof rawState !== 'string' ||
+          !['completed', 'uncompleted', 'failed'].includes(rawState)
+        ) {
+          return errorResponse(
+            `Invalid state "${typeof rawState === 'string' ? rawState : String(rawState ?? '')}" (must be completed, uncompleted, or failed)`,
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
+        }
+        const state = rawState as TaskState;
         const effectiveGameMode = validation.token.game_mode;
         const result = await handleUpdateTask(
           env,
