@@ -1,6 +1,6 @@
 <template>
   <div
-    class="scrollbar-none flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:overflow-x-auto"
+    class="flex scrollbar-none flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:overflow-x-auto"
   >
     <AppTooltip
       :text="isPinned ? t('page.tasks.questcard.unpin_task') : t('page.tasks.questcard.pin_task')"

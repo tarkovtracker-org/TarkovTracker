@@ -570,13 +570,9 @@ export default {
       // POST /progress/task/:taskId - Update single task
       const taskMatch = apiPath.match(/^\/progress\/task\/([^/]+)$/);
       if (taskMatch && request.method === 'POST') {
-        const rawTaskId = taskMatch[1];
-        if (!rawTaskId) {
-          return errorResponse('Missing task ID in URL', 400, origin, reqOrigin);
-        }
         let taskId: string;
         try {
-          taskId = decodeURIComponent(rawTaskId).trim();
+          taskId = decodeURIComponent(taskMatch[1]).trim();
         } catch {
           return errorResponse('Invalid task ID in URL', 400, origin, reqOrigin);
         }
