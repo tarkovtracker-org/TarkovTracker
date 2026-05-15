@@ -20,7 +20,7 @@
     :class="[sidebarWidth]"
   >
     <div
-      class="relative z-10 flex h-full scrollbar-thin flex-col overflow-x-hidden overflow-y-auto"
+      class="scrollbar-thin relative z-10 flex h-full flex-col overflow-x-hidden overflow-y-auto"
     >
       <NuxtLink
         to="/"
