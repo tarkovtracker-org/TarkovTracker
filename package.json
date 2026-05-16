@@ -79,9 +79,6 @@
       ".": "^11.13.0",
       "picomatch": "^4.0.4"
     },
-    "@intlify/vue-i18n-extensions": {
-      "vue-i18n": "$vue-i18n"
-    },
     "@tiptap/core": "3.14.0",
     "@tiptap/pm": "3.14.0",
     "fast-xml-parser": "^5.7.1",
@@ -96,7 +93,8 @@
     "node-forge": "^1.4.0",
     "serialize-javascript": "^7.0.5",
     "tar": "^7.5.13",
-    "yaml": "^2.8.3"
+    "yaml": "^2.8.3",
+    "vue-i18n": "$vue-i18n"
   },
   "packageManager": "npm@11.13.0",
   "private": true,
