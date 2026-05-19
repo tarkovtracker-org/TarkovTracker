@@ -638,32 +638,32 @@
         "resize_handle": "Resize graph height"
       },
       "secondary_views": {
-        "all": "All",
+        "all": "Tutte",
         "available": "Disponibile",
         "completed": "Completato",
         "locked": "Bloccato",
         "failed": "Fallito"
       },
       "user_views": {
-        "all": "All",
-        "yourself": "Yourself"
+        "all": "Tutti",
+        "yourself": "Tu"
       },
       "search": {
-        "placeholder": "Search...",
-        "aria_label": "Search tasks",
-        "clear": "Clear search"
+        "placeholder": "Cerca...",
+        "aria_label": "Cerca missioni",
+        "clear": "Cancella ricerca"
       },
       "sort": {
-        "none": "Default order",
+        "none": "Ordine predefinito",
         "impact": "Impact",
         "alphabetical": "Alphabetical",
         "level": "Level Required",
         "trader": "Trader Order",
         "teammates": "Available to Teammates",
         "xp": "XP Reward",
-        "ascending": "Ascending",
-        "descending": "Descending",
-        "aria_label": "Sort tasks"
+        "ascending": "Ascendente",
+        "descending": "Discendente",
+        "aria_label": "Ordina le missioni"
       },
       "filters": {
         "close": "Chiudi"
@@ -715,7 +715,7 @@
           "failed_filter": "Filtro Fallito"
         },
         "advanced": {
-          "manual_fail_actions": "Azioni Fallimento manuale",
+          "manual_fail_actions": "Marca manualmente le missioni fallite",
           "failed_tasks_label": "Missioni fallite",
           "repair_failed": "Ripara missioni fallite",
           "repair_failed_confirm": "Riparare le missioni fallite eliminando i flag \"fallita\" che non sono supportati dalle attuali condizioni?",
@@ -780,15 +780,15 @@
         "complete": "Segna come completato",
         "mark_complete": "Segna come completato",
         "uncomplete": "Segna come non completato",
-        "completed": "Completato",
-        "not_completed": "Non completato",
+        "completed": "Completate",
+        "not_completed": "Non completate",
         "of": "di",
         "item": "Oggetto",
-        "mark_failed": "Contrassegna come Fallita",
+        "mark_failed": "Fallita",
         "complete_button": "Completata",
-        "available_button": "Segna come Disponibile",
-        "uncomplete_button": "Segna come Non completata",
-        "reset_failed": "Reset fallito",
+        "available_button": "Disponibile",
+        "uncomplete_button": "Non completata",
+        "reset_failed": "Reset",
         "reset_item_counts": "Resetta conteggio oggetti",
         "reset_item_counts_disabled_complete": "Uncomplete this task to reset item counts",
         "reset_item_counts_disabled_failed": "Mark this task as available to reset item counts",
@@ -902,7 +902,7 @@
         "confirm_confirm": "Enable"
       },
       "primary_views": {
-        "all": "All",
+        "all": "Tutte",
         "locked": "Bloccato",
         "available": "Disponibile",
         "maxed": "Maxed"
@@ -941,13 +941,13 @@
       "meta_description": "View all items needed for your active quests and hideout upgrades. Filter by quest, craft, and find-in-raid requirements.",
       "loading": "Loading task and hideout data",
       "search_placeholder": "Search items, tasks, or hideout stations...",
-      "clear_search": "Clear search",
+      "clear_search": "Cancella ricerca",
       "items": "items",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
       "retry": "Riprova",
       "filters": {
-        "all": "All",
+        "all": "Tutte",
         "label": "Filters",
         "sections": {
           "items": "ITEMS",
@@ -1657,7 +1657,7 @@
       "description": "Migrate your local progress data to your cloud account. This happens automatically when you sign in."
     },
     "reset": {
-      "error_title": "Reset fallito"
+      "error_title": "Reset"
     },
     "reset_pvp": {
       "success_title": "PvP Data Reset",
@@ -1948,7 +1948,7 @@
     "expand": "Expand",
     "view": {
       "available": "Disponibile",
-      "all": "All",
+      "all": "Tutte",
       "maxed": "Maxed",
       "locked": "Bloccato"
     }
@@ -1985,7 +1985,7 @@
     "level_required": "Lvl {level}",
     "locked_before": "{count} before",
     "filters": {
-      "all": "All",
+      "all": "Tutte",
       "tasks": "Missioni",
       "hideout": "Hideout",
       "completed": "Completato"
