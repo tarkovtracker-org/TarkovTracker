@@ -629,13 +629,13 @@
         "legend": "Legenda",
         "flow_start": "Avvia (senza prereq.)",
         "flow_end": "Fine (nessun follow-up)",
-        "flow_direction": "Tasks flow top → bottom",
-        "keyboard_controls_title": "Keyboard controls",
-        "keyboard_pan": "Pan",
+        "flow_direction": "Flusso missioni alto → basso",
+        "keyboard_controls_title": "Controlli tastiera",
+        "keyboard_pan": "Sposta",
         "keyboard_zoom": "Zoom",
-        "keyboard_reset": "Reset view",
-        "alpha_notice": "Graph view is in alpha. Layout and features may change frequently as we improve it.",
-        "resize_handle": "Resize graph height"
+        "keyboard_reset": "Reset vista",
+        "alpha_notice": "Vista grafico in alfa. Layout e caratteristiche saranno soggette a cambiamenti.",
+        "resize_handle": "Ridimensiona altezza grafico"
       },
       "secondary_views": {
         "all": "Tutte",
@@ -655,12 +655,12 @@
       },
       "sort": {
         "none": "Ordine predefinito",
-        "impact": "Impact",
-        "alphabetical": "Alphabetical",
-        "level": "Level Required",
-        "trader": "Trader Order",
-        "teammates": "Available to Teammates",
-        "xp": "XP Reward",
+        "impact": "Impatto",
+        "alphabetical": "Alfabetico",
+        "level": "Livello Necessario",
+        "trader": "Ordine Trader",
+        "teammates": "Disponibile ai compagni di squadra",
+        "xp": "Ricompensa XP",
         "ascending": "Ascendente",
         "descending": "Discendente",
         "aria_label": "Ordina le missioni"
@@ -669,33 +669,33 @@
         "close": "Chiudi"
       },
       "api_update_log": {
-        "title": "Recent Sync History",
-        "subtitle": "Track when your progress was automatically synced from external sources.",
-        "empty": "No syncs recorded yet. Your progress will appear here when synced.",
-        "entry_count": "{count} tasks",
-        "no_task_details": "Progress synced successfully.",
-        "more_tasks": "+{count} more",
-        "unknown_time": "Unknown time",
-        "collapse": "Collapse sync history",
-        "expand": "Expand sync history"
+        "title": "Cronologia Sincronizzazione Recente",
+        "subtitle": "Traccia i progressi sincronizzati automaticamente da fonti esterne.",
+        "empty": "Nessuna sincronizzazione registrata. I tuoi progressi appariranno qui quando saranno sincronizzati.",
+        "entry_count": "{count} missioni",
+        "no_task_details": "Progresso sincronizzato con successo.",
+        "more_tasks": "+{count}",
+        "unknown_time": "Orario sconosciuto",
+        "collapse": "Comprimi cronologia",
+        "expand": "Espandi cronologia"
       },
       "settings": {
-        "title": "Task Settings",
+        "title": "Impostazioni missioni",
         "tabs": {
-          "filters": "Task Filters",
-          "appearance": "Appearance",
-          "filter_bar": "Filter Bar",
-          "advanced": "Advanced"
+          "filters": "Filtri missioni",
+          "appearance": "Aspetto",
+          "filter_bar": "Barra dei filtri",
+          "advanced": "Avanzate"
         },
         "filters": {
-          "hint": "Control which tasks appear.",
-          "regular_tasks": "Regular Tasks",
-          "kappa_required": "Kappa Required",
-          "lightkeeper_required": "Lightkeeper Required",
-          "team_shared_only": "Team Shared Only",
-          "has_required_keys": "Only Tasks with Keys",
-          "show_global_tasks": "Show Global Tasks on Map",
-          "impact_respects_filters": "Impact Respects Task Filters",
+          "hint": "Controlla quali missioni appaiono.",
+          "regular_tasks": "Missioni normali",
+          "kappa_required": "Missioni Kappa",
+          "lightkeeper_required": "Missioni Lightkeeper",
+          "team_shared_only": "Condivise dal team",
+          "has_required_keys": "Missioni con chiavi",
+          "show_global_tasks": "Missioni globali nelle mappe",
+          "impact_respects_filters": "Rispetta l'impatto dei filtri missione",
           "hide_completed_map_objectives": "Nascondi missioni complete per mappa"
         },
         "appearance": {
@@ -1322,7 +1322,7 @@
     "mode_pve": "PvE",
     "platform_obs": "OBS Studio / Streamlabs Desktop",
     "platform_xsplit": "XSplit / vMix",
-    "appearance_title": "Appearance",
+    "appearance_title": "Aspetto",
     "customize_options": "Customize overlay options",
     "reset_defaults": "Reset Defaults",
     "layout_label": "Layout",
