@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "Mostrar u ocultar filtros de estado.",
           "all_filter": "Todos los filtros",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "Filtro disponible",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Filtro bloqueado",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Filtro completado",
-          "failed_filter": "Filtro fallido"
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Filtro fallido",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Acciones manuales de error",
@@ -867,6 +872,8 @@
         "kappa_required": "KAPPA REQUERIDA",
         "level_badge_tooltip": "Nivel mínimo de jugador {level} requerido para desbloquear esta misión",
         "lightkeeper_tooltip": "Esta misión es necesaria para desbloquear al comerciante Lightkeeper",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "LIGHTKEEPER REQUERIDO",
         "location_tooltip": "Los objetivos de la misión están en {map}",
         "next_tasks": "Siguiente(s) misión(es):",
