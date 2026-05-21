@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "Показать или скрыть фильтры статуса.",
           "all_filter": "Фильтр \"Все\"",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "Фильтр \"Доступные\"",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Фильтр \"Заблокированные\"",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Фильтр \"Завершённые\"",
-          "failed_filter": "Фильтр \"Проваленные\""
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Фильтр \"Проваленные\"",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Отмечать проваленные вручную",
@@ -867,6 +872,8 @@
         "kappa_required": "ТРЕБУЕТСЯ ДЛЯ КАППЫ",
         "level_badge_tooltip": "Требуется {level} уровень для открытия этого задания",
         "lightkeeper_tooltip": "Это задание необходимо для открытия Смотрителя Маяка",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "ТРЕБУЕТСЯ ДЛЯ СМОТРИТЕЛЯ МАЯКА",
         "location_tooltip": "Цели задания находятся на карте {map}",
         "next_tasks": "Следующее(ие) задание(я):",
