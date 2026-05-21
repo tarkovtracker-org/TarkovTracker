@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "Afficher ou masquer les filtres d'état.",
           "all_filter": "Tous les filtres",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "Filtre disponible",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Filtre verrouillé",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Filtre terminé",
-          "failed_filter": "Échec du filtre"
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Échec du filtre",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Actions manuelles en cas d'échec",
@@ -867,6 +872,8 @@
         "kappa_required": "KAPPA REQUIS",
         "level_badge_tooltip": "Niveau minimum du joueur {level} requis pour débloquer cette quête",
         "lightkeeper_tooltip": "Cette quête est requise pour débloquer le marchand Lightkeeper",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "LIGHTKEEPER REQUIS",
         "location_tooltip": "Les objectifs de la quête sont sur {map}",
         "next_tasks": "Quête(s) suivante(s) :",
