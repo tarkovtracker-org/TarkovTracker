@@ -423,6 +423,7 @@
     normalizeSecondaryView,
     normalizeSortMode,
   } from '@/utils/taskFilterNormalization';
+  import type { TaskSecondaryView } from '@/types/taskFilter';
   import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
   const props = defineProps<{
     searchQuery: string;
@@ -486,6 +487,18 @@
     return !isGraphView.value && preferencesStore.getShowFailedFilter;
   });
   type StatusToggleView = 'all' | 'available' | 'locked' | 'completed' | 'failed';
+  const statusViewVisibility = computed<Record<StatusToggleView, boolean>>(() => ({
+    all: showAllStatusButton.value,
+    available: !isGraphView.value && preferencesStore.getShowAvailableFilter,
+    locked: !isGraphView.value && preferencesStore.getShowLockedFilter,
+    completed: showCompletedFilterButton.value,
+    failed: showFailedFilterButton.value,
+  }));
+  const visibleStatusViews = computed<TaskSecondaryView[]>(() => {
+    return (['all', 'available', 'locked', 'completed', 'failed'] as const).filter(
+      (view) => statusViewVisibility.value[view]
+    );
+  });
   const toggleButtonBaseClass =
     'border border-transparent font-medium transition-colors duration-150 disabled:cursor-default disabled:opacity-100';
   const primaryToggleInactiveClass =
@@ -708,6 +721,14 @@
         const canShowAllOption = currentTeammates.length > 0;
         preferencesStore.setTaskUserView(canShowAllOption ? 'all' : 'self');
       }
+    },
+    { immediate: true }
+  );
+  watch(
+    [secondaryView, visibleStatusViews],
+    ([selectedStatusView, statusViews]) => {
+      if (statusViewVisibility.value[selectedStatusView]) return;
+      preferencesStore.setTaskSecondaryView(statusViews[0] ?? 'all');
     },
     { immediate: true }
   );

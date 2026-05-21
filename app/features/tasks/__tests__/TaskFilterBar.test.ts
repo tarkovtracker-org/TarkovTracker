@@ -26,6 +26,10 @@ type SetupOptions = {
     getTaskMapView: string;
     getTaskTraderView: string;
     getShowAllFilter: boolean;
+    getShowAvailableFilter: boolean;
+    getShowLockedFilter: boolean;
+    getShowCompletedFilter: boolean;
+    getShowFailedFilter: boolean;
     getHideCompletedMapObjectives: boolean;
     taskTeamAllHidden: boolean;
   }>;
@@ -330,6 +334,27 @@ describe('TaskFilterBar', () => {
     expect(buttonTexts.some((text) => text.includes('COMPLETED'))).toBe(false);
     expect(buttonTexts.some((text) => text.includes('FAILED'))).toBe(false);
     expect(buttonTexts.some((text) => text.includes('ALL2'))).toBe(true);
+  });
+  it('moves off a hidden active status filter', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup({
+      preferencesStore: {
+        getTaskSecondaryView: 'available',
+        getShowAvailableFilter: false,
+      },
+    });
+    mountTaskFilterBar(TaskFilterBar);
+    expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('all');
+  });
+  it('uses the first visible status filter when all is hidden too', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup({
+      preferencesStore: {
+        getTaskSecondaryView: 'available',
+        getShowAllFilter: false,
+        getShowAvailableFilter: false,
+      },
+    });
+    mountTaskFilterBar(TaskFilterBar);
+    expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('locked');
   });
   it('keeps persisted teammate view while roster is still loading', async () => {
     const { TaskFilterBar, preferencesStore } = await setup({

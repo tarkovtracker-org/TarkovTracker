@@ -10,10 +10,10 @@
       {{ t('page.tasks.settings.filter_bar.hint') }}
     </p>
     <div class="space-y-2">
-      <div
+      <label
         v-for="filter in filters"
         :key="filter.key"
-        class="flex items-center justify-between gap-3 rounded px-2 py-1.5"
+        class="hover:bg-surface-700/50 flex cursor-pointer items-center justify-between gap-3 rounded px-2 py-2 transition-colors"
       >
         <div class="min-w-0 flex-1">
           <span class="text-surface-200 text-sm font-medium">
@@ -27,9 +27,10 @@
           :model-value="filter.model.value"
           size="sm"
           color="primary"
+          :aria-label="t(`page.tasks.settings.filter_bar.${filter.key}`, filter.key)"
           @update:model-value="filter.model.value = $event"
         />
-      </div>
+      </label>
     </div>
   </section>
 </template>
