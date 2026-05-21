@@ -9,7 +9,7 @@
     :class="
       isOverlayMode
         ? 'bg-surface-900/96 fixed right-3 bottom-3 left-3 z-40 flex max-h-[72vh] flex-col rounded-[28px] border border-white/10 p-4 shadow-2xl sm:top-24 sm:right-4 sm:bottom-4 sm:left-auto sm:max-h-[calc(100vh-7rem)] sm:w-96'
-        : 'bg-surface-800/95 sticky top-6 max-h-[calc(100vh-3rem)] w-72 rounded-lg border border-white/10 p-4 shadow-xl'
+        : 'bg-surface-800/95 sticky top-6 max-h-[calc(100vh-3rem)] w-full rounded-lg border border-white/10 p-4 shadow-xl'
     "
     @keydown="handleKeydown"
   >
