@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "显示或隐藏状态筛选",
           "all_filter": "全部筛选",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "可用筛选",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "锁定筛选",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "已完成筛选",
-          "failed_filter": "失败筛选"
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "失败筛选",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "手动失败操作",
@@ -867,6 +872,8 @@
         "kappa_required": "KAPPA 必需",
         "level_badge_tooltip": "需要玩家最低等级 {level} 才能解锁该任务",
         "lightkeeper_tooltip": "该任务是解锁商人 Lightkeeper 的必需任务",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "LIGHTKEEPER 必需",
         "location_tooltip": "任务目标位于 {map}",
         "next_tasks": "后续任务：",
