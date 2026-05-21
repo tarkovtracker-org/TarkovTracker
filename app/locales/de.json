@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "Statusfilter ein- oder ausblenden.",
           "all_filter": "Alle Filter",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "Verfügbarer Filter",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Gesperrter Filter",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Abgeschlossener Filter",
-          "failed_filter": "Fehlerhafter Filter"
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Fehlerhafter Filter",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Manuelle Fehleraktionen",
@@ -867,6 +872,8 @@
         "kappa_required": "KAPPA ERFORDERLICH",
         "level_badge_tooltip": "Mindest-Spielerlevel {level} erforderlich, um diese Aufgabe freizuschalten",
         "lightkeeper_tooltip": "Diese Aufgabe ist erforderlich, um den Händler Lightkeeper freizuschalten",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "LIGHTKEEPER ERFORDERLICH",
         "location_tooltip": "Aufgabenziele sind auf {map}",
         "next_tasks": "Nächste Aufgabe(n):",
