@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "Mostra o nascondi i filtri di stato.",
           "all_filter": "Tutti i filtri",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "Filtro Disponibile",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Filtro Bloccato",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Filtro Completato",
-          "failed_filter": "Filtro Fallito"
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Filtro Fallito",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Marca manualmente le missioni fallite",
@@ -867,6 +872,8 @@
         "kappa_required": "KAPPA REQUIRED",
         "level_badge_tooltip": "Minimum player level {level} required to unlock this quest",
         "lightkeeper_tooltip": "This quest is required to unlock the Lightkeeper trader",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "LIGHTKEEPER REQUIRED",
         "location_tooltip": "Quest objectives are on {map}",
         "next_tasks": "Next Task(s):",
