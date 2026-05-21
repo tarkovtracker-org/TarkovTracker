@@ -709,15 +709,15 @@
         "filter_bar": {
           "hint": "Mostra o nascondi i filtri di stato.",
           "all_filter": "Tutti i filtri",
-          "all_filter_hint": "Display every task regardless of status.",
+          "all_filter_hint": "Mostra ogni missione indipendentemente dallo stato.",
           "available_filter": "Filtro Disponibile",
-          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
+          "available_filter_hint": "Missioni che puoi iniziare adesso in base a livello e prerequisiti.",
           "locked_filter": "Filtro Bloccato",
-          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
+          "locked_filter_hint": "Missioni bloccate da livello, rep trader o missioni prerequisito.",
           "completed_filter": "Filtro Completato",
-          "completed_filter_hint": "Tasks you've already finished.",
+          "completed_filter_hint": "Missioni che hai già completato.",
           "failed_filter": "Filtro Fallito",
-          "failed_filter_hint": "Tasks that failed due to missed conditions."
+          "failed_filter_hint": "Missioni fallite a causa di condizioni mancate."
         },
         "advanced": {
           "manual_fail_actions": "Marca manualmente le missioni fallite",
