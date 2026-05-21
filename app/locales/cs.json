@@ -709,10 +709,15 @@
         "filter_bar": {
           "hint": "Zvolte, zda zobrazit nebo schovat stavové filtry.",
           "all_filter": "Všechny filtry",
+          "all_filter_hint": "Display every task regardless of status.",
           "available_filter": "Dostupný filtr",
+          "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Uzamčený filtr",
+          "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Dokončený filtr",
-          "failed_filter": "Filtr selhal"
+          "completed_filter_hint": "Tasks you've already finished.",
+          "failed_filter": "Filtr selhal",
+          "failed_filter_hint": "Tasks that failed due to missed conditions."
         },
         "advanced": {
           "manual_fail_actions": "Manuální neúspěšná akce",
@@ -867,6 +872,8 @@
         "kappa_required": "POVOLENÁ KAPPA",
         "level_badge_tooltip": "Pro odemknutí tohoto úkolu je vyžadována minimální úroveň {level}",
         "lightkeeper_tooltip": "Tento úkol je vyžadován k odemčení obchodníka Lightkeeper",
+        "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
+        "alternatives_badge": "{count} alt",
         "lightkeeper_required": "VYŽADUJE LIGHTKEEPER",
         "location_tooltip": "Cíle úkolu jsou na {map}",
         "next_tasks": "Další úkol(y):",
