@@ -28,3 +28,6 @@ schema.graphql
 # Local EFT log archives (can contain sensitive data)
 Logs.zip
 Logs - Copy.zip
+
+# Kiro IDE
+.kiro/
