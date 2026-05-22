@@ -338,6 +338,9 @@
     "zoom_speed": "Vitesse du zoom",
     "pan_speed": "Vitesse de déplacement",
     "zone_opacity": "Opacité des zones",
+    "tooltip_density": "Tooltips",
+    "tooltip_density_default": "Default",
+    "tooltip_density_compact": "Compact",
     "map_settings": "Paramètres de la carte",
     "not_available_title": "Carte indisponible",
     "not_available_description": "La carte interactive de {mapName} n'est pas encore disponible. Nous attendons la création d'une carte compatible.",
@@ -372,7 +375,8 @@
     "aria": {
       "zoom_speed": "Vitesse du zoom",
       "pan_speed": "Vitesse de déplacement",
-      "zone_opacity": "Opacité des zones"
+      "zone_opacity": "Opacité des zones",
+      "tooltip_density": "Tooltip density"
     },
     "tooltip": {
       "go_to": "Aller à l'objectif",
@@ -604,6 +608,22 @@
       "route_unlock_map": "Map: {name}",
       "route_unlock_trader": "Trader: {name}",
       "route_unlock_reward": "Reward: {name}"
+    },
+    "kappa": {
+      "title": "Kappa & Lightkeeper Tracker",
+      "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
+      "tabs": {
+        "kappa": "Kappa",
+        "lightkeeper": "Lightkeeper"
+      },
+      "stats": {
+        "total": "Quêtes Kappa",
+        "completed": "Kappa Done",
+        "lightkeeper_total": "Lightkeeper Tasks",
+        "lightkeeper_completed": "Lightkeeper Done"
+      },
+      "progress_label": "complete",
+      "all_complete": "All tasks complete! Well done, PMC."
     },
     "tasks": {
       "title": "Quêtes",
@@ -1298,6 +1318,7 @@
     "credits": "Crédits",
     "settings": "Paramètres",
     "profile": "Profil",
+    "kappa": "Kappa & Lightkeeper",
     "section_navigation": "Navigation",
     "section_game_settings": "Paramètres du jeu",
     "section_external": "Externe",
@@ -1502,6 +1523,11 @@
     },
     "account": {
       "begin_deletion": "Commencer la suppression du compte"
+    },
+    "debug_state": {
+      "title": "Debug State",
+      "description": "Capture a JSON snapshot of your current tracker state for bug reports. Includes game mode, level, task completion states, and prerequisite chains.",
+      "copy_button": "Copy Debug State"
     },
     "general": {
       "privacy_mode": "Mode streamer",
