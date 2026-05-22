@@ -335,6 +335,10 @@
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
   import {
+    RARITY_BORDER_MAP,
+    REQUIREMENT_BORDER_MAP,
+  } from '@/features/neededitems/itemRarityBorder';
+  import {
     createDefaultNeededItemContext,
     neededItemKey,
     type NeededItemContext,
@@ -342,7 +346,6 @@
   import RequirementInfo from '@/features/neededitems/RequirementInfo.vue';
   import TeamNeedsDisplay from '@/features/neededitems/TeamNeedsDisplay.vue';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES } from '@/utils/constants';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
   const TaskLink = defineAsyncComponent(() => import('@/features/tasks/TaskLink.vue'));
@@ -391,30 +394,12 @@
     initialVisible: props.initiallyVisible,
   });
   const itemRowClasses = computed(() => {
-    const mode = tarkovStore.getCurrentGameMode();
-    const modeAccent =
-      mode === GAME_MODES.PVE ? 'border-r-2 border-r-pve-400/30' : 'border-r-2 border-r-pvp-400/30';
     return {
       'bg-gradient-to-l from-complete to-surface':
         selfCompletedNeed.value || currentCount.value >= neededCount.value,
       'bg-surface-800': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
-      [modeAccent]: true,
     };
   });
-  const RARITY_BORDER_MAP: Record<string, string> = {
-    violet: 'border-l-rarity-violet',
-    grey: 'border-l-rarity-grey',
-    yellow: 'border-l-rarity-yellow',
-    orange: 'border-l-rarity-orange',
-    green: 'border-l-rarity-green',
-    red: 'border-l-rarity-red',
-    black: 'border-l-rarity-black',
-    blue: 'border-l-rarity-blue',
-  };
-  const REQUIREMENT_BORDER_MAP: Record<string, string> = {
-    taskObjective: 'border-l-kappa-400',
-    hideoutModule: 'border-l-lightkeeper-400',
-  };
   const rarityBorderClass = computed(() => {
     const bg = imageItem.value?.backgroundColor?.toLowerCase();
     if (bg && bg in RARITY_BORDER_MAP) return RARITY_BORDER_MAP[bg];

@@ -184,6 +184,10 @@
 <script setup lang="ts">
   import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
   import {
+    RARITY_BORDER_MAP,
+    REQUIREMENT_BORDER_MAP,
+  } from '@/features/neededitems/itemRarityBorder';
+  import {
     createDefaultNeededItemContext,
     neededItemKey,
   } from '@/features/neededitems/neededitem-keys';
@@ -247,20 +251,6 @@
       'bg-surface-800': !(selfCompletedNeed.value || currentCount.value >= neededCount.value),
     };
   });
-  const RARITY_BORDER_MAP: Record<string, string> = {
-    violet: 'border-l-rarity-violet',
-    grey: 'border-l-rarity-grey',
-    yellow: 'border-l-rarity-yellow',
-    orange: 'border-l-rarity-orange',
-    green: 'border-l-rarity-green',
-    red: 'border-l-rarity-red',
-    black: 'border-l-rarity-black',
-    blue: 'border-l-rarity-blue',
-  };
-  const REQUIREMENT_BORDER_MAP: Record<string, string> = {
-    taskObjective: 'border-l-kappa-400',
-    hideoutModule: 'border-l-lightkeeper-400',
-  };
   const rarityBorderClass = computed(() => {
     const bg = imageItem.value?.backgroundColor?.toLowerCase();
     if (bg && bg in RARITY_BORDER_MAP) return RARITY_BORDER_MAP[bg];

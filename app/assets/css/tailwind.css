@@ -216,9 +216,13 @@ html.no-smooth-scroll {
   --color-rarity-grey: hsl(0 0% 17%);
   --color-rarity-yellow: hsl(44 17% 26%);
   --color-rarity-orange: hsl(28 36% 22%);
+  --color-rarity-orange-400: hsl(28 65% 55%);
   --color-rarity-green: hsl(120 10% 14%);
+  --color-rarity-green-400: hsl(120 35% 50%);
   --color-rarity-red: hsl(0 25% 18%);
+  --color-rarity-red-400: hsl(0 55% 50%);
   --color-rarity-black: hsl(0 0% 7%);
+  --color-rarity-black-400: hsl(0 0% 35%);
   --color-rarity-blue: hsl(195 20% 13%);
   --color-rarity-default: hsl(0 0% 13%);
   /* Extract marker colors */
