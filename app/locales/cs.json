@@ -338,6 +338,9 @@
     "zoom_speed": "Rychlost přiblížení",
     "pan_speed": "Rychlost panelu",
     "zone_opacity": "Neprůhlednost zóny",
+    "tooltip_density": "Tooltips",
+    "tooltip_density_default": "Default",
+    "tooltip_density_compact": "Kompaktní",
     "map_settings": "Nastavení mapy",
     "not_available_title": "Mapa není k dispozici",
     "not_available_description": "Interaktivní mapa pro {mapName} ještě není k dispozici. Čekáme na vytvoření kompatibilní mapy.",
@@ -372,7 +375,8 @@
     "aria": {
       "zoom_speed": "Rychlost přiblížení",
       "pan_speed": "Rychlost panelu",
-      "zone_opacity": "Neprůhlednost zóny"
+      "zone_opacity": "Neprůhlednost zóny",
+      "tooltip_density": "Tooltip density"
     },
     "tooltip": {
       "go_to": "Přejít na cíl",
@@ -604,6 +608,22 @@
       "route_unlock_map": "Mapa: {name}",
       "route_unlock_trader": "Obchodník: {name}",
       "route_unlock_reward": "Odměna: {name}"
+    },
+    "kappa": {
+      "title": "Kappa & Lightkeeper Tracker",
+      "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
+      "tabs": {
+        "kappa": "Kappa",
+        "lightkeeper": "Držák blesku"
+      },
+      "stats": {
+        "total": "Kappa úkoly",
+        "completed": "Kappa Done",
+        "lightkeeper_total": "Lightkeeper Tasks",
+        "lightkeeper_completed": "Lightkeeper Done"
+      },
+      "progress_label": "complete",
+      "all_complete": "All tasks complete! Well done, PMC."
     },
     "tasks": {
       "title": "Úkoly",
@@ -1298,6 +1318,7 @@
     "credits": "Kredity",
     "settings": "Nastavení",
     "profile": "Profil",
+    "kappa": "Kappa & Lightkeeper",
     "section_navigation": "Navigation",
     "section_game_settings": "Nastavení hry",
     "section_external": "Externí",
@@ -1502,6 +1523,11 @@
     },
     "account": {
       "begin_deletion": "Zahájit odstranění účtu"
+    },
+    "debug_state": {
+      "title": "Debug State",
+      "description": "Capture a JSON snapshot of your current tracker state for bug reports. Includes game mode, level, task completion states, and prerequisite chains.",
+      "copy_button": "Copy Debug State"
     },
     "general": {
       "privacy_mode": "Streamovací režim",
