@@ -156,7 +156,7 @@
     if (combinedText.includes('supabase')) {
       return t(
         'error.supabase_config_hint',
-        'This deployment is missing public Supabase configuration. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.'
+        'This deployment is missing public Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.'
       );
     }
     if (combinedText.includes('403')) {

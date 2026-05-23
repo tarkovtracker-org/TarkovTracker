@@ -25,36 +25,14 @@ const CONFIGURED_NITRO_PRESET = process.env.NITRO_PRESET;
 const NITRO_PRESET = resolveNitroPreset(CONFIGURED_NITRO_PRESET);
 const PUBLIC_APP_URL = resolvePublicAppUrl(process.env);
 const IS_PRODUCTION_BUILD = process.env.NODE_ENV === 'production';
-const GOOGLE_ANALYTICS_MEASUREMENT_ID =
-  process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID ||
-  process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID ||
-  '';
-const MICROSOFT_CLARITY_PROJECT_ID =
-  process.env.NUXT_PUBLIC_CLARITY_PROJECT_ID ||
-  process.env.NUXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID ||
-  '';
+const GOOGLE_ANALYTICS_MEASUREMENT_ID = process.env.GA_MEASUREMENT_ID || '';
+const MICROSOFT_CLARITY_PROJECT_ID = process.env.CLARITY_PROJECT_ID || '';
 const {
   privateAnonKey: PRIVATE_SUPABASE_ANON_KEY,
   privateUrl: PRIVATE_SUPABASE_URL,
   publicAnonKey: PUBLIC_SUPABASE_ANON_KEY,
   publicUrl: PUBLIC_SUPABASE_URL,
 } = resolveSupabaseRuntimeConfig(process.env);
-if (
-  process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID &&
-  process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID &&
-  process.env.NUXT_PUBLIC_GA_MEASUREMENT_ID !==
-    process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID
-) {
-  console.warn('[Config] Conflicting GA measurement IDs - using NUXT_PUBLIC_GA_MEASUREMENT_ID');
-}
-if (
-  process.env.NUXT_PUBLIC_CLARITY_PROJECT_ID &&
-  process.env.NUXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID &&
-  process.env.NUXT_PUBLIC_CLARITY_PROJECT_ID !==
-    process.env.NUXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID
-) {
-  console.warn('[Config] Conflicting Clarity project IDs - using NUXT_PUBLIC_CLARITY_PROJECT_ID');
-}
 const STRIPE_PRICE_KEYS = [
   'STRIPE_PRICE_SCAV_MONTHLY',
   'STRIPE_PRICE_SCAV_6MONTH',
@@ -115,14 +93,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only (private) runtime config
     supabaseUrl: PRIVATE_SUPABASE_URL,
-    supabaseServiceKey:
-      process.env.NUXT_SUPABASE_SERVICE_KEY ||
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SB_SERVICE_ROLE_KEY ||
-      '',
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     supabaseAnonKey: PRIVATE_SUPABASE_ANON_KEY,
-    githubToken:
-      process.env.NUXT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '',
+    githubToken: process.env.GITHUB_TOKEN || '',
     githubContributorsExclude:
       process.env.NUXT_GITHUB_CONTRIBUTORS_EXCLUDE ||
       process.env.GITHUB_CONTRIBUTORS_EXCLUDE ||

@@ -55,9 +55,8 @@ NUXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 NUXT_SUPABASE_URL=your_supabase_url
 NUXT_SUPABASE_ANON_KEY=your_anon_key
 NUXT_SUPABASE_SERVICE_KEY=your_service_role_key
-# Legacy service role aliases (either key name works)
+# Fallback for service role key (NUXT_SUPABASE_SERVICE_KEY preferred)
 # SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-# SB_SERVICE_ROLE_KEY=your_service_role_key
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 

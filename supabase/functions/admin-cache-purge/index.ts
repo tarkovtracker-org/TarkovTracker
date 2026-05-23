@@ -364,8 +364,8 @@ serve(async (req) => {
 
     // Get base URL for cache key construction
     const baseUrl =
+      Deno.env.get('APP_URL') ||
       Deno.env.get('APP_BASE_URL') ||
-      Deno.env.get('NUXT_PUBLIC_APP_URL') ||
       Deno.env.get('SITE_URL') ||
       'https://tarkovtracker.org';
 

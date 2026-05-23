@@ -10,10 +10,10 @@ import {
   TARKOV_IMAGE_DOMAINS,
 } from '@/utils/runtimeConfig';
 describe('resolveSupabaseRuntimeConfig', () => {
-  it('falls back to public Supabase env values for private runtime config', () => {
+  it('resolves Supabase env values', () => {
     const config = resolveSupabaseRuntimeConfig({
-      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'public-anon-key',
-      NUXT_PUBLIC_SUPABASE_URL: 'https://public.supabase.co',
+      SUPABASE_ANON_KEY: 'public-anon-key',
+      SUPABASE_URL: 'https://public.supabase.co',
     });
     expect(config.privateUrl).toBe('https://public.supabase.co');
     expect(config.privateAnonKey).toBe('public-anon-key');
@@ -30,7 +30,7 @@ describe('resolvePublicAppUrl', () => {
   it('prefers explicit public app url', () => {
     expect(
       resolvePublicAppUrl({
-        NUXT_PUBLIC_APP_URL: 'https://preview.example.com',
+        APP_URL: 'https://preview.example.com',
       })
     ).toBe('https://preview.example.com');
   });

@@ -440,11 +440,11 @@ export const useMetadataStore = defineStore('metadata', {
     },
   },
   actions: {
-    async initialize() {
+    async initialize(options?: { forceRefresh?: boolean }) {
+      const forceRefresh = options?.forceRefresh ?? false;
       const perfTimer = perfStart('[Metadata] initialize');
       const promiseStore = getPromiseStore(this);
-      // Guard against concurrent initialization calls
-      if (promiseStore.initPromise) {
+      if (promiseStore.initPromise && !forceRefresh) {
         perfEnd(perfTimer, { reused: true });
         return promiseStore.initPromise;
       }
@@ -453,16 +453,15 @@ export const useMetadataStore = defineStore('metadata', {
         try {
           this.updateLanguageAndGameMode();
           await this.loadStaticMapData();
-          // Load critical cache data once and reuse it to avoid redundant fetches
           let cachedData: Awaited<ReturnType<typeof this.loadCriticalCacheData>> = null;
-          if (typeof window !== 'undefined') {
+          if (typeof window !== 'undefined' && !forceRefresh) {
             cachedData = await this.loadCriticalCacheData();
             if (cachedData) {
               this.initialized = true;
               logger.debug('[MetadataStore] Critical cache exists, skipping loading screen');
             }
           }
-          await this.fetchAllData(false, { deferHeavy: true, cachedData });
+          await this.fetchAllData(forceRefresh, { deferHeavy: !forceRefresh, cachedData });
           this.assertCriticalMetadataReady();
           this.initialized = true;
           this.initializationFailed = false;

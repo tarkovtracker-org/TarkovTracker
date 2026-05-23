@@ -11,9 +11,7 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY env");
   })();
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-const supabasePublishableKey = Deno.env.get("SB_PUBLISHABLE_KEY");
-const supabaseAuthKey = supabaseAnonKey || supabasePublishableKey ||
-  supabaseServiceKey;
+const supabaseAuthKey = supabaseAnonKey || supabaseServiceKey;
 const createSupabaseClient = (key: string): SupabaseClient =>
   createClient(supabaseUrl, key, {
     auth: {
@@ -22,12 +20,9 @@ const createSupabaseClient = (key: string): SupabaseClient =>
       persistSession: false,
     },
   }) as SupabaseClient;
-if (
-  supabaseAuthKey === supabaseServiceKey && !supabaseAnonKey &&
-  !supabasePublishableKey
-) {
+if (supabaseAuthKey === supabaseServiceKey && !supabaseAnonKey) {
   console.warn(
-    "[auth] Missing SUPABASE_ANON_KEY and SB_PUBLISHABLE_KEY; " +
+    "[auth] Missing SUPABASE_ANON_KEY; " +
       "supabaseAuthKey is falling back to supabaseServiceKey while authSupabase " +
       "initializes getClaims().",
   );

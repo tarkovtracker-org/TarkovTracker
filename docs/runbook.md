@@ -4,7 +4,7 @@
 
 - `NUXT_PUBLIC_SUPABASE_URL`
 - `NUXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NUXT_SUPABASE_SERVICE_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY` / `SB_SERVICE_ROLE_KEY`) for server profile/team routes
+- `NUXT_SUPABASE_SERVICE_KEY` (or fallback `SUPABASE_SERVICE_ROLE_KEY`) for server profile/team routes
 - `NUXT_PUBLIC_APP_URL`
 - `API_ALLOWED_HOSTS` (production host allowlist)
 - `API_TRUST_PROXY` only when overriding proxy auto-detection (forwarded headers are trusted

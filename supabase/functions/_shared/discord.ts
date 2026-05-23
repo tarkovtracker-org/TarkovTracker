@@ -53,9 +53,17 @@ export interface DiscordRoleConfig {
 }
 
 export function getDiscordRoleConfig(): DiscordRoleConfig {
+  const guildId = Deno.env.get('DISCORD_GUILD_ID');
+  const supporterRoleId = Deno.env.get('DISCORD_SUPPORTER_ROLE_ID');
+  const missing: string[] = [];
+  if (!guildId) missing.push('DISCORD_GUILD_ID');
+  if (!supporterRoleId) missing.push('DISCORD_SUPPORTER_ROLE_ID');
+  if (missing.length) {
+    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
   return {
-    guildId: Deno.env.get('DISCORD_GUILD_ID') || '1433379620648124451',
-    supporterRoleId: Deno.env.get('DISCORD_SUPPORTER_ROLE_ID') || '1434776517635866817',
+    guildId: guildId as string,
+    supporterRoleId: supporterRoleId as string,
     scavRoleId: Deno.env.get('DISCORD_SCAV_ROLE_ID') || '',
     timmyRoleId: Deno.env.get('DISCORD_TIMMY_ROLE_ID') || '',
     chadRoleId: Deno.env.get('DISCORD_CHAD_ROLE_ID') || '',
