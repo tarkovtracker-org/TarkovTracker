@@ -80,12 +80,20 @@ function hexToBytes(hex: string): Uint8Array | null {
 
 /**
  * Extract Discord user ID from Supabase auth identities.
+ * Prefer identity_data.provider_id (Discord snowflake) and fall back to
+ * identity_data.sub. Avoid identity.id, which can be the Supabase row UUID
+ * depending on auth client version, not the Discord-side user id.
  */
 async function getDiscordUserId(userId: string): Promise<string | null> {
   const { data } = await supabase.auth.admin.getUserById(userId);
   if (!data?.user?.identities) return null;
   const discordIdentity = data.user.identities.find((i) => i.provider === 'discord');
-  return discordIdentity?.identity_data?.provider_id || discordIdentity?.id || null;
+  if (!discordIdentity) return null;
+  const providerId = discordIdentity.identity_data?.provider_id;
+  if (typeof providerId === 'string' && providerId) return providerId;
+  const sub = discordIdentity.identity_data?.sub;
+  if (typeof sub === 'string' && sub) return sub;
+  return null;
 }
 
 /**

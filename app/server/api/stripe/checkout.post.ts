@@ -73,13 +73,14 @@ export default defineEventHandler(async (event) => {
   const appUrl = (config.public.appUrl as string) || 'https://tarkovtracker.org';
   if (mode === 'payment') {
     // One-time custom amount payment
-    const amountCents = Math.round(Number(amount) * 100);
-    if (!amountCents || amountCents < MIN_ONE_TIME_CENTS) {
+    const amountFloat = Number(amount);
+    if (!Number.isFinite(amountFloat) || amountFloat * 100 < MIN_ONE_TIME_CENTS) {
       throw createError({
         statusCode: 400,
         message: `Minimum amount is $${MIN_ONE_TIME_CENTS / 100}`,
       });
     }
+    const amountCents = Math.round(amountFloat * 100);
     try {
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
