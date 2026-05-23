@@ -39,8 +39,8 @@
     "audit_log_table_not_found": "Tabla de registro de auditoría no encontrada.",
     "audit_log_table_not_found_description": "Ejecute la migración de SQL para crear admin_audit_log.",
     "audit_log_fetch_failed": "Error al recuperar registros de auditoría",
-    "no_actions_recorded": "No admin actions recorded yet",
-    "audit_log_by": "by"
+    "no_actions_recorded": "No hay acciones de administración registradas aún",
+    "audit_log_by": "por"
   },
   "alerts": {
     "no_map_data": "No hay datos de mapa disponibles para esta selección."
@@ -54,17 +54,17 @@
     "user_avatar_alt": "Avatar de usuario"
   },
   "promoted_stream": {
-    "close": "Close stream",
-    "expand": "Open stream",
-    "mute": "Mute stream",
-    "open_channel": "Go to Twitch channel",
-    "pause": "Pause stream",
-    "player_title": "{streamer} Twitch stream",
-    "play": "Play stream",
-    "region_label": "Promoted Twitch stream for {streamer}",
-    "shrink": "Shrink stream",
-    "title": "{streamer} live",
-    "unmute": "Unmute stream"
+    "close": "Cerrar transmisión",
+    "expand": "Abrir transmisión",
+    "mute": "Silenciar transmisión",
+    "open_channel": "Ir al canal de Twitch",
+    "pause": "Pausar la transmisión",
+    "player_title": "Transmisión de Twitch {streamer}",
+    "play": "Reproducir transmisión",
+    "region_label": "Transmisión de Twitch promocionado por {streamer}",
+    "shrink": "Contraer transmisión",
+    "title": "{streamer} en vivo",
+    "unmute": "Des silenciar transmisión"
   },
   "buttons": {
     "retry": "Reintentar"
@@ -338,8 +338,8 @@
     "zoom_speed": "Velocidad de zoom",
     "pan_speed": "Velocidad de desplazamiento",
     "zone_opacity": "Opacidad de zona",
-    "tooltip_density": "Tooltips",
-    "tooltip_density_default": "Default",
+    "tooltip_density": "Consejos",
+    "tooltip_density_default": "Por defecto",
     "tooltip_density_compact": "Compacta",
     "map_settings": "Ajustes del mapa",
     "not_available_title": "Mapa no disponible",
@@ -526,7 +526,7 @@
       },
       "progress_card": {
         "view_details": "Ver detalles de {label}",
-        "progress_label": "{label} progress"
+        "progress_label": "{label} Progreso"
       },
       "milestones": {
         "title": "Hitos",
@@ -588,26 +588,26 @@
       "mark_complete": "Marcar como completado",
       "mark_incomplete": "Marcar como incompleto",
       "completed": "Completado",
-      "endings": "Endings",
-      "route_choice": "Route choice",
+      "endings": "Finales",
+      "route_choice": "Opción de ruta",
       "route_available": "Disponible",
-      "route_chosen": "Route selected",
+      "route_chosen": "Ruta seleccionada",
       "route_blocked": "Bloqueado",
-      "route_blocks": "Blocks: {objectives}",
-      "route_blocked_by": "Blocked by: {objectives}",
-      "route_decision": "Decision {index}",
-      "route_choose_one": "Choose one",
+      "route_blocks": "Bloqueos: {objectives}",
+      "route_blocked_by": "Bloqueado por: {objectives}",
+      "route_decision": "Decisión {index}",
+      "route_choose_one": "Selecciona uno",
       "route_optional": "Opcional",
-      "route_required_steps": "Required steps",
-      "route_optional_steps": "Optional steps",
-      "route_selected_hint": "This route is active.",
-      "route_switch_hint": "To switch routes, uncheck the selected route first.",
-      "route_unlocks_here": "Unlocks here",
-      "route_unlocks_chapter": "Chapter unlocks",
-      "route_unlocks_estimated": "Estimated timing",
-      "route_unlock_map": "Map: {name}",
-      "route_unlock_trader": "Trader: {name}",
-      "route_unlock_reward": "Reward: {name}"
+      "route_required_steps": "Pasos requeridos",
+      "route_optional_steps": "Pasos opcionales",
+      "route_selected_hint": "Esta ruta está activa.",
+      "route_switch_hint": "Para cambiar de ruta, desmarque la ruta seleccionada primero.",
+      "route_unlocks_here": "Desbloquea aquí",
+      "route_unlocks_chapter": "Capítulo se desbloquea",
+      "route_unlocks_estimated": "Tiempo estimado",
+      "route_unlock_map": "Mapa: {name}",
+      "route_unlock_trader": "Comerciante: {name}",
+      "route_unlock_reward": "Recompensa: {name}"
     },
     "kappa": {
       "title": "Kappa & Lightkeeper Tracker",
@@ -622,8 +622,8 @@
         "lightkeeper_total": "Lightkeeper Tasks",
         "lightkeeper_completed": "Lightkeeper Done"
       },
-      "progress_label": "complete",
-      "all_complete": "All tasks complete! Well done, PMC."
+      "progress_label": "completado",
+      "all_complete": "¡Todas las tareas completadas! Bien hecho, PMC."
     },
     "tasks": {
       "title": "Misiones",
@@ -729,15 +729,15 @@
         "filter_bar": {
           "hint": "Mostrar u ocultar filtros de estado.",
           "all_filter": "Todos los filtros",
-          "all_filter_hint": "Display every task regardless of status.",
+          "all_filter_hint": "Mostrar cada tarea sin importar el estado.",
           "available_filter": "Filtro disponible",
           "available_filter_hint": "Tasks you can start right now based on your level and prerequisites.",
           "locked_filter": "Filtro bloqueado",
           "locked_filter_hint": "Tasks blocked by level, trader rep, or prerequisite tasks.",
           "completed_filter": "Filtro completado",
-          "completed_filter_hint": "Tasks you've already finished.",
+          "completed_filter_hint": "Tareas que ya has finalizado.",
           "failed_filter": "Filtro fallido",
-          "failed_filter_hint": "Tasks that failed due to missed conditions."
+          "failed_filter_hint": "Tareas que fallaron debido a condiciones perdidas."
         },
         "advanced": {
           "manual_fail_actions": "Acciones manuales de error",
@@ -971,7 +971,7 @@
       "clear_search": "Limpiar búsqueda",
       "items": "artículos",
       "empty": "No hay objetos que coincidan con tu búsqueda.",
-      "error": "Unable to load needed items.",
+      "error": "No se pueden cargar los elementos necesarios.",
       "retry": "Intentar de nuevo",
       "filters": {
         "all": "Todas",
@@ -1022,22 +1022,22 @@
           "create_token_success": "Se ha creado correctamente un nuevo token de API.",
           "create_token_error": "Error al crear un nuevo token de API.",
           "load_tokens_error": "Error al cargar los tokens de API.",
-          "copy_failed": "Failed to copy token.",
-          "copy_token": "Copy token",
+          "copy_failed": "Error al copiar el token.",
+          "copy_token": "Copiar token",
           "token_created": "Token creado",
           "token_created_description": "Copia y guarda este token ahora. No podrás verlo nuevamente.",
           "token_created_close": "Listo",
           "token_copied": "Token copiado al portapapeles",
-          "hide_token": "Hide token",
+          "hide_token": "Ocultar token",
           "token_revoked": "Token revocado",
           "token_revoke_error": "No se pudo revocar el token. Inténtalo nuevamente.",
           "no_tokens": "No tienes ningún token de API de TarkovTracker.",
           "not_logged_in": "Debes iniciar sesión para crear un token de API.",
           "default_note": "Token sin nombre",
-          "show_token": "Show token",
-          "token_value_hidden": "Token value hidden by server configuration",
-          "token_value_missing": "Token value unavailable",
-          "token_value_unavailable": "Token value display unavailable",
+          "show_token": "Mostrar token",
+          "token_value_hidden": "Valor del token oculto por la configuración del servidor",
+          "token_value_missing": "Valor del token no disponible",
+          "token_value_unavailable": "Mostrar el valor del token no disponible",
           "token_value_unavailable_desc": "Your current API does not expose token values for existing tokens.",
           "revoke_button": "Revocar",
           "report": {
@@ -1084,10 +1084,10 @@
           "section_tasks": "Misiones",
           "section_items": "Items",
           "section_maps": "Mapas",
-          "toggle_tasks": "Hide team members' tasks",
-          "toggle_items": "Hide team members' needed items",
+          "toggle_tasks": "Ocultar tareas de los miembros del equipo",
+          "toggle_items": "Ocultar elementos necesarios del equipo",
           "toggle_non_fir": "Hide non-FIR needed items",
-          "toggle_hideout": "Hide hideout needed items",
+          "toggle_hideout": "Ocultar ocultamiento de elementos necesarios",
           "toggle_maps": "Hide team members' map objectives"
         },
         "myteam": {
@@ -1155,7 +1155,7 @@
       "terms_of_service": "Términos de servicio",
       "popup_blocked_title": "Popup bloqueado",
       "popup_blocked_description": "Tu navegador bloqueó la ventana de inicio de sesión. Redirigiendo ahora...",
-      "authenticating": "Authenticating...",
+      "authenticating": "Autentificando...",
       "authenticating_description": "Please wait while we complete your sign in.",
       "error_title": "Sign-in failed",
       "error_description": "Authentication was canceled or failed. Please try again.",
