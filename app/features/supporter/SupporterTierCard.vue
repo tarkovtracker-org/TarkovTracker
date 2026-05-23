@@ -47,16 +47,17 @@
           {{ perk }}
         </li>
       </ul>
+      <p v-if="!currentUserId" class="text-warning-400 text-xs">
+        {{ t('page.supporter.login_required_warning') }}
+      </p>
       <UButton
         class="w-full justify-center font-semibold"
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
         size="lg"
-        :to="ctaUrl || undefined"
-        :disabled="!ctaUrl"
-        :external="!!ctaUrl"
-        target="_blank"
-        rel="noopener noreferrer"
+        :loading="checkoutLoading"
+        :disabled="!currentUserId"
+        @click="handleCheckout"
       >
         {{ t('page.supporter.tier_cta') }}
       </UButton>
@@ -75,7 +76,14 @@
     interval: BillingInterval;
   }>();
   const { locale, t } = useI18n({ useScope: 'global' });
-  const runtimeConfig = useRuntimeConfig();
+  const { $supabase } = useNuxtApp();
+  const { createCheckout } = useSupporter();
+  const checkoutLoading = ref(false);
+  const currentUserId = ref<string | null>(null);
+  onMounted(async () => {
+    const { data } = await $supabase.client.auth.getUser();
+    currentUserId.value = data?.user?.id ?? null;
+  });
   const fmt = computed(
     () =>
       new Intl.NumberFormat(locale.value || 'en-US', {
@@ -103,12 +111,23 @@
         : t('page.supporter.billing_yearly').toLowerCase();
     return t('page.supporter.billed_note', { total, label });
   });
-  const ctaUrl = computed<string>(() => {
-    const tierId = props.tier.id.charAt(0).toUpperCase() + props.tier.id.slice(1);
-    const intId = props.interval.charAt(0).toUpperCase() + props.interval.slice(1);
-    const key = `stripe${tierId}${intId}Url` as keyof typeof runtimeConfig.public;
-    return (runtimeConfig.public[key] as string) ?? '';
-  });
+  async function handleCheckout() {
+    if (!currentUserId.value) return;
+    checkoutLoading.value = true;
+    try {
+      const url = await createCheckout({
+        mode: 'subscription',
+        userId: currentUserId.value,
+        tier: props.tier.id,
+        interval: props.interval,
+      });
+      if (url) {
+        window.location.href = url;
+      }
+    } finally {
+      checkoutLoading.value = false;
+    }
+  }
   const perks = computed(() => {
     const base = [
       t('page.supporter.perk_badge'),

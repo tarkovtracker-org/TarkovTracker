@@ -55,26 +55,25 @@ if (
 ) {
   console.warn('[Config] Conflicting Clarity project IDs - using NUXT_PUBLIC_CLARITY_PROJECT_ID');
 }
-const STRIPE_PUBLIC_URL_KEYS = [
-  'STRIPE_SCAV_MONTHLY_URL',
-  'STRIPE_SCAV_6MONTH_URL',
-  'STRIPE_SCAV_YEARLY_URL',
-  'STRIPE_TIMMY_MONTHLY_URL',
-  'STRIPE_TIMMY_6MONTH_URL',
-  'STRIPE_TIMMY_YEARLY_URL',
-  'STRIPE_CHAD_MONTHLY_URL',
-  'STRIPE_CHAD_6MONTH_URL',
-  'STRIPE_CHAD_YEARLY_URL',
-  'STRIPE_ONE_TIME_URL',
+const STRIPE_PRICE_KEYS = [
+  'STRIPE_PRICE_SCAV_MONTHLY',
+  'STRIPE_PRICE_SCAV_6MONTH',
+  'STRIPE_PRICE_SCAV_YEARLY',
+  'STRIPE_PRICE_TIMMY_MONTHLY',
+  'STRIPE_PRICE_TIMMY_6MONTH',
+  'STRIPE_PRICE_TIMMY_YEARLY',
+  'STRIPE_PRICE_CHAD_MONTHLY',
+  'STRIPE_PRICE_CHAD_6MONTH',
+  'STRIPE_PRICE_CHAD_YEARLY',
 ] as const;
 const IS_BUILD_COMMAND = process.argv.some((a) => a === 'build' || a === 'generate');
 const IS_CF_PREVIEW = process.env.CF_PAGES === '1' && process.env.CF_PAGES_BRANCH !== 'main';
 if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW) {
-  const missingStripeUrls = STRIPE_PUBLIC_URL_KEYS.filter((key) => !process.env[key]?.trim());
-  if (missingStripeUrls.length > 0) {
-    throw new Error(
-      `[Config] Missing required Stripe checkout URL env vars: ${missingStripeUrls.join(', ')}`
-    );
+  const missingKeys = ['STRIPE_SECRET_KEY', ...STRIPE_PRICE_KEYS].filter(
+    (key) => !process.env[key]?.trim()
+  );
+  if (missingKeys.length > 0) {
+    throw new Error(`[Config] Missing required Stripe env vars: ${missingKeys.join(', ')}`);
   }
 }
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
@@ -152,6 +151,16 @@ export default defineNuxtConfig({
           process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
           '120'
       ) || 120,
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
+    stripePriceScavMonthly: process.env.STRIPE_PRICE_SCAV_MONTHLY ?? '',
+    stripePriceScav6month: process.env.STRIPE_PRICE_SCAV_6MONTH ?? '',
+    stripePriceScavYearly: process.env.STRIPE_PRICE_SCAV_YEARLY ?? '',
+    stripePriceTimmyMonthly: process.env.STRIPE_PRICE_TIMMY_MONTHLY ?? '',
+    stripePriceTimmy6month: process.env.STRIPE_PRICE_TIMMY_6MONTH ?? '',
+    stripePriceTimmyYearly: process.env.STRIPE_PRICE_TIMMY_YEARLY ?? '',
+    stripePriceChadMonthly: process.env.STRIPE_PRICE_CHAD_MONTHLY ?? '',
+    stripePriceChad6month: process.env.STRIPE_PRICE_CHAD_6MONTH ?? '',
+    stripePriceChadYearly: process.env.STRIPE_PRICE_CHAD_YEARLY ?? '',
     sharedProfileCacheTtlMs:
       Number(
         process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS ||
@@ -177,7 +186,7 @@ export default defineNuxtConfig({
       // e.g., "/api/tarkov/*" for public data endpoints
       publicRoutes:
         process.env.API_PUBLIC_ROUTES?.trim() ||
-        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/profile/*,/api/streamer/*,/api/twitch/*',
+        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/profile/*,/api/streamer/*,/api/twitch/*,/api/stripe/*',
       // Whether to trust proxy headers (X-Forwarded-For, etc.)
       // ONLY enable this if the server is behind a trusted proxy like Cloudflare
       trustProxy: resolveTrustProxySetting({
@@ -200,16 +209,6 @@ export default defineNuxtConfig({
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,
       githubOwner: process.env.GITHUB_OWNER || 'tarkovtracker-org',
       githubRepo: process.env.GITHUB_REPO || 'TarkovTracker',
-      stripeScavMonthlyUrl: process.env.STRIPE_SCAV_MONTHLY_URL ?? '',
-      stripeScav6monthUrl: process.env.STRIPE_SCAV_6MONTH_URL ?? '',
-      stripeScavYearlyUrl: process.env.STRIPE_SCAV_YEARLY_URL ?? '',
-      stripeTimmyMonthlyUrl: process.env.STRIPE_TIMMY_MONTHLY_URL ?? '',
-      stripeTimmy6monthUrl: process.env.STRIPE_TIMMY_6MONTH_URL ?? '',
-      stripeTimmyYearlyUrl: process.env.STRIPE_TIMMY_YEARLY_URL ?? '',
-      stripeChadMonthlyUrl: process.env.STRIPE_CHAD_MONTHLY_URL ?? '',
-      stripeChad6monthUrl: process.env.STRIPE_CHAD_6MONTH_URL ?? '',
-      stripeChadYearlyUrl: process.env.STRIPE_CHAD_YEARLY_URL ?? '',
-      stripeOneTimeUrl: process.env.STRIPE_ONE_TIME_URL ?? '',
       promotedTwitch: {
         channel: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_CHANNEL || 'honeyxxo',
         displayName: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_DISPLAY_NAME || 'honeyxxo',
