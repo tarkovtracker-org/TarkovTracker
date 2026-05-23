@@ -610,7 +610,7 @@
       "route_unlock_reward": "Ricompensa: {name}"
     },
     "kappa": {
-      "title": "Kappa & Lightkeeper",
+      "title": "Tracker Kappa & Lightkeeper",
       "subtitle": "Traccia i progressi verso il contenitore Kappa e le missioni Lightkeeper.",
       "tabs": {
         "kappa": "Kappa",
@@ -618,9 +618,9 @@
       },
       "stats": {
         "total": "Missioni Kappa",
-        "completed": "Kappa ottenuto",
+        "completed": "Missioni Kappa completate",
         "lightkeeper_total": "Missioni Lightkeeper",
-        "lightkeeper_completed": "Lightkeeper raggiunto"
+        "lightkeeper_completed": "Missioni Lightkeeper completate"
       },
       "progress_label": "completo",
       "all_complete": "Tutte le missioni completate! Ben fatto, PMC."
