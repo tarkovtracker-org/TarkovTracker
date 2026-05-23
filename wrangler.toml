@@ -3,3 +3,14 @@ name = "tarkovtracker"
 compatibility_date = "2026-01-09"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
+
+[vars]
+STRIPE_PRICE_SCAV_MONTHLY = "price_1Ta4aBLaRBke56G2tGRWFgxh"
+STRIPE_PRICE_SCAV_6MONTH = "price_1Ta4aCLaRBke56G2fHWOOR4n"
+STRIPE_PRICE_SCAV_YEARLY = "price_1Ta4aDLaRBke56G2Qdb4VU2A"
+STRIPE_PRICE_TIMMY_MONTHLY = "price_1Ta4aDLaRBke56G2UQ4K79Yb"
+STRIPE_PRICE_TIMMY_6MONTH = "price_1Ta4aELaRBke56G2l0jQYyFc"
+STRIPE_PRICE_TIMMY_YEARLY = "price_1Ta4aFLaRBke56G29aU9LUeb"
+STRIPE_PRICE_CHAD_MONTHLY = "price_1Ta4aGLaRBke56G2ncgwP5DO"
+STRIPE_PRICE_CHAD_6MONTH = "price_1Ta4aHLaRBke56G2oKmYuqvl"
+STRIPE_PRICE_CHAD_YEARLY = "price_1Ta4aILaRBke56G2pxce76Pi"
