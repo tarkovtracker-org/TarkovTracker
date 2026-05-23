@@ -660,7 +660,9 @@
       "alt_payments_coming_soon": "We're working on adding additional payment options so everyone can contribute in the way that works best for them.",
       "alt_payment_crypto": "Crypto",
       "alt_payment_gift_cards": "Gift Cards",
-      "alt_payments_more": "& More"
+      "alt_payments_more": "& More",
+      "checkout_error_title": "Checkout failed",
+      "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment."
     },
     "tasks": {
       "title": "Tasks",
