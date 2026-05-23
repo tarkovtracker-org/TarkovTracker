@@ -147,7 +147,7 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
   const { error } = await supabase
     .from('supporters')
     .update({
-      tier: isActive ? newTier : supporter.tier,
+      tier: isActive ? newTier : isPastDue ? supporter.tier : 'supporter',
       status,
       expires_at: expiresAt,
     })
