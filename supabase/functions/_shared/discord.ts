@@ -96,8 +96,9 @@ export async function syncRolesForSupporter(
   tier: string,
   active: boolean
 ): Promise<void> {
+  if (!discordUserId) return;
   const config = getDiscordRoleConfig();
-  if (!discordUserId || !config.guildId) return;
+  if (!config.guildId) return;
 
   // Always keep the base Supporter role (permanent once earned)
   await addRole({
@@ -120,8 +121,9 @@ export async function syncRolesForSupporter(
  * Remove all tier roles (but keep Supporter) when a subscription expires.
  */
 export async function removeAllTierRoles(discordUserId: string): Promise<void> {
+  if (!discordUserId) return;
   const config = getDiscordRoleConfig();
-  if (!discordUserId || !config.guildId) return;
+  if (!config.guildId) return;
 
   const tierRoles = [config.scavRoleId, config.timmyRoleId, config.chadRoleId].filter(Boolean);
   for (const roleId of tierRoles) {

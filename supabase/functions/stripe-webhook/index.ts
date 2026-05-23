@@ -8,9 +8,16 @@ import {
 } from '../_shared/discord.ts';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
+const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GRACE_PERIOD_DAYS = 7;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    '[stripe-webhook] Missing required env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set'
+  );
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
@@ -34,9 +41,10 @@ async function verifyStripeSignature(
   const signature = parts['v1'];
   if (!timestamp || !signature) return false;
 
-  // Reject timestamps older than 5 minutes
+  // Reject signatures whose timestamp is older than 5 minutes OR set in the future
+  // (negative age means the signed timestamp is in the future, which Stripe never produces).
   const age = Math.floor(Date.now() / 1000) - Number(timestamp);
-  if (Math.abs(age) > 300) return false;
+  if (age > 300 || age < -30) return false;
 
   const signedPayload = `${timestamp}.${payload}`;
   const key = await crypto.subtle.importKey(
@@ -47,10 +55,27 @@ async function verifyStripeSignature(
     ['sign']
   );
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signedPayload));
-  const expectedHex = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return expectedHex === signature;
+  const expectedBytes = new Uint8Array(sig);
+  const signatureBytes = hexToBytes(signature);
+  if (!signatureBytes || signatureBytes.length !== expectedBytes.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < expectedBytes.length; i += 1) {
+    mismatch |= expectedBytes[i] ^ signatureBytes[i];
+  }
+  return mismatch === 0;
+}
+
+/**
+ * Decode a hex string to a byte array. Returns null on invalid input.
+ */
+function hexToBytes(hex: string): Uint8Array | null {
+  if (typeof hex !== 'string' || hex.length === 0 || hex.length % 2 !== 0) return null;
+  if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i += 1) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
 }
 
 /**
@@ -69,6 +94,29 @@ async function getDiscordUserId(userId: string): Promise<string | null> {
  */
 function resolveTier(metadata: Record<string, string>): string {
   return metadata?.tier || 'supporter';
+}
+
+/**
+ * Wrap a Discord role sync call so failures don't break the payment path.
+ * Logs the error with context but still allows the webhook to return 200.
+ *
+ * Policy: Discord role sync is treated as eventual consistency. A Discord
+ * outage or 5xx must NOT cause the whole Stripe webhook to retry, because
+ * Stripe would replay the payment event repeatedly and risk duplicate side
+ * effects (notifications, audit logs). Operators can reconcile drift via the
+ * admin role-sync tooling. If a fully consistent path is required, build a
+ * dedicated reconcile queue rather than blocking the payment ack.
+ */
+async function safeDiscordCall(
+  label: string,
+  context: Record<string, unknown>,
+  fn: () => Promise<unknown>
+): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    console.error(`[stripe-webhook] Discord ${label} failed:`, { ...context, err });
+  }
 }
 
 // deno-lint-ignore no-explicit-any
@@ -92,6 +140,15 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
   const isSubscription = session.mode === 'subscription';
   const discordUserId = await getDiscordUserId(userId);
 
+  // Preserve started_at across re-subscriptions so renewal/upgrade flows
+  // don't reset the original support date. Only set it when the row is new.
+  const { data: existing } = await supabase
+    .from('supporters')
+    .select('started_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const startedAt = existing?.started_at ?? new Date().toISOString();
+
   const record = {
     user_id: userId,
     tier,
@@ -102,7 +159,7 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
     has_ever_supported: true,
     discord_user_id: discordUserId,
     amount_total: session.amount_total || 0,
-    started_at: new Date().toISOString(),
+    started_at: startedAt,
     expires_at: null,
     updated_at: new Date().toISOString(),
   };
@@ -113,12 +170,14 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
 
   if (error) {
     console.error('[stripe-webhook] Failed to upsert supporter:', error);
-    return;
+    throw new Error(`Failed to upsert supporter for ${userId}: ${error.message}`);
   }
 
-  // Sync Discord roles
+  // Sync Discord roles (best-effort — Discord failures must not retry payment events)
   if (discordUserId) {
-    await syncRolesForSupporter(discordUserId, tier, true);
+    await safeDiscordCall('role sync', { userId, discordUserId, tier }, () =>
+      syncRolesForSupporter(discordUserId, tier, true)
+    );
   }
 
   console.info(`[stripe-webhook] Supporter activated: ${userId} tier=${tier} type=${record.type}`);
@@ -164,15 +223,25 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
 
   if (error) {
     console.error('[stripe-webhook] Failed to update subscription:', error);
-    return;
+    throw new Error(
+      `Failed to update subscription for ${supporter.user_id}: ${error.message}`
+    );
   }
 
-  // Sync Discord roles
+  // Sync Discord roles (best-effort)
   if (supporter.discord_user_id) {
     if (isActive) {
-      await syncRolesForSupporter(supporter.discord_user_id, newTier, true);
+      await safeDiscordCall(
+        'role sync',
+        { userId: supporter.user_id, discordUserId: supporter.discord_user_id, tier: newTier },
+        () => syncRolesForSupporter(supporter.discord_user_id, newTier, true)
+      );
     } else if (!isActive && !isPastDue) {
-      await removeAllTierRoles(supporter.discord_user_id);
+      await safeDiscordCall(
+        'remove tier roles',
+        { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+        () => removeAllTierRoles(supporter.discord_user_id)
+      );
     }
   }
 }
@@ -200,12 +269,18 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
 
   if (error) {
     console.error('[stripe-webhook] Failed to expire subscription:', error);
-    return;
+    throw new Error(
+      `Failed to expire subscription for ${supporter.user_id}: ${error.message}`
+    );
   }
 
-  // Remove tier roles but keep base Supporter role
+  // Remove tier roles but keep base Supporter role (best-effort)
   if (supporter.discord_user_id) {
-    await removeAllTierRoles(supporter.discord_user_id);
+    await safeDiscordCall(
+      'remove tier roles',
+      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+      () => removeAllTierRoles(supporter.discord_user_id)
+    );
   }
 
   console.info(`[stripe-webhook] Subscription expired: ${supporter.user_id}`);
@@ -228,7 +303,7 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   const grace = new Date();
   grace.setDate(grace.getDate() + GRACE_PERIOD_DAYS);
 
-  await supabase
+  const { error } = await supabase
     .from('supporters')
     .update({
       status: 'past_due',
@@ -236,32 +311,73 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
     })
     .eq('user_id', supporter.user_id);
 
+  if (error) {
+    console.error('[stripe-webhook] Failed to mark past_due on payment failure:', error);
+    throw new Error(
+      `Failed to mark past_due for ${supporter.user_id}: ${error.message}`
+    );
+  }
+
   console.warn(`[stripe-webhook] Payment failed for ${supporter.user_id}, grace until ${grace.toISOString()}`);
 }
 
 /**
- * Count successful payments for a Stripe customer to determine supporter history.
+ * Count successful charges for a Stripe customer via the Stripe Charges API.
+ * Falls back to a conservative count of 1 (treats the refund as the only payment)
+ * if Stripe is unreachable or unauthorized, which is the safer default for refunds.
  */
 async function getCustomerPaymentCount(stripeCustomerId: string): Promise<number> {
-  // Query the supporters table for historical context.
-  // A more robust approach would query Stripe API for charges, but for now
-  // we track via the amount_total and started_at to infer history.
-  // If started_at is more than 30 days ago OR amount_total indicates multiple payments,
-  // they have payment history.
-  const { data } = await supabase
-    .from('supporters')
-    .select('started_at, amount_total')
-    .eq('stripe_customer_id', stripeCustomerId)
-    .maybeSingle();
+  if (!STRIPE_SECRET_KEY) {
+    console.warn(
+      '[stripe-webhook] STRIPE_SECRET_KEY missing; cannot determine charge history. Defaulting to 1.'
+    );
+    return 1;
+  }
 
-  if (!data) return 0;
+  try {
+    let count = 0;
+    let startingAfter: string | undefined;
+    // Page through up to 5 pages of 100 to keep the worst case bounded for noisy customers
+    for (let page = 0; page < 5; page += 1) {
+      const params = new URLSearchParams({
+        customer: stripeCustomerId,
+        limit: '100',
+      });
+      if (startingAfter) params.set('starting_after', startingAfter);
 
-  // If they've been a supporter for more than 30 days, they have history
-  const startedAt = new Date(data.started_at);
-  const daysSinceStart = (Date.now() - startedAt.getTime()) / (1000 * 60 * 60 * 24);
-  if (daysSinceStart > 30) return 2; // Indicates multiple billing cycles
+      const resp = await fetch(`https://api.stripe.com/v1/charges?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+          'Stripe-Version': '2024-06-20',
+        },
+      });
 
-  return 1; // Only one payment period
+      if (!resp.ok) {
+        const body = await resp.text();
+        console.error(
+          `[stripe-webhook] Stripe charges lookup failed (${resp.status}) for ${stripeCustomerId}: ${body.slice(0, 500)}`
+        );
+        return 1;
+      }
+
+      const json = (await resp.json()) as {
+        data: Array<{ id: string; status: string }>;
+        has_more: boolean;
+      };
+
+      for (const charge of json.data) {
+        if (charge.status === 'succeeded') count += 1;
+      }
+
+      if (!json.has_more || json.data.length === 0) break;
+      startingAfter = json.data[json.data.length - 1].id;
+    }
+
+    return count;
+  } catch (err) {
+    console.error('[stripe-webhook] Charge history lookup threw:', { stripeCustomerId, err });
+    return 1;
+  }
 }
 
 // deno-lint-ignore no-explicit-any
@@ -276,6 +392,14 @@ async function handleAsyncPaymentSucceeded(session: any): Promise<void> {
   const isSubscription = session.mode === 'subscription';
   const discordUserId = await getDiscordUserId(userId);
 
+  // Preserve started_at across re-subscriptions (see handleCheckoutCompleted).
+  const { data: existing } = await supabase
+    .from('supporters')
+    .select('started_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const startedAt = existing?.started_at ?? new Date().toISOString();
+
   const record = {
     user_id: userId,
     tier,
@@ -286,7 +410,7 @@ async function handleAsyncPaymentSucceeded(session: any): Promise<void> {
     has_ever_supported: true,
     discord_user_id: discordUserId,
     amount_total: session.amount_total || 0,
-    started_at: new Date().toISOString(),
+    started_at: startedAt,
     expires_at: null,
     updated_at: new Date().toISOString(),
   };
@@ -295,11 +419,15 @@ async function handleAsyncPaymentSucceeded(session: any): Promise<void> {
 
   if (error) {
     console.error('[stripe-webhook] Failed to upsert supporter (async payment):', error);
-    return;
+    throw new Error(
+      `Failed to upsert supporter (async) for ${userId}: ${error.message}`
+    );
   }
 
   if (discordUserId) {
-    await syncRolesForSupporter(discordUserId, tier, true);
+    await safeDiscordCall('role sync (async)', { userId, discordUserId, tier }, () =>
+      syncRolesForSupporter(discordUserId, tier, true)
+    );
   }
 
   console.info(
@@ -328,10 +456,16 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
 
   // Only update if somehow the record was set active (guard against duplicate events).
   if (supporter?.status === 'active') {
-    await supabase
+    const { error } = await supabase
       .from('supporters')
       .update({ status: 'expired', expires_at: new Date().toISOString() })
       .eq('user_id', userId);
+    if (error) {
+      console.error('[stripe-webhook] Failed to expire on async payment failure:', error);
+      throw new Error(
+        `Failed to expire async-failed supporter for ${userId}: ${error.message}`
+      );
+    }
   }
 }
 
@@ -365,17 +499,26 @@ async function handleChargeRefunded(charge: any): Promise<void> {
 
     if (error) {
       console.error('[stripe-webhook] Failed to revoke on refund:', error);
-      return;
+      throw new Error(`Failed to revoke supporter on refund for ${supporter.user_id}: ${error.message}`);
     }
 
-    // Remove ALL roles including base Supporter
+    // Remove ALL roles including base Supporter (best-effort)
     if (supporter.discord_user_id) {
-      await removeAllTierRoles(supporter.discord_user_id);
-      await removeRole({
-        guildId: getDiscordRoleConfig().guildId,
-        userId: supporter.discord_user_id,
-        roleId: getDiscordRoleConfig().supporterRoleId,
-      });
+      await safeDiscordCall(
+        'remove tier roles (refund)',
+        { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+        () => removeAllTierRoles(supporter.discord_user_id)
+      );
+      await safeDiscordCall(
+        'remove supporter role (refund)',
+        { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+        () =>
+          removeRole({
+            guildId: getDiscordRoleConfig().guildId,
+            userId: supporter.discord_user_id,
+            roleId: getDiscordRoleConfig().supporterRoleId,
+          })
+      );
     }
 
     console.info(`[stripe-webhook] Full revoke on refund (first payment): ${supporter.user_id}`);
@@ -393,12 +536,16 @@ async function handleChargeRefunded(charge: any): Promise<void> {
 
     if (error) {
       console.error('[stripe-webhook] Failed to downgrade on refund:', error);
-      return;
+      throw new Error(`Failed to downgrade supporter on refund for ${supporter.user_id}: ${error.message}`);
     }
 
-    // Remove tier roles but keep base Supporter
+    // Remove tier roles but keep base Supporter (best-effort)
     if (supporter.discord_user_id) {
-      await removeAllTierRoles(supporter.discord_user_id);
+      await safeDiscordCall(
+        'remove tier roles (partial refund)',
+        { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+        () => removeAllTierRoles(supporter.discord_user_id)
+      );
     }
 
     console.info(`[stripe-webhook] Partial revoke on refund (kept Supporter): ${supporter.user_id}`);
@@ -432,17 +579,26 @@ async function handleChargeDisputeCreated(dispute: any): Promise<void> {
 
   if (error) {
     console.error('[stripe-webhook] Failed to revoke on dispute:', error);
-    return;
+    throw new Error(`Failed to revoke supporter on dispute for ${supporter.user_id}: ${error.message}`);
   }
 
-  // Remove ALL roles
+  // Remove ALL roles (best-effort)
   if (supporter.discord_user_id) {
-    await removeAllTierRoles(supporter.discord_user_id);
-    await removeRole({
-      guildId: getDiscordRoleConfig().guildId,
-      userId: supporter.discord_user_id,
-      roleId: getDiscordRoleConfig().supporterRoleId,
-    });
+    await safeDiscordCall(
+      'remove tier roles (dispute)',
+      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+      () => removeAllTierRoles(supporter.discord_user_id)
+    );
+    await safeDiscordCall(
+      'remove supporter role (dispute)',
+      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+      () =>
+        removeRole({
+          guildId: getDiscordRoleConfig().guildId,
+          userId: supporter.discord_user_id,
+          roleId: getDiscordRoleConfig().supporterRoleId,
+        })
+    );
   }
 
   console.warn(`[stripe-webhook] Full revoke on chargeback: ${supporter.user_id}`);
@@ -481,7 +637,16 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const event = JSON.parse(body);
+  let event: { type: string; data: { object: unknown } };
+  try {
+    event = JSON.parse(body);
+  } catch (err) {
+    console.warn('[stripe-webhook] Invalid JSON payload:', err);
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   try {
     switch (event.type) {
