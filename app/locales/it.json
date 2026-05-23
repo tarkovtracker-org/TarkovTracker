@@ -438,7 +438,7 @@
           "progress": "Progresso",
           "status": "Status",
           "secondary": "Altre buone opzioni",
-          "secondary_actionable": "In alternativa alla migliore.",
+          "secondary_actionable": "Le seguenti se la missione primaria non è adatta.",
           "secondary_blocked": "Queste sono i prossimi sblocchi più vicini in coda.",
           "secondary_empty": "Questo è il passo più chiaro in questo momento."
         },
@@ -522,7 +522,7 @@
         "lightkeeper": "Missioni Lightkeeper",
         "filtered_status_active": "Filtro missioni attivo",
         "filtered_status_inactive": "Filtro missioni disattivato",
-        "filtered_warning_tooltip": "Le statistiche seguono i filtri missione impostati (Kappa, Lightkeeper, e missioni non speciali)."
+        "filtered_warning_tooltip": "Le statistiche seguono i filtri missione impostati (Kappa, Lightkeeper e missioni non speciali)."
       },
       "progress_card": {
         "view_details": "Visualizza i dettagli per {label}",
@@ -546,7 +546,7 @@
         "title": "Progressi trader",
         "view_tasks": "Visualizza missioni di {name}",
         "tasks": "missioni",
-        "loyalty_level": "Livello fedeltà (LF)",
+        "loyalty_level": "Livello fedeltà",
         "reputation": "Reputazione",
         "reputation_input_label": "Input reputazione",
         "set_loyalty_level": "Imposta il livello fedeltà a {level}",
@@ -596,13 +596,13 @@
       "route_blocks": "Blocchi: {objectives}",
       "route_blocked_by": "Bloccato da: {objectives}",
       "route_decision": "Decisione {index}",
-      "route_choose_one": "Sceglierne uno",
+      "route_choose_one": "Scegli un'opzione",
       "route_optional": "Opzionale",
       "route_required_steps": "Passaggi richiesti",
       "route_optional_steps": "Passaggi facoltativi",
       "route_selected_hint": "Questo percorso è attivo.",
       "route_switch_hint": "Per cambiare percorso, deselezionare prima quello selezionato.",
-      "route_unlocks_here": "Sblocca qui",
+      "route_unlocks_here": "Sblocca",
       "route_unlocks_chapter": "Sblocca il capitolo",
       "route_unlocks_estimated": "Tempo stimato",
       "route_unlock_map": "Mappa: {name}",
