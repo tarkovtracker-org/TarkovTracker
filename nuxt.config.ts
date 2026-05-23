@@ -68,7 +68,8 @@ const STRIPE_PRICE_KEYS = [
 ] as const;
 const IS_BUILD_COMMAND = process.argv.some((a) => a === 'build' || a === 'generate');
 const IS_CF_PREVIEW = process.env.CF_PAGES === '1' && process.env.CF_PAGES_BRANCH !== 'main';
-if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW) {
+const IS_CI = process.env.CI === 'true';
+if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
   const missingKeys = ['STRIPE_SECRET_KEY', ...STRIPE_PRICE_KEYS].filter(
     (key) => !process.env[key]?.trim()
   );
