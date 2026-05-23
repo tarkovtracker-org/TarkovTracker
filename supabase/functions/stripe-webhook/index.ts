@@ -79,6 +79,15 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
     return;
   }
 
+  // ACH Direct Debit and other delayed methods complete the session before funds clear.
+  // Defer activation until async_payment_succeeded fires.
+  if (session.payment_status === 'processing') {
+    console.info(
+      `[stripe-webhook] Payment processing (delayed method), deferring activation: ${userId}`
+    );
+    return;
+  }
+
   const tier = resolveTier(session.metadata || {});
   const isSubscription = session.mode === 'subscription';
   const discordUserId = await getDiscordUserId(userId);
@@ -256,6 +265,77 @@ async function getCustomerPaymentCount(stripeCustomerId: string): Promise<number
 }
 
 // deno-lint-ignore no-explicit-any
+async function handleAsyncPaymentSucceeded(session: any): Promise<void> {
+  const userId = session.client_reference_id;
+  if (!userId) {
+    console.warn('[stripe-webhook] async_payment_succeeded without client_reference_id');
+    return;
+  }
+
+  const tier = resolveTier(session.metadata || {});
+  const isSubscription = session.mode === 'subscription';
+  const discordUserId = await getDiscordUserId(userId);
+
+  const record = {
+    user_id: userId,
+    tier,
+    status: 'active',
+    type: isSubscription ? 'subscription' : 'one_time',
+    stripe_customer_id: session.customer || null,
+    stripe_subscription_id: session.subscription || null,
+    has_ever_supported: true,
+    discord_user_id: discordUserId,
+    amount_total: session.amount_total || 0,
+    started_at: new Date().toISOString(),
+    expires_at: null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase.from('supporters').upsert(record, { onConflict: 'user_id' });
+
+  if (error) {
+    console.error('[stripe-webhook] Failed to upsert supporter (async payment):', error);
+    return;
+  }
+
+  if (discordUserId) {
+    await syncRolesForSupporter(discordUserId, tier, true);
+  }
+
+  console.info(
+    `[stripe-webhook] Supporter activated (async payment cleared): ${userId} tier=${tier} type=${record.type}`
+  );
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleAsyncPaymentFailed(session: any): Promise<void> {
+  const userId = session.client_reference_id;
+  if (!userId) {
+    console.warn('[stripe-webhook] async_payment_failed without client_reference_id');
+    return;
+  }
+
+  console.warn(
+    `[stripe-webhook] Async payment failed (ACH/delayed), no activation: ${userId}`
+  );
+
+  // Ensure no lingering active record exists from a prior partial state.
+  const { data: supporter } = await supabase
+    .from('supporters')
+    .select('status')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  // Only update if somehow the record was set active (guard against duplicate events).
+  if (supporter?.status === 'active') {
+    await supabase
+      .from('supporters')
+      .update({ status: 'expired', expires_at: new Date().toISOString() })
+      .eq('user_id', userId);
+  }
+}
+
+// deno-lint-ignore no-explicit-any
 async function handleChargeRefunded(charge: any): Promise<void> {
   const customerId = charge.customer;
   if (!customerId) return;
@@ -416,6 +496,12 @@ Deno.serve(async (req: Request) => {
         break;
       case 'invoice.payment_failed':
         await handleInvoicePaymentFailed(event.data.object);
+        break;
+      case 'checkout.session.async_payment_succeeded':
+        await handleAsyncPaymentSucceeded(event.data.object);
+        break;
+      case 'checkout.session.async_payment_failed':
+        await handleAsyncPaymentFailed(event.data.object);
         break;
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object);
