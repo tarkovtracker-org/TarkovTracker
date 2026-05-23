@@ -2,10 +2,10 @@
 
 ## Required Environment Variables
 
-- `NUXT_PUBLIC_SUPABASE_URL`
-- `NUXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL` (or `NUXT_SUPABASE_URL`)
+- `SUPABASE_ANON_KEY` (or `NUXT_SUPABASE_ANON_KEY`)
 - `NUXT_SUPABASE_SERVICE_KEY` (or fallback `SUPABASE_SERVICE_ROLE_KEY`) for server profile/team routes
-- `NUXT_PUBLIC_APP_URL`
+- `APP_URL` (or `CF_PAGES_URL` on Cloudflare Pages)
 - `API_ALLOWED_HOSTS` (production host allowlist)
 - `API_TRUST_PROXY` only when overriding proxy auto-detection (forwarded headers are trusted
   only when `API_TRUST_PROXY=true` or `NITRO_PRESET` is explicitly set to a `cloudflare*`
