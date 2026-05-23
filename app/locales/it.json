@@ -610,7 +610,7 @@
       "route_unlock_reward": "Ricompensa: {name}"
     },
     "kappa": {
-      "title": "Tracker Kappa & Lightkeeper",
+      "title": "Kappa & Lightkeeper",
       "subtitle": "Traccia i progressi verso il contenitore Kappa e le missioni Lightkeeper.",
       "tabs": {
         "kappa": "Kappa",
