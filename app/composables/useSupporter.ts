@@ -1,3 +1,4 @@
+import { logger } from '@/utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
@@ -7,12 +8,16 @@ export interface SupporterStatus {
   expiresAt: string | null;
   startedAt: string;
 }
+// Module-scoped reactive state: useSupporter() is a singleton-style composable
+// (similar to Pinia stores) so all components observe the same supporter status
+// without re-fetching. Per-call refs would defeat the purpose of the realtime channel.
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+let channel: RealtimeChannel | null = null;
+let channelUserId: string | null = null;
 export function useSupporter() {
   const { $supabase } = useNuxtApp();
-  let channel: RealtimeChannel | null = null;
   const isSupporter = computed(() => supporterState.value?.hasEverSupported === true);
   const isActiveSubscriber = computed(
     () =>
@@ -65,6 +70,12 @@ export function useSupporter() {
   }
   function subscribe(userId: string) {
     if (!$supabase || !userId) return;
+    if (channel && channelUserId === userId) return;
+    if (channel) {
+      channel.unsubscribe();
+      channel = null;
+      channelUserId = null;
+    }
     channel = $supabase.client
       .channel(`supporters:${userId}`)
       .on(
@@ -80,16 +91,19 @@ export function useSupporter() {
         }
       )
       .subscribe();
+    channelUserId = userId;
   }
   function unsubscribe() {
     if (channel) {
       channel.unsubscribe();
       channel = null;
+      channelUserId = null;
     }
   }
   async function createCheckout(params: {
     mode: 'payment' | 'subscription';
     userId: string;
+    email?: string;
     tier?: string;
     interval?: string;
     amount?: number;
@@ -103,6 +117,12 @@ export function useSupporter() {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Checkout failed';
       error.value = message;
+      logger.error('createCheckout failed', {
+        mode: params.mode,
+        tier: params.tier,
+        interval: params.interval,
+        error: e,
+      });
       return null;
     }
   }

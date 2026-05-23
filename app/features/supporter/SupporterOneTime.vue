@@ -39,20 +39,41 @@
         </UButton>
       </div>
     </div>
+    <UAlert
+      v-if="checkoutError"
+      class="mt-4"
+      color="error"
+      variant="soft"
+      icon="i-mdi-alert-circle-outline"
+      :title="t('page.supporter.checkout_error_title', 'Checkout failed')"
+      :description="checkoutError"
+      :close="true"
+      @update:open="checkoutError = null"
+    />
   </div>
 </template>
 <script setup lang="ts">
   import { calcOneTimeCharge } from '@/features/supporter/supporterPricing';
+  import { logger } from '@/utils/logger';
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
-  const { createCheckout } = useSupporter();
+  const { createCheckout, error: composableError } = useSupporter();
   const ONE_TIME_BASE = 3;
   const customAmount = ref<string>(String(ONE_TIME_BASE));
   const checkoutLoading = ref(false);
+  const checkoutError = ref<string | null>(null);
   const currentUserId = ref<string | null>(null);
+  const currentUserEmail = ref<string | null>(null);
   onMounted(async () => {
-    const { data } = await $supabase.client.auth.getUser();
-    currentUserId.value = data?.user?.id ?? null;
+    try {
+      const { data } = await $supabase.client.auth.getUser();
+      currentUserId.value = data?.user?.id ?? null;
+      currentUserEmail.value = data?.user?.email ?? null;
+    } catch (err) {
+      logger.error('SupporterOneTime: failed to load auth user', err);
+      currentUserId.value = null;
+      currentUserEmail.value = null;
+    }
   });
   const numericAmount = computed(() => {
     const val = Number(customAmount.value);
@@ -78,15 +99,30 @@
   async function handleCheckout() {
     if (!isValid.value || !currentUserId.value) return;
     checkoutLoading.value = true;
+    checkoutError.value = null;
     try {
       const url = await createCheckout({
         mode: 'payment',
         userId: currentUserId.value,
+        email: currentUserEmail.value ?? undefined,
         amount: oneTimeCharge.value,
       });
       if (url) {
         window.location.href = url;
+        return;
       }
+      checkoutError.value =
+        composableError.value || t('page.supporter.checkout_error_generic', 'Checkout failed');
+    } catch (e: unknown) {
+      logger.error('SupporterOneTime: handleCheckout failed', {
+        userId: currentUserId.value,
+        amount: numericAmount.value,
+        err: e,
+      });
+      checkoutError.value =
+        e instanceof Error
+          ? e.message
+          : t('page.supporter.checkout_error_generic', 'Checkout failed');
     } finally {
       checkoutLoading.value = false;
     }

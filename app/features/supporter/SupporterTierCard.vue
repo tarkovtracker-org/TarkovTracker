@@ -50,6 +50,16 @@
       <p v-if="!currentUserId" class="text-warning-400 text-xs">
         {{ t('page.supporter.login_required_warning') }}
       </p>
+      <UAlert
+        v-if="checkoutError"
+        color="error"
+        variant="soft"
+        icon="i-mdi-alert-circle-outline"
+        :title="t('page.supporter.checkout_error_title', 'Checkout failed')"
+        :description="checkoutError"
+        :close="true"
+        @update:open="checkoutError = null"
+      />
       <UButton
         class="w-full justify-center font-semibold"
         :color="tier.featured ? 'primary' : 'neutral'"
@@ -70,6 +80,7 @@
     calcIntervalMonths,
     calcSubscriptionCharge,
   } from '@/features/supporter/supporterPricing';
+  import { logger } from '@/utils/logger';
   import type { BillingInterval, SupporterTier } from '@/features/supporter/supporterTypes';
   const props = defineProps<{
     tier: SupporterTier;
@@ -77,12 +88,21 @@
   }>();
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
-  const { createCheckout } = useSupporter();
+  const { createCheckout, error: composableError } = useSupporter();
   const checkoutLoading = ref(false);
+  const checkoutError = ref<string | null>(null);
   const currentUserId = ref<string | null>(null);
+  const currentUserEmail = ref<string | null>(null);
   onMounted(async () => {
-    const { data } = await $supabase.client.auth.getUser();
-    currentUserId.value = data?.user?.id ?? null;
+    try {
+      const { data } = await $supabase.client.auth.getUser();
+      currentUserId.value = data?.user?.id ?? null;
+      currentUserEmail.value = data?.user?.email ?? null;
+    } catch (err) {
+      logger.error('SupporterTierCard: failed to load auth user', err);
+      currentUserId.value = null;
+      currentUserEmail.value = null;
+    }
   });
   const fmt = computed(
     () =>
@@ -114,16 +134,32 @@
   async function handleCheckout() {
     if (!currentUserId.value) return;
     checkoutLoading.value = true;
+    checkoutError.value = null;
     try {
       const url = await createCheckout({
         mode: 'subscription',
         userId: currentUserId.value,
+        email: currentUserEmail.value ?? undefined,
         tier: props.tier.id,
         interval: props.interval,
       });
       if (url) {
         window.location.href = url;
+        return;
       }
+      checkoutError.value =
+        composableError.value || t('page.supporter.checkout_error_generic', 'Checkout failed');
+    } catch (e: unknown) {
+      logger.error('SupporterTierCard: handleCheckout failed', {
+        userId: currentUserId.value,
+        tier: props.tier.id,
+        interval: props.interval,
+        err: e,
+      });
+      checkoutError.value =
+        e instanceof Error
+          ? e.message
+          : t('page.supporter.checkout_error_generic', 'Checkout failed');
     } finally {
       checkoutLoading.value = false;
     }
