@@ -864,7 +864,7 @@
         "requires_progress_tooltip": "Successiva: {tasks}",
         "requires_progress_tooltip_overflow": "Successiva: {tasks}, e altre {count}",
         "objective_optional_badge": "Opzionale",
-        "ready_to_hand_over": "Ready to hand over",
+        "ready_to_hand_over": "Pronto per la consegna",
         "objectives_hidden": "{count} objectives not on this map ({uncompleted} uncompleted)",
         "alternatives": "Alternative tasks",
         "alternative_failed": "Alternative tasks will also be reset",
@@ -2028,7 +2028,7 @@
     "switch_to_compact": "Switch to Compact view",
     "collected": "Collected",
     "mark_collected": "Mark as collected",
-    "ready_to_hand_over": "Ready to hand over",
+    "ready_to_hand_over": "Pronto per la consegna",
     "handed_over": "Handed over",
     "aria": {
       "enter_count": "Enter item count",
