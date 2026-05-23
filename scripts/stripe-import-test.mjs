@@ -59,7 +59,6 @@ console.log('Creating product…');
 const product = await stripe.products.create({
   name: PRODUCT_CSV.name,
   description: PRODUCT_CSV.description,
-  type: 'service',
   metadata: { source_prod_id: PRODUCT_CSV.id },
 });
 console.log(`  ✓ ${product.name} → ${product.id}`);
@@ -82,10 +81,10 @@ for (const tier of TIERS) {
       metadata: { tier: tier.id, interval },
     });
 
-    const envKey = `STRIPE_PRICE_${tier.id.toUpperCase()}_${interval.toUpperCase().replace('MONTH', '6MONTH')}`;
-    const normalizedKey = interval === '6month'
-      ? `STRIPE_PRICE_${tier.id.toUpperCase()}_6MONTH`
-      : `STRIPE_PRICE_${tier.id.toUpperCase()}_${interval.toUpperCase()}`;
+    const normalizedKey =
+      interval === '6month'
+        ? `STRIPE_PRICE_${tier.id.toUpperCase()}_6MONTH`
+        : `STRIPE_PRICE_${tier.id.toUpperCase()}_${interval.toUpperCase()}`;
 
     envLines.push(`${normalizedKey}=${price.id}`);
     console.log(`  ✓ ${tier.id} ${interval.padEnd(7)} $${amountDollars.toFixed(2)} → ${price.id}`);

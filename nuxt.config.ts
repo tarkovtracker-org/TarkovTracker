@@ -47,6 +47,9 @@ const STRIPE_PRICE_KEYS = [
 const IS_BUILD_COMMAND = process.argv.some((a) => a === 'build' || a === 'generate');
 const IS_CF_PREVIEW = process.env.CF_PAGES === '1' && process.env.CF_PAGES_BRANCH !== 'main';
 const IS_CI = process.env.CI === 'true';
+// Skip Stripe env validation in CI: GitHub Actions builds run with placeholder/test keys
+// and shouldn't fail the production build guard. Real production builds run on Cloudflare
+// Pages (CF_PAGES=1), where IS_CI is false and the keys must be present.
 if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
   const missingKeys = ['STRIPE_SECRET_KEY', ...STRIPE_PRICE_KEYS].filter(
     (key) => !process.env[key]?.trim()
