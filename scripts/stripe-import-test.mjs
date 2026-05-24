@@ -56,30 +56,47 @@ const STRIPE_INTERVAL = {
 // ── Import ────────────────────────────────────────────────────────────────────
 
 console.log('Creating product…');
-const product = await stripe.products.create({
-  name: PRODUCT_CSV.name,
-  description: PRODUCT_CSV.description,
-  metadata: { source_prod_id: PRODUCT_CSV.id },
-});
+let product;
+try {
+  product = await stripe.products.create({
+    name: PRODUCT_CSV.name,
+    description: PRODUCT_CSV.description,
+    metadata: { source_prod_id: PRODUCT_CSV.id },
+  });
+} catch (err) {
+  console.error(`  ✗ Failed to create product (source ${PRODUCT_CSV.id}):`, err);
+  process.exit(1);
+}
 console.log(`  ✓ ${product.name} → ${product.id}`);
 
 const envLines = [`STRIPE_PRODUCT_ID=${product.id}`];
 
 console.log('\nCreating prices…');
+let failed = 0;
 for (const tier of TIERS) {
   for (const interval of INTERVALS) {
     const amountDollars = calcSubscriptionCharge(tier.baseMonthly, interval);
     const amountCents = Math.round(amountDollars * 100);
     const { interval: stripeInterval, interval_count } = STRIPE_INTERVAL[interval];
 
-    const price = await stripe.prices.create({
-      product: product.id,
-      unit_amount: amountCents,
-      currency: 'usd',
-      recurring: { interval: stripeInterval, interval_count },
-      nickname: `${tier.id} ${interval}`,
-      metadata: { tier: tier.id, interval },
-    });
+    let price;
+    try {
+      price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: amountCents,
+        currency: 'usd',
+        recurring: { interval: stripeInterval, interval_count },
+        nickname: `${tier.id} ${interval}`,
+        metadata: { tier: tier.id, interval },
+      });
+    } catch (err) {
+      failed += 1;
+      console.error(
+        `  ✗ ${tier.id} ${interval.padEnd(7)} (product ${product.id}) failed:`,
+        err
+      );
+      continue;
+    }
 
     const normalizedKey =
       interval === '6month'
@@ -94,3 +111,8 @@ for (const tier of TIERS) {
 console.log('\n── .env snippet (' + 'copy into your .env.test or local .env) ──────────────');
 console.log(envLines.join('\n'));
 console.log('────────────────────────────────────────────────────────────────────');
+
+if (failed > 0) {
+  console.error(`\n${failed} price(s) failed to create. See errors above.`);
+  process.exit(1);
+}
