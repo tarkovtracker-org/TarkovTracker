@@ -49,6 +49,7 @@ export function useSupporter() {
         .eq('user_id', userId)
         .maybeSingle();
       if (err) {
+        logger.error('Failed to fetch supporter status', { userId, err });
         error.value = err.message;
         return;
       }
@@ -64,6 +65,10 @@ export function useSupporter() {
       } else {
         supporterState.value = null;
       }
+    } catch (e: unknown) {
+      logger.error('fetchStatus threw', { userId, err: e });
+      error.value = e instanceof Error ? e.message : 'Failed to load supporter status';
+      supporterState.value = null;
     } finally {
       loading.value = false;
     }
