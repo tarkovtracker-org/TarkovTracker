@@ -124,8 +124,8 @@
     const total = fmt.value.format(chargeTotal.value);
     const label =
       props.interval === '6month'
-        ? t('page.supporter.billing_6month').toLowerCase()
-        : t('page.supporter.billing_yearly').toLowerCase();
+        ? t('page.supporter.billing_6month_interval', '6 months')
+        : t('page.supporter.billing_yearly_interval', 'year');
     return t('page.supporter.billed_note', { total, label });
   });
   async function handleCheckout() {

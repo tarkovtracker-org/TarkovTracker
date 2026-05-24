@@ -19,6 +19,9 @@
         <UInput
           v-model="customAmount"
           type="number"
+          :aria-label="
+            t('page.supporter.one_time_amount_label', 'One-time contribution amount in USD')
+          "
           :min="ONE_TIME_BASE"
           step="1"
           :placeholder="String(ONE_TIME_BASE)"

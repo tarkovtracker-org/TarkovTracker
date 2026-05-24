@@ -662,7 +662,10 @@
       "alt_payment_gift_cards": "Gift Cards",
       "alt_payments_more": "& More",
       "checkout_error_title": "Checkout failed",
-      "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment."
+      "checkout_error_generic": "We couldn't start the checkout. Please try again in a moment.",
+      "one_time_amount_label": "One-time contribution amount in USD",
+      "billing_6month_interval": "6 months",
+      "billing_yearly_interval": "year"
     },
     "tasks": {
       "title": "Tasks",
