@@ -111,6 +111,10 @@ export function useSupporter() {
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
+    if (!$supabase) {
+      error.value = 'Supabase client not available';
+      return null;
+    }
     try {
       // Stripe checkout requires authentication: the server reads the user id
       // from the session, not the request body, so we must forward the
