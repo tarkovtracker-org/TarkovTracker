@@ -63,16 +63,13 @@
   const checkoutLoading = ref(false);
   const checkoutError = ref<string | null>(null);
   const currentUserId = ref<string | null>(null);
-  const currentUserEmail = ref<string | null>(null);
   onMounted(async () => {
     try {
       const { data } = await $supabase.client.auth.getUser();
       currentUserId.value = data?.user?.id ?? null;
-      currentUserEmail.value = data?.user?.email ?? null;
     } catch (err) {
       logger.error('SupporterOneTime: failed to load auth user', err);
       currentUserId.value = null;
-      currentUserEmail.value = null;
     }
   });
   const numericAmount = computed(() => {
@@ -103,8 +100,6 @@
     try {
       const url = await createCheckout({
         mode: 'payment',
-        userId: currentUserId.value,
-        email: currentUserEmail.value ?? undefined,
         amount: oneTimeCharge.value,
       });
       if (url) {

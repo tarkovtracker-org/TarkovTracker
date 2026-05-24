@@ -107,15 +107,29 @@ export function useSupporter() {
   }
   async function createCheckout(params: {
     mode: 'payment' | 'subscription';
-    userId: string;
-    email?: string;
     tier?: string;
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
     try {
+      // Stripe checkout requires authentication: the server reads the user id
+      // from the session, not the request body, so we must forward the
+      // bearer token. Refresh once if the cached session is missing/stale.
+      let token: string | null = null;
+      const sessionResp = await $supabase.client.auth.getSession();
+      token = sessionResp.data.session?.access_token ?? null;
+      if (!token) {
+        const refreshed = await $supabase.client.auth.refreshSession();
+        token = refreshed.data.session?.access_token ?? null;
+      }
+      if (!token) {
+        const message = 'You must be signed in to support TarkovTracker.';
+        error.value = message;
+        return null;
+      }
       const { url } = await $fetch<{ url: string }>('/api/stripe/checkout', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
         body: params,
       });
       return url;

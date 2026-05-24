@@ -8,8 +8,6 @@ const VALID_MODES = ['payment', 'subscription'] as const;
 const MIN_ONE_TIME_CENTS = 300;
 type CheckoutBody = {
   mode: (typeof VALID_MODES)[number];
-  userId: string;
-  email?: string;
   tier?: (typeof VALID_TIERS)[number];
   interval?: (typeof VALID_INTERVALS)[number];
   amount?: number;
@@ -19,21 +17,13 @@ function validateBody(raw: unknown): CheckoutBody {
     throw createError({ statusCode: 400, message: 'Invalid request body' });
   }
   const body = raw as Record<string, unknown>;
-  const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
-  if (!userId) {
-    throw createError({ statusCode: 400, message: 'Must be logged in to support' });
-  }
   const mode = body.mode;
   if (typeof mode !== 'string' || !VALID_MODES.includes(mode as (typeof VALID_MODES)[number])) {
     throw createError({ statusCode: 400, message: 'Invalid mode' });
   }
   const result: CheckoutBody = {
     mode: mode as (typeof VALID_MODES)[number],
-    userId,
   };
-  if (typeof body.email === 'string' && body.email.includes('@')) {
-    result.email = body.email.trim().toLowerCase();
-  }
   if (body.tier !== undefined) {
     if (
       typeof body.tier !== 'string' ||
@@ -67,9 +57,21 @@ export default defineEventHandler(async (event) => {
   if (!stripeSecretKey) {
     throw createError({ statusCode: 500, message: 'Stripe not configured' });
   }
+  // Auth is enforced by the api-protection middleware (publicRoutes does NOT
+  // include /api/stripe/*), which sets event.context.auth on success.
+  // Always derive userId/email from the authenticated session, never the
+  // request body, to prevent attackers from creating Checkout Sessions for
+  // other users (impersonation -> client_reference_id mismatch -> stolen tier).
+  const authUser = (event.context as { auth?: { user?: { id?: string; email?: string } } }).auth
+    ?.user;
+  const userId = authUser?.id;
+  if (!userId) {
+    throw createError({ statusCode: 401, message: 'Authentication required' });
+  }
+  const email = authUser?.email;
   const stripe = new Stripe(stripeSecretKey);
   const rawBody = await readBody(event);
-  const { mode, tier, interval, amount, userId, email } = validateBody(rawBody);
+  const { mode, tier, interval, amount } = validateBody(rawBody);
   const appUrl = (config.public.appUrl as string) || 'https://tarkovtracker.org';
   if (mode === 'payment') {
     // One-time custom amount payment

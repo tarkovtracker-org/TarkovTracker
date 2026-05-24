@@ -141,7 +141,7 @@ async function validateAuthToken(
   authHeader: string | undefined,
   supabaseUrl: string,
   supabaseAnonKey: string
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; email?: string } | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
@@ -163,7 +163,7 @@ async function validateAuthToken(
       logger.warn('Auth validation failed', { status: response.status });
       return null;
     }
-    const user = (await response.json()) as { id: string };
+    const user = (await response.json()) as { id: string; email?: string };
     return user?.id ? user : null;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
