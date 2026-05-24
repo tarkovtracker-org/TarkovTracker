@@ -560,9 +560,49 @@ async function handleChargeRefunded(charge: any): Promise<void> {
   }
 }
 
+/**
+ * Resolve the customer for a dispute. `dispute.charge` is a charge ID string
+ * (Stripe webhooks send unexpanded refs), and disputes don't always carry a
+ * top-level customer field, so fetch the charge directly when needed.
+ */
+async function resolveDisputeCustomerId(
+  // deno-lint-ignore no-explicit-any
+  dispute: any
+): Promise<string | null> {
+  if (typeof dispute?.customer === 'string' && dispute.customer) return dispute.customer;
+  const chargeId = typeof dispute?.charge === 'string' ? dispute.charge : null;
+  if (!chargeId) return null;
+  if (!STRIPE_SECRET_KEY) {
+    console.warn(
+      '[stripe-webhook] Cannot resolve dispute charge customer: STRIPE_SECRET_KEY missing'
+    );
+    return null;
+  }
+  try {
+    const resp = await fetch(`https://api.stripe.com/v1/charges/${encodeURIComponent(chargeId)}`, {
+      headers: {
+        Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+        'Stripe-Version': '2024-06-20',
+      },
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error(
+        `[stripe-webhook] Stripe charge lookup failed for dispute (${resp.status}) ${chargeId}: ${body.slice(0, 500)}`
+      );
+      return null;
+    }
+    const charge = (await resp.json()) as { customer?: string | null };
+    return typeof charge.customer === 'string' && charge.customer ? charge.customer : null;
+  } catch (err) {
+    console.error('[stripe-webhook] Charge retrieve threw for dispute:', { chargeId, err });
+    return null;
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 async function handleChargeDisputeCreated(dispute: any): Promise<void> {
-  const customerId = dispute.customer || dispute.charge?.customer;
+  const customerId = await resolveDisputeCustomerId(dispute);
   if (!customerId) return;
 
   const { data: supporter } = await supabase
