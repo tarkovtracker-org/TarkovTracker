@@ -92,7 +92,9 @@ export function useSupporter() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          fetchStatus(userId);
+          fetchStatus(userId).catch((err) => {
+            logger.error('Realtime supporter status refresh failed', { userId, err });
+          });
         }
       )
       .subscribe();
