@@ -458,7 +458,7 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
   // Ensure no lingering active record exists from a prior partial state.
   const { data: supporter } = await supabase
     .from('supporters')
-    .select('status')
+    .select('status, discord_user_id')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -472,6 +472,15 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
       console.error('[stripe-webhook] Failed to expire on async payment failure:', error);
       throw new Error(
         `Failed to expire async-failed supporter for ${userId}: ${error.message}`
+      );
+    }
+
+    // Mirror handleSubscriptionDeleted: drop tier roles, keep base Supporter (best-effort).
+    if (supporter.discord_user_id) {
+      await safeDiscordCall(
+        'remove tier roles (async payment failed)',
+        { userId, discordUserId: supporter.discord_user_id },
+        () => removeAllTierRoles(supporter.discord_user_id)
       );
     }
   }

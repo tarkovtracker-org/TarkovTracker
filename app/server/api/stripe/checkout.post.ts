@@ -73,6 +73,12 @@ export default defineEventHandler(async (event) => {
   const appUrl = (config.public.appUrl as string) || 'https://tarkovtracker.org';
   if (mode === 'payment') {
     // One-time custom amount payment
+    if (amount === undefined) {
+      throw createError({
+        statusCode: 400,
+        message: 'Amount is required for one-time payments',
+      });
+    }
     const amountFloat = Number(amount);
     if (!Number.isFinite(amountFloat) || amountFloat * 100 < MIN_ONE_TIME_CENTS) {
       throw createError({

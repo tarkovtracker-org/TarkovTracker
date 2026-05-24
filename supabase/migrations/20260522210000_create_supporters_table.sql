@@ -18,6 +18,16 @@ CREATE INDEX IF NOT EXISTS idx_supporters_stripe_customer ON public.supporters(s
 CREATE INDEX IF NOT EXISTS idx_supporters_stripe_subscription ON public.supporters(stripe_subscription_id);
 CREATE INDEX IF NOT EXISTS idx_supporters_status ON public.supporters(status);
 
+-- Enforce one supporter row per Stripe customer / subscription so the webhook
+-- handlers can safely use maybeSingle() without ambiguous matches. Partial
+-- indexes allow NULLs (one-time payments may have no subscription, etc.).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_supporters_stripe_customer
+  ON public.supporters(stripe_customer_id)
+  WHERE stripe_customer_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_supporters_stripe_subscription
+  ON public.supporters(stripe_subscription_id)
+  WHERE stripe_subscription_id IS NOT NULL;
+
 ALTER TABLE public.supporters ENABLE ROW LEVEL SECURITY;
 
 -- Users can read their own supporter row
