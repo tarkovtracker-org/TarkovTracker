@@ -126,7 +126,10 @@ export async function removeAllTierRoles(discordUserId: string): Promise<void> {
   if (!config.guildId) return;
 
   const tierRoles = [config.scavRoleId, config.timmyRoleId, config.chadRoleId].filter(Boolean);
-  for (const roleId of tierRoles) {
-    await removeRole({ guildId: config.guildId, userId: discordUserId, roleId });
-  }
+  if (tierRoles.length === 0) return;
+  await Promise.all(
+    tierRoles.map((roleId) =>
+      removeRole({ guildId: config.guildId, userId: discordUserId, roleId })
+    )
+  );
 }
