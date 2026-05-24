@@ -425,11 +425,11 @@ Node.js version: 24.x
 
 | Variable                    | Description                                                                | Required      |
 | --------------------------- | -------------------------------------------------------------------------- | ------------- |
-| `NUXT_SUPABASE_URL`         | Private Supabase project URL                                               | Yes (prod)²   |
-| `NUXT_SUPABASE_ANON_KEY`    | Private Supabase anon key                                                  | Yes (prod)²   |
+| `SUPABASE_URL`              | Supabase project URL                                                       | Yes (prod)²   |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                                          | Yes (prod)²   |
 | `NUXT_SUPABASE_SERVICE_KEY` | Service role key (preferred)                                               | Yes (prod)²·³ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key fallback (used if `NUXT_SUPABASE_SERVICE_KEY` not set)    | No³           |
-| `NUXT_PUBLIC_APP_URL`       | Application URL                                                            | Yes (prod)²   |
+| `APP_URL`                   | Application URL (also resolved from `CF_PAGES_URL`)                        | Yes (prod)²   |
 | `NUXT_TARKOV_JSON_BASE_URL` | Static game-data JSON base URL override                                    | No            |
 | `API_ALLOWED_HOSTS`         | Allowed origin hosts                                                       | No            |
 | `API_TRUST_PROXY`           | Override proxy trust auto-detection (`true` to trust forwarded IP headers) | No            |
