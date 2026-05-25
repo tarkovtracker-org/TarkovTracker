@@ -4,6 +4,8 @@
  */
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
+const MAX_RATE_LIMIT_RETRIES = 2;
+const MAX_RATE_LIMIT_WAIT_MS = 10_000;
 
 interface RoleAction {
   guildId: string;
@@ -22,26 +24,60 @@ function getDiscordHeaders(): Record<string, string> {
   };
 }
 
-export async function addRole({ guildId, userId, roleId }: RoleAction): Promise<boolean> {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterSecs(header: string | null): number {
+  if (!header) return 1;
+  const secs = parseInt(header, 10);
+  if (!Number.isNaN(secs)) return secs;
+  const dateMs = Date.parse(header);
+  return Number.isNaN(dateMs) ? 1 : Math.max(1, (dateMs - Date.now()) / 1000);
+}
+
+/**
+ * Discord rate-limit aware fetch. Honours the `Retry-After` header on 429
+ * responses for up to MAX_RATE_LIMIT_RETRIES attempts. Does not retry other
+ * statuses; callers handle their own non-2xx logic.
+ */
+async function discordFetch(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt += 1) {
+    const res = await fetch(url, init);
+    if (res.status !== 429) return res;
+    const retryAfter = parseRetryAfterSecs(res.headers.get('retry-after'));
+    const waitMs = Math.min(
+      Math.max(retryAfter * 1000, 250),
+      MAX_RATE_LIMIT_WAIT_MS
+    );
+    if (attempt === MAX_RATE_LIMIT_RETRIES) return res;
+    console.warn(
+      `[Discord] 429 on ${url}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES})`
+    );
+    await sleep(waitMs);
+  }
+  // Unreachable but keeps TS happy
+  return fetch(url, init);
+}
+
+async function applyRole(
+  method: 'PUT' | 'DELETE',
+  { guildId, userId, roleId }: RoleAction
+): Promise<boolean> {
   const url = `${DISCORD_API_BASE}/guilds/${guildId}/members/${userId}/roles/${roleId}`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: getDiscordHeaders(),
-  });
+  const res = await discordFetch(url, { method, headers: getDiscordHeaders() });
   if (res.status === 204 || res.status === 200) return true;
-  console.error(`[Discord] Failed to add role ${roleId} to user ${userId}: ${res.status}`);
+  const verb = method === 'PUT' ? 'add' : 'remove';
+  console.error(`[Discord] Failed to ${verb} role ${roleId} for user ${userId}: ${res.status}`);
   return false;
 }
 
-export async function removeRole({ guildId, userId, roleId }: RoleAction): Promise<boolean> {
-  const url = `${DISCORD_API_BASE}/guilds/${guildId}/members/${userId}/roles/${roleId}`;
-  const res = await fetch(url, {
-    method: 'DELETE',
-    headers: getDiscordHeaders(),
-  });
-  if (res.status === 204 || res.status === 200) return true;
-  console.error(`[Discord] Failed to remove role ${roleId} from user ${userId}: ${res.status}`);
-  return false;
+export function addRole(action: RoleAction): Promise<boolean> {
+  return applyRole('PUT', action);
+}
+
+export function removeRole(action: RoleAction): Promise<boolean> {
+  return applyRole('DELETE', action);
 }
 
 export interface DiscordRoleConfig {
@@ -70,10 +106,7 @@ export function getDiscordRoleConfig(): DiscordRoleConfig {
   };
 }
 
-export function getTierRoleId(
-  tier: string,
-  config: DiscordRoleConfig
-): string | null {
+export function getTierRoleId(tier: string, config: DiscordRoleConfig): string | null {
   switch (tier) {
     case 'scav':
       return config.scavRoleId || null;
@@ -89,7 +122,7 @@ export function getTierRoleId(
 /**
  * Sync Discord roles for a supporter.
  * Always adds the base Supporter role.
- * Adds the tier-specific role if applicable.
+ * Adds the tier-specific role and removes stale tier roles.
  */
 export async function syncRolesForSupporter(
   discordUserId: string,
@@ -98,9 +131,7 @@ export async function syncRolesForSupporter(
 ): Promise<void> {
   if (!discordUserId) return;
   const config = getDiscordRoleConfig();
-  if (!config.guildId) return;
 
-  // Always keep the base Supporter role (permanent once earned)
   await addRole({
     guildId: config.guildId,
     userId: discordUserId,
@@ -111,6 +142,13 @@ export async function syncRolesForSupporter(
   if (!tierRoleId) return;
 
   if (active) {
+    const allTierRoles = [config.scavRoleId, config.timmyRoleId, config.chadRoleId].filter(Boolean);
+    const staleRoles = allTierRoles.filter((id) => id !== tierRoleId);
+    await Promise.all(
+      staleRoles.map((roleId) =>
+        removeRole({ guildId: config.guildId, userId: discordUserId, roleId })
+      )
+    );
     await addRole({ guildId: config.guildId, userId: discordUserId, roleId: tierRoleId });
   } else {
     await removeRole({ guildId: config.guildId, userId: discordUserId, roleId: tierRoleId });
@@ -123,7 +161,6 @@ export async function syncRolesForSupporter(
 export async function removeAllTierRoles(discordUserId: string): Promise<void> {
   if (!discordUserId) return;
   const config = getDiscordRoleConfig();
-  if (!config.guildId) return;
 
   const tierRoles = [config.scavRoleId, config.timmyRoleId, config.chadRoleId].filter(Boolean);
   if (tierRoles.length === 0) return;
