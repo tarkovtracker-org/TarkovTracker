@@ -15,8 +15,8 @@ const INTERVAL_DISCOUNT: Record<BillingInterval, number> = {
   yearly: 0.2,
 };
 const STRIPE_SUB_RATE = 0.029 + 0.007;
-const STRIPE_FIXED = 0.3;
-const STRIPE_ONETIME_RATE = 0.029;
+export const STRIPE_FIXED = 0.3;
+export const STRIPE_ONETIME_RATE = 0.029;
 function passThrough(base: number, rate: number, fixed: number): number {
   return Math.ceil(((base + fixed) / (1 - rate)) * 100) / 100;
 }
