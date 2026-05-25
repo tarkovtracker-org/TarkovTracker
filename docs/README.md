@@ -19,7 +19,7 @@ This is the consolidated source of truth for the TarkovTracker Nuxt 4 applicatio
 - [`app/layouts/`](../app/layouts/): Composition of structural shell components.
 - [`app/shell/`](../app/shell/): "Chrome" components (AppBar, NavDrawer, AppFooter).
 - [`app/features/`](../app/features/): Domain-specific logic slices (admin, dashboard, drawer,
-  hideout, maps, neededitems, profile, settings, storyline, streamer-tools, tasks, team).
+  hideout, maps, neededitems, profile, settings, storyline, streamer-tools, supporter, tasks, team).
 - [`app/stores/`](../app/stores/): Pinia domain stores with localStorage persistence and Supabase sync.
 - [`app/server/api/`](../app/server/api/): Nitro routes for app APIs plus proxying and caching
   `json.tarkov.dev` static data.

@@ -175,6 +175,21 @@ Prestige is intentionally sourced from `regular/tasks` and cached by language on
 
 ---
 
+### GET /api/tarkov/map-spawns
+
+Fetches map spawn point data.
+
+**Query Parameters:**
+
+| Parameter  | Type   | Default   | Description                    |
+| ---------- | ------ | --------- | ------------------------------ |
+| `lang`     | string | `en`      | Language code                  |
+| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
+
+**Cache TTL:** 12 hours
+
+---
+
 ### GET /api/tarkov/cache-meta
 
 Fetches cache purge timestamp to detect server-side cache clears.
@@ -280,26 +295,23 @@ Pass `cacheBust=1` query parameter to bypass cache.
 
 ## Supported Languages
 
-| Code | Language   |
-| ---- | ---------- |
-| `cs` | Czech      |
-| `de` | German     |
-| `en` | English    |
-| `es` | Spanish    |
-| `fr` | French     |
-| `hu` | Hungarian  |
-| `it` | Italian    |
-| `ja` | Japanese   |
-| `ko` | Korean     |
-| `pl` | Polish     |
-| `pt` | Portuguese |
-| `ro` | Romanian   |
-| `ru` | Russian    |
-| `sk` | Slovak     |
-| `tr` | Turkish    |
-| `zh` | Chinese    |
+**Enabled UI locales** (from `SUPPORTED_LOCALES` in `app/utils/locales.ts`):
 
-> **Note:** Ukrainian (`uk`) is supported in the UI but maps to English for API requests.
+| Code | Language  |
+| ---- | --------- |
+| `en` | English   |
+| `de` | German    |
+| `es` | Spanish   |
+| `fr` | French    |
+| `ru` | Russian   |
+| `uk` | Ukrainian |
+| `zh` | Chinese   |
+
+**Locale JSON files that exist but are not currently enabled** (may be enabled in the future; Crowdin may still sync translations for these):
+
+`cs` (Czech), `it` (Italian), `ko` (Korean), `pl` (Polish), `pt` (Portuguese)
+
+The API accepts any language code that `json.tarkov.dev` supports; unsupported codes fall back to English.
 
 ---
 

@@ -39,6 +39,7 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 │   │   ├── settings/        # User settings
 │   │   ├── storyline/       # Storyline progression
 │   │   ├── streamer-tools/  # Streamer overlay tooling
+│   │   ├── supporter/       # Supporter/tier management
 │   │   ├── tasks/           # Task/quest tracking
 │   │   └── team/            # Team collaboration
 │   ├── layouts/             # Page layouts
@@ -309,6 +310,7 @@ All game data is fetched through Nuxt server routes that proxy to `json.tarkov.d
 | `/api/tarkov/items-lite`       | Items (minimal)      | 24h       |
 | `/api/tarkov/items`            | Items (full)         | 24h       |
 | `/api/tarkov/prestige`         | Prestige levels      | 24h       |
+| `/api/tarkov/map-spawns`       | Map spawn points     | 12h       |
 | `/api/tarkov/cache-meta`       | Cache purge status   | no-store  |
 
 ### Team API
@@ -411,28 +413,30 @@ Node.js version: 24.x
 
 **Client-side (browser):**
 
-| Variable                        | Description                            | Required |
-| ------------------------------- | -------------------------------------- | -------- |
-| `NUXT_PUBLIC_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
-| `NUXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
+| Variable            | Description                            | Required |
+| ------------------- | -------------------------------------- | -------- |
+| `SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
+| `SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
 
-> **¹ Yes:** Required in production; optional for local development. Legacy `VITE_SUPABASE_URL`
-> and `VITE_SUPABASE_ANON_KEY` still work as build-time fallbacks. Without public Supabase
-> configuration, authentication, multi-device sync, real-time collaboration, and team features will
-> be unavailable. The app will function in offline mode with localStorage persistence only.
+> **¹ Yes:** Required in production; optional for local development. Legacy
+> `NUXT_PUBLIC_SUPABASE_URL`, `NUXT_PUBLIC_SUPABASE_ANON_KEY`, `NUXT_SUPABASE_URL`,
+> `NUXT_SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` still work as
+> build-time fallbacks. Without public Supabase configuration, authentication, multi-device sync,
+> real-time collaboration, and team features will be unavailable. The app will function in offline
+> mode with localStorage persistence only.
 
 **Server-side (Nuxt/Workers):**
 
-| Variable                    | Description                                                                | Required      |
-| --------------------------- | -------------------------------------------------------------------------- | ------------- |
-| `SUPABASE_URL`              | Supabase project URL                                                       | Yes (prod)²   |
-| `SUPABASE_ANON_KEY`         | Supabase anon key                                                          | Yes (prod)²   |
-| `NUXT_SUPABASE_SERVICE_KEY` | Service role key (preferred)                                               | Yes (prod)²·³ |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key fallback (used if `NUXT_SUPABASE_SERVICE_KEY` not set)    | No³           |
-| `APP_URL`                   | Application URL (also resolved from `CF_PAGES_URL`)                        | Yes (prod)²   |
-| `NUXT_TARKOV_JSON_BASE_URL` | Static game-data JSON base URL override                                    | No            |
-| `API_ALLOWED_HOSTS`         | Allowed origin hosts                                                       | No            |
-| `API_TRUST_PROXY`           | Override proxy trust auto-detection (`true` to trust forwarded IP headers) | No            |
+| Variable                    | Description                                                                 | Required      |
+| --------------------------- | --------------------------------------------------------------------------- | ------------- |
+| `SUPABASE_URL`              | Supabase project URL                                                        | Yes (prod)²   |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                                           | Yes (prod)²   |
+| `NUXT_SUPABASE_SERVICE_KEY` | Service role key (preferred)                                                | Yes (prod)²·³ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key fallback (used if `NUXT_SUPABASE_SERVICE_KEY` not set)     | No³           |
+| `APP_URL`                   | Application URL (also resolved from `NUXT_PUBLIC_APP_URL` / `CF_PAGES_URL`) | Yes (prod)²   |
+| `NUXT_TARKOV_JSON_BASE_URL` | Static game-data JSON base URL override                                     | No            |
+| `API_ALLOWED_HOSTS`         | Allowed origin hosts                                                        | No            |
+| `API_TRUST_PROXY`           | Override proxy trust auto-detection (`true` to trust forwarded IP headers)  | No            |
 
 > **² Yes (prod):** Required in production deployments; optional in local/dev where auth and sync will be disabled.
 >

@@ -29,7 +29,7 @@ The app will be available at `http://localhost:3000`.
 ## AI Agent Context Files
 
 - `AGENTS.md` is the repository source of truth for agent instructions.
-- `CLAUDE.md` remains in the repo only as a Claude Code shim that imports `AGENTS.md`.
+- `.claude/CLAUDE.md` is a thin shim that imports `AGENTS.md` for Claude Code (moved from root to reduce clutter).
 - `GEMINI.md` is intentionally not tracked. If you use Gemini CLI, configure it to load `AGENTS.md` directly in `.gemini/settings.json`:
 
 ```json
@@ -47,17 +47,15 @@ The app will be available at `http://localhost:3000`.
 Create a `.env` file in the project root:
 
 ```env
-# Client-side (for browser auth)
-NUXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NUXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+# Supabase (for browser auth and server auth validation)
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_anon_key
 
 # Server-side (for API routes - production only)
-NUXT_SUPABASE_URL=your_supabase_url
-NUXT_SUPABASE_ANON_KEY=your_anon_key
 NUXT_SUPABASE_SERVICE_KEY=your_service_role_key
 # Fallback for service role key (NUXT_SUPABASE_SERVICE_KEY preferred)
 # SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-NUXT_PUBLIC_APP_URL=http://localhost:3000
+APP_URL=http://localhost:3000
 ```
 
 > **Note:** Most features work without Supabase configuration. Auth and sync will be disabled.
@@ -70,7 +68,7 @@ app/
 ├── components/      # Global UI components
 ├── composables/     # Reusable composition functions
 ├── data/            # Static map/story data
-├── features/        # Feature modules (tasks, hideout, team, etc.)
+├── features/        # Feature modules (tasks, hideout, team, supporter, etc.)
 ├── layouts/         # Page layouts
 ├── locales/         # Locale JSON files
 ├── pages/           # File-based routing

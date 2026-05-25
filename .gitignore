@@ -7,7 +7,8 @@
 coverage
 dist
 .wrangler
-.claude
+.claude/*
+!.claude/CLAUDE.md
 .codegraph
 .codex
 node_modules

@@ -227,7 +227,7 @@ When working with AI coding assistants on this project:
 
 ### Context Files
 - `AGENTS.md` is the single source of truth for repo-wide agent instructions.
-- `CLAUDE.md` is intentionally a thin shim that imports `AGENTS.md` for Claude Code.
+- `.claude/CLAUDE.md` is a thin shim that imports `AGENTS.md` for Claude Code (moved from root to reduce clutter).
 - `GEMINI.md` is intentionally not tracked. If you use Gemini CLI, point it at `AGENTS.md` with `.gemini/settings.json`:
 
 ```json
