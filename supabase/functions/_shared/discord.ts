@@ -31,7 +31,7 @@ function sleep(ms: number): Promise<void> {
 function parseRetryAfterSecs(header: string | null): number {
   if (!header) return 1;
   const secs = parseInt(header, 10);
-  if (!Number.isNaN(secs)) return secs;
+  if (!Number.isNaN(secs)) return Math.max(1, secs);
   const dateMs = Date.parse(header);
   return Number.isNaN(dateMs) ? 1 : Math.max(1, (dateMs - Date.now()) / 1000);
 }

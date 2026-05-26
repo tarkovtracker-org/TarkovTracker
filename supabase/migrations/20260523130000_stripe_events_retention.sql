@@ -5,6 +5,17 @@
 -- range scan efficient.
 CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA extensions;
 
+-- Idempotent (re)scheduling: cron.schedule() throws on duplicate jobname,
+-- so unschedule any pre-existing job with the same name first. Wrap in a
+-- DO block because cron.unschedule(text) raises if the job is missing.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'stripe-events-cleanup') THEN
+    PERFORM cron.unschedule('stripe-events-cleanup');
+  END IF;
+END;
+$$;
+
 SELECT cron.schedule(
   'stripe-events-cleanup',
   '0 3 * * *',

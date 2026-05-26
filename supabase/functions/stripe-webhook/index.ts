@@ -15,9 +15,14 @@ const GRACE_PERIOD_DAYS = 7;
 const STRIPE_API_VERSION = '2024-06-20';
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !STRIPE_WEBHOOK_SECRET) {
+if (
+  !SUPABASE_URL ||
+  !SUPABASE_SERVICE_ROLE_KEY ||
+  !STRIPE_WEBHOOK_SECRET ||
+  !STRIPE_SECRET_KEY
+) {
   throw new Error(
-    '[stripe-webhook] Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET must be set'
+    '[stripe-webhook] Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY must be set. STRIPE_SECRET_KEY is required to correlate refund/dispute charges back to the originating subscription/customer.'
   );
 }
 
@@ -476,11 +481,40 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
     throw new PermanentError('async_payment_failed without client_reference_id');
   }
 
-  console.warn(`[stripe-webhook] Async payment failed (ACH/delayed), no activation: ${userId}`);
+  console.warn(
+    `[stripe-webhook] Async payment failed (ACH/delayed): user=${userId} session=${session.id}`
+  );
 
   const supporter = await findSupporterBy('user_id', userId);
-  // Only update if somehow the record was set active (guard against duplicate events).
-  if (supporter?.status !== 'active') return;
+  // Nothing to revert. Activation is deferred for delayed payments, so the
+  // expected state when a delayed payment fails is no supporter row at all.
+  if (!supporter || supporter.status !== 'active') return;
+
+  // Correlation guard: only revert the active supporter row if its Stripe
+  // identifiers match this failed session. Without this guard, an existing
+  // active supporter starting an unrelated delayed checkout (e.g., a renewal
+  // attempt or a separate one-time purchase) that fails would wipe out the
+  // active row even though its underlying payment is still good.
+  const sessionSubscriptionId =
+    typeof session.subscription === 'string' ? session.subscription : null;
+  const sessionCustomerId = typeof session.customer === 'string' ? session.customer : null;
+
+  const matchesSubscription = Boolean(
+    sessionSubscriptionId && supporter.stripe_subscription_id === sessionSubscriptionId
+  );
+  const matchesOneTime = Boolean(
+    !sessionSubscriptionId &&
+      supporter.type === 'one_time' &&
+      sessionCustomerId &&
+      supporter.stripe_customer_id === sessionCustomerId
+  );
+
+  if (!matchesSubscription && !matchesOneTime) {
+    console.info(
+      `[stripe-webhook] async_payment_failed for ${userId} session=${session.id} does not correlate with active supporter row (sub=${supporter.stripe_subscription_id} customer=${supporter.stripe_customer_id} type=${supporter.type}); leaving row untouched`
+    );
+    return;
+  }
 
   const { error } = await supabase
     .from('supporters')
@@ -574,11 +608,22 @@ async function revokeSupporter(
 
 // deno-lint-ignore no-explicit-any
 async function handleChargeRefunded(charge: any): Promise<void> {
-  const customerId = charge.customer;
+  const customerId = typeof charge?.customer === 'string' ? charge.customer : null;
   if (!customerId) return;
 
   const supporter = await findSupporterBy('stripe_customer_id', customerId);
-  if (!supporter) return;
+  if (!supporter) {
+    // Stripe webhook ordering is not guaranteed: a refund can arrive before
+    // checkout.session.completed activates the supporter row. If we ack the
+    // refund here, the activation event would later create the row as if no
+    // refund happened. Throw transient so the idempotency claim rolls back
+    // and Stripe retries; either the row eventually exists and gets revoked,
+    // or Stripe gives up after its retry window (~3 days) without ever
+    // creating an unrevoked supporter row.
+    throw new Error(
+      `charge.refunded for customer=${customerId} charge=${charge.id} has no supporter row yet; deferring`
+    );
+  }
 
   // Determine if the refunded charge is tied to the active subscription.
   // If the supporter has an active subscription and this charge belongs to a
@@ -640,7 +685,14 @@ async function handleChargeDisputeCreated(dispute: any): Promise<void> {
   if (!customerId) return;
 
   const supporter = await findSupporterBy('stripe_customer_id', customerId);
-  if (!supporter) return;
+  if (!supporter) {
+    // Webhook ordering: a dispute can arrive before activation. Treat as
+    // transient so Stripe retries until either the row appears (and we
+    // revoke) or the retry window closes. See handleChargeRefunded note.
+    throw new Error(
+      `charge.dispute.created for customer=${customerId} dispute=${dispute.id} has no supporter row yet; deferring`
+    );
+  }
 
   // Chargeback = adversarial. Full revoke always.
   await revokeSupporter(supporter, true, 'chargeback');
