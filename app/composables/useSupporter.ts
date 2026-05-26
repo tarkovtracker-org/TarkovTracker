@@ -1,3 +1,4 @@
+import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
 import { logger } from '@/utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 export interface SupporterStatus {
@@ -22,11 +23,11 @@ export function useSupporter() {
   const isActiveSubscriber = computed(
     () =>
       supporterState.value?.type === 'subscription' &&
-      (supporterState.value?.status === 'active' || supporterState.value?.status === 'past_due')
+      isSupporterActivityActive(supporterState.value)
   );
   const activeTier = computed(() => {
     if (!supporterState.value) return null;
-    if (supporterState.value.status === 'active' || supporterState.value.status === 'past_due') {
+    if (isSupporterActivityActive(supporterState.value)) {
       return supporterState.value.tier;
     }
     if (supporterState.value.hasEverSupported) return 'supporter';
