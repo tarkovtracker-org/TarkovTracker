@@ -89,7 +89,7 @@ export function shouldBypassCache(event: H3Event): boolean {
   const bypassEnabled =
     config.publicCacheBypassEnabled === true ||
     String(config.publicCacheBypassEnabled) === 'true' ||
-    process.env.NUXT_PUBLIC_CACHE_BYPASS_ENABLED === 'true';
+    process.env.NUXT_CACHE_BYPASS_ENABLED === 'true';
   if (!bypassEnabled) return false;
   const headerValue =
     event.node?.req?.headers?.['x-bypass-cache'] ?? event.node?.req?.headers?.['x-cache-bypass'];

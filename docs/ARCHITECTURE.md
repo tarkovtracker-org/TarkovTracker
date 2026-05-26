@@ -411,36 +411,59 @@ Node.js version: 24.x
 
 ### Environment Variables
 
-**Client-side (browser):**
+Naming convention: `NUXT_*` for Nuxt private runtime config (server-only), `NUXT_PUBLIC_*`
+for Nuxt public runtime config (browser-exposed), plain names for platform/build-time or
+Supabase Edge Functions.
 
-| Variable            | Description                            | Required |
-| ------------------- | -------------------------------------- | -------- |
-| `SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹     |
-| `SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹     |
+Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
-> **¹ Yes:** Required in production; optional for local development. Legacy
-> `NUXT_PUBLIC_SUPABASE_URL`, `NUXT_PUBLIC_SUPABASE_ANON_KEY`, `NUXT_SUPABASE_URL`,
-> `NUXT_SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` still work as
-> build-time fallbacks. Without public Supabase configuration, authentication, multi-device sync,
-> real-time collaboration, and team features will be unavailable. The app will function in offline
-> mode with localStorage persistence only.
+**Client-side (browser) — Nuxt public runtime config:**
 
-**Server-side (Nuxt/Workers):**
+| Variable                        | Description                            | Required   |
+| ------------------------------- | -------------------------------------- | ---------- |
+| `NUXT_PUBLIC_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹       |
+| `NUXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹       |
+| `NUXT_PUBLIC_APP_URL`           | Application URL                        | Yes (prod) |
 
-| Variable                    | Description                                                                 | Required      |
-| --------------------------- | --------------------------------------------------------------------------- | ------------- |
-| `SUPABASE_URL`              | Supabase project URL                                                        | Yes (prod)²   |
-| `SUPABASE_ANON_KEY`         | Supabase anon key                                                           | Yes (prod)²   |
-| `NUXT_SUPABASE_SERVICE_KEY` | Service role key (preferred)                                                | Yes (prod)²·³ |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key fallback (used if `NUXT_SUPABASE_SERVICE_KEY` not set)     | No³           |
-| `APP_URL`                   | Application URL (also resolved from `NUXT_PUBLIC_APP_URL` / `CF_PAGES_URL`) | Yes (prod)²   |
-| `NUXT_TARKOV_JSON_BASE_URL` | Static game-data JSON base URL override                                     | No            |
-| `API_ALLOWED_HOSTS`         | Allowed origin hosts                                                        | No            |
-| `API_TRUST_PROXY`           | Override proxy trust auto-detection (`true` to trust forwarded IP headers)  | No            |
+> **¹ Required in production.** `SUPABASE_URL` and `SUPABASE_ANON_KEY` work as cross-platform
+> build-time fallbacks. Without Supabase configuration, auth, sync, realtime, and team features
+> are unavailable; the app runs in offline mode with localStorage only.
 
-> **² Yes (prod):** Required in production deployments; optional in local/dev where auth and sync will be disabled.
->
-> **³ Service role key:** Only one of `NUXT_SUPABASE_SERVICE_KEY` or `SUPABASE_SERVICE_ROLE_KEY` is required. `NUXT_SUPABASE_SERVICE_KEY` is preferred; the second is read as a fallback.
+**Server-side (Nuxt private runtime config):**
+
+| Variable                           | Description                                       | Required   |
+| ---------------------------------- | ------------------------------------------------- | ---------- |
+| `NUXT_SUPABASE_SERVICE_KEY`        | Supabase service role key                         | Yes (prod) |
+| `NUXT_TARKOV_JSON_BASE_URL`        | Static game-data JSON base URL override           | No         |
+| `NUXT_LOG_SINK_URL`                | Centralized server log sink (HTTPS)               | No         |
+| `NUXT_TWITCH_CLIENT_ID`            | Twitch API client ID                              | No         |
+| `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE` | Bot accounts excluded from contributors           | No         |
+| `NUXT_GITHUB_TIMEOUT_MS`           | GitHub API timeout                                | No         |
+| `NUXT_CACHE_BYPASS_ENABLED`        | Enable server-side cache bypass header            | No         |
+| `API_ALLOWED_HOSTS`                | Allowed origin hosts                              | No         |
+| `API_TRUSTED_IP_RANGES`            | Trusted IP ranges (CIDR)                          | No         |
+| `API_REQUIRE_AUTH`                 | Require auth for protected routes (default true)  | No         |
+| `API_PUBLIC_ROUTES`                | Routes exempt from auth                           | No         |
+| `API_TRUST_PROXY`                  | Trust proxy headers (auto-detected on Cloudflare) | No         |
+
+**Build-time / platform:**
+
+| Variable             | Description                     |
+| -------------------- | ------------------------------- |
+| `APP_URL`            | App URL (CF Pages / CI)         |
+| `CF_PAGES_URL`       | Cloudflare Pages deploy URL     |
+| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID |
+| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID    |
+| `GITHUB_TOKEN`       | GitHub API token                |
+
+**Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — all canonical for Edge
+Functions. (`SUPABASE_SERVICE_ROLE_KEY` is deprecated only as a Nuxt app fallback; use
+`NUXT_SUPABASE_SERVICE_KEY` for Nuxt.) `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared
+canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`,
+`DISCORD_SUPPORTER_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` are Edge-only.
+See `supabase/functions/.env.example`.
 
 ## Code Conventions
 

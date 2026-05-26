@@ -76,8 +76,11 @@ const resolveClientLogSinkUrl = (): string => {
 const resolveLogLevel = (): LogLevel => {
   if (cachedLogLevel !== null) return cachedLogLevel;
   const nuxtApp = tryUseNuxtApp();
-  const runtimeLevel = nuxtApp?.$config?.public?.VITE_LOG_LEVEL;
-  const envLevel = import.meta.env.VITE_LOG_LEVEL;
+  const runtimeLevel = nuxtApp?.$config?.public?.logLevel;
+  const envLevel =
+    import.meta.env.NUXT_PUBLIC_LOG_LEVEL ||
+    // deprecated — remove after 2026-07-31
+    import.meta.env.VITE_LOG_LEVEL;
   const runtimeLevelString = typeof runtimeLevel === 'string' ? runtimeLevel.trim() : undefined;
   const rawLevel = runtimeLevelString ? runtimeLevelString : envLevel;
   const normalizedLevel = typeof rawLevel === 'string' ? rawLevel.toLowerCase() : undefined;

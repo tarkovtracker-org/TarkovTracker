@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event, createError, setResponseHeaders } from 'h3';
-let appUrl: string | undefined;
-let publicCacheBypassEnabled = false;
+const { _appUrl, _bypassEnabled } = vi.hoisted(() => ({
+  _appUrl: { value: undefined as string | undefined },
+  _bypassEnabled: { value: false },
+}));
 vi.mock('#imports', () => ({
   useRuntimeConfig: () => ({
-    publicCacheBypassEnabled,
+    publicCacheBypassEnabled: _bypassEnabled.value,
     public: {
-      appUrl,
+      appUrl: _appUrl.value,
     },
   }),
 }));
@@ -45,11 +47,11 @@ describe('edgeCache', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
-    appUrl = undefined;
-    publicCacheBypassEnabled = false;
+    _appUrl.value = undefined;
+    _bypassEnabled.value = false;
   });
   it('falls back to default cache host when appUrl is localhost', async () => {
-    appUrl = 'http://localhost:3000';
+    _appUrl.value = 'http://localhost:3000';
     const event = createEvent({ host: 'maps.example.com', 'x-forwarded-proto': 'https' });
     const { edgeCache } = await import('@/server/utils/edgeCache');
     await edgeCache(event, 'items-en', async () => ({ ok: true }), 60, {
@@ -110,8 +112,8 @@ describe('edgeCache', () => {
     expect(cacheSpy.put).toHaveBeenCalledTimes(1);
   });
   it('bypasses cache and skips writes when operator bypass is enabled', async () => {
-    publicCacheBypassEnabled = true;
-    process.env.NUXT_PUBLIC_CACHE_BYPASS_ENABLED = 'true';
+    process.env.NUXT_CACHE_BYPASS_ENABLED = 'true';
+    _bypassEnabled.value = true;
     const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
     const event = createEvent({ 'x-bypass-cache': 'true' });
     const { edgeCache } = await import('@/server/utils/edgeCache');
@@ -125,7 +127,7 @@ describe('edgeCache', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(cacheSpy.match).not.toHaveBeenCalled();
     expect(cacheSpy.put).not.toHaveBeenCalled();
-    delete process.env.NUXT_PUBLIC_CACHE_BYPASS_ENABLED;
+    delete process.env.NUXT_CACHE_BYPASS_ENABLED;
   });
   it('sanitizes error details in thrown status message', async () => {
     const event = createEvent();

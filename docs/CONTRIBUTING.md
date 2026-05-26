@@ -48,14 +48,13 @@ Create a `.env` file in the project root:
 
 ```env
 # Supabase (for browser auth and server auth validation)
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_anon_key
+NUXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NUXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+# SUPABASE_URL and SUPABASE_ANON_KEY also work as cross-platform fallbacks
 
 # Server-side (for API routes - production only)
 NUXT_SUPABASE_SERVICE_KEY=your_service_role_key
-# Fallback for service role key (NUXT_SUPABASE_SERVICE_KEY preferred)
-# SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-APP_URL=http://localhost:3000
+NUXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 > **Note:** Most features work without Supabase configuration. Auth and sync will be disabled.

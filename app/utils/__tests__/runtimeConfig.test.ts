@@ -20,6 +20,38 @@ describe('resolveSupabaseRuntimeConfig', () => {
     expect(config.publicUrl).toBe('https://public.supabase.co');
     expect(config.publicAnonKey).toBe('public-anon-key');
   });
+  it('resolves Supabase env values from canonical names', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'nuxt-public-anon-key',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://nuxt-public.supabase.co',
+    });
+    expect(config.privateUrl).toBe('https://nuxt-public.supabase.co');
+    expect(config.privateAnonKey).toBe('nuxt-public-anon-key');
+    expect(config.publicUrl).toBe('https://nuxt-public.supabase.co');
+    expect(config.publicAnonKey).toBe('nuxt-public-anon-key');
+  });
+  it('falls back to SUPABASE_URL / SUPABASE_ANON_KEY as platform convenience', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      SUPABASE_ANON_KEY: 'platform-anon-key',
+      SUPABASE_URL: 'https://platform.supabase.co',
+    });
+    expect(config.privateUrl).toBe('https://platform.supabase.co');
+    expect(config.privateAnonKey).toBe('platform-anon-key');
+    expect(config.publicUrl).toBe('https://platform.supabase.co');
+    expect(config.publicAnonKey).toBe('platform-anon-key');
+  });
+  it('prefers NUXT_PUBLIC_* over SUPABASE_* for Nuxt runtime config', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'nuxt-anon-key',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://nuxt.supabase.co',
+      SUPABASE_ANON_KEY: 'platform-anon-key',
+      SUPABASE_URL: 'https://platform.supabase.co',
+    });
+    expect(config.privateUrl).toBe('https://nuxt.supabase.co');
+    expect(config.privateAnonKey).toBe('nuxt-anon-key');
+    expect(config.publicUrl).toBe('https://nuxt.supabase.co');
+    expect(config.publicAnonKey).toBe('nuxt-anon-key');
+  });
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
     expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
       expect.arrayContaining(['assets.tarkov.dev', 'avatars.githubusercontent.com', 'github.com'])
@@ -27,12 +59,20 @@ describe('resolveSupabaseRuntimeConfig', () => {
   });
 });
 describe('resolvePublicAppUrl', () => {
-  it('prefers explicit public app url', () => {
+  it('prefers NUXT_PUBLIC_APP_URL as canonical', () => {
     expect(
       resolvePublicAppUrl({
-        APP_URL: 'https://preview.example.com',
+        NUXT_PUBLIC_APP_URL: 'https://canonical.example.com',
+        APP_URL: 'https://platform.example.com',
       })
-    ).toBe('https://preview.example.com');
+    ).toBe('https://canonical.example.com');
+  });
+  it('falls back to APP_URL as platform convenience', () => {
+    expect(
+      resolvePublicAppUrl({
+        APP_URL: 'https://platform.example.com',
+      })
+    ).toBe('https://platform.example.com');
   });
   it('falls back to the current Cloudflare Pages deployment url', () => {
     expect(
@@ -40,6 +80,13 @@ describe('resolvePublicAppUrl', () => {
         CF_PAGES_URL: 'deploy-preview.pages.dev',
       })
     ).toBe('https://deploy-preview.pages.dev');
+  });
+  it('resolves NUXT_PUBLIC_APP_URL when set alone', () => {
+    expect(
+      resolvePublicAppUrl({
+        NUXT_PUBLIC_APP_URL: 'https://legacy-preview.example.com',
+      })
+    ).toBe('https://legacy-preview.example.com');
   });
   it('falls back to localhost when no deployment url exists', () => {
     expect(resolvePublicAppUrl({})).toBe('http://localhost:3000');

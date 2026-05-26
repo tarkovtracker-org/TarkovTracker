@@ -151,6 +151,16 @@ Naming:
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `wip`.
 - Header max 100 chars. Subject must not be UPPER_CASE.
 
+## Environment Variables
+
+- Use one canonical env var name per concept.
+- Use `NUXT_PUBLIC_*` for browser-exposed Nuxt runtime config.
+- Use `NUXT_*` for private Nuxt runtime config (server-only).
+- Use platform-native names for Supabase Edge Functions (`SUPABASE_*`, `STRIPE_*`, `DISCORD_*`).
+- Do not add legacy aliases or fallback chains without explicit approval.
+- If an env var is renamed, update source, docs, examples, CI/deploy references, and tests in the same change.
+- See `docs/ARCHITECTURE.md` for the canonical env var map.
+
 ## Agent Behavior
 
 - **Be concise.** Direct responses only. Minimize explanation unless asked.
