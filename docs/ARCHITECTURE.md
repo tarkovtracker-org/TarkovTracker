@@ -445,6 +445,16 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 | `API_REQUIRE_AUTH`                 | Require auth for protected routes (default true)  | No         |
 | `API_PUBLIC_ROUTES`                | Routes exempt from auth                           | No         |
 | `API_TRUST_PROXY`                  | Trust proxy headers (auto-detected on Cloudflare) | No         |
+| `STRIPE_SECRET_KEY`                | Stripe API secret key                             | Yes (prod) |
+| `STRIPE_PRICE_SCAV_MONTHLY`        | Stripe price ID for Scav monthly plan             | Yes (prod) |
+| `STRIPE_PRICE_SCAV_6MONTH`         | Stripe price ID for Scav 6-month plan             | Yes (prod) |
+| `STRIPE_PRICE_SCAV_YEARLY`         | Stripe price ID for Scav yearly plan              | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_MONTHLY`       | Stripe price ID for Timmy monthly plan            | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_6MONTH`        | Stripe price ID for Timmy 6-month plan            | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_YEARLY`        | Stripe price ID for Timmy yearly plan             | Yes (prod) |
+| `STRIPE_PRICE_CHAD_MONTHLY`        | Stripe price ID for Chad monthly plan             | Yes (prod) |
+| `STRIPE_PRICE_CHAD_6MONTH`         | Stripe price ID for Chad 6-month plan             | Yes (prod) |
+| `STRIPE_PRICE_CHAD_YEARLY`         | Stripe price ID for Chad yearly plan              | Yes (prod) |
 
 **Build-time / platform:**
 

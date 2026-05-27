@@ -252,6 +252,55 @@ Authorization: Bearer <supabase_jwt_token>
 
 ---
 
+## Supporter / Stripe Endpoints
+
+### POST /api/stripe/checkout
+
+Creates a Stripe Checkout session for supporter subscriptions or one-time payments. Requires authentication.
+
+**Request Body (subscription):**
+
+```json
+{
+  "mode": "subscription",
+  "tier": "scav",
+  "interval": "monthly"
+}
+```
+
+**Request Body (one-time payment):**
+
+```json
+{
+  "mode": "payment",
+  "amount": 10
+}
+```
+
+| Field      | Type   | Required     | Description                      |
+| ---------- | ------ | ------------ | -------------------------------- |
+| `mode`     | string | Yes          | `subscription` or `payment`      |
+| `tier`     | string | Subscription | `scav`, `timmy`, or `chad`       |
+| `interval` | string | Subscription | `monthly`, `6month`, or `yearly` |
+| `amount`   | number | One-time     | USD amount (min 1, max 999)      |
+
+**Response:**
+
+```json
+{ "url": "https://checkout.stripe.com/c/pay/..." }
+```
+
+**Errors:**
+
+| Status | Message                           | Cause                      |
+| ------ | --------------------------------- | -------------------------- |
+| 400    | Invalid tier / Invalid interval   | Bad request body           |
+| 401    | Authentication required           | Missing or invalid session |
+| 500    | Stripe not configured             | Server missing Stripe keys |
+| 502    | Failed to create checkout session | Stripe API error           |
+
+---
+
 ## Error Responses
 
 All endpoints return errors in this format:

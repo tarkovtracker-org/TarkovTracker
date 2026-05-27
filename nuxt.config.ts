@@ -155,16 +155,16 @@ export default defineNuxtConfig({
           process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
           '120'
       ) || 120,
-    stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
-    stripePriceScavMonthly: process.env.STRIPE_PRICE_SCAV_MONTHLY ?? '',
-    stripePriceScav6month: process.env.STRIPE_PRICE_SCAV_6MONTH ?? '',
-    stripePriceScavYearly: process.env.STRIPE_PRICE_SCAV_YEARLY ?? '',
-    stripePriceTimmyMonthly: process.env.STRIPE_PRICE_TIMMY_MONTHLY ?? '',
-    stripePriceTimmy6month: process.env.STRIPE_PRICE_TIMMY_6MONTH ?? '',
-    stripePriceTimmyYearly: process.env.STRIPE_PRICE_TIMMY_YEARLY ?? '',
-    stripePriceChadMonthly: process.env.STRIPE_PRICE_CHAD_MONTHLY ?? '',
-    stripePriceChad6month: process.env.STRIPE_PRICE_CHAD_6MONTH ?? '',
-    stripePriceChadYearly: process.env.STRIPE_PRICE_CHAD_YEARLY ?? '',
+    stripeSecretKey: (process.env.STRIPE_SECRET_KEY ?? '').trim(),
+    stripePriceScavMonthly: (process.env.STRIPE_PRICE_SCAV_MONTHLY ?? '').trim(),
+    stripePriceScav6month: (process.env.STRIPE_PRICE_SCAV_6MONTH ?? '').trim(),
+    stripePriceScavYearly: (process.env.STRIPE_PRICE_SCAV_YEARLY ?? '').trim(),
+    stripePriceTimmyMonthly: (process.env.STRIPE_PRICE_TIMMY_MONTHLY ?? '').trim(),
+    stripePriceTimmy6month: (process.env.STRIPE_PRICE_TIMMY_6MONTH ?? '').trim(),
+    stripePriceTimmyYearly: (process.env.STRIPE_PRICE_TIMMY_YEARLY ?? '').trim(),
+    stripePriceChadMonthly: (process.env.STRIPE_PRICE_CHAD_MONTHLY ?? '').trim(),
+    stripePriceChad6month: (process.env.STRIPE_PRICE_CHAD_6MONTH ?? '').trim(),
+    stripePriceChadYearly: (process.env.STRIPE_PRICE_CHAD_YEARLY ?? '').trim(),
     sharedProfileCacheTtlMs:
       Number(
         process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS ||
