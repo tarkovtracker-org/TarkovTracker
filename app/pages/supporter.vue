@@ -36,11 +36,13 @@
   import type { BillingInterval } from '@/features/supporter/supporterTypes';
   const { t } = useI18n({ useScope: 'global' });
   definePageMeta({ layout: 'default' });
-  useSeoMeta({
+  useHead({
     title: () => t('page.supporter.title'),
-    description: () => t('page.supporter.subtitle'),
-    ogTitle: () => t('page.supporter.title'),
-    ogDescription: () => t('page.supporter.subtitle'),
+    meta: [
+      { name: 'description', content: () => t('page.supporter.subtitle') },
+      { property: 'og:title', content: () => t('page.supporter.title') },
+      { property: 'og:description', content: () => t('page.supporter.subtitle') },
+    ],
   });
   const interval = ref<BillingInterval>('monthly');
 </script>

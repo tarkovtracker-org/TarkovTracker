@@ -2,6 +2,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMetadataStore } from '@/stores/useMetadata';
+import * as cacheUtils from '@/utils/tarkovCache';
 vi.mock('@/utils/logger', () => ({
   logger: {
     debug: vi.fn(),
@@ -14,6 +15,8 @@ describe('useMetadataStore initialize', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue(undefined);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -46,6 +49,22 @@ describe('useMetadataStore initialize', () => {
       })
     );
     await store.fetchTasksCoreData(true);
+    expect(store.tasks).toHaveLength(1);
+    expect(store.loading).toBe(false);
+  });
+  it('deduplicates concurrent task core fetches using the same promiseKey', async () => {
+    const store = useMetadataStore();
+    const fetchMock = vi.fn().mockResolvedValue({
+      data: {
+        maps: [],
+        tasks: [{ id: 'task-1', name: 'Task One' }],
+        traders: [],
+      },
+    });
+    vi.stubGlobal('$fetch', fetchMock);
+    // Trigger two concurrent fetches without forceRefresh
+    await Promise.all([store.fetchTasksCoreData(false), store.fetchTasksCoreData(false)]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(store.tasks).toHaveLength(1);
     expect(store.loading).toBe(false);
     expect(store.error).toBeNull();
