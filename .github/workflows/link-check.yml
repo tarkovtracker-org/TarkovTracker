@@ -37,7 +37,7 @@ jobs:
             --max-concurrency 4
             --max-retries 3
             --retry-wait-time 2
-            --exclude-path '^\\./CHANGELOG\\.md$'
+            --exclude-path '(^|/)CHANGELOG\\.md$'
             --exclude 'localhost'
             --exclude '127\.0\.0\.1'
             --exclude 'tarkovtracker\.org'
