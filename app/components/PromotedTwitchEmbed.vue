@@ -56,9 +56,20 @@
         ></iframe>
       </div>
     </aside>
+    <UButton
+      v-else-if="isLive && dismissed"
+      icon="i-mdi-twitch"
+      color="primary"
+      variant="solid"
+      size="sm"
+      class="fixed right-3 bottom-3 z-50 shadow-lg sm:right-5 sm:bottom-5"
+      :aria-label="t('promoted_stream.reopen', 'Reopen stream')"
+      @click="undismiss"
+    />
   </ClientOnly>
 </template>
 <script setup lang="ts">
+  const DISMISS_KEY = 'tt-twitch-dismissed';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const config = runtimeConfig.public.promotedTwitch as {
@@ -70,6 +81,7 @@
   const channel = config.channel?.trim().toLowerCase() || 'honeyxxo';
   const displayName = config.displayName?.trim() || channel;
   const isVisible = ref(false);
+  const isLive = ref(false);
   const dismissed = ref(false);
   const isExpanded = ref(true);
   const playerUrl = ref('');
@@ -86,30 +98,44 @@
   const dismiss = (): void => {
     dismissed.value = true;
     isVisible.value = false;
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
+    try {
+      sessionStorage.setItem(DISMISS_KEY, '1');
+    } catch {}
+  };
+  const undismiss = (): void => {
+    dismissed.value = false;
+    try {
+      sessionStorage.removeItem(DISMISS_KEY);
+    } catch {}
+    if (isLive.value) {
+      playerUrl.value = buildPlayerUrl();
+      isVisible.value = true;
     }
   };
   const checkLive = async (): Promise<void> => {
-    if (dismissed.value) return;
     try {
-      const { isLive } = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
+      const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
         query: { channel },
       });
-      if (isLive && !isVisible.value) {
+      isLive.value = data.isLive;
+      if (dismissed.value) return;
+      if (data.isLive && !isVisible.value) {
         playerUrl.value = buildPlayerUrl();
         isVisible.value = true;
-      } else if (!isLive) {
+      } else if (!data.isLive) {
         isVisible.value = false;
       }
     } catch {
+      isLive.value = false;
       isVisible.value = false;
     }
   };
   onMounted(() => {
     if (config.enabled === false) return;
     if (config.endsAt && new Date(config.endsAt) < new Date()) return;
+    try {
+      dismissed.value = sessionStorage.getItem(DISMISS_KEY) === '1';
+    } catch {}
     checkLive();
     pollTimer = setInterval(checkLive, 60_000);
   });

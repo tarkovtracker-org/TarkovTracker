@@ -82,6 +82,7 @@
     "player_title": "{streamer} Twitch stream",
     "play": "Play stream",
     "region_label": "Promoted Twitch stream for {streamer}",
+    "reopen": "Reopen stream",
     "shrink": "Shrink stream",
     "title": "{streamer} live",
     "unmute": "Unmute stream"
