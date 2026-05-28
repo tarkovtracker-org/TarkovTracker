@@ -68,6 +68,7 @@
         </template>
       </UAlert>
       <div class="grid gap-6 lg:grid-cols-2">
+        <AdminSupporterAccessCard />
         <AdminCacheCard />
         <AdminAuditLog />
       </div>

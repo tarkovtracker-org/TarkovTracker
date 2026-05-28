@@ -107,10 +107,12 @@
     });
   };
   const getActionIcon = (action: string) => {
+    if (action.includes('supporter')) return 'i-mdi-credit-card-check';
     if (action.includes('cache')) return 'i-mdi-cached';
     return 'i-mdi-shield-account';
   };
   const getActionColor = (action: string) => {
+    if (action.includes('supporter')) return 'success';
     if (action.includes('purge')) return 'warning';
     return 'info';
   };

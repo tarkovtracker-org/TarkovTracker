@@ -53,6 +53,7 @@ describe('admin page', () => {
         stubs: {
           AdminAuditLog: { template: '<div data-testid="audit-log" />' },
           AdminCacheCard: { template: '<div data-testid="cache-card" />' },
+          AdminSupporterAccessCard: { template: '<div data-testid="supporter-card" />' },
           UAlert: true,
           UIcon: true,
         },
@@ -60,6 +61,7 @@ describe('admin page', () => {
     });
     expect(wrapper.find('[data-testid="cache-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="audit-log"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="supporter-card"]').exists()).toBe(true);
   });
   it('redirects non-admin users to home', async () => {
     state.isAdmin = false;
@@ -68,6 +70,7 @@ describe('admin page', () => {
         stubs: {
           AdminAuditLog: true,
           AdminCacheCard: true,
+          AdminSupporterAccessCard: true,
           UAlert: true,
           UIcon: true,
         },
