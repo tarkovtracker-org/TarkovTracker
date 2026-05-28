@@ -40,7 +40,25 @@
     "audit_log_table_not_found_description": "Run the SQL migration to create admin_audit_log.",
     "audit_log_fetch_failed": "Failed to fetch audit logs",
     "no_actions_recorded": "No admin actions recorded yet",
-    "audit_log_by": "by"
+    "audit_log_by": "by",
+    "supporter_override_title": "Supporter Access",
+    "supporter_override_description": "Set a user's supporter state for production testing without creating a Stripe payment.",
+    "supporter_target_user_label": "User ID",
+    "supporter_target_user_placeholder": "Supabase auth user UUID",
+    "supporter_tier_label": "Tier",
+    "supporter_tier_supporter": "Supporter",
+    "supporter_tier_scav": "Scav",
+    "supporter_tier_timmy": "Timmy",
+    "supporter_tier_chad": "Chad",
+    "supporter_enabled_label": "Enabled",
+    "supporter_disabled_label": "Disabled",
+    "supporter_override_save_button": "Apply",
+    "supporter_override_login_required": "You must be signed in to update supporter access.",
+    "supporter_override_saved_title": "Supporter access updated",
+    "supporter_override_enabled_description": "Enabled {tier} supporter access.",
+    "supporter_override_disabled_description": "Disabled active supporter access.",
+    "supporter_override_failed_title": "Update failed",
+    "supporter_override_failed_description": "Could not update supporter access."
   },
   "alerts": {
     "no_map_data": "No map data available for this selection."
@@ -64,6 +82,7 @@
     "player_title": "{streamer} Twitch stream",
     "play": "Play stream",
     "region_label": "Promoted Twitch stream for {streamer}",
+    "reopen": "Reopen stream",
     "shrink": "Shrink stream",
     "title": "{streamer} live",
     "unmute": "Unmute stream"
