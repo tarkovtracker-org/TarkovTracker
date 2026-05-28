@@ -11,6 +11,7 @@ const runtimeConfig = {
 const mockReadBody = vi.fn();
 const mockGetSupporterStripeCustomerId = vi.fn();
 const mockCreatePortalSession = vi.fn();
+class MockSupporterCustomerLookupUnavailableError extends Error {}
 vi.mock('h3', async () => {
   const actual = await vi.importActual<typeof import('h3')>('h3');
   return {
@@ -37,6 +38,7 @@ vi.mock('@/server/utils/logger', () => ({
   }),
 }));
 vi.mock('@/server/utils/supporterCustomerLookup', () => ({
+  SupporterCustomerLookupUnavailableError: MockSupporterCustomerLookupUnavailableError,
   getSupporterStripeCustomerId: (...args: unknown[]) => mockGetSupporterStripeCustomerId(...args),
 }));
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
@@ -71,6 +73,15 @@ describe('POST /api/stripe/portal', () => {
     mockReadBody.mockResolvedValue({});
     const { default: handler } = await import('@/server/api/stripe/portal.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 404 });
+  });
+  it('throws 500 when the supporter customer lookup is unavailable', async () => {
+    mockGetSupporterStripeCustomerId.mockRejectedValue(
+      new MockSupporterCustomerLookupUnavailableError('missing config')
+    );
+    mockReadBody.mockResolvedValue({});
+    const { default: handler } = await import('@/server/api/stripe/portal.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 500 });
+    expect(mockCreatePortalSession).not.toHaveBeenCalled();
   });
   it('creates a portal session with the configured app return url by default', async () => {
     mockGetSupporterStripeCustomerId.mockResolvedValue('cus_123');

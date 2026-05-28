@@ -1,7 +1,10 @@
 import { createError, defineEventHandler, readBody } from 'h3';
 import Stripe from 'stripe';
 import { createLogger } from '@/server/utils/logger';
-import { getSupporterStripeCustomerId } from '@/server/utils/supporterCustomerLookup';
+import {
+  SupporterCustomerLookupUnavailableError,
+  getSupporterStripeCustomerId,
+} from '@/server/utils/supporterCustomerLookup';
 const logger = createLogger('StripePortal');
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);
@@ -15,7 +18,19 @@ export default defineEventHandler(async (event) => {
   if (!userId) {
     throw createError({ statusCode: 401, message: 'Authentication required' });
   }
-  const customerId = await getSupporterStripeCustomerId(event, userId);
+  let customerId: string | null;
+  try {
+    customerId = await getSupporterStripeCustomerId(event, userId, { throwOnUnavailable: true });
+  } catch (err: unknown) {
+    if (err instanceof SupporterCustomerLookupUnavailableError) {
+      logger.error('[Stripe Portal] Supporter customer lookup unavailable', { userId, err });
+      throw createError({
+        statusCode: 500,
+        message: 'Supporter customer lookup unavailable',
+      });
+    }
+    throw err;
+  }
   if (!customerId) {
     throw createError({
       statusCode: 404,

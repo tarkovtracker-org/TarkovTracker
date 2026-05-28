@@ -17,8 +17,15 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 let channel: RealtimeChannel | null = null;
 let channelUserId: string | null = null;
+let statusRequestVersion = 0;
 export function useSupporter() {
   const { $supabase } = useNuxtApp();
+  const isCurrentStatusRequest = (userId: string, requestVersion: number) => {
+    if (requestVersion !== statusRequestVersion) return false;
+    if ($supabase.user?.loggedIn === false) return false;
+    const currentUserId = $supabase.user?.id ?? null;
+    return !currentUserId || currentUserId === userId;
+  };
   const isSupporter = computed(() => supporterState.value?.hasEverSupported === true);
   const isActiveSubscriber = computed(
     () =>
@@ -41,6 +48,7 @@ export function useSupporter() {
   });
   async function fetchStatus(userId: string) {
     if (!$supabase || !userId) return;
+    const requestVersion = ++statusRequestVersion;
     loading.value = true;
     error.value = null;
     try {
@@ -51,9 +59,11 @@ export function useSupporter() {
         .maybeSingle();
       if (err) {
         logger.error('Failed to fetch supporter status', { userId, err });
+        if (!isCurrentStatusRequest(userId, requestVersion)) return;
         error.value = err.message;
         return;
       }
+      if (!isCurrentStatusRequest(userId, requestVersion)) return;
       if (data) {
         supporterState.value = {
           tier: data.tier,
@@ -68,10 +78,13 @@ export function useSupporter() {
       }
     } catch (e: unknown) {
       logger.error('fetchStatus threw', { userId, err: e });
+      if (!isCurrentStatusRequest(userId, requestVersion)) return;
       error.value = e instanceof Error ? e.message : 'Failed to load supporter status';
       supporterState.value = null;
     } finally {
-      loading.value = false;
+      if (isCurrentStatusRequest(userId, requestVersion)) {
+        loading.value = false;
+      }
     }
   }
   function subscribe(userId: string) {
@@ -109,6 +122,7 @@ export function useSupporter() {
     }
   }
   function reset() {
+    statusRequestVersion += 1;
     unsubscribe();
     supporterState.value = null;
     error.value = null;

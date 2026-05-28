@@ -34,6 +34,15 @@ describe('getSupporterStripeCustomerId', () => {
     expect(result).toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();
   });
+  it('throws when supabase config is missing and unavailable lookups are fatal', async () => {
+    runtimeConfig.supabaseUrl = '';
+    const { SupporterCustomerLookupUnavailableError, getSupporterStripeCustomerId } =
+      await import('@/server/utils/supporterCustomerLookup');
+    await expect(
+      getSupporterStripeCustomerId(event, 'user-1', { throwOnUnavailable: true })
+    ).rejects.toBeInstanceOf(SupporterCustomerLookupUnavailableError);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
   it('returns the customer id when found', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -61,6 +70,14 @@ describe('getSupporterStripeCustomerId', () => {
     const { getSupporterStripeCustomerId } = await import('@/server/utils/supporterCustomerLookup');
     const result = await getSupporterStripeCustomerId(event, 'user-1');
     expect(result).toBeNull();
+  });
+  it('throws on a non-ok response when unavailable lookups are fatal', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500 } as Response);
+    const { SupporterCustomerLookupUnavailableError, getSupporterStripeCustomerId } =
+      await import('@/server/utils/supporterCustomerLookup');
+    await expect(
+      getSupporterStripeCustomerId(event, 'user-1', { throwOnUnavailable: true })
+    ).rejects.toBeInstanceOf(SupporterCustomerLookupUnavailableError);
   });
   it('returns null when fetch throws', async () => {
     mockFetch.mockRejectedValue(new Error('network'));
