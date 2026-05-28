@@ -480,7 +480,8 @@ function applyTranslations<T>(
           json: translatedResponse,
           resultType: 'all',
           callback: (result: JsonPathResult) => {
-            if (!isRecord(result.parent)) return;
+            const parent = result.parent;
+            if (!isRecord(parent) && !Array.isArray(parent)) return;
             const parentProperty = result.parentProperty;
             if (parentProperty === undefined) return;
             const translationKey = result.value;
@@ -490,7 +491,7 @@ function applyTranslations<T>(
             if (translated.source === 'fallback') {
               logger.debug('[TarkovJson] Applied fallback translation', { path, translationKey });
             }
-            result.parent[parentProperty] = translated.value;
+            (parent as Record<string | number, unknown>)[parentProperty] = translated.value;
           },
         });
       } catch (error) {
