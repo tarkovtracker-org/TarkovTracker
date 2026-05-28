@@ -321,6 +321,31 @@ describe('AppBar logged out actions', () => {
     wrapper.unmount();
   });
 });
+describe('AppBar supporter badge', () => {
+  beforeEach(() => {
+    supporterTierRef.value = null;
+  });
+  it('renders the green Support Development CTA when there is no active tier', async () => {
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain('footer.support_button');
+    expect(wrapper.text()).not.toContain('page.supporter.tier_chad_name');
+    wrapper.unmount();
+  });
+  it('renders the chad tier badge for active chad subscribers', async () => {
+    supporterTierRef.value = 'chad';
+    const wrapper = await mountAppBar();
+    // te() mock returns false, so AppBar falls back to the capitalized tier name
+    expect(wrapper.text()).toContain('Chad');
+    expect(wrapper.text()).not.toContain('footer.support_button');
+    wrapper.unmount();
+  });
+  it('falls back to the generic Supporter label for past supporters', async () => {
+    supporterTierRef.value = 'supporter';
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain('app_bar.supporter_badge_label');
+    wrapper.unmount();
+  });
+});
 describe('AppBar page title', () => {
   beforeEach(() => {
     routeState.name = 'tasks';
