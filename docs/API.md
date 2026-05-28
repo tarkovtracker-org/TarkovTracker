@@ -301,6 +301,39 @@ Creates a Stripe Checkout session for supporter subscriptions or one-time paymen
 
 ---
 
+### POST /api/stripe/portal
+
+Creates a Stripe Customer Portal session so an authenticated subscriber can manage their subscription, payment method, or view invoices. Requires authentication and an existing Stripe customer linked to the user (via the `supporters` table).
+
+**Request Body:**
+
+```json
+{ "returnUrl": "https://tarkovtracker.org/supporter" }
+```
+
+| Field       | Type   | Required | Description                                                                                |
+| ----------- | ------ | -------- | ------------------------------------------------------------------------------------------ |
+| `returnUrl` | string | No       | Absolute URL on the configured app origin to send the user back to. Defaults to /supporter |
+
+The `returnUrl` host must match the configured app URL host. Mismatched hosts fall back to `${appUrl}/supporter` to prevent open-redirect abuse.
+
+**Response:**
+
+```json
+{ "url": "https://billing.stripe.com/p/session/..." }
+```
+
+**Errors:**
+
+| Status | Message                                 | Cause                                            |
+| ------ | --------------------------------------- | ------------------------------------------------ |
+| 401    | Authentication required                 | Missing or invalid session                       |
+| 404    | No Stripe customer found                | User has never paid; no `stripe_customer_id` row |
+| 500    | Stripe not configured                   | Server missing Stripe keys                       |
+| 502    | Failed to create billing portal session | Stripe API error                                 |
+
+---
+
 ## Error Responses
 
 All endpoints return errors in this format:
