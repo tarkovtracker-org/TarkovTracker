@@ -5,7 +5,7 @@ import {
   validateCheckoutBody,
   validateOneTimeAmount,
 } from '@/server/utils/stripeCheckoutValidation';
-import type { H3Event } from 'h3';
+import { getSupporterStripeCustomerId } from '@/server/utils/supporterCustomerLookup';
 const logger = createLogger('StripeCheckout');
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   // Reuse the existing Stripe Customer for returning supporters so refund and
   // dispute lookups against stripe_customer_id keep matching after re-subscribe.
   // Falls back to customer_email for first-time supporters (Stripe creates one).
-  const existingCustomerId = await getExistingStripeCustomerId(event, userId);
+  const existingCustomerId = await getSupporterStripeCustomerId(event, userId);
   const customerFields: { customer?: string; customer_email?: string } = existingCustomerId
     ? { customer: existingCustomerId }
     : email
@@ -106,46 +106,4 @@ export default defineEventHandler(async (event) => {
 });
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-/**
- * Look up the user's existing Stripe customer ID via Supabase service role.
- * Returns null on any error or if not found — caller falls back to
- * customer_email so first-time supporters can still check out.
- */
-async function getExistingStripeCustomerId(event: H3Event, userId: string): Promise<string | null> {
-  const config = useRuntimeConfig(event);
-  const supabaseUrl = (config.supabaseUrl as string) || '';
-  const serviceKey = (config.supabaseServiceKey as string) || '';
-  if (!supabaseUrl || !serviceKey) return null;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-  try {
-    const url =
-      `${supabaseUrl}/rest/v1/supporters` +
-      `?select=stripe_customer_id&user_id=eq.${encodeURIComponent(userId)}&limit=1`;
-    const resp = await fetch(url, {
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        Accept: 'application/json',
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!resp.ok) {
-      logger.warn('Supporter lookup failed', { userId, status: resp.status });
-      return null;
-    }
-    const rows = (await resp.json()) as Array<{ stripe_customer_id: string | null }>;
-    const cid = rows?.[0]?.stripe_customer_id;
-    return typeof cid === 'string' && cid.length > 0 ? cid : null;
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err instanceof Error && err.name === 'AbortError') {
-      logger.warn('Supporter lookup timed out', { userId });
-      return null;
-    }
-    logger.warn('Supporter lookup threw', { userId, err });
-    return null;
-  }
 }

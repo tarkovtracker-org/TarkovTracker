@@ -120,12 +120,22 @@ export function useSupporter() {
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
+    return postWithAuth<{ url: string }>('/api/stripe/checkout', params).then(
+      (r) => r?.url ?? null
+    );
+  }
+  async function openBillingPortal(returnUrl?: string): Promise<string | null> {
+    return postWithAuth<{ url: string }>('/api/stripe/portal', returnUrl ? { returnUrl } : {}).then(
+      (r) => r?.url ?? null
+    );
+  }
+  async function postWithAuth<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
     if (!$supabase) {
       error.value = 'Supabase client not available';
       return null;
     }
     try {
-      // Stripe checkout requires authentication: the server reads the user id
+      // Stripe endpoints require authentication: the server reads the user id
       // from the session, not the request body, so we must forward the
       // bearer token. Refresh once if the cached session is missing/stale.
       let token: string | null = null;
@@ -140,21 +150,16 @@ export function useSupporter() {
         error.value = message;
         return null;
       }
-      const { url } = await $fetch<{ url: string }>('/api/stripe/checkout', {
+      const result = await $fetch(path, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
-        body: params,
+        body,
       });
-      return url;
+      return result as T;
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Checkout failed';
+      const message = e instanceof Error ? e.message : 'Request failed';
       error.value = message;
-      logger.error('createCheckout failed', {
-        mode: params.mode,
-        tier: params.tier,
-        interval: params.interval,
-        error: e,
-      });
+      logger.error('Supporter request failed', { path, error: e });
       return null;
     }
   }
@@ -171,5 +176,6 @@ export function useSupporter() {
     unsubscribe,
     reset,
     createCheckout,
+    openBillingPortal,
   };
 }

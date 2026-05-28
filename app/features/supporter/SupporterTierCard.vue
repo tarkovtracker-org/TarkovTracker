@@ -8,7 +8,13 @@
     "
   >
     <div
-      v-if="tier.featured"
+      v-if="isCurrentTier"
+      class="bg-success-600 py-1 text-center text-xs font-semibold tracking-wider text-white uppercase"
+    >
+      {{ t('page.supporter.current_tier_badge', 'Current tier') }}
+    </div>
+    <div
+      v-else-if="tier.featured"
       class="bg-primary-600 py-1 text-center text-xs font-semibold tracking-wider text-white uppercase"
     >
       {{ t('page.supporter.most_popular') }}
@@ -61,6 +67,19 @@
         @update:open="checkoutError = null"
       />
       <UButton
+        v-if="isCurrentTier"
+        class="w-full justify-center font-semibold"
+        color="primary"
+        variant="soft"
+        size="lg"
+        :loading="manageLoading"
+        icon="i-mdi-credit-card-outline"
+        @click="handleManage"
+      >
+        {{ t('page.supporter.manage_subscription_cta', 'Manage subscription') }}
+      </UButton>
+      <UButton
+        v-else
         class="w-full justify-center font-semibold"
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
@@ -69,7 +88,11 @@
         :disabled="!currentUserId"
         @click="handleCheckout"
       >
-        {{ t('page.supporter.tier_cta') }}
+        {{
+          isActiveSubscriber
+            ? t('page.supporter.tier_change_cta', 'Switch to this tier')
+            : t('page.supporter.tier_cta')
+        }}
       </UButton>
     </div>
   </div>
@@ -88,10 +111,20 @@
   }>();
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
-  const { createCheckout, error: composableError } = useSupporter();
+  const {
+    activeTier,
+    isActiveSubscriber,
+    openBillingPortal,
+    createCheckout,
+    error: composableError,
+  } = useSupporter();
   const checkoutLoading = ref(false);
   const checkoutError = ref<string | null>(null);
+  const manageLoading = ref(false);
   const currentUserId = ref<string | null>(null);
+  const isCurrentTier = computed(
+    () => isActiveSubscriber.value && activeTier.value === props.tier.id
+  );
   onMounted(async () => {
     try {
       const { data } = await $supabase.client.auth.getUser();
@@ -157,6 +190,33 @@
           : t('page.supporter.checkout_error_generic', 'Checkout failed');
     } finally {
       checkoutLoading.value = false;
+    }
+  }
+  async function handleManage() {
+    if (manageLoading.value) return;
+    manageLoading.value = true;
+    checkoutError.value = null;
+    try {
+      const url = await openBillingPortal(window.location.href);
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      checkoutError.value =
+        composableError.value ||
+        t('page.supporter.portal_error_generic', 'We could not open the billing portal.');
+    } catch (e: unknown) {
+      logger.error('SupporterTierCard: handleManage failed', {
+        userId: currentUserId.value,
+        tier: props.tier.id,
+        err: e,
+      });
+      checkoutError.value =
+        e instanceof Error
+          ? e.message
+          : t('page.supporter.portal_error_generic', 'We could not open the billing portal.');
+    } finally {
+      manageLoading.value = false;
     }
   }
   const perks = computed(() => {
