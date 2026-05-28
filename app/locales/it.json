@@ -648,7 +648,7 @@
       "transparency_note": "Trasparenza sulle commissioni",
       "transparency_detail": "I prezzi mostrati includono le commissioni di Stripe (2,9% + $0,30 per transazione, più lo 0,7% per gli abbonamenti). Questo significa che riceveremo l'intero importo base scelto — niente di meno.",
       "one_time_title": "Contributo una tantum",
-      "one_time_subtitle": "Preferisci non abbonarti? Invia un regalo una tantum a partire da {min} (commissioni incluse).",
+      "one_time_subtitle": "Preferisci non abbonarti? Fai una donazione una tantum a partire da {min} (commissioni incluse).",
       "one_time_cta": "Dona una volta",
       "login_required_warning": "Devi aver effettuato l'accesso per ricevere i vantaggi da Supporter.",
       "price_breakdown": "{base}/mese a noi + {fees}/mese di commissioni Stripe",
