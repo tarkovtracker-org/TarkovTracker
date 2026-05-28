@@ -74,6 +74,13 @@ describe('POST /api/admin/supporter', () => {
       statusCode: 403,
     });
   });
+  it('normalizes Supabase fetch failures', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('network unavailable'));
+    const { default: handler } = await import('@/server/api/admin/supporter.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 502,
+    });
+  });
   it('upserts an active supporter tier for admins', async () => {
     mockReadBody.mockResolvedValue({
       enabled: true,
@@ -150,11 +157,23 @@ describe('POST /api/admin/supporter', () => {
     });
     expect(typeof payload.expires_at).toBe('string');
   });
-  it('validates target user id and tier', async () => {
+  it('validates target user id', async () => {
     mockReadBody.mockResolvedValue({
       enabled: true,
       targetUserId: 'not-a-user-id',
       tier: 'chad',
+    });
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
+    const { default: handler } = await import('@/server/api/admin/supporter.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 400,
+    });
+  });
+  it('validates tier', async () => {
+    mockReadBody.mockResolvedValue({
+      enabled: true,
+      targetUserId: 'c191868d-26e3-40f0-87e0-b2bc07d95d4c',
+      tier: 'invalid-tier',
     });
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
     const { default: handler } = await import('@/server/api/admin/supporter.post');

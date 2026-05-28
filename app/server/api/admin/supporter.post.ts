@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, readBody } from 'h3';
 import { createLogger } from '@/server/utils/logger';
+import { VALID_TIERS } from '@/server/utils/stripeCheckoutValidation';
 const logger = createLogger('AdminSupporter');
-const VALID_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
 type SupporterTier = (typeof VALID_TIERS)[number];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 interface AdminSupporterBody {
@@ -122,16 +122,22 @@ async function supabaseFetch<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(`${supabaseUrl}${path}`, {
-    ...init,
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${supabaseUrl}${path}`, {
+      ...init,
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+    });
+  } catch (error) {
+    logger.error('[AdminSupporter] Supabase request failed', { path, error });
+    throw createError({ statusCode: 502, message: 'Supabase request failed' });
+  }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
     logger.warn('[AdminSupporter] Supabase request failed', {

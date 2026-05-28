@@ -11,12 +11,12 @@
   const tier = ref<SupporterTier>('chad');
   const enabled = ref(true);
   const isSaving = ref(false);
-  const tierOptions: Array<{ label: string; value: SupporterTier }> = [
+  const tierOptions = computed<Array<{ label: string; value: SupporterTier }>>(() => [
     { label: t('admin.supporter_tier_supporter'), value: 'supporter' },
     { label: t('admin.supporter_tier_scav'), value: 'scav' },
     { label: t('admin.supporter_tier_timmy'), value: 'timmy' },
     { label: t('admin.supporter_tier_chad'), value: 'chad' },
-  ];
+  ]);
   const canSave = computed(() => {
     return systemStore.isAdmin && targetUserId.value.trim().length > 0 && !isSaving.value;
   });
