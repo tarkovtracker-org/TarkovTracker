@@ -108,6 +108,12 @@ export function useSupporter() {
       channelUserId = null;
     }
   }
+  function reset() {
+    unsubscribe();
+    supporterState.value = null;
+    error.value = null;
+    loading.value = false;
+  }
   async function createCheckout(params: {
     mode: 'payment' | 'subscription';
     tier?: string;
@@ -163,6 +169,7 @@ export function useSupporter() {
     fetchStatus,
     subscribe,
     unsubscribe,
+    reset,
     createCheckout,
   };
 }

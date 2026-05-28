@@ -88,6 +88,20 @@
           </template>
         </SelectMenuFixed>
         <NuxtLink
+          v-if="supporterTier"
+          to="/supporter"
+          :class="[
+            'inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-semibold text-white shadow-sm shadow-black/30 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm',
+            supporterBadgeClass,
+          ]"
+          :aria-label="supporterBadgeAriaLabel"
+          :title="supporterBadgeAriaLabel"
+        >
+          <UIcon :name="supporterBadgeIcon" class="h-3.5 w-3.5 shrink-0 text-white" />
+          <span class="hidden sm:inline">{{ supporterBadgeLabel }}</span>
+        </NuxtLink>
+        <NuxtLink
+          v-else
           to="/supporter"
           class="border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500 inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-semibold text-white shadow-sm shadow-black/30 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm"
           :aria-label="t('footer.support_button')"
@@ -159,6 +173,7 @@
 <script setup lang="ts">
   import { useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
+  import { useSupporter } from '@/composables/useSupporter';
   import { useAppStore } from '@/stores/useApp';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -171,6 +186,46 @@
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const currentMode = computed(() => tarkovStore.getCurrentGameMode());
+  const { activeTier: supporterTier } = useSupporter();
+  const supporterBadgeLabel = computed(() => {
+    const tier = supporterTier.value;
+    if (!tier) return '';
+    if (tier === 'supporter') {
+      return t('app_bar.supporter_badge_label', 'Supporter');
+    }
+    const tierKey = `page.supporter.tier_${tier}_name`;
+    if (te(tierKey)) {
+      return t(tierKey);
+    }
+    return tier.charAt(0).toUpperCase() + tier.slice(1);
+  });
+  const supporterBadgeAriaLabel = computed(() =>
+    t('app_bar.supporter_badge_aria', { tier: supporterBadgeLabel.value })
+  );
+  const supporterBadgeIcon = computed(() => {
+    switch (supporterTier.value) {
+      case 'chad':
+        return 'i-mdi-crown';
+      case 'timmy':
+        return 'i-mdi-star';
+      case 'scav':
+        return 'i-mdi-shield-star';
+      default:
+        return 'i-mdi-heart';
+    }
+  });
+  const supporterBadgeClass = computed(() => {
+    switch (supporterTier.value) {
+      case 'chad':
+        return 'border-amber-400 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500';
+      case 'timmy':
+        return 'border-primary-400 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500';
+      case 'scav':
+        return 'border-surface-500 bg-gradient-to-r from-surface-600 to-surface-700 hover:from-surface-500 hover:to-surface-600';
+      default:
+        return 'border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500';
+    }
+  });
   const skillCalculation = useSkillCalculation();
   const route = useRoute();
   const { $supabase } = useNuxtApp();

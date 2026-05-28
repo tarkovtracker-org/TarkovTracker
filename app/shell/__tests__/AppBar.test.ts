@@ -24,6 +24,10 @@ const mockToast = {
 const mockSkillCalculation = {
   migrateLegacySkillOffsets: vi.fn(),
 };
+const supporterTierRef = ref<string | null>(null);
+const mockUseSupporter = vi.fn(() => ({
+  activeTier: supporterTierRef,
+}));
 const mockMetadataStore = reactive({
   loading: false,
   hideoutLoading: false,
@@ -72,6 +76,9 @@ vi.mock('@vueuse/core', async (importOriginal) => ({
   useWindowSize: () => ({
     width: ref(1280),
   }),
+}));
+vi.mock('@/composables/useSupporter', () => ({
+  useSupporter: () => mockUseSupporter(),
 }));
 vi.mock('@/stores/useApp', () => ({
   useAppStore: () => ({
@@ -164,6 +171,8 @@ describe('AppBar locale switching', () => {
       mockPreferencesStore.getLocaleOverride = value;
     });
     mockSkillCalculation.migrateLegacySkillOffsets.mockClear();
+    supporterTierRef.value = null;
+    mockUseSupporter.mockClear();
     mockTarkovStore.getCurrentGameMode.mockClear();
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockClear();

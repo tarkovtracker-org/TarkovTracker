@@ -1,3 +1,4 @@
+import { useSupporter } from '@/composables/useSupporter';
 import { useToastI18n } from '@/composables/useToastI18n';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -17,6 +18,7 @@ export function useAppInitialization() {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  const supporter = useSupporter();
   const { availableLocales, locale, setLocale } = useI18n({ useScope: 'global' });
   const { showLoadFailed } = useToastI18n();
   const isAvailableLocale = (value: string): value is typeof locale.value =>
@@ -53,9 +55,26 @@ export function useAppInitialization() {
   };
   let syncStarted = false;
   let migrationAttempted = false;
+  let supporterLoadedForUserId: string | null = null;
   let authChangeToken = 0;
   const resetTarkovState = (reason: string, previousUserId: string | null = null) => {
     resetTarkovStoreForSessionTransition(previousUserId, reason);
+  };
+  const loadSupporterStatusIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
+    const authenticatedUserId = getAuthenticatedUserId();
+    if (expectedUserId && authenticatedUserId !== expectedUserId) return;
+    if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
+    if (!authenticatedUserId) return;
+    if (supporterLoadedForUserId === authenticatedUserId) return;
+    try {
+      await supporter.fetchStatus(authenticatedUserId);
+      if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) return;
+      if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
+      supporter.subscribe(authenticatedUserId);
+      supporterLoadedForUserId = authenticatedUserId;
+    } catch (error) {
+      logger.error('[useAppInitialization] Failed to load supporter status:', error);
+    }
   };
   const startSyncIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
     const authenticatedUserId = getAuthenticatedUserId();
@@ -109,16 +128,22 @@ export function useAppInitialization() {
         }
         syncStarted = false;
         migrationAttempted = false;
+        supporterLoadedForUserId = null;
+        supporter.reset();
         return;
       }
       if (prevUserId && userId && prevUserId !== userId) {
         resetTarkovState('user switched', prevUserId);
         syncStarted = false;
         migrationAttempted = false;
+        supporterLoadedForUserId = null;
+        supporter.reset();
       }
       await startSyncIfNeeded(userId, token);
       if (token !== authChangeToken) return;
       await runMigrationIfNeeded(userId, token);
+      if (token !== authChangeToken) return;
+      await loadSupporterStatusIfNeeded(userId, token);
     },
     { immediate: true }
   );
@@ -132,5 +157,6 @@ export function useAppInitialization() {
   onMounted(async () => {
     await startSyncIfNeeded();
     await runMigrationIfNeeded();
+    await loadSupporterStatusIfNeeded();
   });
 }

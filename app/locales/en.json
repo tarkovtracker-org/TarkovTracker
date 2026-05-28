@@ -51,7 +51,9 @@
     "logout_failed": "Unable to log out. Please try again.",
     "hidden_label": "Hidden",
     "user_label": "User",
-    "user_avatar_alt": "User avatar"
+    "user_avatar_alt": "User avatar",
+    "supporter_badge_label": "Supporter",
+    "supporter_badge_aria": "Manage your supporter subscription ({tier})"
   },
   "promoted_stream": {
     "close": "Close stream",
