@@ -169,6 +169,25 @@ describe('fetchTarkovJsonEndpoint', () => {
     expect(result.items.item1?.shortName).toBe('Short');
     expect(result.items.item2?.name).toBe('item.name');
   });
+  it('falls back to JSONPath when the fast path cannot parse a translation path', async () => {
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/items': {
+        data: { items: [{ id: 'item1', name: 'item.name', shortName: 'item.short' }] },
+        translations: ['$..name', '$.data.items[*].shortName'],
+      },
+      'https://json.tarkov.dev/regular/items_en': {
+        data: { 'item.name': 'Bandage', 'item.short': 'Band' },
+      },
+    });
+    const result = await fetchTarkovJsonEndpoint<{
+      items: Array<{ id: string; name: string; shortName: string }>;
+    }>('items', {
+      deps: { fetcher },
+      lang: 'en',
+    });
+    expect(result.items[0]?.name).toBe('Bandage');
+    expect(result.items[0]?.shortName).toBe('Band');
+  });
   it('does not fetch translation files when the base response has no translation paths', async () => {
     const payload = { items: {} };
     const fetcher = createFetcher({
