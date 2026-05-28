@@ -40,7 +40,7 @@
           to="#tiers"
           icon="i-mdi-arrow-up-bold-circle-outline"
         >
-          {{ t('page.supporter.upgrade_cta', 'Upgrade tier') }}
+          {{ t('page.supporter.upgrade_cta', 'Pick a tier') }}
         </UButton>
       </div>
     </div>
