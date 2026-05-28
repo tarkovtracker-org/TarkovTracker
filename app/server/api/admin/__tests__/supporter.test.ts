@@ -129,7 +129,7 @@ describe('POST /api/admin/supporter', () => {
         jsonResponse([
           {
             expires_at: '2026-05-28T12:00:00.000Z',
-            has_ever_supported: false,
+            has_ever_supported: true,
             started_at: '2026-05-28T12:00:00.000Z',
             status: 'expired',
             tier: 'supporter',
@@ -143,10 +143,10 @@ describe('POST /api/admin/supporter', () => {
     const [, upsertInit] = mockFetch.mock.calls[1] as [string, RequestInit];
     const payload = JSON.parse(upsertInit.body as string) as Record<string, unknown>;
     expect(payload).toMatchObject({
-      has_ever_supported: false,
       status: 'expired',
       tier: 'supporter',
       type: 'subscription',
+      has_ever_supported: true,
     });
     expect(typeof payload.expires_at).toBe('string');
   });

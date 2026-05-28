@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     tier: enabled ? tier : 'supporter',
     status: enabled ? 'active' : 'expired',
     type: 'subscription',
-    has_ever_supported: enabled,
+    has_ever_supported: true,
     expires_at: expiresAt,
   };
   const updatedRows = await supabaseFetch<SupabaseRow[]>(
