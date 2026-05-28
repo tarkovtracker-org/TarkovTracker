@@ -40,7 +40,25 @@
     "audit_log_table_not_found_description": "Esegui la migrazione SQL per creare admin_audit_log.",
     "audit_log_fetch_failed": "Recupero audit log fallito",
     "no_actions_recorded": "Nessuna azione admin registrata",
-    "audit_log_by": "da"
+    "audit_log_by": "da",
+    "supporter_override_title": "Supporter Access",
+    "supporter_override_description": "Set a user's supporter state for production testing without creating a Stripe payment.",
+    "supporter_target_user_label": "User ID",
+    "supporter_target_user_placeholder": "Supabase auth user UUID",
+    "supporter_tier_label": "Tier",
+    "supporter_tier_supporter": "Supporter",
+    "supporter_tier_scav": "Scav",
+    "supporter_tier_timmy": "Timmy",
+    "supporter_tier_chad": "Chad",
+    "supporter_enabled_label": "Enabled",
+    "supporter_disabled_label": "Disabled",
+    "supporter_override_save_button": "Applica",
+    "supporter_override_login_required": "You must be signed in to update supporter access.",
+    "supporter_override_saved_title": "Supporter access updated",
+    "supporter_override_enabled_description": "Enabled {tier} supporter access.",
+    "supporter_override_disabled_description": "Disabled active supporter access.",
+    "supporter_override_failed_title": "Update failed",
+    "supporter_override_failed_description": "Could not update supporter access."
   },
   "alerts": {
     "no_map_data": "Nessun dato della mappa disponibile per questa selezione."
@@ -64,6 +82,7 @@
     "player_title": "Diretta Twitch di {streamer}",
     "play": "Riproduci la diretta",
     "region_label": "Diretta Twitch sponsorizzata per {streamer}",
+    "reopen": "Reopen stream",
     "shrink": "Riduci la diretta",
     "title": "{streamer} è live",
     "unmute": "Riattiva audio diretta"
