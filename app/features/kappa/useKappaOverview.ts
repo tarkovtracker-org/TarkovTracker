@@ -48,6 +48,7 @@ export function useKappaOverview(tab: () => KappaTabKey) {
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const progressStore = useProgressStore();
+  const { t } = useI18n({ useScope: 'global' });
   const sourceTasks = computed(() => {
     const tabFiltered = metadataStore.tasks.filter(taskFilterFor(toValue(tab)));
     const faction = tarkovStore.getPMCFaction() ?? 'Any';
@@ -153,7 +154,7 @@ export function useKappaOverview(tab: () => KappaTabKey) {
       groups.set(traderId, {
         trader: {
           id: traderId,
-          name: traderRef?.name ?? 'Other',
+          name: traderRef?.name ?? t('page.kappa.trader.other', 'Other'),
           normalizedName: traderRef?.normalizedName,
           imageLink: traderRef?.imageLink,
         },

@@ -678,7 +678,10 @@
       "trader_selector": {
         "label": "Select Trader"
       },
-      "appbar_title": "Kappa & Lightkeeper"
+      "appbar_title": "Kappa & Lightkeeper",
+      "trader": {
+        "other": "Other"
+      }
     },
     "supporter": {
       "title": "Support TarkovTracker",

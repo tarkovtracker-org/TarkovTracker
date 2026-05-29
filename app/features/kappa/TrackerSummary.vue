@@ -69,7 +69,7 @@
                 : 'border-error-500/30 bg-error-500/10 text-error-300'
             "
           >
-            Lv {{ minLevel }}
+            {{ t('page.kappa.row.level_prefix', 'Lv') }} {{ minLevel }}
           </span>
         </div>
       </div>

@@ -31,7 +31,7 @@
         :aria-label="levelChipAriaLabel"
         :title="levelChipTitle"
       >
-        Lv {{ minLevel }}
+        {{ t('page.kappa.row.level_prefix', 'Lv') }} {{ minLevel }}
       </span>
       <UIcon
         v-if="row.task.lightkeeperRequired && !row.task.kappaRequired"

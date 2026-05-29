@@ -70,8 +70,7 @@
     <template v-else>
       <div
         v-if="xxlAndUp"
-        class="grid items-start gap-3"
-        style="grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr))"
+        class="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] items-start gap-3"
       >
         <KappaTraderColumn
           v-for="group in groupedByTraderWithoutFence"
