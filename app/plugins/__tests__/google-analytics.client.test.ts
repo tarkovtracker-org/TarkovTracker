@@ -132,7 +132,7 @@ describe('google analytics plugin', () => {
   });
   it('initial successful load with consent granted', async () => {
     window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     const script = document.getElementById('tt-google-analytics') as HTMLScriptElement | null;
@@ -149,7 +149,7 @@ describe('google analytics plugin', () => {
       '/tasks?trader=54cb57776803fa99248b456e&view=maps&_tt_retry=123&view=maps'
     );
     window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     expectAnalyticsInitialized(
@@ -163,7 +163,7 @@ describe('google analytics plugin', () => {
       updatedAt: '2026-03-09T00:00:00.000Z',
     };
     window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     expect(document.getElementById('tt-google-analytics')).toBeNull();
@@ -184,7 +184,7 @@ describe('google analytics plugin', () => {
   });
   it('does not initialize analytics for an invalid measurement ID', async () => {
     runtimeConfig.public.googleAnalyticsMeasurementId = '';
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     expect(document.getElementById('tt-google-analytics')).toBeNull();
@@ -193,7 +193,7 @@ describe('google analytics plugin', () => {
   });
   it('skips initialization when analytics runtime is disabled', async () => {
     shouldEnableAnalyticsIntegrations.mockReturnValueOnce(false);
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     expect(document.getElementById('tt-google-analytics')).toBeNull();
@@ -204,7 +204,7 @@ describe('google analytics plugin', () => {
     const originalScript = document.createElement('script');
     originalScript.id = 'tt-google-analytics';
     document.head.appendChild(originalScript);
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     expect(originalScript).toBeTruthy();
@@ -232,7 +232,7 @@ describe('google analytics plugin', () => {
   });
   it('tracks route changes with normalized page paths', async () => {
     window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushAnalyticsSync();
     currentRoute.value = createRoute('/needed-items?type=hideout&type=hideout');
@@ -247,7 +247,7 @@ describe('google analytics plugin', () => {
     window.happyDOM.settings.handleDisabledFileLoadingAsSuccess = true;
     const routerReadyDeferred = createDeferred<undefined>();
     routerIsReadyMock.mockReturnValueOnce(routerReadyDeferred.promise);
-    const plugin = (await import('@/plugins/03.google-analytics.client')).default;
+    const plugin = (await import('@/plugins/05.google-analytics.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushPromises();
     expect(window.gtag).toBeTypeOf('function');

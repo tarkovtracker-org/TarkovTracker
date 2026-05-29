@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
  */
 export default defineNuxtPlugin((nuxtApp) => {
   const metadataStore = useMetadataStore();
-  if (process.env.NODE_ENV === 'test') {
+  if (import.meta.env.MODE === 'test') {
     return {
       provide: {
         metadata: metadataStore,

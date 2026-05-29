@@ -54,7 +54,7 @@ and `NUXT_PUBLIC_CLARITY_PROJECT_ID` only enable the Google Analytics and Micros
 integration codepaths; they do not start tracking by themselves. Tracking stays disabled until the
 user explicitly opts in through the analytics consent banner or footer "Analytics Preferences"
 control. That opt-in state is managed in `app/composables/useAnalyticsConsent.ts`, and
-`app/plugins/03.analytics-consent-mode.client.ts` keeps analytics consent mode denied until the
+`app/plugins/04.analytics-consent-mode.client.ts` keeps analytics consent mode denied until the
 user accepts.
 
 `NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK` is disabled by default and should stay off in

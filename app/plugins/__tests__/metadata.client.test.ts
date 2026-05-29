@@ -31,7 +31,7 @@ describe('metadata plugin', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('MODE', 'development');
     routeState.path = '/tasks';
     metadataStoreMock.hasInitialized = false;
     metadataStoreMock.initializationFailed = true;

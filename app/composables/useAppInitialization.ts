@@ -154,9 +154,4 @@ export function useAppInitialization() {
     },
     { immediate: true }
   );
-  onMounted(async () => {
-    await startSyncIfNeeded();
-    await runMigrationIfNeeded();
-    await loadSupporterStatusIfNeeded();
-  });
 }

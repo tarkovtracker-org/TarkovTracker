@@ -74,7 +74,7 @@ describe('microsoft clarity plugin', () => {
     const script = document.createElement('script');
     script.id = 'tt-microsoft-clarity';
     document.head.appendChild(script);
-    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
     expect(script).toBeTruthy();
@@ -90,7 +90,7 @@ describe('microsoft clarity plugin', () => {
     script.id = 'tt-microsoft-clarity';
     document.head.appendChild(script);
     window.clarity = clarity;
-    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
     expect(script).toBeTruthy();
@@ -115,7 +115,7 @@ describe('microsoft clarity plugin', () => {
     const originalScript = document.createElement('script');
     originalScript.id = 'tt-microsoft-clarity';
     document.head.appendChild(originalScript);
-    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
     originalScript.dispatchEvent(new Event('error'));
@@ -145,7 +145,7 @@ describe('microsoft clarity plugin', () => {
     const originalScript = document.createElement('script');
     originalScript.id = 'tt-microsoft-clarity';
     document.head.appendChild(originalScript);
-    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
     originalScript.dispatchEvent(new Event('error'));
@@ -169,7 +169,7 @@ describe('microsoft clarity plugin', () => {
   });
   it('does not initialize when project ID format is invalid', async () => {
     runtimeConfig.public.microsoftClarityProjectId = 'invalid-id-format';
-    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
     expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
@@ -177,7 +177,7 @@ describe('microsoft clarity plugin', () => {
   });
   it('skips initialization when analytics runtime is disabled', async () => {
     shouldEnableAnalyticsIntegrations.mockReturnValueOnce(false);
-    const plugin = (await import('@/plugins/04.microsoft-clarity.client')).default;
+    const plugin = (await import('@/plugins/06.microsoft-clarity.client')).default;
     plugin({} as Parameters<typeof plugin>[0]);
     await flushClaritySync();
     expect(document.getElementById('tt-microsoft-clarity')).toBeNull();
