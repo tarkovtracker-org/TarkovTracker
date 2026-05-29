@@ -149,3 +149,64 @@ describe('useKappaOverview', () => {
     expect(mid?.lockedBy).toBeUndefined();
   });
 });
+describe('useKappaOverview chain ordering', () => {
+  it('keeps multi-part chains together anchored at the first part level', async () => {
+    const chainTasks: Task[] = [
+      {
+        id: 't-hp-p1',
+        name: 'Healthcare Privacy - Part 1',
+        minPlayerLevel: 28,
+        kappaRequired: true,
+        trader: { id: 'therapist', name: 'Therapist' },
+      },
+      {
+        id: 't-hp-p2',
+        name: 'Healthcare Privacy - Part 2',
+        minPlayerLevel: 32,
+        kappaRequired: true,
+        trader: { id: 'therapist', name: 'Therapist' },
+      },
+      {
+        id: 't-hp-p3',
+        name: 'Healthcare Privacy - Part 3',
+        minPlayerLevel: 35,
+        kappaRequired: true,
+        trader: { id: 'therapist', name: 'Therapist' },
+      },
+      {
+        id: 't-other-30',
+        name: 'Sample Quest',
+        minPlayerLevel: 30,
+        kappaRequired: true,
+        trader: { id: 'therapist', name: 'Therapist' },
+      },
+    ];
+    vi.resetModules();
+    vi.doMock('@/stores/useMetadata', () => ({
+      useMetadataStore: () => ({
+        tasks: chainTasks,
+        sortedTraders: [{ id: 'therapist', name: 'Therapist', normalizedName: 'therapist' }],
+      }),
+    }));
+    vi.doMock('@/stores/useTarkov', () => ({
+      useTarkovStore: () => ({
+        isTaskComplete: () => false,
+        isTaskFailed: () => false,
+      }),
+    }));
+    vi.doMock('@/stores/useProgress', () => ({
+      useProgressStore: () => ({ unlockedTasks: {} }),
+    }));
+    const { useKappaOverview: useFresh } = await import('@/features/kappa/useKappaOverview');
+    const { groupedByTrader } = useFresh(() => 'kappa');
+    const ids = groupedByTrader.value
+      .find((group) => group.trader.id === 'therapist')!
+      .rows.map((row) => row.task.id);
+    // Anchor for the chain is Lv 28 (Part 1), so all three parts come before
+    // the standalone Lv 30 quest, in part-number order.
+    expect(ids).toEqual(['t-hp-p1', 't-hp-p2', 't-hp-p3', 't-other-30']);
+    vi.doUnmock('@/stores/useMetadata');
+    vi.doUnmock('@/stores/useTarkov');
+    vi.doUnmock('@/stores/useProgress');
+  });
+});

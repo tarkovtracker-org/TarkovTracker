@@ -16,6 +16,27 @@ export type KappaTraderGroupEntry = {
   completedCount: number;
 };
 const OTHER_GROUP_ID = '__other__';
+const CHAIN_PART_REGEX = /^(.*?)\s*[-\u2013\u2014]\s*Part\s+(\d+)\s*$/i;
+type ChainKey = {
+  chain: string;
+  part: number;
+};
+/**
+ * Detects multi-part quest chains by name (e.g. 'Healthcare Privacy - Part 2').
+ * Returns the chain prefix and the part number, or null when the task is not
+ * a numbered part.
+ */
+function parseChainKey(name: string | undefined): ChainKey | null {
+  if (!name) return null;
+  const match = name.match(CHAIN_PART_REGEX);
+  if (!match) return null;
+  const prefix = match[1]?.trim();
+  const partRaw = match[2];
+  if (!prefix || !partRaw) return null;
+  const part = Number.parseInt(partRaw, 10);
+  if (!Number.isFinite(part)) return null;
+  return { chain: prefix.toLocaleLowerCase(), part };
+}
 const taskFilterFor = (tab: KappaTabKey) =>
   tab === 'kappa'
     ? (task: Task) => task.kappaRequired === true
@@ -107,21 +128,51 @@ export function useKappaOverview(tab: () => KappaTabKey) {
       });
     }
     /**
-     * Sort each trader column purely by required player level (then name as a
-     * stable tiebreak). This matches the reference spreadsheet's reading order;
-     * dependency-depth was tried first but produced surprising orders such as
-     * a Lv 18 prerequisite landing above a Lv 5 follow-up.
+     * Sort each trader column by required player level, but keep multi-part
+     * quest chains adjacent and ordered by part number. The reference
+     * spreadsheet groups chains like 'Healthcare Privacy - Part 1/2/3'
+     * together anchored at the first part's level, even when later parts have
+     * higher level requirements that would otherwise scatter them across the
+     * column. Tasks outside a chain sort by their own level then name.
      */
-    const sortRows = (a: KappaRowEntry, b: KappaRowEntry) => {
-      const levelA = a.task.minPlayerLevel ?? 0;
-      const levelB = b.task.minPlayerLevel ?? 0;
-      if (levelA !== levelB) return levelA - levelB;
-      const nameA = a.task.name ?? '';
-      const nameB = b.task.name ?? '';
-      return nameA.localeCompare(nameB);
+    type SortMeta = { anchorLevel: number; chainKey: string; part: number; name: string };
+    const sortGroupRows = (rows: KappaRowEntry[]): KappaRowEntry[] => {
+      const chainAnchors = new Map<string, number>();
+      for (const row of rows) {
+        const chainKey = parseChainKey(row.task.name);
+        if (!chainKey) continue;
+        const level = row.task.minPlayerLevel ?? 0;
+        const existing = chainAnchors.get(chainKey.chain);
+        if (existing === undefined || level < existing) {
+          chainAnchors.set(chainKey.chain, level);
+        }
+      }
+      const metaFor = (row: KappaRowEntry): SortMeta => {
+        const ownLevel = row.task.minPlayerLevel ?? 0;
+        const name = row.task.name ?? '';
+        const chainKey = parseChainKey(row.task.name);
+        if (chainKey) {
+          const anchor = chainAnchors.get(chainKey.chain) ?? ownLevel;
+          return {
+            anchorLevel: anchor,
+            chainKey: chainKey.chain,
+            part: chainKey.part,
+            name,
+          };
+        }
+        return { anchorLevel: ownLevel, chainKey: name.toLocaleLowerCase(), part: 0, name };
+      };
+      return [...rows].sort((a, b) => {
+        const metaA = metaFor(a);
+        const metaB = metaFor(b);
+        if (metaA.anchorLevel !== metaB.anchorLevel) return metaA.anchorLevel - metaB.anchorLevel;
+        if (metaA.chainKey !== metaB.chainKey) return metaA.chainKey.localeCompare(metaB.chainKey);
+        if (metaA.part !== metaB.part) return metaA.part - metaB.part;
+        return metaA.name.localeCompare(metaB.name);
+      });
     };
     return Array.from(groups.values())
-      .map((group) => ({ ...group, rows: [...group.rows].sort(sortRows) }))
+      .map((group) => ({ ...group, rows: sortGroupRows(group.rows) }))
       .sort((a, b) => {
         const indexA = traderOrder.get(a.trader.id) ?? Number.MAX_SAFE_INTEGER;
         const indexB = traderOrder.get(b.trader.id) ?? Number.MAX_SAFE_INTEGER;
