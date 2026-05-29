@@ -60,39 +60,6 @@ export function useKappaOverview(tab: () => KappaTabKey) {
       return { task, status, lockedBy };
     });
   });
-  /**
-   * Topological depth per task across the full task graph.
-   * depth(task) = 1 + max(depth(req)) for every required predecessor;
-   * tasks with no requirements are depth 0. Cycles are skipped via the
-   * visiting set so a corrupt graph can't infinitely recurse.
-   */
-  const taskDepthMap = computed<Map<string, number>>(() => {
-    const allTasks = metadataStore.tasks;
-    const tasksById = new Map(allTasks.map((task) => [task.id, task]));
-    const depthCache = new Map<string, number>();
-    const visiting = new Set<string>();
-    const computeDepth = (taskId: string): number => {
-      const cached = depthCache.get(taskId);
-      if (cached !== undefined) return cached;
-      if (visiting.has(taskId)) return 0;
-      const task = tasksById.get(taskId);
-      if (!task) return 0;
-      visiting.add(taskId);
-      let maxParent = -1;
-      for (const requirement of task.taskRequirements ?? []) {
-        const parentId = requirement?.task?.id;
-        if (!parentId || parentId === taskId) continue;
-        const parentDepth = computeDepth(parentId);
-        if (parentDepth > maxParent) maxParent = parentDepth;
-      }
-      visiting.delete(taskId);
-      const depth = maxParent + 1;
-      depthCache.set(taskId, depth);
-      return depth;
-    };
-    for (const task of allTasks) computeDepth(task.id);
-    return depthCache;
-  });
   const totals = computed(() => {
     let completed = 0;
     let failed = 0;
@@ -139,10 +106,13 @@ export function useKappaOverview(tab: () => KappaTabKey) {
         completedCount: row.status === 'complete' ? 1 : 0,
       });
     }
+    /**
+     * Sort each trader column purely by required player level (then name as a
+     * stable tiebreak). This matches the reference spreadsheet's reading order;
+     * dependency-depth was tried first but produced surprising orders such as
+     * a Lv 18 prerequisite landing above a Lv 5 follow-up.
+     */
     const sortRows = (a: KappaRowEntry, b: KappaRowEntry) => {
-      const depthA = taskDepthMap.value.get(a.task.id) ?? 0;
-      const depthB = taskDepthMap.value.get(b.task.id) ?? 0;
-      if (depthA !== depthB) return depthA - depthB;
       const levelA = a.task.minPlayerLevel ?? 0;
       const levelB = b.task.minPlayerLevel ?? 0;
       if (levelA !== levelB) return levelA - levelB;

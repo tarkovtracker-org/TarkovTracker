@@ -124,10 +124,10 @@ describe('useKappaOverview', () => {
     expect(prapor?.totalCount).toBe(2);
     expect(prapor?.completedCount).toBe(1);
   });
-  it('sorts dependent tasks after their predecessors even when alphabetical or level ties would invert it', () => {
-    // t-prapor-mid depends on t-prapor-low. Without dependency-aware sorting,
-    // identical levels and alphabetical 'M' < 'L' fallback could invert the
-    // order; we expect the predecessor to come first.
+  it('orders rows strictly by required level (spreadsheet-style), ignoring dependency depth', () => {
+    // t-prapor-low (Lv 1) and t-prapor-mid (Lv 20) share a trader column.
+    // t-prapor-mid depends on t-prapor-low, but the spreadsheet sorts purely
+    // by required level so we expect Lv 1 first then Lv 20.
     const { groupedByTrader } = useKappaOverview(() => 'kappa');
     const ids = groupedByTrader.value
       .find((group) => group.trader.id === 'prapor')!
