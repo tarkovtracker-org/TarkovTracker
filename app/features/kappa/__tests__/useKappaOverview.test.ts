@@ -49,21 +49,28 @@ const tasks: Task[] = [
 let completionState: Record<string, boolean> = {};
 let failedState: Record<string, boolean> = {};
 let unlockedState: Record<string, { self: boolean }> = {};
+let invalidState: Record<string, { self: boolean }> = {};
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
     tasks,
     sortedTraders: traders,
+    editions: [],
+    prestigeTaskMap: new Map(),
   }),
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     isTaskComplete: (id: string) => completionState[id] === true,
     isTaskFailed: (id: string) => failedState[id] === true,
+    getPMCFaction: () => 'Any',
+    getGameEdition: () => undefined,
+    getPrestigeLevel: () => 0,
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({
   useProgressStore: () => ({
     unlockedTasks: unlockedState,
+    invalidTasks: invalidState,
   }),
 }));
 describe('useKappaOverview', () => {
@@ -71,6 +78,7 @@ describe('useKappaOverview', () => {
     completionState = {};
     failedState = {};
     unlockedState = {};
+    invalidState = {};
   });
   it('filters by kappaRequired tab', () => {
     const tab = ref<'kappa' | 'lightkeeper'>('kappa');
@@ -94,7 +102,7 @@ describe('useKappaOverview', () => {
     // t-no-trader is locked (no unlock entry, not complete, not failed)
     const { totals, tasksWithStatus } = useKappaOverview(() => 'kappa');
     expect(totals.value).toEqual({
-      total: 4,
+      total: 3,
       completed: 1,
       failed: 1,
       available: 1,
@@ -107,6 +115,15 @@ describe('useKappaOverview', () => {
       't-therapist': 'available',
       't-no-trader': 'locked',
     });
+  });
+  it('excludes failed tasks from group totalCount and overview total', () => {
+    completionState['t-prapor-low'] = true;
+    failedState['t-prapor-mid'] = true;
+    const { totals, groupedByTrader } = useKappaOverview(() => 'kappa');
+    expect(totals.value.total).toBe(3);
+    const prapor = groupedByTrader.value.find((group) => group.trader.id === 'prapor');
+    expect(prapor?.totalCount).toBe(1);
+    expect(prapor?.completedCount).toBe(1);
   });
   it('groups tasks by trader, sorts groups by sortedTraders order, sorts rows by level then name', () => {
     const { groupedByTrader } = useKappaOverview(() => 'kappa');
@@ -148,6 +165,14 @@ describe('useKappaOverview', () => {
     expect(mid?.status).toBe('available');
     expect(mid?.lockedBy).toBeUndefined();
   });
+  it('excludes invalid locked tasks from group totals and overview total', () => {
+    invalidState['t-prapor-mid'] = { self: true };
+    const { totals, groupedByTrader } = useKappaOverview(() => 'kappa');
+    // Middling quest is invalid, so only low, therapist, and no-trader are counted (total = 3)
+    expect(totals.value.total).toBe(3);
+    const prapor = groupedByTrader.value.find((group) => group.trader.id === 'prapor');
+    expect(prapor?.totalCount).toBe(1); // mid is excluded
+  });
 });
 describe('useKappaOverview chain ordering', () => {
   it('keeps multi-part chains together anchored at the first part level', async () => {
@@ -186,16 +211,21 @@ describe('useKappaOverview chain ordering', () => {
       useMetadataStore: () => ({
         tasks: chainTasks,
         sortedTraders: [{ id: 'therapist', name: 'Therapist', normalizedName: 'therapist' }],
+        editions: [],
+        prestigeTaskMap: new Map(),
       }),
     }));
     vi.doMock('@/stores/useTarkov', () => ({
       useTarkovStore: () => ({
         isTaskComplete: () => false,
         isTaskFailed: () => false,
+        getPMCFaction: () => 'Any',
+        getGameEdition: () => undefined,
+        getPrestigeLevel: () => 0,
       }),
     }));
     vi.doMock('@/stores/useProgress', () => ({
-      useProgressStore: () => ({ unlockedTasks: {} }),
+      useProgressStore: () => ({ unlockedTasks: {}, invalidTasks: {} }),
     }));
     const { useKappaOverview: useFresh } = await import('@/features/kappa/useKappaOverview');
     const { groupedByTrader } = useFresh(() => 'kappa');

@@ -367,7 +367,8 @@
     }
     const routeName = profileRouteName.value;
     const titleKeys = [
-      routeName === 'neededitems' ? 'page.needed_items.title' : `page.${routeName}.title`,
+      routeName === 'neededitems' ? 'page.needed_items.title' : `page.${routeName}.appbar_title`,
+      `page.${routeName}.title`,
       `page.${routeName}.meta.title`,
       routeName === 'admin' ? 'admin.title' : '',
       `navigation_drawer.${routeName}`,

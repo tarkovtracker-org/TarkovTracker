@@ -61,6 +61,6 @@
     () => props.group.totalCount > 0 && props.group.completedCount === props.group.totalCount
   );
   const accentBarClass = computed(() =>
-    props.accent === 'kappa' ? 'bg-kappa-500' : 'bg-lightkeeper-500'
+    props.accent === 'kappa' ? 'bg-warning-500' : 'bg-info-500'
   );
 </script>

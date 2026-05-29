@@ -669,7 +669,16 @@
       },
       "progress_label": "complete",
       "all_complete": "All tasks complete! Well done, PMC.",
-      "empty": "No tasks for this list yet."
+      "empty": "No tasks for this list yet.",
+      "summary": {
+        "progress": "Progress",
+        "complete": "complete",
+        "final_goal": "Final Kappa Goal"
+      },
+      "trader_selector": {
+        "label": "Select Trader"
+      },
+      "appbar_title": "Kappa & Lightkeeper"
     },
     "supporter": {
       "title": "Support TarkovTracker",

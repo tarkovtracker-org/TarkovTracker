@@ -15,6 +15,7 @@ const breakpoints = useBreakpoints({
   md: 960,
   lg: 1024,
   xl: 1280,
+  xxl: 1920,
 });
 // VueUse's smaller() and greaterOrEqual() already return ComputedRef<boolean>
 // so no additional computed() wrapper is needed
@@ -25,6 +26,7 @@ const mdAndUp = breakpoints.greaterOrEqual('md'); // >= 960px
 const belowLg = breakpoints.smaller('lg'); // < 1024px
 const lgAndUp = breakpoints.greaterOrEqual('lg'); // >= 1024px
 const xlAndUp = breakpoints.greaterOrEqual('xl'); // >= 1280px
+const xxlAndUp = breakpoints.greaterOrEqual('xxl'); // >= 1920px
 export interface SharedBreakpoints {
   /** Extra small: < 600px (mobile) */
   xs: ComputedRef<boolean>;
@@ -40,6 +42,8 @@ export interface SharedBreakpoints {
   lgAndUp: ComputedRef<boolean>;
   /** Extra large and up: >= 1280px */
   xlAndUp: ComputedRef<boolean>;
+  /** Extra extra large and up: >= 1920px (wide desktop, full trader board) */
+  xxlAndUp: ComputedRef<boolean>;
 }
 /**
  * Returns shared breakpoint computed refs.
@@ -55,5 +59,6 @@ export function useSharedBreakpoints(): SharedBreakpoints {
     belowLg,
     lgAndUp,
     xlAndUp,
+    xxlAndUp,
   };
 }
