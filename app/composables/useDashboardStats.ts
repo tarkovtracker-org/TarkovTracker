@@ -5,6 +5,7 @@ import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { CURRENCY_ITEM_IDS } from '@/utils/constants';
 import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
+import { isTaskComplete, isTaskCounted } from '@/utils/taskStatus';
 import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
 import type { ComputedRef } from '#imports';
 import type {
@@ -46,7 +47,10 @@ export function useDashboardStats(): {
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const isTaskSuccessful = (taskId: string) =>
-    tarkovStore.isTaskComplete(taskId) && !tarkovStore.isTaskFailed(taskId);
+    isTaskComplete({
+      complete: tarkovStore.isTaskComplete(taskId),
+      failed: tarkovStore.isTaskFailed(taskId),
+    });
   // Check if a task is invalid (failed, blocked by failed prereqs, wrong faction, etc.)
   const isTaskInvalid = (taskId: string) => progressStore.invalidTasks[taskId]?.self === true;
   // Check if a task is available for the user's edition (uses shared helper)
@@ -135,24 +139,24 @@ export function useDashboardStats(): {
   // Total tasks count - includes completed tasks, excludes failed and invalid tasks
   const totalTasks = computed(() => {
     return relevantTasks.value.filter((task) => {
-      // Completed tasks always count toward total
-      if (isTaskSuccessful(task.id)) return true;
-      // Failed tasks don't count (they failed as side effect of completing alternatives)
-      if (tarkovStore.isTaskFailed(task.id)) return false;
-      // Incomplete tasks only count if they can still be completed (not invalid)
-      return !isTaskInvalid(task.id);
+      const completion = {
+        complete: tarkovStore.isTaskComplete(task.id),
+        failed: tarkovStore.isTaskFailed(task.id),
+      };
+      return isTaskCounted(completion, isTaskInvalid(task.id));
     }).length;
   });
   // Total objectives count - includes objectives from completed tasks, excludes from failed/invalid tasks
   const totalObjectives = computed(() => {
     return relevantTasks.value.reduce((total, task) => {
-      // Completed tasks' objectives always count
-      if (isTaskSuccessful(task.id)) return total + (task?.objectives?.length || 0);
-      // Failed tasks' objectives don't count
-      if (tarkovStore.isTaskFailed(task.id)) return total;
-      // Incomplete invalid tasks' objectives don't count
-      if (isTaskInvalid(task.id)) return total;
-      return total + (task?.objectives?.length || 0);
+      const completion = {
+        complete: tarkovStore.isTaskComplete(task.id),
+        failed: tarkovStore.isTaskFailed(task.id),
+      };
+      if (isTaskCounted(completion, isTaskInvalid(task.id))) {
+        return total + (task?.objectives?.length || 0);
+      }
+      return total;
     }, 0);
   });
   // Completed objectives count - from completed tasks or non-failed/non-invalid incomplete tasks
@@ -162,10 +166,13 @@ export function useDashboardStats(): {
     }
     let count = 0;
     for (const task of relevantTasks.value) {
-      // Skip failed tasks
-      if (tarkovStore.isTaskFailed(task.id)) continue;
-      // Skip incomplete invalid tasks
-      if (!isTaskSuccessful(task.id) && isTaskInvalid(task.id)) continue;
+      const completion = {
+        complete: tarkovStore.isTaskComplete(task.id),
+        failed: tarkovStore.isTaskFailed(task.id),
+      };
+      if (!isTaskCounted(completion, isTaskInvalid(task.id))) {
+        continue;
+      }
       for (const objective of task.objectives || []) {
         if (objective?.id && tarkovStore.isTaskObjectiveComplete(objective.id)) {
           count++;
@@ -286,12 +293,11 @@ export function useDashboardStats(): {
   const totalKappaTasks = computed(() => {
     return relevantTasks.value.filter((task) => {
       if (!task.kappaRequired) return false;
-      // Completed kappa tasks always count
-      if (isTaskSuccessful(task.id)) return true;
-      // Failed kappa tasks don't count
-      if (tarkovStore.isTaskFailed(task.id)) return false;
-      // Incomplete kappa tasks only count if not invalid
-      return !isTaskInvalid(task.id);
+      const completion = {
+        complete: tarkovStore.isTaskComplete(task.id),
+        failed: tarkovStore.isTaskFailed(task.id),
+      };
+      return isTaskCounted(completion, isTaskInvalid(task.id));
     }).length;
   });
   // Completed Kappa tasks count
@@ -304,12 +310,11 @@ export function useDashboardStats(): {
   const totalLightkeeperTasks = computed(() => {
     return relevantTasks.value.filter((task) => {
       if (!task.lightkeeperRequired) return false;
-      // Completed lightkeeper tasks always count
-      if (isTaskSuccessful(task.id)) return true;
-      // Failed lightkeeper tasks don't count
-      if (tarkovStore.isTaskFailed(task.id)) return false;
-      // Incomplete lightkeeper tasks only count if not invalid
-      return !isTaskInvalid(task.id);
+      const completion = {
+        complete: tarkovStore.isTaskComplete(task.id),
+        failed: tarkovStore.isTaskFailed(task.id),
+      };
+      return isTaskCounted(completion, isTaskInvalid(task.id));
     }).length;
   });
   // Completed Lightkeeper tasks count
@@ -326,9 +331,11 @@ export function useDashboardStats(): {
         const traderTasks = relevantTasks.value.filter((task) => task.trader?.id === trader.id);
         // Total includes completed tasks, excludes failed and invalid tasks
         const totalTasks = traderTasks.filter((task) => {
-          if (isTaskSuccessful(task.id)) return true;
-          if (tarkovStore.isTaskFailed(task.id)) return false;
-          return !isTaskInvalid(task.id);
+          const completion = {
+            complete: tarkovStore.isTaskComplete(task.id),
+            failed: tarkovStore.isTaskFailed(task.id),
+          };
+          return isTaskCounted(completion, isTaskInvalid(task.id));
         }).length;
         const completedTasks = traderTasks.filter((task) => isTaskSuccessful(task.id)).length;
         return {
