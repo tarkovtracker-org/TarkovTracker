@@ -27,10 +27,12 @@
         </NuxtLink>
         <span
           v-if="minLevel"
-          class="bg-surface-900/70 text-surface-400 shrink-0 rounded px-1 text-[10px] tabular-nums"
-          aria-hidden="true"
+          class="shrink-0 rounded border px-1 text-[10px] font-medium tabular-nums"
+          :class="levelChipClasses"
+          :aria-label="levelChipAriaLabel"
+          :title="levelChipTitle"
         >
-          {{ minLevel }}
+          Lv {{ minLevel }}
         </span>
         <UIcon
           v-if="row.task.lightkeeperRequired && !row.task.kappaRequired"
@@ -57,9 +59,12 @@
 <script setup lang="ts">
   import AppTooltip from '@/components/ui/AppTooltip.vue';
   import { useTaskActions } from '@/composables/useTaskActions';
+  import { useProgressStore } from '@/stores/useProgress';
   import type { KappaRowEntry } from '@/features/kappa/useKappaOverview';
   const props = defineProps<{ row: KappaRowEntry }>();
   const { t } = useI18n({ useScope: 'global' });
+  const progressStore = useProgressStore();
+  const playerLevel = computed(() => progressStore.getLevel('self'));
   const taskRef = computed(() => props.row.task);
   const { markTaskComplete, markTaskUncomplete, markTaskAvailable } = useTaskActions(
     () => taskRef.value
@@ -68,6 +73,37 @@
   const minLevel = computed(() => {
     const level = props.row.task.minPlayerLevel ?? 0;
     return level > 1 ? level : null;
+  });
+  const levelMet = computed(() => {
+    if (minLevel.value == null) return true;
+    return playerLevel.value >= minLevel.value;
+  });
+  const levelChipClasses = computed(() =>
+    levelMet.value
+      ? 'border-success-500/30 bg-success-500/10 text-success-300'
+      : 'border-error-500/30 bg-error-500/10 text-error-300'
+  );
+  const levelChipAriaLabel = computed(() => {
+    if (minLevel.value == null) return undefined;
+    return levelMet.value
+      ? t(
+          'page.kappa.row.level_met_aria',
+          { required: minLevel.value, current: playerLevel.value },
+          `Required level ${minLevel.value}, you are level ${playerLevel.value}`
+        )
+      : t(
+          'page.kappa.row.level_unmet_aria',
+          { required: minLevel.value, current: playerLevel.value },
+          `Requires level ${minLevel.value}, you are level ${playerLevel.value}`
+        );
+  });
+  const levelChipTitle = computed(() => {
+    if (minLevel.value == null) return undefined;
+    return t(
+      'page.kappa.row.level_title',
+      { required: minLevel.value, current: playerLevel.value },
+      `Required level ${minLevel.value} (you are ${playerLevel.value})`
+    );
   });
   const traderLevelLabel = computed(() => {
     const reqs = props.row.task.traderLevelRequirements;
@@ -95,6 +131,15 @@
   const tooltipText = computed(() => {
     const parts: string[] = [props.row.task.name ?? props.row.task.id];
     parts.push(`(${statusLabel.value})`);
+    if (minLevel.value != null) {
+      parts.push(
+        t(
+          'page.kappa.row.level_summary',
+          { required: minLevel.value, current: playerLevel.value },
+          `Lv ${minLevel.value} (you ${playerLevel.value})`
+        )
+      );
+    }
     if (traderLevelLabel.value) parts.push(traderLevelLabel.value);
     if (props.row.task.factionName) parts.push(props.row.task.factionName);
     if (props.row.task.map?.name) parts.push(props.row.task.map.name);
