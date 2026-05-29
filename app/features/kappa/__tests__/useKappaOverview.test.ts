@@ -24,6 +24,7 @@ const tasks: Task[] = [
     minPlayerLevel: 20,
     kappaRequired: true,
     trader: { id: 'prapor', name: 'Prapor' },
+    taskRequirements: [{ task: { id: 't-prapor-low', name: 'Prapor Low Level' } }],
   },
   {
     id: 't-therapist',
@@ -122,5 +123,29 @@ describe('useKappaOverview', () => {
     const prapor = groupedByTrader.value.find((group) => group.trader.id === 'prapor');
     expect(prapor?.totalCount).toBe(2);
     expect(prapor?.completedCount).toBe(1);
+  });
+  it('sorts dependent tasks after their predecessors even when alphabetical or level ties would invert it', () => {
+    // t-prapor-mid depends on t-prapor-low. Without dependency-aware sorting,
+    // identical levels and alphabetical 'M' < 'L' fallback could invert the
+    // order; we expect the predecessor to come first.
+    const { groupedByTrader } = useKappaOverview(() => 'kappa');
+    const ids = groupedByTrader.value
+      .find((group) => group.trader.id === 'prapor')!
+      .rows.map((row) => row.task.id);
+    expect(ids).toEqual(['t-prapor-low', 't-prapor-mid']);
+  });
+  it('exposes lockedBy hint pointing at the first uncompleted required predecessor', () => {
+    const { tasksWithStatus } = useKappaOverview(() => 'kappa');
+    const mid = tasksWithStatus.value.find((row) => row.task.id === 't-prapor-mid');
+    expect(mid?.status).toBe('locked');
+    expect(mid?.lockedBy).toEqual({ id: 't-prapor-low', name: 'Prapor Low Level' });
+  });
+  it('clears lockedBy hint once the predecessor is complete', () => {
+    completionState['t-prapor-low'] = true;
+    unlockedState['t-prapor-mid'] = { self: true };
+    const { tasksWithStatus } = useKappaOverview(() => 'kappa');
+    const mid = tasksWithStatus.value.find((row) => row.task.id === 't-prapor-mid');
+    expect(mid?.status).toBe('available');
+    expect(mid?.lockedBy).toBeUndefined();
   });
 });

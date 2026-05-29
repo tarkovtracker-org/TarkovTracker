@@ -7,6 +7,7 @@ export type KappaTabKey = 'kappa' | 'lightkeeper';
 export type KappaRowEntry = {
   task: Task;
   status: KappaTaskStatus;
+  lockedBy?: { id: string; name?: string };
 };
 export type KappaTraderGroupEntry = {
   trader: Pick<Trader, 'id' | 'name' | 'normalizedName' | 'imageLink'>;
@@ -26,6 +27,7 @@ export function useKappaOverview(tab: () => KappaTabKey) {
   const sourceTasks = computed(() => metadataStore.tasks.filter(taskFilterFor(toValue(tab))));
   const tasksWithStatus = computed<KappaRowEntry[]>(() => {
     const unlocked = progressStore.unlockedTasks;
+    const tasksById = new Map(metadataStore.tasks.map((task) => [task.id, task]));
     return sourceTasks.value.map((task) => {
       const isComplete = tarkovStore.isTaskComplete(task.id);
       const isFailed = tarkovStore.isTaskFailed(task.id);
@@ -41,8 +43,55 @@ export function useKappaOverview(tab: () => KappaTabKey) {
       } else {
         status = 'locked';
       }
-      return { task, status };
+      let lockedBy: KappaRowEntry['lockedBy'] | undefined;
+      if (status === 'locked') {
+        for (const requirement of task.taskRequirements ?? []) {
+          const requiredId = requirement?.task?.id;
+          if (!requiredId) continue;
+          if (tarkovStore.isTaskComplete(requiredId)) continue;
+          const required = tasksById.get(requiredId);
+          lockedBy = {
+            id: requiredId,
+            name: required?.name ?? requirement.task.name,
+          };
+          break;
+        }
+      }
+      return { task, status, lockedBy };
     });
+  });
+  /**
+   * Topological depth per task across the full task graph.
+   * depth(task) = 1 + max(depth(req)) for every required predecessor;
+   * tasks with no requirements are depth 0. Cycles are skipped via the
+   * visiting set so a corrupt graph can't infinitely recurse.
+   */
+  const taskDepthMap = computed<Map<string, number>>(() => {
+    const allTasks = metadataStore.tasks;
+    const tasksById = new Map(allTasks.map((task) => [task.id, task]));
+    const depthCache = new Map<string, number>();
+    const visiting = new Set<string>();
+    const computeDepth = (taskId: string): number => {
+      const cached = depthCache.get(taskId);
+      if (cached !== undefined) return cached;
+      if (visiting.has(taskId)) return 0;
+      const task = tasksById.get(taskId);
+      if (!task) return 0;
+      visiting.add(taskId);
+      let maxParent = -1;
+      for (const requirement of task.taskRequirements ?? []) {
+        const parentId = requirement?.task?.id;
+        if (!parentId || parentId === taskId) continue;
+        const parentDepth = computeDepth(parentId);
+        if (parentDepth > maxParent) maxParent = parentDepth;
+      }
+      visiting.delete(taskId);
+      const depth = maxParent + 1;
+      depthCache.set(taskId, depth);
+      return depth;
+    };
+    for (const task of allTasks) computeDepth(task.id);
+    return depthCache;
   });
   const totals = computed(() => {
     let completed = 0;
@@ -91,6 +140,9 @@ export function useKappaOverview(tab: () => KappaTabKey) {
       });
     }
     const sortRows = (a: KappaRowEntry, b: KappaRowEntry) => {
+      const depthA = taskDepthMap.value.get(a.task.id) ?? 0;
+      const depthB = taskDepthMap.value.get(b.task.id) ?? 0;
+      if (depthA !== depthB) return depthA - depthB;
       const levelA = a.task.minPlayerLevel ?? 0;
       const levelB = b.task.minPlayerLevel ?? 0;
       if (levelA !== levelB) return levelA - levelB;

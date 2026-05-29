@@ -1,6 +1,6 @@
 <template>
   <div class="flex min-h-full flex-col px-3 py-6 sm:px-6">
-    <div class="mx-auto w-full max-w-[1400px]">
+    <div class="mx-auto w-full max-w-[1600px]">
       <div class="mb-6">
         <div class="flex items-center gap-3">
           <span
@@ -37,16 +37,6 @@
           <UIcon name="i-mdi-lighthouse" class="mr-1.5 h-4 w-4" />
           {{ t('page.kappa.tabs.lightkeeper') }} ({{ lightkeeperTotals.total }})
         </UButton>
-        <div class="ml-auto flex flex-wrap items-center gap-2">
-          <UButton variant="ghost" color="neutral" size="xs" @click="expandAll">
-            <UIcon name="i-mdi-chevron-down" class="mr-1 h-4 w-4" />
-            {{ t('page.kappa.actions.expand_all', 'Expand all') }}
-          </UButton>
-          <UButton variant="ghost" color="neutral" size="xs" @click="collapseAll">
-            <UIcon name="i-mdi-chevron-up" class="mr-1 h-4 w-4" />
-            {{ t('page.kappa.actions.collapse_all', 'Collapse all') }}
-          </UButton>
-        </div>
       </div>
       <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
@@ -104,25 +94,26 @@
           {{ t('page.kappa.all_complete') }}
         </p>
       </div>
-      <div v-else class="space-y-3">
-        <KappaTraderGroup
+      <div
+        v-else
+        class="grid items-start gap-3"
+        style="grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr))"
+      >
+        <KappaTraderColumn
           v-for="group in groupedByTrader"
           :key="group.trader.id"
           :group="group"
           :accent="activeTab"
-          :expanded="isExpanded(group.trader.id)"
-          @toggle="toggleGroup(group.trader.id)"
         />
       </div>
     </div>
   </div>
 </template>
 <script setup lang="ts">
-  import KappaTraderGroup from '@/features/kappa/KappaTraderGroup.vue';
+  import KappaTraderColumn from '@/features/kappa/KappaTraderColumn.vue';
   import { useKappaOverview, type KappaTabKey } from '@/features/kappa/useKappaOverview';
   const { t } = useI18n({ useScope: 'global' });
   const activeTab = ref<KappaTabKey>('kappa');
-  const collapsedGroups = ref<Set<string>>(new Set());
   const { totals: kappaTotals } = useKappaOverview(() => 'kappa');
   const { totals: lightkeeperTotals } = useKappaOverview(() => 'lightkeeper');
   const { totals, groupedByTrader } = useKappaOverview(() => activeTab.value);
@@ -135,27 +126,7 @@
     return Math.round((totals.value.completed / totals.value.total) * 100);
   });
   function setTab(tab: KappaTabKey) {
-    if (activeTab.value === tab) return;
     activeTab.value = tab;
-    collapsedGroups.value = new Set();
-  }
-  function isExpanded(traderId: string) {
-    return !collapsedGroups.value.has(traderId);
-  }
-  function toggleGroup(traderId: string) {
-    const next = new Set(collapsedGroups.value);
-    if (next.has(traderId)) {
-      next.delete(traderId);
-    } else {
-      next.add(traderId);
-    }
-    collapsedGroups.value = next;
-  }
-  function expandAll() {
-    collapsedGroups.value = new Set();
-  }
-  function collapseAll() {
-    collapsedGroups.value = new Set(groupedByTrader.value.map((group) => group.trader.id));
   }
   useSeoMeta({
     title: () => t('page.kappa.title'),
