@@ -19,6 +19,9 @@
       <span class="text-surface-500 text-[11px] tabular-nums">
         {{ t('page.kappa.stats.locked') }} {{ locked }}
       </span>
+      <span class="text-surface-500 text-[11px] tabular-nums">
+        {{ t('page.kappa.stats.failed') }} {{ failed }}
+      </span>
     </div>
     <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
       <div
@@ -100,6 +103,7 @@
     label: string;
     total: number;
     completed: number;
+    failed: number;
     available: number;
     locked: number;
     accent: KappaTabKey;

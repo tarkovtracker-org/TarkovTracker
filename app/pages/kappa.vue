@@ -56,6 +56,7 @@
       :label="tabLabel"
       :total="totals.total"
       :completed="totals.completed"
+      :failed="totals.failed"
       :available="totals.available"
       :locked="totals.locked"
       :accent="activeTab"

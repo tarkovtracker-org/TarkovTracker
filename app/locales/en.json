@@ -643,7 +643,8 @@
         "lightkeeper_total": "Lightkeeper Tasks",
         "lightkeeper_completed": "Lightkeeper Done",
         "available": "Available",
-        "locked": "Locked"
+        "locked": "Locked",
+        "failed": "Failed"
       },
       "actions": {
         "expand_all": "Expand all",
