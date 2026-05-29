@@ -1,4 +1,4 @@
-import { isTaskAvailableForEdition } from './editionHelpers';
+import { isTaskAvailableForEdition } from '@/utils/editionHelpers';
 import type { GameEdition, Task } from '@/types/tarkov';
 export type RawTaskCompletion =
   | { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean }
