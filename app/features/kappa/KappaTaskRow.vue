@@ -1,58 +1,44 @@
 <template>
   <AppTooltip :text="tooltipText">
     <div
-      class="group ring-offset-surface-900 focus-within:ring-primary-500/40 flex min-w-0 flex-col gap-0.5 rounded-md border px-1.5 py-1 transition-colors focus-within:ring-2 focus-within:ring-offset-1"
+      class="group ring-offset-surface-900 focus-within:ring-primary-500/40 flex min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors focus-within:ring-2 focus-within:ring-offset-1"
       :class="tileClasses"
     >
-      <div class="flex min-w-0 items-center gap-1.5">
-        <button
-          type="button"
-          class="ring-offset-surface-900 focus-visible:ring-primary-500/60 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-          :class="checkboxClasses"
-          :aria-pressed="row.status === 'complete'"
-          :aria-label="checkboxLabel"
-          :disabled="row.status === 'locked'"
-          @click="onToggle"
-        >
-          <UIcon v-if="row.status === 'complete'" name="i-mdi-check-bold" class="h-3 w-3" />
-          <UIcon v-else-if="row.status === 'failed'" name="i-mdi-close-thick" class="h-3 w-3" />
-          <UIcon v-else-if="row.status === 'locked'" name="i-mdi-lock" class="h-2.5 w-2.5" />
-        </button>
-        <NuxtLink
-          :to="taskHref"
-          class="text-link hover:text-link-hover min-w-0 flex-1 truncate text-xs no-underline"
-          :class="{ 'line-through opacity-70': row.status === 'complete' }"
-        >
-          {{ row.task.name || row.task.id }}
-        </NuxtLink>
-        <span
-          v-if="minLevel"
-          class="shrink-0 rounded border px-1 text-[10px] font-medium tabular-nums"
-          :class="levelChipClasses"
-          :aria-label="levelChipAriaLabel"
-          :title="levelChipTitle"
-        >
-          Lv {{ minLevel }}
-        </span>
-        <UIcon
-          v-if="row.task.lightkeeperRequired && !row.task.kappaRequired"
-          name="i-mdi-lighthouse"
-          class="text-lightkeeper-400 h-3 w-3 shrink-0"
-          aria-hidden="true"
-        />
-      </div>
-      <div
-        v-if="row.status === 'locked' && row.lockedBy"
-        class="text-surface-500 flex min-w-0 items-center gap-1 pl-5 text-[10px]"
+      <button
+        type="button"
+        class="ring-offset-surface-900 focus-visible:ring-primary-500/60 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+        :class="checkboxClasses"
+        :aria-pressed="row.status === 'complete'"
+        :aria-label="checkboxLabel"
+        :disabled="row.status === 'locked'"
+        @click="onToggle"
       >
-        <UIcon name="i-mdi-arrow-up-thin" class="h-3 w-3 shrink-0" aria-hidden="true" />
-        <NuxtLink
-          :to="`/tasks?task=${row.lockedBy.id}`"
-          class="text-surface-300 hover:text-surface-200 truncate underline-offset-2 hover:underline"
-        >
-          {{ row.lockedBy.name || row.lockedBy.id }}
-        </NuxtLink>
-      </div>
+        <UIcon v-if="row.status === 'complete'" name="i-mdi-check-bold" class="h-3 w-3" />
+        <UIcon v-else-if="row.status === 'failed'" name="i-mdi-close-thick" class="h-3 w-3" />
+        <UIcon v-else-if="row.status === 'locked'" name="i-mdi-lock" class="h-2.5 w-2.5" />
+      </button>
+      <NuxtLink
+        :to="taskHref"
+        class="text-link hover:text-link-hover min-w-0 flex-1 truncate text-xs no-underline"
+        :class="{ 'line-through opacity-70': row.status === 'complete' }"
+      >
+        {{ row.task.name || row.task.id }}
+      </NuxtLink>
+      <span
+        v-if="minLevel"
+        class="shrink-0 rounded border px-1 text-[10px] font-medium tabular-nums"
+        :class="levelChipClasses"
+        :aria-label="levelChipAriaLabel"
+        :title="levelChipTitle"
+      >
+        Lv {{ minLevel }}
+      </span>
+      <UIcon
+        v-if="row.task.lightkeeperRequired && !row.task.kappaRequired"
+        name="i-mdi-lighthouse"
+        class="text-lightkeeper-400 h-3 w-3 shrink-0"
+        aria-hidden="true"
+      />
     </div>
   </AppTooltip>
 </template>
