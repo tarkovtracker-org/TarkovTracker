@@ -641,10 +641,30 @@
         "total": "Kappa Tasks",
         "completed": "Kappa Done",
         "lightkeeper_total": "Lightkeeper Tasks",
-        "lightkeeper_completed": "Lightkeeper Done"
+        "lightkeeper_completed": "Lightkeeper Done",
+        "available": "Available",
+        "locked": "Locked"
+      },
+      "actions": {
+        "expand_all": "Expand all",
+        "collapse_all": "Collapse all"
+      },
+      "row": {
+        "level_prefix": "Lv",
+        "trader_level": "{trader} Lv{level}",
+        "badge_kappa": "Kappa Required",
+        "badge_lightkeeper": "Lightkeeper Required",
+        "status_complete": "Complete",
+        "status_failed": "Failed",
+        "status_locked": "Locked",
+        "status_available": "Available",
+        "action_complete": "Mark complete",
+        "action_uncomplete": "Mark uncomplete",
+        "action_reset_failed": "Reset failed"
       },
       "progress_label": "complete",
-      "all_complete": "All tasks complete! Well done, PMC."
+      "all_complete": "All tasks complete! Well done, PMC.",
+      "empty": "No tasks for this list yet."
     },
     "supporter": {
       "title": "Support TarkovTracker",
