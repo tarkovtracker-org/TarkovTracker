@@ -1,25 +1,11 @@
 import { SPECIAL_STATIONS } from '@/utils/constants';
+import { isTaskCounted } from '@/utils/taskStatus';
 import type { UserProgressData } from '@/stores/progressState';
 import type { GameEdition, HideoutStation, Task } from '@/types/tarkov';
-type TaskStatus = {
-  complete?: boolean;
-  failed?: boolean;
-};
-const isTaskStatusSuccessful = (status: TaskStatus | undefined): boolean =>
-  status?.complete === true && status?.failed !== true;
-const isTaskStatusFailed = (status: TaskStatus | undefined): boolean => status?.failed === true;
-const isTaskCounted = (status: TaskStatus | undefined, isInvalid: boolean): boolean => {
-  if (isTaskStatusSuccessful(status)) {
-    return true;
-  }
-  if (isTaskStatusFailed(status)) {
-    return false;
-  }
-  return !isInvalid;
-};
+import type { RawTaskCompletion } from '@/utils/taskStatus';
 export const getCountedTasks = (
   tasks: Task[],
-  taskStatuses: Record<string, TaskStatus>,
+  taskStatuses: Record<string, RawTaskCompletion>,
   invalidTasks: Record<string, boolean>
 ): Task[] =>
   tasks.filter((task) => isTaskCounted(taskStatuses[task.id], invalidTasks[task.id] === true));

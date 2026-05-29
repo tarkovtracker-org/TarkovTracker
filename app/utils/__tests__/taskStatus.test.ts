@@ -5,7 +5,10 @@ import {
   isTaskFailed,
   isTaskActive,
   getTaskStatusFromFlags,
+  isTaskRelevant,
+  isTaskCounted,
 } from '@/utils/taskStatus';
+import type { GameEdition, Task } from '@/types/tarkov';
 describe('taskStatus', () => {
   describe('getCompletionFlags', () => {
     it('handles boolean true -> {complete: true, failed: false}', () => {
@@ -96,6 +99,111 @@ describe('taskStatus', () => {
       expect(getTaskStatusFromFlags(false)).toBe('incomplete');
       expect(getTaskStatusFromFlags(null)).toBe('incomplete');
       expect(getTaskStatusFromFlags(undefined)).toBe('incomplete');
+    });
+  });
+  describe('isTaskCounted', () => {
+    it('returns true for completed tasks that did not fail', () => {
+      expect(isTaskCounted({ complete: true }, false)).toBe(true);
+      expect(isTaskCounted(true, false)).toBe(true);
+    });
+    it('returns false for failed tasks', () => {
+      expect(isTaskCounted({ failed: true }, false)).toBe(false);
+      expect(isTaskCounted({ complete: true, failed: true }, false)).toBe(false);
+    });
+    it('returns false for invalid incomplete tasks', () => {
+      expect(isTaskCounted({ complete: false }, true)).toBe(false);
+      expect(isTaskCounted(undefined, true)).toBe(false);
+    });
+    it('returns true for valid incomplete tasks', () => {
+      expect(isTaskCounted({ complete: false }, false)).toBe(true);
+      expect(isTaskCounted(undefined, false)).toBe(true);
+    });
+  });
+  describe('isTaskRelevant', () => {
+    const mockEditions = [
+      {
+        id: 'standard',
+        value: 1,
+        excludedTaskIds: ['task-excluded-standard'],
+        exclusiveTaskIds: [],
+      },
+      { id: 'eod', value: 2, excludedTaskIds: [], exclusiveTaskIds: ['task-exclusive-eod'] },
+    ] as unknown as GameEdition[];
+    it('returns true if faction is Any and edition is compatible', () => {
+      const task = { id: 'task-1', factionName: 'Any' } as unknown as Task;
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+        })
+      ).toBe(true);
+    });
+    it('returns false if faction does not match', () => {
+      const task = { id: 'task-1', factionName: 'Bear' } as unknown as Task;
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+        })
+      ).toBe(false);
+    });
+    it('returns true if faction matches Usec', () => {
+      const task = { id: 'task-1', factionName: 'Usec' } as unknown as Task;
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+        })
+      ).toBe(true);
+    });
+    it('returns false if task is excluded from edition', () => {
+      const task = { id: 'task-excluded-standard', factionName: 'Any' } as unknown as Task;
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+        })
+      ).toBe(false);
+    });
+    it('returns false if task is exclusive to another edition', () => {
+      const task = { id: 'task-exclusive-eod', factionName: 'Any' } as unknown as Task;
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+        })
+      ).toBe(false);
+    });
+    it('returns false if prestige level does not match', () => {
+      const task = { id: 'task-prestige-1', factionName: 'Any' } as unknown as Task;
+      const prestigeTaskMap = new Map([['task-prestige-1', 2]]);
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+          prestigeLevel: 1,
+          prestigeTaskMap,
+        })
+      ).toBe(false);
+    });
+    it('returns true if prestige level matches', () => {
+      const task = { id: 'task-prestige-1', factionName: 'Any' } as unknown as Task;
+      const prestigeTaskMap = new Map([['task-prestige-1', 2]]);
+      expect(
+        isTaskRelevant(task, {
+          faction: 'Usec',
+          gameEditionValue: 1,
+          editions: mockEditions,
+          prestigeLevel: 2,
+          prestigeTaskMap,
+        })
+      ).toBe(true);
     });
   });
 });

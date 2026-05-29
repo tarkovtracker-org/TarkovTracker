@@ -1,9 +1,18 @@
+import { isTaskAvailableForEdition } from './editionHelpers';
+import type { GameEdition, Task } from '@/types/tarkov';
 export type RawTaskCompletion =
   | { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean }
   | boolean
   | null
   | undefined;
 export type TaskStatusResult = 'completed' | 'failed' | 'incomplete';
+export interface TaskRelevanceOptions {
+  faction: string;
+  gameEditionValue: number | undefined;
+  editions: GameEdition[];
+  prestigeLevel?: number;
+  prestigeTaskMap?: Map<string, number>;
+}
 export function getCompletionFlags(completion: RawTaskCompletion): {
   complete: boolean;
   failed: boolean;
@@ -51,4 +60,42 @@ export function getTaskStatusFromFlags(completion?: RawTaskCompletion): TaskStat
   if (flags.failed) return 'failed';
   if (flags.complete) return 'completed';
   return 'incomplete';
+}
+/**
+ * Checks if a task is relevant for a user based on faction, game edition, and prestige level.
+ */
+export function isTaskRelevant(task: Task, options: TaskRelevanceOptions): boolean {
+  // Check faction compatibility
+  const taskFaction = task.factionName ?? 'Any';
+  if (taskFaction !== 'Any' && taskFaction !== options.faction) {
+    return false;
+  }
+  // Check game edition availability
+  if (!isTaskAvailableForEdition(task.id, options.gameEditionValue, options.editions)) {
+    return false;
+  }
+  // Check prestige level compatibility if maps and levels are specified
+  if (options.prestigeTaskMap && options.prestigeLevel !== undefined) {
+    if (options.prestigeTaskMap.has(task.id)) {
+      const taskPrestigeLevel = options.prestigeTaskMap.get(task.id);
+      if (taskPrestigeLevel !== options.prestigeLevel) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+/**
+ * Checks if a task should be counted towards progression totals.
+ * Completed tasks always count. Failed tasks and invalid tasks do not count.
+ */
+export function isTaskCounted(completion: RawTaskCompletion, isInvalid: boolean): boolean {
+  const flags = getCompletionFlags(completion);
+  if (flags.complete && !flags.failed) {
+    return true;
+  }
+  if (flags.failed) {
+    return false;
+  }
+  return !isInvalid;
 }
