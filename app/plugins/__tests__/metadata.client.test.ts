@@ -69,4 +69,53 @@ describe('metadata plugin', () => {
     await flushPromises();
     expect(metadataStoreMock.initialize).toHaveBeenCalledTimes(1);
   });
+  it.each([
+    ['/changelog'],
+    ['/credits'],
+    ['/privacy'],
+    ['/supporter'],
+    ['/terms-of-service'],
+    ['/login'],
+    ['/not-found'],
+    ['/auth/callback'],
+    ['/oauth/twitch'],
+    ['/changelog/2024'],
+  ])('skips initialization for skip-list path %s', async (path) => {
+    routeState.path = path;
+    metadataStoreMock.initialize.mockResolvedValue(undefined);
+    const plugin = (await import('@/plugins/metadata.client')).default;
+    const hooks = new Map<string, () => void>();
+    plugin({
+      hook(name: string, callback: () => void) {
+        hooks.set(name, callback);
+      },
+    } as Parameters<typeof plugin>[0]);
+    metadataStoreMock.initialize.mockClear();
+    hooks.get('app:mounted')?.();
+    await flushPromises();
+    expect(metadataStoreMock.initialize).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['/changelog-archive'],
+    ['/credits-team'],
+    ['/privacy-policy-2'],
+    ['/supporter-tier'],
+    ['/loginhelp'],
+    ['/tasks'],
+    ['/'],
+  ])('initializes for non-skip-list path %s', async (path) => {
+    routeState.path = path;
+    metadataStoreMock.initialize.mockResolvedValue(undefined);
+    const plugin = (await import('@/plugins/metadata.client')).default;
+    const hooks = new Map<string, () => void>();
+    plugin({
+      hook(name: string, callback: () => void) {
+        hooks.set(name, callback);
+      },
+    } as Parameters<typeof plugin>[0]);
+    metadataStoreMock.initialize.mockClear();
+    hooks.get('app:mounted')?.();
+    await flushPromises();
+    expect(metadataStoreMock.initialize).toHaveBeenCalled();
+  });
 });

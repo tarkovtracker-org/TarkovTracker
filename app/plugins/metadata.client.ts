@@ -17,12 +17,12 @@ export default defineNuxtPlugin((nuxtApp) => {
   const toast = useToast();
   const route = useRoute();
   const SKIP_METADATA_PATH_PREFIXES = [
-    '/auth/',
+    '/auth',
     '/changelog',
     '/credits',
     '/login',
     '/not-found',
-    '/oauth/',
+    '/oauth',
     '/privacy',
     '/supporter',
     '/terms-of-service',
@@ -33,7 +33,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const INITIAL_DELAY = 1000;
   const shouldInitializeForPath = (path: string): boolean => {
     return !SKIP_METADATA_PATH_PREFIXES.some(
-      (prefix) => path === prefix || path.startsWith(prefix)
+      (prefix) => path === prefix || path.startsWith(`${prefix}/`)
     );
   };
   let initPromise: Promise<void> | null = null;
