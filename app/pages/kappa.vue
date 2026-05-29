@@ -99,40 +99,18 @@
         style="grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr))"
       >
         <KappaTraderColumn
-          v-for="group in mainColumns"
+          v-for="group in groupedByTrader"
           :key="group.trader.id"
           :group="group"
           :accent="activeTab"
         />
       </div>
-      <section v-if="finalStepRows.length" class="mt-6">
-        <header class="mb-2 flex items-center gap-2">
-          <UIcon name="i-mdi-flag-checkered" class="text-kappa h-4 w-4" aria-hidden="true" />
-          <h2 class="text-surface-200 text-sm font-semibold">
-            {{ t('page.kappa.final_step.title', 'Final step') }}
-          </h2>
-          <span class="text-surface-500 text-xs">
-            {{ t('page.kappa.final_step.subtitle', 'Last quest before the reward') }}
-          </span>
-        </header>
-        <div
-          class="bg-surface-800/40 grid items-stretch gap-2 rounded-lg border border-white/5 p-2"
-          style="grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr))"
-        >
-          <KappaTaskRow v-for="row in finalStepRows" :key="row.task.id" :row="row" />
-        </div>
-      </section>
     </template>
   </div>
 </template>
 <script setup lang="ts">
-  import KappaTaskRow from '@/features/kappa/KappaTaskRow.vue';
   import KappaTraderColumn from '@/features/kappa/KappaTraderColumn.vue';
-  import {
-    useKappaOverview,
-    type KappaRowEntry,
-    type KappaTabKey,
-  } from '@/features/kappa/useKappaOverview';
+  import { useKappaOverview, type KappaTabKey } from '@/features/kappa/useKappaOverview';
   const { t } = useI18n({ useScope: 'global' });
   const activeTab = ref<KappaTabKey>('kappa');
   const { totals: kappaTotals } = useKappaOverview(() => 'kappa');
@@ -146,20 +124,6 @@
     if (totals.value.total === 0) return 0;
     return Math.round((totals.value.completed / totals.value.total) * 100);
   });
-  /**
-   * Pull single-task trader groups out of the main grid. A trader that only
-   * contributes one task (e.g. Fence's Collector for Kappa) would otherwise
-   * occupy a whole column at the same width as a 30-task Prapor section.
-   */
-  const SINGLE_TASK_THRESHOLD = 1;
-  const mainColumns = computed(() =>
-    groupedByTrader.value.filter((group) => group.totalCount > SINGLE_TASK_THRESHOLD)
-  );
-  const finalStepRows = computed<KappaRowEntry[]>(() =>
-    groupedByTrader.value
-      .filter((group) => group.totalCount === SINGLE_TASK_THRESHOLD)
-      .flatMap((group) => group.rows)
-  );
   function setTab(tab: KappaTabKey) {
     activeTab.value = tab;
   }
