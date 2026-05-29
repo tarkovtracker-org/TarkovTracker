@@ -664,7 +664,11 @@
       },
       "progress_label": "complete",
       "all_complete": "All tasks complete! Well done, PMC.",
-      "empty": "No tasks for this list yet."
+      "empty": "No tasks for this list yet.",
+      "final_step": {
+        "title": "Final step",
+        "subtitle": "Last quest before the reward"
+      }
     },
     "supporter": {
       "title": "Support TarkovTracker",
