@@ -648,7 +648,7 @@
       },
       "row": {
         "level_prefix": "Lvl",
-        "level_met_aria": "Required level {required}, you are level {current}",
+        "level_met_aria": "Livello richiesto {required}, sei livello {current}",
         "level_unmet_aria": "Requires level {required}, you are level {current}",
         "level_title": "Required level {required} (you are {current})",
         "level_summary": "Lv {required} (you {current})",
