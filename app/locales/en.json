@@ -646,10 +646,6 @@
         "locked": "Locked",
         "failed": "Failed"
       },
-      "actions": {
-        "expand_all": "Expand all",
-        "collapse_all": "Collapse all"
-      },
       "row": {
         "level_prefix": "Lv",
         "level_met_aria": "Required level {required}, you are level {current}",
@@ -657,8 +653,6 @@
         "level_title": "Required level {required} (you are {current})",
         "level_summary": "Lv {required} (you {current})",
         "trader_level": "{trader} Lv{level}",
-        "badge_kappa": "Kappa Required",
-        "badge_lightkeeper": "Lightkeeper Required",
         "status_complete": "Complete",
         "status_failed": "Failed",
         "status_locked": "Locked",
