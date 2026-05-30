@@ -77,9 +77,11 @@
   "name": "tarkovtracker-nuxt",
   "overrides": {
     "npm": {
-      ".": "^11.13.0",
+      ".": "^11.16.0",
       "picomatch": "^4.0.4"
     },
+    "brace-expansion": "^5.0.6",
+    "ws": "^8.20.1",
     "@tiptap/core": "3.14.0",
     "@tiptap/pm": "3.14.0",
     "fast-xml-parser": "^5.7.1",
