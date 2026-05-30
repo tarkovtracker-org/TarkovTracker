@@ -641,10 +641,42 @@
         "total": "Kappa Aufgaben",
         "completed": "Kappa Done",
         "lightkeeper_total": "Lightkeeper Tasks",
-        "lightkeeper_completed": "Lightkeeper Done"
+        "lightkeeper_completed": "Lightkeeper Done",
+        "available": "Available",
+        "locked": "Gesperrt",
+        "failed": "Gescheitert"
+      },
+      "row": {
+        "level_prefix": "Lv",
+        "level_met_aria": "Required level {required}, you are level {current}",
+        "level_unmet_aria": "Requires level {required}, you are level {current}",
+        "level_title": "Required level {required} (you are {current})",
+        "level_summary": "Lv {required} (you {current})",
+        "trader_level": "{trader} Lv{level}",
+        "status_complete": "Abschließen",
+        "status_failed": "Gescheitert",
+        "status_locked": "Gesperrt",
+        "status_available": "Available",
+        "action_complete": "Als abgeschlossen markieren",
+        "action_uncomplete": "Mark uncomplete",
+        "action_reset_failed": "Reset failed",
+        "locked_by": "Requires: {task}"
       },
       "progress_label": "complete",
-      "all_complete": "All tasks complete! Well done, PMC."
+      "all_complete": "All tasks complete! Well done, PMC.",
+      "empty": "No tasks for this list yet.",
+      "summary": {
+        "progress": "Progress",
+        "complete": "complete",
+        "final_goal": "Final Kappa Goal"
+      },
+      "trader_selector": {
+        "label": "Select Trader"
+      },
+      "appbar_title": "Kappa & Lightkeeper",
+      "trader": {
+        "other": "Other"
+      }
     },
     "supporter": {
       "title": "Support TarkovTracker",
