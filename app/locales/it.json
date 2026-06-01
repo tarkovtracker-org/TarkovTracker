@@ -632,10 +632,10 @@
     },
     "kappa": {
       "title": "Tracker Kappa & Lightkeeper",
-      "subtitle": "Traccia i progressi verso il contenitore Kappa e le missioni Lightkeeper.",
+      "subtitle": "Traccia i progressi per il Contenitore di sicurezza Kappa e le missioni Lightkeeper.",
       "tabs": {
         "kappa": "Kappa",
-        "lightkeeper": "Missioni Lightkeeper"
+        "lightkeeper": "Lightkeeper"
       },
       "stats": {
         "total": "Missioni Kappa",
