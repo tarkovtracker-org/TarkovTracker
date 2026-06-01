@@ -640,7 +640,7 @@
       "stats": {
         "total": "Missioni Kappa",
         "completed": "Missioni Kappa completate",
-        "lightkeeper_total": "Missioni Lightkeeper",
+        "lightkeeper_total": "Lightkeeper",
         "lightkeeper_completed": "Missioni Lightkeeper completate",
         "available": "Disponibile",
         "locked": "Bloccata",
