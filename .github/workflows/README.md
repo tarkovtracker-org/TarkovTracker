@@ -9,6 +9,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Trigger:** Push to main/develop/wip branches, PRs
 **Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
+
 - `Lint & Format` — ESLint + Prettier checks
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test` — Vitest with coverage
@@ -50,11 +51,11 @@ the current floors as long-term targets.
 
 ## Check Count
 
-| Context       | Checks                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------- |
+| Context       | Checks                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
 | PR            | ~10 (Lint & Format, Type Check, Test, Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Dependabot PR | ~11 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                    |
-| Main push     | ~9 (Lint & Format, Type Check, Test, Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)    |
+| Dependabot PR | ~11 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                |
+| Main push     | ~9 (Lint & Format, Type Check, Test, Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)                |
 
 \*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
 

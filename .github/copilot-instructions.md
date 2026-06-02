@@ -61,9 +61,9 @@ app/
 ### Three-Store Architecture
 
 ```typescript
-const metadata = useMetadata()    // Static game data from tarkov.dev API
-const progress = useProgress()    // User progress (completions, objectives)
-const preferences = usePreferences() // User settings with localStorage persistence
+const metadata = useMetadata(); // Static game data from tarkov.dev API
+const progress = useProgress(); // User progress (completions, objectives)
+const preferences = usePreferences(); // User settings with localStorage persistence
 ```
 
 ### TypeScript

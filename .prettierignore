@@ -12,3 +12,7 @@ public/_fonts
 package-lock.json
 .wrangler
 .data
+
+# Generated or verbatim docs (do not reformat)
+CHANGELOG.md
+LICENSE.md
