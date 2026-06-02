@@ -137,12 +137,11 @@ For each item in **Inbox**:
 1. **Verify completeness**
    - Is there enough information?
    - Can it be reproduced (for bugs)?
-   - If not → Add `status:needs-info` label
+   - If not → Move to **Waiting for Info** and request details
 
 2. **Add labels**
    - Add `area:*` label(s)
    - Add `priority:*` label
-   - Add `data:*` if applicable
    - Add special labels if appropriate
 
 3. **Set custom fields**
@@ -155,8 +154,6 @@ For each item in **Inbox**:
    - **Backlog**: Valid issue, but not prioritized yet
    - **Todo**: High priority, ready to work
    - **Done**: Duplicate, wontfix, or invalid
-
-5. **Remove `status:inbox` label**
 
 #### Prioritization (Backlog → Todo)
 
@@ -206,7 +203,7 @@ Create these saved views for better workflow management:
 
 ### Blocked Items
 
-- Filter: Label = status:blocked
+- Filter: Status = Blocked
 - Sort: Created (oldest first)
 
 ### My Work

@@ -11,8 +11,17 @@
 # create an org team with write access (e.g. @tarkovtracker-org/maintainers)
 # and replace @DysektAI below. Owners must have write access or the rule is ignored.
 #
-# No catch-all (`*`) rule on purpose: routine and Dependabot PRs stay ungated so
-# existing auto-merge keeps working. Only the critical paths below require review.
+# No catch-all (`*`) rule on purpose: most routine PRs stay ungated. Only the
+# critical paths below request review.
+#
+# DEPENDABOT INTERACTION: some owned paths (/.github/, /workers/, /package.json,
+# /package-lock.json) overlap with the Dependabot auto-merge allowlist in
+# .github/workflows/dependabot-auto-merge.yml. CODEOWNERS cannot exclude a bot
+# author, so if you enable "Require review from Code Owners" on `main`, those
+# Dependabot PRs will block on a code-owner approval that no workflow provides
+# and auto-merge will stall. Before enabling that rule, either exclude Dependabot
+# from it (e.g. a ruleset bypass actor) or add a code-owner auto-approval step to
+# the auto-merge workflow.
 
 # CI/CD, automation, and repo governance (incl. this file)
 /.github/                 @DysektAI
