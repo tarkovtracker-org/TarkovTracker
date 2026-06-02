@@ -7,7 +7,7 @@ Maintainer-owned working notes, ideas, and TODOs. Not auto-generated.
 # PERSONAL NOTES AND THOUGHTS, IDEAS, etc.
 
 - Finish implementing Team System (Supabase Realtime) and Cloudflare Workers.
-- Figure out the best way to handle the open source API from the original TarkovTracker project and if there is better alternatives to NodeJS / Express for that service.
+- Figure out the best way to handle the open-source API from the original TarkovTracker project and if there is better alternatives to NodeJS / Express for that service.
 - Finish fixing the Settings page UI/UX and ensure ALL settings are visible to unauthenticated users while restricting what they can and cant do.
 - Improve the i18n system to allow for easier translations and community contributions.
 - Explore adding a PWA mode for offline tracking and notifications.
