@@ -1,0 +1,45 @@
+# CODEOWNERS — auto-requests review from the listed owner on matching paths.
+#
+# IMPORTANT: This file only *requests* reviewers. It does NOT block pushes or
+# merges on its own. To actually require these reviews before merging to `main`,
+# enable a branch protection rule (or ruleset) on `main` with:
+#   - Require a pull request before merging
+#   - Require review from Code Owners
+#   - (recommended) Restrict who can push to matching branches
+#
+# Owner is the primary maintainer. To scale to multiple maintainers later,
+# create an org team with write access (e.g. @tarkovtracker-org/maintainers)
+# and replace @DysektAI below. Owners must have write access or the rule is ignored.
+#
+# No catch-all (`*`) rule on purpose: routine and Dependabot PRs stay ungated so
+# existing auto-merge keeps working. Only the critical paths below require review.
+
+# CI/CD, automation, and repo governance (incl. this file)
+/.github/                 @DysektAI
+
+# Database schema migrations (data-loss risk)
+/supabase/migrations/     @DysektAI
+
+# Edge functions: auth, billing webhook, account deletion
+/supabase/functions/      @DysektAI
+
+# Public API gateway: auth + rate limiting
+/workers/                 @DysektAI
+
+# Server routes, API-protection middleware, and route guards
+/app/server/              @DysektAI
+/app/middleware/          @DysektAI
+
+# Build, runtime, security, and release configuration
+/nuxt.config.ts           @DysektAI
+/wrangler.toml            @DysektAI
+/package.json             @DysektAI
+/package-lock.json        @DysektAI
+/eslint.config.mjs        @DysektAI
+/tsconfig.json            @DysektAI
+/commitlint.config.js     @DysektAI
+/.releaserc.json          @DysektAI
+
+# Agent contract + source locale (drift / instruction integrity)
+/AGENTS.md                @DysektAI
+/app/locales/en.json      @DysektAI

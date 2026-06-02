@@ -90,25 +90,10 @@ The application will be available at `http://localhost:3000`.
 
 ## Code Quality
 
-```bash
-# Format code (Prettier + ESLint)
-npm run format
-
-# Validate Supabase migrations locally
-npm run supabase:check
-
-# Lint code
-npm run lint
-
-# Run tests
-npm test
-
-# Type check
-npm run typecheck
-
-# Check for dependency updates
-npm run deps
-```
+Run `npm run lint`, `npm run typecheck`, and `npm test` before pushing. See
+[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) and
+[`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md) for the full command list, pre-commit
+hooks, and CI details.
 
 ## Tarkov.dev Profile Cleanup
 
@@ -132,23 +117,18 @@ npm run preview
 
 ## Project Structure
 
-- `app/` - Main application source directory
-- `app/features/` - Feature-specific components organized by domain
-- `app/components/` - Global/shared UI components
-- `app/stores/` - Pinia stores for state management
-- `app/composables/` - Reusable composition functions
-- `app/pages/` - File-based routing
-- `app/server/api/` - Nuxt server routes for API proxying and app APIs
-- `app/shell/` - Shared app chrome components
-- `app/utils/` - Client/shared utilities
-- `workers/` - Cloudflare Workers (api-gateway)
-- `docs/` - Project documentation and migration guides
+- `app/` — Nuxt application (features, stores, composables, server routes, shell, locales)
+- `workers/` — Cloudflare Workers (public API gateway)
+- `supabase/` — database migrations and edge functions
+- `docs/` — project documentation
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`AGENTS.md`](AGENTS.md) for the full map.
 
 ## Documentation
 
-For detailed development guidelines, architecture references, and migration progress, see the files in the [`docs/`](docs/) directory.
+For detailed development guidelines and architecture references, see the [`docs/`](docs/) directory (start at [`docs/README.md`](docs/README.md)).
 
-This repository includes both **contribution workflow guidance** and **technical documentation**. 
+This repository includes both **contribution workflow guidance** and **technical documentation**.
 
 [**How to Contribute (Issues, Branches, PR Process):**](.github/CONTRIBUTING.md) Open or pick an issue, get assigned, create a focused branch, Use the PR template, and link the issue.
 

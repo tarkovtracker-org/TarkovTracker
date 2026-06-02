@@ -180,11 +180,18 @@ Naming:
 ## Deeper References
 
 - Agent-context index: `docs/agent-context/README.md`
+- Generated codebase knowledge base (start at the index): `docs/agent-context/summary/index.md`
 - Style, testing, and validation details: `docs/agent-context/style-and-validation.md`
 - Architecture: `docs/ARCHITECTURE.md`
-- Contributing: `docs/CONTRIBUTING.md`
+- Contributing: `.github/CONTRIBUTING.md`
 - Runbook: `docs/runbook.md`
 - API docs: `docs/API.md`
 - Workflow automation: `docs/WORKFLOW_AUTOMATION.md`
-- Analytics setup: `docs/codex-analytics-setup.md`
+- Analytics setup: `docs/agent-context/codex-analytics-setup.md`
 - Design spec: `DESIGN.md`
+
+## Custom Instructions
+
+<!-- This section is for human and agent-maintained operational knowledge.
+     Add repo-specific conventions, gotchas, and workflow rules here.
+     This section is preserved exactly as-is when re-running codebase-summary. -->
