@@ -24,7 +24,7 @@ jobs:
 
       - name: Auto-label PR
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b
+        uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
