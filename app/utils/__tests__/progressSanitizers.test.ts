@@ -54,6 +54,15 @@ describe('sanitizeOwnedProgressData', () => {
       Strength: 0,
     });
   });
+  it('preserves millisecond apiUpdate timestamps without int32 clamping', () => {
+    const millisecondAt = 1780660259335;
+    const result = sanitizeOwnedProgressData({
+      apiUpdateHistory: [{ at: millisecondAt, id: 'sync-1', source: 'api' }],
+      lastApiUpdate: { at: millisecondAt, id: 'sync-1', source: 'api' },
+    });
+    expect(result.apiUpdateHistory).toEqual([{ at: millisecondAt, id: 'sync-1', source: 'api' }]);
+    expect(result.lastApiUpdate).toEqual({ at: millisecondAt, id: 'sync-1', source: 'api' });
+  });
   it('returns the default sanitized state for nullish input', () => {
     const nullResult = sanitizeOwnedProgressData(null);
     const undefinedResult = sanitizeOwnedProgressData(undefined);
