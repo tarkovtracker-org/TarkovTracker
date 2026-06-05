@@ -27,7 +27,9 @@ AS $$
       THEN jsonb_strip_nulls(
         jsonb_build_object(
           'at',
-          to_jsonb(greatest(0, trunc((payload->>'at')::numeric))::bigint),
+          to_jsonb(
+            least(9223372036854775807, greatest(0, trunc((payload->>'at')::numeric)))::bigint
+          ),
           'id', payload->>'id',
           'source', 'api',
           'tasks',
@@ -114,7 +116,7 @@ AS $$
       left(nullif(btrim(value->>'id'), ''), 64) AS id,
       CASE
         WHEN jsonb_typeof(value->'at') = 'number'
-        THEN greatest(0, trunc((value->>'at')::numeric))::bigint
+        THEN least(9223372036854775807, greatest(0, trunc((value->>'at')::numeric)))::bigint
         ELSE NULL
       END AS at,
       CASE
@@ -170,7 +172,10 @@ IMMUTABLE
 AS $$
   SELECT COALESCE(
     (
-      SELECT max((task_completions -> (task.value->>'id') ->> 'timestamp')::numeric)::bigint
+      SELECT least(
+        9223372036854775807::numeric,
+        max((task_completions -> (task.value->>'id') ->> 'timestamp')::numeric)
+      )::bigint
       FROM jsonb_array_elements(
         CASE
           WHEN jsonb_typeof(entry->'tasks') = 'array' THEN entry->'tasks'
@@ -180,6 +185,7 @@ AS $$
       WHERE jsonb_typeof(task.value->'id') = 'string'
         AND jsonb_typeof(task_completions -> (task.value->>'id') -> 'timestamp') = 'number'
         AND (task_completions -> (task.value->>'id') ->> 'timestamp')::numeric > 2147483647
+      HAVING max((task_completions -> (task.value->>'id') ->> 'timestamp')::numeric) IS NOT NULL
     ),
     fallback_ms
   );
@@ -303,6 +309,17 @@ BEGIN
       'sanitize_user_progress_api_update_meta regression: millisecond at must not be clamped';
   END IF;
 
+  -- Oversized/hostile `at` must clamp to the bigint ceiling instead of raising
+  -- `bigint out of range` and aborting the write.
+  sanitized := public.sanitize_user_progress_api_update_meta(
+    jsonb_build_object('id', 'meta-2', 'source', 'api', 'at', 1e40::numeric)
+  );
+
+  IF (sanitized->>'at')::bigint <> 9223372036854775807 THEN
+    RAISE EXCEPTION
+      'sanitize_user_progress_api_update_meta regression: oversized at must clamp to bigint ceiling';
+  END IF;
+
   merged := public.merge_api_update_history(
     jsonb_build_object(
       'lastApiUpdate',
@@ -320,6 +337,20 @@ BEGIN
   IF (merged->0->>'id') <> 'newer' OR (merged->0->>'at')::bigint <> 1780000000001 THEN
     RAISE EXCEPTION
       'merge_api_update_history regression: millisecond at must survive merge and order newest first';
+  END IF;
+
+  merged := public.merge_api_update_history(
+    jsonb_build_object(
+      'lastApiUpdate',
+      jsonb_build_object('id', 'huge', 'source', 'api', 'at', 1e40::numeric)
+    ),
+    '{}'::jsonb,
+    50
+  );
+
+  IF (merged->0->>'at')::bigint <> 9223372036854775807 THEN
+    RAISE EXCEPTION
+      'merge_api_update_history regression: oversized at must clamp to bigint ceiling';
   END IF;
 
   recovered := public.fix_recover_api_update_history_timestamps(
