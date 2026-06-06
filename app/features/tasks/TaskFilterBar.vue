@@ -137,7 +137,7 @@
     </div>
     <div class="space-y-3">
       <div
-        class="bg-surface-900 scrollbar-none flex items-center gap-3 overflow-x-auto rounded-lg border border-white/12 px-3 py-3 shadow-sm [-webkit-overflow-scrolling:touch] sm:flex-wrap sm:justify-center sm:overflow-x-visible sm:px-4"
+        class="bg-surface-900 flex scrollbar-none items-center gap-3 overflow-x-auto rounded-lg border border-white/12 px-3 py-3 shadow-sm [-webkit-overflow-scrolling:touch] sm:flex-wrap sm:justify-center sm:overflow-x-visible sm:px-4"
       >
         <div class="flex shrink-0 items-center gap-1">
           <UButton
@@ -329,7 +329,7 @@
       </div>
       <div
         v-if="primaryView === 'maps' && maps.length > 0"
-        class="scrollbar-none w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
+        class="w-full scrollbar-none overflow-x-auto [-webkit-overflow-scrolling:touch]"
       >
         <div
           class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
@@ -363,7 +363,7 @@
       </div>
       <div
         v-if="(primaryView === 'traders' || primaryView === 'graph') && traders.length > 0"
-        class="scrollbar-none w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
+        class="w-full scrollbar-none overflow-x-auto [-webkit-overflow-scrolling:touch]"
       >
         <div
           class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"

@@ -82,7 +82,7 @@
       </div>
       <div
         v-else-if="lgAndUp"
-        class="scrollbar-thin -mx-3 flex snap-x gap-3 overflow-x-auto px-3 pb-2 lg:-mx-10 lg:px-10"
+        class="-mx-3 flex snap-x scrollbar-thin gap-3 overflow-x-auto px-3 pb-2 lg:-mx-10 lg:px-10"
       >
         <KappaTraderColumn
           v-for="group in groupedByTraderWithoutFence"

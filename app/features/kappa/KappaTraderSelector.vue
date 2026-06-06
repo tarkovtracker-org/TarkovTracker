@@ -1,7 +1,7 @@
 <template>
   <nav
     :aria-label="t('page.kappa.trader_selector.label', 'Select Trader')"
-    class="scrollbar-none -mx-3 flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-3 py-1 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
+    class="-mx-3 flex snap-x snap-mandatory scrollbar-none gap-1.5 overflow-x-auto px-3 py-1 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
   >
     <button
       v-for="group in groups"

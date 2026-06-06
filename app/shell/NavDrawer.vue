@@ -20,7 +20,7 @@
     :class="[sidebarWidth, currentMode === 'pve' ? 'border-pve-700/50' : 'border-pvp-700/50']"
   >
     <div
-      class="scrollbar-thin relative z-10 flex h-full flex-col overflow-x-hidden overflow-y-auto"
+      class="relative z-10 flex h-full scrollbar-thin flex-col overflow-x-hidden overflow-y-auto"
     >
       <NuxtLink
         to="/"
