@@ -46,31 +46,32 @@ AS $$
   -- sanitizer already keeps the largest at per id, so a clamped lastApiUpdate
   -- (e.g. the 2147483647 sentinel) is corrected to the real millisecond value
   -- whenever the same id is present in history with a larger at.
+  -- at of the matching history entry for the same id, if any. NULL when the id
+  -- is absent from the sanitized history (e.g. trimmed by its LIMIT). Computed
+  -- as a standalone scalar so a zero-row match cannot null out lastApiUpdate.
+  matched_history_at AS (
+    SELECT (entry.value->>'at')::bigint AS value
+    FROM jsonb_array_elements(
+      (SELECT value FROM sanitized_api_update_history)
+    ) AS entry(value)
+    WHERE (SELECT value FROM raw_last_api_update) IS NOT NULL
+      AND entry.value->>'id' = ((SELECT value FROM raw_last_api_update)->>'id')
+    ORDER BY (entry.value->>'at')::bigint DESC
+    LIMIT 1
+  ),
   sanitized_last_api_update AS (
     SELECT
       CASE
         WHEN (SELECT value FROM raw_last_api_update) IS NULL THEN NULL
-        ELSE (
-          SELECT
-            CASE
-              WHEN match.value IS NOT NULL
-                AND (match.value->>'at')::bigint > ((SELECT value FROM raw_last_api_update)->>'at')::bigint
-              THEN jsonb_set(
-                (SELECT value FROM raw_last_api_update),
-                '{at}',
-                match.value->'at'
-              )
-              ELSE (SELECT value FROM raw_last_api_update)
-            END
-          FROM (
-            SELECT entry.value
-            FROM jsonb_array_elements(
-              (SELECT value FROM sanitized_api_update_history)
-            ) AS entry(value)
-            WHERE entry.value->>'id' = ((SELECT value FROM raw_last_api_update)->>'id')
-            LIMIT 1
-          ) AS match(value)
+        WHEN (SELECT value FROM matched_history_at) IS NOT NULL
+          AND (SELECT value FROM matched_history_at)
+              > ((SELECT value FROM raw_last_api_update)->>'at')::bigint
+        THEN jsonb_set(
+          (SELECT value FROM raw_last_api_update),
+          '{at}',
+          to_jsonb((SELECT value FROM matched_history_at))
         )
+        ELSE (SELECT value FROM raw_last_api_update)
       END AS value
   )
   SELECT jsonb_strip_nulls(
@@ -268,6 +269,37 @@ BEGIN
   IF (sanitized->'apiUpdateHistory'->0->>'id') <> 'orphan' THEN
     RAISE EXCEPTION
       'sanitize_user_progress_mode_data regression: orphan lastApiUpdate must be folded into history';
+  END IF;
+
+  -- Edge case: lastApiUpdate.id is older than the top 50 history entries, so the
+  -- history sanitizer's LIMIT trims it out. lastApiUpdate must still be preserved
+  -- (a zero-row history match must not null it out).
+  sanitized := public.sanitize_user_progress_mode_data(
+    jsonb_build_object(
+      'lastApiUpdate',
+      jsonb_build_object('id', 'older-than-50', 'source', 'api', 'at', 1000000000000::bigint),
+      'apiUpdateHistory',
+      (
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', 'newer-' || gs::text,
+            'source', 'api',
+            'at', (1780000000000::bigint + gs)
+          )
+        )
+        FROM generate_series(1, 60) AS gs
+      )
+    )
+  );
+
+  IF sanitized->'lastApiUpdate' IS NULL OR sanitized->'lastApiUpdate' = 'null'::jsonb THEN
+    RAISE EXCEPTION
+      'sanitize_user_progress_mode_data regression: lastApiUpdate must survive when its id is trimmed from history';
+  END IF;
+
+  IF (sanitized->'lastApiUpdate'->>'at')::bigint <> 1000000000000 THEN
+    RAISE EXCEPTION
+      'sanitize_user_progress_mode_data regression: trimmed-id lastApiUpdate.at must be preserved unchanged';
   END IF;
 END;
 $$;
