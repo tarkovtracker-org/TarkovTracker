@@ -399,38 +399,31 @@ $$;
 
 -- Repair already-clamped rows in place. Functions above are already fixed, so
 -- the BEFORE triggers preserve the recovered millisecond values.
-DO $$
-DECLARE
-  rows_updated integer := 0;
-BEGIN
-  LOOP
-    WITH batch AS (
-      SELECT user_id
-      FROM public.user_progress
-      WHERE
-        public.fix_api_update_history_needs_recovery(COALESCE(pvp_data, '{}'::jsonb))
-        OR public.fix_api_update_history_needs_recovery(COALESCE(pve_data, '{}'::jsonb))
-      LIMIT 500
-    )
-    UPDATE public.user_progress AS up
-    SET
-      pvp_data = public.fix_recover_api_update_history_timestamps(
-        COALESCE(up.pvp_data, '{}'::jsonb),
-        (extract(epoch FROM COALESCE(up.updated_at, now())) * 1000)::bigint
-      ),
-      pve_data = public.fix_recover_api_update_history_timestamps(
-        COALESCE(up.pve_data, '{}'::jsonb),
-        (extract(epoch FROM COALESCE(up.updated_at, now())) * 1000)::bigint
-      )
-    FROM batch
-    WHERE up.user_id = batch.user_id;
+--
+-- Run as a single set-based UPDATE that only rewrites rows still carrying the
+-- int32 sentinel. The per-statement timeout is lifted for this maintenance step
+-- because hosted Postgres caps statements at 2 minutes and a DO-block loop
+-- counts as one statement -- its internal batching and pg_sleep cannot dodge
+-- statement_timeout. Plain SET (not SET LOCAL) so it applies whether or not the
+-- migration runner wraps this file in a transaction; RESET restores the default
+-- once the backfill completes.
+SET statement_timeout = 0;
 
-    GET DIAGNOSTICS rows_updated = ROW_COUNT;
-    EXIT WHEN rows_updated = 0;
-    PERFORM pg_sleep(0.05);
-  END LOOP;
-END;
-$$;
+UPDATE public.user_progress AS up
+SET
+  pvp_data = public.fix_recover_api_update_history_timestamps(
+    COALESCE(up.pvp_data, '{}'::jsonb),
+    (extract(epoch FROM COALESCE(up.updated_at, now())) * 1000)::bigint
+  ),
+  pve_data = public.fix_recover_api_update_history_timestamps(
+    COALESCE(up.pve_data, '{}'::jsonb),
+    (extract(epoch FROM COALESCE(up.updated_at, now())) * 1000)::bigint
+  )
+WHERE
+  public.fix_api_update_history_needs_recovery(COALESCE(up.pvp_data, '{}'::jsonb))
+  OR public.fix_api_update_history_needs_recovery(COALESCE(up.pve_data, '{}'::jsonb));
+
+RESET statement_timeout;
 
 DROP FUNCTION IF EXISTS public.fix_api_update_history_needs_recovery(jsonb);
 DROP FUNCTION IF EXISTS public.fix_recover_api_update_history_timestamps(jsonb, bigint);
