@@ -573,7 +573,14 @@
         "set_loyalty_level": "Nastavte věrnostní úroveň {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav Karma",
-        "unlock_required": "Vyžadováno odemknutí:"
+        "unlock_required": "Vyžadováno odemknutí:",
+        "sort": {
+          "aria_label": "Sort traders",
+          "direction_aria_label": "Toggle sort direction",
+          "default": "Default",
+          "progress": "Progress",
+          "level": "Úrovně"
+        }
       },
       "stats": {
         "failed": {
