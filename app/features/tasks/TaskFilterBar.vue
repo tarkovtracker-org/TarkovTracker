@@ -41,8 +41,8 @@
           @click="setPrimaryView('all')"
         >
           <UIcon name="i-mdi-checkbox-multiple-marked" class="h-4 w-4 shrink-0 sm:mr-1.5" />
-          <span class="hidden text-xs leading-none sm:inline">
-            {{ t('page.tasks.primary_views.list').toUpperCase() }}
+          <span class="hidden text-xs leading-none uppercase sm:inline">
+            {{ t('page.tasks.primary_views.list') }}
           </span>
         </UButton>
         <UButton
@@ -57,8 +57,8 @@
           @click="setPrimaryView('traders')"
         >
           <UIcon name="i-mdi-account-group" class="h-4 w-4 shrink-0 sm:mr-1.5" />
-          <span class="hidden text-xs leading-none sm:inline">
-            {{ t('page.tasks.primary_views.traders').toUpperCase() }}
+          <span class="hidden text-xs leading-none uppercase sm:inline">
+            {{ t('page.tasks.primary_views.traders') }}
           </span>
         </UButton>
         <UButton
@@ -73,8 +73,8 @@
           @click="setPrimaryView('maps')"
         >
           <UIcon name="i-mdi-map" class="h-4 w-4 shrink-0 sm:mr-1.5" />
-          <span class="hidden text-xs leading-none sm:inline">
-            {{ t('page.tasks.primary_views.maps').toUpperCase() }}
+          <span class="hidden text-xs leading-none uppercase sm:inline">
+            {{ t('page.tasks.primary_views.maps') }}
           </span>
         </UButton>
         <UButton
@@ -89,8 +89,8 @@
           @click="setPrimaryView('graph')"
         >
           <UIcon name="i-mdi-graph-outline" class="h-4 w-4 shrink-0 sm:mr-1.5" />
-          <span class="hidden text-xs leading-none sm:inline">
-            {{ t('page.tasks.primary_views.graph').toUpperCase() }}
+          <span class="hidden text-xs leading-none uppercase sm:inline">
+            {{ t('page.tasks.primary_views.graph') }}
           </span>
         </UButton>
       </div>
@@ -155,8 +155,8 @@
               name="i-mdi-format-list-bulleted"
               class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block"
             />
-            <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.secondary_views.all', 'All').toUpperCase() }}
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('page.tasks.secondary_views.all', 'All') }}
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -182,8 +182,8 @@
             @click="setSecondaryView('available')"
           >
             <UIcon name="i-mdi-clipboard-text" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
-            <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.secondary_views.available').toUpperCase() }}
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('page.tasks.secondary_views.available') }}
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -204,8 +204,8 @@
             @click="setSecondaryView('locked')"
           >
             <UIcon name="i-mdi-lock" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
-            <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.secondary_views.locked').toUpperCase() }}
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('page.tasks.secondary_views.locked') }}
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -226,8 +226,8 @@
             @click="setSecondaryView('completed')"
           >
             <UIcon name="i-mdi-check-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
-            <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.secondary_views.completed').toUpperCase() }}
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('page.tasks.secondary_views.completed') }}
             </span>
             <span
               class="bg-success-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -247,8 +247,8 @@
             @click="setSecondaryView('failed')"
           >
             <UIcon name="i-mdi-close-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
-            <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.secondary_views.failed').toUpperCase() }}
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('page.tasks.secondary_views.failed') }}
             </span>
             <span
               class="bg-error-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -270,11 +270,11 @@
             @click="onUserViewSelect({ label: currentUserDisplayName, value: 'self' })"
           >
             <UIcon name="i-mdi-account-circle" class="h-4 w-4 shrink-0 sm:mr-1" />
-            <span class="hidden text-xs leading-none sm:inline sm:text-sm">
-              {{ currentUserDisplayName.toUpperCase() }}
+            <span class="hidden text-xs leading-none uppercase sm:inline sm:text-sm">
+              {{ currentUserDisplayName }}
             </span>
-            <UBadge size="sm" color="primary" variant="solid" class="ml-1">
-              {{ t('page.tasks.user_views.yourself').toUpperCase() }}
+            <UBadge size="sm" color="primary" variant="solid" class="ml-1 uppercase">
+              {{ t('page.tasks.user_views.yourself') }}
             </UBadge>
           </UButton>
           <template v-for="teamId in teammates" :key="teamId">
@@ -294,8 +294,8 @@
               @click="onUserViewSelect({ label: getTeammateDisplayName(teamId), value: teamId })"
             >
               <UIcon name="i-mdi-account" class="h-4 w-4 shrink-0 sm:mr-1" />
-              <span class="text-xs leading-none sm:text-sm">
-                {{ getTeammateDisplayName(teamId).toUpperCase() }}
+              <span class="text-xs leading-none uppercase sm:text-sm">
+                {{ getTeammateDisplayName(teamId) }}
               </span>
             </UButton>
             <UButton
@@ -321,8 +321,8 @@
             @click="onUserViewSelect({ label: t('page.tasks.user_views.all'), value: 'all' })"
           >
             <UIcon name="i-mdi-account-multiple" class="h-4 w-4 shrink-0 sm:mr-1" />
-            <span class="text-xs leading-none sm:text-sm">
-              {{ t('page.tasks.user_views.all').toUpperCase() }}
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('page.tasks.user_views.all') }}
             </span>
           </UButton>
         </div>

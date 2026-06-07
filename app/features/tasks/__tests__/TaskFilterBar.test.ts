@@ -185,7 +185,7 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     await wrapper.find('input').setValue('propane');
     expect(wrapper.emitted('update:searchQuery')).toEqual([['propane']]);
-    const mapButton = wrapper.findAll('button').find((button) => button.text().includes('MAPS'));
+    const mapButton = wrapper.findAll('button').find((button) => button.text().includes('maps'));
     expect(mapButton).toBeTruthy();
     await mapButton!.trigger('click');
     expect(preferencesStore.setTaskPrimaryView).toHaveBeenCalledWith('maps');
@@ -281,7 +281,7 @@ describe('TaskFilterBar', () => {
     });
     const availableButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('AVAILABLE'));
+      .find((button) => button.text().includes('available'));
     expect(availableButton).toBeTruthy();
     expect(availableButton!.text()).toContain('0');
     expect(availableButton!.text()).not.toContain('1');
@@ -294,13 +294,13 @@ describe('TaskFilterBar', () => {
       },
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
-    const listButton = wrapper.findAll('button').find((button) => button.text().includes('LIST'));
+    const listButton = wrapper.findAll('button').find((button) => button.text().includes('list'));
     const allStatusButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('ALL2'));
+      .find((button) => button.text().includes('All2'));
     const availableButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('AVAILABLE'));
+      .find((button) => button.text().includes('available'));
     expect(listButton?.classes()).toContain('border-primary-500/45');
     expect(listButton?.classes()).toContain('ring-primary-500/25');
     expect(allStatusButton?.classes()).toContain('border-primary-500/45');
@@ -316,8 +316,8 @@ describe('TaskFilterBar', () => {
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     const buttonTexts = wrapper.findAll('button').map((button) => button.text());
-    expect(buttonTexts.some((text) => text.includes('COMPLETED0'))).toBe(true);
-    expect(buttonTexts.some((text) => text.includes('FAILED0'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('completed0'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('failed0'))).toBe(true);
   });
   it('forces graph view to show only the all status filter', async () => {
     const { TaskFilterBar } = await setup({
@@ -329,11 +329,11 @@ describe('TaskFilterBar', () => {
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     const buttonTexts = wrapper.findAll('button').map((button) => button.text());
-    expect(buttonTexts.some((text) => text.includes('AVAILABLE'))).toBe(false);
-    expect(buttonTexts.some((text) => text.includes('LOCKED'))).toBe(false);
-    expect(buttonTexts.some((text) => text.includes('COMPLETED'))).toBe(false);
-    expect(buttonTexts.some((text) => text.includes('FAILED'))).toBe(false);
-    expect(buttonTexts.some((text) => text.includes('ALL2'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('available'))).toBe(false);
+    expect(buttonTexts.some((text) => text.includes('locked'))).toBe(false);
+    expect(buttonTexts.some((text) => text.includes('completed'))).toBe(false);
+    expect(buttonTexts.some((text) => text.includes('failed'))).toBe(false);
+    expect(buttonTexts.some((text) => text.includes('All2'))).toBe(true);
   });
   it('moves off a hidden active status filter', async () => {
     const { TaskFilterBar, preferencesStore } = await setup({
@@ -431,7 +431,7 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     const teammateButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('ALPHA'));
+      .find((button) => button.text().includes('Alpha'));
     expect(teammateButton).toBeTruthy();
     await teammateButton!.trigger('click');
     expect(preferencesStore.toggleHidden).toHaveBeenCalledWith('teammate-1');
@@ -448,7 +448,7 @@ describe('TaskFilterBar', () => {
     const wrapper = mountTaskFilterBar(TaskFilterBar);
     const teammateButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('TEAMMATE-1'));
+      .find((button) => button.text().includes('teammate-1'));
     expect(teammateButton).toBeTruthy();
     await teammateButton!.trigger('click');
     expect(preferencesStore.toggleHidden).not.toHaveBeenCalled();
