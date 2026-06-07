@@ -41,7 +41,7 @@ Replace the stats grid with an action-oriented layout:
 
 ## New Locale Keys Needed
 
-```
+```text
 page.dashboard.next_up.*
 page.dashboard.quick_actions.*
 page.dashboard.traders.subtitle
