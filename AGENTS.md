@@ -26,7 +26,7 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 ## Project Snapshot
 
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
-- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.13.0).
+- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.16.0).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
 - **Deployment:** Cloudflare Pages/Workers.
 

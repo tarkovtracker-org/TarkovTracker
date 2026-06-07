@@ -182,7 +182,7 @@ graph TD
 
 | Concern            | Tooling                                                                      |
 | ------------------ | ---------------------------------------------------------------------------- |
-| Package manager    | npm `>=11.6.2` (`packageManager: npm@11.13.0`), Node `>=24.12.0`             |
+| Package manager    | npm `>=11.6.2` (`packageManager: npm@11.16.0`), Node `>=24.12.0`             |
 | Dev/build          | `nuxt dev`, `nuxt build`, `nuxt generate`, `nuxt preview`                    |
 | Lint               | ESLint flat config (`eslint app --max-warnings=0`) + DESIGN.md lint          |
 | Format             | Prettier (+ `prettier-plugin-tailwindcss`), enforced via husky + lint-staged |
