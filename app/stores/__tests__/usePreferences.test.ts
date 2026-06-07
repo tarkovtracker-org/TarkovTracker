@@ -944,6 +944,25 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.getSkillSortMode).toBe('priority');
     });
+    it('should return traderSortMode and traderSortDirection defaults', () => {
+      const store = usePreferencesStore();
+      expect(store.getTraderSortMode).toBe('default');
+      expect(store.getTraderSortDirection).toBe('desc');
+    });
+    it('should fall back to defaults when persisted trader sort values are invalid', () => {
+      const store = usePreferencesStore();
+      (store.traderSortMode as unknown) = 'foo';
+      (store.traderSortDirection as unknown) = 'up';
+      expect(store.getTraderSortMode).toBe('default');
+      expect(store.getTraderSortDirection).toBe('desc');
+    });
+    it('should return persisted trader sort values when valid', () => {
+      const store = usePreferencesStore();
+      store.setTraderSortMode('progress');
+      store.setTraderSortDirection('asc');
+      expect(store.getTraderSortMode).toBe('progress');
+      expect(store.getTraderSortDirection).toBe('asc');
+    });
   });
   describe('Actions - Streamer Mode', () => {
     it('should set streamer mode', () => {

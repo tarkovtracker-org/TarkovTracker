@@ -68,4 +68,20 @@ describe('sortTraderStats', () => {
     sortTraderStats(traders, 'progress', 'desc', mockGetLevel, mockGetRep);
     expect(traders).toEqual(original);
   });
+  it('breaks ties deterministically by name for traders outside TRADER_ORDER', () => {
+    const unknownTraders = [
+      makeTrader({ normalizedName: 'unknown-zeta', percentage: 50, completedTasks: 5 }),
+      makeTrader({ normalizedName: 'unknown-alpha', percentage: 50, completedTasks: 5 }),
+    ];
+    const result = sortTraderStats(unknownTraders, 'progress', 'desc', mockGetLevel, mockGetRep);
+    expect(result.map((t) => t.normalizedName)).toEqual(['unknown-alpha', 'unknown-zeta']);
+    const reversed = sortTraderStats(
+      [...unknownTraders].reverse(),
+      'progress',
+      'desc',
+      mockGetLevel,
+      mockGetRep
+    );
+    expect(reversed.map((t) => t.normalizedName)).toEqual(['unknown-alpha', 'unknown-zeta']);
+  });
 });

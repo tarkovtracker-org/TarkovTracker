@@ -9,7 +9,7 @@ import {
   type PersistedPreferencesState,
   type PreferencesState,
 } from '@/stores/usePreferences';
-import { SKILL_SORT_MODES } from '@/utils/constants';
+import { SKILL_SORT_MODES, TRADER_SORT_DIRECTIONS, TRADER_SORT_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { migrateLegacyMapMarkerColors, normalizeMapMarkerColors } from '@/utils/theme-colors';
 import type { Pinia } from 'pinia';
@@ -215,6 +215,11 @@ const buildPreferencesSyncPayload = (
       ? preferencesState.taskFilterPresets
       : [],
     skill_sort_mode: normalizeEnum(preferencesState.skillSortMode, SKILL_SORT_MODES),
+    trader_sort_mode: normalizeEnum(preferencesState.traderSortMode, TRADER_SORT_MODES),
+    trader_sort_direction: normalizeEnum(
+      preferencesState.traderSortDirection,
+      TRADER_SORT_DIRECTIONS
+    ),
   };
 };
 export default defineNuxtPlugin((nuxtApp) => {

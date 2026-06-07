@@ -296,11 +296,11 @@
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
   const traderSortMode = computed({
-    get: () => preferencesStore.getTraderSortMode as TraderSortMode,
+    get: () => preferencesStore.getTraderSortMode,
     set: (val: TraderSortMode) => preferencesStore.setTraderSortMode(val),
   });
   const traderSortDirection = computed({
-    get: () => preferencesStore.getTraderSortDirection as TraderSortDirection,
+    get: () => preferencesStore.getTraderSortDirection,
     set: (val: TraderSortDirection) => preferencesStore.setTraderSortDirection(val),
   });
   const toggleSortDirection = () => {
@@ -317,8 +317,8 @@
       stats,
       traderSortMode.value,
       traderSortDirection.value,
-      (id: string) => tarkovStore.getTraderLevel(id),
-      (id: string) => tarkovStore.getTraderReputation(id)
+      tarkovStore.getTraderLevel,
+      tarkovStore.getTraderReputation
     );
   });
   const clearTraderHighlight = () => {

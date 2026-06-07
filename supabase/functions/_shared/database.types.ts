@@ -356,6 +356,8 @@ export type Database = {
           task_trader_view: string | null
           task_user_view: string | null
           team_hide: Json | null
+          trader_sort_direction: string | null
+          trader_sort_mode: string | null
           updated_at: string | null
           use_automatic_level_calculation: boolean | null
           user_id: string
@@ -426,6 +428,8 @@ export type Database = {
           task_trader_view?: string | null
           task_user_view?: string | null
           team_hide?: Json | null
+          trader_sort_direction?: string | null
+          trader_sort_mode?: string | null
           updated_at?: string | null
           use_automatic_level_calculation?: boolean | null
           user_id: string
@@ -496,6 +500,8 @@ export type Database = {
           task_trader_view?: string | null
           task_user_view?: string | null
           team_hide?: Json | null
+          trader_sort_direction?: string | null
+          trader_sort_mode?: string | null
           updated_at?: string | null
           use_automatic_level_calculation?: boolean | null
           user_id?: string

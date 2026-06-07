@@ -301,7 +301,8 @@ export function sortTradersByGameOrder<T extends { name: string; normalizedName?
 }
 export const TRADER_SORT_MODES = ['default', 'progress', 'level'] as const;
 export type TraderSortMode = (typeof TRADER_SORT_MODES)[number];
-export type TraderSortDirection = 'asc' | 'desc';
+export const TRADER_SORT_DIRECTIONS = ['asc', 'desc'] as const;
+export type TraderSortDirection = (typeof TRADER_SORT_DIRECTIONS)[number];
 export function sortTraderStats<
   T extends {
     id: string;
@@ -333,9 +334,10 @@ export function sortTraderStats<
     if (cmp === 0) {
       const aIdx = TRADER_ORDER.indexOf(a.normalizedName as (typeof TRADER_ORDER)[number]);
       const bIdx = TRADER_ORDER.indexOf(b.normalizedName as (typeof TRADER_ORDER)[number]);
-      const aPos = aIdx === -1 ? Infinity : aIdx;
-      const bPos = bIdx === -1 ? Infinity : bIdx;
-      return aPos - bPos;
+      if (aIdx === -1 && bIdx === -1) return a.name.localeCompare(b.name);
+      if (aIdx === -1) return 1;
+      if (bIdx === -1) return -1;
+      return aIdx - bIdx;
     }
     return cmp * dirMul;
   });

@@ -26,6 +26,7 @@ import {
   type TaskSecondaryView,
 } from '@/types/taskFilter';
 import { clearPreferencesStorage } from '@/utils/clientStorage';
+import { TRADER_SORT_DIRECTIONS, TRADER_SORT_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import {
@@ -616,11 +617,15 @@ export const usePreferencesStore = defineStore('preferences', {
     getSkillSortMode: (state) => {
       return state.skillSortMode ?? 'priority';
     },
-    getTraderSortMode: (state) => {
-      return state.traderSortMode ?? 'default';
+    getTraderSortMode: (state): TraderSortMode => {
+      return state.traderSortMode && TRADER_SORT_MODES.includes(state.traderSortMode)
+        ? state.traderSortMode
+        : 'default';
     },
-    getTraderSortDirection: (state) => {
-      return state.traderSortDirection ?? 'desc';
+    getTraderSortDirection: (state): TraderSortDirection => {
+      return state.traderSortDirection && TRADER_SORT_DIRECTIONS.includes(state.traderSortDirection)
+        ? state.traderSortDirection
+        : 'desc';
     },
   },
   actions: {
