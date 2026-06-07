@@ -573,7 +573,14 @@
         "set_loyalty_level": "设置忠诚度等级 {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav 信誉",
-        "unlock_required": "需要解锁:"
+        "unlock_required": "需要解锁:",
+        "sort": {
+          "aria_label": "Sort traders",
+          "direction_aria_label": "Toggle sort direction",
+          "default": "Default",
+          "progress": "Progress",
+          "level": "等级"
+        }
       },
       "stats": {
         "failed": {
