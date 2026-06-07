@@ -690,4 +690,150 @@ describe('api-gateway', () => {
       | undefined;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
   });
+  it('rejects POST /progress/task/objective with URL-encoded whitespace ID', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/%20%20', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Missing objective ID in URL');
+  });
+  it('rejects POST /progress/task/objective with malformed encoded ID', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/%E0%A4%A', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid objective ID in URL');
+  });
+  it('rejects POST /progress/task/objective with malformed JSON body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: '{not json',
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid JSON body');
+  });
+  it('rejects POST /progress/task/objective with array JSON body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: '[]',
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid request body (expected object)');
+  });
+  it('rejects POST /progress/task/objective without state or count', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Must provide state or count');
+  });
+  it('rejects POST /progress/task/objective with invalid state and echoes the value', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'foo' }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid state "foo" (must be completed or uncompleted)');
+  });
+  it('rejects POST /progress/task/objective when state is not a string', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 123 }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid state "123" (must be completed or uncompleted)');
+  });
+  it('rejects POST /progress/task/objective with negative count', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: -1 }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid count (must be a non-negative number)');
+  });
+  it('accepts POST /progress/task/objective with URL-encoded valid objective ID', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    const fetchMock = createBaseFetchMock({
+      onPatch: (body) => {
+        patchBody = body;
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/obj-1%20', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(patchBody).not.toBeNull();
+    const pvpData = (
+      patchBody as unknown as { pvp_data?: { taskObjectives?: Record<string, unknown> } }
+    ).pvp_data;
+    const taskObjectives = pvpData?.taskObjectives as
+      | Record<string, { complete?: boolean }>
+      | undefined;
+    expect(taskObjectives?.['obj-1']?.complete).toBe(true);
+  });
 });

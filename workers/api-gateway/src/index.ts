@@ -522,6 +522,15 @@ export default {
       // POST /progress/task/objective/:objectiveId - Update task objective
       const objectiveMatch = apiPath.match(/^\/progress\/task\/objective\/([^/]+)$/);
       if (objectiveMatch && request.method === 'POST') {
+        let objectiveId: string;
+        try {
+          objectiveId = decodeURIComponent(objectiveMatch[1]).trim();
+        } catch {
+          return errorResponse('Invalid objective ID in URL', 400, origin, reqOrigin);
+        }
+        if (!objectiveId) {
+          return errorResponse('Missing objective ID in URL', 400, origin, reqOrigin);
+        }
         const validation = await validateToken(env, rawToken, 'WP');
         if (!validation.valid) {
           return errorResponse(validation.error, validation.status, origin, reqOrigin);
@@ -544,13 +553,43 @@ export default {
             rlHeaders
           );
         }
-        const body = (await request.json()) as { state?: string; count?: number };
-        if (!body.state && body.count === undefined) {
+        let parsedBody: unknown;
+        try {
+          parsedBody = await request.json();
+        } catch {
+          return errorResponse('Invalid JSON body', 400, origin, reqOrigin, rlHeaders);
+        }
+        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+          return errorResponse(
+            'Invalid request body (expected object)',
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
+        }
+        const body = parsedBody as { state?: unknown; count?: unknown };
+        if (body.state === undefined && body.count === undefined) {
           return errorResponse('Must provide state or count', 400, origin, reqOrigin, rlHeaders);
         }
-        if (body.state && !['completed', 'uncompleted'].includes(body.state)) {
+        if (
+          body.state !== undefined &&
+          (typeof body.state !== 'string' || !['completed', 'uncompleted'].includes(body.state))
+        ) {
           return errorResponse(
-            'Invalid state (must be completed or uncompleted)',
+            `Invalid state "${typeof body.state === 'string' ? body.state : String(body.state ?? '')}" (must be completed or uncompleted)`,
+            400,
+            origin,
+            reqOrigin,
+            rlHeaders
+          );
+        }
+        if (
+          body.count !== undefined &&
+          (typeof body.count !== 'number' || !Number.isFinite(body.count) || body.count < 0)
+        ) {
+          return errorResponse(
+            'Invalid count (must be a non-negative number)',
             400,
             origin,
             reqOrigin,
@@ -561,8 +600,11 @@ export default {
         const result = await handleUpdateObjective(
           env,
           validation.token,
-          objectiveMatch[1],
-          body,
+          objectiveId,
+          {
+            ...(body.state !== undefined && { state: body.state as string }),
+            ...(body.count !== undefined && { count: body.count as number }),
+          },
           effectiveGameMode
         );
         return successResponse(result, undefined, 200, origin, reqOrigin, rlHeaders);
