@@ -146,6 +146,11 @@ jobs:
           APP_URL: http://localhost:3000
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          # Disable the promoted Twitch embed so audits measure the app itself.
+          # The embed loads a heavy third-party iframe whose impact (script eval,
+          # layout shift, third-party cookies) varies with the streamer's live
+          # status, which made the Lighthouse gate non-deterministic.
+          NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED: 'false'
 
       - name: Start preview server
         run: |
