@@ -575,8 +575,8 @@
         "scav_karma": "Scav Karma",
         "unlock_required": "Sblocco richiesto:",
         "sort": {
-          "aria_label": "Sort traders",
-          "direction_aria_label": "Toggle sort direction",
+          "aria_label": "Ordina i trader",
+          "direction_aria_label": "Inverti ordinamento",
           "default": "Predefinito",
           "progress": "Progresso",
           "level": "Livello"
