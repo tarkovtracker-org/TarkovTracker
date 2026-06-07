@@ -573,7 +573,14 @@
         "set_loyalty_level": "Définir le niveau de fidélité {level}",
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Karma de Scav",
-        "unlock_required": "Déblocage requis:"
+        "unlock_required": "Déblocage requis:",
+        "sort": {
+          "aria_label": "Sort traders",
+          "direction_aria_label": "Toggle sort direction",
+          "default": "Default",
+          "progress": "Progress",
+          "level": "Niveau"
+        }
       },
       "stats": {
         "failed": {
