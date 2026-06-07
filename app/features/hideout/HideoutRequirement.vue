@@ -261,12 +261,12 @@
   };
   const openTarkovDev = (): void => {
     if (props.requirement.item.link) {
-      window.open(props.requirement.item.link, '_blank');
+      window.open(props.requirement.item.link, '_blank', 'noopener,noreferrer');
     }
   };
   const openWiki = (): void => {
     if (props.requirement.item.wikiLink) {
-      window.open(props.requirement.item.wikiLink, '_blank');
+      window.open(props.requirement.item.wikiLink, '_blank', 'noopener,noreferrer');
     }
   };
 </script>

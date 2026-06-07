@@ -380,12 +380,12 @@
   // Action methods
   const openTarkovDevLink = () => {
     if (props.devLink) {
-      window.open(props.devLink, '_blank');
+      window.open(props.devLink, '_blank', 'noopener,noreferrer');
     }
   };
   const openWikiLink = () => {
     if (props.wikiLink) {
-      window.open(props.wikiLink, '_blank');
+      window.open(props.wikiLink, '_blank', 'noopener,noreferrer');
     }
   };
   const copyItemName = async () => {
@@ -407,7 +407,7 @@
   };
   const openTaskWiki = () => {
     if (props.taskWikiLink) {
-      window.open(props.taskWikiLink, '_blank');
+      window.open(props.taskWikiLink, '_blank', 'noopener,noreferrer');
     }
   };
 </script>
