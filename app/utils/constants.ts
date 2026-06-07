@@ -299,6 +299,47 @@ export function sortTradersByGameOrder<T extends { name: string; normalizedName?
     return aIndex - bIndex;
   });
 }
+export const TRADER_SORT_MODES = ['default', 'progress', 'level'] as const;
+export type TraderSortMode = (typeof TRADER_SORT_MODES)[number];
+export type TraderSortDirection = 'asc' | 'desc';
+export function sortTraderStats<
+  T extends {
+    id: string;
+    name: string;
+    normalizedName?: string;
+    percentage: number;
+    completedTasks: number;
+  },
+>(
+  traders: T[],
+  mode: TraderSortMode,
+  direction: TraderSortDirection,
+  getTraderLevel: (traderId: string) => number,
+  getTraderReputation: (traderId: string) => number
+): T[] {
+  if (mode === 'default') {
+    return sortTradersByGameOrder(traders);
+  }
+  const dirMul = direction === 'desc' ? -1 : 1;
+  return [...traders].sort((a, b) => {
+    let cmp: number;
+    if (mode === 'progress') {
+      cmp = a.percentage - b.percentage;
+      if (cmp === 0) cmp = a.completedTasks - b.completedTasks;
+    } else {
+      cmp = getTraderLevel(a.id) - getTraderLevel(b.id);
+      if (cmp === 0) cmp = getTraderReputation(a.id) - getTraderReputation(b.id);
+    }
+    if (cmp === 0) {
+      const aIdx = TRADER_ORDER.indexOf(a.normalizedName as (typeof TRADER_ORDER)[number]);
+      const bIdx = TRADER_ORDER.indexOf(b.normalizedName as (typeof TRADER_ORDER)[number]);
+      const aPos = aIdx === -1 ? Infinity : aIdx;
+      const bPos = bIdx === -1 ? Infinity : bIdx;
+      return aPos - bPos;
+    }
+    return cmp * dirMul;
+  });
+}
 // Map display order (matches typical task progression)
 // Uses static map keys from maps.json for stable identification
 export const MAP_ORDER = [

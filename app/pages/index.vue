@@ -111,19 +111,43 @@
           </div>
         </div>
         <div id="dashboard-traders" class="mb-8 scroll-mt-16">
-          <button
-            type="button"
-            class="group mb-4 flex w-full cursor-pointer items-center text-2xl font-bold text-white"
-            :aria-expanded="!tradersSectionCollapsed"
-            @click="tradersSectionCollapsed = !tradersSectionCollapsed"
-          >
-            <UIcon name="i-mdi-account-group" class="text-primary-500 mr-2 h-6 w-6" />
-            {{ $t('page.dashboard.traders.title') }}
-            <UIcon
-              :name="tradersSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
-              class="text-surface-400 group-hover:text-surface-200 ml-auto h-5 w-5 transition-colors"
-            />
-          </button>
+          <div class="mb-4 flex w-full items-center">
+            <button
+              type="button"
+              class="group flex min-w-0 flex-1 cursor-pointer items-center text-2xl font-bold text-white"
+              :aria-expanded="!tradersSectionCollapsed"
+              @click="tradersSectionCollapsed = !tradersSectionCollapsed"
+            >
+              <UIcon name="i-mdi-account-group" class="text-primary-500 mr-2 h-6 w-6 shrink-0" />
+              <span class="truncate">{{ $t('page.dashboard.traders.title') }}</span>
+              <UIcon
+                :name="tradersSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
+                class="text-surface-400 group-hover:text-surface-200 ml-2 h-5 w-5 shrink-0 transition-colors"
+              />
+            </button>
+            <div class="ml-auto flex shrink-0 items-center gap-1.5" @click.stop>
+              <SelectMenuFixed
+                :model-value="traderSortMode"
+                :items="traderSortOptions"
+                value-key="value"
+                size="sm"
+                class="w-28"
+                :aria-label="$t('page.dashboard.traders.sort.aria_label')"
+                @update:model-value="traderSortMode = $event"
+              />
+              <UButton
+                v-show="traderSortMode !== 'default'"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                :icon="
+                  traderSortDirection === 'desc' ? 'i-mdi-sort-descending' : 'i-mdi-sort-ascending'
+                "
+                :aria-label="$t('page.dashboard.traders.sort.direction_aria_label')"
+                @click="toggleSortDirection"
+              />
+            </div>
+          </div>
           <div
             v-show="!tradersSectionCollapsed"
             class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -238,8 +262,12 @@
 </template>
 <script setup lang="ts">
   import { useDashboardFilters } from '@/composables/useDashboardFilters';
+  import { usePreferencesStore } from '@/stores/usePreferences';
+  import { useTarkovStore } from '@/stores/useTarkov';
+  import { sortTraderStats } from '@/utils/constants';
   import { calculatePercentageNum } from '@/utils/formatters';
   import { getQueryString } from '@/utils/routeHelpers';
+  import type { TraderSortMode, TraderSortDirection } from '@/utils/constants';
   const { isOpen: isHelpOpen } = usePageHelpState('dashboard');
   const { isDesktopHelpPanelOpen, isMobileHelpPanelOpen } = usePageSideRailState({
     helpOpen: isHelpOpen,
@@ -264,8 +292,35 @@
   const dashboardStats = useDashboardStats();
   const router = useRouter();
   const { hasDashboardFiltersActive } = useDashboardFilters();
-  // Unwrap trader stats for template usage
-  const traderStats = computed(() => dashboardStats.traderStats.value || []);
+  const preferencesStore = usePreferencesStore();
+  const tarkovStore = useTarkovStore();
+  const { t } = useI18n({ useScope: 'global' });
+  const traderSortMode = computed({
+    get: () => preferencesStore.getTraderSortMode as TraderSortMode,
+    set: (val: TraderSortMode) => preferencesStore.setTraderSortMode(val),
+  });
+  const traderSortDirection = computed({
+    get: () => preferencesStore.getTraderSortDirection as TraderSortDirection,
+    set: (val: TraderSortDirection) => preferencesStore.setTraderSortDirection(val),
+  });
+  const toggleSortDirection = () => {
+    traderSortDirection.value = traderSortDirection.value === 'desc' ? 'asc' : 'desc';
+  };
+  const traderSortOptions = computed(() => [
+    { value: 'default', label: t('page.dashboard.traders.sort.default') },
+    { value: 'progress', label: t('page.dashboard.traders.sort.progress') },
+    { value: 'level', label: t('page.dashboard.traders.sort.level') },
+  ]);
+  const traderStats = computed(() => {
+    const stats = dashboardStats.traderStats.value || [];
+    return sortTraderStats(
+      stats,
+      traderSortMode.value,
+      traderSortDirection.value,
+      (id: string) => tarkovStore.getTraderLevel(id),
+      (id: string) => tarkovStore.getTraderReputation(id)
+    );
+  });
   const clearTraderHighlight = () => {
     if (traderHighlightTimeout.value) {
       clearTimeout(traderHighlightTimeout.value);

@@ -50,7 +50,7 @@ import type {
   NeededItemsFilterType,
 } from '@/features/neededitems/neededitems-constants';
 import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
-import type { SkillSortMode } from '@/utils/constants';
+import type { SkillSortMode, TraderSortMode, TraderSortDirection } from '@/utils/constants';
 export type { PersistedPreferencesState };
 export type TaskFilterSettings = {
   taskPrimaryView: TaskPrimaryView | null;
@@ -150,6 +150,8 @@ export interface PreferencesState {
   pinnedTaskIds: string[];
   // Skills settings
   skillSortMode: SkillSortMode | null;
+  traderSortMode: TraderSortMode | null;
+  traderSortDirection: TraderSortDirection | null;
   taskFilterPresets: TaskFilterPreset[];
   saving?: {
     streamerMode: boolean;
@@ -231,6 +233,8 @@ export const preferencesDefaultState: PreferencesState = {
   pinnedTaskIds: [],
   // Skills settings
   skillSortMode: null,
+  traderSortMode: null,
+  traderSortDirection: null,
   taskFilterPresets: [],
   saving: {
     streamerMode: false,
@@ -612,6 +616,12 @@ export const usePreferencesStore = defineStore('preferences', {
     getSkillSortMode: (state) => {
       return state.skillSortMode ?? 'priority';
     },
+    getTraderSortMode: (state) => {
+      return state.traderSortMode ?? 'default';
+    },
+    getTraderSortDirection: (state) => {
+      return state.traderSortDirection ?? 'desc';
+    },
   },
   actions: {
     resetToDefaults() {
@@ -885,6 +895,12 @@ export const usePreferencesStore = defineStore('preferences', {
     setSkillSortMode(mode: SkillSortMode) {
       this.skillSortMode = mode;
     },
+    setTraderSortMode(mode: TraderSortMode) {
+      this.traderSortMode = mode;
+    },
+    setTraderSortDirection(direction: TraderSortDirection) {
+      this.traderSortDirection = direction;
+    },
   },
   // Enable automatic localStorage persistence
   persist: {
@@ -981,6 +997,8 @@ export const usePreferencesStore = defineStore('preferences', {
       'pinnedTaskIds',
       'taskFilterPresets',
       'skillSortMode',
+      'traderSortMode',
+      'traderSortDirection',
     ],
   },
 });

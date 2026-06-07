@@ -23,6 +23,7 @@ const createDashboardStatsMock = (
     traderStats?: Array<{
       id: string;
       name: string;
+      normalizedName?: string;
       imageLink: string | null;
       completedTasks: number;
       totalTasks: number;
@@ -84,6 +85,8 @@ const setup = async (
     showNonSpecialTasks?: boolean;
     showLightkeeperTasks?: boolean;
     onlyTasksWithRequiredKeys?: boolean;
+    traderSortMode?: 'default' | 'progress' | 'level';
+    traderSortDirection?: 'asc' | 'desc';
   } = {}
 ) => {
   const {
@@ -94,8 +97,12 @@ const setup = async (
     showNonSpecialTasks = true,
     showLightkeeperTasks = true,
     onlyTasksWithRequiredKeys = false,
+    traderSortMode = 'default',
+    traderSortDirection = 'desc',
   } = storeOverrides;
   vi.resetModules();
+  const setTraderSortMode = vi.fn();
+  const setTraderSortDirection = vi.fn();
   vi.doMock('@/composables/useDashboardStats', () => ({
     useDashboardStats: createDashboardStatsMock(dashboardStatsOptions),
   }));
@@ -128,6 +135,14 @@ const setup = async (
       get getOnlyTasksWithRequiredKeys() {
         return onlyTasksWithRequiredKeys;
       },
+      get getTraderSortMode() {
+        return traderSortMode;
+      },
+      get getTraderSortDirection() {
+        return traderSortDirection;
+      },
+      setTraderSortMode,
+      setTraderSortDirection,
       dashboardNoticeDismissed: false,
       setDashboardNoticeDismissed: vi.fn(),
       setTaskPrimaryView: vi.fn(),
@@ -138,7 +153,7 @@ const setup = async (
     useRouter: () => ({ push: vi.fn() }),
   }));
   const { default: DashboardPage } = await import('@/pages/index.vue');
-  return { DashboardPage };
+  return { DashboardPage, setTraderSortMode, setTraderSortDirection };
 };
 const defaultGlobalStubs = {
   AppTooltip: { template: '<span><slot /></span>' },
@@ -155,6 +170,16 @@ const defaultGlobalStubs = {
   },
   DashboardChangelog: {
     template: '<div data-testid="dashboard-changelog"></div>',
+  },
+  DashboardTraderCard: {
+    props: ['trader', 'completedTasks', 'totalTasks', 'percentage'],
+    template: '<div data-testid="trader-card">{{ trader.name }}</div>',
+  },
+  SelectMenuFixed: {
+    name: 'SelectMenuFixed',
+    props: ['modelValue', 'items', 'valueKey'],
+    emits: ['update:modelValue'],
+    template: '<div data-testid="sort-select"></div>',
   },
   UIcon: true,
 };
@@ -392,6 +417,87 @@ describe('dashboard page', () => {
       // DashboardPage doesn't expose the computed level via a data-testid or prop.
       // The level is used internally by child components. Full verification would
       // require integration tests or exposing the level in the DOM.
+    });
+  });
+  describe('trader sorting', () => {
+    const sortableTraders = [
+      {
+        id: 'prapor',
+        name: 'Prapor',
+        normalizedName: 'prapor',
+        imageLink: null,
+        completedTasks: 3,
+        totalTasks: 10,
+        percentage: 30,
+      },
+      {
+        id: 'therapist',
+        name: 'Therapist',
+        normalizedName: 'therapist',
+        imageLink: null,
+        completedTasks: 8,
+        totalTasks: 10,
+        percentage: 80,
+      },
+      {
+        id: 'skier',
+        name: 'Skier',
+        normalizedName: 'skier',
+        imageLink: null,
+        completedTasks: 5,
+        totalTasks: 10,
+        percentage: 50,
+      },
+    ];
+    const renderedTraderOrder = (wrapper: {
+      findAll: (s: string) => Array<{ attributes: (a: string) => string | undefined }>;
+    }) =>
+      wrapper
+        .findAll('[id^="dashboard-trader-"]')
+        .map((node) => node.attributes('id')?.replace('dashboard-trader-', ''));
+    it('renders traders in canonical order for default sort mode', async () => {
+      const { DashboardPage } = await setup(
+        { traderStats: sortableTraders },
+        { traderSortMode: 'default' }
+      );
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedTraderOrder(wrapper)).toEqual(['prapor', 'therapist', 'skier']);
+    });
+    it('sorts traders by progress descending', async () => {
+      const { DashboardPage } = await setup(
+        { traderStats: sortableTraders },
+        { traderSortMode: 'progress', traderSortDirection: 'desc' }
+      );
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedTraderOrder(wrapper)).toEqual(['therapist', 'skier', 'prapor']);
+    });
+    it('sorts traders by progress ascending', async () => {
+      const { DashboardPage } = await setup(
+        { traderStats: sortableTraders },
+        { traderSortMode: 'progress', traderSortDirection: 'asc' }
+      );
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedTraderOrder(wrapper)).toEqual(['prapor', 'skier', 'therapist']);
+    });
+    it('persists sort mode changes through the preferences store', async () => {
+      const { DashboardPage, setTraderSortMode } = await setup(
+        { traderStats: sortableTraders },
+        { traderSortMode: 'default' }
+      );
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      const select = wrapper.findComponent({ name: 'SelectMenuFixed' });
+      expect(select.exists()).toBe(true);
+      select.vm.$emit('update:modelValue', 'progress');
+      await wrapper.vm.$nextTick();
+      expect(setTraderSortMode).toHaveBeenCalledWith('progress');
     });
   });
 });
