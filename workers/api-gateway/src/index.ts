@@ -9,7 +9,14 @@ import {
 import { handleGetTeamProgress } from './handlers/team';
 import { handleGetToken } from './handlers/token';
 import { OPENAPI_JSON } from './openapi';
-import type { Env, TaskState, BatchTaskUpdate, LegacyTokenResponse } from './types';
+import type {
+  ApiToken,
+  Env,
+  Permission,
+  TaskState,
+  BatchTaskUpdate,
+  LegacyTokenResponse,
+} from './types';
 /**
  * Normalize task updates to support both legacy object and array formats
  * Legacy: { "taskId1": "completed", "taskId2": "failed" }
@@ -331,6 +338,78 @@ function errorResponse(
     },
   });
 }
+type AuthSuccess = {
+  validation: { valid: true; token: ApiToken };
+  rlHeaders: Record<string, string>;
+};
+async function authenticateAndRateLimit(
+  env: Env,
+  request: Request,
+  rawToken: string,
+  permission: Permission,
+  action: Action,
+  envOrigin?: string,
+  requestOrigin?: string
+): Promise<AuthSuccess | Response> {
+  const validation = await validateToken(env, rawToken, permission);
+  if (!validation.valid) {
+    return errorResponse(validation.error, validation.status, envOrigin, requestOrigin);
+  }
+  const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const rlKey = `${action}:${clientIp}:${rawToken.slice(-16)}`;
+  const rl = await rateLimit(env, rlKey, RATE_LIMITS[action].limit, RATE_LIMITS[action].windowSec);
+  const rlHeaders = rateLimitHeaders(rl);
+  if (!rl.allowed) {
+    return errorResponse(
+      rl.message || 'Rate limit exceeded',
+      rl.status || 429,
+      envOrigin,
+      requestOrigin,
+      rlHeaders
+    );
+  }
+  return { validation, rlHeaders };
+}
+function decodeUrlParam(
+  raw: string,
+  label: string,
+  envOrigin?: string,
+  requestOrigin?: string
+): string | Response {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw).trim();
+  } catch {
+    return errorResponse(`Invalid ${label} in URL`, 400, envOrigin, requestOrigin);
+  }
+  if (!decoded) {
+    return errorResponse(`Missing ${label} in URL`, 400, envOrigin, requestOrigin);
+  }
+  return decoded;
+}
+async function parseJsonObjectBody(
+  request: Request,
+  envOrigin?: string,
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
+): Promise<Record<string, unknown> | Response> {
+  let parsedBody: unknown;
+  try {
+    parsedBody = await request.json();
+  } catch {
+    return errorResponse('Invalid JSON body', 400, envOrigin, requestOrigin, extraHeaders);
+  }
+  if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+    return errorResponse(
+      'Invalid request body (expected object)',
+      400,
+      envOrigin,
+      requestOrigin,
+      extraHeaders
+    );
+  }
+  return parsedBody as Record<string, unknown>;
+}
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -399,83 +478,50 @@ export default {
     try {
       // GET /token - Token info
       if (apiPath === '/token' && request.method === 'GET') {
-        const validation = await validateToken(env, rawToken, 'GP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `token-info:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['token-info'].limit,
-          RATE_LIMITS['token-info'].windowSec
+          request,
+          rawToken,
+          'GP',
+          'token-info',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
         const tokenResponse = handleGetToken(validation.token, rawToken);
         return tokenFlatResponse(tokenResponse, origin, reqOrigin, rlHeaders);
       }
       // GET /progress - Player progress
       if (apiPath === '/progress' && request.method === 'GET') {
-        const validation = await validateToken(env, rawToken, 'GP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `progress-read:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['progress-read'].limit,
-          RATE_LIMITS['progress-read'].windowSec
+          request,
+          rawToken,
+          'GP',
+          'progress-read',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const progress = await handleGetProgress(env, validation.token, effectiveGameMode);
         return successResponse(progress, undefined, 200, origin, reqOrigin, rlHeaders);
       }
       // GET /team/progress - Team progress (requires TP permission)
       if (apiPath === '/team/progress' && request.method === 'GET') {
-        const validation = await validateToken(env, rawToken, 'TP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `progress-read:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['progress-read'].limit,
-          RATE_LIMITS['progress-read'].windowSec
+          request,
+          rawToken,
+          'TP',
+          'progress-read',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const teamProgress = await handleGetTeamProgress(env, validation.token, effectiveGameMode);
         return successResponse(teamProgress, undefined, 200, origin, reqOrigin, rlHeaders);
@@ -483,28 +529,17 @@ export default {
       // POST /progress/level/:levelValue - Update player level
       const levelMatch = apiPath.match(/^\/progress\/level\/(\d+)$/);
       if (levelMatch && request.method === 'POST') {
-        const validation = await validateToken(env, rawToken, 'WP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `progress-write:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['progress-write'].limit,
-          RATE_LIMITS['progress-write'].windowSec
+          request,
+          rawToken,
+          'WP',
+          'progress-write',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
         const level = parseInt(levelMatch[1], 10);
         if (isNaN(level) || level < 1 || level > 79) {
           return errorResponse(
@@ -522,52 +557,21 @@ export default {
       // POST /progress/task/objective/:objectiveId - Update task objective
       const objectiveMatch = apiPath.match(/^\/progress\/task\/objective\/([^/]+)$/);
       if (objectiveMatch && request.method === 'POST') {
-        let objectiveId: string;
-        try {
-          objectiveId = decodeURIComponent(objectiveMatch[1]).trim();
-        } catch {
-          return errorResponse('Invalid objective ID in URL', 400, origin, reqOrigin);
-        }
-        if (!objectiveId) {
-          return errorResponse('Missing objective ID in URL', 400, origin, reqOrigin);
-        }
-        const validation = await validateToken(env, rawToken, 'WP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `progress-write:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const objectiveId = decodeUrlParam(objectiveMatch[1], 'objective ID', origin, reqOrigin);
+        if (objectiveId instanceof Response) return objectiveId;
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['progress-write'].limit,
-          RATE_LIMITS['progress-write'].windowSec
+          request,
+          rawToken,
+          'WP',
+          'progress-write',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
-        let parsedBody: unknown;
-        try {
-          parsedBody = await request.json();
-        } catch {
-          return errorResponse('Invalid JSON body', 400, origin, reqOrigin, rlHeaders);
-        }
-        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
-          return errorResponse(
-            'Invalid request body (expected object)',
-            400,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
+        const parsedBody = await parseJsonObjectBody(request, origin, reqOrigin, rlHeaders);
+        if (parsedBody instanceof Response) return parsedBody;
         const body = parsedBody as { state?: unknown; count?: unknown };
         if (body.state === undefined && body.count === undefined) {
           return errorResponse('Must provide state or count', 400, origin, reqOrigin, rlHeaders);
@@ -612,52 +616,21 @@ export default {
       // POST /progress/task/:taskId - Update single task
       const taskMatch = apiPath.match(/^\/progress\/task\/([^/]+)$/);
       if (taskMatch && request.method === 'POST') {
-        let taskId: string;
-        try {
-          taskId = decodeURIComponent(taskMatch[1]).trim();
-        } catch {
-          return errorResponse('Invalid task ID in URL', 400, origin, reqOrigin);
-        }
-        if (!taskId) {
-          return errorResponse('Missing task ID in URL', 400, origin, reqOrigin);
-        }
-        const validation = await validateToken(env, rawToken, 'WP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `progress-write:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const taskId = decodeUrlParam(taskMatch[1], 'task ID', origin, reqOrigin);
+        if (taskId instanceof Response) return taskId;
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['progress-write'].limit,
-          RATE_LIMITS['progress-write'].windowSec
+          request,
+          rawToken,
+          'WP',
+          'progress-write',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
-        let parsedBody: unknown;
-        try {
-          parsedBody = await request.json();
-        } catch {
-          return errorResponse('Invalid JSON body', 400, origin, reqOrigin, rlHeaders);
-        }
-        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
-          return errorResponse(
-            'Invalid request body (expected object)',
-            400,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
+        const parsedBody = await parseJsonObjectBody(request, origin, reqOrigin, rlHeaders);
+        if (parsedBody instanceof Response) return parsedBody;
         const rawState = (parsedBody as { state?: unknown }).state;
         if (
           typeof rawState !== 'string' ||
@@ -684,28 +657,17 @@ export default {
       }
       // POST /progress/tasks - Batch update tasks
       if (apiPath === '/progress/tasks' && request.method === 'POST') {
-        const validation = await validateToken(env, rawToken, 'WP');
-        if (!validation.valid) {
-          return errorResponse(validation.error, validation.status, origin, reqOrigin);
-        }
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const rlKey = `progress-write:${clientIp}:${rawToken.slice(-16)}`;
-        const rl = await rateLimit(
+        const auth = await authenticateAndRateLimit(
           env,
-          rlKey,
-          RATE_LIMITS['progress-write'].limit,
-          RATE_LIMITS['progress-write'].windowSec
+          request,
+          rawToken,
+          'WP',
+          'progress-write',
+          origin,
+          reqOrigin
         );
-        const rlHeaders = rateLimitHeaders(rl);
-        if (!rl.allowed) {
-          return errorResponse(
-            rl.message || 'Rate limit exceeded',
-            rl.status || 429,
-            origin,
-            reqOrigin,
-            rlHeaders
-          );
-        }
+        if (auth instanceof Response) return auth;
+        const { validation, rlHeaders } = auth;
         const body = await request.json();
         // Support both legacy object format and new array format
         const updates = normalizeTaskUpdates(body);

@@ -43,6 +43,7 @@ type BaseFetchMockOptions = {
   onPatch?: (body: Record<string, unknown>) => void;
   tasks?: Array<Record<string, unknown>>;
   userProgress?: Record<string, unknown>;
+  permissions?: string[];
 };
 const createBaseFetchMock = ({
   onPatch,
@@ -53,6 +54,7 @@ const createBaseFetchMock = ({
     pvp_data: { taskCompletions: {} },
     pve_data: null,
   },
+  permissions = ['WP'],
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
@@ -63,7 +65,7 @@ const createBaseFetchMock = ({
           token_id: 'token-1',
           user_id: 'user-1',
           token_hash: 'hash',
-          permissions: ['WP'],
+          permissions,
           game_mode: 'pvp',
           note: 'test',
           is_active: true,
@@ -104,6 +106,25 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+const AUTH_HEADERS = { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' };
+const postObjectiveRequest = (objectiveId: string, body: unknown) =>
+  buildRequest(`/progress/task/objective/${objectiveId}`, {
+    method: 'POST',
+    headers: AUTH_HEADERS,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+const postTaskRequest = (taskId: string, body: unknown) =>
+  buildRequest(`/progress/task/${taskId}`, {
+    method: 'POST',
+    headers: AUTH_HEADERS,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+const expectErrorResponse = async (res: Response, status: number, error: string) => {
+  expect(res.status).toBe(status);
+  const body = (await res.json()) as { success: boolean; error: string };
+  expect(body.success).toBe(false);
+  expect(body.error).toBe(error);
+};
 describe('api-gateway', () => {
   it('serves health without auth', async () => {
     const res = await worker.fetch(buildRequest('/health'), BASE_ENV);
@@ -128,36 +149,10 @@ describe('api-gateway', () => {
   });
   it('rejects missing bearer token', async () => {
     const res = await worker.fetch(buildRequest('/token', { method: 'GET' }), BASE_ENV);
-    expect(res.status).toBe(401);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Unauthorized');
+    await expectErrorResponse(res, 401, 'Unauthorized');
   });
   it('returns token info for valid token', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.includes('/rest/v1/api_tokens')) {
-        return jsonResponse([
-          {
-            token_id: 'token-1',
-            user_id: 'user-1',
-            token_hash: 'hash',
-            permissions: ['GP'],
-            game_mode: 'pvp',
-            note: 'test',
-            is_active: true,
-            usage_count: 0,
-            expires_at: null,
-          },
-        ]);
-      }
-      if (url.includes('/rest/v1/rpc/increment_token_usage')) {
-        return jsonResponse({ ok: true });
-      }
-      return new Response('Not Found', { status: 404 });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const res = await worker.fetch(
       buildRequest('/token', {
         method: 'GET',
@@ -172,30 +167,7 @@ describe('api-gateway', () => {
     expect(body.owner).toBe('user-1');
   });
   it('exposes rate-limit headers on successful responses', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.includes('/rest/v1/api_tokens')) {
-        return jsonResponse([
-          {
-            token_id: 'token-1',
-            user_id: 'user-1',
-            token_hash: 'hash',
-            permissions: ['GP'],
-            game_mode: 'pvp',
-            note: 'test',
-            is_active: true,
-            usage_count: 0,
-            expires_at: null,
-          },
-        ]);
-      }
-      if (url.includes('/rest/v1/rpc/increment_token_usage')) {
-        return jsonResponse({ ok: true });
-      }
-      return new Response('Not Found', { status: 404 });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const res = await worker.fetch(
       buildRequest('/token', {
         method: 'GET',
@@ -216,30 +188,7 @@ describe('api-gateway', () => {
       ...BASE_ENV,
       API_GATEWAY_LIMITER: makeLimiter({ allowed: false, remaining: 0, resetAt }),
     };
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.includes('/rest/v1/api_tokens')) {
-        return jsonResponse([
-          {
-            token_id: 'token-1',
-            user_id: 'user-1',
-            token_hash: 'hash',
-            permissions: ['GP'],
-            game_mode: 'pvp',
-            note: 'test',
-            is_active: true,
-            usage_count: 0,
-            expires_at: null,
-          },
-        ]);
-      }
-      if (url.includes('/rest/v1/rpc/increment_token_usage')) {
-        return jsonResponse({ ok: true });
-      }
-      return new Response('Not Found', { status: 404 });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const res = await worker.fetch(
       buildRequest('/token', {
         method: 'GET',
@@ -551,108 +500,46 @@ describe('api-gateway', () => {
   });
   it('rejects POST /progress/task with URL-encoded whitespace ID', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/%20%20', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Missing task ID in URL');
+    const res = await worker.fetch(postTaskRequest('%20%20', { state: 'completed' }), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Missing task ID in URL');
   });
   it('rejects POST /progress/task with malformed encoded ID', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/%E0%A4%A', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid task ID in URL');
+    const res = await worker.fetch(postTaskRequest('%E0%A4%A', { state: 'completed' }), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid task ID in URL');
   });
   it('rejects POST /progress/task with malformed JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/task-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: '{not json',
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid JSON body');
+    const res = await worker.fetch(postTaskRequest('task-1', '{not json'), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid JSON body');
   });
   it('rejects POST /progress/task with null JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/task-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: 'null',
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid request body (expected object)');
+    const res = await worker.fetch(postTaskRequest('task-1', 'null'), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid request body (expected object)');
   });
   it('rejects POST /progress/task with array JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/task-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: '[]',
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid request body (expected object)');
+    const res = await worker.fetch(postTaskRequest('task-1', '[]'), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid request body (expected object)');
   });
   it('rejects POST /progress/task with invalid state and echoes the value', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/task-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'foo' }),
-      }),
-      BASE_ENV
+    const res = await worker.fetch(postTaskRequest('task-1', { state: 'foo' }), BASE_ENV);
+    await expectErrorResponse(
+      res,
+      400,
+      'Invalid state "foo" (must be completed, uncompleted, or failed)'
     );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid state "foo" (must be completed, uncompleted, or failed)');
   });
   it('rejects POST /progress/task when state is not a string', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/task-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 123 }),
-      }),
-      BASE_ENV
+    const res = await worker.fetch(postTaskRequest('task-1', { state: 123 }), BASE_ENV);
+    await expectErrorResponse(
+      res,
+      400,
+      'Invalid state "123" (must be completed, uncompleted, or failed)'
     );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid state "123" (must be completed, uncompleted, or failed)');
   });
   it('accepts POST /progress/task with URL-encoded valid task ID', async () => {
     let patchBody: Record<string, unknown> | null = null;
@@ -673,11 +560,7 @@ describe('api-gateway', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const res = await worker.fetch(
-      buildRequest('/progress/task/task-main%20', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
-      }),
+      postTaskRequest('task-main%20', { state: 'completed' }),
       BASE_ENV
     );
     expect(res.status).toBe(200);
@@ -693,122 +576,48 @@ describe('api-gateway', () => {
   it('rejects POST /progress/task/objective with URL-encoded whitespace ID', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
     const res = await worker.fetch(
-      buildRequest('/progress/task/objective/%20%20', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
-      }),
+      postObjectiveRequest('%20%20', { state: 'completed' }),
       BASE_ENV
     );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Missing objective ID in URL');
+    await expectErrorResponse(res, 400, 'Missing objective ID in URL');
   });
   it('rejects POST /progress/task/objective with malformed encoded ID', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
     const res = await worker.fetch(
-      buildRequest('/progress/task/objective/%E0%A4%A', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
-      }),
+      postObjectiveRequest('%E0%A4%A', { state: 'completed' }),
       BASE_ENV
     );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid objective ID in URL');
+    await expectErrorResponse(res, 400, 'Invalid objective ID in URL');
   });
   it('rejects POST /progress/task/objective with malformed JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: '{not json',
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid JSON body');
+    const res = await worker.fetch(postObjectiveRequest('obj-1', '{not json'), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid JSON body');
   });
   it('rejects POST /progress/task/objective with array JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: '[]',
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid request body (expected object)');
+    const res = await worker.fetch(postObjectiveRequest('obj-1', '[]'), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid request body (expected object)');
   });
   it('rejects POST /progress/task/objective without state or count', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Must provide state or count');
+    const res = await worker.fetch(postObjectiveRequest('obj-1', {}), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Must provide state or count');
   });
   it('rejects POST /progress/task/objective with invalid state and echoes the value', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'foo' }),
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid state "foo" (must be completed or uncompleted)');
+    const res = await worker.fetch(postObjectiveRequest('obj-1', { state: 'foo' }), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid state "foo" (must be completed or uncompleted)');
   });
   it('rejects POST /progress/task/objective when state is not a string', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 123 }),
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid state "123" (must be completed or uncompleted)');
+    const res = await worker.fetch(postObjectiveRequest('obj-1', { state: 123 }), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid state "123" (must be completed or uncompleted)');
   });
   it('rejects POST /progress/task/objective with negative count', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: -1 }),
-      }),
-      BASE_ENV
-    );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.success).toBe(false);
-    expect(body.error).toBe('Invalid count (must be a non-negative number)');
+    const res = await worker.fetch(postObjectiveRequest('obj-1', { count: -1 }), BASE_ENV);
+    await expectErrorResponse(res, 400, 'Invalid count (must be a non-negative number)');
   });
   it('accepts POST /progress/task/objective with URL-encoded valid objective ID', async () => {
     let patchBody: Record<string, unknown> | null = null;
@@ -819,11 +628,7 @@ describe('api-gateway', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const res = await worker.fetch(
-      buildRequest('/progress/task/objective/obj-1%20', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'completed' }),
-      }),
+      postObjectiveRequest('obj-1%20', { state: 'completed' }),
       BASE_ENV
     );
     expect(res.status).toBe(200);
