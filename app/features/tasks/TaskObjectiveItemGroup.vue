@@ -25,60 +25,12 @@
           isParentTaskLocked ? 'opacity-70' : '',
         ]"
       >
-        <AppTooltip
-          v-if="row.meta.itemIcon"
-          :text="row.meta.itemName"
-          :ui="{ content: 'h-auto overflow-hidden rounded-lg p-0' }"
-        >
-          <img
-            :src="row.meta.itemIcon"
-            :alt="row.meta.itemName"
-            class="h-8 w-8 shrink-0 cursor-pointer rounded-sm object-contain transition-opacity hover:opacity-80"
-          />
-          <template #content>
-            <img
-              :src="row.meta.itemPreview ?? row.meta.itemIcon"
-              :alt="row.meta.itemName"
-              class="bg-surface-900/90 block h-28 w-28 object-contain"
-            />
-          </template>
-        </AppTooltip>
-        <div class="flex min-w-0 flex-1 items-center gap-1">
-          <AppTooltip :text="row.meta.itemName">
-            <a
-              v-if="row.meta.itemPrimaryUrl"
-              :href="row.meta.itemPrimaryUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-link hover:text-link-hover focus-visible:ring-primary-500 flex min-w-0 items-center gap-0.5 rounded-sm text-xs font-bold no-underline focus:outline-none focus-visible:ring-2"
-              @click.stop
-            >
-              <span class="truncate">{{ row.meta.itemName }}</span>
-              <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
-            </a>
-            <span v-else class="text-surface-100 block truncate text-xs font-semibold">
-              {{ row.meta.itemName }}
-            </span>
-          </AppTooltip>
-          <AppTooltip
-            v-if="row.meta.itemDevUrl"
-            :text="t('page.tasks.questcard.view_on_tarkov_dev')"
-          >
-            <a
-              :href="row.meta.itemDevUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
-              @click.stop
-            >
-              <img
-                src="/img/logos/tarkovdevlogo.webp"
-                :alt="t('page.tasks.questcard.view_on_tarkov_dev')"
-                class="h-4 w-4"
-              />
-            </a>
-          </AppTooltip>
-        </div>
+        <ObjectiveItemDisplay
+          :primary-item="getRowPrimaryItem(row)"
+          :accepted-items="getRowAcceptedItems(row)"
+          :fallback-name="row.meta.itemName"
+          :paused="isParentTaskLocked"
+        />
         <span
           v-if="row.meta.foundInRaid"
           class="bg-kappa-500/20 text-kappa-300 rounded px-1 py-0.5 text-[10px] font-semibold"
@@ -141,6 +93,7 @@
 </template>
 <script setup lang="ts">
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
+  import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import {
     isMapViewKey,
@@ -364,6 +317,28 @@
   });
   const getRowObjectiveIds = (row: ConsolidatedRow): string[] => {
     return row.objectives.map((objRow) => objRow.objective.id);
+  };
+  // Resolve the canonical (primary) item for a consolidated row, preferring the
+  // hydrated full objective so we get complete item data.
+  const getRowPrimaryItem = (row: ConsolidatedRow): TarkovItem | undefined => {
+    const objective = row.objectives[0]?.objective;
+    if (!objective) return undefined;
+    const full = fullObjectives.value.find((o) => o.id === objective.id);
+    const source = full ?? objective;
+    return source.item ?? source.items?.[0] ?? source.markerItem ?? source.questItem ?? undefined;
+  };
+  // "Any of these" objectives accept multiple items; expose the full list so the
+  // display can rotate through them. Only returns >1 items for a single
+  // objective whose items array has alternatives (display-only).
+  const getRowAcceptedItems = (row: ConsolidatedRow): TarkovItem[] | undefined => {
+    if (row.objectives.length !== 1) return undefined;
+    const objective = row.objectives[0]?.objective;
+    if (!objective) return undefined;
+    const full = fullObjectives.value.find((o) => o.id === objective.id);
+    const items = (full ?? objective).items;
+    if (!Array.isArray(items)) return undefined;
+    const valid = items.filter((entry): entry is TarkovItem => Boolean(entry?.id));
+    return valid.length > 1 ? valid : undefined;
   };
   const rowHasGiveObjectives = (row: ConsolidatedRow): boolean => {
     return row.objectives.some((objRow) => giveObjectiveTypes.has(objRow.objective.type ?? ''));

@@ -169,11 +169,14 @@ export function useGraphBuilder() {
           // When an objective accepts more than one item (e.g. "hand over any
           // found-in-raid medicine item"), keep the full list so the UI can show
           // that alternatives are valid. The primary item stays canonical for
-          // grouping/keying/progress; acceptedItems is display-only.
-          const acceptedItems =
-            Array.isArray(objective.items) && objective.items.length > 1
-              ? objective.items
-              : undefined;
+          // grouping/keying/progress; acceptedItems is display-only. Filter to
+          // valid items so the "Any N" count matches the cycled candidates.
+          const validItems = Array.isArray(objective.items)
+            ? objective.items.filter((entry): entry is NonNullable<typeof entry> =>
+                Boolean(entry?.id)
+              )
+            : [];
+          const acceptedItems = validItems.length > 1 ? validItems : undefined;
           tempNeededObjectives.push({
             id: objective.id,
             needType: 'taskObjective',

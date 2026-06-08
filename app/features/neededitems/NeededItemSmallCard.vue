@@ -71,13 +71,21 @@
             />
             <AppTooltip
               v-if="isCyclingItems"
-              :text="t('needed_items.any_of_items', { count: acceptedItemsCount })"
+              :text="
+                t(
+                  'needed_items.any_of_items',
+                  { count: acceptedItemsCount },
+                  'Any one of these {count} items counts'
+                )
+              "
             >
               <div
                 class="bg-surface-900/80 text-surface-100 absolute top-0 right-0 z-10 flex items-center gap-1 rounded-bl-lg px-2 py-1 text-xs font-semibold ring-1 ring-white/10 backdrop-blur-sm"
               >
                 <UIcon name="i-mdi-swap-horizontal" class="h-3.5 w-3.5" aria-hidden="true" />
-                {{ t('needed_items.any_of_items_short', { count: acceptedItemsCount }) }}
+                {{
+                  t('needed_items.any_of_items_short', { count: acceptedItemsCount }, 'Any {count}')
+                }}
               </div>
             </AppTooltip>
             <div

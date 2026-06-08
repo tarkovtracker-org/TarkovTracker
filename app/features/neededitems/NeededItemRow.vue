@@ -26,13 +26,25 @@
                 <span class="truncate">{{ item?.name ?? '' }}</span>
                 <AppTooltip
                   v-if="isCyclingItems"
-                  :text="$t('needed_items.any_of_items', { count: acceptedItemsCount })"
+                  :text="
+                    $t(
+                      'needed_items.any_of_items',
+                      { count: acceptedItemsCount },
+                      'Any one of these {count} items counts'
+                    )
+                  "
                 >
                   <span
                     class="bg-surface-700/80 text-surface-200 ml-1.5 inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
                   >
                     <UIcon name="i-mdi-swap-horizontal" class="h-3 w-3" aria-hidden="true" />
-                    {{ $t('needed_items.any_of_items_short', { count: acceptedItemsCount }) }}
+                    {{
+                      $t(
+                        'needed_items.any_of_items_short',
+                        { count: acceptedItemsCount },
+                        'Any {count}'
+                      )
+                    }}
                   </span>
                 </AppTooltip>
                 <ItemIndicators
