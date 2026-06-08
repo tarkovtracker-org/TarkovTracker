@@ -60,7 +60,7 @@
     "lint-staged": "^16.4.0",
     "postcss": "^8.5.9",
     "prettier": "^3.8.1",
-    "prettier-plugin-tailwindcss": "^0.7.2",
+    "prettier-plugin-tailwindcss": "^0.8.0",
     "semantic-release": "^25.0.3",
     "supabase": "^2.101.0",
     "tailwindcss": "^4.2.2",
