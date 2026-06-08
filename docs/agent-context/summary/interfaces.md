@@ -124,12 +124,6 @@ Invoked via `app/composables/api/useEdgeFunctions.ts` (or Stripe webhooks). All 
 | Twitch / GitHub                      | Outbound (server)       | Live status / contributors                                      |
 | Google Analytics / Microsoft Clarity | Client (consent-gated)  | Product analytics                                               |
 
-## 6. MCP Servers (developer/agent tooling)
-
-`.claude-plugin/mcp/eft-wiki` and `.claude-plugin/mcp/tarkov-dev` expose Model Context Protocol
-tools for querying the EFT wiki and the tarkov.dev GraphQL API. Treat MCP/API output as
-"only what the API returned" — absence of data is not proof of absence in-game.
-
 ## Error Conventions
 
 Nitro endpoints return errors as `{ error, statusCode, statusMessage }`. Typical statuses:

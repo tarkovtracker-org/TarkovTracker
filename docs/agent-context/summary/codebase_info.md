@@ -43,7 +43,6 @@ Deno/TypeScript for Supabase Edge Functions; small Node `.mjs` scripts; SQL migr
 ├── scripts/          # Node/shell dev + i18n + setup scripts
 ├── docs/             # Project documentation (ARCHITECTURE.md, API.md, agent-context/)
 ├── public/           # Static assets (incl. llms.txt)
-├── .claude-plugin/   # MCP servers (eft-wiki, tarkov-dev) + Claude plugin config
 ├── nuxt.config.ts    # Nuxt + Nitro + runtimeConfig + security
 ├── eslint.config.mjs # Flat ESLint config (zero-warning policy)
 ├── wrangler.toml     # Cloudflare Pages/Worker config
@@ -155,7 +154,6 @@ graph TD
     Root --> Workers[workers/api-gateway — Public API]
     Root --> Scripts[scripts/ — dev + i18n]
     Root --> Docs[docs/ — documentation]
-    Root --> MCP[.claude-plugin/mcp — MCP servers]
 
     App --> Pages[pages/ — routes]
     App --> Features[features/ — 13 domain slices]

@@ -135,10 +135,3 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 | `utils/transform.ts`                          | Progress transform + hideout auto-complete.                    |
 | `utils/{invalidation,memory-cache,logger}.ts` | Cache invalidation + in-memory cache.                          |
 | `openapi.ts`                                  | OpenAPI spec (validated in CI).                                |
-
-## MCP Servers (`.claude-plugin/mcp/`)
-
-| Server                    | Responsibility                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `eft-wiki/src/index.ts`   | Fetch/search EFT wiki pages (HTML → markdown, infobox/section extraction).     |
-| `tarkov-dev/src/index.ts` | Query tarkov.dev GraphQL (tasks, items, ammo, bosses) with concise formatting. |

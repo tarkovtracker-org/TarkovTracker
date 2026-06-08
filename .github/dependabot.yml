@@ -4,8 +4,6 @@ updates:
     directories:
       - /
       - /workers/api-gateway
-    exclude-paths:
-      - '.claude-plugin/**'
     schedule:
       interval: weekly
       day: monday
@@ -108,54 +106,6 @@ updates:
           - minor
           - patch
       remaining-npm:
-        patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-
-  - package-ecosystem: npm
-    directories:
-      - /.claude-plugin/mcp/tarkov-dev
-      - /.claude-plugin/mcp/eft-wiki
-    schedule:
-      interval: monthly
-      day: monday
-      time: '05:00'
-      timezone: America/New_York
-    open-pull-requests-limit: 1
-    rebase-strategy: auto
-    cooldown:
-      semver-major-days: 30
-      semver-minor-days: 14
-      semver-patch-days: 7
-    labels:
-      - dependencies
-      - javascript
-    commit-message:
-      prefix: chore(deps)
-      prefix-development: chore(deps)
-    versioning-strategy: increase-if-necessary
-    allow:
-      - dependency-type: direct
-    groups:
-      claude-plugin-dev:
-        dependency-type: development
-        patterns:
-          - typescript
-          - '@types/*'
-        update-types:
-          - minor
-          - patch
-      claude-plugin-runtime:
-        patterns:
-          - '@modelcontextprotocol/*'
-          - graphql-request
-          - node-html-parser
-        update-types:
-          - minor
-          - patch
-      claude-plugin-remaining:
         patterns:
           - '*'
         update-types:

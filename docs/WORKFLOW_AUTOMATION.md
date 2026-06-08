@@ -89,7 +89,7 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 - Dependabot-only, `main`-targeted PRs only
 - No repository checkout in the privileged `pull_request_target` workflow
 - Only package lockfiles, package manifests, and workflow files are allowed
-- Runtime Nuxt, Cloudflare, TypeScript compiler, catch-all npm, and `.claude-plugin` updates stay manual
+- Runtime Nuxt, Cloudflare, TypeScript compiler, and catch-all npm updates stay manual
 - PR must be mergeable and all standard CI/security checks must finish without failures
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
@@ -170,7 +170,6 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Features:**
 
 - Weekly npm update batches across the app root and `workers/api-gateway`
-- Monthly grouped npm batches for `.claude-plugin` MCP tooling
 - Monthly grouped GitHub Actions updates
 - Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
@@ -191,7 +190,6 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - cloudflare tooling
 - release tooling
 - remaining npm minor/patch updates
-- claude-plugin MCP runtime and dev tooling
 
 **Review strategy:**
 
@@ -200,8 +198,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Keep major upgrades explicit
 - Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
-- Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, catch-all npm, and `.claude-plugin` updates manual
-- Keep `.claude-plugin` updates out of the main app queue; review them monthly as isolated tooling maintenance
+- Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, and catch-all npm updates manual
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
 
 ## Development Environment Setup

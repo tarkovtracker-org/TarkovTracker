@@ -33,12 +33,6 @@
   ],
   "ignoreExportsUsedInFile": true,
   "workspaces": {
-    ".claude-plugin/mcp/eft-wiki": {
-      "entry": ["src/index.ts"]
-    },
-    ".claude-plugin/mcp/tarkov-dev": {
-      "entry": ["src/index.ts"]
-    },
     "workers/api-gateway": {
       "entry": [
         "scripts/validate-openapi.ts",
