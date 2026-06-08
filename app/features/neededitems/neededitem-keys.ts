@@ -17,6 +17,10 @@ export type NeededItemContext = {
   isLightkeeperRequired: ComputedRef<boolean>;
   isParentCompleted: ComputedRef<boolean>;
   item: ComputedRef<TarkovItem | null>;
+  /** All accepted items when the objective allows alternatives (display-only). */
+  acceptedItems: ComputedRef<TarkovItem[]>;
+  /** True when more than one item is accepted and the display is rotating. */
+  isCyclingItems: ComputedRef<boolean>;
   levelRequired: ComputedRef<number>;
   lockedBefore: ComputedRef<number>;
   neededCount: ComputedRef<number>;
@@ -40,6 +44,8 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     isLightkeeperRequired: asComputed(false),
     isParentCompleted: asComputed(false),
     item: asComputed(null),
+    acceptedItems: asComputed([]),
+    isCyclingItems: asComputed(false),
     levelRequired: asComputed(0),
     lockedBefore: asComputed(0),
     neededCount: asComputed(0),

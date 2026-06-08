@@ -24,6 +24,17 @@
             <span class="ml-3 flex min-w-0 flex-1 flex-col overflow-hidden">
               <span class="flex items-center truncate text-sm font-semibold">
                 <span class="truncate">{{ item?.name ?? '' }}</span>
+                <AppTooltip
+                  v-if="isCyclingItems"
+                  :text="$t('needed_items.any_of_items', { count: acceptedItemsCount })"
+                >
+                  <span
+                    class="bg-surface-700/80 text-surface-200 ml-1.5 inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
+                  >
+                    <UIcon name="i-mdi-swap-horizontal" class="h-3 w-3" aria-hidden="true" />
+                    {{ $t('needed_items.any_of_items_short', { count: acceptedItemsCount }) }}
+                  </span>
+                </AppTooltip>
                 <ItemIndicators
                   :found-in-raid="isFoundInRaid"
                   :is-craftable="isCraftable"
@@ -385,9 +396,12 @@
     item,
     teamNeeds,
     imageItem,
+    acceptedItems,
+    isCyclingItems,
   } = neededItemContext;
   const resolvedImageItem = computed(() => imageItem.value ?? undefined);
   const isFoundInRaid = computed(() => Boolean(props.need.foundInRaid));
+  const acceptedItemsCount = computed(() => acceptedItems.value.length);
   // Intersection observer for lazy loading
   const cardRef = ref<HTMLElement | null>(null);
   const { isVisible } = useItemRowIntersection(cardRef, {

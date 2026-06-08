@@ -431,6 +431,14 @@ export interface NeededItemTaskObjective extends NeededItemBase {
   teamId?: string | null;
   type?: string;
   markerItem?: TarkovItem;
+  /**
+   * All items accepted for an "any of these" objective (e.g. "hand over any
+   * found-in-raid medicine item"). Present only when the objective accepts more
+   * than one item. The primary `item` remains the canonical item used for
+   * grouping, keying, and progress; `acceptedItems` is display-only metadata so
+   * the UI can show that alternatives are allowed.
+   */
+  acceptedItems?: TarkovItem[];
 }
 export interface NeededItemHideoutModule extends NeededItemBase {
   needType: 'hideoutModule';

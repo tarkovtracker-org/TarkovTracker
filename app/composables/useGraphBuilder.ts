@@ -166,6 +166,14 @@ export function useGraphBuilder() {
           objective.type !== 'findQuestItem'
         ) {
           const primaryItem = objective.item ?? objective.items?.[0];
+          // When an objective accepts more than one item (e.g. "hand over any
+          // found-in-raid medicine item"), keep the full list so the UI can show
+          // that alternatives are valid. The primary item stays canonical for
+          // grouping/keying/progress; acceptedItems is display-only.
+          const acceptedItems =
+            Array.isArray(objective.items) && objective.items.length > 1
+              ? objective.items
+              : undefined;
           tempNeededObjectives.push({
             id: objective.id,
             needType: 'taskObjective',
@@ -175,6 +183,7 @@ export function useGraphBuilder() {
             markerItem: objective.markerItem,
             count: objective.count ?? 1,
             foundInRaid: objective.foundInRaid ?? false,
+            ...(acceptedItems ? { acceptedItems } : {}),
           });
         }
       });

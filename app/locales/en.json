@@ -2232,6 +2232,8 @@
       "increase_hideout_count": "Increase hideout count for {station_name}"
     },
     "item": "Item",
+    "any_of_items": "Any one of these {count} items counts",
+    "any_of_items_short": "Any {count}",
     "not_collected": "Not collected",
     "click_to_collect": "Click to collect",
     "click_to_uncollect": "Click to uncollect",

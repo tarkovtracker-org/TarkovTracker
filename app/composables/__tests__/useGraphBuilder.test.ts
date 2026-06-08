@@ -97,3 +97,56 @@ describe('useGraphBuilder alternatives', () => {
     ]);
   });
 });
+describe('useGraphBuilder needed item accepted items', () => {
+  it('carries all accepted items for "any of these" objectives', () => {
+    const task: Task = {
+      id: 'first-in-line',
+      name: 'First in Line',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-meds',
+          type: 'giveItem',
+          count: 3,
+          foundInRaid: true,
+          items: [
+            { id: 'augmentin', name: 'Augmentin antibiotic pills' },
+            { id: 'analgin', name: 'Analgin painkillers' },
+            { id: 'ibuprofen', name: 'Ibuprofen painkillers' },
+          ],
+        },
+      ],
+      taskRequirements: [],
+    };
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const need = result.neededItemTaskObjectives.find((n) => n.id === 'obj-meds');
+    expect(need).toBeDefined();
+    // Primary item stays canonical for grouping/keying/progress.
+    expect(need?.item?.id).toBe('augmentin');
+    expect(need?.count).toBe(3);
+    // Full list is carried for display-only cycling.
+    expect(need?.acceptedItems?.map((i) => i.id)).toEqual(['augmentin', 'analgin', 'ibuprofen']);
+  });
+  it('does not set acceptedItems for single-item objectives', () => {
+    const task: Task = {
+      id: 'single-item-task',
+      name: 'Single Item Task',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-single',
+          type: 'giveItem',
+          count: 1,
+          items: [{ id: 'bitcoin', name: 'Physical Bitcoin' }],
+        },
+      ],
+      taskRequirements: [],
+    };
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const need = result.neededItemTaskObjectives.find((n) => n.id === 'obj-single');
+    expect(need?.item?.id).toBe('bitcoin');
+    expect(need?.acceptedItems).toBeUndefined();
+  });
+});

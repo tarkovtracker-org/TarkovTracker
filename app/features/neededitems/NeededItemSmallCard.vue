@@ -69,6 +69,17 @@
                 isSingleItem && !selfCompletedNeed ? '!cursor-pointer' : '',
               ]"
             />
+            <AppTooltip
+              v-if="isCyclingItems"
+              :text="t('needed_items.any_of_items', { count: acceptedItemsCount })"
+            >
+              <div
+                class="bg-surface-900/80 text-surface-100 absolute top-0 right-0 z-10 flex items-center gap-1 rounded-bl-lg px-2 py-1 text-xs font-semibold ring-1 ring-white/10 backdrop-blur-sm"
+              >
+                <UIcon name="i-mdi-swap-horizontal" class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ t('needed_items.any_of_items_short', { count: acceptedItemsCount }) }}
+              </div>
+            </AppTooltip>
             <div
               v-if="selfCompletedNeed || currentCount >= neededCount"
               class="pointer-events-none absolute right-1 bottom-1 z-20"
@@ -223,10 +234,13 @@
     lockedBefore,
     item,
     imageItem,
+    acceptedItems,
+    isCyclingItems,
     cardStyle,
   } = inject(neededItemKey, createDefaultNeededItemContext());
   const hasItem = computed(() => Boolean(item.value));
   const isSingleItem = computed(() => neededCount.value === 1);
+  const acceptedItemsCount = computed(() => acceptedItems.value.length);
   const cardAriaLabel = computed(() => {
     const itemName = item.value?.name || t('needed_items.item');
     const status =
