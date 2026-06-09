@@ -40,4 +40,8 @@ reviews:
     biome:
       enabled: false
     eslint:
-      enabled: true
+      # Disabled: ESLint is enforced in CI (`npm run lint`) and pre-commit (lint-staged).
+      # CodeRabbit's sandbox cannot reliably reproduce the generated `.nuxt/eslint.config.mjs`
+      # (gitignored, produced by `nuxt prepare`), so it intermittently skips with
+      # "missing config or dependency". CI is the source of truth for lint.
+      enabled: false
