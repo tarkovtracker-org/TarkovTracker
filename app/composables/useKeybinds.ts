@@ -1,7 +1,7 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { queueIdleTask } from '@/utils/idleScheduler';
-import { matchesKeybind } from '@/utils/keybinds';
+import { DEFAULT_KEYBINDS, matchesKeybind } from '@/utils/keybinds';
 export function useKeybinds(): void {
   const preferencesStore = usePreferencesStore();
   const actionHistoryStore = useActionHistoryStore();
@@ -17,13 +17,13 @@ export function useKeybinds(): void {
       return;
     }
     const matchesShortcut = (shortcut: string) => matchesKeybind(event, shortcut);
-    const undoShortcut = preferencesStore.getKeybindUndo || 'ctrl+z';
+    const undoShortcut = preferencesStore.getKeybindUndo || DEFAULT_KEYBINDS.undo;
     if (matchesShortcut(undoShortcut)) {
       event.preventDefault();
       void actionHistoryStore.undoLastAction();
       return;
     }
-    const omnibarShortcut = preferencesStore.getKeybindOmnibar || 'ctrl+q';
+    const omnibarShortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
     if (matchesShortcut(omnibarShortcut)) {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('toggle-omnibar'));

@@ -22,16 +22,28 @@
                 </p>
               </div>
               <div class="flex flex-col items-end gap-1.5">
-                <UInput
-                  readonly
-                  :value="recordingField === field.id ? tempKeys : field.value"
-                  :placeholder="t('settings.keybinds.record_placeholder', 'Click to record...')"
-                  class="w-48 cursor-pointer text-center font-mono text-xs"
-                  :color="getValidationColor(field.id)"
-                  @focus="startRecording(field.id)"
-                  @blur="stopRecording(field.id)"
-                  @keydown="handleKeydown"
-                />
+                <div class="flex items-center gap-1.5">
+                  <UInput
+                    readonly
+                    :value="recordingField === field.id ? tempKeys : field.value"
+                    :placeholder="t('settings.keybinds.record_placeholder', 'Click to record...')"
+                    class="w-48 cursor-pointer text-center font-mono text-xs"
+                    :color="getValidationColor(field.id)"
+                    @focus="startRecording(field.id)"
+                    @blur="stopRecording(field.id)"
+                    @keydown="handleKeydown"
+                  />
+                  <UButton
+                    v-if="!field.isDefault"
+                    icon="i-mdi-restore"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    :aria-label="t('settings.keybinds.reset_aria', 'Reset to default')"
+                    :title="t('settings.keybinds.reset', 'Reset')"
+                    @click="resetField(field.id)"
+                  />
+                </div>
                 <span
                   v-if="warningMessages[field.id]"
                   class="text-right text-[10px]"
@@ -50,7 +62,7 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { serializeKeybindEvent } from '@/utils/keybinds';
+  import { DEFAULT_KEYBINDS, hasSystemConflict, serializeKeybindEvent } from '@/utils/keybinds';
   const { t } = useI18n();
   const preferencesStore = usePreferencesStore();
   const keybindOmnibar = computed({
@@ -71,6 +83,7 @@
         'Press this shortcut to open the global search palette.'
       ),
       value: keybindOmnibar.value,
+      isDefault: keybindOmnibar.value === DEFAULT_KEYBINDS.omnibar,
     },
     {
       id: 'undo' as const,
@@ -80,6 +93,7 @@
         'Press this shortcut to revert your most recent progress change.'
       ),
       value: keybindUndo.value,
+      isDefault: keybindUndo.value === DEFAULT_KEYBINDS.undo,
     },
   ]);
   type WarningKind = 'none' | 'conflict' | 'system';
@@ -97,6 +111,13 @@
     if (recordingField.value === field) {
       recordingField.value = null;
       tempKeys.value = '';
+    }
+  };
+  const resetField = (field: KeybindFieldId) => {
+    if (field === 'omnibar') {
+      keybindOmnibar.value = DEFAULT_KEYBINDS.omnibar;
+    } else {
+      keybindUndo.value = DEFAULT_KEYBINDS.undo;
     }
   };
   const handleKeydown = (event: KeyboardEvent) => {
@@ -134,21 +155,10 @@
       warnings.value.undo = 'conflict';
       return;
     }
-    const isDangerous = (shortcut: string) => {
-      const parts = shortcut.split('+');
-      const hasCtrl = parts.includes('ctrl');
-      const hasAlt = parts.includes('alt');
-      const key = parts[parts.length - 1];
-      if (!key) return false;
-      const dangerousKeys = ['t', 'w', 'n', 'f', 'tab', 'r', 'q'];
-      if (hasCtrl && dangerousKeys.includes(key)) return true;
-      if (hasAlt && ['tab', 'f4'].includes(key)) return true;
-      return false;
-    };
-    if (isDangerous(omnibarVal)) {
+    if (hasSystemConflict(omnibarVal)) {
       warnings.value.omnibar = 'system';
     }
-    if (isDangerous(undoVal)) {
+    if (hasSystemConflict(undoVal)) {
       warnings.value.undo = 'system';
     }
   };

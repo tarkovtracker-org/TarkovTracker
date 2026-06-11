@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_KEYBINDS,
+  hasSystemConflict,
   isValidKeybind,
   matchesKeybind,
   sanitizeKeybind,
@@ -67,6 +69,28 @@ describe('keybinds util', () => {
     });
     it('treats control as an alias for ctrl', () => {
       expect(matchesKeybind(makeEvent({ key: 'z', ctrlKey: true }), 'control+z')).toBe(true);
+    });
+  });
+  describe('hasSystemConflict', () => {
+    it('flags reserved keys behind Ctrl or Meta equivalently', () => {
+      expect(hasSystemConflict('ctrl+f')).toBe(true);
+      expect(hasSystemConflict('meta+f')).toBe(true);
+      expect(hasSystemConflict('ctrl+w')).toBe(true);
+      expect(hasSystemConflict('meta+t')).toBe(true);
+    });
+    it('flags Alt+Tab and Alt+F4', () => {
+      expect(hasSystemConflict('alt+tab')).toBe(true);
+      expect(hasSystemConflict('alt+f4')).toBe(true);
+    });
+    it('does not flag the shipped defaults or unreserved combos', () => {
+      expect(hasSystemConflict(DEFAULT_KEYBINDS.omnibar)).toBe(false);
+      expect(hasSystemConflict(DEFAULT_KEYBINDS.undo)).toBe(false);
+      expect(hasSystemConflict('ctrl+k')).toBe(false);
+      expect(hasSystemConflict('ctrl+shift+x')).toBe(false);
+    });
+    it('returns false for invalid shortcut strings', () => {
+      expect(hasSystemConflict(' ')).toBe(false);
+      expect(hasSystemConflict('ctrl+')).toBe(false);
     });
   });
 });

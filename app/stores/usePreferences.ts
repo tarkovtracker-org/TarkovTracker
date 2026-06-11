@@ -27,6 +27,7 @@ import {
 } from '@/types/taskFilter';
 import { clearPreferencesStorage } from '@/utils/clientStorage';
 import { TRADER_SORT_DIRECTIONS, TRADER_SORT_MODES } from '@/utils/constants';
+import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import {
@@ -239,8 +240,8 @@ export const preferencesDefaultState: PreferencesState = {
   traderSortMode: null,
   traderSortDirection: null,
   taskFilterPresets: [],
-  keybindOmnibar: 'ctrl+q',
-  keybindUndo: 'ctrl+z',
+  keybindOmnibar: DEFAULT_KEYBINDS.omnibar,
+  keybindUndo: DEFAULT_KEYBINDS.undo,
   saving: {
     streamerMode: false,
     hideGlobalTasks: false,
@@ -632,10 +633,10 @@ export const usePreferencesStore = defineStore('preferences', {
         : 'desc';
     },
     getKeybindOmnibar: (state) => {
-      return state.keybindOmnibar ?? 'ctrl+q';
+      return state.keybindOmnibar ?? DEFAULT_KEYBINDS.omnibar;
     },
     getKeybindUndo: (state) => {
-      return state.keybindUndo ?? 'ctrl+z';
+      return state.keybindUndo ?? DEFAULT_KEYBINDS.undo;
     },
   },
   actions: {

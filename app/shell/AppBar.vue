@@ -219,6 +219,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
   import { logger } from '@/utils/logger';
   import type { DropdownMenuItem } from '@nuxt/ui';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
@@ -248,7 +249,7 @@
     window.removeEventListener('toggle-omnibar', handleToggleOmnibar);
   });
   const omnibarShortcutParts = computed(() => {
-    const shortcut = preferencesStore.getKeybindOmnibar || 'ctrl+q';
+    const shortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
     return shortcut.split('+').map((part) => {
       if (part === 'ctrl' || part === 'control') return 'Ctrl';
       if (part === 'alt') return 'Alt';
@@ -259,7 +260,7 @@
     });
   });
   const omnibarAriaKeyshortcuts = computed(() => {
-    const shortcut = preferencesStore.getKeybindOmnibar || 'ctrl+q';
+    const shortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
     return shortcut
       .split('+')
       .map((part) => {
