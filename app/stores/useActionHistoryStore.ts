@@ -27,39 +27,18 @@ export const useActionHistoryStore = defineStore('actionHistory', {
       if (!lastAction) return;
       try {
         await lastAction.undo();
-        const toast = useSafeToast();
-        let title = `Undid action: ${lastAction.description}`;
-        try {
-          const { $i18n } = useNuxtApp();
-          if (typeof $i18n?.t === 'function') {
-            title = $i18n.t('toast.action_undone.title', { description: lastAction.description });
-          }
-        } catch (err) {
-          logger.warn('[ActionHistoryStore] i18n translator unavailable for undo toast.', err);
-        }
-        toast?.add({
-          title,
+        showUndoToast({
+          key: 'toast.action_undone.title',
+          fallback: `Undid action: ${lastAction.description}`,
+          description: lastAction.description,
           color: 'success',
         });
       } catch (error) {
         logger.error('[ActionHistoryStore] Failed to undo action:', error);
-        const toast = useSafeToast();
-        let title = `Failed to undo action: ${lastAction.description}`;
-        try {
-          const { $i18n } = useNuxtApp();
-          if (typeof $i18n?.t === 'function') {
-            title = $i18n.t('toast.action_undo_failed.title', {
-              description: lastAction.description,
-            });
-          }
-        } catch (translatorError) {
-          logger.warn(
-            '[ActionHistoryStore] i18n translator unavailable for undo-failure toast.',
-            translatorError
-          );
-        }
-        toast?.add({
-          title,
+        showUndoToast({
+          key: 'toast.action_undo_failed.title',
+          fallback: `Failed to undo action: ${lastAction.description}`,
+          description: lastAction.description,
           color: 'error',
         });
       }
@@ -69,3 +48,20 @@ export const useActionHistoryStore = defineStore('actionHistory', {
     },
   },
 });
+function showUndoToast(options: {
+  key: string;
+  fallback: string;
+  description: string;
+  color: 'success' | 'error';
+}) {
+  let title = options.fallback;
+  try {
+    const { $i18n } = useNuxtApp();
+    if (typeof $i18n?.t === 'function') {
+      title = $i18n.t(options.key, { description: options.description });
+    }
+  } catch (err) {
+    logger.warn('[ActionHistoryStore] i18n translator unavailable for undo toast.', err);
+  }
+  useSafeToast()?.add({ title, color: options.color });
+}

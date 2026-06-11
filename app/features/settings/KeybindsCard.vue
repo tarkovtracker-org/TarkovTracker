@@ -10,77 +10,38 @@
     <template #content>
       <div class="space-y-6 px-4 py-4 text-white">
         <div class="space-y-4">
-          <!-- Omnibar Keybind -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-surface-100 text-sm font-semibold">
-                {{ t('settings.keybinds.omnibar_label', 'Global Search (Omnibar)') }}
-              </p>
-              <p class="text-surface-400 text-xs">
-                {{
-                  t(
-                    'settings.keybinds.omnibar_description',
-                    'Press this shortcut to open the global search palette.'
-                  )
-                }}
-              </p>
+          <template v-for="(field, index) in keybindFields" :key="field.id">
+            <USeparator v-if="index > 0" />
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="text-surface-100 text-sm font-semibold">
+                  {{ field.label }}
+                </p>
+                <p class="text-surface-400 text-xs">
+                  {{ field.description }}
+                </p>
+              </div>
+              <div class="flex flex-col items-end gap-1.5">
+                <UInput
+                  readonly
+                  :value="recordingField === field.id ? tempKeys : field.value"
+                  :placeholder="t('settings.keybinds.record_placeholder', 'Click to record...')"
+                  class="w-48 cursor-pointer text-center font-mono text-xs"
+                  :color="getValidationColor(field.id)"
+                  @focus="startRecording(field.id)"
+                  @blur="stopRecording(field.id)"
+                  @keydown="handleKeydown"
+                />
+                <span
+                  v-if="warningMessages[field.id]"
+                  class="text-right text-[10px]"
+                  :class="getWarningClass(field.id)"
+                >
+                  {{ warningMessages[field.id] }}
+                </span>
+              </div>
             </div>
-            <div class="flex flex-col items-end gap-1.5">
-              <UInput
-                readonly
-                :value="recordingField === 'omnibar' ? tempKeys : keybindOmnibar"
-                :placeholder="t('settings.keybinds.record_placeholder', 'Click to record...')"
-                class="w-48 cursor-pointer text-center font-mono text-xs"
-                :color="getValidationColor('omnibar')"
-                @focus="startRecording('omnibar')"
-                @blur="stopRecording('omnibar')"
-                @keydown="handleKeydown"
-              />
-              <span
-                v-if="warningMessages.omnibar"
-                class="text-right text-[10px]"
-                :class="getWarningClass('omnibar')"
-              >
-                {{ warningMessages.omnibar }}
-              </span>
-            </div>
-          </div>
-          <USeparator />
-          <!-- Undo Keybind -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-surface-100 text-sm font-semibold">
-                {{ t('settings.keybinds.undo_label', 'Undo Last Action') }}
-              </p>
-              <p class="text-surface-400 text-xs">
-                {{
-                  t(
-                    'settings.keybinds.undo_description',
-                    'Press this shortcut to revert your most recent progress change.'
-                  )
-                }}
-              </p>
-            </div>
-            <div class="flex flex-col items-end gap-1.5">
-              <UInput
-                readonly
-                :value="recordingField === 'undo' ? tempKeys : keybindUndo"
-                :placeholder="t('settings.keybinds.record_placeholder', 'Click to record...')"
-                class="w-48 cursor-pointer text-center font-mono text-xs"
-                :color="getValidationColor('undo')"
-                @focus="startRecording('undo')"
-                @blur="stopRecording('undo')"
-                @keydown="handleKeydown"
-              />
-              <span
-                v-if="warningMessages.undo"
-                class="text-right text-[10px]"
-                :class="getWarningClass('undo')"
-              >
-                {{ warningMessages.undo }}
-              </span>
-            </div>
-          </div>
+          </template>
         </div>
       </div>
     </template>
@@ -100,18 +61,39 @@
     get: () => preferencesStore.getKeybindUndo,
     set: (val) => preferencesStore.setKeybindUndo(val),
   });
+  type KeybindFieldId = 'omnibar' | 'undo';
+  const keybindFields = computed(() => [
+    {
+      id: 'omnibar' as const,
+      label: t('settings.keybinds.omnibar_label', 'Global Search (Omnibar)'),
+      description: t(
+        'settings.keybinds.omnibar_description',
+        'Press this shortcut to open the global search palette.'
+      ),
+      value: keybindOmnibar.value,
+    },
+    {
+      id: 'undo' as const,
+      label: t('settings.keybinds.undo_label', 'Undo Last Action'),
+      description: t(
+        'settings.keybinds.undo_description',
+        'Press this shortcut to revert your most recent progress change.'
+      ),
+      value: keybindUndo.value,
+    },
+  ]);
   type WarningKind = 'none' | 'conflict' | 'system';
-  const recordingField = ref<'omnibar' | 'undo' | null>(null);
+  const recordingField = ref<KeybindFieldId | null>(null);
   const tempKeys = ref('');
-  const warnings = ref<{ omnibar: WarningKind; undo: WarningKind }>({
+  const warnings = ref<Record<KeybindFieldId, WarningKind>>({
     omnibar: 'none',
     undo: 'none',
   });
-  const startRecording = (field: 'omnibar' | 'undo') => {
+  const startRecording = (field: KeybindFieldId) => {
     recordingField.value = field;
     tempKeys.value = t('settings.keybinds.recording', 'Press key combination...');
   };
-  const stopRecording = (field: 'omnibar' | 'undo') => {
+  const stopRecording = (field: KeybindFieldId) => {
     if (recordingField.value === field) {
       recordingField.value = null;
       tempKeys.value = '';
@@ -175,7 +157,7 @@
     omnibar: warningMessageFor('omnibar'),
     undo: warningMessageFor('undo'),
   }));
-  function warningMessageFor(field: 'omnibar' | 'undo'): string {
+  function warningMessageFor(field: KeybindFieldId): string {
     const kind = warnings.value[field];
     if (kind === 'conflict') {
       return field === 'omnibar'
@@ -195,13 +177,13 @@
     }
     return '';
   }
-  const getValidationColor = (field: 'omnibar' | 'undo') => {
+  const getValidationColor = (field: KeybindFieldId) => {
     if (recordingField.value === field) return 'primary';
     const kind = warnings.value[field];
     if (kind === 'none') return 'neutral';
     return kind === 'system' ? 'warning' : 'error';
   };
-  const getWarningClass = (field: 'omnibar' | 'undo') => {
+  const getWarningClass = (field: KeybindFieldId) => {
     const kind = warnings.value[field];
     if (kind === 'none') return '';
     return kind === 'system' ? 'text-warning-400' : 'text-error-400';
