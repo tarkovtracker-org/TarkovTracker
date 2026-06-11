@@ -1,5 +1,5 @@
 <template>
-  <div class="border-surface-700/60 bg-surface-900/96 w-80 rounded-2xl border p-4 shadow-xl">
+  <div class="w-80 p-4">
     <div class="border-surface-700 mb-3 flex items-center justify-between border-b pb-2">
       <div class="flex items-center gap-2">
         <UIcon name="i-heroicons-bell" class="text-primary-400 h-4 w-4" />

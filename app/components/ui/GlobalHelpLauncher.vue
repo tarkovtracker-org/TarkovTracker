@@ -18,59 +18,57 @@
         </span>
       </UButton>
       <template #content>
-        <div class="w-[min(19rem,calc(100vw-1.5rem))] p-2">
-          <div class="border-surface-700/60 bg-surface-900/96 space-y-3 rounded-[24px] border p-3">
-            <div class="space-y-1">
-              <div class="text-surface-50 text-sm font-semibold">
-                {{ launcherTitle }}
-              </div>
-              <p class="text-surface-400 text-[11px] leading-5">
-                {{ launcherSummary }}
-              </p>
+        <div class="w-[min(19rem,calc(100vw-1.5rem))] space-y-3 p-3">
+          <div class="space-y-1">
+            <div class="text-surface-50 text-sm font-semibold">
+              {{ launcherTitle }}
             </div>
-            <div class="space-y-2">
-              <button
-                type="button"
-                class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-55"
-                :disabled="!currentPageHelpKey"
-                @click="openPageGuide"
+            <p class="text-surface-400 text-[11px] leading-5">
+              {{ launcherSummary }}
+            </p>
+          </div>
+          <div class="space-y-2">
+            <button
+              type="button"
+              class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-55"
+              :disabled="!currentPageHelpKey"
+              @click="openPageGuide"
+            >
+              <span
+                class="bg-primary-500/12 border-primary-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
               >
-                <span
-                  class="bg-primary-500/12 border-primary-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-                >
-                  <UIcon name="i-mdi-crosshairs-question" class="text-primary-300 h-4 w-4" />
+                <UIcon name="i-mdi-crosshairs-question" class="text-primary-300 h-4 w-4" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="text-surface-50 block text-sm font-semibold">
+                  {{ pageGuideLabel }}
                 </span>
-                <span class="min-w-0 flex-1">
-                  <span class="text-surface-50 block text-sm font-semibold">
-                    {{ pageGuideLabel }}
-                  </span>
-                  <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
-                    {{ pageGuideDescription }}
-                  </span>
+                <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
+                  {{ pageGuideDescription }}
                 </span>
-                <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
-              </button>
-              <button
-                type="button"
-                class="border-surface-700/70 bg-surface-950/55 hover:border-info-500/35 hover:bg-surface-800 focus-visible:ring-info-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-                @click="openOnboarding"
+              </span>
+              <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
+            </button>
+            <button
+              type="button"
+              class="border-surface-700/70 bg-surface-950/55 hover:border-info-500/35 hover:bg-surface-800 focus-visible:ring-info-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none"
+              @click="openOnboarding"
+            >
+              <span
+                class="bg-info-500/12 border-info-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
               >
-                <span
-                  class="bg-info-500/12 border-info-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-                >
-                  <UIcon name="i-mdi-map-marker-path" class="text-info-300 h-4 w-4" />
+                <UIcon name="i-mdi-map-marker-path" class="text-info-300 h-4 w-4" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="text-surface-50 block text-sm font-semibold">
+                  {{ onboardingLabel }}
                 </span>
-                <span class="min-w-0 flex-1">
-                  <span class="text-surface-50 block text-sm font-semibold">
-                    {{ onboardingLabel }}
-                  </span>
-                  <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
-                    {{ onboardingDescription }}
-                  </span>
+                <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
+                  {{ onboardingDescription }}
                 </span>
-                <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
-              </button>
-            </div>
+              </span>
+              <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
+            </button>
           </div>
         </div>
       </template>

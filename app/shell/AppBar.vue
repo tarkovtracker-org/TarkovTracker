@@ -67,10 +67,7 @@
           </span>
         </div>
         <div class="shrink-0">
-          <UPopover
-            :content="{ align: 'end', side: 'bottom', sideOffset: 10 }"
-            :ui="{ content: 'z-[9999] bg-transparent shadow-none ring-0 rounded-none' }"
-          >
+          <UPopover :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
             <UButton
               color="neutral"
               variant="ghost"
