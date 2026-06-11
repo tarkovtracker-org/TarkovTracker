@@ -646,6 +646,10 @@ html.no-smooth-scroll {
     content-visibility: auto;
     contain-intrinsic-size: auto 420px;
   }
+  .content-visibility-auto-task-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 368px;
+  }
   .shadow-nav-drawer {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.03),
