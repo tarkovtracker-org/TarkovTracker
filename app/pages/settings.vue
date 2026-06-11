@@ -87,6 +87,7 @@
               <PrivacyCard />
               <TaskDisplayCard />
               <MapSettingsCard />
+              <KeybindsCard />
             </section>
             <section
               v-if="visitedTabs.account"
@@ -162,6 +163,7 @@
   import DebugStateCard from '@/features/settings/DebugStateCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
+  import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
   import PrivacyCard from '@/features/settings/PrivacyCard.vue';

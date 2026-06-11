@@ -154,6 +154,8 @@ export interface PreferencesState {
   traderSortMode: TraderSortMode | null;
   traderSortDirection: TraderSortDirection | null;
   taskFilterPresets: TaskFilterPreset[];
+  keybindOmnibar: string;
+  keybindUndo: string;
   saving?: {
     streamerMode: boolean;
     hideGlobalTasks: boolean;
@@ -237,6 +239,8 @@ export const preferencesDefaultState: PreferencesState = {
   traderSortMode: null,
   traderSortDirection: null,
   taskFilterPresets: [],
+  keybindOmnibar: 'ctrl+q',
+  keybindUndo: 'ctrl+z',
   saving: {
     streamerMode: false,
     hideGlobalTasks: false,
@@ -627,6 +631,12 @@ export const usePreferencesStore = defineStore('preferences', {
         ? state.traderSortDirection
         : 'desc';
     },
+    getKeybindOmnibar: (state) => {
+      return state.keybindOmnibar ?? 'ctrl+q';
+    },
+    getKeybindUndo: (state) => {
+      return state.keybindUndo ?? 'ctrl+z';
+    },
   },
   actions: {
     resetToDefaults() {
@@ -647,6 +657,12 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     setProfileSharePvePublic(value: boolean) {
       this.profileSharePvePublic = value;
+    },
+    setKeybindOmnibar(keybind: string) {
+      this.keybindOmnibar = keybind;
+    },
+    setKeybindUndo(keybind: string) {
+      this.keybindUndo = keybind;
     },
     toggleHidden(teamId: string) {
       if (!this.teamHide) {

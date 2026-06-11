@@ -21,11 +21,29 @@
           @click.stop="changeNavigationDrawer"
         />
       </AppTooltip>
-      <!-- Center: Page Title -->
-      <span class="flex min-w-0 flex-1 items-center">
-        <span class="truncate text-base leading-none font-semibold text-white">
+      <!-- Center: Page Title & Omnibar Search -->
+      <span class="flex min-w-0 flex-1 items-center gap-4">
+        <span class="hidden truncate text-base leading-none font-semibold text-white md:inline">
           {{ pageTitle }}
         </span>
+        <button
+          type="button"
+          class="bg-surface-800/40 border-surface-700/60 hover:bg-surface-800/80 hover:border-surface-600 flex h-8 w-full max-w-xs cursor-pointer items-center justify-between rounded-lg border px-3 text-left transition-colors"
+          :aria-label="t('omnibar.open_aria', 'Open global search')"
+          :aria-keyshortcuts="omnibarAriaKeyshortcuts"
+          @click="openOmnibar"
+        >
+          <span class="text-surface-400 flex items-center gap-2 text-xs">
+            <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4" />
+            {{ t('omnibar.trigger_label', 'Search...') }}
+          </span>
+          <span class="hidden items-center gap-0.5 sm:flex">
+            <template v-for="(part, index) in omnibarShortcutParts" :key="index">
+              <span v-if="index > 0" class="text-surface-500 text-[10px]">+</span>
+              <UKbd size="sm">{{ part }}</UKbd>
+            </template>
+          </span>
+        </button>
       </span>
       <!-- Right: Status Icons & Settings -->
       <div class="ml-auto flex items-center gap-1 sm:gap-2">
@@ -47,6 +65,26 @@
               </span>
             </AppTooltip>
           </span>
+        </div>
+        <div class="shrink-0">
+          <UPopover :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              icon="i-heroicons-bell"
+              :aria-label="t('activity_log.aria_label', 'Activity Log')"
+              class="relative"
+            >
+              <span
+                v-if="activityLogStore.hasUnread"
+                class="bg-error-500 ring-surface-900 absolute top-1 right-1 flex h-2 w-2 rounded-full ring-2"
+              />
+            </UButton>
+            <template #content>
+              <ActivityLogPanel />
+            </template>
+          </UPopover>
         </div>
         <div class="shrink-0">
           <GlobalHelpLauncher />
@@ -168,12 +206,17 @@
         </div>
       </div>
     </div>
+    <Omnibar />
   </header>
 </template>
 <script setup lang="ts">
   import { useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
+  import { useKeybinds } from '@/composables/useKeybinds';
   import { useSupporter } from '@/composables/useSupporter';
+  import Omnibar from '@/features/omnibar/Omnibar.vue';
+  import ActivityLogPanel from '@/shell/ActivityLogPanel.vue';
+  import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useAppStore } from '@/stores/useApp';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -182,9 +225,36 @@
   import type { DropdownMenuItem } from '@nuxt/ui';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
   const appStore = useAppStore();
+  const activityLogStore = useActivityLogStore();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
+  // Initialize global keyboard shortcuts (Undo: CTRL+Z, Search: CTRL+Q or /)
+  useKeybinds();
+  function openOmnibar() {
+    window.dispatchEvent(new CustomEvent('toggle-omnibar'));
+  }
+  const omnibarShortcutParts = computed(() => {
+    const shortcut = preferencesStore.getKeybindOmnibar || 'ctrl+q';
+    return shortcut.split('+').map((part) => {
+      if (part === 'ctrl' || part === 'control') return 'Ctrl';
+      if (part === 'alt') return 'Alt';
+      if (part === 'shift') return 'Shift';
+      if (part === 'meta') return 'Cmd';
+      if (part === 'space') return 'Space';
+      return part.toUpperCase();
+    });
+  });
+  const omnibarAriaKeyshortcuts = computed(() => {
+    const shortcut = preferencesStore.getKeybindOmnibar || 'ctrl+q';
+    return shortcut
+      .split('+')
+      .map((part) => {
+        if (part === 'ctrl') return 'Control';
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join('+');
+  });
   const currentMode = computed(() => tarkovStore.getCurrentGameMode());
   const { activeTier: supporterTier } = useSupporter();
   const supporterBadgeLabel = computed(() => {

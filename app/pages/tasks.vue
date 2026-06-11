@@ -9,7 +9,6 @@
             :active-search-count="activeSearchCount"
             :is-search-active="isSearchActive"
           />
-          <ApiUpdateLogPanel :progress-data="currentModeProgressData" />
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
           <template v-else>
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
@@ -363,7 +362,6 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
-  import ApiUpdateLogPanel from '@/features/tasks/ApiUpdateLogPanel.vue';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';

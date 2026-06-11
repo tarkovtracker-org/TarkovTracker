@@ -244,6 +244,12 @@ export const sanitizePersistedPreferencesState = (
       sanitizedState.neededItemsCardStyle
     );
   }
+  if ('keybindOmnibar' in sanitizedState && typeof sanitizedState.keybindOmnibar !== 'string') {
+    sanitizedState.keybindOmnibar = 'ctrl+q';
+  }
+  if ('keybindUndo' in sanitizedState && typeof sanitizedState.keybindUndo !== 'string') {
+    sanitizedState.keybindUndo = 'ctrl+z';
+  }
   return sanitizedState;
 };
 export const isPersistedPreferencesStateRecord = (

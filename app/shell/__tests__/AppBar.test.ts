@@ -77,8 +77,20 @@ vi.mock('@vueuse/core', async (importOriginal) => ({
     width: ref(1280),
   }),
 }));
+vi.mock('@/composables/useKeybinds', () => ({
+  useKeybinds: vi.fn(),
+}));
 vi.mock('@/composables/useSupporter', () => ({
   useSupporter: () => mockUseSupporter(),
+}));
+vi.mock('@/stores/useActivityLogStore', () => ({
+  useActivityLogStore: () => ({
+    unreadCount: 0,
+    hasUnread: false,
+    allEntries: [],
+    markAllAsRead: vi.fn(),
+    clearLog: vi.fn(),
+  }),
 }));
 vi.mock('@/stores/useApp', () => ({
   useAppStore: () => ({
@@ -124,6 +136,7 @@ const mountAppBar = async () => {
   return mount(AppBar, {
     global: {
       stubs: {
+        ActivityLogPanel: true,
         AppTooltip: {
           template: '<span><slot /></span>',
         },
@@ -134,6 +147,8 @@ const mountAppBar = async () => {
         NuxtLink: {
           template: '<a><slot /></a>',
         },
+        Omnibar: true,
+        SelectMenuFixed: SelectMenuFixedStub,
         UButton: {
           props: ['icon'],
           emits: ['click'],
@@ -145,7 +160,10 @@ const mountAppBar = async () => {
             '<div><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><button v-for="item in group" :key="item.label" type="button" :data-menu-item="item.label" @click="item.onSelect?.()">{{ item.label }}</button></template></div>',
         },
         UIcon: true,
-        SelectMenuFixed: SelectMenuFixedStub,
+        UKbd: true,
+        UPopover: {
+          template: '<div><slot /><slot name="content" /></div>',
+        },
       },
     },
   });

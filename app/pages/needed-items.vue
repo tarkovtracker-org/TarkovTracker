@@ -241,8 +241,14 @@
       baseRenderCount: DEFAULT_INITIAL_RENDER_COUNT,
     }
   );
-  const search = ref('');
   const route = useRoute();
+  const search = ref((route.query.q as string) || '');
+  watch(
+    () => route.query.q,
+    (newQ) => {
+      search.value = (newQ as string) || '';
+    }
+  );
   const PERF_QUERY_PARAM = 'perfNeededItems';
   const perfDebug = computed(() => {
     const rawValue = route.query[PERF_QUERY_PARAM];

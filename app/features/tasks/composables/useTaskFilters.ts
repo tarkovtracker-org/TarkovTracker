@@ -39,7 +39,14 @@ export function useTaskFilters({
   tasks,
   visibleTasks,
 }: TaskFilterInputs) {
-  const searchQuery = ref('');
+  const route = useRoute();
+  const searchQuery = ref((route.query.q as string) || '');
+  watch(
+    () => route.query.q,
+    (newQ) => {
+      searchQuery.value = (newQ as string) || '';
+    }
+  );
   const debouncedSearch = ref('');
   const updateDebouncedSearch = debounce((value: string) => {
     debouncedSearch.value = value;
