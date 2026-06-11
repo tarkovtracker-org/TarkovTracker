@@ -30,7 +30,6 @@ export const useActivityLogStore = defineStore('activityLog', {
     allEntries(): ActivityLogEntry[] {
       const tarkovStore = useTarkovStore();
       const currentData = tarkovStore.getCurrentProgressData();
-      // Convert ApiUpdateMeta to ActivityLogEntry format
       const apiEntries: ActivityLogEntry[] = (currentData?.apiUpdateHistory || []).map(
         (entry: ApiUpdateMeta) => ({
           id: entry.id,
@@ -42,16 +41,31 @@ export const useActivityLogStore = defineStore('activityLog', {
           metadata: entry,
         })
       );
-      // Combine and sort
       const combined = [...apiEntries, ...this.manualEntries];
       return combined.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
     },
     unreadCount(): number {
-      const all = this.allEntries;
-      return all.filter((entry) => entry.timestamp > this.lastReadTimestamp).length;
+      const tarkovStore = useTarkovStore();
+      const currentData = tarkovStore.getCurrentProgressData();
+      const apiUnreadCount = (currentData?.apiUpdateHistory || []).reduce(
+        (count: number, entry: ApiUpdateMeta) =>
+          entry.at > this.lastReadTimestamp ? count + 1 : count,
+        0
+      );
+      const manualUnreadCount = this.manualEntries.reduce(
+        (count, entry) => (entry.timestamp > this.lastReadTimestamp ? count + 1 : count),
+        0
+      );
+      return apiUnreadCount + manualUnreadCount;
     },
     hasUnread(): boolean {
-      return this.unreadCount > 0;
+      const tarkovStore = useTarkovStore();
+      const currentData = tarkovStore.getCurrentProgressData();
+      return (
+        (currentData?.apiUpdateHistory || []).some(
+          (entry: ApiUpdateMeta) => entry.at > this.lastReadTimestamp
+        ) || this.manualEntries.some((entry) => entry.timestamp > this.lastReadTimestamp)
+      );
     },
   },
   actions: {
@@ -67,7 +81,17 @@ export const useActivityLogStore = defineStore('activityLog', {
       }
     },
     markAllAsRead() {
-      this.lastReadTimestamp = this.allEntries[0]?.timestamp ?? Date.now();
+      const tarkovStore = useTarkovStore();
+      const currentData = tarkovStore.getCurrentProgressData();
+      const latestApiTimestamp = (currentData?.apiUpdateHistory || []).reduce(
+        (latest: number, entry: ApiUpdateMeta) => Math.max(latest, entry.at),
+        0
+      );
+      const latestManualTimestamp = this.manualEntries.reduce(
+        (latest, entry) => Math.max(latest, entry.timestamp),
+        0
+      );
+      this.lastReadTimestamp = Math.max(latestApiTimestamp, latestManualTimestamp, Date.now());
     },
     clearLog() {
       this.manualEntries = [];

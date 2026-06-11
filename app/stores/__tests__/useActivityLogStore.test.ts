@@ -66,6 +66,16 @@ describe('useActivityLogStore', () => {
     expect(store.hasUnread).toBe(false);
     expect(store.unreadCount).toBe(0);
   });
+  it('tracks unread API history without requiring the sorted entry list', () => {
+    apiUpdateHistory.push({ id: 'api-old', at: 1000 }, { id: 'api-new', at: 5000 });
+    const store = useActivityLogStore();
+    store.lastReadTimestamp = 2000;
+    expect(store.hasUnread).toBe(true);
+    expect(store.unreadCount).toBe(1);
+    store.markAllAsRead();
+    expect(store.hasUnread).toBe(false);
+    expect(store.unreadCount).toBe(0);
+  });
   it('clears the manual log and marks everything read', () => {
     const store = useActivityLogStore();
     store.addManualEntry({ id: 'm1', type: 'task', action: 'complete', title: 'Entry' });
