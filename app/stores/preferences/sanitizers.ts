@@ -8,6 +8,7 @@ import {
 } from '@/features/neededitems/neededItemsFilterNormalization';
 import { isValidPrimaryView, type TaskPrimaryView } from '@/types/taskFilter';
 import { isValidSortDirection, type TaskSortDirection } from '@/types/taskSort';
+import { sanitizeKeybind } from '@/utils/keybinds';
 import { logger } from '@/utils/logger';
 import { normalizeSecondaryView, normalizeSortMode } from '@/utils/taskFilterNormalization';
 import type { NeededItemsFilterType } from '@/features/neededitems/neededitems-constants';
@@ -244,11 +245,11 @@ export const sanitizePersistedPreferencesState = (
       sanitizedState.neededItemsCardStyle
     );
   }
-  if ('keybindOmnibar' in sanitizedState && typeof sanitizedState.keybindOmnibar !== 'string') {
-    sanitizedState.keybindOmnibar = 'ctrl+q';
+  if ('keybindOmnibar' in sanitizedState) {
+    sanitizedState.keybindOmnibar = sanitizeKeybind(sanitizedState.keybindOmnibar, 'ctrl+q');
   }
-  if ('keybindUndo' in sanitizedState && typeof sanitizedState.keybindUndo !== 'string') {
-    sanitizedState.keybindUndo = 'ctrl+z';
+  if ('keybindUndo' in sanitizedState) {
+    sanitizedState.keybindUndo = sanitizeKeybind(sanitizedState.keybindUndo, 'ctrl+z');
   }
   return sanitizedState;
 };

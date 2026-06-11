@@ -1020,6 +1020,8 @@ export const usePreferencesStore = defineStore('preferences', {
       'skillSortMode',
       'traderSortMode',
       'traderSortDirection',
+      'keybindOmnibar',
+      'keybindUndo',
     ],
   },
 });

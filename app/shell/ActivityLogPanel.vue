@@ -122,6 +122,7 @@
   };
   const navigateToTask = async (taskId: string) => {
     await router.replace({
+      path: '/tasks',
       query: {
         ...route.query,
         highlightObjective: undefined,

@@ -1,5 +1,6 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { usePreferencesStore } from '@/stores/usePreferences';
+import { matchesKeybind } from '@/utils/keybinds';
 export function useKeybinds() {
   const preferencesStore = usePreferencesStore();
   const actionHistoryStore = useActionHistoryStore();
@@ -14,20 +15,7 @@ export function useKeybinds() {
     ) {
       return;
     }
-    const matchesShortcut = (shortcut: string) => {
-      const parts = shortcut.toLowerCase().split('+');
-      const hasCtrl = parts.includes('ctrl') || parts.includes('control');
-      const hasAlt = parts.includes('alt');
-      const hasShift = parts.includes('shift');
-      const key = parts.find((p) => !['ctrl', 'control', 'alt', 'shift'].includes(p));
-      if (!key) return false;
-      const matchCtrl = event.ctrlKey === hasCtrl;
-      const matchAlt = event.altKey === hasAlt;
-      const matchShift = event.shiftKey === hasShift;
-      let eventKey = event.key.toLowerCase();
-      if (eventKey === ' ') eventKey = 'space';
-      return matchCtrl && matchAlt && matchShift && eventKey === key;
-    };
+    const matchesShortcut = (shortcut: string) => matchesKeybind(event, shortcut);
     const undoShortcut = preferencesStore.getKeybindUndo || 'ctrl+z';
     if (matchesShortcut(undoShortcut)) {
       event.preventDefault();

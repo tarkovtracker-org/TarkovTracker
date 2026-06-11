@@ -37,7 +37,7 @@ export const useActivityLogStore = defineStore('activityLog', {
           source: 'api',
           type: 'system',
           action: 'sync',
-          title: 'API Sync Progress',
+          title: 'activity_log.api_synced',
           metadata: entry,
         })
       );

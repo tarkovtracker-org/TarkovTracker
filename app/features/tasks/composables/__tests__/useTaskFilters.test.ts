@@ -136,4 +136,34 @@ describe('useTaskFilters', () => {
     await nextTick();
     expect(searchQuery.value).toBe('');
   });
+  it('falls back to an empty string when route.query.q is an array', async () => {
+    routeState.query.q = ['foo', 'bar'] as unknown as string;
+    const visibleTasks = ref([createTask('1', 'Alpha Task')]);
+    const tasks = ref([...visibleTasks.value]);
+    const getTaskMapView = ref('all');
+    const showMapDisplay = computed(() => false);
+    const options = computed(
+      () =>
+        ({
+          mapView: 'all',
+          mergedMaps: [],
+          primaryView: 'all',
+          secondaryView: 'available',
+          sortDirection: 'asc',
+          sortMode: 'none',
+          traderView: 'all',
+          userView: 'self',
+        }) as TaskFilterAndSortOptions
+    );
+    const { searchQuery } = useTaskFilters({
+      calculateFilteredTasksForOptions: (inputTasks) => inputTasks,
+      getTaskMapView,
+      mapTaskVisibilityFilterOptions: options,
+      showMapDisplay,
+      tasks,
+      visibleTasks,
+    });
+    expect(searchQuery.value).toBe('foo');
+    expect(typeof searchQuery.value).toBe('string');
+  });
 });

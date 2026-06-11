@@ -206,7 +206,7 @@
         </div>
       </div>
     </div>
-    <Omnibar />
+    <Omnibar v-if="omnibarMounted" v-model:open="omnibarOpen" />
   </header>
 </template>
 <script setup lang="ts">
@@ -214,8 +214,6 @@
   import { storeToRefs } from 'pinia';
   import { useKeybinds } from '@/composables/useKeybinds';
   import { useSupporter } from '@/composables/useSupporter';
-  import Omnibar from '@/features/omnibar/Omnibar.vue';
-  import ActivityLogPanel from '@/shell/ActivityLogPanel.vue';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useAppStore } from '@/stores/useApp';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -229,11 +227,26 @@
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
+  const Omnibar = defineAsyncComponent(() => import('@/features/omnibar/Omnibar.vue'));
+  const ActivityLogPanel = defineAsyncComponent(() => import('@/shell/ActivityLogPanel.vue'));
   // Initialize global keyboard shortcuts (Undo: CTRL+Z, Search: CTRL+Q or /)
   useKeybinds();
+  const omnibarMounted = ref(false);
+  const omnibarOpen = ref(false);
   function openOmnibar() {
-    window.dispatchEvent(new CustomEvent('toggle-omnibar'));
+    omnibarMounted.value = true;
+    omnibarOpen.value = true;
   }
+  const handleToggleOmnibar = () => {
+    omnibarMounted.value = true;
+    omnibarOpen.value = !omnibarOpen.value;
+  };
+  onMounted(() => {
+    window.addEventListener('toggle-omnibar', handleToggleOmnibar);
+  });
+  onUnmounted(() => {
+    window.removeEventListener('toggle-omnibar', handleToggleOmnibar);
+  });
   const omnibarShortcutParts = computed(() => {
     const shortcut = preferencesStore.getKeybindOmnibar || 'ctrl+q';
     return shortcut.split('+').map((part) => {

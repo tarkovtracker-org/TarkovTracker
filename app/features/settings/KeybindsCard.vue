@@ -89,6 +89,7 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { serializeKeybindEvent } from '@/utils/keybinds';
   const { t } = useI18n();
   const preferencesStore = usePreferencesStore();
   const keybindOmnibar = computed({
@@ -131,14 +132,7 @@
       activeEl?.blur();
       return;
     }
-    const parts: string[] = [];
-    if (event.ctrlKey) parts.push('ctrl');
-    if (event.altKey) parts.push('alt');
-    if (event.shiftKey) parts.push('shift');
-    let key = event.key.toLowerCase();
-    if (key === ' ') key = 'space';
-    parts.push(key);
-    const result = parts.join('+');
+    const result = serializeKeybindEvent(event);
     if (recordingField.value === 'omnibar') {
       keybindOmnibar.value = result;
     } else if (recordingField.value === 'undo') {

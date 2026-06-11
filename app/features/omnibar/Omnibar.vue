@@ -58,18 +58,9 @@
     query: Record<string, string>;
   }
   const { t } = useI18n();
-  const isOpen = ref(false);
+  const isOpen = defineModel<boolean>('open', { default: false });
   const router = useRouter();
   const { searchQuery, results, currentContext } = useOmnibarSearch();
-  const handleToggleEvent = () => {
-    isOpen.value = !isOpen.value;
-  };
-  onMounted(() => {
-    window.addEventListener('toggle-omnibar', handleToggleEvent);
-  });
-  onUnmounted(() => {
-    window.removeEventListener('toggle-omnibar', handleToggleEvent);
-  });
   watch(isOpen, (open) => {
     if (!open) {
       searchQuery.value = '';

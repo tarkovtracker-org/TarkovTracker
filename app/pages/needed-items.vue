@@ -208,6 +208,7 @@
   import NeededItemsFilterBar from '@/features/neededitems/NeededItemsFilterBar.vue';
   import { logger } from '@/utils/logger';
   import { perfNow, roundPerfMs } from '@/utils/perf';
+  import { getQueryString } from '@/utils/routeHelpers';
   const NeededItemsSettingsDrawer = defineAsyncComponent(
     () => import('@/features/neededitems/NeededItemsSettingsDrawer.vue')
   );
@@ -242,11 +243,11 @@
     }
   );
   const route = useRoute();
-  const search = ref((route.query.q as string) || '');
+  const search = ref(getQueryString(route.query.q) || '');
   watch(
     () => route.query.q,
     (newQ) => {
-      search.value = (newQ as string) || '';
+      search.value = getQueryString(newQ) || '';
     }
   );
   const PERF_QUERY_PARAM = 'perfNeededItems';

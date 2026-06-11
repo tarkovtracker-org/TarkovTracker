@@ -77,12 +77,12 @@ export function useTaskNotification(): TaskNotificationReturn {
               tarkovStore.setTaskUncompleted(taskId);
               if (taskToUndo?.objectives) {
                 handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
-                handleAlternatives(
-                  taskToUndo.alternatives,
-                  'setTaskUncompleted',
-                  'setTaskObjectiveUncomplete'
-                );
               }
+              handleAlternatives(
+                taskToUndo?.alternatives,
+                'setTaskUncompleted',
+                'setTaskObjectiveUncomplete'
+              );
               activityLogStore.addManualEntry({
                 id: `manual-task-undo-${taskId}-${Date.now()}`,
                 type: 'task',
@@ -94,15 +94,15 @@ export function useTaskNotification(): TaskNotificationReturn {
               tarkovStore.setTaskComplete(taskId);
               if (taskToUndo?.objectives) {
                 handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveComplete');
-                handleAlternatives(taskToUndo.alternatives, 'setTaskFailed');
-                const minLevel = taskToUndo.minPlayerLevel;
-                if (minLevel !== undefined) {
-                  const currentLevel = tarkovStore.playerLevel();
-                  const isValidLevel =
-                    typeof currentLevel === 'number' && Number.isFinite(currentLevel);
-                  if (!isValidLevel || currentLevel < minLevel) {
-                    tarkovStore.setLevel(minLevel);
-                  }
+              }
+              handleAlternatives(taskToUndo?.alternatives, 'setTaskFailed');
+              const minLevel = taskToUndo?.minPlayerLevel;
+              if (minLevel !== undefined) {
+                const currentLevel = tarkovStore.playerLevel();
+                const isValidLevel =
+                  typeof currentLevel === 'number' && Number.isFinite(currentLevel);
+                if (!isValidLevel || currentLevel < minLevel) {
+                  tarkovStore.setLevel(minLevel);
                 }
               }
               activityLogStore.addManualEntry({
