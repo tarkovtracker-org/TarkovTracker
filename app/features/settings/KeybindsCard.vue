@@ -104,21 +104,31 @@
   type WarningKind = 'none' | 'conflict' | 'system';
   const recordingField = ref<KeybindFieldId | null>(null);
   const tempKeys = ref('');
+  const captureError = ref<KeybindFieldId | null>(null);
   const warnings = ref<Record<KeybindFieldId, WarningKind>>({
     omnibar: 'none',
     undo: 'none',
   });
+  const otherField = (field: KeybindFieldId): KeybindFieldId =>
+    field === 'omnibar' ? 'undo' : 'omnibar';
+  const fieldLabel = (field: KeybindFieldId): string =>
+    field === 'omnibar'
+      ? t('settings.keybinds.omnibar_label', 'Global Search (Omnibar)')
+      : t('settings.keybinds.undo_label', 'Undo Last Action');
   const startRecording = (field: KeybindFieldId) => {
     recordingField.value = field;
+    captureError.value = null;
     tempKeys.value = t('settings.keybinds.recording', 'Press key combination...');
   };
   const stopRecording = (field: KeybindFieldId) => {
     if (recordingField.value === field) {
       recordingField.value = null;
       tempKeys.value = '';
+      captureError.value = null;
     }
   };
   const resetField = (field: KeybindFieldId) => {
+    captureError.value = null;
     if (field === 'omnibar') {
       keybindOmnibar.value = DEFAULT_KEYBINDS.omnibar;
     } else {
@@ -126,7 +136,8 @@
     }
   };
   const handleKeydown = (event: KeyboardEvent) => {
-    if (!recordingField.value) return;
+    const field = recordingField.value;
+    if (!field) return;
     event.preventDefault();
     event.stopPropagation();
     // Ignore modifier keys on their own
@@ -135,20 +146,28 @@
       return;
     }
     if (event.key === 'Escape') {
-      stopRecording(recordingField.value);
-      const activeEl = document.activeElement as HTMLElement;
-      activeEl?.blur();
+      stopRecording(field);
+      (document.activeElement as HTMLElement | null)?.blur();
       return;
     }
     const result = serializeKeybindEvent(event);
-    if (recordingField.value === 'omnibar') {
+    const otherValue = field === 'omnibar' ? keybindUndo.value : keybindOmnibar.value;
+    // Reject a combination already bound to the other action. The value is never
+    // committed, so a conflicting keybind can never be saved. Recording stays
+    // active so the user must resolve it now (or press Escape to keep the old value).
+    if (keybindsConflict(result, otherValue)) {
+      captureError.value = field;
+      tempKeys.value = t('settings.keybinds.recording', 'Press key combination...');
+      return;
+    }
+    captureError.value = null;
+    if (field === 'omnibar') {
       keybindOmnibar.value = result;
-    } else if (recordingField.value === 'undo') {
+    } else {
       keybindUndo.value = result;
     }
-    stopRecording(recordingField.value);
-    const activeEl = document.activeElement as HTMLElement;
-    activeEl?.blur();
+    stopRecording(field);
+    (document.activeElement as HTMLElement | null)?.blur();
   };
   const checkWarnings = () => {
     warnings.value.omnibar = 'none';
@@ -173,6 +192,11 @@
     undo: warningMessageFor('undo'),
   }));
   function warningMessageFor(field: KeybindFieldId): string {
+    if (captureError.value === field) {
+      return t('settings.keybinds.conflict_rejected', {
+        action: fieldLabel(otherField(field)),
+      });
+    }
     const kind = warnings.value[field];
     if (kind === 'conflict') {
       return field === 'omnibar'
@@ -193,12 +217,14 @@
     return '';
   }
   const getValidationColor = (field: KeybindFieldId) => {
+    if (captureError.value === field) return 'error';
     if (recordingField.value === field) return 'primary';
     const kind = warnings.value[field];
     if (kind === 'none') return 'neutral';
     return kind === 'system' ? 'warning' : 'error';
   };
   const getWarningClass = (field: KeybindFieldId) => {
+    if (captureError.value === field) return 'text-error-400';
     const kind = warnings.value[field];
     if (kind === 'none') return '';
     return kind === 'system' ? 'text-warning-400' : 'text-error-400';
