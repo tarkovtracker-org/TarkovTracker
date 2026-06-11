@@ -248,27 +248,28 @@
   onUnmounted(() => {
     window.removeEventListener('toggle-omnibar', handleToggleOmnibar);
   });
-  const omnibarShortcutParts = computed(() => {
+  const getOmnibarShortcutParts = () => {
     const shortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
-    return shortcut.split('+').map((part) => {
+    return shortcut.split('+').map((part) => part.trim());
+  };
+  const omnibarShortcutParts = computed(() =>
+    getOmnibarShortcutParts().map((part) => {
       if (part === 'ctrl' || part === 'control') return 'Ctrl';
       if (part === 'alt') return 'Alt';
       if (part === 'shift') return 'Shift';
       if (part === 'meta') return 'Cmd';
       if (part === 'space') return 'Space';
       return part.toUpperCase();
-    });
-  });
-  const omnibarAriaKeyshortcuts = computed(() => {
-    const shortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
-    return shortcut
-      .split('+')
+    })
+  );
+  const omnibarAriaKeyshortcuts = computed(() =>
+    getOmnibarShortcutParts()
       .map((part) => {
         if (part === 'ctrl') return 'Control';
         return part.charAt(0).toUpperCase() + part.slice(1);
       })
-      .join('+');
-  });
+      .join('+')
+  );
   const currentMode = computed(() => tarkovStore.getCurrentGameMode());
   const { activeTier: supporterTier } = useSupporter();
   const supporterBadgeLabel = computed(() => {
