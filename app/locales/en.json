@@ -89,6 +89,7 @@
   "activity_log": {
     "title": "Activity Log",
     "aria_label": "Activity Log",
+    "unread_indicator": "You have unread activity",
     "mark_read": "Mark read",
     "clear": "Clear",
     "empty": "No activity recorded yet.",

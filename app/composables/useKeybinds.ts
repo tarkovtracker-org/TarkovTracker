@@ -13,7 +13,7 @@ export function useKeybinds(): void {
       activeEl &&
       (activeEl.tagName === 'INPUT' ||
         activeEl.tagName === 'TEXTAREA' ||
-        activeEl.hasAttribute('contenteditable'))
+        (activeEl instanceof HTMLElement && activeEl.isContentEditable))
     ) {
       return;
     }

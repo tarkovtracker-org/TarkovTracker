@@ -76,8 +76,12 @@
               :aria-label="t('activity_log.aria_label', 'Activity Log')"
               class="relative"
             >
+              <span v-if="activityLogStore.hasUnread" class="sr-only" aria-live="polite">
+                {{ t('activity_log.unread_indicator', 'You have unread activity') }}
+              </span>
               <span
                 v-if="activityLogStore.hasUnread"
+                aria-hidden="true"
                 class="bg-error-500 ring-surface-900 absolute top-1 right-1 flex h-2 w-2 rounded-full ring-2"
               />
             </UButton>

@@ -27,7 +27,7 @@ import {
 } from '@/types/taskFilter';
 import { clearPreferencesStorage } from '@/utils/clientStorage';
 import { TRADER_SORT_DIRECTIONS, TRADER_SORT_MODES } from '@/utils/constants';
-import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
+import { DEFAULT_KEYBINDS, sanitizeKeybind } from '@/utils/keybinds';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import {
@@ -660,10 +660,10 @@ export const usePreferencesStore = defineStore('preferences', {
       this.profileSharePvePublic = value;
     },
     setKeybindOmnibar(keybind: string) {
-      this.keybindOmnibar = keybind;
+      this.keybindOmnibar = sanitizeKeybind(keybind, DEFAULT_KEYBINDS.omnibar);
     },
     setKeybindUndo(keybind: string) {
-      this.keybindUndo = keybind;
+      this.keybindUndo = sanitizeKeybind(keybind, DEFAULT_KEYBINDS.undo);
     },
     toggleHidden(teamId: string) {
       if (!this.teamHide) {

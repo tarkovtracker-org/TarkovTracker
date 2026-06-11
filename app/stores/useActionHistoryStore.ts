@@ -23,10 +23,11 @@ export const useActionHistoryStore = defineStore('actionHistory', {
       }
     },
     async undoLastAction() {
-      const lastAction = this.undoStack.pop();
+      const lastAction = this.undoStack.at(-1);
       if (!lastAction) return;
       try {
         await lastAction.undo();
+        this.undoStack.pop();
         showUndoToast({
           key: 'toast.action_undone.title',
           fallback: `Undid action: ${lastAction.description}`,
