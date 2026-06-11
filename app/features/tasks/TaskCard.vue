@@ -404,6 +404,7 @@
   import { useTaskCardLinks } from '@/composables/useTaskCardLinks';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
+  import QuestObjectives from '@/features/tasks/QuestObjectives.vue';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
   import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
   import {
@@ -456,11 +457,6 @@
     'Left Behind': 'Left Behind',
     'Prepare for Escape': 'PFE',
   };
-  const QuestObjectives = defineAsyncComponent({
-    loader: () => import('@/features/tasks/QuestObjectives.vue'),
-    loadingComponent: QuestObjectivesSkeleton,
-    delay: 150,
-  });
   type TaskCardAccentVariant = 'default' | 'global';
   const props = withDefaults(
     defineProps<{
