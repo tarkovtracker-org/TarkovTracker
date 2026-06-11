@@ -66,13 +66,7 @@ export const useActivityLogStore = defineStore('activityLog', {
       }
     },
     markAllAsRead() {
-      const entries = this.allEntries;
-      const firstEntry = entries[0];
-      if (firstEntry) {
-        this.lastReadTimestamp = firstEntry.timestamp;
-      } else {
-        this.lastReadTimestamp = Date.now();
-      }
+      this.lastReadTimestamp = this.allEntries[0]?.timestamp ?? Date.now();
     },
     clearLog() {
       this.manualEntries = [];

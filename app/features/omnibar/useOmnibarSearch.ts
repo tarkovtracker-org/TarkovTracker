@@ -9,7 +9,6 @@ export interface SearchResult {
 }
 export function useOmnibarSearch(): {
   searchQuery: Ref<string>;
-  debouncedQuery: Ref<string>;
   results: ComputedRef<SearchResult>;
   currentContext: ComputedRef<'tasks' | 'hideout' | 'items' | 'global'>;
 } {
@@ -54,7 +53,6 @@ export function useOmnibarSearch(): {
   });
   return {
     searchQuery,
-    debouncedQuery,
     results,
     currentContext,
   };

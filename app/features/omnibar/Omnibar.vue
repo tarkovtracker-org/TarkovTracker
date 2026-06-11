@@ -51,7 +51,6 @@
 </template>
 <script setup lang="ts">
   import { useOmnibarSearch } from '@/features/omnibar/useOmnibarSearch';
-  import type { Task, TarkovItem, HideoutStation } from '@/types/tarkov';
   import type { CommandPaletteGroup, CommandPaletteItem } from '@nuxt/ui';
   interface OmnibarRoute {
     path: string;
@@ -66,8 +65,6 @@
       searchQuery.value = '';
     }
   });
-  const getTaskMapName = (task: Task): string => task.map?.name || '';
-  const getItemShortName = (item: TarkovItem): string => item.shortName || '';
   const taskGroup = computed<CommandPaletteGroup>(() => ({
     id: 'tasks',
     label: t('omnibar.group_tasks', 'Tasks / Quests'),
@@ -75,7 +72,7 @@
     items: results.value.tasks.map((task) => ({
       id: task.id,
       label: task.name || '',
-      suffix: getTaskMapName(task),
+      suffix: task.map?.name || '',
       icon: 'i-mdi-clipboard-text-outline',
       route: { path: '/tasks', query: { task: task.id } } as OmnibarRoute,
     })),
@@ -87,7 +84,7 @@
     items: results.value.items.map((item) => ({
       id: item.id,
       label: item.name || '',
-      suffix: getItemShortName(item),
+      suffix: item.shortName || '',
       icon: 'i-mdi-package-variant-closed',
       route: { path: '/needed-items', query: { q: item.name || '' } } as OmnibarRoute,
     })),
@@ -104,12 +101,16 @@
     })),
   }));
   const groups = computed<CommandPaletteGroup[]>(() => {
-    const ordered = [taskGroup.value, itemGroup.value, hideoutGroup.value];
-    if (currentContext.value === 'items') {
-      ordered.unshift(ordered.splice(1, 1)[0]!);
-    } else if (currentContext.value === 'hideout') {
-      ordered.unshift(ordered.splice(2, 1)[0]!);
-    }
+    // Surface the group matching the current page first so contextual results lead.
+    const orderedByContext: Partial<Record<string, CommandPaletteGroup[]>> = {
+      items: [itemGroup.value, taskGroup.value, hideoutGroup.value],
+      hideout: [hideoutGroup.value, taskGroup.value, itemGroup.value],
+    };
+    const ordered = orderedByContext[currentContext.value] ?? [
+      taskGroup.value,
+      itemGroup.value,
+      hideoutGroup.value,
+    ];
     return ordered.filter((group) => group.items && group.items.length > 0);
   });
   const onSelect = (item: CommandPaletteItem | undefined) => {
