@@ -101,8 +101,9 @@
     })),
   }));
   const groups = computed<CommandPaletteGroup[]>(() => {
-    // Surface the group matching the current page first so contextual results lead.
-    const orderedByContext: Partial<Record<string, CommandPaletteGroup[]>> = {
+    const orderedByContext: Partial<
+      Record<'tasks' | 'hideout' | 'items' | 'global', CommandPaletteGroup[]>
+    > = {
       items: [itemGroup.value, taskGroup.value, hideoutGroup.value],
       hideout: [hideoutGroup.value, taskGroup.value, itemGroup.value],
     };
