@@ -73,4 +73,12 @@ describe('useActivityLogStore', () => {
     expect(store.manualEntries).toHaveLength(0);
     expect(store.hasUnread).toBe(false);
   });
+  it('wipes manual entries and read state on session reset', () => {
+    const store = useActivityLogStore();
+    store.addManualEntry({ id: 'm1', type: 'task', action: 'complete', title: 'Entry' });
+    store.markAllAsRead();
+    store.resetForSession();
+    expect(store.manualEntries).toHaveLength(0);
+    expect(store.lastReadTimestamp).toBe(0);
+  });
 });

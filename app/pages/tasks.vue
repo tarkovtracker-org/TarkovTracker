@@ -433,9 +433,6 @@
   const { isGlobalTask, visibleTasks, updateVisibleTasks, calculateFilteredTasksForOptions } =
     useTaskFiltering();
   const tarkovStore = useTarkovStore();
-  const currentModeProgressData = computed(() =>
-    tarkovStore.currentGameMode === 'pve' ? tarkovStore.pve : tarkovStore.pvp
-  );
   const userGameEdition = computed(() => tarkovStore.getGameEdition());
   const { tarkovTime } = useTarkovTime();
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('tasks');

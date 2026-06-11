@@ -1,6 +1,7 @@
 import { useStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { ApiUpdateMeta } from '@/types/progress';
 export interface ActivityLogEntry {
   id: string;
@@ -22,8 +23,8 @@ export interface ActivityLogEntry {
 }
 export const useActivityLogStore = defineStore('activityLog', {
   state: () => ({
-    manualEntries: useStorage<ActivityLogEntry[]>('activity_log_manual', []),
-    lastReadTimestamp: useStorage<number>('activity_log_last_read', 0),
+    manualEntries: useStorage<ActivityLogEntry[]>(STORAGE_KEYS.activityLogManual, []),
+    lastReadTimestamp: useStorage<number>(STORAGE_KEYS.activityLogLastRead, 0),
   }),
   getters: {
     allEntries(): ActivityLogEntry[] {
@@ -71,6 +72,10 @@ export const useActivityLogStore = defineStore('activityLog', {
     clearLog() {
       this.manualEntries = [];
       this.lastReadTimestamp = Date.now();
+    },
+    resetForSession() {
+      this.manualEntries = [];
+      this.lastReadTimestamp = 0;
     },
   },
 });

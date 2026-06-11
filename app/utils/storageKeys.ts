@@ -11,6 +11,8 @@ export const STORAGE_KEYS = {
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,
   sessionDataMigrated: `${STORAGE_PREFIX}tarkovDataMigrated`,
+  activityLogManual: `${STORAGE_PREFIX}activity_log_manual`,
+  activityLogLastRead: `${STORAGE_PREFIX}activity_log_last_read`,
 } as const;
 export const LEGACY_STORAGE_KEYS = {
   progress: 'progress',
@@ -22,4 +24,6 @@ export const LEGACY_STORAGE_KEYS = {
   cachePurgeAt: 'tt:cache:last-purge',
   cachePurgeCheckAt: 'tt:cache:last-check',
   sessionDataMigrated: 'tarkovDataMigrated',
+  activityLogManual: 'activity_log_manual',
+  activityLogLastRead: 'activity_log_last_read',
 } as const;
