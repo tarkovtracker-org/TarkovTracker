@@ -206,6 +206,9 @@
     },
     "action_undone": {
       "title": "Undid action: {description}"
+    },
+    "action_undo_failed": {
+      "title": "Failed to undo action: {description}"
     }
   },
   "common": {

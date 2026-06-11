@@ -42,7 +42,7 @@ describe('useActionHistoryStore', () => {
     await expect(store.undoLastAction()).resolves.toBeUndefined();
     expect(toastAdd).not.toHaveBeenCalled();
   });
-  it('does not surface a success toast when the undo callback throws', async () => {
+  it('surfaces an error toast (not a success toast) when the undo callback throws', async () => {
     const store = useActionHistoryStore();
     store.pushAction({
       id: 'a1',
@@ -52,7 +52,8 @@ describe('useActionHistoryStore', () => {
       },
     });
     await store.undoLastAction();
-    expect(toastAdd).not.toHaveBeenCalled();
+    expect(toastAdd).toHaveBeenCalledTimes(1);
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ color: 'error' }));
     expect(store.undoStack).toHaveLength(0);
   });
   it('clears the history', () => {

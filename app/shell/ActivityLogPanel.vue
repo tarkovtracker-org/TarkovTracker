@@ -101,7 +101,7 @@
   const metadataStore = useMetadataStore();
   const route = useRoute();
   const router = useRouter();
-  const { t } = useI18n({ useScope: 'global' });
+  const { t, locale } = useI18n({ useScope: 'global' });
   const entries = computed(() => activityLogStore.allEntries);
   const getEntryTasks = (entryMeta: unknown): ApiTaskUpdate[] => {
     if (!entryMeta || typeof entryMeta !== 'object') return [];
@@ -133,6 +133,6 @@
   const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return t('activity_log.unknown_time', 'Unknown');
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' });
   };
 </script>

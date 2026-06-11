@@ -2,7 +2,7 @@ import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { queueIdleTask } from '@/utils/idleScheduler';
 import { matchesKeybind } from '@/utils/keybinds';
-export function useKeybinds() {
+export function useKeybinds(): void {
   const preferencesStore = usePreferencesStore();
   const actionHistoryStore = useActionHistoryStore();
   const handleKeydown = (event: KeyboardEvent) => {

@@ -248,6 +248,7 @@ describe('settings page', () => {
       await vi.dynamicImportSettled();
       expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="task-display-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="keybinds-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
     });
     it('opens the imports tab from the route hash', async () => {

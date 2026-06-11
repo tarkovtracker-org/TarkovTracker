@@ -1,12 +1,18 @@
 import { refDebounced } from '@vueuse/core';
 import { useMetadataStore } from '@/stores/useMetadata';
+import type { ComputedRef, Ref } from '#imports';
 import type { Task, TarkovItem, HideoutStation } from '@/types/tarkov';
 export interface SearchResult {
   tasks: Task[];
   items: TarkovItem[];
   hideout: HideoutStation[];
 }
-export function useOmnibarSearch() {
+export function useOmnibarSearch(): {
+  searchQuery: Ref<string>;
+  debouncedQuery: Ref<string>;
+  results: ComputedRef<SearchResult>;
+  currentContext: ComputedRef<'tasks' | 'hideout' | 'items' | 'global'>;
+} {
   const metadataStore = useMetadataStore();
   const route = useRoute();
   const searchQuery = ref('');
@@ -17,19 +23,19 @@ export function useOmnibarSearch() {
       return { tasks: [], items: [], hideout: [] };
     }
     // 1. Search Tasks
-    const matchedTasks = (metadataStore.tasks as Task[]).filter(
+    const matchedTasks = metadataStore.tasks.filter(
       (task) =>
         task.name?.toLowerCase().includes(query) ||
         task.map?.name?.toLowerCase().includes(query) ||
         task.trader?.name?.toLowerCase().includes(query)
     );
     // 2. Search Items
-    const matchedItems = (metadataStore.items as TarkovItem[]).filter(
+    const matchedItems = metadataStore.items.filter(
       (item) =>
         item.name?.toLowerCase().includes(query) || item.shortName?.toLowerCase().includes(query)
     );
     // 3. Search Hideout
-    const matchedHideout = (metadataStore.hideoutStations as HideoutStation[]).filter((station) =>
+    const matchedHideout = metadataStore.hideoutStations.filter((station) =>
       station.name?.toLowerCase().includes(query)
     );
     return {

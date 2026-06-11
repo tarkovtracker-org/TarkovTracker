@@ -43,6 +43,25 @@ export const useActionHistoryStore = defineStore('actionHistory', {
         });
       } catch (error) {
         logger.error('[ActionHistoryStore] Failed to undo action:', error);
+        const toast = useSafeToast();
+        let title = `Failed to undo action: ${lastAction.description}`;
+        try {
+          const { $i18n } = useNuxtApp();
+          if (typeof $i18n?.t === 'function') {
+            title = $i18n.t('toast.action_undo_failed.title', {
+              description: lastAction.description,
+            });
+          }
+        } catch (translatorError) {
+          logger.warn(
+            '[ActionHistoryStore] i18n translator unavailable for undo-failure toast.',
+            translatorError
+          );
+        }
+        toast?.add({
+          title,
+          color: 'error',
+        });
       }
     },
     clearHistory() {
