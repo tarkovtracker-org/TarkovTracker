@@ -62,7 +62,12 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { DEFAULT_KEYBINDS, hasSystemConflict, serializeKeybindEvent } from '@/utils/keybinds';
+  import {
+    DEFAULT_KEYBINDS,
+    hasSystemConflict,
+    keybindsConflict,
+    serializeKeybindEvent,
+  } from '@/utils/keybinds';
   const { t } = useI18n();
   const preferencesStore = usePreferencesStore();
   const keybindOmnibar = computed({
@@ -150,7 +155,7 @@
     warnings.value.undo = 'none';
     const omnibarVal = keybindOmnibar.value.toLowerCase();
     const undoVal = keybindUndo.value.toLowerCase();
-    if (omnibarVal === undoVal) {
+    if (keybindsConflict(omnibarVal, undoVal)) {
       warnings.value.omnibar = 'conflict';
       warnings.value.undo = 'conflict';
       return;

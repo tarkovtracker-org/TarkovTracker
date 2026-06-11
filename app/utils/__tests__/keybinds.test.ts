@@ -3,7 +3,9 @@ import {
   DEFAULT_KEYBINDS,
   hasSystemConflict,
   isValidKeybind,
+  keybindsConflict,
   matchesKeybind,
+  normalizeKeybind,
   sanitizeKeybind,
   serializeKeybindEvent,
 } from '@/utils/keybinds';
@@ -91,6 +93,32 @@ describe('keybinds util', () => {
     it('returns false for invalid shortcut strings', () => {
       expect(hasSystemConflict(' ')).toBe(false);
       expect(hasSystemConflict('ctrl+')).toBe(false);
+    });
+  });
+  describe('normalizeKeybind', () => {
+    it('canonicalizes modifier order and aliases', () => {
+      expect(normalizeKeybind('shift+ctrl+k')).toBe('ctrl+shift+k');
+      expect(normalizeKeybind('control+z')).toBe('ctrl+z');
+      expect(normalizeKeybind('META+K')).toBe('meta+k');
+    });
+    it('returns null for invalid shortcuts', () => {
+      expect(normalizeKeybind('ctrl+')).toBeNull();
+      expect(normalizeKeybind(' ')).toBeNull();
+    });
+  });
+  describe('keybindsConflict', () => {
+    it('detects identical bindings regardless of modifier order or alias', () => {
+      expect(keybindsConflict('ctrl+q', 'ctrl+q')).toBe(true);
+      expect(keybindsConflict('ctrl+shift+k', 'shift+ctrl+k')).toBe(true);
+      expect(keybindsConflict('control+z', 'ctrl+z')).toBe(true);
+    });
+    it('returns false for distinct bindings', () => {
+      expect(keybindsConflict('ctrl+q', 'ctrl+z')).toBe(false);
+      expect(keybindsConflict('ctrl+k', 'meta+k')).toBe(false);
+    });
+    it('returns false when either binding is invalid', () => {
+      expect(keybindsConflict('ctrl+', 'ctrl+')).toBe(false);
+      expect(keybindsConflict('ctrl+q', ' ')).toBe(false);
     });
   });
 });

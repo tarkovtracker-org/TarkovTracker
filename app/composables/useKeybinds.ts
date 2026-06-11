@@ -1,7 +1,8 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { queueIdleTask } from '@/utils/idleScheduler';
-import { DEFAULT_KEYBINDS, matchesKeybind } from '@/utils/keybinds';
+import { DEFAULT_KEYBINDS, keybindsConflict, matchesKeybind } from '@/utils/keybinds';
+import { logger } from '@/utils/logger';
 export function useKeybinds(): void {
   const preferencesStore = usePreferencesStore();
   const actionHistoryStore = useActionHistoryStore();
@@ -18,12 +19,22 @@ export function useKeybinds(): void {
     }
     const matchesShortcut = (shortcut: string) => matchesKeybind(event, shortcut);
     const undoShortcut = preferencesStore.getKeybindUndo || DEFAULT_KEYBINDS.undo;
+    const omnibarShortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
+    // If two actions are bound to the same combination, firing either one would be
+    // ambiguous (e.g. undoing while the user meant to search). Skip both and let the
+    // settings UI surface the conflict for the user to resolve.
+    if (keybindsConflict(undoShortcut, omnibarShortcut) && matchesShortcut(undoShortcut)) {
+      logger.warn(
+        '[useKeybinds] Ignoring ambiguous shortcut bound to multiple actions:',
+        undoShortcut
+      );
+      return;
+    }
     if (matchesShortcut(undoShortcut)) {
       event.preventDefault();
       void actionHistoryStore.undoLastAction();
       return;
     }
-    const omnibarShortcut = preferencesStore.getKeybindOmnibar || DEFAULT_KEYBINDS.omnibar;
     if (matchesShortcut(omnibarShortcut)) {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('toggle-omnibar'));

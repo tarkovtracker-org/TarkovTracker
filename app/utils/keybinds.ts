@@ -25,6 +25,29 @@ export const isValidKeybind = (shortcut: unknown): shortcut is string => {
 };
 export const sanitizeKeybind = (shortcut: unknown, fallback: string): string =>
   isValidKeybind(shortcut) ? shortcut.toLowerCase() : fallback;
+// Canonicalizes a shortcut so semantically identical bindings compare equal
+// regardless of modifier order or alias (e.g. 'shift+ctrl+k' === 'ctrl+shift+k',
+// 'control+z' === 'ctrl+z'). Returns null for invalid shortcuts.
+const MODIFIER_ORDER: Record<string, number> = { ctrl: 0, alt: 1, shift: 2, meta: 3 };
+export const normalizeKeybind = (shortcut: string): string | null => {
+  if (!isValidKeybind(shortcut)) return null;
+  const parts = shortcut.toLowerCase().split('+');
+  const key = parts.find((part) => !isModifierToken(part))!;
+  const modifiers = parts
+    .filter((part) => isModifierToken(part))
+    .map((part) => (part === 'control' ? 'ctrl' : part));
+  const uniqueModifiers = Array.from(new Set(modifiers)).sort(
+    (a, b) => (MODIFIER_ORDER[a] ?? 99) - (MODIFIER_ORDER[b] ?? 99)
+  );
+  return [...uniqueModifiers, key].join('+');
+};
+// Reports whether two shortcuts resolve to the same key combination. Used to
+// detect double-binds, where one keypress would trigger multiple actions.
+export const keybindsConflict = (a: string, b: string): boolean => {
+  const normalizedA = normalizeKeybind(a);
+  const normalizedB = normalizeKeybind(b);
+  return normalizedA !== null && normalizedA === normalizedB;
+};
 export const matchesKeybind = (event: KeyboardEvent, shortcut: string): boolean => {
   if (!isValidKeybind(shortcut)) return false;
   const parts = shortcut.toLowerCase().split('+');
