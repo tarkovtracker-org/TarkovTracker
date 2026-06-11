@@ -150,11 +150,7 @@
                   </UButton>
                 </div>
                 <div>
-                  <div
-                    v-for="task in focusedTaskInSlice"
-                    :key="`focused-${task.id}`"
-                    class="content-visibility-auto-task-card pb-4"
-                  >
+                  <div v-for="task in focusedTaskInSlice" :key="`focused-${task.id}`" class="pb-4">
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -177,11 +173,7 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div
-                    v-for="task in pinnedTasksInSlice"
-                    :key="`pinned-${task.id}`"
-                    class="content-visibility-auto-task-card pb-4"
-                  >
+                  <div v-for="task in pinnedTasksInSlice" :key="`pinned-${task.id}`" class="pb-4">
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -207,11 +199,7 @@
                 @toggle="toggleMapTaskVisibilityFilter"
               />
               <div>
-                <div
-                  v-for="task in mapSpecificTasksInSlice"
-                  :key="`task-${task.id}`"
-                  class="content-visibility-auto-task-card pb-4"
-                >
+                <div v-for="task in mapSpecificTasksInSlice" :key="`task-${task.id}`" class="pb-4">
                   <TaskCard :task="task" @on-task-action="handleTaskAction" />
                 </div>
               </div>
@@ -227,11 +215,7 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div
-                    v-for="task in globalTasksInSlice"
-                    :key="`global-${task.id}`"
-                    class="content-visibility-auto-task-card pb-4"
-                  >
+                  <div v-for="task in globalTasksInSlice" :key="`global-${task.id}`" class="pb-4">
                     <TaskCard
                       accent-variant="global"
                       :task="task"
