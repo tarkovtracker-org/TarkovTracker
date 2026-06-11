@@ -1,5 +1,6 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { usePreferencesStore } from '@/stores/usePreferences';
+import { queueIdleTask } from '@/utils/idleScheduler';
 import { matchesKeybind } from '@/utils/keybinds';
 export function useKeybinds() {
   const preferencesStore = usePreferencesStore();
@@ -36,7 +37,12 @@ export function useKeybinds() {
     }
   };
   onMounted(() => {
-    window.addEventListener('keydown', handleKeydown);
+    void queueIdleTask(
+      () => {
+        window.addEventListener('keydown', handleKeydown);
+      },
+      { timeout: 3000 }
+    );
   });
   onUnmounted(() => {
     window.removeEventListener('keydown', handleKeydown);
