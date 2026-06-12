@@ -1329,7 +1329,9 @@
       "error_description": "L'authentification a été annulée ou a échoué. Veuillez réessayer.",
       "success_title": "Connecté",
       "success_description": "Connecté avec {provider}.",
-      "login_options": "Options de connexion"
+      "login_options": "Options de connexion",
+      "meta_title": "Connexion",
+      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
       "title": "Profil utilisateur",
@@ -2256,6 +2258,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Authorize Application",
       "loading": "Loading...",
       "error": "{error}",
