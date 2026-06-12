@@ -97,7 +97,7 @@
     }
   }
   useSeoMeta({
-    title: 'OAuth Consent - TarkovTracker',
+    title: () => t('oauth.consent.meta_title', 'OAuth Consent - TarkovTracker'),
   });
 </script>
 <template>

@@ -2256,6 +2256,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Authorize Application",
       "loading": "Loading...",
       "error": "{error}",
