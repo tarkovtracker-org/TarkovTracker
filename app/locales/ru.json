@@ -1329,7 +1329,9 @@
       "error_description": "Авторизация была отменена или не удалась. Пожалуйста, попробуйте снова.",
       "success_title": "Вход выполнен",
       "success_description": "Вы вошли через {provider}.",
-      "login_options": "Варианты входа"
+      "login_options": "Варианты входа",
+      "meta_title": "Войти",
+      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
       "title": "User Profile",
@@ -2256,6 +2258,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Authorize Application",
       "loading": "Loading...",
       "error": "{error}",
