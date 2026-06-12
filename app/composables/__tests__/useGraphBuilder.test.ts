@@ -128,6 +128,57 @@ describe('useGraphBuilder needed item accepted items', () => {
     // Full list is carried for display-only cycling.
     expect(need?.acceptedItems?.map((i) => i.id)).toEqual(['augmentin', 'analgin', 'ibuprofen']);
   });
+  it('filters falsy/invalid entries when deriving acceptedItems', () => {
+    const task: Task = {
+      id: 'mixed-items-task',
+      name: 'Mixed Items Task',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-meds',
+          type: 'giveItem',
+          count: 3,
+          foundInRaid: true,
+          items: [
+            { id: 'augmentin', name: 'Augmentin antibiotic pills' },
+            null,
+            { name: 'Missing id item' },
+            { id: 'ibuprofen', name: 'Ibuprofen painkillers' },
+          ],
+        },
+      ],
+      taskRequirements: [],
+    } as unknown as Task;
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const need = result.neededItemTaskObjectives.find((n) => n.id === 'obj-meds');
+    expect(need).toBeDefined();
+    expect(need?.item?.id).toBe('augmentin');
+    expect(need?.count).toBe(3);
+    // Only valid entries (with a real id) are retained, in order.
+    expect(need?.acceptedItems?.map((i) => i.id)).toEqual(['augmentin', 'ibuprofen']);
+  });
+  it('omits acceptedItems when filtering leaves a single valid entry', () => {
+    const task: Task = {
+      id: 'one-valid-task',
+      name: 'One Valid Task',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-one-valid',
+          type: 'giveItem',
+          count: 1,
+          items: [{ id: 'bitcoin', name: 'Physical Bitcoin' }, null, { name: 'Missing id item' }],
+        },
+      ],
+      taskRequirements: [],
+    } as unknown as Task;
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const need = result.neededItemTaskObjectives.find((n) => n.id === 'obj-one-valid');
+    expect(need?.item?.id).toBe('bitcoin');
+    expect(need?.acceptedItems).toBeUndefined();
+  });
   it('does not set acceptedItems for single-item objectives', () => {
     const task: Task = {
       id: 'single-item-task',

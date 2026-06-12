@@ -42,7 +42,10 @@
         <UIcon name="i-mdi-swap-horizontal" class="h-3 w-3" aria-hidden="true" />
         {{ t('needed_items.any_of_items_short', { count: acceptedItems.length }, 'Any {count}') }}
       </span>
-      <AppTooltip v-if="displayDevUrl" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
+      <AppTooltip
+        v-if="displayDevUrl"
+        :text="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
+      >
         <a
           :href="displayDevUrl"
           target="_blank"
@@ -52,7 +55,7 @@
         >
           <img
             src="/img/logos/tarkovdevlogo.webp"
-            :alt="t('page.tasks.questcard.view_on_tarkov_dev')"
+            :alt="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
             class="h-4 w-4"
           />
         </a>
