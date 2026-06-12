@@ -1329,7 +1329,9 @@
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "Sesión iniciada",
       "success_description": "Sesión iniciada con {provider}.",
-      "login_options": "Opciones de inicio de sesión"
+      "login_options": "Opciones de inicio de sesión",
+      "meta_title": "Iniciar sesión",
+      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
       "title": "Perfil de usuario",
@@ -2256,6 +2258,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Authorize Application",
       "loading": "Cargando...",
       "error": "{error}",
