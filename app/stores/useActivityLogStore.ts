@@ -2,6 +2,11 @@ import { useStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  getCurrentSupabaseUserId,
+  parseUserScopedStorage,
+  serializeUserScopedStorage,
+} from '@/utils/userScopedStorage';
 import type { ApiUpdateMeta } from '@/types/progress';
 export interface ActivityLogEntry {
   id: string;
@@ -21,10 +26,48 @@ export interface ActivityLogEntry {
   details?: string;
   metadata?: unknown;
 }
+const parseLegacyJson = <T>(raw: string, fallback: T): T => {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+const activityLogEntriesSerializer = {
+  read: (raw: string): ActivityLogEntry[] => {
+    const currentUserId = getCurrentSupabaseUserId();
+    const wrapped = parseUserScopedStorage<ActivityLogEntry[]>(raw);
+    if (wrapped) {
+      return wrapped._userId === currentUserId && Array.isArray(wrapped.data) ? wrapped.data : [];
+    }
+    const legacyEntries = parseLegacyJson<unknown>(raw, []);
+    return Array.isArray(legacyEntries) ? (legacyEntries as ActivityLogEntry[]) : [];
+  },
+  write: (value: ActivityLogEntry[]): string =>
+    serializeUserScopedStorage(value, getCurrentSupabaseUserId()),
+};
+const activityLogTimestampSerializer = {
+  read: (raw: string): number => {
+    const currentUserId = getCurrentSupabaseUserId();
+    const wrapped = parseUserScopedStorage<number>(raw);
+    if (wrapped) {
+      return wrapped._userId === currentUserId && typeof wrapped.data === 'number'
+        ? wrapped.data
+        : 0;
+    }
+    const legacyTimestamp = parseLegacyJson<unknown>(raw, 0);
+    return typeof legacyTimestamp === 'number' ? legacyTimestamp : 0;
+  },
+  write: (value: number): string => serializeUserScopedStorage(value, getCurrentSupabaseUserId()),
+};
 export const useActivityLogStore = defineStore('activityLog', {
   state: () => ({
-    manualEntries: useStorage<ActivityLogEntry[]>(STORAGE_KEYS.activityLogManual, []),
-    lastReadTimestamp: useStorage<number>(STORAGE_KEYS.activityLogLastRead, 0),
+    manualEntries: useStorage<ActivityLogEntry[]>(STORAGE_KEYS.activityLogManual, [], undefined, {
+      serializer: activityLogEntriesSerializer,
+    }),
+    lastReadTimestamp: useStorage<number>(STORAGE_KEYS.activityLogLastRead, 0, undefined, {
+      serializer: activityLogTimestampSerializer,
+    }),
   }),
   getters: {
     allEntries(): ActivityLogEntry[] {

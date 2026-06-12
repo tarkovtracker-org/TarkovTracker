@@ -1,16 +1,35 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { useActivityLogStore } from '@/stores/useActivityLogStore';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { serializeUserScopedStorage } from '@/utils/userScopedStorage';
+import type { ActivityLogEntry } from '@/stores/useActivityLogStore';
 const apiUpdateHistory: Array<{ id: string; at: number }> = [];
+const { currentUserId } = vi.hoisted(() => ({
+  currentUserId: {
+    value: null as string | null,
+  },
+}));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getCurrentProgressData: () => ({ apiUpdateHistory }),
   }),
 }));
+vi.mock('@/utils/userScopedStorage', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/userScopedStorage')>(
+    '@/utils/userScopedStorage'
+  );
+  return {
+    ...actual,
+    getCurrentSupabaseUserId: () => currentUserId.value,
+  };
+});
 describe('useActivityLogStore', () => {
   beforeEach(() => {
     localStorage.clear();
     apiUpdateHistory.length = 0;
+    currentUserId.value = null;
     setActivePinia(createPinia());
   });
   afterEach(() => {
@@ -90,5 +109,98 @@ describe('useActivityLogStore', () => {
     store.resetForSession();
     expect(store.manualEntries).toHaveLength(0);
     expect(store.lastReadTimestamp).toBe(0);
+  });
+  it('loads matching user-scoped manual entries and read timestamp', () => {
+    currentUserId.value = 'user-1';
+    localStorage.setItem(
+      STORAGE_KEYS.activityLogManual,
+      serializeUserScopedStorage(
+        [
+          {
+            id: 'm1',
+            type: 'task',
+            action: 'complete',
+            title: 'Scoped',
+            source: 'manual',
+            timestamp: 1000,
+          },
+        ],
+        'user-1',
+        2000
+      )
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.activityLogLastRead,
+      serializeUserScopedStorage(1500, 'user-1', 2000)
+    );
+    const store = useActivityLogStore();
+    expect(store.manualEntries.map((entry) => entry.id)).toEqual(['m1']);
+    expect(store.lastReadTimestamp).toBe(1500);
+  });
+  it('ignores activity log storage owned by another user', () => {
+    currentUserId.value = 'user-2';
+    localStorage.setItem(
+      STORAGE_KEYS.activityLogManual,
+      serializeUserScopedStorage(
+        [
+          {
+            id: 'm1',
+            type: 'task',
+            action: 'complete',
+            title: 'Other user',
+            source: 'manual',
+            timestamp: 1000,
+          },
+        ],
+        'user-1',
+        2000
+      )
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.activityLogLastRead,
+      serializeUserScopedStorage(1500, 'user-1', 2000)
+    );
+    const store = useActivityLogStore();
+    expect(store.manualEntries).toEqual([]);
+    expect(store.lastReadTimestamp).toBe(0);
+  });
+  it('migrates legacy raw activity log storage on write', async () => {
+    currentUserId.value = 'user-1';
+    localStorage.setItem(
+      STORAGE_KEYS.activityLogManual,
+      JSON.stringify([
+        {
+          id: 'legacy',
+          type: 'task',
+          action: 'complete',
+          title: 'Legacy',
+          source: 'manual',
+          timestamp: 1000,
+        },
+      ])
+    );
+    localStorage.setItem(STORAGE_KEYS.activityLogLastRead, JSON.stringify(1000));
+    const store = useActivityLogStore();
+    expect(store.manualEntries.map((entry) => entry.id)).toEqual(['legacy']);
+    expect(store.lastReadTimestamp).toBe(1000);
+    store.addManualEntry({ id: 'new', type: 'task', action: 'fail', title: 'New' });
+    store.markAllAsRead();
+    await nextTick();
+    const persistedEntries = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.activityLogManual) || '{}'
+    ) as {
+      _userId?: string;
+      data?: ActivityLogEntry[];
+    };
+    const persistedTimestamp = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.activityLogLastRead) || '{}'
+    ) as {
+      _userId?: string;
+      data?: number;
+    };
+    expect(persistedEntries._userId).toBe('user-1');
+    expect(persistedEntries.data?.map((entry) => entry.id)).toEqual(['new', 'legacy']);
+    expect(persistedTimestamp._userId).toBe('user-1');
+    expect(persistedTimestamp.data).toBeTypeOf('number');
   });
 });
