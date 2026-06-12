@@ -73,6 +73,43 @@
     "supporter_badge_label": "Supporter",
     "supporter_badge_aria": "Manage your supporter subscription ({tier})"
   },
+  "omnibar": {
+    "title": "Search",
+    "description": "Search tasks, needed items, and hideout stations",
+    "trigger_label": "Search...",
+    "open_aria": "Open global search",
+    "aria_label": "Global search",
+    "placeholder": "Search tasks, needed items, hideout...",
+    "hint_min_chars": "Type at least 2 characters to search...",
+    "no_results": "No results found for \"{query}\".",
+    "group_tasks": "Tasks / Quests",
+    "group_items": "Needed Items",
+    "group_hideout": "Hideout Stations"
+  },
+  "activity_log": {
+    "title": "Activity Log",
+    "aria_label": "Activity Log",
+    "unread_indicator": "You have unread activity",
+    "mark_read": "Mark read",
+    "clear": "Clear",
+    "empty": "No activity recorded yet.",
+    "badge_api": "API Sync",
+    "badge_manual": "Manual",
+    "api_synced": "API Progress Synced",
+    "more_count": "+{count} more",
+    "unknown_time": "Unknown",
+    "entry": {
+      "completed": "Completed Task: {name}",
+      "uncompleted": "Uncompleted Task: {name}",
+      "failed": "Failed Task: {name}",
+      "reset_failed": "Reset Failed Task: {name}",
+      "available": "Unlocked Task: {name}",
+      "undo_completed": "Undid Task Completion: {name}",
+      "undo_uncompleted": "Undid Task Uncompletion: {name}",
+      "undo_reset_failed": "Undid Reset Failed Task: {name}",
+      "undo_failed": "Undid Task Failure: {name}"
+    }
+  },
   "promoted_stream": {
     "close": "Close stream",
     "expand": "Open stream",
@@ -167,6 +204,12 @@
     "clipboard_error": {
       "title": "Copy failed",
       "description": "Unable to copy \"{value}\" to clipboard."
+    },
+    "action_undone": {
+      "title": "Undid action: {description}"
+    },
+    "action_undo_failed": {
+      "title": "Failed to undo action: {description}"
     }
   },
   "common": {
@@ -1975,6 +2018,22 @@
         "priority": "Priority",
         "ingame": "In-Game"
       }
+    },
+    "keybinds": {
+      "title": "Keyboard Shortcuts",
+      "omnibar_label": "Global Search (Omnibar)",
+      "omnibar_description": "Press this shortcut to open the global search palette.",
+      "undo_label": "Undo Last Action",
+      "undo_description": "Press this shortcut to revert your most recent progress change.",
+      "record_placeholder": "Click to record...",
+      "recording": "Press key combination...",
+      "reset": "Reset",
+      "reset_aria": "Reset to default",
+      "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
+      "conflict_undo": "Shortcut conflicts with Search keybind.",
+      "conflict_rejected": "Already used by {action}. Press a different combination.",
+      "warn_system_omnibar": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+T, Ctrl+W, Alt+Tab).",
+      "warn_system_undo": "Warning: May conflict with browser/OS system shortcuts (e.g. Ctrl+W, Ctrl+T, Alt+Tab)."
     },
     "experience": {
       "title": "Experience & Level",
