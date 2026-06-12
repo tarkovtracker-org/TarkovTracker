@@ -1329,7 +1329,9 @@
       "error_description": "Ověření bylo zrušeno nebo se nezdařilo. Zkuste to prosím znovu.",
       "success_title": "Přihlášen",
       "success_description": "Přihlášen pomocí {provider}.",
-      "login_options": "Možnosti přihlášení"
+      "login_options": "Možnosti přihlášení",
+      "meta_title": "Přihlásit se",
+      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
       "title": "Profil uživatele",
@@ -2256,6 +2258,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Autorizovat aplikaci",
       "loading": "Načítám...",
       "error": "{error}",
