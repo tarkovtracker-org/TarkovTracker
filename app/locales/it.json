@@ -1329,7 +1329,9 @@
       "error_description": "L'autenticazione è stata annullata o non riuscita. Per favore riprova.",
       "success_title": "Accesso effettuato",
       "success_description": "Accesso effettuato con {provider}.",
-      "login_options": "Opzioni accesso"
+      "login_options": "Opzioni accesso",
+      "meta_title": "Accedi",
+      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
       "title": "Profilo Utente",
@@ -2256,6 +2258,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Autorizza Applicazione",
       "loading": "Caricamento...",
       "error": "{error}",
