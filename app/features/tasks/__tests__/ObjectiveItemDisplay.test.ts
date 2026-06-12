@@ -7,8 +7,10 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
     locale: ref('en'),
-    t: (key: string, named?: Record<string, unknown>) =>
-      named && 'count' in named ? `${key}:${named.count}` : key,
+    t: (key: string, namedOrDefault?: Record<string, unknown> | string) =>
+      namedOrDefault && typeof namedOrDefault === 'object' && 'count' in namedOrDefault
+        ? `${key}:${namedOrDefault.count}`
+        : key,
   }),
 }));
 const makeItem = (id: string, name: string): TarkovItem =>
