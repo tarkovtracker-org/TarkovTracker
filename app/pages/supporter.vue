@@ -44,13 +44,11 @@
   const { $supabase } = useNuxtApp();
   const { fetchStatus } = useSupporter();
   definePageMeta({ layout: 'default' });
-  useHead({
+  useSeoMeta({
     title: () => t('page.supporter.title'),
-    meta: [
-      { name: 'description', content: () => t('page.supporter.subtitle') },
-      { property: 'og:title', content: () => t('page.supporter.title') },
-      { property: 'og:description', content: () => t('page.supporter.subtitle') },
-    ],
+    description: () => t('page.supporter.subtitle'),
+    ogTitle: () => t('page.supporter.title'),
+    ogDescription: () => t('page.supporter.subtitle'),
   });
   const interval = ref<BillingInterval>('monthly');
   onMounted(() => {

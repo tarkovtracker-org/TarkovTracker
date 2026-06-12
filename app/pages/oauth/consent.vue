@@ -96,7 +96,7 @@
       loading.value = false;
     }
   }
-  useHead({
+  useSeoMeta({
     title: 'OAuth Consent - TarkovTracker',
   });
 </script>
