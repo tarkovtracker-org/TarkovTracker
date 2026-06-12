@@ -1329,7 +1329,9 @@
       "error_description": "Authentication was canceled or failed. Please try again.",
       "success_title": "已登录",
       "success_description": "已通过 {provider} 登录。",
-      "login_options": "登录选项"
+      "login_options": "登录选项",
+      "meta_title": "登录",
+      "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
       "title": "User Profile",
@@ -2256,6 +2258,7 @@
   },
   "oauth": {
     "consent": {
+      "meta_title": "OAuth Consent - TarkovTracker",
       "authorize": "Authorize Application",
       "loading": "Loading...",
       "error": "{error}",
