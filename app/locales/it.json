@@ -2234,6 +2234,9 @@
       "increase_hideout_count": "Aumenta il conteggio per {station_name}"
     },
     "item": "Oggetto",
+    "any_of_items": "Any one of these {count} items counts",
+    "any_of_items_short": "Any {count}",
+    "view_accepted_items": "View all {count} accepted items",
     "not_collected": "Non raccolto",
     "click_to_collect": "Clicca per raccogliere",
     "click_to_uncollect": "Clicca per annullare la raccolta",
