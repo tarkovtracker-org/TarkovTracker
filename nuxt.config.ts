@@ -1,8 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { useNitro, useNuxt } from '@nuxt/kit';
+import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
@@ -393,33 +392,6 @@ export default defineNuxtConfig({
             source.includes(sourcePattern) && (names.has(imported.name) || names.has(exposedName))
         );
         if (shouldBlock) imports.splice(index, 1);
-      }
-    },
-    // Workaround for Nuxt 4.4.4 SPA dev server bug (nuxt/nuxt#34957).
-    // With ssr:false the SSR Vite server is never created, so vite-node IPC is
-    // never wired up and `/` returns 500. This stubs the SSR manifest virtuals
-    // and points the client manifest at its built file. Drop after v4.5.0.
-    'vite:extendConfig': (_config, context) => {
-      const nuxt = useNuxt();
-      if (!nuxt.options.dev || nuxt.options.ssr || !context.isClient) return;
-      const nitro = useNitro();
-      const clientManifestPath = pathToFileURL(
-        resolve(nuxt.options.buildDir, 'dist/server/client.manifest.mjs')
-      ).href;
-      const nitroConfig = nitro.options as unknown as {
-        virtual?: Record<string, string>;
-        _config?: { virtual?: Record<string, string> };
-      };
-      nitroConfig.virtual ||= {};
-      const virtualTargets: Record<string, string>[] = [nitroConfig.virtual];
-      if (nitroConfig._config) {
-        nitroConfig._config.virtual ||= {};
-        virtualTargets.push(nitroConfig._config.virtual);
-      }
-      for (const virtual of virtualTargets) {
-        virtual['#build/dist/server/server.mjs'] = 'export default () => {}';
-        virtual['#build/dist/server/client.manifest.mjs'] =
-          `export { default } from ${JSON.stringify(clientManifestPath)}`;
       }
     },
   },
