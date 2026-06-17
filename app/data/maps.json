@@ -44,6 +44,9 @@
       "maxZoom": 6
     }
   },
+  "icebreaker": {
+    "unavailable": true
+  },
   "interchange": {
     "svg": {
       "file": "Interchange.svg",
