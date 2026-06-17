@@ -34,3 +34,8 @@ Deeper conventions for agents. Root `AGENTS.md` links here for reference; these 
 - Keep types close to usage; reuse existing types where possible.
 - Match existing patterns for enums (often union types in this codebase).
 - Prefer explicit types for exported functions, stores, and composables.
+
+## SEO / Head Meta
+
+- Use `useSeoMeta` for all SEO properties (`title`, `description`, `og:*`, `twitter:*`). This is the established convention across all pages.
+- Do not replace `useSeoMeta` with `useHead` — they serve different purposes.

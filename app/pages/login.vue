@@ -192,11 +192,6 @@
   import { toProviderLabel, useOAuthLogin } from '@/composables/useOAuthLogin';
   import { logger } from '@/utils/logger';
   import { sanitizeInternalRedirect } from '@/utils/redirect';
-  useSeoMeta({
-    title: 'Login',
-    description:
-      'Sign in to TarkovTracker to sync your progress across devices and collaborate with your team.',
-  });
   const { $supabase } = useNuxtApp();
   const isOfflineMode = computed(() => $supabase.isOfflineMode === true);
   const loading = ref({
@@ -209,6 +204,14 @@
   let loginPageUnmounted = false;
   const route = useRoute();
   const { t } = useI18n({ useScope: 'global' });
+  useSeoMeta({
+    title: () => t('page.login.meta_title', 'Login'),
+    description: () =>
+      t(
+        'page.login.meta_description',
+        'Sign in to TarkovTracker to sync your progress across devices and collaborate with your team.'
+      ),
+  });
   const { showErrorToast, showSuccessToast } = useDiagnosticToast();
   const buildCallbackUrl = () => {
     const config = useRuntimeConfig();

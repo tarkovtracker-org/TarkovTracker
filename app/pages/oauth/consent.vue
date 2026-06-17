@@ -96,8 +96,9 @@
       loading.value = false;
     }
   }
-  useHead({
-    title: 'OAuth Consent - TarkovTracker',
+  useSeoMeta({
+    title: () => t('oauth.consent.meta_title', 'OAuth Consent - TarkovTracker'),
+    robots: 'noindex, nofollow',
   });
 </script>
 <template>

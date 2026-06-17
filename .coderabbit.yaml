@@ -36,6 +36,10 @@ reviews:
 
         In this project, `useI18n` may be auto-imported in .vue files via Nuxt i18n integration.
         Do not require explicit `import { useI18n } from 'vue-i18n'` unless typecheck fails.
+
+        SEO meta convention: this project uses `useSeoMeta` for all SEO properties (title, description, og:*, twitter:*).
+        Do not suggest replacing `useSeoMeta` with `useHead`. `useHead` is reserved for non-meta head elements
+        (htmlAttrs, link, script, style) only.
   tools:
     biome:
       enabled: false

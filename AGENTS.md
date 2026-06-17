@@ -94,7 +94,9 @@ Naming:
 - Vue SFCs use `<script setup lang="ts">`.
 - Auto-imported Vue/Nuxt utilities (`ref`, `computed`, `watch`, `useRoute`, `useFetch`, hooks) must not be explicitly imported.
 - Explicitly import Pinia stores and utilities.
-- Use `definePageMeta` and `useHead` for page metadata.
+- Use `definePageMeta` for route metadata (layout, middleware).
+- Use `useSeoMeta` for SEO properties (`title`, `description`, `og:*`, `twitter:*`). This is the established convention across all pages — do not suggest `useHead` as a replacement.
+- Reserve `useHead` for non-meta head elements only (`htmlAttrs`, `link`, `script`, `style`).
 - Prefer `useFetch`/`useAsyncData` for data fetching.
 - Use `*.client.ts` suffix for client-only plugins.
 - Keep page files lean; move logic into features/composables.
