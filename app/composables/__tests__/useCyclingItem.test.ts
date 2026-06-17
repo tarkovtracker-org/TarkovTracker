@@ -61,6 +61,45 @@ describe('useCyclingItem', () => {
     vi.advanceTimersByTime(5000);
     expect(currentItem.value?.id).toBe('a');
   });
+  it('exposes hasAlternatives independent of motion/enabled state', async () => {
+    const items = [makeItem('a'), makeItem('b')];
+    const enabled = ref(false);
+    const { hasAlternatives, isCycling } = useCyclingItem(items, () => items[0] ?? null, {
+      enabled,
+    });
+    await nextTick();
+    // Alternatives exist even though rotation is disabled.
+    expect(hasAlternatives.value).toBe(true);
+    expect(isCycling.value).toBe(false);
+  });
+  it('does not cycle when the user prefers reduced motion', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const items = [makeItem('a'), makeItem('b'), makeItem('c')];
+      const { currentItem, isCycling, hasAlternatives } = useCyclingItem(
+        items,
+        () => items[0] ?? null,
+        { intervalMs: 1000 }
+      );
+      await nextTick();
+      expect(hasAlternatives.value).toBe(true);
+      expect(isCycling.value).toBe(false);
+      vi.advanceTimersByTime(5000);
+      expect(currentItem.value?.id).toBe('a');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
   it('keeps the index within bounds when the list shrinks', async () => {
     const items = ref([makeItem('a'), makeItem('b'), makeItem('c')]);
     const { currentItem, currentIndex } = useCyclingItem(items, () => items.value[0] ?? null, {

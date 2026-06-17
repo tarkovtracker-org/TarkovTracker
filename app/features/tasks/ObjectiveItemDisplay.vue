@@ -1,5 +1,11 @@
 <template>
-  <span class="contents">
+  <span
+    class="contents"
+    @mouseenter="hovered = true"
+    @mouseleave="hovered = false"
+    @focusin="hovered = true"
+    @focusout="hovered = false"
+  >
     <AppTooltip
       v-if="displayIcon"
       :text="cyclingTooltip"
@@ -35,13 +41,13 @@
           {{ displayName }}
         </span>
       </AppTooltip>
-      <span
-        v-if="isCycling"
-        class="bg-surface-700/80 text-surface-200 inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
-      >
-        <UIcon name="i-mdi-swap-horizontal" class="h-3 w-3" aria-hidden="true" />
-        {{ t('needed_items.any_of_items_short', { count: acceptedItems.length }, 'Any {count}') }}
-      </span>
+      <AcceptedItemsPopover
+        v-if="hasAlternatives"
+        v-model:open="acceptedItemsOpen"
+        :items="acceptedItems"
+        :cycling="isCycling"
+        trigger-class="bg-surface-700/80 text-surface-200 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
+      />
       <AppTooltip
         v-if="displayDevUrl"
         :text="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
@@ -83,8 +89,10 @@
     (props.acceptedItems ?? []).filter((entry): entry is TarkovItem => Boolean(entry?.id))
   );
   const primary = computed(() => props.primaryItem ?? null);
-  const { currentItem, isCycling } = useCyclingItem(acceptedItems, primary, {
-    enabled: () => !props.paused,
+  const hovered = ref(false);
+  const acceptedItemsOpen = ref(false);
+  const { currentItem, isCycling, hasAlternatives } = useCyclingItem(acceptedItems, primary, {
+    enabled: () => !props.paused && !hovered.value && !acceptedItemsOpen.value,
   });
   // Prefer the defaultPreset image for weapons (full gun vs bare receiver).
   const imageItem = computed(() => {
@@ -126,7 +134,7 @@
     linkItem.value ? getKeyPrimaryUrl(linkItem.value) : undefined
   );
   const cyclingTooltip = computed(() => {
-    if (isCycling.value) {
+    if (hasAlternatives.value) {
       return t(
         'needed_items.any_of_items',
         { count: acceptedItems.value.length },

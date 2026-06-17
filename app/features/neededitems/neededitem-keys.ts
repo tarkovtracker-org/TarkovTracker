@@ -19,8 +19,12 @@ export type NeededItemContext = {
   item: ComputedRef<TarkovItem | null>;
   /** All accepted items when the objective allows alternatives (display-only). */
   acceptedItems: ComputedRef<TarkovItem[]>;
+  /** True when more than one item is accepted (alternatives exist), regardless of motion. */
+  hasAlternativeItems: ComputedRef<boolean>;
   /** True when more than one item is accepted and the display is rotating. */
   isCyclingItems: ComputedRef<boolean>;
+  /** Pause/resume the ambient item rotation (e.g. while a list popover is open). */
+  setCyclingPaused: (paused: boolean) => void;
   levelRequired: ComputedRef<number>;
   lockedBefore: ComputedRef<number>;
   neededCount: ComputedRef<number>;
@@ -45,7 +49,9 @@ export const createDefaultNeededItemContext = (): NeededItemContext => {
     isParentCompleted: asComputed(false),
     item: asComputed(null),
     acceptedItems: asComputed([]),
+    hasAlternativeItems: asComputed(false),
     isCyclingItems: asComputed(false),
+    setCyclingPaused: () => {},
     levelRequired: asComputed(0),
     lockedBefore: asComputed(0),
     neededCount: asComputed(0),

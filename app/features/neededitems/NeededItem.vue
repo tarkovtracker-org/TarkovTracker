@@ -249,10 +249,15 @@
     }
     return null;
   });
+  const cyclingPaused = ref(false);
+  const setCyclingPaused = (paused: boolean) => {
+    cyclingPaused.value = paused;
+  };
+  const hasAlternativeItems = computed(() => acceptedItems.value.length > 1);
   const { currentItem: cyclingItem, isCycling: isCyclingItems } = useCyclingItem(
     acceptedItems,
     primaryItem,
-    { enabled: () => !selfCompletedNeed.value }
+    { enabled: () => !selfCompletedNeed.value && !cyclingPaused.value }
   );
   const relatedStation = computed(() => {
     const need = props.need;
@@ -355,7 +360,9 @@
     teamNeeds,
     imageItem,
     acceptedItems,
+    hasAlternativeItems,
     isCyclingItems,
+    setCyclingPaused,
     craftableIconClass,
     craftableTitle,
     isCraftable,

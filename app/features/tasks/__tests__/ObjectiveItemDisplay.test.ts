@@ -18,6 +18,10 @@ const makeItem = (id: string, name: string): TarkovItem =>
 const AppTooltipStub = defineComponent({
   template: '<span><slot /><slot name="content" /></span>',
 });
+const AcceptedItemsPopoverStub = defineComponent({
+  props: { items: { type: Array, default: () => [] }, cycling: Boolean },
+  template: '<span class="accepted-items-popover">any-of:{{ items.length }}</span>',
+});
 const mountDisplay = (props: {
   primaryItem?: TarkovItem;
   acceptedItems?: TarkovItem[];
@@ -29,6 +33,7 @@ const mountDisplay = (props: {
     global: {
       stubs: {
         AppTooltip: AppTooltipStub,
+        AcceptedItemsPopover: AcceptedItemsPopoverStub,
         UIcon: true,
       },
     },
@@ -46,9 +51,9 @@ describe('ObjectiveItemDisplay', () => {
       fallbackName: 'Augmentin antibiotic pills',
     });
     expect(wrapper.text()).toContain('Augmentin antibiotic pills');
-    expect(wrapper.text()).not.toContain('needed_items.any_of_items_short');
+    expect(wrapper.find('.accepted-items-popover').exists()).toBe(false);
   });
-  it('cycles through accepted items and shows the "any of" badge', async () => {
+  it('cycles through accepted items and shows the accepted-items badge', async () => {
     const accepted = [
       makeItem('augmentin', 'Augmentin antibiotic pills'),
       makeItem('analgin', 'Analgin painkillers'),
@@ -59,12 +64,30 @@ describe('ObjectiveItemDisplay', () => {
       fallbackName: 'Augmentin antibiotic pills',
     });
     await nextTick();
-    // Badge reflects the accepted-item count.
-    expect(wrapper.text()).toContain('needed_items.any_of_items_short:2');
+    // Badge popover is rendered with the full accepted-item list.
+    expect(wrapper.find('.accepted-items-popover').text()).toBe('any-of:2');
     expect(wrapper.text()).toContain('Augmentin antibiotic pills');
     vi.advanceTimersByTime(5000);
     await nextTick();
     expect(wrapper.text()).toContain('Analgin painkillers');
+  });
+  it('pauses cycling while hovered so users can read the current item', async () => {
+    const accepted = [
+      makeItem('augmentin', 'Augmentin antibiotic pills'),
+      makeItem('analgin', 'Analgin painkillers'),
+    ];
+    const wrapper = mountDisplay({
+      primaryItem: accepted[0],
+      acceptedItems: accepted,
+      fallbackName: 'Augmentin antibiotic pills',
+    });
+    await nextTick();
+    await wrapper.find('span.contents').trigger('mouseenter');
+    vi.advanceTimersByTime(15000);
+    await nextTick();
+    // Stays on the primary item while hovered.
+    expect(wrapper.text()).toContain('Augmentin antibiotic pills');
+    expect(wrapper.text()).not.toContain('Analgin painkillers');
   });
   it('does not cycle when paused', async () => {
     const accepted = [
