@@ -329,7 +329,7 @@
       </div>
       <div
         v-if="primaryView === 'maps' && maps.length > 0"
-        class="w-full scrollbar-none overflow-x-auto [-webkit-overflow-scrolling:touch]"
+        class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
       >
         <div
           class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
@@ -363,7 +363,7 @@
       </div>
       <div
         v-if="(primaryView === 'traders' || primaryView === 'graph') && traders.length > 0"
-        class="w-full scrollbar-none overflow-x-auto [-webkit-overflow-scrolling:touch]"
+        class="w-full scrollbar-thin overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
       >
         <div
           class="bg-surface-900 flex w-max min-w-full justify-center gap-1 rounded-lg border border-white/12 px-3 py-3 shadow-sm sm:px-4"
