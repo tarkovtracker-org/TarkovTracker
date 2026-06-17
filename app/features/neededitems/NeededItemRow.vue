@@ -401,6 +401,7 @@
   const isFoundInRaid = computed(() => Boolean(props.need.foundInRaid));
   const acceptedItemsOpen = ref(false);
   watch(acceptedItemsOpen, (isOpen) => setCyclingPaused(isOpen));
+  onBeforeUnmount(() => setCyclingPaused(false));
   // Intersection observer for lazy loading
   const cardRef = ref<HTMLElement | null>(null);
   const { isVisible } = useItemRowIntersection(cardRef, {

@@ -69,7 +69,13 @@
                 isSingleItem && !selfCompletedNeed ? '!cursor-pointer' : '',
               ]"
             />
-            <div v-if="hasAlternativeItems" class="absolute top-0 right-0 z-10" @click.stop>
+            <div
+              v-if="hasAlternativeItems"
+              class="absolute top-0 right-0 z-10"
+              @click.stop
+              @keydown.enter.stop
+              @keydown.space.stop
+            >
               <AcceptedItemsPopover
                 v-model:open="acceptedItemsOpen"
                 :items="acceptedItems"
@@ -241,6 +247,7 @@
   const isSingleItem = computed(() => neededCount.value === 1);
   const acceptedItemsOpen = ref(false);
   watch(acceptedItemsOpen, (isOpen) => setCyclingPaused(isOpen));
+  onBeforeUnmount(() => setCyclingPaused(false));
   const cardAriaLabel = computed(() => {
     const itemName = item.value?.name || t('needed_items.item');
     const status =
