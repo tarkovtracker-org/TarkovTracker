@@ -2234,6 +2234,9 @@
       "increase_hideout_count": "Увеличить счётчик убежища для {station_name}"
     },
     "item": "Предмет",
+    "any_of_items": "Any one of these {count} items counts",
+    "any_of_items_short": "Any {count}",
+    "view_accepted_items": "View all {count} accepted items",
     "not_collected": "Не получено",
     "click_to_collect": "Нажмите, чтобы получить",
     "click_to_uncollect": "Нажмите, чтобы отменить получение",
