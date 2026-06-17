@@ -208,6 +208,7 @@
   import NeededItemsFilterBar from '@/features/neededitems/NeededItemsFilterBar.vue';
   import { logger } from '@/utils/logger';
   import { perfNow, roundPerfMs } from '@/utils/perf';
+  import { getQueryString } from '@/utils/routeHelpers';
   const NeededItemsSettingsDrawer = defineAsyncComponent(
     () => import('@/features/neededitems/NeededItemsSettingsDrawer.vue')
   );
@@ -241,8 +242,14 @@
       baseRenderCount: DEFAULT_INITIAL_RENDER_COUNT,
     }
   );
-  const search = ref('');
   const route = useRoute();
+  const search = ref(getQueryString(route.query.q) || '');
+  watch(
+    () => route.query.q,
+    (newQ) => {
+      search.value = getQueryString(newQ) || '';
+    }
+  );
   const PERF_QUERY_PARAM = 'perfNeededItems';
   const perfDebug = computed(() => {
     const rawValue = route.query[PERF_QUERY_PARAM];

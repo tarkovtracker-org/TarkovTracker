@@ -24,6 +24,13 @@
             <span class="ml-3 flex min-w-0 flex-1 flex-col overflow-hidden">
               <span class="flex items-center truncate text-sm font-semibold">
                 <span class="truncate">{{ item?.name ?? '' }}</span>
+                <AcceptedItemsPopover
+                  v-if="hasAlternativeItems"
+                  v-model:open="acceptedItemsOpen"
+                  :items="acceptedItems"
+                  :cycling="isCyclingItems"
+                  trigger-class="bg-surface-700/80 text-surface-200 ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
+                />
                 <ItemIndicators
                   :found-in-raid="isFoundInRaid"
                   :is-craftable="isCraftable"
@@ -385,9 +392,16 @@
     item,
     teamNeeds,
     imageItem,
+    acceptedItems,
+    hasAlternativeItems,
+    isCyclingItems,
+    setCyclingPaused,
   } = neededItemContext;
   const resolvedImageItem = computed(() => imageItem.value ?? undefined);
   const isFoundInRaid = computed(() => Boolean(props.need.foundInRaid));
+  const acceptedItemsOpen = ref(false);
+  watch(acceptedItemsOpen, (isOpen) => setCyclingPaused(isOpen));
+  onBeforeUnmount(() => setCyclingPaused(false));
   // Intersection observer for lazy loading
   const cardRef = ref<HTMLElement | null>(null);
   const { isVisible } = useItemRowIntersection(cardRef, {

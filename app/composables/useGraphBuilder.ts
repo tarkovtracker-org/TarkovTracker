@@ -165,7 +165,20 @@ export function useGraphBuilder() {
           objective.type !== 'findItem' &&
           objective.type !== 'findQuestItem'
         ) {
-          const primaryItem = objective.item ?? objective.items?.[0];
+          // When an objective accepts more than one item (e.g. "hand over any
+          // found-in-raid medicine item"), keep the full list so the UI can show
+          // that alternatives are valid. The primary item stays canonical for
+          // grouping/keying/progress; acceptedItems is display-only. Filter to
+          // valid items so the "Any N" count matches the cycled candidates.
+          const validItems = Array.isArray(objective.items)
+            ? objective.items.filter((entry): entry is NonNullable<typeof entry> =>
+                Boolean(entry?.id)
+              )
+            : [];
+          // Prefer an explicit item, then the first valid (id-bearing) accepted
+          // item; never a sparse/id-less array entry that would break grouping.
+          const primaryItem = objective.item ?? validItems[0];
+          const acceptedItems = validItems.length > 1 ? validItems : undefined;
           tempNeededObjectives.push({
             id: objective.id,
             needType: 'taskObjective',
@@ -175,6 +188,7 @@ export function useGraphBuilder() {
             markerItem: objective.markerItem,
             count: objective.count ?? 1,
             foundInRaid: objective.foundInRaid ?? false,
+            ...(acceptedItems ? { acceptedItems } : {}),
           });
         }
       });

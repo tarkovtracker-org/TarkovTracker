@@ -27,6 +27,7 @@ import {
 } from '@/types/taskFilter';
 import { clearPreferencesStorage } from '@/utils/clientStorage';
 import { TRADER_SORT_DIRECTIONS, TRADER_SORT_MODES } from '@/utils/constants';
+import { DEFAULT_KEYBINDS, sanitizeKeybind } from '@/utils/keybinds';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import {
@@ -154,6 +155,8 @@ export interface PreferencesState {
   traderSortMode: TraderSortMode | null;
   traderSortDirection: TraderSortDirection | null;
   taskFilterPresets: TaskFilterPreset[];
+  keybindOmnibar: string;
+  keybindUndo: string;
   saving?: {
     streamerMode: boolean;
     hideGlobalTasks: boolean;
@@ -237,6 +240,8 @@ export const preferencesDefaultState: PreferencesState = {
   traderSortMode: null,
   traderSortDirection: null,
   taskFilterPresets: [],
+  keybindOmnibar: DEFAULT_KEYBINDS.omnibar,
+  keybindUndo: DEFAULT_KEYBINDS.undo,
   saving: {
     streamerMode: false,
     hideGlobalTasks: false,
@@ -627,6 +632,12 @@ export const usePreferencesStore = defineStore('preferences', {
         ? state.traderSortDirection
         : 'desc';
     },
+    getKeybindOmnibar: (state) => {
+      return state.keybindOmnibar ?? DEFAULT_KEYBINDS.omnibar;
+    },
+    getKeybindUndo: (state) => {
+      return state.keybindUndo ?? DEFAULT_KEYBINDS.undo;
+    },
   },
   actions: {
     resetToDefaults() {
@@ -647,6 +658,12 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     setProfileSharePvePublic(value: boolean) {
       this.profileSharePvePublic = value;
+    },
+    setKeybindOmnibar(keybind: string) {
+      this.keybindOmnibar = sanitizeKeybind(keybind, DEFAULT_KEYBINDS.omnibar);
+    },
+    setKeybindUndo(keybind: string) {
+      this.keybindUndo = sanitizeKeybind(keybind, DEFAULT_KEYBINDS.undo);
     },
     toggleHidden(teamId: string) {
       if (!this.teamHide) {
@@ -1004,6 +1021,8 @@ export const usePreferencesStore = defineStore('preferences', {
       'skillSortMode',
       'traderSortMode',
       'traderSortDirection',
+      'keybindOmnibar',
+      'keybindUndo',
     ],
   },
 });

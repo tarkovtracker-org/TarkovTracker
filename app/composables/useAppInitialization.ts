@@ -1,5 +1,6 @@
 import { useSupporter } from '@/composables/useSupporter';
 import { useToastI18n } from '@/composables/useToastI18n';
+import { useActivityLogStore } from '@/stores/useActivityLogStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import {
@@ -16,6 +17,7 @@ import { logger } from '@/utils/logger';
  */
 export function useAppInitialization() {
   const { $supabase } = useNuxtApp();
+  const activityLogStore = useActivityLogStore();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const supporter = useSupporter();
@@ -59,6 +61,7 @@ export function useAppInitialization() {
   let authChangeToken = 0;
   const resetTarkovState = (reason: string, previousUserId: string | null = null) => {
     resetTarkovStoreForSessionTransition(previousUserId, reason);
+    activityLogStore.resetForSession();
   };
   const loadSupporterStatusIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
     const authenticatedUserId = getAuthenticatedUserId();

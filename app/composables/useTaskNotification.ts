@@ -1,6 +1,7 @@
+import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
+import { useActivityLogStore } from '@/stores/useActivityLogStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { logger } from '@/utils/logger';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskObjective } from '@/types/tarkov';
 interface TaskNotificationReturn {
@@ -14,17 +15,13 @@ interface TaskNotificationReturn {
 }
 export function useTaskNotification(): TaskNotificationReturn {
   const { t } = useI18n({ useScope: 'global' });
+  const actionHistoryStore = useActionHistoryStore();
+  const activityLogStore = useActivityLogStore();
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const tasks = computed(() => metadataStore.tasks);
   const taskStatusUpdated = ref(false);
   const taskStatus = ref('');
-  const undoData = ref<{
-    taskId: string;
-    taskName: string;
-    action: TaskActionPayload['action'];
-    wasManualFail?: boolean;
-  } | null>(null);
   const showUndoButton = ref(false);
   const notificationTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const updateTaskStatus = (statusKey: string, taskName: string, showUndo = false) => {
@@ -48,16 +45,112 @@ export function useTaskNotification(): TaskNotificationReturn {
     taskStatusUpdated.value = false;
   };
   const onTaskAction = (event: TaskActionPayload) => {
-    undoData.value = {
-      taskId: event.taskId,
-      taskName: event.taskName,
-      action: event.action,
-      wasManualFail: event.wasManualFail,
+    const taskId = event.taskId;
+    const taskName = event.taskName;
+    const action = event.action;
+    const wasManualFail = event.wasManualFail;
+    const entryTitleKeys: Partial<Record<TaskActionPayload['action'], string>> = {
+      complete: 'activity_log.entry.completed',
+      uncomplete: 'activity_log.entry.uncompleted',
+      fail: 'activity_log.entry.failed',
+      reset_failed: 'activity_log.entry.reset_failed',
+      available: 'activity_log.entry.available',
     };
+    const titleKey = entryTitleKeys[action];
+    if (titleKey) {
+      const title = t(titleKey, { name: taskName });
+      activityLogStore.addManualEntry({
+        id: `manual-task-${taskId}-${Date.now()}`,
+        type: 'task',
+        action,
+        title,
+      });
+      // Register a reversible action in the global undo store for actions we can revert.
+      // 'available' mutates an unbounded set of prerequisite tasks and is not safely reversible.
+      if (action !== 'available') {
+        const taskToUndo = tasks.value.find((task) => task.id === taskId);
+        actionHistoryStore.pushAction({
+          id: `task-${taskId}-${Date.now()}`,
+          description: title,
+          undo: () => {
+            if (action === 'complete') {
+              tarkovStore.setTaskUncompleted(taskId);
+              if (taskToUndo?.objectives) {
+                handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
+              }
+              handleAlternatives(
+                taskToUndo?.alternatives,
+                'setTaskUncompleted',
+                'setTaskObjectiveUncomplete'
+              );
+              activityLogStore.addManualEntry({
+                id: `manual-task-undo-${taskId}-${Date.now()}`,
+                type: 'task',
+                action: 'uncomplete',
+                title: t('activity_log.entry.undo_completed', { name: taskName }),
+              });
+              updateTaskStatus('page.tasks.questcard.undo_complete', taskName);
+            } else if (action === 'uncomplete') {
+              tarkovStore.setTaskComplete(taskId);
+              if (taskToUndo?.objectives) {
+                handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveComplete');
+              }
+              handleAlternatives(taskToUndo?.alternatives, 'setTaskFailed');
+              const minLevel = taskToUndo?.minPlayerLevel;
+              if (minLevel !== undefined) {
+                const currentLevel = tarkovStore.playerLevel();
+                const isValidLevel =
+                  typeof currentLevel === 'number' && Number.isFinite(currentLevel);
+                if (!isValidLevel || currentLevel < minLevel) {
+                  tarkovStore.setLevel(minLevel);
+                }
+              }
+              activityLogStore.addManualEntry({
+                id: `manual-task-undo-${taskId}-${Date.now()}`,
+                type: 'task',
+                action: 'complete',
+                title: t('activity_log.entry.undo_uncompleted', { name: taskName }),
+              });
+              updateTaskStatus('page.tasks.questcard.undo_uncomplete', taskName);
+            } else if (action === 'reset_failed') {
+              if (wasManualFail) {
+                tarkovStore.setTaskFailed(taskId, { manual: true });
+              } else {
+                tarkovStore.setTaskFailed(taskId);
+              }
+              if (taskToUndo?.objectives) {
+                clearTaskObjectives(taskToUndo.objectives);
+              }
+              activityLogStore.addManualEntry({
+                id: `manual-task-undo-${taskId}-${Date.now()}`,
+                type: 'task',
+                action: 'fail',
+                title: t('activity_log.entry.undo_reset_failed', { name: taskName }),
+              });
+              updateTaskStatus('page.tasks.questcard.undo_reset_failed', taskName);
+            } else if (action === 'fail') {
+              tarkovStore.setTaskUncompleted(taskId);
+              if (taskToUndo?.objectives) {
+                handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
+              }
+              activityLogStore.addManualEntry({
+                id: `manual-task-undo-${taskId}-${Date.now()}`,
+                type: 'task',
+                action: 'uncomplete',
+                title: t('activity_log.entry.undo_failed', { name: taskName }),
+              });
+              updateTaskStatus('page.tasks.questcard.undo_failed', taskName);
+            }
+            showUndoButton.value = false;
+          },
+        });
+      }
+    }
     if (event.undoKey) {
       updateTaskStatus(event.undoKey, event.taskName, false);
     } else if (event.statusKey) {
-      updateTaskStatus(event.statusKey, event.taskName, true);
+      // Only offer the inline Undo button for actions we can actually reverse.
+      updateTaskStatus(event.statusKey, event.taskName, action !== 'available');
     }
   };
   const handleTaskObjectives = (
@@ -115,61 +208,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     });
   };
   const undoLastAction = () => {
-    if (!undoData.value) return;
-    const { taskId, taskName, action, wasManualFail } = undoData.value;
-    const taskToUndo = tasks.value.find((task) => task.id === taskId);
-    if (action === 'complete') {
-      tarkovStore.setTaskUncompleted(taskId);
-      if (taskToUndo?.objectives) {
-        handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
-        handleAlternatives(
-          taskToUndo.alternatives,
-          'setTaskUncompleted',
-          'setTaskObjectiveUncomplete'
-        );
-      }
-      updateTaskStatus('page.tasks.questcard.undo_complete', taskName);
-    } else if (action === 'uncomplete') {
-      tarkovStore.setTaskComplete(taskId);
-      if (taskToUndo?.objectives) {
-        handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveComplete');
-        handleAlternatives(taskToUndo.alternatives, 'setTaskFailed');
-        const minLevel = taskToUndo.minPlayerLevel;
-        if (minLevel !== undefined) {
-          const currentLevel = tarkovStore.playerLevel();
-          const isValidLevel = typeof currentLevel === 'number' && Number.isFinite(currentLevel);
-          if (!isValidLevel || currentLevel < minLevel) {
-            tarkovStore.setLevel(minLevel);
-          }
-        }
-      }
-      updateTaskStatus('page.tasks.questcard.undo_uncomplete', taskName);
-    } else if (action === 'reset_failed') {
-      if (wasManualFail) {
-        tarkovStore.setTaskFailed(taskId, { manual: true });
-      } else {
-        tarkovStore.setTaskFailed(taskId);
-      }
-      if (taskToUndo?.objectives) {
-        clearTaskObjectives(taskToUndo.objectives);
-      }
-      updateTaskStatus('page.tasks.questcard.undo_reset_failed', taskName);
-    } else if (action === 'fail') {
-      tarkovStore.setTaskUncompleted(taskId);
-      if (taskToUndo?.objectives) {
-        handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
-      }
-      updateTaskStatus('page.tasks.questcard.undo_failed', taskName);
-    } else {
-      logger.error('[TaskNotification] Unknown undo action received.', {
-        action,
-        taskId,
-        taskName,
-      });
-      updateTaskStatus('page.tasks.questcard.undo_unknown', taskName);
-    }
-    showUndoButton.value = false;
-    undoData.value = null;
+    void actionHistoryStore.undoLastAction();
   };
   const cleanup = () => {
     if (notificationTimeout.value !== null) {

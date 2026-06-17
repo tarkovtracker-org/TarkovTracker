@@ -1,3 +1,31 @@
+## [1.48.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.0...v1.48.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* **hideout:** match skill requirements by canonical skill id ([#457](https://github.com/tarkovtracker-org/TarkovTracker/issues/457)) ([c9d058b](https://github.com/tarkovtracker-org/TarkovTracker/commit/c9d058b09b7ffc808b83ec498072298985f1df5f)), closes [#420](https://github.com/tarkovtracker-org/TarkovTracker/issues/420)
+
+# [1.48.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.47.0...v1.48.0) (2026-06-17)
+
+
+### Features
+
+* **ui:** cycle through accepted items for "any of these" objectives ([#439](https://github.com/tarkovtracker-org/TarkovTracker/issues/439)) ([ef119a7](https://github.com/tarkovtracker-org/TarkovTracker/commit/ef119a74f2f2892c1ba7e34aa163a45d11eff76d))
+
+# [1.47.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.46.0...v1.47.0) (2026-06-12)
+
+
+### Features
+
+* **ui:** omnibar global search, activity log, and configurable keybinds ([#443](https://github.com/tarkovtracker-org/TarkovTracker/issues/443)) ([62b849b](https://github.com/tarkovtracker-org/TarkovTracker/commit/62b849be85c60c3ddbf56202181f5e53f3934910))
+
+# [1.46.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.45.5...v1.46.0) (2026-06-07)
+
+
+### Features
+
+* **ui:** consolidate dashboard trader sort + cleanup from stale branches ([#430](https://github.com/tarkovtracker-org/TarkovTracker/issues/430)) ([9e93624](https://github.com/tarkovtracker-org/TarkovTracker/commit/9e9362489b06646af14958ec8e4836f6481c1dd0))
+
 ## [1.45.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.45.4...v1.45.5) (2026-06-06)
 
 

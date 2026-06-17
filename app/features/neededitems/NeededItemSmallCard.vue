@@ -70,6 +70,20 @@
               ]"
             />
             <div
+              v-if="hasAlternativeItems"
+              class="absolute top-0 right-0 z-10"
+              @click.stop
+              @keydown.enter.stop
+              @keydown.space.stop
+            >
+              <AcceptedItemsPopover
+                v-model:open="acceptedItemsOpen"
+                :items="acceptedItems"
+                :cycling="isCyclingItems"
+                trigger-class="bg-surface-900/80 text-surface-100 px-2 py-1 text-xs font-semibold ring-1 ring-white/10 backdrop-blur-sm rounded-bl-lg"
+              />
+            </div>
+            <div
               v-if="selfCompletedNeed || currentCount >= neededCount"
               class="pointer-events-none absolute right-1 bottom-1 z-20"
               aria-hidden="true"
@@ -223,10 +237,17 @@
     lockedBefore,
     item,
     imageItem,
+    acceptedItems,
+    hasAlternativeItems,
+    isCyclingItems,
+    setCyclingPaused,
     cardStyle,
   } = inject(neededItemKey, createDefaultNeededItemContext());
   const hasItem = computed(() => Boolean(item.value));
   const isSingleItem = computed(() => neededCount.value === 1);
+  const acceptedItemsOpen = ref(false);
+  watch(acceptedItemsOpen, (isOpen) => setCyclingPaused(isOpen));
+  onBeforeUnmount(() => setCyclingPaused(false));
   const cardAriaLabel = computed(() => {
     const itemName = item.value?.name || t('needed_items.item');
     const status =

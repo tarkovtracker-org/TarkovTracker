@@ -94,6 +94,10 @@ export const clearUserScopedAppStorage = (
   storage.removeItem(LEGACY_STORAGE_KEYS.cachePurgeAt);
   storage.removeItem(STORAGE_KEYS.cachePurgeCheckAt);
   storage.removeItem(LEGACY_STORAGE_KEYS.cachePurgeCheckAt);
+  storage.removeItem(STORAGE_KEYS.activityLogManual);
+  storage.removeItem(LEGACY_STORAGE_KEYS.activityLogManual);
+  storage.removeItem(STORAGE_KEYS.activityLogLastRead);
+  storage.removeItem(LEGACY_STORAGE_KEYS.activityLogLastRead);
   if (!includeAuthSessions) {
     return;
   }

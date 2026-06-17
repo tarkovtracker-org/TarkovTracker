@@ -114,6 +114,7 @@ const defaultGlobalStubs = {
   },
   'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
+  KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
   PrivacyCard: { template: '<div data-testid="privacy-card" />' },
@@ -247,6 +248,7 @@ describe('settings page', () => {
       await vi.dynamicImportSettled();
       expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="task-display-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="keybinds-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
     });
     it('opens the imports tab from the route hash', async () => {

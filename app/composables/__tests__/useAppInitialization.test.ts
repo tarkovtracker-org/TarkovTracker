@@ -32,6 +32,7 @@ const mockSupabase = {
 const mockInitializeTarkovSync = vi.fn(async () => {});
 const mockResetTarkovStoreForSessionTransition = vi.fn();
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
+const mockActivityLogResetForSession = vi.fn();
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
@@ -52,6 +53,11 @@ vi.mock('@/stores/usePreferences', () => ({
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => mockMetadataStore,
+}));
+vi.mock('@/stores/useActivityLogStore', () => ({
+  useActivityLogStore: () => ({
+    resetForSession: mockActivityLogResetForSession,
+  }),
 }));
 vi.mock('@/composables/useToastI18n', () => ({
   useToastI18n: () => ({
@@ -100,6 +106,7 @@ describe('useAppInitialization locale setup', () => {
     mockResetTarkovStoreForSessionTransition.mockClear();
     mockMigrateDataIfNeeded.mockClear();
     mockMigrateDataIfNeeded.mockResolvedValue(undefined);
+    mockActivityLogResetForSession.mockClear();
     mockShowLoadFailed.mockClear();
     const { logger } = await import('@/utils/logger');
     (logger.error as Mock).mockClear();
@@ -183,6 +190,7 @@ describe('useAppInitialization locale setup', () => {
     mockSupabaseUser.id = null;
     await flushPromises();
     expect(mockResetTarkovStoreForSessionTransition).toHaveBeenCalledWith('user-1', 'logout');
+    expect(mockActivityLogResetForSession).toHaveBeenCalled();
     wrapper.unmount();
   });
   it('preserves the previous user snapshot before resetting on account switch', async () => {
@@ -199,6 +207,7 @@ describe('useAppInitialization locale setup', () => {
       'user-1',
       'user switched'
     );
+    expect(mockActivityLogResetForSession).toHaveBeenCalled();
     expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
     wrapper.unmount();

@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node", "vitest"]
   },
-  "exclude": ["supabase/functions/**/*", ".claude-plugin/**/*", "workers/**/*"]
+  "exclude": ["supabase/functions/**/*", "workers/**/*"]
 }

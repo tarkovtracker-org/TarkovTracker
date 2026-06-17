@@ -102,9 +102,7 @@
             <span class="hidden md:inline">{{ t('settings.interface.maps.colors.title') }}</span>
           </UButton>
           <template #content>
-            <div
-              class="bg-surface-900 border-surface-700 w-72 space-y-3 rounded-md border p-3 md:w-80"
-            >
+            <div class="w-72 space-y-3 p-3 md:w-80">
               <div class="flex items-start justify-between gap-3">
                 <div class="space-y-0.5">
                   <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
@@ -161,7 +159,7 @@
             :aria-label="t('maps.map_settings')"
           />
           <template #content>
-            <div class="bg-surface-900 border-surface-700 w-56 space-y-2 rounded-md border p-3">
+            <div class="w-56 space-y-2 p-3">
               <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
                 {{ t('maps.map_settings') }}
               </p>

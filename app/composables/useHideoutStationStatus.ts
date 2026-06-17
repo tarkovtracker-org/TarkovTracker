@@ -3,6 +3,7 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
+import { getCanonicalSkillKey } from '@/utils/skillHelpers';
 import type {
   HideoutLevel,
   HideoutStation,
@@ -46,7 +47,9 @@ export const useHideoutStationStatus = (): UseHideoutStationStatusReturn => {
       });
       return true;
     }
-    const currentLevel = skillCalculation.getSkillLevel(requirement.name);
+    const skillKey =
+      getCanonicalSkillKey(requirement.name, requirement.skill?.id) ?? requirement.name;
+    const currentLevel = skillCalculation.getSkillLevel(skillKey);
     return currentLevel >= requirement.level;
   };
   const isTraderReqMet = (requirement: TraderRequirement): boolean => {

@@ -1,9 +1,0 @@
-{
-  "name": "tarkov-data",
-  "version": "1.0.0",
-  "description": "MCP servers for querying Tarkov.dev GraphQL API and EFT Wiki - enables AI agents to access Escape from Tarkov game data",
-  "author": {
-    "name": "TarkovTracker"
-  },
-  "keywords": ["tarkov", "eft", "graphql", "wiki", "game-data", "mcp"]
-}

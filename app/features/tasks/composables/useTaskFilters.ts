@@ -1,6 +1,7 @@
 import { debounce, isDebounceRejection } from '@/utils/debounce';
 import { fuzzyMatchScore } from '@/utils/fuzzySearch';
 import { logger } from '@/utils/logger';
+import { getQueryString } from '@/utils/routeHelpers';
 import type { Task } from '@/types/tarkov';
 import type { TaskFilterAndSortOptions } from '@/types/taskFilter';
 type RefLike<T> = { value: T };
@@ -39,7 +40,14 @@ export function useTaskFilters({
   tasks,
   visibleTasks,
 }: TaskFilterInputs) {
-  const searchQuery = ref('');
+  const route = useRoute();
+  const searchQuery = ref(getQueryString(route.query.q) || '');
+  watch(
+    () => route.query.q,
+    (newQ) => {
+      searchQuery.value = getQueryString(newQ) || '';
+    }
+  );
   const debouncedSearch = ref('');
   const updateDebouncedSearch = debounce((value: string) => {
     debouncedSearch.value = value;

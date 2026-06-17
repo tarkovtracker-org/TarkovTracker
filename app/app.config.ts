@@ -40,7 +40,8 @@ const uiConfig = {
       strategy: 'fixed',
     },
     slots: {
-      content: 'z-[9999]',
+      content:
+        'z-[9999] bg-surface-900 border border-surface-700 rounded-lg shadow-xl ring-0 overflow-hidden',
     },
   },
   // DropdownMenu configuration for account menu and other dropdowns

@@ -10,6 +10,7 @@ import {
   type PreferencesState,
   type TaskFilterPreset,
 } from '@/stores/usePreferences';
+import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { MAP_MARKER_COLORS } from '@/utils/theme-colors';
 import { serializeUserScopedStorage } from '@/utils/userScopedStorage';
@@ -132,6 +133,13 @@ describe('usePreferencesStore', () => {
       expect(store.mapZoomSpeed).toBe(1);
       expect(store.mapPanSpeed).toBe(1);
       expect(store.pinnedTaskIds).toEqual([]);
+    });
+    it('sanitizes keybinds assigned through store actions', () => {
+      const store = usePreferencesStore();
+      store.setKeybindOmnibar('CTRL+SHIFT+K');
+      store.setKeybindUndo('ctrl+');
+      expect(store.keybindOmnibar).toBe('ctrl+shift+k');
+      expect(store.keybindUndo).toBe(DEFAULT_KEYBINDS.undo);
     });
     it('should initialize other settings with correct defaults', () => {
       const store = usePreferencesStore();

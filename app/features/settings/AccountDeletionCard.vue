@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useSystemStore } from '@/stores/useSystemStore';
   import { resetTarkovSync, useTarkovStore } from '@/stores/useTarkov';
@@ -11,6 +12,7 @@
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
+  const activityLogStore = useActivityLogStore();
   const preferencesStore = usePreferencesStore();
   const systemStore = useSystemStore();
   const teamStore = useTeamStore();
@@ -252,6 +254,7 @@
   const resetClientState = () => {
     resetTarkovSync('account deleted');
     preferencesStore.resetToDefaults();
+    activityLogStore.resetForSession();
     systemStore.$reset();
     teamStore.$reset();
     tarkovStore.$reset();

@@ -49,6 +49,10 @@ describe('clearUserScopedAppStorage', () => {
       LEGACY_STORAGE_KEYS.cachePurgeAt,
       STORAGE_KEYS.cachePurgeCheckAt,
       LEGACY_STORAGE_KEYS.cachePurgeCheckAt,
+      STORAGE_KEYS.activityLogManual,
+      LEGACY_STORAGE_KEYS.activityLogManual,
+      STORAGE_KEYS.activityLogLastRead,
+      LEGACY_STORAGE_KEYS.activityLogLastRead,
     ].forEach((key) => localStorage.setItem(key, key));
     sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
     sessionStorage.setItem(LEGACY_STORAGE_KEYS.sessionDataMigrated, 'true');
@@ -66,6 +70,10 @@ describe('clearUserScopedAppStorage', () => {
       LEGACY_STORAGE_KEYS.cachePurgeAt,
       STORAGE_KEYS.cachePurgeCheckAt,
       LEGACY_STORAGE_KEYS.cachePurgeCheckAt,
+      STORAGE_KEYS.activityLogManual,
+      LEGACY_STORAGE_KEYS.activityLogManual,
+      STORAGE_KEYS.activityLogLastRead,
+      LEGACY_STORAGE_KEYS.activityLogLastRead,
     ].forEach((key) => expect(localStorage.getItem(key)).toBeNull());
     expect(sessionStorage.getItem(STORAGE_KEYS.sessionDataMigrated)).toBeNull();
     expect(sessionStorage.getItem(LEGACY_STORAGE_KEYS.sessionDataMigrated)).toBeNull();

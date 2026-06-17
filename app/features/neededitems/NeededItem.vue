@@ -25,6 +25,7 @@
 </template>
 <script setup lang="ts">
   import { useCraftableItem } from '@/composables/useCraftableItem';
+  import { useCyclingItem } from '@/composables/useCyclingItem';
   import { neededItemKey, type NeededItemTeamNeed } from '@/features/neededitems/neededitem-keys';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -187,7 +188,11 @@
     tarkovStore.isTaskComplete(taskId) && !tarkovStore.isTaskFailed(taskId);
   const item = computed(() => {
     if (props.need.needType == 'taskObjective') {
-      // Prefer the objective's item; fall back to marker item (e.g., beacons/cameras) when present
+      // Prefer the cycled accepted item (for "any of these" objectives), then the
+      // objective's primary item; fall back to marker item (e.g., beacons/cameras).
+      if (cyclingItem.value) {
+        return cyclingItem.value;
+      }
       if (props.need.item) {
         return props.need.item;
       }
@@ -231,6 +236,29 @@
       return false;
     }
   });
+  // "Any of these" objectives (e.g. "hand over any FIR medicine item") accept
+  // multiple items. We rotate the displayed item so users see alternatives are
+  // valid, while progress/grouping/counts stay anchored to the primary item.
+  const acceptedItems = computed(() => {
+    if (props.need.needType !== 'taskObjective') return [];
+    return props.need.acceptedItems ?? [];
+  });
+  const primaryItem = computed(() => {
+    if (props.need.needType == 'taskObjective') {
+      return props.need.item ?? props.need.markerItem ?? null;
+    }
+    return null;
+  });
+  const cyclingPaused = ref(false);
+  const setCyclingPaused = (paused: boolean) => {
+    cyclingPaused.value = paused;
+  };
+  const hasAlternativeItems = computed(() => acceptedItems.value.length > 1);
+  const { currentItem: cyclingItem, isCycling: isCyclingItems } = useCyclingItem(
+    acceptedItems,
+    primaryItem,
+    { enabled: () => !selfCompletedNeed.value && !cyclingPaused.value }
+  );
   const relatedStation = computed(() => {
     const need = props.need;
     if (need.needType === 'hideoutModule') {
@@ -331,6 +359,10 @@
     levelRequired,
     teamNeeds,
     imageItem,
+    acceptedItems,
+    hasAlternativeItems,
+    isCyclingItems,
+    setCyclingPaused,
     craftableIconClass,
     craftableTitle,
     isCraftable,

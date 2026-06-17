@@ -26,7 +26,7 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 ## Project Snapshot
 
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
-- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.13.0).
+- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.16.0).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
 - **Deployment:** Cloudflare Pages/Workers.
 
@@ -94,7 +94,9 @@ Naming:
 - Vue SFCs use `<script setup lang="ts">`.
 - Auto-imported Vue/Nuxt utilities (`ref`, `computed`, `watch`, `useRoute`, `useFetch`, hooks) must not be explicitly imported.
 - Explicitly import Pinia stores and utilities.
-- Use `definePageMeta` and `useHead` for page metadata.
+- Use `definePageMeta` for route metadata (layout, middleware).
+- Use `useSeoMeta` for SEO properties (`title`, `description`, `og:*`, `twitter:*`). This is the established convention across all pages — do not suggest `useHead` as a replacement.
+- Reserve `useHead` for non-meta head elements only (`htmlAttrs`, `link`, `script`, `style`).
 - Prefer `useFetch`/`useAsyncData` for data fetching.
 - Use `*.client.ts` suffix for client-only plugins.
 - Keep page files lean; move logic into features/composables.

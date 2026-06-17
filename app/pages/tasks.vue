@@ -9,7 +9,6 @@
             :active-search-count="activeSearchCount"
             :is-search-active="isSearchActive"
           />
-          <ApiUpdateLogPanel :progress-data="currentModeProgressData" />
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
           <template v-else>
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
@@ -151,11 +150,7 @@
                   </UButton>
                 </div>
                 <div>
-                  <div
-                    v-for="task in focusedTaskInSlice"
-                    :key="`focused-${task.id}`"
-                    class="content-visibility-auto-420 pb-4"
-                  >
+                  <div v-for="task in focusedTaskInSlice" :key="`focused-${task.id}`" class="pb-4">
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -178,11 +173,7 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div
-                    v-for="task in pinnedTasksInSlice"
-                    :key="`pinned-${task.id}`"
-                    class="content-visibility-auto-420 pb-4"
-                  >
+                  <div v-for="task in pinnedTasksInSlice" :key="`pinned-${task.id}`" class="pb-4">
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -208,11 +199,7 @@
                 @toggle="toggleMapTaskVisibilityFilter"
               />
               <div>
-                <div
-                  v-for="task in mapSpecificTasksInSlice"
-                  :key="`task-${task.id}`"
-                  class="content-visibility-auto-420 pb-4"
-                >
+                <div v-for="task in mapSpecificTasksInSlice" :key="`task-${task.id}`" class="pb-4">
                   <TaskCard :task="task" @on-task-action="handleTaskAction" />
                 </div>
               </div>
@@ -228,11 +215,7 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div
-                    v-for="task in globalTasksInSlice"
-                    :key="`global-${task.id}`"
-                    class="content-visibility-auto-420 pb-4"
-                  >
+                  <div v-for="task in globalTasksInSlice" :key="`global-${task.id}`" class="pb-4">
                     <TaskCard
                       accent-variant="global"
                       :task="task"
@@ -363,7 +346,6 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
-  import ApiUpdateLogPanel from '@/features/tasks/ApiUpdateLogPanel.vue';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
@@ -435,9 +417,6 @@
   const { isGlobalTask, visibleTasks, updateVisibleTasks, calculateFilteredTasksForOptions } =
     useTaskFiltering();
   const tarkovStore = useTarkovStore();
-  const currentModeProgressData = computed(() =>
-    tarkovStore.currentGameMode === 'pve' ? tarkovStore.pve : tarkovStore.pvp
-  );
   const userGameEdition = computed(() => tarkovStore.getGameEdition());
   const { tarkovTime } = useTarkovTime();
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('tasks');
