@@ -4,10 +4,7 @@
     "app/i18n.config.ts",
     "app/server/api/**/*.{js,ts}",
     "app/server/routes/**/*.{js,ts}",
-    "vitest.config.ts",
-    "vitest.happy-dom.config.ts",
-    "vitest.nuxt.config.ts",
-    "vitest.shared.ts"
+    "vitest.config.ts"
   ],
   "ignore": [
     "supabase/functions/**",
@@ -15,9 +12,7 @@
     "app/i18n.config.ts",
     "app/server/api/changelog.get.ts",
     "app/server/api/contributors.get.ts",
-    "vitest.happy-dom.config.ts",
-    "vitest.nuxt.config.ts",
-    "vitest.shared.ts"
+    "scripts/stripe-import-test.mjs"
   ],
   "ignoreDependencies": [
     "@iconify-json/mdi",
