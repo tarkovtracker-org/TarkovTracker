@@ -133,6 +133,23 @@ describe('useHideoutStationStatus', () => {
     expect(isSkillReqMet(skillRequirement)).toBe(false);
     expect(getStationStatus(station)).toBe('locked');
   });
+  it('matches a skill requirement by skill.id when the display name differs (issue #420)', () => {
+    // Hideout requirement uses the spaced display name, but the level is stored
+    // under the canonical id key (as produced by task rewards / SkillsCard).
+    mockState.hideoutLevels = { 'station-main': { self: 0 } };
+    mockState.skills = { HideoutManagement: 11 };
+    const requirement: SkillRequirement = {
+      id: 'req-hideout-mgmt',
+      name: 'Hideout Management',
+      level: 5,
+      skill: { id: 'HideoutManagement', name: 'Hideout Management' },
+    };
+    const level = createLevel(1, { skillRequirements: [requirement] });
+    const station = createStation([level]);
+    const { getStationStatus, isSkillReqMet } = useHideoutStationStatus();
+    expect(isSkillReqMet(requirement)).toBe(true);
+    expect(getStationStatus(station)).toBe('available');
+  });
   it('returns locked when a trader requirement is unmet', () => {
     const { stationRequirement, skillRequirement, traderRequirement } = createRequirements();
     mockState.hideoutLevels = {

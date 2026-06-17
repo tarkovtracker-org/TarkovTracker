@@ -80,7 +80,8 @@ export const checkSkillReqsMet = (
   return (
     module.skillRequirements?.every((req) => {
       if (!req?.name || typeof req?.level !== 'number') return true;
-      const skillKey = resolveSkillKey(req.name, options.skillKeyAliases);
+      const canonicalKey = getCanonicalSkillKey(req.name, req.skill?.id) ?? req.name;
+      const skillKey = resolveSkillKey(canonicalKey, options.skillKeyAliases);
       const playerSkillLevel = options.skills?.[skillKey] ?? 0;
       return playerSkillLevel >= req.level;
     }) ?? true
