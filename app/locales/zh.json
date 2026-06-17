@@ -2234,6 +2234,9 @@
       "increase_hideout_count": "增加 {station_name} 的藏身处数量"
     },
     "item": "物品",
+    "any_of_items": "Any one of these {count} items counts",
+    "any_of_items_short": "Any {count}",
+    "view_accepted_items": "View all {count} accepted items",
     "not_collected": "未收集",
     "click_to_collect": "点击收藏",
     "click_to_uncollect": "点击取消收集",
