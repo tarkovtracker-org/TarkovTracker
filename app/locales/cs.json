@@ -2234,6 +2234,9 @@
       "increase_hideout_count": "Zvýšit počet skriptů pro {station_name}"
     },
     "item": "Položka",
+    "any_of_items": "Any one of these {count} items counts",
+    "any_of_items_short": "Any {count}",
+    "view_accepted_items": "View all {count} accepted items",
     "not_collected": "Nesbíráno",
     "click_to_collect": "Kliknutím shromáždíte",
     "click_to_uncollect": "Kliknutím zrušíte sběr",
