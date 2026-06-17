@@ -179,6 +179,36 @@ describe('useGraphBuilder needed item accepted items', () => {
     expect(need?.item?.id).toBe('bitcoin');
     expect(need?.acceptedItems).toBeUndefined();
   });
+  it('uses the first valid item as primary when items[0] lacks an id', () => {
+    const task: Task = {
+      id: 'sparse-primary-task',
+      name: 'Sparse Primary Task',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-sparse-primary',
+          type: 'giveItem',
+          count: 3,
+          // No explicit `item`; items[0] has no id, so the guard passes via
+          // markerItem. Primary must be the first valid item, not the sparse entry.
+          items: [
+            { name: 'Missing id item' },
+            { id: 'augmentin', name: 'Augmentin antibiotic pills' },
+            { id: 'analgin', name: 'Analgin painkillers' },
+          ],
+          markerItem: { id: 'marker', name: 'Marker' },
+        },
+      ],
+      taskRequirements: [],
+    } as unknown as Task;
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const need = result.neededItemTaskObjectives.find((n) => n.id === 'obj-sparse-primary');
+    expect(need).toBeDefined();
+    // Canonical item is the first valid (id-bearing) item, never the id-less entry.
+    expect(need?.item?.id).toBe('augmentin');
+    expect(need?.acceptedItems?.map((i) => i.id)).toEqual(['augmentin', 'analgin']);
+  });
   it('does not set acceptedItems for single-item objectives', () => {
     const task: Task = {
       id: 'single-item-task',
