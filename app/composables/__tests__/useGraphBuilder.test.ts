@@ -167,7 +167,7 @@ describe('useGraphBuilder needed item accepted items', () => {
         {
           id: 'obj-one-valid',
           type: 'giveItem',
-          count: 1,
+          count: 2,
           items: [{ id: 'bitcoin', name: 'Physical Bitcoin' }, null, { name: 'Missing id item' }],
         },
       ],
