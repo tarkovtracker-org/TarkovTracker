@@ -4,6 +4,17 @@ compatibility_date = "2026-01-09"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
 
+# Atomic, globally-consistent rate limiter shared with the api-gateway Worker.
+# The ApiGatewayRateLimiter Durable Object class is owned and deployed by
+# workers/api-gateway; Pages binds to it by script_name (Pages cannot define a
+# DO class itself). When this binding is absent the rate limiter degrades to a
+# best-effort Cache API + in-memory path. durable_objects is a non-inheritable
+# key, so it must also be repeated under [env.preview].
+[[durable_objects.bindings]]
+name = "API_GATEWAY_LIMITER"
+class_name = "ApiGatewayRateLimiter"
+script_name = "api-gateway"
+
 [vars]
 NODE_ENV = "production"
 APP_URL = "https://tarkovtracker.org"
@@ -42,3 +53,9 @@ STRIPE_PRICE_TIMMY_YEARLY = "price_1TaNKwLaRBke56G2ySrDQVcC"
 STRIPE_PRICE_CHAD_MONTHLY = "price_1TaNKwLaRBke56G2NzMWPZUT"
 STRIPE_PRICE_CHAD_6MONTH = "price_1TaNKwLaRBke56G2v0oqXYeA"
 STRIPE_PRICE_CHAD_YEARLY = "price_1TaNKwLaRBke56G2IXA28xmv"
+
+# durable_objects is non-inheritable, so the binding is repeated for preview.
+[[env.preview.durable_objects.bindings]]
+name = "API_GATEWAY_LIMITER"
+class_name = "ApiGatewayRateLimiter"
+script_name = "api-gateway"
