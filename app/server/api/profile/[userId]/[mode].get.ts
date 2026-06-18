@@ -616,7 +616,7 @@ export default defineEventHandler(async (event) => {
   );
   const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
   if (!isTestEnvironment) {
-    const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}:${userId}:${mode}`;
+    const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}`;
     if (
       !(await consumeRateLimit(
         sharedCacheHandle,

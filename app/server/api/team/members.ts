@@ -212,7 +212,7 @@ export default defineEventHandler(async (event) => {
     getRateLimiterBinding(event)
   );
   if (!isTestEnvironment) {
-    const preAuthRateLimitKey = `team-members:ip:${teamId}:${getProxyAwareClientIdentifier(
+    const preAuthRateLimitKey = `team-members:ip:${getProxyAwareClientIdentifier(
       event,
       trustProxy
     )}`;
