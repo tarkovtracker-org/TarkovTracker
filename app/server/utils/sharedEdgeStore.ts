@@ -283,7 +283,7 @@ const consumeDurableRateLimit = async (
   windowMs: number,
   onError?: SharedCacheErrorHandler
 ): Promise<boolean | null> => {
-  const windowSec = Math.max(1, Math.round(windowMs / 1000));
+  const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DURABLE_RATE_LIMIT_TIMEOUT_MS);
   try {
