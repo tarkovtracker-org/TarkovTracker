@@ -6,6 +6,9 @@ const {
   mockSetResponseHeader,
   mockSetResponseStatus,
   mockLogger,
+  mockConsumeSharedRateLimit,
+  mockCreateSharedCacheHandle,
+  mockGetProxyAwareClientIdentifier,
 } = vi.hoisted(() => ({
   mockGetRequestHeader: vi.fn(),
   mockReadBody: vi.fn(),
@@ -17,6 +20,9 @@ const {
     info: vi.fn(),
     warn: vi.fn(),
   },
+  mockConsumeSharedRateLimit: vi.fn(),
+  mockCreateSharedCacheHandle: vi.fn(),
+  mockGetProxyAwareClientIdentifier: vi.fn(),
 }));
 vi.mock('h3', async () => {
   const actual = await vi.importActual<typeof import('h3')>('h3');
@@ -29,8 +35,21 @@ vi.mock('h3', async () => {
     setResponseStatus: mockSetResponseStatus,
   };
 });
+vi.mock('#imports', () => ({
+  useRuntimeConfig: () => ({
+    apiProtection: { trustProxy: true },
+    public: { appUrl: 'https://tarkovtracker.org' },
+  }),
+}));
 vi.mock('@/server/utils/logger', () => ({
   createLogger: () => mockLogger,
+}));
+vi.mock('@/server/utils/requestIdentity', () => ({
+  getProxyAwareClientIdentifier: mockGetProxyAwareClientIdentifier,
+}));
+vi.mock('@/server/utils/sharedEdgeStore', () => ({
+  consumeSharedRateLimit: mockConsumeSharedRateLimit,
+  createSharedCacheHandle: mockCreateSharedCacheHandle,
 }));
 describe('client logs endpoint', () => {
   const event = {
@@ -45,6 +64,9 @@ describe('client logs endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRequestHeader.mockReturnValue(undefined);
+    mockGetProxyAwareClientIdentifier.mockReturnValue('203.0.113.9');
+    mockCreateSharedCacheHandle.mockReturnValue({ cache: null, origin: {} });
+    mockConsumeSharedRateLimit.mockResolvedValue(true);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -64,10 +86,7 @@ describe('client logs endpoint', () => {
     expect(mockLogger.warn).not.toHaveBeenCalled();
     expect(mockLogger.error).not.toHaveBeenCalled();
   });
-  it('logs sanitized payloads at the requested level', async () => {
-    mockGetRequestHeader.mockImplementation((_event, name: string) =>
-      name === 'cf-connecting-ip' ? '203.0.113.9' : undefined
-    );
+  it('logs sanitized payloads at the requested level without client ip', async () => {
     mockReadBody.mockResolvedValueOnce({
       args: Array.from({ length: 25 }, (_value, index) => `arg-${index}`),
       href: ' https://tarkovtracker.org/tasks ',
@@ -76,15 +95,12 @@ describe('client logs endpoint', () => {
     });
     const { default: handler } = await import('@/server/api/logs/client.post');
     await handler(event);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      'Client log',
-      expect.objectContaining({
-        args: Array.from({ length: 20 }, (_value, index) => `arg-${index}`),
-        clientIp: '203.0.113.9',
-        href: 'https://tarkovtracker.org/tasks',
-        timestamp: '2026-02-24T10:11:12.000Z',
-      })
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith('Client log', {
+      args: Array.from({ length: 20 }, (_value, index) => `arg-${index}`),
+      href: 'https://tarkovtracker.org/tasks',
+      timestamp: '2026-02-24T10:11:12.000Z',
+    });
+    expect(mockLogger.warn.mock.calls[0]?.[1]).not.toHaveProperty('clientIp');
     expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
   });
   it('falls back to info level and generated timestamp for invalid values', async () => {
@@ -101,11 +117,22 @@ describe('client logs endpoint', () => {
       'Client log',
       expect.objectContaining({
         args: ['a'],
-        clientIp: '198.51.100.8',
         href: null,
         timestamp: expect.any(String),
       })
     );
+    expect(mockLogger.info.mock.calls[0]?.[1]).not.toHaveProperty('clientIp');
     expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
+  });
+  it('drops the request without reading the body when rate limited', async () => {
+    mockConsumeSharedRateLimit.mockResolvedValueOnce(false);
+    const { default: handler } = await import('@/server/api/logs/client.post');
+    const response = await handler(event);
+    expect(response).toBeNull();
+    expect(mockReadBody).not.toHaveBeenCalled();
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
+    expect(mockLogger.info).not.toHaveBeenCalled();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
+    expect(mockLogger.error).not.toHaveBeenCalled();
   });
 });
