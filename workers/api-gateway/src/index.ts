@@ -111,7 +111,7 @@ export class ApiGatewayRateLimiter {
     // alarm fires shortly after the window resets and wipes all storage.
     const cleanupAt = this.data.resetAt + 1000;
     const existingAlarm = await this.state.storage.getAlarm();
-    if (existingAlarm === null || existingAlarm < cleanupAt) {
+    if (existingAlarm !== cleanupAt) {
       await this.state.storage.setAlarm(cleanupAt);
     }
     if (this.data.count >= limit) {

@@ -710,6 +710,7 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
     await limiter.alarm();
     expect(mock.storage.deleteAll).not.toHaveBeenCalled();
     expect(mock.store.has('state')).toBe(true);
+    expect(mock.storage.setAlarm).toHaveBeenLastCalledWith(stored.resetAt + 1000);
     vi.restoreAllMocks();
   });
 });
