@@ -135,4 +135,20 @@ describe('client logs endpoint', () => {
     expect(mockLogger.warn).not.toHaveBeenCalled();
     expect(mockLogger.error).not.toHaveBeenCalled();
   });
+  it('reports cache errors without forwarding to the log sink', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockConsumeSharedRateLimit.mockImplementationOnce(
+      async (_handle, _prefix, _key, _limit, _windowMs, onError) => {
+        onError?.({ action: 'read', error: new Error('cache down'), key: 'k', prefix: 'p' });
+        return false;
+      }
+    );
+    const { default: handler } = await import('@/server/api/logs/client.post');
+    await handler(event);
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    expect(mockLogger.warn).not.toHaveBeenCalled();
+    expect(mockLogger.error).not.toHaveBeenCalled();
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(event, 204);
+    consoleWarnSpy.mockRestore();
+  });
 });

@@ -50,7 +50,7 @@ const consumeRateLimit = async (handle: SharedCacheHandle, key: string): Promise
     CLIENT_LOG_RATE_LIMIT_PER_MINUTE,
     RATE_LIMIT_WINDOW_MS,
     ({ action, error, key: failedKey }) => {
-      logger.warn('Client log rate-limit cache operation failed', {
+      console.warn('[ClientLogsApi] Client log rate-limit cache operation failed', {
         action,
         error: error instanceof Error ? error.message : String(error),
         key: failedKey,
