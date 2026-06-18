@@ -274,6 +274,7 @@ export const writeSharedCache = async <T>(
     onError?.({ action: 'write', error, key, prefix });
   }
 };
+const DURABLE_RATE_LIMIT_TIMEOUT_MS = 3000;
 const consumeDurableRateLimit = async (
   limiter: SharedRateLimitNamespace,
   prefix: string,
@@ -283,6 +284,8 @@ const consumeDurableRateLimit = async (
   onError?: SharedCacheErrorHandler
 ): Promise<boolean | null> => {
   const windowSec = Math.max(1, Math.round(windowMs / 1000));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DURABLE_RATE_LIMIT_TIMEOUT_MS);
   try {
     const id = limiter.idFromName(`${prefix}:${key}`);
     const stub = limiter.get(id);
@@ -290,6 +293,7 @@ const consumeDurableRateLimit = async (
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ limit, windowSec }),
+      signal: controller.signal,
     });
     if (!response.ok) {
       onError?.({
@@ -314,6 +318,8 @@ const consumeDurableRateLimit = async (
   } catch (error) {
     onError?.({ action: 'read', error, key, prefix });
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 };
 /**

@@ -271,4 +271,30 @@ describe('consumeSharedRateLimit', () => {
     expect(cacheMatch).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledTimes(1);
   });
+  it('aborts a hung durable object request and falls back to the cache path', async () => {
+    const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
+    const cacheMatch = vi.fn(async () => undefined);
+    const onError = vi.fn();
+    const stubFetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        })
+    );
+    const handle = {
+      cache: { match: cacheMatch, put: vi.fn(async () => undefined) } as unknown as Cache,
+      origin: { host: 'example.com', protocol: 'https:' },
+      limiter: {
+        idFromName: vi.fn(() => 'id-1'),
+        get: vi.fn(() => ({ fetch: stubFetch })),
+      },
+    };
+    const pending = consumeSharedRateLimit(handle, 'rate-limit', 'user-1', 2, 60_000, onError);
+    await vi.advanceTimersByTimeAsync(3000);
+    await expect(pending).resolves.toBe(true);
+    expect(cacheMatch).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
 });
