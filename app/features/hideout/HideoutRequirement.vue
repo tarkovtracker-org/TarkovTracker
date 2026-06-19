@@ -158,6 +158,7 @@
   import ContextMenu from '@/components/ui/ContextMenu.vue';
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import GameItem from '@/components/ui/GameItem.vue';
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   interface Props {
@@ -181,6 +182,7 @@
   }
   const props = defineProps<Props>();
   const tarkovStore = useTarkovStore();
+  const { toWikiUrl } = useWikiLink();
   const formatNumber = useLocaleNumberFormatter();
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
@@ -265,8 +267,9 @@
     }
   };
   const openWiki = (): void => {
-    if (props.requirement.item.wikiLink) {
-      window.open(props.requirement.item.wikiLink, '_blank', 'noopener,noreferrer');
+    const url = toWikiUrl(props.requirement.item.wikiLink);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 </script>

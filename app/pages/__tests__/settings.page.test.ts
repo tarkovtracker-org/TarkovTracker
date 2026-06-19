@@ -114,6 +114,7 @@ const defaultGlobalStubs = {
   },
   'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
+  ExternalLinksCard: { template: '<div data-testid="external-links-card" />' },
   KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },

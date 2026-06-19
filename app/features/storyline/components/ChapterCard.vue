@@ -40,7 +40,7 @@
       </div>
       <div class="min-w-0 flex-1">
         <a
-          :href="chapter.wikiLink"
+          :href="toWikiUrl(chapter.wikiLink)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-link hover:text-link-hover flex items-center gap-1 text-sm font-semibold no-underline"
@@ -686,6 +686,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useWikiLink } from '@/composables/useWikiLink';
   import type {
     StorylineNormalizedChapterView,
     StorylineObjectiveProgress,
@@ -703,6 +704,7 @@
     toggleObjective: [chapterId: string, objectiveId: string];
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const getUnlockBadgeColor = (type: StorylineObjectiveUnlockView['type']) => {
     if (type === 'map') {
       return 'primary';

@@ -33,7 +33,7 @@
     </AppTooltip>
     <a
       v-if="props.showWikiLink"
-      :href="props.task.wikiLink"
+      :href="toWikiUrl(props.task.wikiLink)"
       target="_blank"
       class="text-link hover:text-link-hover flex items-center text-xs whitespace-nowrap"
     >
@@ -43,6 +43,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { getFactionIconPath } from '@/utils/factionIcons';
   const props = defineProps({
     task: {
@@ -61,6 +62,7 @@
     },
   });
   const { t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const factionImage = computed(() => getFactionIconPath(props.task?.factionName) ?? undefined);
   const isFactionTask = computed(() => Boolean(factionImage.value));
   const factionAlt = computed(() => props.task?.factionName || 'Faction image');

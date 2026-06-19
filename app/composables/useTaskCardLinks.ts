@@ -1,4 +1,5 @@
 import { writeToClipboard } from '@/composables/useCopyToClipboard';
+import { useWikiLink } from '@/composables/useWikiLink';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { Task, TaskObjective } from '@/types/tarkov';
 export interface UseTaskCardLinksOptions {
@@ -27,6 +28,7 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
   const { task, objectives } = options;
   const router = useRouter();
   const tarkovStore = useTarkovStore();
+  const { toWikiUrl } = useWikiLink();
   const selectedItem = ref<SelectedTaskItem | null>(null);
   const tarkovDevTaskUrl = computed(() => `https://tarkov.dev/task/${task().id}`);
   const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -37,7 +39,7 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
     return copyTextToClipboard(`${window.location.origin}${href}`);
   };
   const openTaskWiki = () => {
-    const wikiLink = task().wikiLink;
+    const wikiLink = toWikiUrl(task().wikiLink);
     if (wikiLink) {
       window.open(wikiLink, '_blank', 'noopener,noreferrer');
     }
@@ -90,15 +92,19 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
   const openItemOnWiki = () => {
     if (!selectedItem.value) return;
     if (selectedItem.value.wikiLink) {
-      window.open(selectedItem.value.wikiLink, '_blank', 'noopener,noreferrer');
+      const wikiLink = toWikiUrl(selectedItem.value.wikiLink);
+      if (wikiLink) {
+        window.open(wikiLink, '_blank', 'noopener,noreferrer');
+      }
       return;
     }
     const fallbackQuery = selectedItem.value.name?.trim() || selectedItem.value.id;
-    window.open(
-      `https://escapefromtarkov.fandom.com/wiki/Special:Search?query=${encodeURIComponent(fallbackQuery)}`,
-      '_blank',
-      'noopener,noreferrer'
+    const fallbackUrl = toWikiUrl(
+      `https://escapefromtarkov.fandom.com/wiki/Special:Search?query=${encodeURIComponent(fallbackQuery)}`
     );
+    if (fallbackUrl) {
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    }
   };
   return {
     selectedItem,

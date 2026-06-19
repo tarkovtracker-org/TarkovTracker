@@ -121,7 +121,7 @@
                       <div class="flex items-center gap-1.5">
                         <a
                           v-if="row.href"
-                          :href="row.href"
+                          :href="toWikiUrl(row.href)"
                           target="_blank"
                           rel="noopener noreferrer"
                           class="text-surface-100 hover:text-warning-300 text-sm font-semibold transition-colors"
@@ -426,6 +426,7 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useWikiLink } from '@/composables/useWikiLink';
   import {
     buildPrestigeRequirementRows,
     getNextPrestigeLevel,
@@ -450,6 +451,7 @@
   const DAY_MS = 24 * 60 * 60 * 1000;
   const currentPrestigeInputId = 'settings-pvp-prestige-input';
   const { locale, t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const toast = useToast();
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();

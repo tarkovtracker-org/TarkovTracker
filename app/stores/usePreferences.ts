@@ -121,6 +121,8 @@ export interface PreferencesState {
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
   localeOverride: string | null;
+  // External links
+  wikiUseAntifandom: boolean;
   // Task filter settings
   showNonSpecialTasks: boolean;
   showLightkeeperTasks: boolean;
@@ -206,6 +208,8 @@ export const preferencesDefaultState: PreferencesState = {
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
   localeOverride: null,
+  // External links
+  wikiUseAntifandom: false,
   // Task filter settings (all shown by default)
   showNonSpecialTasks: true,
   showLightkeeperTasks: true,
@@ -549,6 +553,9 @@ export const usePreferencesStore = defineStore('preferences', {
     getLocaleOverride: (state) => {
       return state.localeOverride ?? null;
     },
+    getWikiUseAntifandom: (state) => {
+      return state.wikiUseAntifandom ?? false;
+    },
     // Task filter getters
     getShowNonSpecialTasks: (state) => {
       return state.showNonSpecialTasks ?? true;
@@ -817,6 +824,9 @@ export const usePreferencesStore = defineStore('preferences', {
     setLocaleOverride(locale: string | null) {
       this.localeOverride = locale;
     },
+    setWikiUseAntifandom(enabled: boolean) {
+      this.wikiUseAntifandom = enabled;
+    },
     // Task filter actions
     setShowNonSpecialTasks(show: boolean) {
       this.showNonSpecialTasks = show;
@@ -986,6 +996,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'neededitemsStyle',
       'hideoutPrimaryView',
       'localeOverride',
+      'wikiUseAntifandom',
       // Task filter settings
       'showNonSpecialTasks',
       'showLightkeeperTasks',

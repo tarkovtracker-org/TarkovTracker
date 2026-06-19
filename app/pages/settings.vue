@@ -87,6 +87,7 @@
               <PrivacyCard />
               <TaskDisplayCard />
               <MapSettingsCard />
+              <ExternalLinksCard />
               <KeybindsCard />
             </section>
             <section
@@ -163,6 +164,7 @@
   import DebugStateCard from '@/features/settings/DebugStateCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
+  import ExternalLinksCard from '@/features/settings/ExternalLinksCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';

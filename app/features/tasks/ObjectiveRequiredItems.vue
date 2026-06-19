@@ -30,7 +30,7 @@
       </AppTooltip>
       <AppTooltip :text="getPrimaryTooltip(item)">
         <a
-          :href="getKeyPrimaryUrl(item)"
+          :href="toWikiUrl(getKeyPrimaryUrl(item))"
           target="_blank"
           rel="noopener noreferrer"
           class="text-link hover:text-link-hover focus-visible:ring-primary-500 inline-flex items-center gap-0.5 rounded-sm text-xs font-bold no-underline focus:outline-none focus-visible:ring-2"
@@ -120,6 +120,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { logger } from '@/utils/logger';
   import {
     getKeyBackgroundClass,
@@ -131,6 +132,7 @@
   import type ContextMenu from '@/components/ui/ContextMenu.vue';
   import type { TarkovItem } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const props = defineProps<{
     variant: 'keys' | 'equipment';
     requiredKeys?: TarkovItem[][];
@@ -184,7 +186,10 @@
       ? t('page.tasks.questcard.view_on_wiki')
       : t('page.tasks.questcard.view_on_tarkov_dev');
   const openPrimaryLink = (item: TarkovItem) => {
-    window.open(getKeyPrimaryUrl(item), '_blank', 'noopener,noreferrer');
+    const url = toWikiUrl(getKeyPrimaryUrl(item));
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
   const handleContextMenu = (event: MouseEvent, item: TarkovItem) => {
     activeItem.value = item;
@@ -196,8 +201,9 @@
     }
   };
   const openWikiLink = () => {
-    if (activeItem.value?.wikiLink) {
-      window.open(activeItem.value.wikiLink, '_blank', 'noopener,noreferrer');
+    const url = toWikiUrl(activeItem.value?.wikiLink);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
   const copyItemName = async () => {
