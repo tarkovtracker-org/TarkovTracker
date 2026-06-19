@@ -553,6 +553,7 @@ export const usePreferencesStore = defineStore('preferences', {
     getLocaleOverride: (state) => {
       return state.localeOverride ?? null;
     },
+    /** Whether wiki links should open on the antifandom.com mirror. */
     getWikiUseAntifandom: (state) => {
       return state.wikiUseAntifandom ?? false;
     },
@@ -824,6 +825,7 @@ export const usePreferencesStore = defineStore('preferences', {
     setLocaleOverride(locale: string | null) {
       this.localeOverride = locale;
     },
+    /** Toggle whether wiki links open on the antifandom.com mirror. */
     setWikiUseAntifandom(enabled: boolean) {
       this.wikiUseAntifandom = enabled;
     },

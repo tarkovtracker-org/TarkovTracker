@@ -7,6 +7,10 @@ import { rewriteWikiUrl } from '@/utils/wikiLink';
  */
 export function useWikiLink() {
   const preferencesStore = usePreferencesStore();
+  /**
+   * Rewrite a wiki URL to the antifandom.com mirror when the preference is on,
+   * preserving the nullability of the input for safe `:href` bindings.
+   */
   function toWikiUrl(url: string): string;
   function toWikiUrl(url: string | undefined): string | undefined;
   function toWikiUrl(url: string | null): string | null;
