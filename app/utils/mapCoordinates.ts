@@ -31,6 +31,10 @@ export interface MapTileConfig {
   bounds: number[][];
   minZoom?: number;
   maxZoom?: number;
+  tileSize?: number;
+  floors?: string[];
+  defaultFloor?: string;
+  floorTilePaths?: Record<string, string>;
 }
 export type MapRenderConfig = MapSvgConfig | MapTileConfig;
 export function rotateGameCoordinates(

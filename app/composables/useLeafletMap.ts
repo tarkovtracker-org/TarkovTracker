@@ -261,7 +261,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   });
   const getRenderKey = (): string | undefined => renderKeyRef.value;
   const rawFloors = computed<string[]>(() => {
-    return getSvgConfig()?.floors ?? [];
+    return getSvgConfig()?.floors ?? getTileConfig()?.floors ?? [];
   });
   const floors = computed<string[]>(() => {
     if (rawFloors.value.length <= 1) return rawFloors.value;
@@ -371,13 +371,17 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     try {
       const bounds = getLeafletBounds(tileConfig);
-      const tilePaths = [tileConfig.tilePath, ...(tileConfig.tileFallbacks ?? [])];
-      tileLayer.value = L.tileLayer(tileConfig.tilePath, {
+      const initialPath =
+        (selectedFloor.value && tileConfig.floorTilePaths?.[selectedFloor.value]) ||
+        tileConfig.tilePath;
+      const tilePaths = [initialPath, ...(tileConfig.tileFallbacks ?? [])];
+      tileLayer.value = L.tileLayer(initialPath, {
         minZoom: tileConfig.minZoom ?? 1,
         maxZoom: tileConfig.maxZoom ?? 6,
         noWrap: true,
         bounds,
         pane: 'mapBackground',
+        tileSize: tileConfig.tileSize ?? 256,
       });
       const layer = tileLayer.value;
       const attachTileErrorHandler = (currentIndex: number) => {
@@ -580,7 +584,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     return floorToId;
   }
-  const FLOOR_GROUP_ID_PATTERN = /(ground|underground|basement|bunker|tunnel|garage|floor)/i;
+  const FLOOR_GROUP_ID_PATTERN = /(ground|underground|basement|bunker|tunnel|garage|floor|level)/i;
   function getTopLevelFloorGroups(svgElement: SVGElement): SVGGElement[] {
     return Array.from(svgElement.children).filter(
       (child): child is SVGGElement =>
@@ -756,6 +760,12 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
           svgConfig.defaultFloor ||
           svgConfig.floors[svgConfig.floors.length - 1] ||
           '';
+      } else if (tileConfig) {
+        selectedFloor.value =
+          initialFloor ||
+          tileConfig.defaultFloor ||
+          tileConfig.floors?.[tileConfig.floors.length - 1] ||
+          '';
       } else {
         selectedFloor.value = '';
       }
@@ -920,6 +930,14 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       }
     }
   );
+  // Watch selected floor to update tile layer url if needed
+  watch(selectedFloor, (newFloor) => {
+    const tileConfig = getTileConfig();
+    if (tileConfig && tileLayer.value) {
+      const floorPath = tileConfig.floorTilePaths?.[newFloor] ?? tileConfig.tilePath;
+      tileLayer.value.setUrl(floorPath);
+    }
+  });
   // Lifecycle
   onMounted(() => {
     initializeMap();
