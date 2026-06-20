@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
+import { createPinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import type { StorylineNormalizedChapterView } from '@/composables/useStorylineChapters';
@@ -181,6 +182,7 @@ const createWrapper = async (readOnly: boolean) => {
       readOnly,
     },
     global: {
+      plugins: [createPinia()],
       stubs: {
         UAlert: {
           template: '<div><slot /></div>',
