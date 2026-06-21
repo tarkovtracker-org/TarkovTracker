@@ -1,9 +1,9 @@
 {
   "admin": {
-    "title": "Admin Panel",
-    "verifying_access": "Verifying admin access...",
-    "error_title": "Connection Error",
-    "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
+    "title": "관리자 패널",
+    "verifying_access": "관리자 권한 확인 중...",
+    "error_title": "연결 오류",
+    "load_error_description": "관리자 데이터를 불러오지 못했습니다. 새로고침하거나 고객지원에 문의해 주세요. 참조: {reference}",
     "no_reference": "N/A",
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
@@ -1703,7 +1703,7 @@
     "general": {
       "privacy_mode": "Streamer Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming.",
-      "admin_panel": "Admin Panel"
+      "admin_panel": "관리자 패널"
     },
     "interface": {
       "title": "Interface Customization",
