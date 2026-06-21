@@ -1,5 +1,5 @@
 #!/bin/bash
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 pkill -9 -f google-chrome 2>/dev/null
 pkill -9 -f measure-chrome 2>/dev/null
 sleep 1

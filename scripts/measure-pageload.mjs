@@ -6,11 +6,9 @@
 import { spawn } from 'node:child_process';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-
 const log = (...a) => process.stderr.write(`[measure] ${a.join(' ')}\n`);
-
 const DIST = join(process.cwd(), process.env.MEASURE_DIST || '.output/public');
 const PORT = Number(process.env.MEASURE_PORT || 4178);
 const RUNS = Number(process.env.MEASURE_RUNS || 5);
@@ -19,7 +17,6 @@ const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome';
 const PAGES = (process.env.MEASURE_PAGES || '/,/tasks,/hideout,/needed-items,/settings,/team').split(
   ','
 );
-
 const MIME = {
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -32,12 +29,11 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
 };
-
 function startServer() {
   const server = createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
     let filePath = normalize(join(DIST, urlPath));
-    if (!filePath.startsWith(DIST)) {
+    if (filePath !== DIST && !filePath.startsWith(DIST + sep)) {
       res.statusCode = 403;
       return res.end('forbidden');
     }
@@ -49,11 +45,18 @@ function startServer() {
       filePath = join(DIST, 'index.html');
     }
     res.setHeader('content-type', MIME[extname(filePath)] || 'application/octet-stream');
-    createReadStream(filePath).pipe(res);
+    createReadStream(filePath)
+      .on('error', () => {
+        res.statusCode = 500;
+        res.end('read error');
+      })
+      .pipe(res);
   });
-  return new Promise((resolve) => server.listen(PORT, () => resolve(server)));
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(PORT, () => resolve(server));
+  });
 }
-
 function startChrome() {
   const args = [
     '--headless=new',
@@ -66,7 +69,6 @@ function startChrome() {
   const proc = spawn(CHROME, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   return proc;
 }
-
 async function getWsUrl() {
   for (let i = 0; i < 50; i++) {
     try {
@@ -80,7 +82,6 @@ async function getWsUrl() {
   }
   throw new Error('Chrome CDP endpoint never came up');
 }
-
 // Minimal CDP client over WebSocket.
 class CDP {
   constructor(ws) {
@@ -96,6 +97,10 @@ class CDP {
         msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
       }
     });
+    ws.addEventListener('close', () => {
+      for (const { reject } of this.pending.values()) reject(new Error('WebSocket closed'));
+      this.pending.clear();
+    });
   }
   send(method, params = {}, sessionId) {
     const id = ++this.id;
@@ -107,7 +112,6 @@ class CDP {
     });
   }
 }
-
 function connect(url) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
@@ -115,7 +119,6 @@ function connect(url) {
     ws.addEventListener('error', reject);
   });
 }
-
 async function measurePage(cdp, sessionId, url) {
   // Fresh navigation; clear cache so we measure cold load each run.
   await cdp.send('Network.clearBrowserCache', {}, sessionId);
@@ -158,7 +161,6 @@ async function measurePage(cdp, sessionId, url) {
     if (Date.now() > deadline) throw new Error(`timeout measuring ${url}`);
   }
 }
-
 function stats(nums) {
   const sorted = [...nums].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
@@ -166,7 +168,6 @@ function stats(nums) {
   const max = sorted[sorted.length - 1];
   return { median, min, max };
 }
-
 async function main() {
   if (!existsSync(DIST)) {
     console.error(`${DIST} not found — run \`bash scripts/build-measure.sh\` first.`);
@@ -193,7 +194,6 @@ async function main() {
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     await cdp.send('Page.enable', {}, sessionId);
     await cdp.send('Network.enable', {}, sessionId);
-
     const base = `http://127.0.0.1:${PORT}`;
     const results = [];
     for (const page of PAGES) {
@@ -216,7 +216,6 @@ async function main() {
       const fs = fcps.length ? stats(fcps) : { median: null };
       results.push({ page, load: ls.median, ready: rs.median, fcp: fs.median, transferKB });
     }
-
     console.log(
       `\nPage-load (cold cache, ${RUNS} runs, ${CPU_THROTTLE}x CPU throttle, headless Chrome, static SPA)`
     );
@@ -243,7 +242,6 @@ async function main() {
     server.close();
   }
 }
-
 main().catch((e) => {
   console.error(e);
   process.exit(1);
