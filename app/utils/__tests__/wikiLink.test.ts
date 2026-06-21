@@ -5,17 +5,17 @@ describe('rewriteWikiUrl', () => {
   it('returns the original url when the preference is disabled', () => {
     expect(rewriteWikiUrl(url, false)).toBe(url);
   });
-  it('swaps the fandom.com host for antifandom.com when enabled', () => {
-    expect(rewriteWikiUrl(url, true)).toBe('https://escapefromtarkov.antifandom.com/wiki/Debut');
+  it('rewrites a fandom wiki url to the antifandom path form when enabled', () => {
+    expect(rewriteWikiUrl(url, true)).toBe('https://antifandom.com/escapefromtarkov/wiki/Debut');
   });
   it('preserves path and query when rewriting', () => {
     expect(
       rewriteWikiUrl('https://escapefromtarkov.fandom.com/wiki/Special:Search?query=Bitcoin', true)
-    ).toBe('https://escapefromtarkov.antifandom.com/wiki/Special:Search?query=Bitcoin');
+    ).toBe('https://antifandom.com/escapefromtarkov/wiki/Special:Search?query=Bitcoin');
   });
-  it('rewrites a bare fandom.com host', () => {
+  it('leaves a bare fandom.com host unchanged', () => {
     expect(rewriteWikiUrl('https://fandom.com/wiki/Test', true)).toBe(
-      'https://antifandom.com/wiki/Test'
+      'https://fandom.com/wiki/Test'
     );
   });
   it('leaves non-fandom hosts untouched', () => {
