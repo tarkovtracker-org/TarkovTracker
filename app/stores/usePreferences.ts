@@ -299,7 +299,7 @@ export const readPersistedPreferencesSnapshot = (
   if (!import.meta.client) {
     return null;
   }
-  let rawPersistedState: string | null = null;
+  let rawPersistedState: string | null;
   try {
     rawPersistedState = localStorage.getItem(STORAGE_KEYS.preferences);
   } catch (error) {
@@ -1043,7 +1043,7 @@ const getPreservedPreferencesStorageValue = (previousUserId: string | null): str
   if (!import.meta.client || !previousUserId || getCurrentSupabaseUserId() !== null) {
     return null;
   }
-  let rawPersistedState: string | null = null;
+  let rawPersistedState: string | null;
   try {
     rawPersistedState = localStorage.getItem(STORAGE_KEYS.preferences);
   } catch (error) {

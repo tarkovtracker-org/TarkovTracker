@@ -64,7 +64,7 @@ export default defineEventHandler(async (event) => {
     return { data: { lastPurgeAt: null } };
   }
   if (!response.ok) {
-    let bodySnippet = '';
+    let bodySnippet: string;
     try {
       bodySnippet = await response.text();
       if (bodySnippet.length > 200) {
