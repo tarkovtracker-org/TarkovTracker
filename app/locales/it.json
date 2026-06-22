@@ -1739,9 +1739,9 @@
         }
       },
       "links": {
-        "title": "Wiki Links",
-        "antifandom": "Use antifandom.com",
-        "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
+        "title": "Link Wiki",
+        "antifandom": "Usa antifandom.com",
+        "antifandom_hint": "Apri i link su antifanfom.com, un mirror community-run di Fandom con meno pubblicità, invece di fandom.com."
       },
       "misc": {
         "title": "Varie"
