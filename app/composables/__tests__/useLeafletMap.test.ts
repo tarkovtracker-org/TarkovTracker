@@ -621,6 +621,41 @@ describe('useLeafletMap', () => {
       expect(result.floors.value).toEqual(['ground', 'upper']);
       wrapper.unmount();
     });
+    it('rebuilds the tile layer with the new floor path when switching floors', async () => {
+      const leafletModule = await import('leaflet');
+      const tileLayerSpy = vi.spyOn(leafletModule.default, 'tileLayer');
+      const mapData = {
+        id: 'lab',
+        name: 'The Lab',
+        normalizedName: 'lab',
+        tile: {
+          tilePath: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+          floorTilePaths: {
+            First_Level: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+            Second_Level: 'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+          },
+          floors: ['First_Level', 'Second_Level'],
+          defaultFloor: 'First_Level',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as unknown as TarkovMap;
+      const { result, wrapper } = await mountUseLeafletMap(mapData);
+      tileLayerSpy.mockClear();
+      result.setFloor('Second_Level');
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(1000);
+      await nextTick();
+      expect(result.selectedFloor.value).toBe('Second_Level');
+      expect(tileLayerSpy).toHaveBeenCalledWith(
+        'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+        expect.any(Object)
+      );
+      wrapper.unmount();
+    });
   });
   describe('marker management', () => {
     it('clearMarkers removes all layers', async () => {

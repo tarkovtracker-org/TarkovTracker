@@ -930,13 +930,14 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       }
     }
   );
-  // Watch selected floor to update tile layer url if needed
-  watch(selectedFloor, (newFloor) => {
+  // Rebuild the tile layer on a user-initiated floor change so the tile-error fallback chain
+  // is recreated for the new floor instead of reusing stale fallback state from the initial
+  // floor. Skip while a load is already in flight (initial load already builds the right floor).
+  watch(selectedFloor, () => {
+    if (isLoading.value) return;
     const tileConfig = getTileConfig();
-    if (tileConfig && tileLayer.value) {
-      const floorPath = tileConfig.floorTilePaths?.[newFloor] ?? tileConfig.tilePath;
-      tileLayer.value.setUrl(floorPath);
-    }
+    if (!tileConfig || !tileLayer.value || !leaflet.value || !mapInstance.value) return;
+    void loadTileMap(leaflet.value, tileConfig, undefined, createMapLayerLoadToken());
   });
   // Lifecycle
   onMounted(() => {
