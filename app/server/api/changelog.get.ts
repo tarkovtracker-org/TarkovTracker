@@ -382,7 +382,7 @@ const fetchGithub = async <T>(
     return null;
   }
   if (!response.ok) {
-    let bodySnippet = '';
+    let bodySnippet: string;
     try {
       bodySnippet = await response.text();
       if (bodySnippet.length > 200) {

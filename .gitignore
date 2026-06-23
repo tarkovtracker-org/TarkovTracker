@@ -16,7 +16,7 @@ node_modules
 .fleet
 .idea
 .vscode/settings.json
-logs
+/logs/
 *.log
 .env
 .env.*

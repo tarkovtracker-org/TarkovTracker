@@ -4,6 +4,7 @@ import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
   consumeSharedRateLimit,
   createSharedCacheHandle,
+  getRateLimiterBinding,
   readSharedCache,
   writeSharedCache,
   type SharedCacheHandle,
@@ -206,9 +207,12 @@ export default defineEventHandler(async (event) => {
   );
   const typedConfig = config as ApiProtectionConfig;
   const trustProxy = Boolean(typedConfig.apiProtection?.trustProxy);
-  const sharedCacheHandle = createSharedCacheHandle(typedConfig.public?.appUrl);
+  const sharedCacheHandle = createSharedCacheHandle(
+    typedConfig.public?.appUrl,
+    getRateLimiterBinding(event)
+  );
   if (!isTestEnvironment) {
-    const preAuthRateLimitKey = `team-members:ip:${teamId}:${getProxyAwareClientIdentifier(
+    const preAuthRateLimitKey = `team-members:ip:${getProxyAwareClientIdentifier(
       event,
       trustProxy
     )}`;

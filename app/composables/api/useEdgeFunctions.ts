@@ -42,7 +42,7 @@ const normalizeFunctionError = async <TError>(
   if (!(context instanceof Response)) {
     return error;
   }
-  let data: unknown = null;
+  let data: unknown;
   try {
     data = await context.clone().json();
   } catch {

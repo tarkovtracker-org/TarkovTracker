@@ -10,6 +10,7 @@ import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
   consumeSharedRateLimit,
   createSharedCacheHandle,
+  getRateLimiterBinding,
   readSharedCache,
   writeSharedCache,
   type SharedCacheHandle,
@@ -609,10 +610,13 @@ export default defineEventHandler(async (event) => {
     DEFAULT_SHARED_PROFILE_CACHE_TTL_MS
   );
   const trustProxy = Boolean(typedConfig.apiProtection?.trustProxy);
-  const sharedCacheHandle = createSharedCacheHandle(typedConfig.public?.appUrl);
+  const sharedCacheHandle = createSharedCacheHandle(
+    typedConfig.public?.appUrl,
+    getRateLimiterBinding(event)
+  );
   const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
   if (!isTestEnvironment) {
-    const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}:${userId}:${mode}`;
+    const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}`;
     if (
       !(await consumeRateLimit(
         sharedCacheHandle,

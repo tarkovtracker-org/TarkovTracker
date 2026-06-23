@@ -40,7 +40,7 @@
         :text="t('page.tasks.questcard.view_on_wiki')"
       >
         <a
-          :href="task.wikiLink"
+          :href="toWikiUrl(task.wikiLink)"
           target="_blank"
           rel="noopener noreferrer"
           :class="ICON_BUTTON_CLASS"
@@ -101,6 +101,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { getFactionIconPath } from '@/utils/factionIcons';
   import type { Task } from '@/types/tarkov';
   const props = defineProps<{
@@ -109,6 +110,7 @@
   }>();
   const route = useRoute();
   const { t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const factionImage = computed(() => getFactionIconPath(props.task.factionName));
   const tarkovDevTaskUrl = computed(() => `https://tarkov.dev/task/${props.task.id}`);
   const isTasksRoute = computed(() => route.path.startsWith('/tasks'));
@@ -121,7 +123,7 @@
   const titleProps = computed(() => {
     if (shouldLinkToWiki.value) {
       return {
-        href: props.task.wikiLink,
+        href: toWikiUrl(props.task.wikiLink),
         target: '_blank',
         rel: 'noopener noreferrer',
       };

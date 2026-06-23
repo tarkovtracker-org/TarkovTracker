@@ -93,6 +93,7 @@
 </template>
 <script setup lang="ts">
   import { useI18n, type Composer } from 'vue-i18n';
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -141,6 +142,7 @@
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const preferencesStore = usePreferencesStore();
+  const { toWikiUrl } = useWikiLink();
   const isCompact = computed(() => preferencesStore.getMapTooltipDensity === 'compact');
   const defaultButtonClass =
     'inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200';
@@ -163,7 +165,7 @@
   const taskTitleProps = computed(() => {
     if (task.value?.wikiLink) {
       return {
-        href: task.value.wikiLink,
+        href: toWikiUrl(task.value.wikiLink),
         target: '_blank',
         rel: 'noopener noreferrer',
       };

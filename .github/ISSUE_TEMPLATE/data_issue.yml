@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Note:** Quest and item data issues should be reported in the [data-overlay repository](https://github.com/TarkovTracker/tarkovdata).
+        **Note:** Quest and item data issues should be reported in the [data-overlay repository](https://github.com/tarkovtracker-org/tarkov-data-overlay).
 
         Only use this template if the data source is correct but our tracker isn't displaying or handling it properly. Otherwise, please report at the data-overlay repo.
 

@@ -106,6 +106,14 @@ export class ApiGatewayRateLimiter {
     if (!this.data || this.data.windowSec !== windowSec || now >= this.data.resetAt) {
       this.data = { count: 0, resetAt: now + windowMs, windowSec };
     }
+    // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
+    // pre-auth rate-limit keys) do not retain billable storage forever. The
+    // alarm fires shortly after the window resets and wipes all storage.
+    const cleanupAt = this.data.resetAt + 1000;
+    const existingAlarm = await this.state.storage.getAlarm();
+    if (existingAlarm !== cleanupAt) {
+      await this.state.storage.setAlarm(cleanupAt);
+    }
     if (this.data.count >= limit) {
       return this.json({
         allowed: false,
@@ -120,6 +128,16 @@ export class ApiGatewayRateLimiter {
       remaining: Math.max(limit - this.data.count, 0),
       resetAt: this.data.resetAt,
     });
+  }
+  async alarm(): Promise<void> {
+    const stored = await this.state.storage.get<RateLimitState>('state');
+    // If a newer window is still active, reschedule cleanup instead of wiping it.
+    if (stored && Date.now() < stored.resetAt) {
+      await this.state.storage.setAlarm(stored.resetAt + 1000);
+      return;
+    }
+    this.data = undefined;
+    await this.state.storage.deleteAll();
   }
 }
 async function rateLimit(

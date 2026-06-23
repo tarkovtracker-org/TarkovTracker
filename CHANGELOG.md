@@ -1,3 +1,39 @@
+# [1.49.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.5...v1.49.0) (2026-06-22)
+
+
+### Features
+
+* **settings:** add antifandom.com wiki link option ([130d1a0](https://github.com/tarkovtracker-org/TarkovTracker/commit/130d1a0ea1a154ad21667ab8917493e7750364f8))
+
+## [1.48.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.4...v1.48.5) (2026-06-18)
+
+
+### Bug Fixes
+
+* **api:** atomic durable-object rate limiting with graceful fallback ([#465](https://github.com/tarkovtracker-org/TarkovTracker/issues/465)) ([9443722](https://github.com/tarkovtracker-org/TarkovTracker/commit/94437226f30ba13067d2d6ecb6bcc29e830a595d)), closes [#464](https://github.com/tarkovtracker-org/TarkovTracker/issues/464)
+
+## [1.48.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.3...v1.48.4) (2026-06-18)
+
+
+### Bug Fixes
+
+* **api:** rate-limit client log sink and drop logged client IP ([#463](https://github.com/tarkovtracker-org/TarkovTracker/issues/463)) ([c1e9035](https://github.com/tarkovtracker-org/TarkovTracker/commit/c1e90354a9b31910c3fb7cac82718dacf90bdc77))
+
+## [1.48.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.2...v1.48.3) (2026-06-17)
+
+
+### Bug Fixes
+
+* **deps:** patch dependabot security alerts via overrides ([#461](https://github.com/tarkovtracker-org/TarkovTracker/issues/461)) ([8e89a36](https://github.com/tarkovtracker-org/TarkovTracker/commit/8e89a3630a78eca4c60f37662ad403d510cf6f0e))
+
+## [1.48.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.1...v1.48.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **maps:** add Icebreaker as unavailable static map data ([#458](https://github.com/tarkovtracker-org/TarkovTracker/issues/458)) ([6f654f1](https://github.com/tarkovtracker-org/TarkovTracker/commit/6f654f10a5b2c0f240409779e1472c90c61833c1))
+* **ui:** show scrollbar on overflowing map and trader selectors ([#459](https://github.com/tarkovtracker-org/TarkovTracker/issues/459)) ([7002a5c](https://github.com/tarkovtracker-org/TarkovTracker/commit/7002a5c2710f4b69c4014a6c2fd9c9130b3e0456))
+
 ## [1.48.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.48.0...v1.48.1) (2026-06-17)
 
 

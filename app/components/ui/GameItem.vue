@@ -99,7 +99,7 @@
         </AppTooltip>
         <AppTooltip v-if="props.wikiLink" :text="t('page.tasks.questcard.view_on_wiki')">
           <a
-            :href="props.wikiLink"
+            :href="toWikiUrl(props.wikiLink)"
             target="_blank"
             rel="noopener noreferrer"
             class="text-surface-200 inline-flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
@@ -204,6 +204,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import type ContextMenu from '@/components/ui/ContextMenu.vue';
@@ -281,6 +282,7 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const { copyToClipboard } = useCopyToClipboard();
+  const { toWikiUrl } = useWikiLink();
   const formatNumber = useLocaleNumberFormatter();
   const BACKGROUND_CLASS_MAP = {
     violet: 'bg-rarity-violet',
@@ -384,8 +386,9 @@
     }
   };
   const openWikiLink = () => {
-    if (props.wikiLink) {
-      window.open(props.wikiLink, '_blank', 'noopener,noreferrer');
+    const url = toWikiUrl(props.wikiLink);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
   const copyItemName = async () => {
@@ -406,8 +409,9 @@
     }
   };
   const openTaskWiki = () => {
-    if (props.taskWikiLink) {
-      window.open(props.taskWikiLink, '_blank', 'noopener,noreferrer');
+    const url = toWikiUrl(props.taskWikiLink);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 </script>

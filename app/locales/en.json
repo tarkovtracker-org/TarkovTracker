@@ -1738,6 +1738,11 @@
           "pmc_spawn": "PMC Spawn"
         }
       },
+      "links": {
+        "title": "Wiki Links",
+        "antifandom": "Use antifandom.com",
+        "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
+      },
       "misc": {
         "title": "Miscellaneous"
       }

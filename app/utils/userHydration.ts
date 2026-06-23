@@ -126,8 +126,8 @@ export function hydrateUserFromSession(user: HydratableUser, sessionUser: User |
       user.providers = null;
     }
   }
-  let username: string | null = null;
-  let displayName: string | null = null;
+  let username: string | null;
+  let displayName: string | null;
   try {
     username = extractUsername(userMetadata, user.email, provider);
     displayName = extractDisplayName(userMetadata, provider, username);

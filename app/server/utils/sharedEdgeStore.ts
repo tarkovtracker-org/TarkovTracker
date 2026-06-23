@@ -2,9 +2,17 @@ export type SharedCacheOrigin = {
   host: string;
   protocol: string;
 };
+export type SharedRateLimitStub = {
+  fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+};
+export type SharedRateLimitNamespace = {
+  idFromName: (name: string) => unknown;
+  get: (id: unknown) => SharedRateLimitStub;
+};
 export type SharedCacheHandle = {
   cache: Cache | null;
   origin: SharedCacheOrigin;
+  limiter?: SharedRateLimitNamespace | null;
 };
 type SharedCacheEnvelope<T> = {
   expiresAt: number;
@@ -181,9 +189,35 @@ const consumeInMemoryRateLimit = (
   setInMemoryRateLimitEntry(key, nextEntry);
   return nextEntry;
 };
-export const createSharedCacheHandle = (appUrl: unknown): SharedCacheHandle => ({
+const isRateLimitNamespace = (value: unknown): value is SharedRateLimitNamespace => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Partial<SharedRateLimitNamespace>;
+  return typeof candidate.idFromName === 'function' && typeof candidate.get === 'function';
+};
+export const resolveSharedRateLimitNamespace = (
+  binding: unknown
+): SharedRateLimitNamespace | null => {
+  return isRateLimitNamespace(binding) ? binding : null;
+};
+const RATE_LIMITER_BINDING_NAME = 'API_GATEWAY_LIMITER';
+export const getRateLimiterBinding = (event: unknown): SharedRateLimitNamespace | null => {
+  if (!event || typeof event !== 'object') {
+    return null;
+  }
+  const context = (event as { context?: { cloudflare?: { env?: Record<string, unknown> } } })
+    .context;
+  const env = context?.cloudflare?.env;
+  if (!env || typeof env !== 'object') {
+    return null;
+  }
+  return resolveSharedRateLimitNamespace(env[RATE_LIMITER_BINDING_NAME]);
+};
+export const createSharedCacheHandle = (appUrl: unknown, limiter?: unknown): SharedCacheHandle => ({
   cache: getSharedCache(),
   origin: resolveSharedCacheOrigin(appUrl),
+  limiter: resolveSharedRateLimitNamespace(limiter),
 });
 export const readSharedCache = async <T>(
   handle: SharedCacheHandle,
@@ -240,6 +274,70 @@ export const writeSharedCache = async <T>(
     onError?.({ action: 'write', error, key, prefix });
   }
 };
+const DURABLE_RATE_LIMIT_TIMEOUT_MS = 3000;
+const consumeDurableRateLimit = async (
+  limiter: SharedRateLimitNamespace,
+  prefix: string,
+  key: string,
+  limit: number,
+  windowMs: number,
+  onError?: SharedCacheErrorHandler
+): Promise<boolean | null> => {
+  const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DURABLE_RATE_LIMIT_TIMEOUT_MS);
+  try {
+    const id = limiter.idFromName(`${prefix}:${key}`);
+    const stub = limiter.get(id);
+    const response = await stub.fetch('https://rate-limit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ limit, windowSec }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      onError?.({
+        action: 'read',
+        error: new Error(`rate limiter responded ${response.status}`),
+        key,
+        prefix,
+      });
+      return null;
+    }
+    const data = (await response.json()) as { allowed?: unknown };
+    if (typeof data.allowed !== 'boolean') {
+      onError?.({
+        action: 'read',
+        error: new Error('rate limiter returned malformed payload'),
+        key,
+        prefix,
+      });
+      return null;
+    }
+    return data.allowed;
+  } catch (error) {
+    onError?.({ action: 'read', error, key, prefix });
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+/**
+ * Best-effort distributed rate limiter.
+ *
+ * Enforcement tiers, strongest to weakest:
+ * 1. When a Durable Object limiter binding is present (`handle.limiter`), counting is
+ *    globally atomic and exact across isolates and data centers.
+ * 2. Otherwise the limiter falls back to the Cloudflare Cache API plus a per-isolate
+ *    in-memory map. Concurrent calls for a retained key within one live isolate serialize
+ *    the local counter update (the critical section between the cache read and write is
+ *    synchronous), but enforcement across isolates, data centers, in-memory eviction
+ *    (MAX_IN_MEMORY_RATE_LIMIT_ENTRIES), and isolate restarts remains best-effort. Worst-case
+ *    overshoot is roughly `limit x active isolates x active data centers`.
+ *
+ * The Durable Object path fails open to the cache/in-memory path on any binding error so a
+ * limiter outage degrades gracefully instead of breaking request handling.
+ */
 export const consumeSharedRateLimit = async (
   handle: SharedCacheHandle,
   prefix: string,
@@ -250,6 +348,19 @@ export const consumeSharedRateLimit = async (
 ): Promise<boolean> => {
   if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(windowMs) || windowMs <= 0) {
     return true;
+  }
+  if (handle.limiter) {
+    const durableResult = await consumeDurableRateLimit(
+      handle.limiter,
+      prefix,
+      key,
+      limit,
+      windowMs,
+      onError
+    );
+    if (durableResult !== null) {
+      return durableResult;
+    }
   }
   const inMemoryKey = `${prefix}:${key}`;
   if (!handle.cache) {

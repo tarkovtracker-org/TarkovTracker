@@ -555,7 +555,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       }
       const group = groups.get(itemId)!;
       const count = need.count || 1;
-      let needCurrentCount = 0;
+      let needCurrentCount: number;
       if (need.needType === 'taskObjective') {
         const objectiveCount = tarkovStore.getObjectiveCount(need.id);
         needCurrentCount = Math.min(objectiveCount ?? 0, count);

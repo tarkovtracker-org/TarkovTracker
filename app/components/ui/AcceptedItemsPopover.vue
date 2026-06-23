@@ -27,7 +27,7 @@
         <ul class="max-h-72 space-y-1 overflow-y-auto pr-1">
           <li v-for="entry in items" :key="entry.id">
             <a
-              :href="getKeyPrimaryUrl(entry)"
+              :href="toWikiUrl(getKeyPrimaryUrl(entry))"
               target="_blank"
               rel="noopener noreferrer"
               class="hover:bg-surface-800 focus-visible:ring-primary-500 group flex items-center gap-2 rounded-md p-1.5 transition-colors focus:outline-none focus-visible:ring-2"
@@ -63,6 +63,7 @@
   </UPopover>
 </template>
 <script setup lang="ts">
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
   import type { TarkovItem } from '@/types/tarkov';
   const props = withDefaults(
@@ -80,6 +81,7 @@
     }
   );
   const { t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const open = defineModel<boolean>('open', { default: false });
   const count = computed(() => props.items.length);
 </script>

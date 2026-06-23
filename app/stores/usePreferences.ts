@@ -121,6 +121,8 @@ export interface PreferencesState {
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
   localeOverride: string | null;
+  // External links
+  wikiUseAntifandom: boolean;
   // Task filter settings
   showNonSpecialTasks: boolean;
   showLightkeeperTasks: boolean;
@@ -206,6 +208,8 @@ export const preferencesDefaultState: PreferencesState = {
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
   localeOverride: null,
+  // External links
+  wikiUseAntifandom: false,
   // Task filter settings (all shown by default)
   showNonSpecialTasks: true,
   showLightkeeperTasks: true,
@@ -295,7 +299,7 @@ export const readPersistedPreferencesSnapshot = (
   if (!import.meta.client) {
     return null;
   }
-  let rawPersistedState: string | null = null;
+  let rawPersistedState: string | null;
   try {
     rawPersistedState = localStorage.getItem(STORAGE_KEYS.preferences);
   } catch (error) {
@@ -548,6 +552,10 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     getLocaleOverride: (state) => {
       return state.localeOverride ?? null;
+    },
+    /** Whether wiki links should open on the antifandom.com mirror. */
+    getWikiUseAntifandom: (state) => {
+      return state.wikiUseAntifandom ?? false;
     },
     // Task filter getters
     getShowNonSpecialTasks: (state) => {
@@ -817,6 +825,10 @@ export const usePreferencesStore = defineStore('preferences', {
     setLocaleOverride(locale: string | null) {
       this.localeOverride = locale;
     },
+    /** Toggle whether wiki links open on the antifandom.com mirror. */
+    setWikiUseAntifandom(enabled: boolean) {
+      this.wikiUseAntifandom = enabled;
+    },
     // Task filter actions
     setShowNonSpecialTasks(show: boolean) {
       this.showNonSpecialTasks = show;
@@ -986,6 +998,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'neededitemsStyle',
       'hideoutPrimaryView',
       'localeOverride',
+      'wikiUseAntifandom',
       // Task filter settings
       'showNonSpecialTasks',
       'showLightkeeperTasks',
@@ -1030,7 +1043,7 @@ const getPreservedPreferencesStorageValue = (previousUserId: string | null): str
   if (!import.meta.client || !previousUserId || getCurrentSupabaseUserId() !== null) {
     return null;
   }
-  let rawPersistedState: string | null = null;
+  let rawPersistedState: string | null;
   try {
     rawPersistedState = localStorage.getItem(STORAGE_KEYS.preferences);
   } catch (error) {

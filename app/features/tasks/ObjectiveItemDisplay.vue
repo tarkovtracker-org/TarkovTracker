@@ -71,6 +71,7 @@
 </template>
 <script setup lang="ts">
   import { useCyclingItem } from '@/composables/useCyclingItem';
+  import { useWikiLink } from '@/composables/useWikiLink';
   import { resolveObjectiveItemIcon } from '@/features/tasks/task-objective-item-overrides';
   import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
   import type { TarkovItem } from '@/types/tarkov';
@@ -85,6 +86,7 @@
     paused?: boolean;
   }>();
   const { t } = useI18n({ useScope: 'global' });
+  const { toWikiUrl } = useWikiLink();
   const acceptedItems = computed(() =>
     (props.acceptedItems ?? []).filter((entry): entry is TarkovItem => Boolean(entry?.id))
   );
@@ -131,7 +133,7 @@
   });
   const displayDevUrl = computed(() => (linkItem.value ? getKeyDevUrl(linkItem.value) : undefined));
   const displayPrimaryUrl = computed(() =>
-    linkItem.value ? getKeyPrimaryUrl(linkItem.value) : undefined
+    linkItem.value ? toWikiUrl(getKeyPrimaryUrl(linkItem.value)) : undefined
   );
   const cyclingTooltip = computed(() => {
     if (hasAlternatives.value) {

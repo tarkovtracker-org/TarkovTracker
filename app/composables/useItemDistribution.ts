@@ -191,7 +191,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
       });
     } catch (error) {
       logger.error('[useItemDistribution] Failed to apply distribution:', error);
-      throw new Error('Failed to update progress data');
+      throw new Error('Failed to update progress data', { cause: error });
     }
   }
   function resetObjectives(

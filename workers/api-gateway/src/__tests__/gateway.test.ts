@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import worker from '../index';
+import worker, { ApiGatewayRateLimiter } from '../index';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
 const makeLimiter = (
@@ -640,5 +640,77 @@ describe('api-gateway', () => {
       | Record<string, { complete?: boolean }>
       | undefined;
     expect(taskObjectives?.['obj-1']?.complete).toBe(true);
+  });
+});
+describe('ApiGatewayRateLimiter storage cleanup', () => {
+  const createStorageMock = () => {
+    const store = new Map<string, unknown>();
+    let alarm: number | null = null;
+    return {
+      store,
+      getAlarmCalls: () => alarm,
+      deleteAllCount: 0,
+      storage: {
+        get: vi.fn(async (key: string) => store.get(key)),
+        put: vi.fn(async (key: string, value: unknown) => {
+          store.set(key, value);
+        }),
+        getAlarm: vi.fn(async () => alarm),
+        setAlarm: vi.fn(async (time: number) => {
+          alarm = time;
+        }),
+        deleteAll: vi.fn(async () => {
+          store.clear();
+          alarm = null;
+        }),
+      },
+    };
+  };
+  const callLimit = (limiter: ApiGatewayRateLimiter, limit = 5, windowSec = 60) =>
+    limiter.fetch(
+      new Request('https://rate-limit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ limit, windowSec }),
+      })
+    );
+  it('schedules a cleanup alarm after the window when a request is counted', async () => {
+    const mock = createStorageMock();
+    const limiter = new ApiGatewayRateLimiter({
+      storage: mock.storage,
+    } as unknown as DurableObjectState);
+    const before = Date.now();
+    await callLimit(limiter);
+    expect(mock.storage.setAlarm).toHaveBeenCalledTimes(1);
+    const scheduled = mock.storage.setAlarm.mock.calls[0]?.[0] as number;
+    expect(scheduled).toBeGreaterThan(before + 60_000);
+  });
+  it('wipes all storage when the cleanup alarm fires after the window', async () => {
+    const mock = createStorageMock();
+    const limiter = new ApiGatewayRateLimiter({
+      storage: mock.storage,
+    } as unknown as DurableObjectState);
+    await callLimit(limiter, 5, 60);
+    expect(mock.store.has('state')).toBe(true);
+    const stored = mock.store.get('state') as { resetAt: number };
+    vi.spyOn(Date, 'now').mockReturnValue(stored.resetAt + 5000);
+    await limiter.alarm();
+    expect(mock.storage.deleteAll).toHaveBeenCalledTimes(1);
+    expect(mock.store.has('state')).toBe(false);
+    vi.restoreAllMocks();
+  });
+  it('reschedules cleanup instead of wiping when a newer window is still active', async () => {
+    const mock = createStorageMock();
+    const limiter = new ApiGatewayRateLimiter({
+      storage: mock.storage,
+    } as unknown as DurableObjectState);
+    await callLimit(limiter, 5, 60);
+    const stored = mock.store.get('state') as { resetAt: number };
+    vi.spyOn(Date, 'now').mockReturnValue(stored.resetAt - 1000);
+    await limiter.alarm();
+    expect(mock.storage.deleteAll).not.toHaveBeenCalled();
+    expect(mock.store.has('state')).toBe(true);
+    expect(mock.storage.setAlarm).toHaveBeenLastCalledWith(stored.resetAt + 1000);
+    vi.restoreAllMocks();
   });
 });

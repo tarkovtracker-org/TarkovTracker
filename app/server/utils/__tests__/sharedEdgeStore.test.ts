@@ -161,4 +161,140 @@ describe('consumeSharedRateLimit', () => {
       false
     );
   });
+  it('serializes concurrent same-isolate calls so the cap is enforced exactly', async () => {
+    const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
+    let releaseReads: () => void = () => {};
+    const allReadsStarted = (() => {
+      let started = 0;
+      let resolveGate: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        resolveGate = resolve;
+      });
+      return {
+        gate,
+        mark: () => {
+          started += 1;
+          if (started === 5) {
+            resolveGate();
+          }
+        },
+      };
+    })();
+    const barrier = new Promise<void>((resolve) => {
+      releaseReads = resolve;
+    });
+    const handle = {
+      cache: {
+        match: vi.fn(async () => {
+          allReadsStarted.mark();
+          await barrier;
+          return undefined;
+        }),
+        put: vi.fn(async () => undefined),
+      } as unknown as Cache,
+      origin: {
+        host: 'example.com',
+        protocol: 'https:',
+      },
+    };
+    const calls = Array.from({ length: 5 }, () =>
+      consumeSharedRateLimit(handle, 'rate-limit', 'burst-user', 3, 60_000)
+    );
+    await allReadsStarted.gate;
+    releaseReads();
+    const results = await Promise.all(calls);
+    expect(results.filter((allowed) => allowed === true)).toHaveLength(3);
+    expect(results.filter((allowed) => allowed === false)).toHaveLength(2);
+  });
+  it('delegates to the durable object limiter when the binding is present', async () => {
+    const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
+    const stubFetch = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ allowed: true }))
+    );
+    const cacheMatch = vi.fn(async () => undefined);
+    const handle = {
+      cache: { match: cacheMatch, put: vi.fn(async () => undefined) } as unknown as Cache,
+      origin: { host: 'example.com', protocol: 'https:' },
+      limiter: {
+        idFromName: vi.fn(() => 'id-1'),
+        get: vi.fn(() => ({ fetch: stubFetch })),
+      },
+    };
+    await expect(consumeSharedRateLimit(handle, 'rate-limit', 'user-1', 5, 60_000)).resolves.toBe(
+      true
+    );
+    expect(stubFetch).toHaveBeenCalledTimes(1);
+    expect(cacheMatch).not.toHaveBeenCalled();
+    const requestInit = stubFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    const sentBody = JSON.parse(String(requestInit?.body));
+    expect(sentBody).toEqual({ limit: 5, windowSec: 60 });
+  });
+  it('blocks when the durable object limiter denies the request', async () => {
+    const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
+    const handle = {
+      cache: {
+        match: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      } as unknown as Cache,
+      origin: { host: 'example.com', protocol: 'https:' },
+      limiter: {
+        idFromName: vi.fn(() => 'id-1'),
+        get: vi.fn(() => ({
+          fetch: vi.fn(async () => new Response(JSON.stringify({ allowed: false }))),
+        })),
+      },
+    };
+    await expect(consumeSharedRateLimit(handle, 'rate-limit', 'user-1', 5, 60_000)).resolves.toBe(
+      false
+    );
+  });
+  it('fails open to the cache path when the durable object limiter errors', async () => {
+    const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
+    const cacheMatch = vi.fn(async () => undefined);
+    const onError = vi.fn();
+    const handle = {
+      cache: { match: cacheMatch, put: vi.fn(async () => undefined) } as unknown as Cache,
+      origin: { host: 'example.com', protocol: 'https:' },
+      limiter: {
+        idFromName: vi.fn(() => 'id-1'),
+        get: vi.fn(() => ({
+          fetch: vi.fn(async () => {
+            throw new Error('durable object unavailable');
+          }),
+        })),
+      },
+    };
+    await expect(
+      consumeSharedRateLimit(handle, 'rate-limit', 'user-1', 2, 60_000, onError)
+    ).resolves.toBe(true);
+    expect(cacheMatch).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+  it('aborts a hung durable object request and falls back to the cache path', async () => {
+    const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
+    const cacheMatch = vi.fn(async () => undefined);
+    const onError = vi.fn();
+    const stubFetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        })
+    );
+    const handle = {
+      cache: { match: cacheMatch, put: vi.fn(async () => undefined) } as unknown as Cache,
+      origin: { host: 'example.com', protocol: 'https:' },
+      limiter: {
+        idFromName: vi.fn(() => 'id-1'),
+        get: vi.fn(() => ({ fetch: stubFetch })),
+      },
+    };
+    const pending = consumeSharedRateLimit(handle, 'rate-limit', 'user-1', 2, 60_000, onError);
+    await vi.advanceTimersByTimeAsync(3000);
+    await expect(pending).resolves.toBe(true);
+    expect(cacheMatch).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
 });
