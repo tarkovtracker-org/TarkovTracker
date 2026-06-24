@@ -65,7 +65,9 @@ describe('edgeCache', () => {
   });
   it('returns cached payload on cache hit', async () => {
     cacheSpy.match.mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: { items: [{ id: 'cached' }] } }))
+      new Response(JSON.stringify({ data: { items: [{ id: 'cached' }] } }), {
+        headers: { 'X-Cache-Stored-At': String(Date.now()) },
+      })
     );
     const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
     const event = createEvent();
@@ -79,6 +81,60 @@ describe('edgeCache', () => {
     });
     expect(result).toEqual({ data: { items: [{ id: 'cached' }] } });
     expect(fetcher).not.toHaveBeenCalled();
+    expect(cacheSpy.put).not.toHaveBeenCalled();
+  });
+  it('serves a stale entry and refreshes it in the background', async () => {
+    const staleStoredAt = Date.now() - 61_000;
+    cacheSpy.match.mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { items: [{ id: 'stale' }] } }), {
+        headers: { 'X-Cache-Stored-At': String(staleStoredAt) },
+      })
+    );
+    const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
+    const background: Promise<unknown>[] = [];
+    const event = createEvent();
+    (event.context as { cloudflare?: unknown }).cloudflare = {
+      context: { waitUntil: (p: Promise<unknown>) => background.push(p) },
+    };
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'items-en', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { items: [{ id: 'stale' }] } });
+    await Promise.all(background);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(cacheSpy.put).toHaveBeenCalledTimes(1);
+  });
+  it('keeps serving stale data when background revalidation fails', async () => {
+    const staleStoredAt = Date.now() - 61_000;
+    cacheSpy.match.mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { items: [{ id: 'stale' }] } }), {
+        headers: { 'X-Cache-Stored-At': String(staleStoredAt) },
+      })
+    );
+    const fetcher = vi.fn(async () => {
+      throw new Error('upstream down');
+    });
+    const background: Promise<unknown>[] = [];
+    const event = createEvent();
+    (event.context as { cloudflare?: unknown }).cloudflare = {
+      context: { waitUntil: (p: Promise<unknown>) => background.push(p) },
+    };
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'items-en', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { items: [{ id: 'stale' }] } });
+    await Promise.all(background);
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(cacheSpy.put).not.toHaveBeenCalled();
   });
   it('stores fresh payload on cache miss', async () => {

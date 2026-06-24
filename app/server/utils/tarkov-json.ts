@@ -24,8 +24,12 @@ import type {
 } from '@/types/tarkov';
 const logger = createLogger('TarkovJson');
 const TARKOV_JSON_BASE_URL = 'https://json.tarkov.dev';
-const DEFAULT_TIMEOUT_MS = 30000;
-const DEFAULT_MAX_RETRIES = 3;
+// ponytail: budget kept under Cloudflare's 100s origin limit so a slow upstream
+// fails fast (502 the client retries) instead of a 524. Worst case per route:
+// 2 legs (base + lang/en) x (MAX_RETRIES x TIMEOUT + backoff) + overlay ~= 55s.
+// Pairs with stale-while-revalidate in edgeCache so warm colos never block.
+export const DEFAULT_TIMEOUT_MS = 12000;
+export const DEFAULT_MAX_RETRIES = 2;
 const ENGLISH_LANGUAGE = 'en';
 const PRESTIGE_SOURCE_GAME_MODE = 'regular';
 const MAX_DETAILED_OBJECTIVE_ITEMS = 24;

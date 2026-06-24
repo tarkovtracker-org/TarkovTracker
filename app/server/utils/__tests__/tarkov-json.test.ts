@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_TIMEOUT_MS,
   adaptBootstrapResponse,
   adaptHideoutResponse,
   adaptItemsResponse,
@@ -21,6 +23,17 @@ const createFetcher = (responses: Record<string, unknown>) =>
     if (response === undefined) throw new Error(`Unexpected URL: ${url}`);
     return response;
   }) as unknown as TestJsonFetcher;
+describe('default fetch budget', () => {
+  it('keeps worst-case server time under Cloudflare 100s origin limit', () => {
+    // A localized endpoint does two sequential legs (base, then lang/en).
+    const backoffPerLeg = Array.from({ length: DEFAULT_MAX_RETRIES - 1 }, (_, i) =>
+      Math.min(1000 * 2 ** i, 5000)
+    ).reduce((sum, ms) => sum + ms, 0);
+    const perLegMs = DEFAULT_MAX_RETRIES * DEFAULT_TIMEOUT_MS + backoffPerLeg;
+    const worstCaseMs = perLegMs * 2;
+    expect(worstCaseMs).toBeLessThan(100_000);
+  });
+});
 describe('fetchTarkovJsonEndpoint', () => {
   it('merges English translations into the base response', async () => {
     const fetcher = createFetcher({

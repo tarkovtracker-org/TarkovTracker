@@ -14,7 +14,9 @@ const logger = createLogger('EdgeCache');
 type CacheOptions = {
   cacheKeyPrefix?: string;
   deps?: EdgeCacheDependencies;
+  staleTtl?: number;
 };
+type CfExecutionContext = { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
 type OverlayHeadersMeta = {
   status?: string;
   version?: string;
@@ -50,12 +52,14 @@ function setCacheResponseHeaders(
   event: H3Event,
   setHeaders: typeof setResponseHeaders,
   fullCacheKey: string,
-  status: 'BYPASS' | 'DEV' | 'HIT' | 'MISS',
+  status: 'BYPASS' | 'DEV' | 'HIT' | 'MISS' | 'STALE',
   ttl: number,
   overlayMeta: OverlayHeadersMeta | null
 ) {
   const cacheControl =
-    status === 'HIT' || status === 'MISS' ? `public, max-age=${ttl}, s-maxage=${ttl}` : 'no-cache';
+    status === 'HIT' || status === 'MISS' || status === 'STALE'
+      ? `public, max-age=${ttl}, s-maxage=${ttl}`
+      : 'no-cache';
   setHeaders(event, {
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
@@ -83,6 +87,54 @@ function resolveAppUrl(deps?: EdgeCacheDependencies): string | undefined {
     return runtimeAppUrl;
   }
   return undefined;
+}
+const inFlightRevalidations = new Set<string>();
+function buildStoredResponse<T>(
+  payload: T,
+  ttl: number,
+  staleTtl: number,
+  fullCacheKey: string
+): Response {
+  return new Response(JSON.stringify(payload), {
+    headers: {
+      'Content-Type': 'application/json',
+      // s-maxage covers the stale window so Cloudflare keeps the entry past ttl
+      // and we can serve it while a background refresh runs.
+      'Cache-Control': `public, max-age=${ttl}, s-maxage=${ttl + staleTtl}`,
+      'X-Cache-Status': 'MISS',
+      'X-Cache-Key': fullCacheKey,
+      'X-Cache-Stored-At': String(Date.now()),
+    },
+  });
+}
+function reviveCacheEntry<T>(params: {
+  cache: CacheLike;
+  cacheKeyRequest: Request;
+  cfContext: CfExecutionContext;
+  fetcher: () => Promise<T>;
+  fullCacheKey: string;
+  staleTtl: number;
+  ttl: number;
+}): void {
+  const { cache, cacheKeyRequest, cfContext, fetcher, fullCacheKey, staleTtl, ttl } = params;
+  if (inFlightRevalidations.has(fullCacheKey)) return;
+  inFlightRevalidations.add(fullCacheKey);
+  const task = (async () => {
+    try {
+      const fresh = await fetcher();
+      await cache.put(cacheKeyRequest, buildStoredResponse(fresh, ttl, staleTtl, fullCacheKey));
+      logger.info(`Background revalidation refreshed ${fullCacheKey}`);
+    } catch (error) {
+      logger.warn(`Background revalidation failed for ${fullCacheKey}; keeping stale entry`, error);
+    } finally {
+      inFlightRevalidations.delete(fullCacheKey);
+    }
+  })();
+  if (cfContext?.waitUntil) {
+    cfContext.waitUntil(task);
+  } else {
+    void task;
+  }
 }
 export function shouldBypassCache(event: H3Event): boolean {
   const config = useRuntimeConfig(event);
@@ -115,7 +167,7 @@ export async function edgeCache<T>(
   ttl = 43200,
   options: CacheOptions = {}
 ): Promise<T> {
-  const { cacheKeyPrefix = 'tarkovtracker', deps } = options;
+  const { cacheKeyPrefix = 'tarkovtracker', deps, staleTtl = ttl } = options;
   const createErrorFn = deps?.createErrorFn ?? createError;
   const setHeaders = deps?.setResponseHeadersFn ?? setResponseHeaders;
   const cache = deps?.cache ?? getCloudflareCacheFromGlobal();
@@ -130,27 +182,37 @@ export async function edgeCache<T>(
         return response;
       }
       const cacheKeyRequest = buildEdgeCacheRequest(cacheKeyPrefix, key, resolveAppUrl(deps));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cfContext = (event.context as any).cloudflare?.context as CfExecutionContext;
       const cachedResponse = await cache.match(cacheKeyRequest);
       if (cachedResponse) {
         const data = await cachedResponse.json();
         const overlayMeta = getOverlayHeadersMeta(data);
+        const storedAtRaw = cachedResponse.headers.get('X-Cache-Stored-At');
+        const storedAt = storedAtRaw ? Number(storedAtRaw) : Number.NaN;
+        const isStale = Number.isFinite(storedAt) && Date.now() - storedAt > ttl * 1000;
+        if (isStale) {
+          // Serve stale immediately, refresh in the background. A slow or failing
+          // upstream never blocks the user once a colo has any cached entry.
+          reviveCacheEntry({
+            cache,
+            cacheKeyRequest,
+            cfContext,
+            fetcher,
+            fullCacheKey,
+            staleTtl,
+            ttl,
+          });
+          setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'STALE', ttl, overlayMeta);
+          return data;
+        }
         setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'HIT', ttl, overlayMeta);
         return data;
       }
       logger.info(`Cache miss for ${fullCacheKey}`);
       const response = await fetcher();
       const overlayMeta = getOverlayHeadersMeta(response);
-      const cacheResponse = new Response(JSON.stringify(response), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': `public, max-age=${ttl}, s-maxage=${ttl}`,
-          'X-Cache-Status': 'MISS',
-          'X-Cache-Key': fullCacheKey,
-        },
-      });
-      // Non-blocking cache write if waitUntil available
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cfContext = (event.context as any).cloudflare?.context;
+      const cacheResponse = buildStoredResponse(response, ttl, staleTtl, fullCacheKey);
       if (cfContext?.waitUntil) {
         cfContext.waitUntil(cache.put(cacheKeyRequest, cacheResponse.clone()));
       } else {
