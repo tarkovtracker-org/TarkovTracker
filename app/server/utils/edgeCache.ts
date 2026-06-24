@@ -17,6 +17,7 @@ type CacheOptions = {
   staleTtl?: number;
 };
 type CfExecutionContext = { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
+type CfRuntimeContext = { cloudflare?: { context?: CfExecutionContext } };
 type OverlayHeadersMeta = {
   status?: string;
   version?: string;
@@ -57,9 +58,7 @@ function setCacheResponseHeaders(
   overlayMeta: OverlayHeadersMeta | null
 ) {
   const cacheControl =
-    status === 'HIT' || status === 'MISS' || status === 'STALE'
-      ? `public, max-age=${ttl}, s-maxage=${ttl}`
-      : 'no-cache';
+    status === 'HIT' || status === 'MISS' ? `public, max-age=${ttl}, s-maxage=${ttl}` : 'no-cache';
   setHeaders(event, {
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
@@ -182,8 +181,7 @@ export async function edgeCache<T>(
         return response;
       }
       const cacheKeyRequest = buildEdgeCacheRequest(cacheKeyPrefix, key, resolveAppUrl(deps));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cfContext = (event.context as any).cloudflare?.context as CfExecutionContext;
+      const cfContext = (event.context as CfRuntimeContext).cloudflare?.context;
       const cachedResponse = await cache.match(cacheKeyRequest);
       if (cachedResponse) {
         const data = await cachedResponse.json();

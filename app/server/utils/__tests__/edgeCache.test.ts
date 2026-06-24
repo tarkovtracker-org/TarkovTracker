@@ -105,9 +105,16 @@ describe('edgeCache', () => {
       },
     });
     expect(result).toEqual({ data: { items: [{ id: 'stale' }] } });
+    expect(setHeaders).toHaveBeenCalledWith(
+      event,
+      expect.objectContaining({ 'X-Cache-Status': 'STALE', 'Cache-Control': 'no-cache' })
+    );
     await Promise.all(background);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(cacheSpy.put).toHaveBeenCalledTimes(1);
+    const storedResponse = cacheSpy.put.mock.calls[0]?.[1] as Response;
+    expect(await storedResponse.clone().json()).toEqual({ data: { items: [{ id: 'fresh' }] } });
+    expect(storedResponse.headers.get('X-Cache-Stored-At')).toBeTruthy();
   });
   it('keeps serving stale data when background revalidation fails', async () => {
     const staleStoredAt = Date.now() - 61_000;
