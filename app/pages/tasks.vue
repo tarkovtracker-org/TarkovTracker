@@ -329,6 +329,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useStorage } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import {
     type DashboardFocusProgressInteraction,
@@ -458,7 +459,7 @@
     stopResize,
     onResizeKeydown,
   } = useMapResize();
-  const isMapPanelExpanded = ref(true);
+  const isMapPanelExpanded = useStorage<boolean>('tasks_mapPanelExpanded', false);
   const toggleMapPanelVisibility = () => {
     if (isMapPanelExpanded.value) {
       stopResize();
@@ -710,7 +711,6 @@
     checkAndLoadMore,
     filteredTasks,
     handleTaskQueryParam,
-    isMapPanelExpanded,
     metadataStore,
     route,
     selectedMapData,

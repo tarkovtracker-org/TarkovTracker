@@ -25,7 +25,6 @@ describe('useTasksPageEffects', () => {
     };
     const showMapDisplay = computed(() => true);
     const selectedMapData = computed(() => ({ id: 'woods' }));
-    const isMapPanelExpanded = ref(true);
     const stopResize = vi.fn();
     const filteredTasksState = ref([createTask('1')]);
     const filteredTasks = computed(() => filteredTasksState.value);
@@ -39,7 +38,6 @@ describe('useTasksPageEffects', () => {
       checkAndLoadMore,
       filteredTasks,
       handleTaskQueryParam,
-      isMapPanelExpanded,
       metadataStore,
       route,
       selectedMapData,
@@ -59,7 +57,6 @@ describe('useTasksPageEffects', () => {
     };
     const showMapDisplay = computed(() => true);
     const selectedMapData = computed(() => ({ id: 'woods' }));
-    const isMapPanelExpanded = ref(true);
     const stopResize = vi.fn();
     const filteredTasksState = ref([createTask('1')]);
     const filteredTasks = computed(() => filteredTasksState.value);
@@ -75,7 +72,6 @@ describe('useTasksPageEffects', () => {
       checkAndLoadMore,
       filteredTasks,
       handleTaskQueryParam,
-      isMapPanelExpanded,
       metadataStore,
       route,
       selectedMapData,
@@ -99,7 +95,6 @@ describe('useTasksPageEffects', () => {
     };
     const showMapDisplay = computed(() => false);
     const selectedMapData = computed(() => null);
-    const isMapPanelExpanded = ref(true);
     const stopResize = vi.fn();
     const filteredTasksState = ref<Task[]>([]);
     const filteredTasks = computed(() => filteredTasksState.value);
@@ -113,7 +108,6 @@ describe('useTasksPageEffects', () => {
       checkAndLoadMore,
       filteredTasks,
       handleTaskQueryParam,
-      isMapPanelExpanded,
       metadataStore,
       route,
       selectedMapData,
@@ -131,7 +125,6 @@ describe('useTasksPageEffects', () => {
     };
     const showMapDisplay = computed(() => false);
     const selectedMapData = computed(() => null);
-    const isMapPanelExpanded = ref(true);
     const stopResize = vi.fn();
     const filteredTasksState = ref<Task[]>([createTask('task-hidden')]);
     const filteredTasks = computed(() => filteredTasksState.value);
@@ -145,7 +138,6 @@ describe('useTasksPageEffects', () => {
       checkAndLoadMore,
       filteredTasks,
       handleTaskQueryParam,
-      isMapPanelExpanded,
       metadataStore,
       route,
       selectedMapData,
