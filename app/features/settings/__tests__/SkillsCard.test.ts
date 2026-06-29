@@ -19,6 +19,7 @@ const i18n = createI18n({
     ru: {},
     uk: {},
     zh: {},
+    ko: {},
   },
 });
 vi.mock('@/composables/useSkillCalculation');
