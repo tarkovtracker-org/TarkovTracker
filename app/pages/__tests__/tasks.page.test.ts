@@ -2,6 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { Task, TaskObjective } from '@/types/tarkov';
 /**
  * Factory to create a default Task with all required properties.
@@ -296,7 +297,7 @@ describe('tasks page', () => {
     metadataStoreMock.fetchMapSpawnsData.mockClear();
     mapTaskCountsMock.withHide = 0;
     mapTaskCountsMock.withoutHide = 1;
-    localStorage.removeItem('tasks_mapPanelExpanded');
+    localStorage.removeItem(STORAGE_KEYS.tasksMapPanelExpanded);
     const module = await import('@/pages/tasks.vue');
     TasksPage = module.default;
     await mountPage();
@@ -360,7 +361,7 @@ describe('tasks page', () => {
     expect(toggleButton.attributes('aria-expanded')).toBe('false');
   });
   it('restores the saved map panel expanded state', async () => {
-    localStorage.setItem('tasks_mapPanelExpanded', 'true');
+    localStorage.setItem(STORAGE_KEYS.tasksMapPanelExpanded, 'true');
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];

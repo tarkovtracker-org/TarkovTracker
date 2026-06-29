@@ -365,6 +365,7 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
+  import { STORAGE_KEYS } from '@/utils/storageKeys';
   import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { TaskActionPayload } from '@/composables/useTaskActions';
@@ -459,7 +460,7 @@
     stopResize,
     onResizeKeydown,
   } = useMapResize();
-  const isMapPanelExpanded = useStorage<boolean>('tasks_mapPanelExpanded', false);
+  const isMapPanelExpanded = useStorage<boolean>(STORAGE_KEYS.tasksMapPanelExpanded, false);
   const toggleMapPanelVisibility = () => {
     if (isMapPanelExpanded.value) {
       stopResize();
