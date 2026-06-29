@@ -1379,6 +1379,14 @@ export default defineEventHandler((event) => {
           return;
         }
 
+        if (document.hidden) {
+          if (timerId) {
+            window.clearTimeout(timerId);
+          }
+          timerId = window.setTimeout(fetchMetrics, CONFIG.intervalMs);
+          return;
+        }
+
         if (abortController) {
           abortController.abort();
         }
