@@ -181,12 +181,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          merge_state="$(
-            gh pr view "$PR_NUMBER" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json mergeStateStatus \
-              --jq '.mergeStateStatus'
-          )"
+          # GitHub recomputes mergeability asynchronously, so the status can be
+          # UNKNOWN for a short window right after checks settle. Poll until it
+          # resolves instead of failing on the transient state.
+          merge_state="UNKNOWN"
+          deadline=$((SECONDS + 120))
+
+          while true; do
+            merge_state="$(
+              gh pr view "$PR_NUMBER" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json mergeStateStatus \
+                --jq '.mergeStateStatus'
+            )"
+
+            if [ "$merge_state" != "UNKNOWN" ]; then
+              break
+            fi
+
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for merge state to resolve (still UNKNOWN)."
+              exit 1
+            fi
+
+            echo "Merge state is UNKNOWN; waiting for GitHub to recompute mergeability."
+            sleep 10
+          done
 
           case "$merge_state" in
             CLEAN | UNSTABLE)
