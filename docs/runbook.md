@@ -127,8 +127,8 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 ### CLI note
 
 - `supabase db diff` / `db pull` (shadow-DB based) fail in some CLI builds with
-  `unknown flag: --mode`. `db dump`, `db query`, `db reset`, and `migration` work. The bundled
-  Go binary (`supabase-go`) can run `db diff` when the wrapper cannot.
+  `unknown flag: --mode`. `db dump`, `db query`, `db reset`, and `migration` work. The 2.101
+  Go binary (`supabase-2.101` in `~/.local/bin`) can run `db diff` when the 2.108 wrapper cannot.
 
 ## Incident Triage
 
