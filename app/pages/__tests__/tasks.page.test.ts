@@ -2,6 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { Task, TaskObjective } from '@/types/tarkov';
 /**
  * Factory to create a default Task with all required properties.
@@ -296,6 +297,7 @@ describe('tasks page', () => {
     metadataStoreMock.fetchMapSpawnsData.mockClear();
     mapTaskCountsMock.withHide = 0;
     mapTaskCountsMock.withoutHide = 1;
+    localStorage.removeItem(STORAGE_KEYS.tasksMapPanelExpanded);
     const module = await import('@/pages/tasks.vue');
     TasksPage = module.default;
     await mountPage();
@@ -350,12 +352,21 @@ describe('tasks page', () => {
     await mountPage();
     const toggleButton = wrapper.find('[data-testid="map-panel-toggle"]');
     expect(toggleButton.exists()).toBe(true);
+    expect(toggleButton.attributes('aria-expanded')).toBe('false');
+    await toggleButton.trigger('click');
+    await nextTick();
     expect(toggleButton.attributes('aria-expanded')).toBe('true');
     await toggleButton.trigger('click');
     await nextTick();
     expect(toggleButton.attributes('aria-expanded')).toBe('false');
-    await toggleButton.trigger('click');
-    await nextTick();
+  });
+  it('restores the saved map panel expanded state', async () => {
+    localStorage.setItem(STORAGE_KEYS.tasksMapPanelExpanded, 'true');
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    await mountPage();
+    const toggleButton = wrapper.find('[data-testid="map-panel-toggle"]');
     expect(toggleButton.attributes('aria-expanded')).toBe('true');
   });
   it('expands the map panel when jumping to a map objective from a collapsed state', async () => {
@@ -381,9 +392,6 @@ describe('tasks page', () => {
       },
     });
     const toggleButton = wrapper.find('[data-testid="map-panel-toggle"]');
-    expect(toggleButton.attributes('aria-expanded')).toBe('true');
-    await toggleButton.trigger('click');
-    await nextTick();
     expect(toggleButton.attributes('aria-expanded')).toBe('false');
     const jumpButton = wrapper.find('[data-testid="jump-to-map-objective"]');
     expect(jumpButton.exists()).toBe(true);

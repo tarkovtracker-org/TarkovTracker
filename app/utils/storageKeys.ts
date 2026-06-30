@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   sessionDataMigrated: `${STORAGE_PREFIX}tarkovDataMigrated`,
   activityLogManual: `${STORAGE_PREFIX}activity_log_manual`,
   activityLogLastRead: `${STORAGE_PREFIX}activity_log_last_read`,
+  tasksMapPanelExpanded: `${STORAGE_PREFIX}tasks_map_panel_expanded`,
 } as const;
 export const LEGACY_STORAGE_KEYS = {
   progress: 'progress',

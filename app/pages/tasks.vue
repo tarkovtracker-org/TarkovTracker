@@ -329,6 +329,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useStorage } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import {
     type DashboardFocusProgressInteraction,
@@ -364,6 +365,7 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
+  import { STORAGE_KEYS } from '@/utils/storageKeys';
   import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { TaskActionPayload } from '@/composables/useTaskActions';
@@ -458,7 +460,7 @@
     stopResize,
     onResizeKeydown,
   } = useMapResize();
-  const isMapPanelExpanded = ref(true);
+  const isMapPanelExpanded = useStorage<boolean>(STORAGE_KEYS.tasksMapPanelExpanded, false);
   const toggleMapPanelVisibility = () => {
     if (isMapPanelExpanded.value) {
       stopResize();
@@ -710,7 +712,6 @@
     checkAndLoadMore,
     filteredTasks,
     handleTaskQueryParam,
-    isMapPanelExpanded,
     metadataStore,
     route,
     selectedMapData,
