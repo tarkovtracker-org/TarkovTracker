@@ -69,6 +69,67 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 5. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
+## Known Benign Database Signals
+
+These show up in Supabase logs / query performance and are expected. Do not treat as incidents.
+
+1. `database "supabase_admin" does not exist` (SQLSTATE `3D000`, FATAL)
+   - Source: Supabase platform-internal process on the DB host. The log event shows
+     `parsed.connection_from: ::1` (loopback), `parsed.user_name: supabase_admin`,
+     `parsed.command_tag: startup`. A local health/liveness probe authenticates as the
+     `supabase_admin` role without specifying a database, so libpq defaults the db name to the
+     role name, which doesn't exist.
+   - Not us: no repo, edge function, CI, or app connection uses the `supabase_admin` Postgres
+     role (app + functions use `@supabase/supabase-js` over HTTPS). Not fixable from our account.
+   - Handling: suppress in log views / drains by excluding `sql_state_code = '3D000'` with
+     `user_name = 'supabase_admin'`. Safe because our app never connects as `supabase_admin`.
+
+2. `realtime.list_changes(...)` as the top query by total time (role `supabase_admin`)
+   - Source: Supabase Realtime's continuous WAL poller. Tops the chart by call volume, not
+     latency (low mean time, ~99.9999% cache hit). Expected for an always-on poller.
+   - Health checks: replication slots are `active`/`streaming` with `0 GB` lag, and the
+     `supabase_realtime` publication is narrowly scoped to `public.user_progress` only (not
+     `FOR ALL TABLES`). This is the desired configuration.
+   - Watch for: occasional high max-time correlates with an inactive/lagging replication slot.
+     Verify with `supabase inspect db replication-slots --linked` (lag should stay ~0).
+
+3. Duplicate realtime-enable migrations (benign)
+   - `20251205120619_enable_realtime_user_progress.sql` plus `_dup_1` (`20251205171031`) and
+     `_dup_2` (`20251205171557`) all run the same idempotent
+     `ALTER PUBLICATION supabase_realtime ADD TABLE public.user_progress` (guarded by a
+     `WHERE pubname...` existence check). Already applied to production; do not delete (would
+     desync migration history). Avoid this duplicate-add pattern in future migrations.
+
+## Database Migrations
+
+- **Migrations are the source of truth. Do not change the production schema directly** via the
+  Supabase dashboard / SQL editor. Direct edits cause drift: a fresh environment built from
+  migrations no longer matches production, and the next `db push` can fail or apply destructive
+  changes. Always write a migration and let CI apply it.
+- Verify migrations reproduce prod: `supabase db reset --local`, then dump both and compare
+  (`supabase db dump --local` vs `--linked`). Catalog-level checks (columns, constraints,
+  indexes, grants, policies, functions, triggers via `information_schema` / `pg_catalog`) are
+  more reliable than dump text, which differs by harmless column/statement ordering.
+- Platform-managed extensions (`pg_graphql`, `pg_net`) differ between the local stack and prod;
+  migrations do not control these and the difference is expected.
+
+### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
+
+- Captures schema changes that were previously made directly in the dashboard (teams
+  `members`/`max_members`/`updated_at`/nullable `join_code`; team_events PK `event_id`→`id`;
+  team_memberships composite PK; user_system `api_tokens`/`created_at` + grants; supporters
+  defaults; `hypopg`/`index_advisor` extensions).
+- **Already applied to production by hand.** This migration is destructive if executed against
+  prod (drops/recreates PKs and columns). It must be marked applied in prod history via
+  `supabase migration repair --status applied 20260630075121`, NOT run via `db push`. It only
+  executes on fresh/local builds so they reproduce prod.
+
+### CLI note
+
+- `supabase db diff` / `db pull` (shadow-DB based) fail in some CLI builds with
+  `unknown flag: --mode`. `db dump`, `db query`, `db reset`, and `migration` work. The bundled
+  Go binary (`supabase-go`) can run `db diff` when the wrapper cannot.
+
 ## Incident Triage
 
 1. Check Cloudflare Pages / Workers deployment logs for failed builds, missing variables, or failed Git sync.
