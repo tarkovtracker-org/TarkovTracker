@@ -105,7 +105,15 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 - **Migrations are the source of truth. Do not change the production schema directly** via the
   Supabase dashboard / SQL editor. Direct edits cause drift: a fresh environment built from
   migrations no longer matches production, and the next `db push` can fail or apply destructive
-  changes. Always write a migration and let CI apply it.
+  changes. Always write a migration.
+- **CI does NOT apply migrations to production.** The `Supabase DB` job only validates
+  (`supabase:check` = local reset + lint); no workflow runs `db push`. Applying to prod is a
+  **manual step** after merge to `main`:
+  ```bash
+  supabase migration list --linked   # confirm the new migration is pending (blank REMOTE column)
+  supabase db push --linked          # applies pending migrations to production
+  ```
+  Then verify the change landed (e.g. catalog query / `has_column_privilege`).
 - Verify migrations reproduce prod: `supabase db reset --local`, then dump both and compare
   (`supabase db dump --local` vs `--linked`). Catalog-level checks (columns, constraints,
   indexes, grants, policies, functions, triggers via `information_schema` / `pg_catalog`) are
