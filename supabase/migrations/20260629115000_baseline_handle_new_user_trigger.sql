@@ -8,12 +8,15 @@
 --
 -- Definitions dumped from the linked project (ref knptqelvsodccnoehmbj) on
 -- 2026-06-29. Idempotent so it is safe to apply against the existing remote.
+-- search_path is pinned to `pg_catalog, public` (the remote definition used
+-- only `public`) to match the hardened helpers and close the role-mutable
+-- search_path vector on this SECURITY DEFINER function.
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   INSERT INTO public.user_system (user_id)
