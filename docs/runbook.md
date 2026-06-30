@@ -60,13 +60,20 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 ## Deployment
 
 1. Merge to `main` and verify CI workflow `Validate`, `Supabase DB`, and `Workers` jobs are green.
-2. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
-3. Confirm workers are serving the expected revision:
+2. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
+   intentionally disabled to avoid per-preview billing):
+   ```bash
+   supabase migration list --linked   # any row with a blank REMOTE column is pending
+   supabase db push --linked          # apply pending migrations to production
+   ```
+   Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
+3. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
+4. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
-4. Smoke test:
+5. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
-5. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
+6. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
 ## Known Benign Database Signals
@@ -107,8 +114,9 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   migrations no longer matches production, and the next `db push` can fail or apply destructive
   changes. Always write a migration.
 - **CI does NOT apply migrations to production.** The `Supabase DB` job only validates
-  (`supabase:check` = local reset + lint); no workflow runs `db push`. Applying to prod is a
-  **manual step** after merge to `main`:
+  (`supabase:check` = local reset + lint); no workflow runs `db push`. Supabase branch/preview
+  auto-deploy is intentionally **disabled** (it bills per ephemeral preview DB). Applying to prod
+  is a **manual step** after merge to `main` (see Deployment checklist):
   ```bash
   supabase migration list --linked   # confirm the new migration is pending (blank REMOTE column)
   supabase db push --linked          # applies pending migrations to production
