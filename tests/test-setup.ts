@@ -2,6 +2,19 @@ import { enableAutoUnmount } from '@vue/test-utils';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, vi } from 'vitest';
 
+// ponytail: Vue hardcodes this experimental-Suspense notice (console.info, gated only on
+// non-prod) and Vitest's isolated forked workers reload Vue per file, so it spams every run.
+// Drop just that one line; pass everything else through.
+for (const method of ['info', 'log'] as const) {
+  const original = console[method].bind(console);
+  console[method] = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('<Suspense> is an experimental feature')) {
+      return;
+    }
+    original(...args);
+  };
+}
+
 type FetchInput = string | Request | URL;
 type MockFetchResponse =
   | { data: { playerLevels: unknown[] } }

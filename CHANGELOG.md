@@ -1,3 +1,52 @@
+## [1.50.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.5...v1.50.6) (2026-06-30)
+
+
+### Performance Improvements
+
+* **config:** drop unused supporters and game_mode indexes ([#487](https://github.com/tarkovtracker-org/TarkovTracker/issues/487)) ([cef1746](https://github.com/tarkovtracker-org/TarkovTracker/commit/cef1746f3bcfc9f61633f629607cc1d5475d0f2d))
+
+## [1.50.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.4...v1.50.5) (2026-06-30)
+
+
+### Performance Improvements
+
+* **config:** drop unused idx_api_tokens_active index ([#485](https://github.com/tarkovtracker-org/TarkovTracker/issues/485)) ([6309eb6](https://github.com/tarkovtracker-org/TarkovTracker/commit/6309eb6f17dc8e434dc0a911a08bde5305c4a85c))
+
+## [1.50.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.3...v1.50.4) (2026-06-30)
+
+
+### Performance Improvements
+
+* **config:** optimize supporters and stripe_events RLS policies ([#484](https://github.com/tarkovtracker-org/TarkovTracker/issues/484)) ([1450314](https://github.com/tarkovtracker-org/TarkovTracker/commit/1450314c9107606dfddd444464a01809323aaa1e))
+
+## [1.50.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.2...v1.50.3) (2026-06-30)
+
+
+### Bug Fixes
+
+* **config:** add deny-all RLS policy on mutation_rate_limits ([#483](https://github.com/tarkovtracker-org/TarkovTracker/issues/483)) ([8821a21](https://github.com/tarkovtracker-org/TarkovTracker/commit/8821a2171240d7312a0adab0ec050a85fb315c81))
+
+## [1.50.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.1...v1.50.2) (2026-06-30)
+
+
+### Bug Fixes
+
+* **config:** harden SECURITY DEFINER functions and capture handle_new_user baseline ([#482](https://github.com/tarkovtracker-org/TarkovTracker/issues/482)) ([5fe69b2](https://github.com/tarkovtracker-org/TarkovTracker/commit/5fe69b266f97f44407107e14d2f0ee9912061024))
+
+## [1.50.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.0...v1.50.1) (2026-06-29)
+
+
+### Performance Improvements
+
+* **api:** skip kappa overlay polling while hidden ([#481](https://github.com/tarkovtracker-org/TarkovTracker/issues/481)) ([30066f8](https://github.com/tarkovtracker-org/TarkovTracker/commit/30066f82fb35e938e0ed1c4253bbc119088637fa))
+
+# [1.50.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.49.1...v1.50.0) (2026-06-29)
+
+
+### Features
+
+* add korean to supported locales ([#475](https://github.com/tarkovtracker-org/TarkovTracker/issues/475)) ([ddaa53b](https://github.com/tarkovtracker-org/TarkovTracker/commit/ddaa53bf92815fe7c56ef5323e473a6e1e40c6ef))
+
 ## [1.49.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.49.0...v1.49.1) (2026-06-24)
 
 
