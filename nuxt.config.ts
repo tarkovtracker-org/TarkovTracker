@@ -481,10 +481,6 @@ export default defineNuxtConfig({
         'pinia-plugin-persistedstate',
       ],
     },
-    define: {
-      // Suppress Suspense experimental feature warning
-      __VUE_PROD_SUSPENSE__: 'false',
-    },
     vue: {
       // Forwarded to @vitejs/plugin-vue
       template: {
