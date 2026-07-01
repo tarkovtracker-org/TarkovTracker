@@ -30,14 +30,40 @@
       </div>
       <div>
         <div class="flex items-end gap-1">
-          <span class="text-3xl font-bold text-white">{{ formattedMonthlyCharge }}</span>
+          <span class="text-4xl font-bold tracking-tight text-white">
+            {{ formattedMonthlyCharge }}
+          </span>
           <span class="text-surface-400 mb-1 text-sm">/mo</span>
         </div>
-        <p class="text-surface-500 mt-1 text-xs">
-          {{ priceBreakdown }}
-        </p>
-        <p v-if="interval !== 'monthly'" class="text-surface-500 mt-0.5 text-xs">
-          {{ billedNote }}
+        <dl
+          class="border-surface-700/50 bg-surface-800/40 mt-3 space-y-1.5 rounded-xl border px-3.5 py-3 text-sm"
+        >
+          <div
+            v-if="interval !== 'monthly'"
+            class="border-surface-700/50 flex items-center justify-between gap-2 border-b pb-1.5"
+          >
+            <dt class="text-surface-300">{{ billedLabel }}</dt>
+            <dd class="font-semibold text-white">{{ formattedChargeTotal }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <dt class="text-surface-400 text-xs">
+              {{ t('page.supporter.price_to_us', 'Goes to us') }}
+            </dt>
+            <dd class="text-surface-200 text-xs font-medium">{{ formattedToUs }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <dt class="text-surface-400 text-xs">
+              {{ t('page.supporter.price_stripe_fees', 'Stripe fees') }}
+            </dt>
+            <dd class="text-surface-200 text-xs font-medium">{{ formattedFees }}</dd>
+          </div>
+        </dl>
+        <p
+          v-if="savings > 0"
+          class="text-success-400 mt-2 flex items-center gap-1.5 text-xs font-medium"
+        >
+          <UIcon name="i-mdi-tag-outline" class="h-3.5 w-3.5 shrink-0" />
+          {{ savingsNote }}
         </p>
       </div>
       <ul class="flex-1 space-y-2">
@@ -53,9 +79,6 @@
           {{ perk }}
         </li>
       </ul>
-      <p v-if="!currentUserId" class="text-warning-400 text-xs">
-        {{ t('page.supporter.login_required_warning') }}
-      </p>
       <UAlert
         v-if="checkoutError"
         color="error"
@@ -79,13 +102,23 @@
         {{ t('page.supporter.manage_subscription_cta', 'Manage subscription') }}
       </UButton>
       <UButton
+        v-else-if="!currentUserId"
+        class="w-full justify-center font-semibold"
+        :color="tier.featured ? 'primary' : 'neutral'"
+        :variant="tier.featured ? 'solid' : 'soft'"
+        size="lg"
+        icon="i-mdi-login"
+        :to="loginLink"
+      >
+        {{ t('page.supporter.tier_login_cta', 'Log in to subscribe') }}
+      </UButton>
+      <UButton
         v-else
         class="w-full justify-center font-semibold"
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
         size="lg"
         :loading="checkoutLoading"
-        :disabled="!currentUserId"
         @click="handleCheckout"
       >
         {{
@@ -94,6 +127,9 @@
             : t('page.supporter.tier_cta')
         }}
       </UButton>
+      <p v-if="!currentUserId" class="text-warning-400 text-center text-xs">
+        {{ t('page.supporter.login_required_warning') }}
+      </p>
     </div>
   </div>
 </template>
@@ -122,6 +158,7 @@
   const checkoutError = ref<string | null>(null);
   const manageLoading = ref(false);
   const currentUserId = ref<string | null>(null);
+  const loginLink = '/login?redirect=/supporter';
   const isCurrentTier = computed(
     () => isActiveSubscriber.value && activeTier.value === props.tier.id
   );
@@ -148,19 +185,26 @@
   const months = computed(() => calcIntervalMonths(props.interval));
   const monthlyCharge = computed(() => chargeTotal.value / months.value);
   const formattedMonthlyCharge = computed(() => fmt.value.format(monthlyCharge.value));
-  const priceBreakdown = computed(() => {
-    const base = fmt.value.format(baseMonthly.value);
-    const fees = fmt.value.format(monthlyCharge.value - baseMonthly.value);
-    return t('page.supporter.price_breakdown', { base, fees });
+  const periodBase = computed(() => baseMonthly.value * months.value);
+  const intervalLabel = computed(() =>
+    props.interval === '6month'
+      ? t('page.supporter.billing_6month_interval', '6 months')
+      : t('page.supporter.billing_yearly_interval', 'year')
+  );
+  const formattedChargeTotal = computed(() => fmt.value.format(chargeTotal.value));
+  const formattedToUs = computed(() => fmt.value.format(periodBase.value));
+  const formattedFees = computed(() => fmt.value.format(chargeTotal.value - periodBase.value));
+  const billedLabel = computed(() =>
+    t('page.supporter.billed_every_label', { label: intervalLabel.value })
+  );
+  const savings = computed(() => {
+    if (props.interval === 'monthly') return 0;
+    const monthlyEquivalent = calcSubscriptionCharge(props.tier.baseMonthly, 'monthly');
+    return Math.max(0, monthlyEquivalent * months.value - chargeTotal.value);
   });
-  const billedNote = computed(() => {
-    const total = fmt.value.format(chargeTotal.value);
-    const label =
-      props.interval === '6month'
-        ? t('page.supporter.billing_6month_interval', '6 months')
-        : t('page.supporter.billing_yearly_interval', 'year');
-    return t('page.supporter.billed_note', { total, label });
-  });
+  const savingsNote = computed(() =>
+    t('page.supporter.savings_note', { amount: fmt.value.format(savings.value) })
+  );
   async function handleCheckout() {
     if (!currentUserId.value) return;
     checkoutLoading.value = true;
@@ -223,6 +267,9 @@
     const base = [
       t('page.supporter.perk_badge'),
       t('page.supporter.perk_discord'),
+      t('page.supporter.perk_tier_role', { tier: t(`page.supporter.tier_${props.tier.id}_name`) }),
+      t('page.supporter.perk_api_rate_limit'),
+      t('page.supporter.perk_data_retention'),
       t('page.supporter.perk_early_access'),
     ];
     if (props.tier.id === 'timmy' || props.tier.id === 'chad') {

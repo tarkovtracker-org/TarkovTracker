@@ -1,20 +1,20 @@
 <template>
   <div class="space-y-3">
-    <div class="border-warning-700/30 bg-warning-900/20 rounded-2xl border p-4">
+    <div class="border-surface-700/40 bg-surface-900/40 rounded-2xl border p-4">
       <div class="flex items-start gap-3">
-        <UIcon name="i-mdi-alert-circle-outline" class="text-warning-400 mt-0.5 h-5 w-5 shrink-0" />
+        <UIcon name="i-mdi-information-outline" class="text-surface-400 mt-0.5 h-5 w-5 shrink-0" />
         <div>
-          <h3 class="text-warning-300 text-sm font-semibold">
+          <h3 class="text-surface-200 text-sm font-semibold">
             {{ t('page.supporter.kofi_deprecation_title') }}
           </h3>
-          <p class="text-warning-400/80 mt-0.5 text-xs">
+          <p class="text-surface-400 mt-0.5 text-xs">
             {{ t('page.supporter.kofi_deprecation_detail') }}
           </p>
           <a
             href="https://ko-fi.com/dysektai"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-warning-400 hover:text-warning-300 mt-1.5 inline-block text-xs underline transition-colors"
+            class="text-surface-300 hover:text-surface-100 mt-1.5 inline-block text-xs underline transition-colors"
           >
             ko-fi.com/dysektai
           </a>

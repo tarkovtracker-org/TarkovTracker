@@ -1,35 +1,96 @@
 <template>
   <div class="border-surface-700/50 bg-surface-900/60 rounded-2xl border p-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
+    <div class="flex flex-col gap-6 sm:flex-row sm:items-stretch sm:justify-between">
+      <div class="flex flex-col sm:flex-1">
         <h3 class="text-base font-bold text-white">
           {{ t('page.supporter.one_time_title') }}
         </h3>
         <p class="text-surface-400 mt-1 text-sm">
           {{ t('page.supporter.one_time_subtitle', { min: formattedMinimum }) }}
         </p>
-        <p class="text-surface-500 mt-1 text-xs">
-          {{ oneTimeBreakdown }}
+        <p class="text-surface-300 mt-4 text-xs font-semibold tracking-wide uppercase">
+          {{ t('page.supporter.one_time_perks_heading', 'Includes supporter perks') }}
         </p>
-        <p v-if="!currentUserId" class="text-warning-400 mt-1 text-xs">
-          {{ t('page.supporter.login_required_warning') }}
+        <ul class="mt-2 space-y-2">
+          <li
+            v-for="perk in perks"
+            :key="perk.label"
+            class="text-surface-300 flex items-start gap-2 text-sm"
+          >
+            <UIcon :name="perk.icon" class="text-success-500 mt-0.5 h-4 w-4 shrink-0" />
+            {{ perk.label }}
+          </li>
+        </ul>
+        <p class="text-surface-500 mt-4 text-xs">
+          {{
+            t(
+              'page.supporter.one_time_fee_transparency',
+              'Stripe fees (2.9% + $0.30) are shown before you pay.'
+            )
+          }}
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <UInput
-          v-model="customAmount"
-          type="number"
-          :aria-label="
-            t('page.supporter.one_time_amount_label', 'One-time contribution amount in USD')
-          "
-          :min="ONE_TIME_BASE"
-          step="1"
-          :placeholder="String(ONE_TIME_BASE)"
-          class="w-24"
-          size="lg"
-        />
+      <div
+        class="border-surface-700/50 bg-surface-800/40 flex w-full flex-col gap-4 rounded-xl border p-4 sm:w-64"
+      >
+        <div class="flex flex-col gap-1.5">
+          <label :for="amountId" class="text-surface-300 text-xs font-semibold">
+            {{ t('page.supporter.one_time_amount_field_label', 'Contribution amount') }}
+          </label>
+          <UInput
+            :id="amountId"
+            v-model="customAmount"
+            type="text"
+            inputmode="decimal"
+            :aria-label="
+              t('page.supporter.one_time_amount_label', 'One-time contribution amount in USD')
+            "
+            :aria-invalid="!!amountError"
+            :aria-describedby="amountError ? amountErrorId : undefined"
+            :placeholder="ONE_TIME_BASE.toFixed(2)"
+            :color="amountError ? 'error' : 'neutral'"
+            :highlight="!!amountError"
+            size="lg"
+            class="w-full"
+            @blur="normalizeAmount"
+          >
+            <template #leading>
+              <span class="text-surface-400 text-sm font-medium">$</span>
+            </template>
+          </UInput>
+          <p v-if="amountError" :id="amountErrorId" class="text-error-500 text-xs">
+            {{ amountError }}
+          </p>
+        </div>
+        <label
+          class="hover:border-surface-600 flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/8 px-3 py-2 transition-colors"
+        >
+          <span class="flex flex-col">
+            <span class="text-surface-200 text-xs font-semibold">
+              {{ t('page.supporter.one_time_cover_fees', 'Cover Stripe fees') }}
+            </span>
+            <span class="text-surface-500 text-[11px]">
+              {{ t('page.supporter.one_time_fee_amount', { fees: formattedFee }) }}
+            </span>
+          </span>
+          <USwitch v-model="coverFees" size="sm" />
+        </label>
         <UButton
-          class="shrink-0 font-semibold"
+          v-if="!currentUserId"
+          block
+          class="font-semibold"
+          color="primary"
+          variant="solid"
+          size="lg"
+          icon="i-mdi-login"
+          :to="loginLink"
+        >
+          {{ t('page.supporter.one_time_login_cta', 'Log in to contribute') }}
+        </UButton>
+        <UButton
+          v-else
+          block
+          class="font-semibold"
           color="neutral"
           variant="soft"
           size="lg"
@@ -38,8 +99,14 @@
           icon="i-mdi-heart-outline"
           @click="handleCheckout"
         >
-          {{ t('page.supporter.one_time_cta') }}
+          {{ t('page.supporter.one_time_give_cta', { total: formattedOneTimeCharge }) }}
         </UButton>
+        <p v-if="!currentUserId" class="text-warning-400 text-center text-[11px]">
+          {{ t('page.supporter.login_required_warning') }}
+        </p>
+        <p v-else class="text-surface-500 text-center text-[11px]">
+          {{ t('page.supporter.one_time_net_note', { net: formattedNet }) }}
+        </p>
       </div>
     </div>
     <UAlert
@@ -56,16 +123,22 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { calcOneTimeCharge } from '@/features/supporter/supporterPricing';
+  import { calcOneTimeCharge, calcStripeFee } from '@/features/supporter/supporterPricing';
   import { logger } from '@/utils/logger';
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
   const { createCheckout, error: composableError } = useSupporter();
   const ONE_TIME_BASE = 3;
-  const customAmount = ref<string>(String(ONE_TIME_BASE));
+  const ONE_TIME_MAX = 500;
+  const amountId = useId();
+  const amountErrorId = useId();
+  const customAmount = ref<string>(ONE_TIME_BASE.toFixed(2));
+  const amountTouched = ref(false);
+  const coverFees = ref(true);
   const checkoutLoading = ref(false);
   const checkoutError = ref<string | null>(null);
   const currentUserId = ref<string | null>(null);
+  const loginLink = '/login?redirect=/supporter';
   onMounted(async () => {
     try {
       const { data } = await $supabase.client.auth.getUser();
@@ -76,10 +149,31 @@
     }
   });
   const numericAmount = computed(() => {
-    const val = Number(customAmount.value);
+    const val = Number.parseFloat(customAmount.value.replace(/[^0-9.]/g, ''));
     return Number.isFinite(val) ? val : 0;
   });
-  const isValid = computed(() => numericAmount.value >= ONE_TIME_BASE && !!currentUserId.value);
+  function normalizeAmount() {
+    amountTouched.value = true;
+    if (numericAmount.value > 0) {
+      customAmount.value = numericAmount.value.toFixed(2);
+    }
+  }
+  const amountError = computed(() => {
+    if (!amountTouched.value) return null;
+    if (numericAmount.value < ONE_TIME_BASE) {
+      return t('page.supporter.one_time_min_error', { min: formattedMinimum.value });
+    }
+    if (numericAmount.value > ONE_TIME_MAX) {
+      return t('page.supporter.one_time_max_error', { max: formattedMaximum.value });
+    }
+    return null;
+  });
+  const isValid = computed(
+    () =>
+      numericAmount.value >= ONE_TIME_BASE &&
+      numericAmount.value <= ONE_TIME_MAX &&
+      !!currentUserId.value
+  );
   const currencyFormatter = computed(
     () =>
       new Intl.NumberFormat(locale.value || 'en-US', {
@@ -88,14 +182,21 @@
       })
   );
   const formattedMinimum = computed(() => currencyFormatter.value.format(ONE_TIME_BASE));
-  const oneTimeCharge = computed(() => calcOneTimeCharge(numericAmount.value || ONE_TIME_BASE));
-  const oneTimeBreakdown = computed(() => {
-    const base = currencyFormatter.value.format(numericAmount.value || ONE_TIME_BASE);
-    const fees = currencyFormatter.value.format(
-      oneTimeCharge.value - (numericAmount.value || ONE_TIME_BASE)
-    );
-    return t('page.supporter.one_time_breakdown', { base, fees });
-  });
+  const formattedMaximum = computed(() => currencyFormatter.value.format(ONE_TIME_MAX));
+  const perks = computed(() => [
+    { icon: 'i-mdi-shield-star-outline', label: t('page.supporter.perk_badge') },
+    { icon: 'i-mdi-discord', label: t('page.supporter.perk_discord') },
+    { icon: 'i-mdi-calendar-clock', label: t('page.supporter.perk_data_retention') },
+  ]);
+  const baseAmount = computed(() => numericAmount.value || ONE_TIME_BASE);
+  const chargeAmount = computed(() =>
+    coverFees.value ? calcOneTimeCharge(baseAmount.value) : baseAmount.value
+  );
+  const feeAmount = computed(() => calcStripeFee(chargeAmount.value));
+  const netAmount = computed(() => chargeAmount.value - feeAmount.value);
+  const formattedOneTimeCharge = computed(() => currencyFormatter.value.format(chargeAmount.value));
+  const formattedFee = computed(() => currencyFormatter.value.format(feeAmount.value));
+  const formattedNet = computed(() => currencyFormatter.value.format(netAmount.value));
   async function handleCheckout() {
     if (!isValid.value || !currentUserId.value) return;
     checkoutLoading.value = true;
@@ -103,7 +204,7 @@
     try {
       const url = await createCheckout({
         mode: 'payment',
-        amount: oneTimeCharge.value,
+        amount: chargeAmount.value,
       });
       if (url) {
         window.location.href = url;

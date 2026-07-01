@@ -30,6 +30,9 @@ export function calcSubscriptionCharge(baseMonthly: number, interval: BillingInt
 export function calcOneTimeCharge(base: number): number {
   return passThrough(base, STRIPE_ONETIME_RATE, STRIPE_FIXED);
 }
+export function calcStripeFee(charge: number): number {
+  return charge * STRIPE_ONETIME_RATE + STRIPE_FIXED;
+}
 export function discountPercent(interval: BillingInterval): number {
   return Math.round(INTERVAL_DISCOUNT[interval] * 100);
 }

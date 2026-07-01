@@ -3,7 +3,7 @@
     <div class="prose prose-gray dark:prose-invert mx-auto max-w-4xl">
       <h1 class="mb-2 text-4xl font-bold">Privacy Policy</h1>
       <p class="text-surface-500 dark:text-surface-400 mb-12 text-sm">
-        Last Updated: March 8, 2026
+        Last Updated: June 30, 2026
       </p>
       <div class="space-y-12">
         <!-- INTRODUCTION -->
@@ -38,7 +38,7 @@
             <li class="leading-relaxed">
               <strong>Authentication Information:</strong>
               Email address, username, and profile information provided by third-party OAuth
-              providers (Discord, Google, etc.)
+              providers (Twitch, Discord, Google, GitHub, etc.)
             </li>
             <li class="leading-relaxed">
               <strong>Profile Data:</strong>
@@ -58,6 +58,13 @@
             <li class="leading-relaxed">
               <strong>User-Generated Content:</strong>
               Any content you voluntarily submit, post, or transmit through the Service
+            </li>
+            <li class="leading-relaxed">
+              <strong>Supporter & Payment Data:</strong>
+              If you make a contribution or subscribe, our third-party payment processor (Stripe)
+              handles your payment. We do not store your full card number; we retain limited records
+              such as your supporter status, tier, contribution history, and a processor customer or
+              transaction identifier needed to manage perks, renewals, refunds, and disputes
             </li>
           </ul>
           <h3 class="mt-6 mb-3 text-xl font-semibold">2.2 Information Collected Automatically</h3>
@@ -109,8 +116,8 @@
           <ul class="mb-4 ml-6 list-disc space-y-2">
             <li class="leading-relaxed">
               <strong>OAuth Providers:</strong>
-              Profile information, email addresses, and authentication tokens from Discord, Google,
-              or other supported providers
+              Profile information, email addresses, and authentication tokens from Twitch, Discord,
+              Google, GitHub, or other supported providers
             </li>
             <li class="leading-relaxed">
               <strong>Game Data Sources:</strong>
@@ -183,7 +190,8 @@
             </li>
             <li class="leading-relaxed">
               <strong>OAuth Providers:</strong>
-              Authentication credentials managed by Discord, Google, or other connected providers
+              Authentication credentials managed by Twitch, Discord, Google, GitHub, or other
+              connected providers
             </li>
           </ul>
           <h3 class="mt-6 mb-3 text-xl font-semibold">4.2 Security Measures</h3>
@@ -280,6 +288,10 @@
               <strong>OAuth Providers:</strong>
               Authentication and identity verification services
             </li>
+            <li class="leading-relaxed">
+              <strong>Stripe:</strong>
+              Payment processing for one-time contributions and supporter subscriptions
+            </li>
           </ul>
           <p class="mb-4 leading-relaxed">
             These providers have access to your data only to perform services on our behalf and are
@@ -372,10 +384,32 @@
             </li>
           </ul>
           <h3 class="mt-6 mb-3 text-xl font-semibold">6.3 Inactive Account Purging</h3>
+          <p class="mb-4 leading-relaxed">
+            To keep the Service performant and manage storage for active users, we reserve the right
+            to delete accounts and associated data after an extended period of inactivity:
+          </p>
+          <ul class="mb-4 ml-6 list-disc space-y-2">
+            <li class="leading-relaxed">
+              <strong>Standard accounts:</strong>
+              Data may be deleted after an extended period (for example, 6 or more consecutive
+              months) with no login activity.
+            </li>
+            <li class="leading-relaxed">
+              <strong>Supporter accounts:</strong>
+              As a supporter perk, data may be retained for a longer period before an inactive
+              account becomes eligible for deletion. This extended retention applies while your
+              supporter status or paid retention window is active.
+            </li>
+          </ul>
+          <p class="mb-4 leading-relaxed">
+            Where feasible, we will make reasonable efforts to notify you via the email associated
+            with your account before deletion. These retention windows and practices may change over
+            time; any changes will be reflected in this Privacy Policy.
+          </p>
           <p class="leading-relaxed">
-            Accounts with no login activity for 12 consecutive months may be deleted to manage
-            database resources. We will make reasonable efforts to notify you via the email
-            associated with your account at least 30 days before deletion.
+            You can export a complete backup of your profile and progress data at any time from the
+            Service settings (JSON export). We encourage you to keep your own backup if you expect a
+            long period of inactivity, as deletion is permanent and cannot be reversed.
           </p>
         </section>
         <!-- YOUR RIGHTS AND CHOICES -->
@@ -399,7 +433,7 @@
               Editing your profile directly through the Service interface
             </li>
             <li class="leading-relaxed">
-              Updating information with your OAuth provider (Discord, Google, etc.)
+              Updating information with your OAuth provider (Twitch, Discord, Google, GitHub, etc.)
             </li>
             <li class="leading-relaxed">
               Contacting us at support@tarkovtracker.org for assistance
@@ -441,8 +475,12 @@
               and objection
             </li>
             <li class="leading-relaxed">
-              <strong>CCPA (California):</strong>
-              Right to know, delete, opt-out of sale (we do not sell data), and non-discrimination
+              <strong>US State Privacy Laws:</strong>
+              Depending on your state of residence, laws such as the CCPA/CPRA (California), VCDPA
+              (Virginia), CPA (Colorado), CTDPA (Connecticut), UCPA (Utah), and similar state laws
+              may grant rights to know, access, correct, delete, and opt out of the sale or sharing
+              of personal information (we do not sell your data), and non-discrimination for
+              exercising these rights
             </li>
             <li class="leading-relaxed">
               <strong>Other Jurisdictions:</strong>
@@ -459,7 +497,10 @@
           <h2 class="mb-4 text-2xl font-bold">8. Children's Privacy</h2>
           <p class="mb-4 leading-relaxed">
             Our Service is not intended for children under 13 years of age (or the minimum age in
-            your jurisdiction). We do not knowingly collect personal information from children.
+            your jurisdiction). Where applicable law sets a higher minimum age for consenting to the
+            processing of personal data (for example, up to 16 in parts of the European Economic
+            Area), that higher age applies. We do not knowingly collect personal information from
+            children below the applicable age.
           </p>
           <p class="mb-4 leading-relaxed">
             If you are a parent or guardian and believe your child has provided us with personal
@@ -510,6 +551,17 @@
                 class="text-link hover:text-link-hover underline"
               >
                 discord.com/privacy
+              </a>
+            </li>
+            <li class="leading-relaxed">
+              <strong>Stripe:</strong>
+              <a
+                href="https://stripe.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-link hover:text-link-hover underline"
+              >
+                stripe.com/privacy
               </a>
             </li>
             <li class="leading-relaxed">

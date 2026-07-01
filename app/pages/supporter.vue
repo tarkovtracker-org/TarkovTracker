@@ -16,13 +16,6 @@
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SupporterTierCard v-for="tier in TIERS" :key="tier.id" :tier="tier" :interval="interval" />
       </div>
-      <UAlert
-        icon="i-mdi-information-outline"
-        color="info"
-        variant="soft"
-        :title="t('page.supporter.transparency_note')"
-        :description="t('page.supporter.transparency_detail')"
-      />
       <SupporterOneTime />
       <SupporterAltPayments />
     </div>

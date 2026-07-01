@@ -4,7 +4,7 @@
     title: 'Terms of Service',
     description: 'TarkovTracker terms of service and usage guidelines.',
   });
-  const lastUpdated = 'March 8, 2026';
+  const lastUpdated = 'June 30, 2026';
   const ACTIVE_SECTION_OFFSET = 160;
   const toc = [
     { id: 'acceptance', title: '1. Acceptance of Terms' },
@@ -22,8 +22,10 @@
     { id: 'termination', title: '13. Termination' },
     { id: 'disputes', title: '14. Dispute Resolution and Governing Law' },
     { id: 'misc', title: '15. Miscellaneous Provisions' },
-    { id: 'contact', title: '16. Contact Information' },
-    { id: 'acknowledgment', title: '17. Acknowledgment' },
+    { id: 'supporter', title: '16. Supporter Contributions and Perks' },
+    { id: 'refunds', title: '17. Refunds, Disputes, and Chargebacks' },
+    { id: 'contact', title: '18. Contact Information' },
+    { id: 'acknowledgment', title: '19. Acknowledgment' },
   ];
   const activeId = ref(toc[0]?.id || 'acceptance');
   let scrollRoot: HTMLElement | null = null;
@@ -152,18 +154,21 @@
               <h3 class="mb-2 text-xl font-semibold">2.1 Age Requirements</h3>
               <p class="mb-3 leading-relaxed">
                 You must be at least 13 years of age (or the minimum legal age in your jurisdiction,
-                whichever is greater) to use this Service. If you are under 18 years of age (or the
-                age of majority in your jurisdiction), you may only use the Service under the
+                whichever is greater) to use this Service. Where applicable law (such as the GDPR in
+                parts of the European Economic Area) sets a higher minimum age for consenting to the
+                processing of personal data (up to 16), you must meet that higher age or have the
+                consent of a parent or legal guardian. If you are under 18 years of age (or the age
+                of majority in your jurisdiction), you may only use the Service under the
                 supervision of a parent or legal guardian who agrees to be bound by these Terms.
               </p>
               <h3 class="mb-2 text-xl font-semibold">2.2 Account Authentication</h3>
               <p class="mb-3 leading-relaxed">
                 Access to certain features of the Service requires authentication through
-                third-party OAuth providers (including but not limited to Discord, Google, or other
-                supported providers via Supabase authentication). By authenticating through these
-                providers, you authorize us to access certain information from your account as
-                permitted by the provider and you agree to be bound by the respective provider's
-                terms of service.
+                third-party OAuth providers (including but not limited to Twitch, Discord, Google,
+                GitHub, or other supported providers via Supabase authentication). By authenticating
+                through these providers, you authorize us to access certain information from your
+                account as permitted by the provider and you agree to be bound by the respective
+                provider's terms of service.
               </p>
               <h3 class="mb-2 text-xl font-semibold">2.3 Account Security</h3>
               <p class="leading-relaxed">
@@ -450,7 +455,11 @@
                 </li>
                 <li class="leading-relaxed">
                   <strong>OAuth Providers:</strong>
-                  Discord, Google, and other third-party authentication services
+                  Twitch, Discord, Google, GitHub, and other third-party authentication services
+                </li>
+                <li class="leading-relaxed">
+                  <strong>Stripe:</strong>
+                  Payment processing for one-time contributions and supporter subscriptions
                 </li>
                 <li class="leading-relaxed">
                   <strong>Google Analytics:</strong>
@@ -684,11 +693,14 @@
               <ul class="mb-4 ml-6 list-disc space-y-2">
                 <li class="leading-relaxed">Violation of these Terms</li>
                 <li class="leading-relaxed">Fraudulent, abusive, or illegal activity</li>
-                <li class="leading-relaxed">Prolonged inactivity</li>
                 <li class="leading-relaxed">
-                  Extended periods of inactivity (defined as no login for a period exceeding 12
-                  consecutive months). We will make reasonable efforts to notify you via the email
-                  associated with your account prior to such deletion
+                  Extended inactivity. We reserve the right to delete accounts and associated data
+                  after an extended period with no login activity (for example, 6 or more
+                  consecutive months for standard accounts, and a longer window for active
+                  supporters or accounts within a paid supporter retention window). Where feasible,
+                  we will make reasonable efforts to notify you in advance via the email associated
+                  with your account, and you may export a full backup of your profile data at any
+                  time from the Service settings
                 </li>
                 <li class="leading-relaxed">Technical or security concerns</li>
                 <li class="leading-relaxed">Discontinuation of the Service</li>
@@ -722,13 +734,13 @@
               <h3 class="mt-6 mb-3 text-xl font-semibold">14.3 Arbitration</h3>
               <p class="mb-4 leading-relaxed">
                 If informal resolution is unsuccessful, any dispute shall be resolved through
-                binding arbitration in accordance with the Commercial Arbitration Rules of the
-                American Arbitration Association (AAA). The arbitration shall be conducted in
-                English in the State of Florida (or remotely via videoconference by mutual
-                agreement). Each party shall bear its own costs and fees, except that the filing
-                fees shall be paid by the party initiating the arbitration. The arbitrator's
-                decision shall be final and binding, and judgment may be entered in any court of
-                competent jurisdiction.
+                binding arbitration administered by the American Arbitration Association (AAA) under
+                its Consumer Arbitration Rules (or, where those rules do not apply, its Commercial
+                Arbitration Rules). The arbitration shall be conducted in English in the State of
+                Florida (or remotely via videoconference by mutual agreement). Each party shall bear
+                its own costs and fees, except that the filing fees shall be paid by the party
+                initiating the arbitration. The arbitrator's decision shall be final and binding,
+                and judgment may be entered in any court of competent jurisdiction.
               </p>
               <h3 class="mt-6 mb-3 text-xl font-semibold">14.4 Class Action Waiver</h3>
               <p class="leading-relaxed">
@@ -785,9 +797,125 @@
                 version, the English version shall prevail.
               </p>
             </section>
-            <!-- 16. CONTACT INFORMATION -->
+            <!-- 16. SUPPORTER CONTRIBUTIONS -->
+            <section id="supporter">
+              <h2 class="mb-4 text-2xl font-bold">16. Supporter Contributions and Perks</h2>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">16.1 Nature of Contributions</h3>
+              <p class="mb-4 leading-relaxed">
+                TarkovTracker is a free, open-source project. One-time contributions and recurring
+                supporter subscriptions are voluntary payments made to support the ongoing
+                development, hosting, and maintenance of the Service. They are
+                <strong>not</strong>
+                a purchase of the Service itself, and the core Service remains available to all
+                users free of charge. Contributions do not create an employment, agency,
+                partnership, or investment relationship of any kind.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">16.2 Supporter Perks</h3>
+              <p class="mb-4 leading-relaxed">
+                As a token of appreciation, supporters may receive certain non-essential perks,
+                which currently may include:
+              </p>
+              <ul class="mb-4 ml-6 list-disc space-y-2">
+                <li class="leading-relaxed">A supporter badge displayed on your profile</li>
+                <li class="leading-relaxed">
+                  A supporter role in our associated Discord server. Once granted, this role is
+                  retained regardless of whether your support was a one-time contribution or a
+                  subscription, and it does not lapse if a subscription later ends
+                </li>
+                <li class="leading-relaxed">
+                  For recurring supporter subscriptions, an additional tier-specific Discord role
+                  reflecting your tier (for example, "Scav Tier," "Timmy Tier," or "Chad Tier").
+                  This feature is under development and may not yet be available
+                </li>
+                <li class="leading-relaxed">
+                  Higher API rate limits than standard accounts (recurring supporter subscriptions
+                  only)
+                </li>
+                <li class="leading-relaxed">
+                  If and when we delete inactive accounts, a longer data-retention window than
+                  standard accounts before an inactive supporter account becomes eligible for
+                  deletion (as described in Section 13 and the Privacy Policy)
+                </li>
+                <li class="leading-relaxed">
+                  Other perks we may offer, adjust, or discontinue from time to time
+                </li>
+              </ul>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">16.3 No Guarantees</h3>
+              <p class="mb-4 leading-relaxed">
+                Supporter perks are provided on an "as is" and "as available" basis as a courtesy,
+                not as a paid product or guaranteed service. We make no guarantee regarding the
+                continued availability, functionality, value, or existence of any perk. Perks are
+                non-transferable, hold no cash value, and may depend on third-party services
+                (including Discord) that are outside our control. Nothing in this Section limits the
+                disclaimers and limitations of liability set out in Sections 9 and 10.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">16.4 Changes to Pricing and Perks</h3>
+              <p class="mb-4 leading-relaxed">
+                We may change contribution amounts, subscription pricing, and the perks associated
+                with any tier at any time. We will make reasonable efforts to notify affected
+                supporters of material changes in advance (for example, through the Service
+                interface, email, or our community channels), but we are not obligated to maintain
+                any particular price or perk. Changes to recurring subscription pricing will apply
+                to renewals occurring after the change takes effect; you may cancel a subscription
+                before its next renewal if you do not agree to a change.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">16.5 Payment Processing</h3>
+              <p class="leading-relaxed">
+                Contributions and subscriptions are processed by our third-party payment processor
+                (Stripe). We do not store your full payment card details. Your use of the payment
+                process is also subject to the payment processor's own terms and privacy policy. You
+                represent that you are authorized to use any payment method you provide.
+              </p>
+            </section>
+            <!-- 17. REFUNDS, DISPUTES, AND CHARGEBACKS -->
+            <section id="refunds">
+              <h2 class="mb-4 text-2xl font-bold">17. Refunds, Disputes, and Chargebacks</h2>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">17.1 General No-Refund Policy</h3>
+              <p class="mb-4 leading-relaxed">
+                Because contributions and subscriptions are voluntary payments in support of
+                development rather than the purchase of a product, all payments are generally
+                <strong>non-refundable</strong>
+                , except where a refund is required by applicable law. By making a contribution, you
+                acknowledge that you are not entitled to a refund simply because you stop using the
+                Service, a perk changes, or the Service is modified or discontinued.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">17.2 Discretionary Refunds</h3>
+              <p class="mb-4 leading-relaxed">
+                We may, at our sole discretion, grant refunds on a case-by-case basis (for example,
+                in the event of a duplicate or clearly accidental charge, or a proven billing
+                error). To request a refund, contact us at support@tarkovtracker.org with your
+                account details and a description of the issue. Granting a refund in one case does
+                not obligate us to do so in any other case. Where applicable law grants you a
+                statutory right to a refund or cancellation, nothing in this Section limits that
+                right.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">17.3 Subscription Cancellation</h3>
+              <p class="mb-4 leading-relaxed">
+                You may cancel a recurring supporter subscription at any time through the billing
+                portal or by contacting us. Cancellation stops future renewals; it does not
+                retroactively refund amounts already paid for the current or prior billing periods,
+                and your supporter perks generally remain active until the end of the period you
+                have already paid for.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">17.4 Chargebacks and Payment Disputes</h3>
+              <p class="mb-4 leading-relaxed">
+                If you believe a charge is incorrect, we ask that you contact us first at
+                support@tarkovtracker.org so we can try to resolve it directly and avoid dispute
+                fees. Initiating a chargeback or payment dispute without first contacting us may
+                result in the suspension or permanent termination of your account and access to the
+                Service, including any supporter perks, at our discretion. This does not restrict
+                your rights under applicable law or the rules of your card network or payment
+                provider.
+              </p>
+              <h3 class="mt-6 mb-3 text-xl font-semibold">17.5 Failed or Reversed Payments</h3>
+              <p class="leading-relaxed">
+                If a payment fails, is reversed, or is charged back, we may revoke the associated
+                supporter perks and any access granted on the basis of that payment.
+              </p>
+            </section>
+            <!-- 18. CONTACT INFORMATION -->
             <section id="contact">
-              <h2 class="mb-4 text-2xl font-bold">16. Contact Information</h2>
+              <h2 class="mb-4 text-2xl font-bold">18. Contact Information</h2>
               <p class="mb-4 leading-relaxed">
                 If you have any questions, concerns, or requests regarding these Terms or the
                 Service, please contact us through:
@@ -832,9 +960,9 @@
                 issues.
               </p>
             </section>
-            <!-- 17. ACKNOWLEDGMENT -->
+            <!-- 19. ACKNOWLEDGMENT -->
             <section id="acknowledgment">
-              <h2 class="mb-4 text-2xl font-bold">17. Acknowledgment</h2>
+              <h2 class="mb-4 text-2xl font-bold">19. Acknowledgment</h2>
               <p class="mb-4 leading-relaxed">
                 BY ACCESSING OR USING THE SERVICE, YOU ACKNOWLEDGE THAT YOU HAVE READ THESE TERMS OF
                 SERVICE, UNDERSTAND THEM, AND AGREE TO BE BOUND BY THEM. IF YOU DO NOT AGREE TO
@@ -857,6 +985,10 @@
                 </li>
                 <li class="leading-relaxed">
                   You are responsible for compliance with all applicable terms of service and laws
+                </li>
+                <li class="leading-relaxed">
+                  Supporter contributions are voluntary, non-refundable except as described in
+                  Section 17 or required by law, and grant perks that may change over time
                 </li>
               </ul>
               <p class="leading-relaxed font-bold">

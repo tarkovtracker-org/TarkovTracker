@@ -1,5 +1,7 @@
 <template>
-  <div class="bg-surface-800/60 flex items-center justify-center gap-1 rounded-full p-1">
+  <div
+    class="bg-surface-800/60 ring-surface-700/40 flex items-center justify-center gap-1 rounded-full p-1 ring-1"
+  >
     <button
       v-for="opt in options"
       :key="opt.value"
@@ -8,7 +10,7 @@
       class="relative flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-200"
       :class="
         modelValue === opt.value
-          ? 'bg-primary-600 text-white shadow'
+          ? 'bg-primary-600 text-white shadow-md'
           : 'text-surface-300 hover:text-white'
       "
       @click="emit('update:modelValue', opt.value)"
@@ -16,7 +18,10 @@
       {{ opt.label }}
       <span
         v-if="opt.discount"
-        class="bg-success-500/20 text-success-400 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+        class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+        :class="
+          modelValue === opt.value ? 'bg-white/20 text-white' : 'bg-success-500/20 text-success-400'
+        "
       >
         -{{ opt.discount }}%
       </span>
