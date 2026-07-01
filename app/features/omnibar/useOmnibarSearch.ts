@@ -1,5 +1,6 @@
 import { refDebounced } from '@vueuse/core';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { getTaskRewardItems } from '@/utils/taskRewards';
 import type { ComputedRef, Ref } from '#imports';
 import type { Task, TarkovItem, HideoutStation } from '@/types/tarkov';
 export interface SearchResult {
@@ -8,11 +9,7 @@ export interface SearchResult {
   hideout: HideoutStation[];
 }
 const taskRewardsMatchQuery = (task: Task, query: string): boolean => {
-  const rewardItems = [
-    ...(task.finishRewards?.items?.map((reward) => reward.item) ?? []),
-    ...(task.finishRewards?.offerUnlock?.map((reward) => reward.item) ?? []),
-  ];
-  return rewardItems.some(
+  return getTaskRewardItems(task).some(
     (item) =>
       item.name?.toLowerCase().includes(query) ||
       item.shortName?.toLowerCase().includes(query) ||

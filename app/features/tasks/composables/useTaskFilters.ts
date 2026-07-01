@@ -2,6 +2,7 @@ import { debounce, isDebounceRejection } from '@/utils/debounce';
 import { fuzzyMatchScore } from '@/utils/fuzzySearch';
 import { logger } from '@/utils/logger';
 import { getQueryString } from '@/utils/routeHelpers';
+import { getTaskRewardItems } from '@/utils/taskRewards';
 import type { Task } from '@/types/tarkov';
 import type { TaskFilterAndSortOptions } from '@/types/taskFilter';
 type RefLike<T> = { value: T };
@@ -22,10 +23,7 @@ type TaskFilterInputs = {
   visibleTasks: RefLike<Task[]>;
 };
 const getTaskRewardItemSearchText = (task: Task): string => {
-  return [
-    ...(task.finishRewards?.items?.map((reward) => reward.item) ?? []),
-    ...(task.finishRewards?.offerUnlock?.map((reward) => reward.item) ?? []),
-  ]
+  return getTaskRewardItems(task)
     .flatMap((item) => [item.name, item.shortName, item.normalizedName])
     .filter((value): value is string => Boolean(value))
     .join(' ');
