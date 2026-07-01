@@ -8,9 +8,19 @@ const routeState = reactive({
   query: reactive<Record<string, string | undefined>>({}),
 });
 mockNuxtImport('useRoute', () => () => routeState);
-const createTask = (id: string, name: string): Task =>
+const createTask = (id: string, name: string, rewardName?: string): Task =>
   ({
     experience: 0,
+    finishRewards: rewardName
+      ? {
+          items: [
+            {
+              count: 1,
+              item: { id: `${id}-reward`, name: rewardName },
+            },
+          ],
+        }
+      : undefined,
     id,
     kappaRequired: false,
     lightkeeperRequired: false,
@@ -29,6 +39,10 @@ describe('useTaskFilters', () => {
   it('keeps list order when search query is empty', () => {
     const tasks = [createTask('a', 'First'), createTask('b', 'Second')];
     expect(applySearchToTaskList(tasks, '')).toEqual(tasks);
+  });
+  it('matches task completion reward items', () => {
+    const tasks = [createTask('a', 'First'), createTask('b', 'Second', 'Graphics card')];
+    expect(applySearchToTaskList(tasks, 'graphics').map((task) => task.id)).toEqual(['b']);
   });
   it('updates debounced search state and filtered tasks', async () => {
     vi.useFakeTimers();

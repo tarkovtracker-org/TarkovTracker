@@ -21,12 +21,27 @@ type TaskFilterInputs = {
   tasks: RefLike<Task[]>;
   visibleTasks: RefLike<Task[]>;
 };
+const getTaskRewardItemSearchText = (task: Task): string => {
+  return [
+    ...(task.finishRewards?.items?.map((reward) => reward.item) ?? []),
+    ...(task.finishRewards?.offerUnlock?.map((reward) => reward.item) ?? []),
+  ]
+    .flatMap((item) => [item.name, item.shortName, item.normalizedName])
+    .filter((value): value is string => Boolean(value))
+    .join(' ');
+};
+const getTaskSearchScore = (task: Task, query: string): number => {
+  return Math.max(
+    fuzzyMatchScore(task.name ?? '', query),
+    fuzzyMatchScore(getTaskRewardItemSearchText(task), query)
+  );
+};
 export const applySearchToTaskList = (taskList: Task[], query: string): Task[] => {
   if (!query) return taskList;
   return taskList
     .map((task) => ({
       task,
-      score: fuzzyMatchScore(task.name ?? '', query),
+      score: getTaskSearchScore(task, query),
     }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)

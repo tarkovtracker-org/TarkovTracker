@@ -7,6 +7,18 @@ export interface SearchResult {
   items: TarkovItem[];
   hideout: HideoutStation[];
 }
+const taskRewardsMatchQuery = (task: Task, query: string): boolean => {
+  const rewardItems = [
+    ...(task.finishRewards?.items?.map((reward) => reward.item) ?? []),
+    ...(task.finishRewards?.offerUnlock?.map((reward) => reward.item) ?? []),
+  ];
+  return rewardItems.some(
+    (item) =>
+      item.name?.toLowerCase().includes(query) ||
+      item.shortName?.toLowerCase().includes(query) ||
+      item.normalizedName?.toLowerCase().includes(query)
+  );
+};
 export function useOmnibarSearch(): {
   searchQuery: Ref<string>;
   results: ComputedRef<SearchResult>;
@@ -26,7 +38,8 @@ export function useOmnibarSearch(): {
       (task) =>
         task.name?.toLowerCase().includes(query) ||
         task.map?.name?.toLowerCase().includes(query) ||
-        task.trader?.name?.toLowerCase().includes(query)
+        task.trader?.name?.toLowerCase().includes(query) ||
+        taskRewardsMatchQuery(task, query)
     );
     // 2. Search Items
     const matchedItems = metadataStore.items.filter(
