@@ -76,7 +76,7 @@
           <USwitch v-model="coverFees" size="sm" />
         </label>
         <UButton
-          v-if="!currentUserId"
+          v-if="authResolved && !currentUserId"
           block
           class="font-semibold"
           color="primary"
@@ -101,7 +101,7 @@
         >
           {{ t('page.supporter.one_time_give_cta', { total: formattedOneTimeCharge }) }}
         </UButton>
-        <p v-if="!currentUserId" class="text-warning-400 text-center text-[11px]">
+        <p v-if="authResolved && !currentUserId" class="text-warning-400 text-center text-[11px]">
           {{ t('page.supporter.login_required_warning') }}
         </p>
         <p v-else class="text-surface-500 text-center text-[11px]">
@@ -123,7 +123,11 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { calcOneTimeCharge, calcStripeFee } from '@/features/supporter/supporterPricing';
+  import {
+    calcOneTimeCharge,
+    calcStripeFee,
+    parseContributionAmount,
+  } from '@/features/supporter/supporterPricing';
   import { logger } from '@/utils/logger';
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
@@ -138,6 +142,7 @@
   const checkoutLoading = ref(false);
   const checkoutError = ref<string | null>(null);
   const currentUserId = ref<string | null>(null);
+  const authResolved = ref(false);
   const loginLink = '/login?redirect=/supporter';
   onMounted(async () => {
     try {
@@ -146,12 +151,11 @@
     } catch (err) {
       logger.error('SupporterOneTime: failed to load auth user', err);
       currentUserId.value = null;
+    } finally {
+      authResolved.value = true;
     }
   });
-  const numericAmount = computed(() => {
-    const val = Number.parseFloat(customAmount.value.replace(/[^0-9.]/g, ''));
-    return Number.isFinite(val) ? val : 0;
-  });
+  const numericAmount = computed(() => parseContributionAmount(customAmount.value));
   function normalizeAmount() {
     amountTouched.value = true;
     if (numericAmount.value > 0) {
@@ -160,6 +164,9 @@
   }
   const amountError = computed(() => {
     if (!amountTouched.value) return null;
+    if (!Number.isFinite(numericAmount.value)) {
+      return t('page.supporter.one_time_invalid_error', 'Enter a valid amount');
+    }
     if (numericAmount.value < ONE_TIME_BASE) {
       return t('page.supporter.one_time_min_error', { min: formattedMinimum.value });
     }

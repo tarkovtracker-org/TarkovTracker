@@ -6,6 +6,7 @@ import {
   calcStripeFee,
   calcSubscriptionCharge,
   discountPercent,
+  parseContributionAmount,
   STRIPE_FIXED,
   STRIPE_ONETIME_RATE,
   TIERS,
@@ -86,6 +87,21 @@ describe('supporterPricing', () => {
       const base = 3;
       const charge = calcOneTimeCharge(base);
       expect(charge - calcStripeFee(charge)).toBeGreaterThanOrEqual(base - 0.01);
+    });
+  });
+  describe('parseContributionAmount', () => {
+    it('parses plain and two-decimal amounts', () => {
+      expect(parseContributionAmount('3')).toBe(3);
+      expect(parseContributionAmount('12.50')).toBe(12.5);
+      expect(parseContributionAmount('  7.05 ')).toBe(7.05);
+    });
+    it('rejects malformed decimals instead of silently truncating', () => {
+      expect(parseContributionAmount('12.34.56')).toBeNaN();
+      expect(parseContributionAmount('12.999')).toBeNaN();
+      expect(parseContributionAmount('1,000')).toBeNaN();
+      expect(parseContributionAmount('abc')).toBeNaN();
+      expect(parseContributionAmount('')).toBeNaN();
+      expect(parseContributionAmount('-5')).toBeNaN();
     });
   });
 });

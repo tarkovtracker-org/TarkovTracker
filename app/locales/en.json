@@ -759,6 +759,7 @@
       "one_time_fee_amount": "{fees} in fees",
       "one_time_amount_field_label": "Contribution amount",
       "one_time_min_error": "{min} minimum",
+      "one_time_invalid_error": "Enter a valid amount",
       "one_time_max_error": "{max} maximum",
       "one_time_give_cta": "Give {total}",
       "one_time_login_cta": "Log in to contribute",

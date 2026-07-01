@@ -102,7 +102,7 @@
         {{ t('page.supporter.manage_subscription_cta', 'Manage subscription') }}
       </UButton>
       <UButton
-        v-else-if="!currentUserId"
+        v-else-if="authResolved && !currentUserId"
         class="w-full justify-center font-semibold"
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
@@ -127,7 +127,7 @@
             : t('page.supporter.tier_cta')
         }}
       </UButton>
-      <p v-if="!currentUserId" class="text-warning-400 text-center text-xs">
+      <p v-if="authResolved && !currentUserId" class="text-warning-400 text-center text-xs">
         {{ t('page.supporter.login_required_warning') }}
       </p>
     </div>
@@ -158,6 +158,7 @@
   const checkoutError = ref<string | null>(null);
   const manageLoading = ref(false);
   const currentUserId = ref<string | null>(null);
+  const authResolved = ref(false);
   const loginLink = '/login?redirect=/supporter';
   const isCurrentTier = computed(
     () => isActiveSubscriber.value && activeTier.value === props.tier.id
@@ -169,6 +170,8 @@
     } catch (err) {
       logger.error('SupporterTierCard: failed to load auth user', err);
       currentUserId.value = null;
+    } finally {
+      authResolved.value = true;
     }
   });
   const fmt = computed(
