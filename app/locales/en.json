@@ -770,6 +770,7 @@
       "perk_data_retention": "Extended inactive account retention",
       "login_required_warning": "You must be logged in to receive supporter perks.",
       "price_to_us": "Goes to us",
+      "price_per_month_suffix": "/mo",
       "price_stripe_fees": "Stripe fees",
       "billed_every_label": "Billed every {label}",
       "savings_note": "You save {amount} vs. monthly",

@@ -33,7 +33,9 @@
           <span class="text-4xl font-bold tracking-tight text-white">
             {{ formattedMonthlyCharge }}
           </span>
-          <span class="text-surface-400 mb-1 text-sm">/mo</span>
+          <span class="text-surface-400 mb-1 text-sm">
+            {{ t('page.supporter.price_per_month_suffix', '/mo') }}
+          </span>
         </div>
         <dl
           class="border-surface-700/50 bg-surface-800/40 mt-3 space-y-1.5 rounded-xl border px-3.5 py-3 text-sm"
@@ -118,7 +120,8 @@
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
         size="lg"
-        :loading="checkoutLoading"
+        :loading="checkoutLoading || !authResolved"
+        :disabled="!authResolved"
         @click="handleCheckout"
       >
         {{
@@ -128,7 +131,12 @@
         }}
       </UButton>
       <p v-if="authResolved && !currentUserId" class="text-warning-400 text-center text-xs">
-        {{ t('page.supporter.login_required_warning') }}
+        {{
+          t(
+            'page.supporter.login_required_warning',
+            'You must be logged in to receive supporter perks.'
+          )
+        }}
       </p>
     </div>
   </div>
@@ -196,7 +204,10 @@
   );
   const formattedChargeTotal = computed(() => fmt.value.format(chargeTotal.value));
   const formattedToUs = computed(() => fmt.value.format(periodBase.value));
-  const formattedFees = computed(() => fmt.value.format(chargeTotal.value - periodBase.value));
+  const formattedFees = computed(() => {
+    const fees = chargeTotal.value - periodBase.value;
+    return fmt.value.format(Math.abs(fees) < 0.005 ? 0 : fees);
+  });
   const billedLabel = computed(() =>
     t('page.supporter.billed_every_label', { label: intervalLabel.value })
   );
@@ -271,8 +282,8 @@
       t('page.supporter.perk_badge'),
       t('page.supporter.perk_discord'),
       t('page.supporter.perk_tier_role', { tier: t(`page.supporter.tier_${props.tier.id}_name`) }),
-      t('page.supporter.perk_api_rate_limit'),
-      t('page.supporter.perk_data_retention'),
+      t('page.supporter.perk_api_rate_limit', 'Higher API rate limits'),
+      t('page.supporter.perk_data_retention', 'Extended inactive account retention'),
       t('page.supporter.perk_early_access'),
     ];
     if (props.tier.id === 'timmy' || props.tier.id === 'chad') {

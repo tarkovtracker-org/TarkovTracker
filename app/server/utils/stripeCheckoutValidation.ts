@@ -68,7 +68,11 @@ export function validateOneTimeAmount(amount: number | undefined): number {
   if (!Number.isFinite(amountFloat)) {
     throw createError({ statusCode: 400, message: 'Invalid amount' });
   }
-  const amountCents = Math.round(amountFloat * 100);
+  const amountCentsExact = amountFloat * 100;
+  if (Math.abs(amountCentsExact - Math.round(amountCentsExact)) > 1e-9) {
+    throw createError({ statusCode: 400, message: 'Amount must be in whole cents' });
+  }
+  const amountCents = Math.round(amountCentsExact);
   if (amountCents < MIN_ONE_TIME_CENTS) {
     throw createError({
       statusCode: 400,

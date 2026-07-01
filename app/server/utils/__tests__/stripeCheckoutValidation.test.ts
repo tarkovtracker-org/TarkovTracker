@@ -67,9 +67,14 @@ describe('validateOneTimeAmount', () => {
     expectH3Error(() => validateOneTimeAmount(Number.POSITIVE_INFINITY), 400);
     expectH3Error(() => validateOneTimeAmount(Number.NaN), 400);
   });
-  it('returns rounded cents inside the allowed band', () => {
+  it('returns cents for whole-cent amounts inside the allowed band', () => {
     expect(validateOneTimeAmount(MIN_ONE_TIME_CENTS / 100)).toBe(MIN_ONE_TIME_CENTS);
     expect(validateOneTimeAmount(MAX_ONE_TIME_CENTS / 100)).toBe(MAX_ONE_TIME_CENTS);
-    expect(validateOneTimeAmount(7.005)).toBe(701);
+    expect(validateOneTimeAmount(7.05)).toBe(705);
+  });
+  it('rejects sub-cent amounts instead of rounding them', () => {
+    expectH3Error(() => validateOneTimeAmount(3.001), 400);
+    expectH3Error(() => validateOneTimeAmount(499.999), 400);
+    expectH3Error(() => validateOneTimeAmount(7.005), 400);
   });
 });
