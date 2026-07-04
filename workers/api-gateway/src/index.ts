@@ -633,6 +633,18 @@ export default {
     if (isApiHost && path === '/openapi.json') {
       return openApiResponse(origin, reqOrigin);
     }
+    // robots.txt — keep crawlers off the API surface; docs/openapi remain public
+    if (isApiHost && path === '/robots.txt') {
+      const body = 'User-agent: *\nDisallow: /\n\nSitemap: https://tarkovtracker.org/sitemap.xml\n';
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+          ...corsHeaders(origin, reqOrigin),
+        },
+      });
+    }
     // Extract the API path based on host
     let apiPath: string | null = null;
     if (isApiHost) {

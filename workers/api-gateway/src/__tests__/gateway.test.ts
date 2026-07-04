@@ -147,6 +147,15 @@ describe('api-gateway', () => {
     expect(text).toContain('Scalar.createApiReference');
     expect(res.headers.get('content-type')).toContain('text/html');
   });
+  it('serves robots.txt without auth on api host', async () => {
+    const res = await worker.fetch(buildRequest('/robots.txt'), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/plain');
+    const text = await res.text();
+    expect(text).toContain('User-agent: *');
+    expect(text).toContain('Disallow: /');
+    expect(text).toContain('Sitemap: https://tarkovtracker.org/sitemap.xml');
+  });
   it('rejects missing bearer token', async () => {
     const res = await worker.fetch(buildRequest('/token', { method: 'GET' }), BASE_ENV);
     await expectErrorResponse(res, 401, 'Unauthorized');
