@@ -176,7 +176,7 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get('X-RateLimit-Limit')).toBe('60');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('1000');
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
     expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
     expect(res.headers.get('Retry-After')).toBeNull();
@@ -197,7 +197,7 @@ describe('api-gateway', () => {
       env
     );
     expect(res.status).toBe(429);
-    expect(res.headers.get('X-RateLimit-Limit')).toBe('60');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('1000');
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
     expect(res.headers.get('X-RateLimit-Reset')).toBe(String(Math.ceil(resetAt / 1000)));
     const retryAfter = Number(res.headers.get('Retry-After'));

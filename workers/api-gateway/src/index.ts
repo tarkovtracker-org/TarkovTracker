@@ -8,7 +8,10 @@ import {
 } from './handlers/progress';
 import { handleGetTeamProgress } from './handlers/team';
 import { handleGetToken } from './handlers/token';
+import { BURST_WINDOW_SEC, DAILY_WINDOW_SEC, TIER_LIMITS, upgradeMessage } from './limits';
 import { OPENAPI_JSON } from './openapi';
+import { resolveTier } from './services/supporter';
+import { recordUsage } from './services/usage';
 import type {
   ApiToken,
   Env,
@@ -46,15 +49,20 @@ function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
   return null;
 }
 type Action = 'progress-read' | 'progress-write' | 'token-info';
-const RATE_LIMITS: Record<Action, { limit: number; windowSec: number }> = {
-  'progress-read': { limit: 60, windowSec: 60 },
-  'progress-write': { limit: 30, windowSec: 60 },
-  'token-info': { limit: 60, windowSec: 60 },
+type UsageKind = 'read' | 'write';
+type RateLimitAnchor = 'utc-day';
+type RateLimitMode = 'sliding';
+type RateLimitOptions = {
+  anchor?: RateLimitAnchor;
+  mode?: RateLimitMode;
 };
 type RateLimitState = {
   count: number;
   resetAt: number;
   windowSec: number;
+  anchor?: RateLimitAnchor;
+  mode?: RateLimitMode;
+  timestamps?: number[];
 };
 type RateLimitResponse = {
   allowed: boolean;
@@ -71,6 +79,10 @@ type RateLimitResult = {
 };
 const RATE_LIMIT_TIMEOUT_MS = 3000;
 const RATE_LIMIT_SLOW_MS = 200;
+const DAY_MS = 86400000;
+function nextUtcMidnight(now: number): number {
+  return Math.floor(now / DAY_MS) * DAY_MS + DAY_MS;
+}
 export class ApiGatewayRateLimiter {
   private data?: RateLimitState;
   constructor(private state: DurableObjectState) {}
@@ -89,9 +101,14 @@ export class ApiGatewayRateLimiter {
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405 });
     }
-    let payload: { limit?: number; windowSec?: number } = {};
+    let payload: { limit?: number; windowSec?: number; anchor?: string; mode?: string } = {};
     try {
-      payload = (await request.json()) as { limit?: number; windowSec?: number };
+      payload = (await request.json()) as {
+        limit?: number;
+        windowSec?: number;
+        anchor?: string;
+        mode?: string;
+      };
     } catch {
       return new Response('Bad Request', { status: 400 });
     }
@@ -100,34 +117,67 @@ export class ApiGatewayRateLimiter {
     if (!Number.isFinite(limit) || !Number.isFinite(windowSec) || limit <= 0 || windowSec <= 0) {
       return new Response('Bad Request', { status: 400 });
     }
+    const anchor: RateLimitAnchor | undefined = payload.anchor === 'utc-day' ? 'utc-day' : undefined;
+    const mode: RateLimitMode | undefined = payload.mode === 'sliding' ? 'sliding' : undefined;
     await this.load();
     const now = Date.now();
     const windowMs = windowSec * 1000;
-    if (!this.data || this.data.windowSec !== windowSec || now >= this.data.resetAt) {
-      this.data = { count: 0, resetAt: now + windowMs, windowSec };
+    if (mode === 'sliding') {
+      // Sliding-window log: bounded by `limit` entries, so short bursts across
+      // a fixed-window boundary are not spuriously throttled.
+      const cutoff = now - windowMs;
+      const timestamps = (this.data?.timestamps ?? []).filter((ts) => ts > cutoff);
+      const resetAt = timestamps.length ? timestamps[0] + windowMs : now + windowMs;
+      if (timestamps.length >= limit) {
+        this.data = { count: timestamps.length, resetAt, windowSec, mode, timestamps };
+        await this.state.storage.put('state', this.data);
+        await this.scheduleCleanup(resetAt);
+        return this.json({ allowed: false, remaining: 0, resetAt });
+      }
+      timestamps.push(now);
+      this.data = { count: timestamps.length, resetAt: timestamps[0] + windowMs, windowSec, mode, timestamps };
+      await this.state.storage.put('state', this.data);
+      await this.scheduleCleanup(this.data.resetAt);
+      return this.json({
+        allowed: true,
+        remaining: Math.max(limit - timestamps.length, 0),
+        resetAt: this.data.resetAt,
+      });
     }
-    // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
-    // pre-auth rate-limit keys) do not retain billable storage forever. The
-    // alarm fires shortly after the window resets and wipes all storage.
-    const cleanupAt = this.data.resetAt + 1000;
+    const configChanged =
+      !this.data ||
+      this.data.windowSec !== windowSec ||
+      this.data.anchor !== anchor ||
+      this.data.mode !== undefined;
+    if (configChanged || now >= this.data!.resetAt) {
+      const resetAt = anchor === 'utc-day' ? nextUtcMidnight(now) : now + windowMs;
+      this.data = { count: 0, resetAt, windowSec, anchor };
+    }
+    await this.scheduleCleanup(this.data!.resetAt);
+    if (this.data!.count >= limit) {
+      return this.json({
+        allowed: false,
+        remaining: 0,
+        resetAt: this.data!.resetAt,
+      });
+    }
+    this.data!.count += 1;
+    await this.state.storage.put('state', this.data);
+    return this.json({
+      allowed: true,
+      remaining: Math.max(limit - this.data!.count, 0),
+      resetAt: this.data!.resetAt,
+    });
+  }
+  // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
+  // pre-auth rate-limit keys) do not retain billable storage forever. The
+  // alarm fires shortly after the window resets and wipes all storage.
+  private async scheduleCleanup(resetAt: number): Promise<void> {
+    const cleanupAt = resetAt + 1000;
     const existingAlarm = await this.state.storage.getAlarm();
     if (existingAlarm !== cleanupAt) {
       await this.state.storage.setAlarm(cleanupAt);
     }
-    if (this.data.count >= limit) {
-      return this.json({
-        allowed: false,
-        remaining: 0,
-        resetAt: this.data.resetAt,
-      });
-    }
-    this.data.count += 1;
-    await this.state.storage.put('state', this.data);
-    return this.json({
-      allowed: true,
-      remaining: Math.max(limit - this.data.count, 0),
-      resetAt: this.data.resetAt,
-    });
   }
   async alarm(): Promise<void> {
     const stored = await this.state.storage.get<RateLimitState>('state');
@@ -144,7 +194,8 @@ async function rateLimit(
   env: Env,
   key: string,
   limit: number,
-  windowSec: number
+  windowSec: number,
+  options?: RateLimitOptions
 ): Promise<RateLimitResult> {
   const action = key.split(':', 1)[0] || 'unknown';
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
@@ -156,7 +207,7 @@ async function rateLimit(
     const res = await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ limit, windowSec }),
+      body: JSON.stringify({ limit, windowSec, anchor: options?.anchor, mode: options?.mode }),
       signal: controller.signal,
     });
     const durationMs = Date.now() - startedAt;
@@ -367,26 +418,64 @@ async function authenticateAndRateLimit(
   permission: Permission,
   action: Action,
   envOrigin?: string,
-  requestOrigin?: string
+  requestOrigin?: string,
+  ctx?: ExecutionContext
 ): Promise<AuthSuccess | Response> {
   const validation = await validateToken(env, rawToken, permission);
   if (!validation.valid) {
     return errorResponse(validation.error, validation.status, envOrigin, requestOrigin);
   }
-  const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `${action}:${clientIp}:${rawToken.slice(-16)}`;
-  const rl = await rateLimit(env, rlKey, RATE_LIMITS[action].limit, RATE_LIMITS[action].windowSec);
-  const rlHeaders = rateLimitHeaders(rl);
-  if (!rl.allowed) {
+  const token = validation.token;
+  const kind: UsageKind = action === 'progress-write' ? 'write' : 'read';
+  const tier = await resolveTier(env, token.user_id);
+  const limits = TIER_LIMITS[tier];
+  const dailyLimit = kind === 'write' ? limits.writesPerDay : limits.readsPerDay;
+  const track = (throttled: boolean) => {
+    const promise = recordUsage(env, {
+      userId: token.user_id,
+      tokenId: token.token_id,
+      tier,
+      kind,
+      throttled,
+    });
+    if (ctx) {
+      ctx.waitUntil(promise);
+    }
+  };
+  // Daily quota first, so a request rejected by the daily quota does not
+  // consume a burst slot. Both counters key on user_id so extra tokens do not
+  // multiply a user's quota.
+  const daily = await rateLimit(env, `daily-${kind}:${token.user_id}`, dailyLimit, DAILY_WINDOW_SEC, {
+    anchor: 'utc-day',
+  });
+  const dailyHeaders = rateLimitHeaders(daily);
+  if (!daily.allowed) {
+    track(true);
+    const message =
+      daily.status === 429 && tier === 'free'
+        ? upgradeMessage(kind)
+        : daily.message || 'Rate limit exceeded';
+    return errorResponse(message, daily.status || 429, envOrigin, requestOrigin, dailyHeaders);
+  }
+  const burst = await rateLimit(
+    env,
+    `burst-${kind}:${token.user_id}`,
+    limits.burstPerMinute,
+    BURST_WINDOW_SEC,
+    { mode: 'sliding' }
+  );
+  if (!burst.allowed) {
+    track(true);
     return errorResponse(
-      rl.message || 'Rate limit exceeded',
-      rl.status || 429,
+      burst.message || 'Rate limit exceeded',
+      burst.status || 429,
       envOrigin,
       requestOrigin,
-      rlHeaders
+      rateLimitHeaders(burst)
     );
   }
-  return { validation, rlHeaders };
+  track(false);
+  return { validation, rlHeaders: dailyHeaders };
 }
 function decodeUrlParam(
   raw: string,
@@ -429,7 +518,7 @@ async function parseJsonObjectBody(
   return parsedBody as Record<string, unknown>;
 }
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const host = url.hostname.toLowerCase();
     const path = '/' + url.pathname.split('/').filter(Boolean).join('/');
@@ -503,7 +592,8 @@ export default {
           'GP',
           'token-info',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -519,7 +609,8 @@ export default {
           'GP',
           'progress-read',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -536,7 +627,8 @@ export default {
           'TP',
           'progress-read',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -554,7 +646,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -584,7 +677,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -643,7 +737,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -682,7 +777,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
