@@ -17,8 +17,9 @@ type CacheOptions = {
   cacheKeyPrefix?: string;
   deps?: EdgeCacheDependencies;
   // When true, first try the globally-replicated KV store populated by the
-  // tarkov-precompute Worker before touching the per-colo Cache API. Missing
-  // binding or entry falls through to the regular edge-cache path.
+  // scheduled GitHub Actions precompute workflow (scripts/precompute) before
+  // touching the per-colo Cache API. Missing binding or entry falls through
+  // to the regular edge-cache path.
   precomputed?: boolean;
   staleTtl?: number;
 };

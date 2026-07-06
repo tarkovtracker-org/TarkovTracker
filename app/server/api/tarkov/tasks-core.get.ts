@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const bypassOverlayCache = shouldBypassCache(event);
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
-  // Shared with workers/tarkov-precompute, which writes the same key to KV.
+  // Shared with scripts/precompute, which writes the same key to KV.
   const cacheKey = buildTasksCorePrecomputedKey(lang, gameMode);
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
   const fetcherWithOverlay = async () => {

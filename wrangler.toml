@@ -16,16 +16,18 @@ class_name = "ApiGatewayRateLimiter"
 script_name = "api-gateway"
 
 # Globally-replicated store for precomputed heavy-route payloads (tasks-core).
-# Written by the workers/tarkov-precompute scheduled Worker; read by the Nitro
-# request handlers via edgeCache's `precomputed` option. When this binding is
-# absent the handlers fall back to the per-colo Cache API path, so a
+# Written by the scheduled GitHub Actions workflow
+# (.github/workflows/precompute-tarkov-data.yml, via scripts/precompute); read
+# by the Nitro request handlers via edgeCache's `precomputed` option. When this
+# binding is absent the handlers fall back to the per-colo Cache API path, so a
 # misconfigured deploy degrades instead of breaking.
 # kv_namespaces is non-inheritable, so it must also be repeated under
 # [env.preview].
-# TODO: replace with real namespace ID after `wrangler kv namespace create TARKOV_DATA`
+# The same ID must be set as the TARKOV_DATA_KV_NAMESPACE_ID repository
+# variable so the Actions precompute writes where Pages reads.
 [[kv_namespaces]]
 binding = "TARKOV_DATA"
-id = "00000000000000000000000000000000"
+id = "6034d8d7b7534946bf04110c33ac3b88"
 
 [vars]
 NODE_ENV = "production"
@@ -76,7 +78,6 @@ script_name = "api-gateway"
 # Previews read the same precomputed data as production; the payload is
 # identical upstream data, so sharing the namespace is safe and keeps preview
 # deploys warm too.
-# TODO: replace with real namespace ID after `wrangler kv namespace create TARKOV_DATA`
 [[env.preview.kv_namespaces]]
 binding = "TARKOV_DATA"
-id = "00000000000000000000000000000000"
+id = "6034d8d7b7534946bf04110c33ac3b88"

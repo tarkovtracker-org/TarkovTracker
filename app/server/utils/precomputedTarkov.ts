@@ -1,12 +1,13 @@
 /**
  * Shared contract for precomputed heavy-route payloads stored in Cloudflare KV.
  *
- * The tarkov-precompute scheduled Worker (workers/tarkov-precompute) runs the
- * heavy fetch/adapt/overlay pipeline off the request path and writes the final
- * payload to KV. The Nitro request handlers read it back through edgeCache,
- * which keeps every colo warm without ever running the multi-MB transform
- * inside a request invocation (the cause of Cloudflare Error 1102 on cold,
- * low-traffic colos).
+ * The scheduled GitHub Actions precompute workflow
+ * (.github/workflows/precompute-tarkov-data.yml, via scripts/precompute) runs
+ * the heavy fetch/adapt/overlay pipeline off the request path and writes the
+ * final payload to KV. The Nitro request handlers read it back through
+ * edgeCache, which keeps every colo warm without ever running the multi-MB
+ * transform inside a request invocation (the cause of Cloudflare Error 1102
+ * on cold, low-traffic colos).
  *
  * Both sides import this module so key format and envelope shape stay in sync.
  */

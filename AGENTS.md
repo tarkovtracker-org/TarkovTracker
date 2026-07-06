@@ -39,7 +39,8 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 - `app/stores/` — Pinia stores. Core state: `useTarkovStore` with `useMetadataStore`, `useProgressStore`, `usePreferencesStore`.
 - `app/locales/` — JSON locale files. `en.json` is source; non-English files are Crowdin-owned.
 - `supabase/` — `config.toml`, `functions/` (Deno edge functions), `migrations/`.
-- `workers/` — Cloudflare Workers: `api-gateway`, `tarkov-precompute` (scheduled Worker that precomputes heavy tasks-core payloads into the `TARKOV_DATA` KV namespace; request handlers read them via `edgeCache`'s `precomputed` option and fall back to the per-colo Cache API when the binding or entry is absent).
+- `workers/` — Cloudflare Workers: `api-gateway`.
+- `scripts/precompute/` — standalone precompute of heavy tasks-core payloads into the `TARKOV_DATA` KV namespace, run by the scheduled GitHub Actions workflow `.github/workflows/precompute-tarkov-data.yml` (the account's Workers Free tier CPU limit rules out a scheduled Worker). Reuses the `app/server/utils` pipeline via tsx tsconfig paths; request handlers read the entries via `edgeCache`'s `precomputed` option and fall back to the per-colo Cache API when the binding or entry is absent.
 - `docs/` — Project documentation.
 - `public/` — Static assets.
 - Config: `nuxt.config.ts`, `app.config.ts`, `eslint.config.mjs`, `.prettierrc`, `commitlint.config.js`.
@@ -52,7 +53,7 @@ Test: `npm run test` | Watch: `npm run test:watch` | Coverage: `npm run test:cov
 
 Lint: `npm run lint` (zero warnings) | Fix: `npm run lint:fix` | Format: `npm run format` (Prettier + ESLint fix) | Typecheck: `npm run typecheck`
 
-i18n check: `npm run i18n:check` | Supabase types: `npm run supabase:types` | OpenAPI validate: `npm run validate:openapi` | Deps: `npm run deps`
+i18n check: `npm run i18n:check` | Supabase types: `npm run supabase:types` | OpenAPI validate: `npm run validate:openapi` | Deps: `npm run deps` | KV precompute: `npm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
 
 ## Validation Policy
 
