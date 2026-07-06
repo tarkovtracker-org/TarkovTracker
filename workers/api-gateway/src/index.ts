@@ -282,8 +282,7 @@ async function rateLimit(
  * Best-effort refund of one fixed-window slot (used when the daily counter was
  * consumed but the request was subsequently rejected by the burst limiter).
  */
-async function refundRateLimit(env: Env, key: string): Promise<void> {
-  const action = key.split(':', 1)[0] || 'unknown';
+async function refundRateLimit(env: Env, key: string, action: string): Promise<void> {
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
   const stub = env.API_GATEWAY_LIMITER.get(id);
   const controller = new AbortController();
@@ -509,7 +508,7 @@ async function authenticateAndRateLimit(
   if (!burst.allowed) {
     // Give back the daily slot consumed above so burst-throttled attempts do
     // not drain the daily quota.
-    const refund = refundRateLimit(env, dailyKey);
+    const refund = refundRateLimit(env, dailyKey, `daily-${kind}`);
     if (ctx) ctx.waitUntil(refund);
     track(true);
     // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
