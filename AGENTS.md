@@ -39,7 +39,7 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 - `app/stores/` — Pinia stores. Core state: `useTarkovStore` with `useMetadataStore`, `useProgressStore`, `usePreferencesStore`.
 - `app/locales/` — JSON locale files. `en.json` is source; non-English files are Crowdin-owned.
 - `supabase/` — `config.toml`, `functions/` (Deno edge functions), `migrations/`.
-- `workers/` — Cloudflare Workers (api-gateway).
+- `workers/` — Cloudflare Workers: `api-gateway`, `tarkov-precompute` (scheduled Worker that precomputes heavy tasks-core payloads into the `TARKOV_DATA` KV namespace; request handlers read them via `edgeCache`'s `precomputed` option and fall back to the per-colo Cache API when the binding or entry is absent).
 - `docs/` — Project documentation.
 - `public/` — Static assets.
 - Config: `nuxt.config.ts`, `app.config.ts`, `eslint.config.mjs`, `.prettierrc`, `commitlint.config.js`.
