@@ -43,7 +43,7 @@ describe('runPrecompute', () => {
   beforeEach(() => {
     fetcherMock.mockReset().mockResolvedValue({ raw: true });
     createFetcherMock.mockClear();
-    applyOverlayMock.mockReset().mockResolvedValue({ data: { tasks: [] } });
+    applyOverlayMock.mockReset().mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
   });
 
   it('writes a valid envelope per combination with the 7-day TTL', async () => {
@@ -61,7 +61,7 @@ describe('runPrecompute', () => {
     expect(PRECOMPUTED_TTL_SECONDS).toBe(604800);
     const envelope = JSON.parse(value as string);
     expect(isPrecomputedEnvelope(envelope)).toBe(true);
-    expect(envelope.payload).toEqual({ data: { tasks: [] } });
+    expect(envelope.payload).toEqual({ data: { tasks: [{ id: 'task-1' }] } });
   });
 
   it('passes lang and gameMode through to the pipeline', async () => {
@@ -75,7 +75,7 @@ describe('runPrecompute', () => {
   it('records a pipeline failure and continues with remaining combinations', async () => {
     applyOverlayMock
       .mockRejectedValueOnce(new Error('upstream 502'))
-      .mockResolvedValue({ data: { tasks: [] } });
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
@@ -93,5 +93,21 @@ describe('runPrecompute', () => {
       { error: 'KV write failed', key: 'tasks-core-json-v1-en-regular' },
     ]);
     expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
+  });
+
+  it('refuses to write a structurally empty payload to KV', async () => {
+    applyOverlayMock
+      .mockResolvedValueOnce({ data: { tasks: [] } })
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
+    const kv = createKvMock();
+    const result = await runPrecompute(kv, { lang: 'en' });
+    expect(result.failures).toEqual([
+      {
+        error: 'Sanity check failed: payload has no tasks; refusing to write to KV',
+        key: 'tasks-core-json-v1-en-regular',
+      },
+    ]);
+    expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
+    expect(kv.put).toHaveBeenCalledTimes(1);
   });
 });

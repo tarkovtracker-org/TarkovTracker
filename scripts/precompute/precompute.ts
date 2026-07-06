@@ -106,5 +106,20 @@ export async function runPrecompute(
 
 async function precomputeTasksCore(lang: string, gameMode: ValidGameMode): Promise<unknown> {
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
-  return await applyOverlay(await baseFetcher(), { gameMode });
+  const payload = await applyOverlay(await baseFetcher(), { gameMode });
+  assertLooksLikeTasksCore(payload);
+  return payload;
+}
+
+// A KV entry is served globally by every colo until the next successful run,
+// so a structurally empty payload (upstream regression that still parses)
+// must fail the combination instead of poisoning the precomputed store. The
+// previous KV entry keeps serving while the failure is retried on the next
+// scheduled run.
+function assertLooksLikeTasksCore(payload: unknown): void {
+  const data = (payload as { data?: { tasks?: unknown } } | null | undefined)?.data;
+  const tasks = data?.tasks;
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    throw new Error('Sanity check failed: payload has no tasks; refusing to write to KV');
+  }
 }
