@@ -182,8 +182,7 @@
     const map: Record<string, ObjectiveMeta> = {};
     props.objectives.forEach((objective) => {
       const full = fullObjectives.value.find((o) => o.id === objective.id) as
-        | TaskObjective
-        | undefined;
+        TaskObjective | undefined;
       const neededCount = (full?.count ?? objective.count ?? 1) as number;
       const currentCount = tarkovStore.getObjectiveCount(objective.id);
       // Use item, markerItem, or questItem (quest items use questItem)

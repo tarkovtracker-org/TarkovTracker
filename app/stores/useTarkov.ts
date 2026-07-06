@@ -648,8 +648,7 @@ const tarkovActions = {
     const shouldRemainFailed = (
       task: Task | undefined,
       completion:
-        | { complete?: boolean; failed?: boolean; manual?: boolean; timestamp?: number }
-        | undefined
+        { complete?: boolean; failed?: boolean; manual?: boolean; timestamp?: number } | undefined
     ) => {
       if (completion?.manual === true) return true;
       if (!task) return true;

@@ -21,13 +21,7 @@ type DashboardRecommendationReason =
   | 'lightkeeper'
   | 'unlock-trader';
 export type DashboardRecommendationTone =
-  | 'accent'
-  | 'info'
-  | 'kappa'
-  | 'lightkeeper'
-  | 'primary'
-  | 'success'
-  | 'warning';
+  'accent' | 'info' | 'kappa' | 'lightkeeper' | 'primary' | 'success' | 'warning';
 export type DashboardRecommendationMode = 'actionable' | 'blocked' | 'complete' | 'empty';
 export interface DashboardRecommendationRoute {
   path: string;

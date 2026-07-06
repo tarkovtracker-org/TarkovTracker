@@ -98,9 +98,10 @@ const {
   type SupabaseErrorLike = { code?: string; message: string } | null;
   type SingleResult = { data: RemoteRow | null; error: SupabaseErrorLike };
   type UpsertResult = { error: SupabaseErrorLike };
-  const single = vi.fn(
-    async (): Promise<SingleResult> => ({ data: createRemoteRow(), error: null })
-  );
+  const single = vi.fn(async (): Promise<SingleResult> => ({
+    data: createRemoteRow(),
+    error: null,
+  }));
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
   const upsert = vi.fn(async (): Promise<UpsertResult> => ({ error: null }));

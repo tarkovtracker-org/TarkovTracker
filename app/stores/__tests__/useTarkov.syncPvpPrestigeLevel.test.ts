@@ -4,12 +4,10 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
 const { from, upsert, supabaseContext } = vi.hoisted(() => {
-  const upsert = vi.fn(
-    async (): Promise<{ data: null; error: { message: string } | null }> => ({
-      data: null,
-      error: null,
-    })
-  );
+  const upsert = vi.fn(async (): Promise<{ data: null; error: { message: string } | null }> => ({
+    data: null,
+    error: null,
+  }));
   const from = vi.fn(() => ({
     upsert,
   }));

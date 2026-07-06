@@ -193,9 +193,7 @@ export function useDashboardStats(): {
       return false;
     }
     const relatedTask = (objective.taskId ? taskById.value.get(objective.taskId) : null) as
-      | Task
-      | null
-      | undefined;
+      Task | null | undefined;
     if (!relatedTask) return false;
     // Exclude objectives from tasks not available for user's edition
     if (!isTaskAvailableForEdition(relatedTask.id)) return false;

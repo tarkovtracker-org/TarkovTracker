@@ -253,8 +253,7 @@ describe('supabase plugin', () => {
     const { getAuthStateChangeCallback, signInWithOAuth } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
-      | SupabasePluginProvide
-      | undefined;
+      SupabasePluginProvide | undefined;
     await flushPlugin();
     await result?.provide.supabase.ready();
     await result?.provide.supabase.signInWithOAuth('github', {
@@ -302,8 +301,7 @@ describe('supabase plugin', () => {
     });
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
-      | SupabasePluginProvide
-      | undefined;
+      SupabasePluginProvide | undefined;
     await flushPlugin();
     expect(result?.provide.supabase.user.loggedIn).toBe(false);
     await result?.provide.supabase.ready();
@@ -315,8 +313,7 @@ describe('supabase plugin', () => {
     const { signOut } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
-      | SupabasePluginProvide
-      | undefined;
+      SupabasePluginProvide | undefined;
     await flushPlugin();
     await result?.provide.supabase.ready();
     await result?.provide.supabase.signOut();
@@ -332,8 +329,7 @@ describe('supabase plugin', () => {
     });
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
-      | SupabasePluginProvide
-      | undefined;
+      SupabasePluginProvide | undefined;
     await expect(result?.provide.supabase.ready()).rejects.toThrow('create client failed');
     expect(loggerMock.error).toHaveBeenCalledWith(
       '[Supabase] Failed to initialize client',

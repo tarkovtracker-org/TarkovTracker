@@ -296,8 +296,7 @@
     single: () => Promise<{ data: { token_id: string } | null; error: SupabaseTokenError }>;
     then: (
       onfulfilled?:
-        | ((value: { data: RawTokenRow[] | null; error: SupabaseTokenError }) => unknown)
-        | null
+        ((value: { data: RawTokenRow[] | null; error: SupabaseTokenError }) => unknown) | null
     ) => Promise<unknown>;
   }
   const { t } = useI18n({ useScope: 'global' });

@@ -4,12 +4,10 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
 const { rpc, supabaseContext } = vi.hoisted(() => {
-  const rpc = vi.fn(
-    async (): Promise<{ data: null; error: { message: string } | null }> => ({
-      data: null,
-      error: null,
-    })
-  );
+  const rpc = vi.fn(async (): Promise<{ data: null; error: { message: string } | null }> => ({
+    data: null,
+    error: null,
+  }));
   const supabaseContext = {
     user: {
       id: 'user-1',

@@ -105,8 +105,7 @@
         let settled = false;
         const finish = (
           value:
-            | { authenticated: true }
-            | { authenticated: false; description: string; report: string }
+            { authenticated: true } | { authenticated: false; description: string; report: string }
         ) => {
           if (settled) {
             return;
