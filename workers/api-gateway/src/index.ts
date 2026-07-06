@@ -83,6 +83,9 @@ const DAY_MS = 86400000;
 function nextUtcMidnight(now: number): number {
   return Math.floor(now / DAY_MS) * DAY_MS + DAY_MS;
 }
+// RFC 9745 Deprecation header value: structured-field Date for
+// 2026-07-06T00:00:00Z, when the api.tarkovtracker.org migration shipped.
+const LEGACY_API_DEPRECATION_DATE = '@1783296000';
 export class ApiGatewayRateLimiter {
   private data?: RateLimitState;
   constructor(private state: DurableObjectState) {}
@@ -675,7 +678,7 @@ export default {
             headers: {
               ...headers,
               Location: target,
-              Deprecation: 'true',
+              Deprecation: LEGACY_API_DEPRECATION_DATE,
               Link: `<${target}>; rel="successor-version"`,
               'Cache-Control': 'no-store',
             },

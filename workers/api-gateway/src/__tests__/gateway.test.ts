@@ -215,7 +215,8 @@ describe('api-gateway', () => {
     expect(res.headers.get('Location')).toBe(
       'https://api.tarkovtracker.org/progress/task/task-1?foo=bar'
     );
-    expect(res.headers.get('Deprecation')).toBe('true');
+    // RFC 9745: Deprecation is a structured-field Date (@<unix-ts>)
+    expect(res.headers.get('Deprecation')).toBe('@1783296000');
     expect(res.headers.get('Link')).toBe(
       '<https://api.tarkovtracker.org/progress/task/task-1?foo=bar>; rel="successor-version"'
     );

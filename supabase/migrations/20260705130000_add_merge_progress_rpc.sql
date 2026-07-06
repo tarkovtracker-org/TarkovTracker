@@ -5,6 +5,11 @@
 -- changes (lost updates). This RPC merges only the supplied keys in a single
 -- UPDATE and reports whether a row was actually updated, so writes against a
 -- missing progress row can no longer succeed silently.
+--
+-- DEPLOY ORDER: the api-gateway worker calling this RPC auto-deploys from
+-- main via the Cloudflare Git integration. Apply this migration to
+-- production (supabase db push --linked) BEFORE merging the worker change,
+-- or every API progress write will fail with a missing-RPC error.
 
 CREATE OR REPLACE FUNCTION public.merge_progress_data(
   p_user_id UUID,
@@ -30,6 +35,17 @@ BEGIN
   IF p_field IS NULL OR p_field NOT IN ('pvp_data', 'pve_data') THEN
     RAISE EXCEPTION 'p_field must be pvp_data or pve_data';
   END IF;
+  -- jsonb || degrades to array concatenation when an operand is not an
+  -- object, which would corrupt the blob; only object params are valid.
+  IF p_task_completions IS NOT NULL AND jsonb_typeof(p_task_completions) <> 'object' THEN
+    RAISE EXCEPTION 'p_task_completions must be a JSON object';
+  END IF;
+  IF p_task_objectives IS NOT NULL AND jsonb_typeof(p_task_objectives) <> 'object' THEN
+    RAISE EXCEPTION 'p_task_objectives must be a JSON object';
+  END IF;
+  IF p_set IS NOT NULL AND jsonb_typeof(p_set) <> 'object' THEN
+    RAISE EXCEPTION 'p_set must be a JSON object';
+  END IF;
 
   SELECT CASE WHEN p_field = 'pvp_data' THEN pvp_data ELSE pve_data END
     INTO v_data
@@ -41,27 +57,31 @@ BEGIN
     RETURN 0;
   END IF;
 
-  v_data := COALESCE(v_data, '{}'::jsonb);
+  -- Normalize JSON null / non-object blobs (COALESCE only covers SQL NULL);
+  -- jsonb_set errors on scalar roots and || would array-concatenate.
+  IF v_data IS NULL OR jsonb_typeof(v_data) <> 'object' THEN
+    v_data := '{}'::jsonb;
+  END IF;
 
   IF p_task_completions IS NOT NULL THEN
     v_data := jsonb_set(
       v_data,
       '{taskCompletions}',
-      COALESCE(v_data->'taskCompletions', '{}'::jsonb) || p_task_completions
+      CASE WHEN jsonb_typeof(v_data->'taskCompletions') = 'object'
+           THEN v_data->'taskCompletions' ELSE '{}'::jsonb END || p_task_completions
     );
   END IF;
 
   IF p_task_objectives IS NOT NULL THEN
-    v_data := jsonb_set(
-      v_data,
-      '{taskObjectives}',
-      COALESCE(v_data->'taskObjectives', '{}'::jsonb)
-    );
+    IF jsonb_typeof(v_data->'taskObjectives') IS DISTINCT FROM 'object' THEN
+      v_data := jsonb_set(v_data, '{taskObjectives}', '{}'::jsonb);
+    END IF;
     FOR v_key, v_value IN SELECT key, value FROM jsonb_each(p_task_objectives) LOOP
       v_data := jsonb_set(
         v_data,
         ARRAY['taskObjectives', v_key],
-        COALESCE(v_data#>ARRAY['taskObjectives', v_key], '{}'::jsonb) || v_value,
+        CASE WHEN jsonb_typeof(v_data#>ARRAY['taskObjectives', v_key]) = 'object'
+             THEN v_data#>ARRAY['taskObjectives', v_key] ELSE '{}'::jsonb END || v_value,
         true
       );
     END LOOP;

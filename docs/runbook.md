@@ -67,6 +67,10 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    supabase db push --linked          # apply pending migrations to production
    ```
    Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
+   **Ordering caveat:** workers auto-deploy from `main` (step 3) while migrations are manual, so
+   a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
+   for the gap between merge and `db push`. For such changes, apply the pending migration to
+   production **before** merging the worker change; adding a function ahead of its caller is safe.
 3. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
 4. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
