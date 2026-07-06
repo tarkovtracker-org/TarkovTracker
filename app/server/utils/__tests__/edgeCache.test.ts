@@ -32,8 +32,10 @@ describe('edgeCache', () => {
   let lastMatchUrl: string | null;
   let setHeaders: typeof setResponseHeaders;
   let createErrorFn: typeof createError;
+  let previousBypassEnabled: string | undefined;
   beforeEach(() => {
     lastMatchUrl = null;
+    previousBypassEnabled = process.env.NUXT_CACHE_BYPASS_ENABLED;
     cacheSpy = {
       match: vi.fn(async (request: Request) => {
         lastMatchUrl = request.url;
@@ -49,6 +51,11 @@ describe('edgeCache', () => {
     vi.unstubAllGlobals();
     _appUrl.value = undefined;
     _bypassEnabled.value = false;
+    if (previousBypassEnabled === undefined) {
+      delete process.env.NUXT_CACHE_BYPASS_ENABLED;
+    } else {
+      process.env.NUXT_CACHE_BYPASS_ENABLED = previousBypassEnabled;
+    }
   });
   it('falls back to default cache host when appUrl is localhost', async () => {
     _appUrl.value = 'http://localhost:3000';
@@ -281,7 +288,6 @@ describe('edgeCache', () => {
     });
     expect(precomputedStore.get).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(1);
-    delete process.env.NUXT_CACHE_BYPASS_ENABLED;
   });
   it('stores fresh payload on cache miss', async () => {
     const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
@@ -329,7 +335,6 @@ describe('edgeCache', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(cacheSpy.match).not.toHaveBeenCalled();
     expect(cacheSpy.put).not.toHaveBeenCalled();
-    delete process.env.NUXT_CACHE_BYPASS_ENABLED;
   });
   it('sanitizes error details in thrown status message', async () => {
     const event = createEvent();

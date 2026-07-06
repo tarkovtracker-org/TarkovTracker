@@ -33,15 +33,21 @@ export function createKvRestWriter(config: KvRestConfig): KvWriter {
       if (options?.expirationTtl !== undefined) {
         url.searchParams.set('expiration_ttl', String(options.expirationTtl));
       }
-      const response = await fetch(url, {
-        body: value,
-        headers: {
-          Authorization: `Bearer ${config.apiToken}`,
-          'Content-Type': 'text/plain',
-        },
-        method: 'PUT',
-        signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
-      });
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          body: value,
+          headers: {
+            Authorization: `Bearer ${config.apiToken}`,
+            'Content-Type': 'text/plain',
+          },
+          method: 'PUT',
+          signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`KV write failed for "${key}": ${reason}`);
+      }
       const body = (await response.json().catch(() => null)) as CloudflareApiResponse | null;
       if (!response.ok || body?.success !== true) {
         const detail =
