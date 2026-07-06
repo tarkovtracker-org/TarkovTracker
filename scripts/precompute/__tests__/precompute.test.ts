@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
 import { PRECOMPUTED_TTL_SECONDS, runPrecompute, validatePrecomputeFilter } from '../precompute';
 import type { KvWriter } from '../precompute';
-
 const { applyOverlayMock, createFetcherMock, fetcherMock } = vi.hoisted(() => {
   const hoistedFetcherMock = vi.fn();
   return {
@@ -11,18 +10,15 @@ const { applyOverlayMock, createFetcherMock, fetcherMock } = vi.hoisted(() => {
     fetcherMock: hoistedFetcherMock,
   };
 });
-
 vi.mock('@/server/utils/tarkov-json', () => ({
   createTarkovJsonTasksCoreFetcher: createFetcherMock,
 }));
 vi.mock('@/server/utils/overlay', () => ({
   applyOverlay: applyOverlayMock,
 }));
-
 function createKvMock(): KvWriter & { put: ReturnType<typeof vi.fn> } {
   return { put: vi.fn().mockResolvedValue(undefined) };
 }
-
 describe('validatePrecomputeFilter', () => {
   it('accepts an empty filter and supported values', () => {
     expect(validatePrecomputeFilter({})).toBeNull();
@@ -30,7 +26,6 @@ describe('validatePrecomputeFilter', () => {
     expect(validatePrecomputeFilter({ gameMode: 'pve' })).toBeNull();
     expect(validatePrecomputeFilter({ gameMode: 'regular', lang: 'de' })).toBeNull();
   });
-
   it('rejects unsupported lang and gameMode values', () => {
     expect(validatePrecomputeFilter({ lang: 'xx' })).toContain('Unsupported lang "xx"');
     expect(validatePrecomputeFilter({ gameMode: 'arena' })).toContain(
@@ -38,14 +33,12 @@ describe('validatePrecomputeFilter', () => {
     );
   });
 });
-
 describe('runPrecompute', () => {
   beforeEach(() => {
     fetcherMock.mockReset().mockResolvedValue({ raw: true });
     createFetcherMock.mockClear();
     applyOverlayMock.mockReset().mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
   });
-
   it('writes a valid envelope per combination with the 7-day TTL', async () => {
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
@@ -63,7 +56,6 @@ describe('runPrecompute', () => {
     expect(isPrecomputedEnvelope(envelope)).toBe(true);
     expect(envelope.payload).toEqual({ data: { tasks: [{ id: 'task-1' }] } });
   });
-
   it('passes lang and gameMode through to the pipeline', async () => {
     const kv = createKvMock();
     await runPrecompute(kv, { gameMode: 'pve', lang: 'de' });
@@ -71,7 +63,6 @@ describe('runPrecompute', () => {
     expect(createFetcherMock).toHaveBeenCalledWith({ gameMode: 'pve', lang: 'de' });
     expect(applyOverlayMock).toHaveBeenCalledWith({ raw: true }, { gameMode: 'pve' });
   });
-
   it('records a pipeline failure and continues with remaining combinations', async () => {
     applyOverlayMock
       .mockRejectedValueOnce(new Error('upstream 502'))
@@ -84,7 +75,6 @@ describe('runPrecompute', () => {
     expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
     expect(kv.put).toHaveBeenCalledTimes(1);
   });
-
   it('records a KV write failure without aborting the run', async () => {
     const kv = createKvMock();
     kv.put.mockRejectedValueOnce(new Error('KV write failed')).mockResolvedValue(undefined);
@@ -94,7 +84,6 @@ describe('runPrecompute', () => {
     ]);
     expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
   });
-
   it('refuses to write a structurally empty payload to KV', async () => {
     applyOverlayMock
       .mockResolvedValueOnce({ data: { tasks: [] } })

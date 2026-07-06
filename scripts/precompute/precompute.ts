@@ -21,28 +21,23 @@ import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { createTarkovJsonTasksCoreFetcher } from '@/server/utils/tarkov-json';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
-
 // KV entries outlive several missed scheduled runs so a precompute outage
 // degrades to slightly stale data instead of dropping colos back onto the
 // fatal cold-miss path. The schedule refreshes every 12h (matching
 // CACHE_TTL_DEFAULT).
 export const PRECOMPUTED_TTL_SECONDS = 7 * 24 * 60 * 60;
-
 export type KvWriter = {
   put: (key: string, value: string, options?: { expirationTtl?: number }) => Promise<void>;
 };
-
 export type PrecomputeFilter = {
   gameMode?: string;
   lang?: string;
 };
-
 export type PrecomputeResult = {
   durationMs: number;
   failures: { error: string; key: string }[];
   successes: string[];
 };
-
 /**
  * Returns an error message when a filter value matches no supported
  * combination, so the runner can reject it with a non-zero exit instead of
@@ -63,7 +58,6 @@ export function validatePrecomputeFilter(filter: PrecomputeFilter): string | nul
   }
   return null;
 }
-
 export async function runPrecompute(
   kv: KvWriter,
   filter: PrecomputeFilter = {}
@@ -103,14 +97,12 @@ export async function runPrecompute(
     successes,
   };
 }
-
 async function precomputeTasksCore(lang: string, gameMode: ValidGameMode): Promise<unknown> {
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
   const payload = await applyOverlay(await baseFetcher(), { gameMode });
   assertLooksLikeTasksCore(payload);
   return payload;
 }
-
 // A KV entry is served globally by every colo until the next successful run,
 // so a structurally empty payload (upstream regression that still parses)
 // must fail the combination instead of poisoning the precomputed store. The

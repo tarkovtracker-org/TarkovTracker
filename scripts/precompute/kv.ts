@@ -8,21 +8,17 @@
  * per-combination failure isolation in runPrecompute.
  */
 import type { KvWriter } from './precompute';
-
 const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 const KV_WRITE_TIMEOUT_MS = 30_000;
-
 export type KvRestConfig = {
   accountId: string;
   apiToken: string;
   namespaceId: string;
 };
-
 type CloudflareApiResponse = {
   errors?: { code?: number; message?: string }[];
   success?: boolean;
 };
-
 export function createKvRestWriter(config: KvRestConfig): KvWriter {
   return {
     async put(key, value, options) {
@@ -46,7 +42,9 @@ export function createKvRestWriter(config: KvRestConfig): KvWriter {
         });
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
-        throw new Error(`KV write failed for "${key}": ${reason}`);
+        throw new Error(`KV write failed for "${key}": ${reason}`, {
+          cause: error,
+        });
       }
       const body = (await response.json().catch(() => null)) as CloudflareApiResponse | null;
       if (!response.ok || body?.success !== true) {
