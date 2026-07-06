@@ -39,14 +39,52 @@ const jsonResponse = (payload: unknown, status = 200) =>
     status,
     headers: { 'content-type': 'application/json' },
   });
+type MergeRpcPayload = {
+  p_user_id: string;
+  p_field: 'pvp_data' | 'pve_data';
+  p_task_completions: Record<string, Record<string, unknown>> | null;
+  p_task_objectives: Record<string, Record<string, unknown>> | null;
+  p_set: Record<string, unknown> | null;
+};
+// Mirrors the merge semantics of the merge_progress_data SQL function:
+// taskCompletions shallow-merge, taskObjectives per-key deep-merge, set top-level merge.
+const applyMergeRpc = (
+  current: Record<string, unknown>,
+  payload: MergeRpcPayload
+): Record<string, unknown> => {
+  const data = { ...current };
+  if (payload.p_task_completions) {
+    data.taskCompletions = {
+      ...((data.taskCompletions as Record<string, unknown>) ?? {}),
+      ...payload.p_task_completions,
+    };
+  }
+  if (payload.p_task_objectives) {
+    const objectives = {
+      ...((data.taskObjectives as Record<string, Record<string, unknown>>) ?? {}),
+    };
+    for (const [key, value] of Object.entries(payload.p_task_objectives)) {
+      objectives[key] = { ...(objectives[key] ?? {}), ...value };
+    }
+    data.taskObjectives = objectives;
+  }
+  if (payload.p_set) {
+    Object.assign(data, payload.p_set);
+  }
+  return data;
+};
 type BaseFetchMockOptions = {
-  onPatch?: (body: Record<string, unknown>) => void;
+  onMerge?: (payload: MergeRpcPayload) => void;
+  mergeResult?: string;
+  mergeStore?: { data: Record<string, unknown> };
   tasks?: Array<Record<string, unknown>>;
   userProgress?: Record<string, unknown>;
   permissions?: string[];
 };
 const createBaseFetchMock = ({
-  onPatch,
+  onMerge,
+  mergeResult,
+  mergeStore,
   tasks = [],
   userProgress = {
     user_id: 'user-1',
@@ -77,10 +115,13 @@ const createBaseFetchMock = ({
     if (url.includes('/rest/v1/rpc/increment_token_usage')) {
       return jsonResponse({ ok: true });
     }
-    if (url.includes('/rest/v1/user_progress') && init?.method === 'PATCH') {
-      const patchBody = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
-      onPatch?.(patchBody);
-      return new Response(null, { status: 204 });
+    if (url.includes('/rest/v1/rpc/merge_progress_data')) {
+      const payload = JSON.parse(String(init?.body || '{}')) as MergeRpcPayload;
+      onMerge?.(payload);
+      if (mergeStore) {
+        mergeStore.data = applyMergeRpc(mergeStore.data, payload);
+      }
+      return new Response(mergeResult ?? '1', { status: 200 });
     }
     if (url.includes('/rest/v1/user_progress')) {
       return jsonResponse([userProgress]);
@@ -214,10 +255,10 @@ describe('api-gateway', () => {
     expect(retryAfter).toBeLessThanOrEqual(31);
   });
   it('updates dependent and alternative tasks for single update', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
-      onPatch: (body) => {
-        patchBody = body;
+      onMerge: (payload) => {
+        mergePayload = payload;
       },
       tasks: [
         {
@@ -248,25 +289,25 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(patchBody).not.toBeNull();
-    const dataField = (
-      patchBody as unknown as { pvp_data?: { taskCompletions?: Record<string, unknown> } }
-    ).pvp_data;
-    const taskCompletions = dataField?.taskCompletions as
+    expect(mergePayload).not.toBeNull();
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_field).toBe('pvp_data');
+    const taskCompletions = payload.p_task_completions as
       | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
-      | undefined;
+      | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
     expect(taskCompletions?.['task-alt']?.complete).toBe(true);
     expect(taskCompletions?.['task-alt']?.failed).toBe(true);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
+    expect(payload.p_set?.lastApiUpdate).toBeDefined();
   });
   it('skips lastApiUpdate for idempotent single task updates', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
-      onPatch: (body) => {
-        patchBody = body;
+      onMerge: (payload) => {
+        mergePayload = payload;
       },
       tasks: [
         {
@@ -297,15 +338,15 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(patchBody).not.toBeNull();
-    const pvpData = (patchBody as unknown as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
-    expect(pvpData.lastApiUpdate).toBeUndefined();
+    expect(mergePayload).not.toBeNull();
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_set).toBeNull();
   });
   it('preserves explicit dependent task states in batch updates', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
-      onPatch: (body) => {
-        patchBody = body;
+      onMerge: (payload) => {
+        mergePayload = payload;
       },
       tasks: [
         {
@@ -339,23 +380,21 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(patchBody).not.toBeNull();
-    const pvpData = (
-      patchBody as unknown as { pvp_data?: { taskCompletions?: Record<string, unknown> } }
-    ).pvp_data;
-    const taskCompletions = pvpData?.taskCompletions as
+    expect(mergePayload).not.toBeNull();
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    const taskCompletions = payload.p_task_completions as
       | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
-      | undefined;
+      | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(true);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
   });
   it('skips lastApiUpdate for idempotent batch task updates', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
-      onPatch: (body) => {
-        patchBody = body;
+      onMerge: (payload) => {
+        mergePayload = payload;
       },
       tasks: [
         {
@@ -400,8 +439,62 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    const pvpData = (patchBody as unknown as { pvp_data?: Record<string, unknown> }).pvp_data ?? {};
-    expect(pvpData.lastApiUpdate).toBeUndefined();
+    expect(mergePayload).not.toBeNull();
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_set).toBeNull();
+  });
+  it('returns an error when the merge RPC matches no progress row', async () => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        mergeResult: '0',
+        tasks: [
+          {
+            id: 'task-main',
+            name: 'Main Task',
+            factionName: 'Any',
+            alternatives: [],
+            objectives: [],
+            taskRequirements: [],
+          },
+        ],
+      })
+    );
+    const res = await worker.fetch(
+      postTaskRequest('task-main', { state: 'completed' }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 500, 'Progress row not found for user');
+  });
+  it('does not lose unrelated keys when two writers merge concurrently', async () => {
+    // Both writers read the same stale snapshot (GET always returns the
+    // original row), but merges apply server-side to shared state, so
+    // neither write clobbers the other's task.
+    const mergeStore: { data: Record<string, unknown> } = {
+      data: { level: 5, taskCompletions: {} },
+    };
+    const tasks = ['task-a', 'task-b'].map((id) => ({
+      id,
+      name: id,
+      factionName: 'Any',
+      alternatives: [],
+      objectives: [],
+      taskRequirements: [],
+    }));
+    vi.stubGlobal('fetch', createBaseFetchMock({ mergeStore, tasks }));
+    const [resA, resB] = await Promise.all([
+      worker.fetch(postTaskRequest('task-a', { state: 'completed' }), BASE_ENV),
+      worker.fetch(postTaskRequest('task-b', { state: 'completed' }), BASE_ENV),
+    ]);
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    const taskCompletions = mergeStore.data.taskCompletions as Record<
+      string,
+      { complete?: boolean }
+    >;
+    expect(taskCompletions['task-a']?.complete).toBe(true);
+    expect(taskCompletions['task-b']?.complete).toBe(true);
+    expect(mergeStore.data.level).toBe(5);
   });
   it('returns progress for valid token', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -551,10 +644,10 @@ describe('api-gateway', () => {
     );
   });
   it('accepts POST /progress/task with URL-encoded valid task ID', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
-      onPatch: (body) => {
-        patchBody = body;
+      onMerge: (payload) => {
+        mergePayload = payload;
       },
       tasks: [
         {
@@ -573,13 +666,10 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(patchBody).not.toBeNull();
-    const pvpData = (
-      patchBody as unknown as { pvp_data?: { taskCompletions?: Record<string, unknown> } }
-    ).pvp_data;
-    const taskCompletions = pvpData?.taskCompletions as
+    expect(mergePayload).not.toBeNull();
+    const taskCompletions = (mergePayload as unknown as MergeRpcPayload).p_task_completions as
       | Record<string, { complete?: boolean }>
-      | undefined;
+      | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
   });
   it('rejects POST /progress/task/objective with URL-encoded whitespace ID', async () => {
@@ -629,10 +719,10 @@ describe('api-gateway', () => {
     await expectErrorResponse(res, 400, 'Invalid count (must be a non-negative number)');
   });
   it('accepts POST /progress/task/objective with URL-encoded valid objective ID', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
-      onPatch: (body) => {
-        patchBody = body;
+      onMerge: (payload) => {
+        mergePayload = payload;
       },
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -641,13 +731,10 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(200);
-    expect(patchBody).not.toBeNull();
-    const pvpData = (
-      patchBody as unknown as { pvp_data?: { taskObjectives?: Record<string, unknown> } }
-    ).pvp_data;
-    const taskObjectives = pvpData?.taskObjectives as
+    expect(mergePayload).not.toBeNull();
+    const taskObjectives = (mergePayload as unknown as MergeRpcPayload).p_task_objectives as
       | Record<string, { complete?: boolean }>
-      | undefined;
+      | null;
     expect(taskObjectives?.['obj-1']?.complete).toBe(true);
   });
 });
