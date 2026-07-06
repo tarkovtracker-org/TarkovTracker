@@ -118,10 +118,11 @@ const createBaseFetchMock = ({
     if (url.includes('/rest/v1/rpc/merge_progress_data')) {
       const payload = JSON.parse(String(init?.body || '{}')) as MergeRpcPayload;
       onMerge?.(payload);
-      if (mergeStore) {
+      const result = mergeResult ?? '1';
+      if (mergeStore && Number(result) > 0) {
         mergeStore.data = applyMergeRpc(mergeStore.data, payload);
       }
-      return new Response(mergeResult ?? '1', { status: 200 });
+      return new Response(result, { status: 200 });
     }
     if (url.includes('/rest/v1/user_progress')) {
       return jsonResponse([userProgress]);
