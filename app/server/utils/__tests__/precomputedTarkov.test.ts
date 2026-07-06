@@ -28,6 +28,25 @@ describe('precomputedTarkov', () => {
       expect(isPrecomputedEnvelope({ payload: {}, storedAt: Date.now(), version: 2 })).toBe(false);
       expect(isPrecomputedEnvelope({ storedAt: Date.now(), version: 1 })).toBe(false);
     });
+    it('rejects envelopes with a null or undefined payload', () => {
+      expect(isPrecomputedEnvelope({ payload: null, storedAt: Date.now(), version: 1 })).toBe(
+        false
+      );
+      expect(isPrecomputedEnvelope({ payload: undefined, storedAt: Date.now(), version: 1 })).toBe(
+        false
+      );
+    });
+    it('rejects envelopes with a non-finite or non-numeric storedAt', () => {
+      expect(isPrecomputedEnvelope({ payload: {}, storedAt: Number.NaN, version: 1 })).toBe(false);
+      expect(
+        isPrecomputedEnvelope({ payload: {}, storedAt: Number.POSITIVE_INFINITY, version: 1 })
+      ).toBe(false);
+      expect(isPrecomputedEnvelope({ payload: {}, storedAt: 'now', version: 1 })).toBe(false);
+    });
+    it('accepts falsy-but-valid payloads such as empty arrays', () => {
+      expect(isPrecomputedEnvelope({ payload: [], storedAt: Date.now(), version: 1 })).toBe(true);
+      expect(isPrecomputedEnvelope({ payload: 0, storedAt: Date.now(), version: 1 })).toBe(true);
+    });
   });
   describe('getPrecomputedStore', () => {
     it('returns the KV binding when present on the event context', () => {

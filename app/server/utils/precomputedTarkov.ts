@@ -38,7 +38,10 @@ export function isPrecomputedEnvelope<T>(value: unknown): value is PrecomputedEn
     candidate.version === PRECOMPUTED_ENVELOPE_VERSION &&
     typeof candidate.storedAt === 'number' &&
     Number.isFinite(candidate.storedAt) &&
-    'payload' in candidate
+    // A null/undefined payload means a corrupt write; rejecting it falls back
+    // to the edge-cache path instead of serving null to clients.
+    candidate.payload !== null &&
+    candidate.payload !== undefined
   );
 }
 export function getPrecomputedStore(event: unknown): PrecomputedKvReader | null {
