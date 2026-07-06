@@ -10,6 +10,23 @@ Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatib
 - **Development:** `http://localhost:3000/api`
 - **Production:** `https://tarkovtracker.org/api`
 
+## Progress API Host Migration (api.tarkovtracker.org)
+
+The progress API gateway (token, progress, team progress) is served on `https://api.tarkovtracker.org` (clean paths, `/api/v2/*` also accepted). The legacy `https://tarkovtracker.org/api/v2/*` routes remain served during the deprecation window.
+
+Migration plan:
+
+1. TarkovMonitor >= the release containing tarkovtracker-org/TarkovMonitor#3 calls `api.tarkovtracker.org` directly.
+2. Once that release has propagated, ops flip the gateway var `LEGACY_API_REDIRECT` to `"true"` (see `workers/api-gateway/wrangler.toml`); legacy `/api` and `/api/v2` requests then receive a `308` redirect to the subdomain with `Deprecation` and `Link: rel="successor-version"` headers.
+3. Clients should migrate proactively rather than relying on the redirect: .NET `HttpClient` (and several other HTTP stacks) drop the `Authorization` header on cross-host redirects, so authenticated calls through the redirect will fail with `401`.
+
+Migration example:
+
+```diff
+-POST https://tarkovtracker.org/api/v2/progress/task/{taskId}
++POST https://api.tarkovtracker.org/progress/task/{taskId}
+```
+
 ## Authentication
 
 Most tarkov data endpoints are public. Team endpoints require Supabase authentication.

@@ -664,6 +664,23 @@ export default {
       const apiMatch = path.match(/^\/api(?:\/v2)?(.*)$/);
       if (apiMatch) {
         apiPath = apiMatch[1] || '/';
+        // Host migration: once LEGACY_API_REDIRECT is flipped to "true",
+        // legacy /api and /api/v2 routes permanently redirect to the api
+        // subdomain. Clients should migrate proactively: some HTTP stacks
+        // (e.g. .NET HttpClient) drop Authorization on cross-host redirects.
+        if ((env.LEGACY_API_REDIRECT || '').trim().toLowerCase() === 'true') {
+          const target = `https://${apiHost}${apiPath}${url.search}`;
+          return new Response(null, {
+            status: 308,
+            headers: {
+              ...headers,
+              Location: target,
+              Deprecation: 'true',
+              Link: `<${target}>; rel="successor-version"`,
+              'Cache-Control': 'no-store',
+            },
+          });
+        }
       }
     }
     if (!apiPath) {

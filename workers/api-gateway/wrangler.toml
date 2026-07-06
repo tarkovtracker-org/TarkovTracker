@@ -43,3 +43,4 @@ new_sqlite_classes = ["ApiGatewayRateLimiter"]
 [vars]
 ALLOWED_ORIGIN = "https://tarkovtracker.org,https://www.tarkovtracker.org,https://tarkov.dev,https://www.tarkov.dev,http://localhost:3000"
 API_HOST = "api.tarkovtracker.org"
+LEGACY_API_REDIRECT = "false"

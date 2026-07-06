@@ -201,6 +201,44 @@ describe('api-gateway', () => {
     const res = await worker.fetch(buildRequest('/token', { method: 'GET' }), BASE_ENV);
     await expectErrorResponse(res, 401, 'Unauthorized');
   });
+  it('redirects legacy /api/v2 routes with 308 when LEGACY_API_REDIRECT is true', async () => {
+    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      env
+    );
+    expect(res.status).toBe(308);
+    expect(res.headers.get('Location')).toBe(
+      'https://api.tarkovtracker.org/progress/task/task-1?foo=bar'
+    );
+    expect(res.headers.get('Deprecation')).toBe('true');
+    expect(res.headers.get('Link')).toBe(
+      '<https://api.tarkovtracker.org/progress/task/task-1?foo=bar>; rel="successor-version"'
+    );
+  });
+  it('redirects legacy /api routes without /v2 prefix when LEGACY_API_REDIRECT is true', async () => {
+    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/progress', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123' },
+      }),
+      env
+    );
+    expect(res.status).toBe(308);
+    expect(res.headers.get('Location')).toBe('https://api.tarkovtracker.org/progress');
+  });
+  it('serves legacy /api/v2 routes normally when LEGACY_API_REDIRECT is off', async () => {
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/progress', { method: 'GET' }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Unauthorized');
+  });
   it('returns token info for valid token', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const res = await worker.fetch(
