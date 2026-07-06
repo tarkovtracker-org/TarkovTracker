@@ -1,10 +1,9 @@
 import { createError, defineEventHandler, getQuery } from 'h3';
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('AdminApiUsage');
-interface UsageRow {
+interface UsageSummaryRow {
   user_id: string;
   token_id: string;
-  day: string;
   tier: string;
   reads: number;
   writes: number;
@@ -18,7 +17,11 @@ interface ConsumerSummary {
   writes: number;
   throttled: number;
 }
-export default defineEventHandler(async (event) => {
+interface ApiUsageResponse {
+  since: string;
+  consumers: ConsumerSummary[];
+}
+export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
   const config = useRuntimeConfig(event);
   const supabaseUrl = ((config.supabaseUrl as string) || '').replace(/\/$/, '');
   const serviceKey = (config.supabaseServiceKey as string) || '';
@@ -35,33 +38,28 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Admin privileges required' });
   }
   const limit = readLimit(getQuery(event).limit);
+  // UTC-day buckets: covers today and yesterday (UTC), not a rolling 24 hours.
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const sinceDay = since.toISOString().slice(0, 10);
-  const rows = await supabaseFetch<UsageRow[]>(
+  // Aggregation, ranking, and limiting happen in SQL so no raw rows are
+  // truncated before the top consumers are computed.
+  const rows = await supabaseFetch<UsageSummaryRow[]>(
     supabaseUrl,
     serviceKey,
-    `/rest/v1/api_usage_daily?day=gte.${sinceDay}&select=user_id,token_id,day,tier,reads,writes,throttled&order=day.desc&limit=2000`
+    '/rest/v1/rpc/get_api_usage_summary',
+    {
+      method: 'POST',
+      body: JSON.stringify({ p_since: sinceDay, p_limit: limit }),
+    }
   );
-  const byToken = new Map<string, ConsumerSummary>();
-  for (const row of rows) {
-    const key = `${row.user_id}:${row.token_id}`;
-    const entry = byToken.get(key) ?? {
-      userId: row.user_id,
-      tokenId: row.token_id,
-      tier: row.tier,
-      reads: 0,
-      writes: 0,
-      throttled: 0,
-    };
-    entry.tier = row.tier;
-    entry.reads += row.reads;
-    entry.writes += row.writes;
-    entry.throttled += row.throttled;
-    byToken.set(key, entry);
-  }
-  const consumers = [...byToken.values()]
-    .sort((a, b) => b.reads + b.writes - (a.reads + a.writes))
-    .slice(0, limit);
+  const consumers: ConsumerSummary[] = rows.map((row) => ({
+    userId: row.user_id,
+    tokenId: row.token_id,
+    tier: row.tier,
+    reads: Number(row.reads) || 0,
+    writes: Number(row.writes) || 0,
+    throttled: Number(row.throttled) || 0,
+  }));
   return { since: sinceDay, consumers };
 });
 function readLimit(raw: unknown): number {

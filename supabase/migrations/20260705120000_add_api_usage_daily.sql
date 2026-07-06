@@ -61,3 +61,42 @@ REVOKE ALL ON FUNCTION public.record_api_usage(UUID, TEXT, TEXT, INTEGER, INTEGE
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.record_api_usage(UUID, TEXT, TEXT, INTEGER, INTEGER, INTEGER)
   TO service_role;
+
+-- Aggregate usage per user/token in SQL so the admin endpoint never truncates
+-- raw rows before ranking. Tier is taken from the newest day per token. The
+-- window is UTC-day bucketed (day >= p_since), not a rolling 24 hours.
+CREATE OR REPLACE FUNCTION public.get_api_usage_summary(
+  p_since DATE,
+  p_limit INTEGER DEFAULT 20
+)
+RETURNS TABLE (
+  user_id UUID,
+  token_id TEXT,
+  tier TEXT,
+  reads BIGINT,
+  writes BIGINT,
+  throttled BIGINT
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    u.user_id,
+    u.token_id,
+    (ARRAY_AGG(u.tier ORDER BY u.day DESC))[1] AS tier,
+    COALESCE(SUM(u.reads), 0)::BIGINT AS reads,
+    COALESCE(SUM(u.writes), 0)::BIGINT AS writes,
+    COALESCE(SUM(u.throttled), 0)::BIGINT AS throttled
+  FROM public.api_usage_daily u
+  WHERE u.day >= p_since
+  GROUP BY u.user_id, u.token_id
+  ORDER BY COALESCE(SUM(u.reads), 0) + COALESCE(SUM(u.writes), 0) DESC
+  LIMIT LEAST(GREATEST(COALESCE(p_limit, 20), 1), 100)
+$$;
+
+REVOKE ALL ON FUNCTION public.get_api_usage_summary(DATE, INTEGER)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_api_usage_summary(DATE, INTEGER)
+  TO service_role;

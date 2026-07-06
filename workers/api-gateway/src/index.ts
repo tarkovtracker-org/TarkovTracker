@@ -101,16 +101,34 @@ export class ApiGatewayRateLimiter {
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405 });
     }
-    let payload: { limit?: number; windowSec?: number; anchor?: string; mode?: string } = {};
+    let payload: {
+      limit?: number;
+      windowSec?: number;
+      anchor?: string;
+      mode?: string;
+      refund?: boolean;
+    } = {};
     try {
       payload = (await request.json()) as {
         limit?: number;
         windowSec?: number;
         anchor?: string;
         mode?: string;
+        refund?: boolean;
       };
     } catch {
       return new Response('Bad Request', { status: 400 });
+    }
+    if (payload.refund === true) {
+      // Return one previously consumed fixed-window slot (e.g. when a request
+      // that passed the daily check is then rejected by the burst limiter).
+      await this.load();
+      const now = Date.now();
+      if (this.data && !this.data.mode && now < this.data.resetAt && this.data.count > 0) {
+        this.data.count -= 1;
+        await this.state.storage.put('state', this.data);
+      }
+      return this.json({ allowed: true, remaining: 0, resetAt: this.data?.resetAt ?? now });
     }
     const limit = Number(payload.limit);
     const windowSec = Number(payload.windowSec);
@@ -256,6 +274,28 @@ async function rateLimit(
       status: 503,
       message: 'Rate limiter unavailable',
     };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+/**
+ * Best-effort refund of one fixed-window slot (used when the daily counter was
+ * consumed but the request was subsequently rejected by the burst limiter).
+ */
+async function refundRateLimit(env: Env, key: string): Promise<void> {
+  const id = env.API_GATEWAY_LIMITER.idFromName(key);
+  const stub = env.API_GATEWAY_LIMITER.get(id);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RATE_LIMIT_TIMEOUT_MS);
+  try {
+    await stub.fetch('https://rate-limit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refund: true }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    console.warn('rateLimit refund failed', { key, error });
   } finally {
     clearTimeout(timeout);
   }
@@ -445,7 +485,8 @@ async function authenticateAndRateLimit(
   // Daily quota first, so a request rejected by the daily quota does not
   // consume a burst slot. Both counters key on user_id so extra tokens do not
   // multiply a user's quota.
-  const daily = await rateLimit(env, `daily-${kind}:${token.user_id}`, dailyLimit, DAILY_WINDOW_SEC, {
+  const dailyKey = `daily-${kind}:${token.user_id}`;
+  const daily = await rateLimit(env, dailyKey, dailyLimit, DAILY_WINDOW_SEC, {
     anchor: 'utc-day',
   });
   const dailyHeaders = rateLimitHeaders(daily);
@@ -465,13 +506,26 @@ async function authenticateAndRateLimit(
     { mode: 'sliding' }
   );
   if (!burst.allowed) {
+    // Give back the daily slot consumed above so burst-throttled attempts do
+    // not drain the daily quota.
+    const refund = refundRateLimit(env, dailyKey);
+    if (ctx) ctx.waitUntil(refund);
     track(true);
+    // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
+    // remaining for the refund. Retry-After reflects when burst capacity frees.
+    const headers = rateLimitHeaders({
+      ...daily,
+      remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
+    });
+    if (typeof burst.resetAt === 'number') {
+      headers['Retry-After'] = String(Math.max(1, Math.ceil((burst.resetAt - Date.now()) / 1000)));
+    }
     return errorResponse(
       burst.message || 'Rate limit exceeded',
       burst.status || 429,
       envOrigin,
       requestOrigin,
-      rateLimitHeaders(burst)
+      headers
     );
   }
   track(false);

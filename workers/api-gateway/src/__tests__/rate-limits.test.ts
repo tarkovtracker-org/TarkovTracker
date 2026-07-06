@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker, { ApiGatewayRateLimiter } from '../index';
-import { TIER_LIMITS, UPGRADE_URL } from '../limits';
+import { isKnownTier, TIER_LIMITS, UPGRADE_URL } from '../limits';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
 
@@ -183,6 +183,24 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(allowedAgain.allowed).toBe(true);
   });
 
+  it('refunds a consumed fixed-window slot on demand', async () => {
+    const limiter = new ApiGatewayRateLimiter(makeState());
+    const payload = { limit: 2, windowSec: 86400, anchor: 'utc-day' };
+    await limiter.fetch(limiterRequest(payload));
+    await limiter.fetch(limiterRequest(payload));
+    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+    };
+    expect(blocked.allowed).toBe(false);
+    await limiter.fetch(limiterRequest({ refund: true }));
+    const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+      remaining: number;
+    };
+    expect(afterRefund.allowed).toBe(true);
+    expect(afterRefund.remaining).toBe(0);
+  });
+
   it('keeps legacy fixed-window behavior for payloads without mode or anchor', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const payload = { limit: 2, windowSec: 60 };
@@ -302,6 +320,48 @@ describe('tiered quotas in the worker', () => {
     await flushAsync();
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
+  });
+
+  it('rejects inherited object keys as tiers', () => {
+    expect(isKnownTier('__proto__')).toBe(false);
+    expect(isKnownTier('constructor')).toBe(false);
+    expect(isKnownTier('chad')).toBe(true);
+  });
+
+  it('refunds the daily slot and returns daily headers when burst throttles', async () => {
+    const calls: LimiterCall[] = [];
+    const burstResetAt = Date.now() + 30_000;
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
+        if (call.body.refund === true) {
+          return { allowed: true, remaining: 0, resetAt: burstResetAt };
+        }
+        if (String(call.key).startsWith('burst-')) {
+          return { allowed: false, remaining: 0, resetAt: burstResetAt };
+        }
+        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000 };
+      }),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      env
+    );
+    expect(res.status).toBe(429);
+    // X-RateLimit-* reflects the daily quota; remaining includes the refunded slot.
+    expect(res.headers.get('X-RateLimit-Limit')).toBe(String(TIER_LIMITS.free.readsPerDay));
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('6');
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(31);
+    await flushAsync();
+    const refunds = calls.filter((call) => call.body.refund === true);
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0].key).toBe('daily-read:user-free');
   });
 
   it('records successful usage through the record_api_usage rpc', async () => {

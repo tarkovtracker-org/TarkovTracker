@@ -3,6 +3,7 @@ import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
 
 const TIER_CACHE_TTL_SECONDS = 60;
+const TIER_FETCH_TIMEOUT_MS = 3000;
 
 interface SupporterRow {
   tier?: string | null;
@@ -19,13 +20,16 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
   const cached = getMemoryCache<ApiTier>(cacheKey);
   if (cached) return cached;
   let tier: ApiTier = 'free';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIER_FETCH_TIMEOUT_MS);
   try {
-    const url = `${env.SUPABASE_URL}/rest/v1/supporters?user_id=eq.${userId}&select=tier,status,expires_at&limit=1`;
+    const url = `${env.SUPABASE_URL}/rest/v1/supporters?user_id=eq.${encodeURIComponent(userId)}&select=tier,status,expires_at&limit=1`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
       },
+      signal: controller.signal,
     });
     if (response.ok) {
       const rows = (await response.json()) as SupporterRow[];
@@ -39,6 +43,8 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
     }
   } catch (error) {
     console.warn('resolveTier failed, defaulting to free', { error });
+  } finally {
+    clearTimeout(timeout);
   }
   setMemoryCache(cacheKey, tier, TIER_CACHE_TTL_SECONDS);
   return tier;

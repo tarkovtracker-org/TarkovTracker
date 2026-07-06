@@ -1,6 +1,8 @@
 import type { ApiTier } from '../limits';
 import type { Env } from '../types';
 
+const USAGE_RPC_TIMEOUT_MS = 3000;
+
 export interface UsageRecord {
   userId: string;
   tokenId: string;
@@ -14,6 +16,8 @@ export interface UsageRecord {
  * record_api_usage RPC. Best-effort: failures are logged, never surfaced.
  */
 export async function recordUsage(env: Env, record: UsageRecord): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), USAGE_RPC_TIMEOUT_MS);
   try {
     const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/record_api_usage`, {
       method: 'POST',
@@ -22,6 +26,7 @@ export async function recordUsage(env: Env, record: UsageRecord): Promise<void> 
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
         'content-type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         p_user_id: record.userId,
         p_token_id: record.tokenId,
@@ -36,5 +41,7 @@ export async function recordUsage(env: Env, record: UsageRecord): Promise<void> 
     }
   } catch (error) {
     console.warn('recordUsage error', { error });
+  } finally {
+    clearTimeout(timeout);
   }
 }

@@ -37,5 +37,5 @@ export function upgradeMessage(kind: 'read' | 'write'): string {
 }
 
 export function isKnownTier(value: string): value is ApiTier {
-  return value in TIER_LIMITS;
+  return Object.hasOwn(TIER_LIMITS, value);
 }

@@ -57,31 +57,20 @@ describe('GET /api/admin/api-usage', () => {
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 403 });
   });
-  it('aggregates and ranks the top consumers over the last 24h', async () => {
+  it('returns the top consumers from the SQL aggregation RPC', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
       jsonResponse([
         {
           user_id: 'u1',
           token_id: 't1',
-          day: '2026-07-05',
           tier: 'free',
-          reads: 900,
-          writes: 50,
+          reads: 1000,
+          writes: 60,
           throttled: 12,
-        },
-        {
-          user_id: 'u1',
-          token_id: 't1',
-          day: '2026-07-04',
-          tier: 'free',
-          reads: 100,
-          writes: 10,
-          throttled: 0,
         },
         {
           user_id: 'u2',
           token_id: 't2',
-          day: '2026-07-05',
           tier: 'chad',
           reads: 200,
           writes: 20,
@@ -91,8 +80,16 @@ describe('GET /api/admin/api-usage', () => {
     );
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
     const result = (await handler(makeEvent({ id: 'admin-1' }))) as unknown as {
+      since: string;
       consumers: Array<Record<string, unknown>>;
     };
+    const rpcCall = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(rpcCall[0]).toContain('/rest/v1/rpc/get_api_usage_summary');
+    expect(rpcCall[1].method).toBe('POST');
+    expect(JSON.parse(String(rpcCall[1].body))).toMatchObject({
+      p_since: result.since,
+      p_limit: 20,
+    });
     expect(result.consumers).toHaveLength(2);
     expect(result.consumers[0]).toMatchObject({
       userId: 'u1',
