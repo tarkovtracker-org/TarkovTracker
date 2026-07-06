@@ -3,20 +3,19 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": false,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "#imports": ["./src/shims/nuxt-imports.ts"],
+      "#imports": ["./nuxt-imports.ts"],
       "@/*": ["../../app/*"],
       "~/*": ["../../app/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["./**/*.ts"]
 }

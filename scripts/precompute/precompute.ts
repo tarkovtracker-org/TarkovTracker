@@ -7,21 +7,26 @@
  * the precomputed blob instead of running the multi-MB transform inside a
  * request invocation, which is what exceeded the per-invocation resource
  * ceiling (Cloudflare Error 1102) on cold, low-traffic colos.
+ *
+ * Executed from GitHub Actions (.github/workflows/precompute-tarkov-data.yml)
+ * because the Workers Free tier's 10ms CPU budget cannot fit even a single
+ * lang x gameMode transform, let alone the full 32-combination run.
  */
-import { applyOverlay } from '../../../app/server/utils/overlay';
+import { applyOverlay } from '@/server/utils/overlay';
 import {
   buildPrecomputedEnvelope,
   buildTasksCorePrecomputedKey,
-} from '../../../app/server/utils/precomputedTarkov';
-import { VALID_GAME_MODES } from '../../../app/server/utils/tarkov-cache-config';
-import { createTarkovJsonTasksCoreFetcher } from '../../../app/server/utils/tarkov-json';
-import { API_SUPPORTED_LANGUAGES } from '../../../app/utils/constants';
-import type { ValidGameMode } from '../../../app/server/utils/tarkov-cache-config';
+} from '@/server/utils/precomputedTarkov';
+import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
+import { createTarkovJsonTasksCoreFetcher } from '@/server/utils/tarkov-json';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
+import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 
-// KV entries outlive several missed cron runs so a precompute outage degrades
-// to slightly stale data instead of dropping colos back onto the fatal
-// cold-miss path. The cron refreshes every 12h (matching CACHE_TTL_DEFAULT).
-const PRECOMPUTED_TTL_SECONDS = 7 * 24 * 60 * 60;
+// KV entries outlive several missed scheduled runs so a precompute outage
+// degrades to slightly stale data instead of dropping colos back onto the
+// fatal cold-miss path. The schedule refreshes every 12h (matching
+// CACHE_TTL_DEFAULT).
+export const PRECOMPUTED_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export type KvWriter = {
   put: (key: string, value: string, options?: { expirationTtl?: number }) => Promise<void>;
@@ -40,7 +45,7 @@ export type PrecomputeResult = {
 
 /**
  * Returns an error message when a filter value matches no supported
- * combination, so the /run handler can reject it with a 400 instead of
+ * combination, so the runner can reject it with a non-zero exit instead of
  * silently completing a no-op run. Returns null when the filter is valid.
  */
 export function validatePrecomputeFilter(filter: PrecomputeFilter): string | null {
@@ -71,10 +76,10 @@ export async function runPrecompute(
   const successes: string[] = [];
   const failures: { error: string; key: string }[] = [];
   // Sequential on purpose: each combination materializes several multi-MB JSON
-  // documents. Running them in parallel would recreate the memory pressure
-  // this Worker exists to remove. A failed combination is recorded and skipped
-  // so one bad upstream response cannot abort the whole run; the next cron
-  // run retries it while the previous KV entry keeps serving.
+  // documents, and sequential runs keep memory flat and upstream load polite.
+  // A failed combination is recorded and skipped so one bad upstream response
+  // cannot abort the whole run; the next scheduled run retries it while the
+  // previous KV entry keeps serving.
   for (const lang of langs) {
     for (const gameMode of gameModes) {
       const key = buildTasksCorePrecomputedKey(lang, gameMode);
