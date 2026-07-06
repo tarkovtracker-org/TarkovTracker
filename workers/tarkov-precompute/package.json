@@ -1,0 +1,11 @@
+{
+  "name": "tarkov-precompute",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:check": "wrangler deploy --dry-run --outdir=dist",
+    "typecheck": "tsc --noEmit"
+  }
+}

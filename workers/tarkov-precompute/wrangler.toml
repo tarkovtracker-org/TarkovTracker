@@ -1,0 +1,41 @@
+# tarkov-precompute: scheduled Worker that runs the heavy tasks-core
+# fetch/adapt/overlay pipeline off the request path and writes the final
+# payload to the TARKOV_DATA KV namespace. The Pages app (root wrangler.toml)
+# binds the same namespace read-only via edgeCache's `precomputed` option.
+#
+# Human provisioning steps (this Worker is not deployed by CI):
+#   1. wrangler kv namespace create TARKOV_DATA
+#   2. Replace the placeholder `id` below AND in the root wrangler.toml
+#      ([[kv_namespaces]] and [[env.preview.kv_namespaces]]).
+#   3. wrangler secret put PRECOMPUTE_TRIGGER_TOKEN   (enables POST /run)
+#   4. wrangler deploy   (from workers/tarkov-precompute)
+#   5. Optionally trigger the first fill immediately:
+#      curl -X POST -H "Authorization: Bearer <token>" https://<worker-url>/run
+name = "tarkov-precompute"
+main = "src/index.ts"
+compatibility_date = "2026-01-09"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+# Every 12h, matching CACHE_TTL_DEFAULT (43200s) in the app. Runs must be
+# sequential per combination, so a full run takes a few minutes of wall time;
+# cron invocations allow up to 15 minutes.
+[triggers]
+crons = ["0 */12 * * *"]
+
+[observability]
+enabled = true
+
+# TODO: replace with real namespace ID after `wrangler kv namespace create TARKOV_DATA`
+[[kv_namespaces]]
+binding = "TARKOV_DATA"
+id = "00000000000000000000000000000000"
+
+# The bundled modules under app/server/utils are shared with the Nuxt app and
+# use Nuxt's `#imports` virtual module plus the `@/` alias. Wrangler resolves
+# these at build time; the shim returns an empty runtime config, which the
+# shared modules already treat as "use defaults".
+[alias]
+"#imports" = "./src/shims/nuxt-imports.ts"
+"@/server/utils/logger" = "../../app/server/utils/logger.ts"
