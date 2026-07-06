@@ -38,6 +38,27 @@ export type PrecomputeResult = {
   successes: string[];
 };
 
+/**
+ * Returns an error message when a filter value matches no supported
+ * combination, so the /run handler can reject it with a 400 instead of
+ * silently completing a no-op run. Returns null when the filter is valid.
+ */
+export function validatePrecomputeFilter(filter: PrecomputeFilter): string | null {
+  if (
+    filter.lang !== undefined &&
+    !(API_SUPPORTED_LANGUAGES as readonly string[]).includes(filter.lang)
+  ) {
+    return `Unsupported lang "${filter.lang}". Supported: ${API_SUPPORTED_LANGUAGES.join(', ')}`;
+  }
+  if (
+    filter.gameMode !== undefined &&
+    !(VALID_GAME_MODES as readonly string[]).includes(filter.gameMode)
+  ) {
+    return `Unsupported gameMode "${filter.gameMode}". Supported: ${VALID_GAME_MODES.join(', ')}`;
+  }
+  return null;
+}
+
 export async function runPrecompute(
   kv: KvWriter,
   filter: PrecomputeFilter = {}
