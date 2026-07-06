@@ -18,9 +18,6 @@ export interface Env {
   PRECOMPUTE_TRIGGER_TOKEN?: string;
 }
 
-type ScheduledController = { cron: string; scheduledTime: number };
-type ExecutionContext = { waitUntil: (promise: Promise<unknown>) => void };
-
 function summarize(result: PrecomputeResult): string {
   return JSON.stringify({
     durationMs: result.durationMs,
