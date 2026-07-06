@@ -27,7 +27,7 @@ BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION 'p_user_id is required';
   END IF;
-  IF p_field NOT IN ('pvp_data', 'pve_data') THEN
+  IF p_field IS NULL OR p_field NOT IN ('pvp_data', 'pve_data') THEN
     RAISE EXCEPTION 'p_field must be pvp_data or pve_data';
   END IF;
 

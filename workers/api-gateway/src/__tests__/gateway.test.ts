@@ -330,9 +330,10 @@ describe('api-gateway', () => {
     expect(mergePayload).not.toBeNull();
     const payload = mergePayload as unknown as MergeRpcPayload;
     expect(payload.p_field).toBe('pvp_data');
-    const taskCompletions = payload.p_task_completions as
-      | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
-      | null;
+    const taskCompletions = payload.p_task_completions as Record<
+      string,
+      { complete?: boolean; failed?: boolean; timestamp?: number }
+    > | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
     expect(taskCompletions?.['task-alt']?.complete).toBe(true);
@@ -420,9 +421,10 @@ describe('api-gateway', () => {
     expect(res.status).toBe(200);
     expect(mergePayload).not.toBeNull();
     const payload = mergePayload as unknown as MergeRpcPayload;
-    const taskCompletions = payload.p_task_completions as
-      | Record<string, { complete?: boolean; failed?: boolean; timestamp?: number }>
-      | null;
+    const taskCompletions = payload.p_task_completions as Record<
+      string,
+      { complete?: boolean; failed?: boolean; timestamp?: number }
+    > | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(true);
@@ -498,10 +500,7 @@ describe('api-gateway', () => {
         ],
       })
     );
-    const res = await worker.fetch(
-      postTaskRequest('task-main', { state: 'completed' }),
-      BASE_ENV
-    );
+    const res = await worker.fetch(postTaskRequest('task-main', { state: 'completed' }), BASE_ENV);
     await expectErrorResponse(res, 500, 'Progress row not found for user');
   });
   it('does not lose unrelated keys when two writers merge concurrently', async () => {
@@ -705,9 +704,8 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     expect(mergePayload).not.toBeNull();
-    const taskCompletions = (mergePayload as unknown as MergeRpcPayload).p_task_completions as
-      | Record<string, { complete?: boolean }>
-      | null;
+    const taskCompletions = (mergePayload as unknown as MergeRpcPayload)
+      .p_task_completions as Record<string, { complete?: boolean }> | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
   });
   it('rejects POST /progress/task/objective with URL-encoded whitespace ID', async () => {
@@ -770,10 +768,34 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     expect(mergePayload).not.toBeNull();
-    const taskObjectives = (mergePayload as unknown as MergeRpcPayload).p_task_objectives as
-      | Record<string, { complete?: boolean }>
-      | null;
+    const taskObjectives = (mergePayload as unknown as MergeRpcPayload).p_task_objectives as Record<
+      string,
+      { complete?: boolean }
+    > | null;
     expect(taskObjectives?.['obj-1']?.complete).toBe(true);
+  });
+  it('objective count-only update does not carry stale complete state', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    const fetchMock = createBaseFetchMock({
+      onMerge: (payload) => {
+        mergePayload = payload;
+      },
+      userProgress: {
+        user_id: 'user-1',
+        game_edition: 1,
+        pvp_data: { taskObjectives: { 'obj-1': { complete: true, count: 0, timestamp: 1 } } },
+        pve_data: null,
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(postObjectiveRequest('obj-1', { count: 5 }), BASE_ENV);
+    expect(res.status).toBe(200);
+    const objectives = (mergePayload as unknown as MergeRpcPayload).p_task_objectives as Record<
+      string,
+      Record<string, unknown>
+    > | null;
+    expect(objectives?.['obj-1']?.count).toBe(5);
+    expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {

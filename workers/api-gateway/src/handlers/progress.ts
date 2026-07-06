@@ -20,9 +20,7 @@ interface ProgressMergePayload {
   taskObjectives?: Record<string, Record<string, unknown>>;
   set?: Record<string, unknown>;
 }
-function snapshotCompletions(
-  taskCompletions: Record<string, TaskCompletion>
-): Map<string, string> {
+function snapshotCompletions(taskCompletions: Record<string, TaskCompletion>): Map<string, string> {
   return new Map(Object.entries(taskCompletions).map(([id, value]) => [id, JSON.stringify(value)]));
 }
 function diffCompletions(
@@ -369,35 +367,19 @@ export async function handleUpdateObjective(
 ): Promise<{ objectiveId: string; state?: string; count?: number; message: string }> {
   const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
   const updateTime = Date.now();
-  // Read the current objective to merge state/count/timestamp incrementally.
-  // The write below is atomic, but this read can still race another writer;
-  // last objective-state write wins, which is the desired semantic here.
-  const getUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=${dataField}`;
-  const getRes = await fetch(getUrl, {
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!getRes.ok) {
-    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
-  }
-  const rows = (await getRes.json()) as Array<Record<string, unknown>>;
-  const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
-  const taskObjectives =
-    (currentData.taskObjectives as Record<string, Record<string, unknown>>) || {};
-  const objectiveData = taskObjectives[objectiveId] || {};
-  // Update state if provided
+  // Build the patch from `update` only and let the RPC's per-key objective
+  // merge preserve untouched fields server-side. Reading the current objective
+  // here would race a concurrent writer and could carry a stale `complete` or
+  // `count` back into the merge, reintroducing the lost-update this refactor
+  // fixes. Every objective write bumps `timestamp` to mark last touch.
+  const objectiveData: Record<string, unknown> = {};
   if (update.state !== undefined) {
     objectiveData.complete = update.state === 'completed';
     objectiveData.timestamp = updateTime;
   }
-  // Update count if provided
   if (update.count !== undefined) {
     objectiveData.count = update.count;
-    if (!objectiveData.timestamp) {
-      objectiveData.timestamp = updateTime;
-    }
+    objectiveData.timestamp = updateTime;
   }
   await mergeProgressData(
     env,
