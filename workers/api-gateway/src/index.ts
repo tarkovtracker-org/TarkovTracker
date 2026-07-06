@@ -283,6 +283,7 @@ async function rateLimit(
  * consumed but the request was subsequently rejected by the burst limiter).
  */
 async function refundRateLimit(env: Env, key: string): Promise<void> {
+  const action = key.split(':', 1)[0] || 'unknown';
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
   const stub = env.API_GATEWAY_LIMITER.get(id);
   const controller = new AbortController();
@@ -295,7 +296,7 @@ async function refundRateLimit(env: Env, key: string): Promise<void> {
       signal: controller.signal,
     });
   } catch (error) {
-    console.warn('rateLimit refund failed', { key, error });
+    console.warn('rateLimit refund failed', { action, error });
   } finally {
     clearTimeout(timeout);
   }
