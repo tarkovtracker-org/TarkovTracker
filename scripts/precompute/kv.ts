@@ -10,6 +10,7 @@
 import type { KvWriter } from './precompute';
 
 const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
+const KV_WRITE_TIMEOUT_MS = 30_000;
 
 export type KvRestConfig = {
   accountId: string;
@@ -39,6 +40,7 @@ export function createKvRestWriter(config: KvRestConfig): KvWriter {
           'Content-Type': 'text/plain',
         },
         method: 'PUT',
+        signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
       });
       const body = (await response.json().catch(() => null)) as CloudflareApiResponse | null;
       if (!response.ok || body?.success !== true) {
