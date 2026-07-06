@@ -144,6 +144,145 @@ describe('edgeCache', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(cacheSpy.put).not.toHaveBeenCalled();
   });
+  it('serves precomputed payload from the KV store without touching edge cache', async () => {
+    const precomputedStore = {
+      get: vi.fn(async () => ({
+        payload: { data: { tasks: [{ id: 'precomputed' }] } },
+        storedAt: Date.now(),
+        version: 1,
+      })),
+    };
+    const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
+    const event = createEvent();
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      precomputed: true,
+      deps: {
+        createErrorFn,
+        precomputedStore,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { tasks: [{ id: 'precomputed' }] } });
+    expect(precomputedStore.get).toHaveBeenCalledWith('tasks-core-json-v1-en-regular', 'json');
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(cacheSpy.match).not.toHaveBeenCalled();
+    expect(cacheSpy.put).not.toHaveBeenCalled();
+    expect(setHeaders).toHaveBeenCalledWith(
+      event,
+      expect.objectContaining({
+        'X-Cache-Status': 'PRECOMPUTE',
+        'Cache-Control': 'public, max-age=60, s-maxage=60',
+      })
+    );
+  });
+  it('resolves the precomputed store from the Cloudflare binding on the event', async () => {
+    const kvGet = vi.fn(async () => ({
+      payload: { data: { tasks: [{ id: 'from-binding' }] } },
+      storedAt: Date.now(),
+      version: 1,
+    }));
+    const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
+    const event = createEvent();
+    (event.context as { cloudflare?: unknown }).cloudflare = {
+      env: { TARKOV_DATA: { get: kvGet } },
+    };
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      precomputed: true,
+      deps: {
+        createErrorFn,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { tasks: [{ id: 'from-binding' }] } });
+    expect(kvGet).toHaveBeenCalledWith('tasks-core-json-v1-en-regular', 'json');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('falls back to edge cache when the precomputed entry is missing', async () => {
+    const precomputedStore = { get: vi.fn(async () => null) };
+    const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
+    const event = createEvent();
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      precomputed: true,
+      deps: {
+        createErrorFn,
+        precomputedStore,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { tasks: [{ id: 'fresh' }] } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(cacheSpy.match).toHaveBeenCalledTimes(1);
+    expect(cacheSpy.put).toHaveBeenCalledTimes(1);
+    expect(setHeaders).toHaveBeenCalledWith(
+      event,
+      expect.objectContaining({ 'X-Cache-Status': 'MISS' })
+    );
+  });
+  it('falls back to edge cache when the precomputed entry is malformed', async () => {
+    const precomputedStore = { get: vi.fn(async () => ({ unexpected: true })) };
+    const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
+    const event = createEvent();
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      precomputed: true,
+      deps: {
+        createErrorFn,
+        precomputedStore,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { tasks: [{ id: 'fresh' }] } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('falls back to edge cache when the precomputed store read fails', async () => {
+    const precomputedStore = {
+      get: vi.fn(async () => {
+        throw new Error('kv unavailable');
+      }),
+    };
+    const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
+    const event = createEvent();
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      precomputed: true,
+      deps: {
+        createErrorFn,
+        precomputedStore,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(result).toEqual({ data: { tasks: [{ id: 'fresh' }] } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(cacheSpy.put).toHaveBeenCalledTimes(1);
+  });
+  it('skips the precomputed store when operator bypass is requested', async () => {
+    process.env.NUXT_CACHE_BYPASS_ENABLED = 'true';
+    _bypassEnabled.value = true;
+    const precomputedStore = { get: vi.fn() };
+    const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
+    const event = createEvent({ 'x-bypass-cache': 'true' });
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+      cacheKeyPrefix: 'tarkov',
+      precomputed: true,
+      deps: {
+        createErrorFn,
+        precomputedStore,
+        setResponseHeadersFn: setHeaders,
+      },
+    });
+    expect(precomputedStore.get).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    delete process.env.NUXT_CACHE_BYPASS_ENABLED;
+  });
   it('stores fresh payload on cache miss', async () => {
     const fetcher = vi.fn(async () => ({ data: { items: [{ id: 'fresh' }] } }));
     const event = createEvent();

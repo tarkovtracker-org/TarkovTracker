@@ -254,7 +254,7 @@ describe('Tarkov API handlers', () => {
       'tasks-core-json-v1-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', precomputed: true }
     );
   });
   it('applies overlay for tasks-objectives with versioned cache key', async () => {
