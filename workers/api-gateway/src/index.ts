@@ -147,8 +147,11 @@ export class ApiGatewayRateLimiter {
       const timestamps = (this.data?.timestamps ?? []).filter((ts) => ts > cutoff);
       const resetAt = timestamps.length ? timestamps[0] + windowMs : now + windowMs;
       if (timestamps.length >= limit) {
+        // Deny path: refresh in-memory state but skip the storage write. The
+        // pruned timestamps/resetAt are recomputed from storage on the next
+        // load, so persisting on every throttled hit would only add Durable
+        // Object write amplification under sustained bursts.
         this.data = { count: timestamps.length, resetAt, windowSec, mode, timestamps };
-        await this.state.storage.put('state', this.data);
         await this.scheduleCleanup(resetAt);
         return this.json({ allowed: false, remaining: 0, resetAt });
       }

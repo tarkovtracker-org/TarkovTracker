@@ -113,6 +113,15 @@ export const OPENAPI_SPEC = {
             schema: { $ref: '#/components/schemas/ErrorResponse' },
             examples: {
               rateLimited: { value: { success: false, error: 'Rate limit exceeded' } },
+              dailyQuotaUpgrade: {
+                summary: 'Free-tier daily quota exhausted',
+                value: {
+                  success: false,
+                  error:
+                    'Daily read quota exceeded for the free tier. Quotas reset at 00:00 UTC. ' +
+                    'Upgrade your account for higher limits: https://tarkovtracker.org/supporter',
+                },
+              },
             },
           },
         },

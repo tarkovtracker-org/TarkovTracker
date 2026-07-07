@@ -1,6 +1,5 @@
 import { createError, defineEventHandler, getQuery } from 'h3';
-import { createLogger } from '@/server/utils/logger';
-const logger = createLogger('AdminApiUsage');
+import { adminSupabaseFetch, getIsAdmin } from '@/server/utils/adminSupabase';
 interface UsageSummaryRow {
   user_id: string;
   token_id: string;
@@ -43,7 +42,7 @@ export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
   const sinceDay = since.toISOString().slice(0, 10);
   // Aggregation, ranking, and limiting happen in SQL so no raw rows are
   // truncated before the top consumers are computed.
-  const rows = await supabaseFetch<UsageSummaryRow[]>(
+  const rows = await adminSupabaseFetch<UsageSummaryRow[]>(
     supabaseUrl,
     serviceKey,
     '/rest/v1/rpc/get_api_usage_summary',
@@ -64,51 +63,6 @@ export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
 });
 function readLimit(raw: unknown): number {
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 20;
+  if (!Number.isFinite(parsed) || parsed < 1) return 20;
   return Math.min(Math.floor(parsed), 100);
-}
-async function getIsAdmin(
-  supabaseUrl: string,
-  serviceKey: string,
-  userId: string
-): Promise<boolean> {
-  const rows = await supabaseFetch<Array<{ is_admin: boolean | null }>>(
-    supabaseUrl,
-    serviceKey,
-    `/rest/v1/user_system?select=is_admin&user_id=eq.${encodeURIComponent(userId)}&limit=1`
-  );
-  return rows[0]?.is_admin === true;
-}
-async function supabaseFetch<T>(
-  supabaseUrl: string,
-  serviceKey: string,
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${supabaseUrl}${path}`, {
-      ...init,
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...(init.headers || {}),
-      },
-    });
-  } catch (error) {
-    logger.error('[AdminApiUsage] Supabase request failed', { path, error });
-    throw createError({ statusCode: 502, message: 'Supabase request failed' });
-  }
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    logger.error('[AdminApiUsage] Supabase request error', {
-      path,
-      status: response.status,
-      body: body.slice(0, 300),
-    });
-    throw createError({ statusCode: 502, message: 'Supabase request error' });
-  }
-  return (await response.json()) as T;
 }
