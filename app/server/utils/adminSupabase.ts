@@ -20,7 +20,7 @@ export async function adminSupabaseFetch<T>(
   serviceKey: string,
   path: string,
   init: RequestInit = {}
-): Promise<T> {
+): Promise<T | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SUPABASE_ADMIN_FETCH_TIMEOUT_MS);
   try {
@@ -45,11 +45,11 @@ export async function adminSupabaseFetch<T>(
       throw createError({ statusCode: 502, message: 'Supabase request failed' });
     }
     if (response.status === 204) {
-      return null as T;
+      return null;
     }
     const text = await response.text();
     if (!text.trim()) {
-      return null as T;
+      return null;
     }
     return JSON.parse(text) as T;
   } catch (error) {

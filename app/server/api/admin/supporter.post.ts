@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
       },
     }
   );
-  const updated = updatedRows[0];
+  const updated = updatedRows?.[0];
   if (!updated) {
     throw createError({ statusCode: 502, message: 'Supporter update returned no row' });
   }

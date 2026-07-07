@@ -51,7 +51,7 @@ export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
       body: JSON.stringify({ p_since: sinceDay, p_limit: limit }),
     }
   );
-  const consumers: ConsumerSummary[] = rows.map((row) => ({
+  const consumers: ConsumerSummary[] = (rows ?? []).map((row) => ({
     userId: row.user_id,
     tokenId: row.token_id,
     tier: row.tier,
