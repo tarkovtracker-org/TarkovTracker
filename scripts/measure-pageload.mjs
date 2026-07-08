@@ -31,29 +31,37 @@ const MIME = {
 };
 function startServer() {
   const distReal = realpathSync(DIST);
+  const distPrefix = distReal + sep;
+  const indexHtml = join(distReal, 'index.html');
   const server = createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
     let filePath;
     try {
       filePath = realpathSync(join(DIST, urlPath));
-      if (statSync(filePath).isDirectory()) {
-        filePath = realpathSync(join(filePath, 'index.html'));
-      }
     } catch {
       filePath = null;
     }
     if (!filePath) {
-      // SPA fallback
-      try {
-        filePath = realpathSync(join(DIST, 'index.html'));
-      } catch {
-        res.statusCode = 404;
-        return res.end('not found');
-      }
+      // SPA fallback for paths that don't exist
+      filePath = indexHtml;
     }
-    if (filePath !== distReal && !filePath.startsWith(distReal + sep)) {
+    if (filePath === distReal) {
+      filePath = indexHtml;
+    }
+    if (!filePath.startsWith(distPrefix)) {
       res.statusCode = 403;
       return res.end('forbidden');
+    }
+    if (existsSync(filePath) && statSync(filePath).isDirectory()) {
+      try {
+        filePath = realpathSync(join(filePath, 'index.html'));
+      } catch {
+        filePath = indexHtml;
+      }
+      if (!filePath.startsWith(distPrefix)) {
+        res.statusCode = 403;
+        return res.end('forbidden');
+      }
     }
     res.setHeader('content-type', MIME[extname(filePath)] || 'application/octet-stream');
     createReadStream(filePath)
