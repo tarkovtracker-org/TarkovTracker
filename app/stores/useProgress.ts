@@ -186,7 +186,6 @@ export const useProgressStore = defineStore('progress', () => {
       {
         mode: GameMode;
         level: number;
-        prestigeLevel: number;
         faction: string;
         completions: Record<string, RawTaskCompletion>;
         traders: Record<string, { level?: number; reputation?: number }>;
@@ -199,19 +198,12 @@ export const useProgressStore = defineStore('progress', () => {
       teamDataCache.set(teamId, {
         mode: store.$state.currentGameMode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP,
         level: getLevel(teamId),
-        prestigeLevel: currentData?.prestigeLevel ?? 0,
         faction: currentData?.pmcFaction ?? 'USEC',
         completions: currentData?.taskCompletions ?? {},
         traders: currentData?.traders ?? {},
       });
     }
     const tasksById = new Map(tasks.map((task) => [task.id, task]));
-    const prestigeLevelById = new Map<string, number>();
-    for (const entry of metadataStore.prestigeLevels ?? []) {
-      if (entry?.id && typeof entry.prestigeLevel === 'number') {
-        prestigeLevelById.set(entry.id, entry.prestigeLevel);
-      }
-    }
     const normalizeStatuses = (statuses?: string[]) =>
       (statuses ?? []).map((status) => status.toLowerCase());
     const hasAnyStatus = (statuses: string[], values: string[]) =>
@@ -283,19 +275,6 @@ export const useProgressStore = defineStore('progress', () => {
           memo.set(taskId, false);
           visiting.delete(taskId);
           return false;
-        }
-        // Prestige check - gate tasks that require a minimum prestige level.
-        // Fail open when prestige metadata is missing so tasks are not locked spuriously.
-        if (task.requiredPrestige?.id) {
-          const requiredPrestigeLevel = prestigeLevelById.get(task.requiredPrestige.id);
-          if (
-            requiredPrestigeLevel !== undefined &&
-            teamData.prestigeLevel < requiredPrestigeLevel
-          ) {
-            memo.set(taskId, false);
-            visiting.delete(taskId);
-            return false;
-          }
         }
         // Fence reputation check - only Fence trader requirements gate availability
         // Other trader level/rep requirements are display-only, not gating
