@@ -1728,7 +1728,7 @@
         "show_next": "Mostra missioni successive",
         "show_prev": "Mostra missioni precedenti",
         "density": "Densità pannello",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Richiede livello di fedeltà trader e reputazione per la disponibilità della missione"
       },
       "defaults": {
         "title": "Viste predefinite"
