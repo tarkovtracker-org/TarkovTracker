@@ -9,6 +9,7 @@ import {
   isValidMapSvgConfig,
   isValidMapTileConfig,
   normalizeTileConfig,
+  resolveFloorTilePath,
   type MapRenderConfig,
   type MapSvgConfig,
   type MapTileConfig,
@@ -65,6 +66,29 @@ interface MapLayerLoadToken {
   signal: AbortSignal;
 }
 const svgCache = new Map<string, string>();
+function resolveInitialFloor(
+  svgConfig?: MapSvgConfig,
+  tileConfig?: MapTileConfig,
+  preferredFloor?: string
+): string {
+  if (svgConfig) {
+    return (
+      preferredFloor ||
+      svgConfig.defaultFloor ||
+      svgConfig.floors[svgConfig.floors.length - 1] ||
+      ''
+    );
+  }
+  if (tileConfig) {
+    return (
+      preferredFloor ||
+      tileConfig.defaultFloor ||
+      tileConfig.floors?.[tileConfig.floors.length - 1] ||
+      ''
+    );
+  }
+  return '';
+}
 function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === 'AbortError') ||
@@ -371,9 +395,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     }
     try {
       const bounds = getLeafletBounds(tileConfig);
-      const initialPath =
-        (selectedFloor.value && tileConfig.floorTilePaths?.[selectedFloor.value]) ||
-        tileConfig.tilePath;
+      const initialPath = resolveFloorTilePath(tileConfig, selectedFloor.value);
       const tilePaths = [initialPath, ...(tileConfig.tileFallbacks ?? [])];
       tileLayer.value = L.tileLayer(initialPath, {
         minZoom: tileConfig.minZoom ?? 1,
@@ -754,21 +776,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       const bounds = getLeafletBounds(renderConfig);
       mapInstance.value.fitBounds(bounds);
       // Set initial floor
-      if (svgConfig) {
-        selectedFloor.value =
-          initialFloor ||
-          svgConfig.defaultFloor ||
-          svgConfig.floors[svgConfig.floors.length - 1] ||
-          '';
-      } else if (tileConfig) {
-        selectedFloor.value =
-          initialFloor ||
-          tileConfig.defaultFloor ||
-          tileConfig.floors?.[tileConfig.floors.length - 1] ||
-          '';
-      } else {
-        selectedFloor.value = '';
-      }
+      selectedFloor.value = resolveInitialFloor(svgConfig, tileConfig, initialFloor);
       renderKey.value = getRenderKey() ?? '';
       loadToken = createMapLayerLoadToken();
       await loadMapLayer(initToken, loadToken);
@@ -906,13 +914,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
         return;
       }
       // Update floor selection
-      const svgConfig = newMap.svg;
-      if (isValidMapSvgConfig(svgConfig)) {
-        selectedFloor.value =
-          svgConfig.defaultFloor || svgConfig.floors[svgConfig.floors.length - 1] || '';
-      } else {
-        selectedFloor.value = '';
-      }
+      selectedFloor.value = resolveInitialFloor(newSvgConfig, newTileConfig);
       const nextRenderKey = getRenderKey() ?? '';
       if (nextRenderKey !== renderKey.value) {
         const loadToken = createMapLayerLoadToken();
@@ -933,6 +935,8 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   // Rebuild the tile layer on a user-initiated floor change so the tile-error fallback chain
   // is recreated for the new floor instead of reusing stale fallback state from the initial
   // floor. Skip while a load is already in flight (initial load already builds the right floor).
+  // The rebuild re-reads bounds/tileSize from the shared tile config: per-floor geometry is not
+  // supported because all current tile maps (Labs) share bounds and tileSize across floors.
   watch(selectedFloor, () => {
     if (isLoading.value) return;
     const tileConfig = getTileConfig();

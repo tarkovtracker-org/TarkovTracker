@@ -275,6 +275,18 @@ export function isValidMapTileConfig(tile: unknown): tile is MapTileConfig {
     hasValidFallbacks
   );
 }
+/**
+ * Resolves the tile URL template for a floor of a tile-based map.
+ * Falls back to the base tilePath when no floor is selected or the floor
+ * has no dedicated tile set.
+ * @param tileConfig Map tile configuration
+ * @param floor Currently selected floor name
+ * @returns Tile URL template for the floor
+ */
+export function resolveFloorTilePath(tileConfig: MapTileConfig, floor?: string): string {
+  const floorPath = floor ? tileConfig.floorTilePaths?.[floor] : undefined;
+  return floorPath || tileConfig.tilePath;
+}
 export function normalizeTileConfig(tileConfig: MapTileConfig): MapTileConfig {
   if (!Array.isArray(tileConfig.transform) || tileConfig.transform.length < 4) return tileConfig;
   const [scaleX, marginX, scaleYRaw, marginY] = tileConfig.transform;
