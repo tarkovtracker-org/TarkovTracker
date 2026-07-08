@@ -33,22 +33,29 @@ function startServer() {
   const distReal = realpathSync(DIST);
   const distPrefix = distReal + sep;
   const indexHtml = join(distReal, 'index.html');
+  // Maps a request path to a file inside dist, or null if it escapes dist.
+  // `requested` is assigned once and only read after the startsWith guard.
+  const resolveRequest = (urlPath) => {
+    const requested = resolvePath(join(distReal, urlPath));
+    if (requested === distReal) {
+      return indexHtml;
+    }
+    if (!requested.startsWith(distPrefix)) {
+      return null;
+    }
+    if (existsSync(requested) && statSync(requested).isDirectory()) {
+      const dirIndex = join(requested, 'index.html');
+      return existsSync(dirIndex) ? dirIndex : indexHtml;
+    }
+    // SPA fallback for routes without a generated file
+    return existsSync(requested) ? requested : indexHtml;
+  };
   const server = createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-    let filePath = resolvePath(join(distReal, urlPath));
-    if (filePath === distReal) {
-      filePath = indexHtml;
-    }
-    if (!filePath.startsWith(distPrefix)) {
+    const filePath = resolveRequest(urlPath);
+    if (!filePath) {
       res.statusCode = 403;
       return res.end('forbidden');
-    }
-    if (existsSync(filePath) && statSync(filePath).isDirectory()) {
-      filePath = join(filePath, 'index.html');
-    }
-    if (!existsSync(filePath)) {
-      // SPA fallback
-      filePath = indexHtml;
     }
     // Reject symlinks that resolve outside dist (realpath used for validation only).
     let realPath;
