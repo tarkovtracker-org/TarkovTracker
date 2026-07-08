@@ -369,7 +369,7 @@ All endpoints return errors in this format:
 
 The client caches API responses in IndexedDB with keys like:
 
-- `tasks-core-json-v1-regular-en`
+- `tasks-core-json-v2-regular-en`
 - `hideout-json-v1-pve-de`
 - `items-lite-json-v1-regular-en`
 - `prestige-all-json-v1-en`

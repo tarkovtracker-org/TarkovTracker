@@ -13,13 +13,13 @@ describe('createKvRestWriter', () => {
     createKvRestWriter({ accountId: 'acc-1', apiToken: 'token-1', namespaceId: 'ns-1' });
   it('PUTs the value to the namespaced key with TTL and bearer auth', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ success: true }));
-    await writer().put('tasks-core-json-v1-en-regular', '{"payload":1}', {
+    await writer().put('tasks-core-json-v2-en-regular', '{"payload":1}', {
       expirationTtl: 604800,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe(
-      'https://api.cloudflare.com/client/v4/accounts/acc-1/storage/kv/namespaces/ns-1/values/tasks-core-json-v1-en-regular?expiration_ttl=604800'
+      'https://api.cloudflare.com/client/v4/accounts/acc-1/storage/kv/namespaces/ns-1/values/tasks-core-json-v2-en-regular?expiration_ttl=604800'
     );
     expect(init.method).toBe('PUT');
     expect(init.body).toBe('{"payload":1}');

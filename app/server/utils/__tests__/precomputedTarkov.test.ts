@@ -8,8 +8,8 @@ import {
 describe('precomputedTarkov', () => {
   describe('buildTasksCorePrecomputedKey', () => {
     it('matches the tasks-core edge cache key format', () => {
-      expect(buildTasksCorePrecomputedKey('en', 'regular')).toBe('tasks-core-json-v1-en-regular');
-      expect(buildTasksCorePrecomputedKey('de', 'pve')).toBe('tasks-core-json-v1-de-pve');
+      expect(buildTasksCorePrecomputedKey('en', 'regular')).toBe('tasks-core-json-v2-en-regular');
+      expect(buildTasksCorePrecomputedKey('de', 'pve')).toBe('tasks-core-json-v2-de-pve');
     });
   });
   describe('envelope round trip', () => {

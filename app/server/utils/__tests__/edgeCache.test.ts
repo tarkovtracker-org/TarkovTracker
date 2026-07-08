@@ -162,7 +162,7 @@ describe('edgeCache', () => {
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
     const event = createEvent();
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+    const result = await edgeCache(event, 'tasks-core-json-v2-en-regular', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
       precomputed: true,
       deps: {
@@ -172,7 +172,7 @@ describe('edgeCache', () => {
       },
     });
     expect(result).toEqual({ data: { tasks: [{ id: 'precomputed' }] } });
-    expect(precomputedStore.get).toHaveBeenCalledWith('tasks-core-json-v1-en-regular', 'json');
+    expect(precomputedStore.get).toHaveBeenCalledWith('tasks-core-json-v2-en-regular', 'json');
     expect(fetcher).not.toHaveBeenCalled();
     expect(cacheSpy.match).not.toHaveBeenCalled();
     expect(cacheSpy.put).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe('edgeCache', () => {
       env: { TARKOV_DATA: { get: kvGet } },
     };
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+    const result = await edgeCache(event, 'tasks-core-json-v2-en-regular', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
       precomputed: true,
       deps: {
@@ -205,7 +205,7 @@ describe('edgeCache', () => {
       },
     });
     expect(result).toEqual({ data: { tasks: [{ id: 'from-binding' }] } });
-    expect(kvGet).toHaveBeenCalledWith('tasks-core-json-v1-en-regular', 'json');
+    expect(kvGet).toHaveBeenCalledWith('tasks-core-json-v2-en-regular', 'json');
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('falls back to edge cache when the precomputed entry is missing', async () => {
@@ -213,7 +213,7 @@ describe('edgeCache', () => {
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
     const event = createEvent();
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+    const result = await edgeCache(event, 'tasks-core-json-v2-en-regular', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
       precomputed: true,
       deps: {
@@ -236,7 +236,7 @@ describe('edgeCache', () => {
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
     const event = createEvent();
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+    const result = await edgeCache(event, 'tasks-core-json-v2-en-regular', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
       precomputed: true,
       deps: {
@@ -257,7 +257,7 @@ describe('edgeCache', () => {
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
     const event = createEvent();
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    const result = await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+    const result = await edgeCache(event, 'tasks-core-json-v2-en-regular', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
       precomputed: true,
       deps: {
@@ -277,7 +277,7 @@ describe('edgeCache', () => {
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
     const event = createEvent({ 'x-bypass-cache': 'true' });
     const { edgeCache } = await import('@/server/utils/edgeCache');
-    await edgeCache(event, 'tasks-core-json-v1-en-regular', fetcher, 60, {
+    await edgeCache(event, 'tasks-core-json-v2-en-regular', fetcher, 60, {
       cacheKeyPrefix: 'tarkov',
       precomputed: true,
       deps: {

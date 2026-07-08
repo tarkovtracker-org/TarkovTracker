@@ -44,12 +44,12 @@ describe('runPrecompute', () => {
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v1-en-regular',
-      'tasks-core-json-v1-en-pve',
+      'tasks-core-json-v2-en-regular',
+      'tasks-core-json-v2-en-pve',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
     const [key, value, options] = kv.put.mock.calls[0];
-    expect(key).toBe('tasks-core-json-v1-en-regular');
+    expect(key).toBe('tasks-core-json-v2-en-regular');
     expect(options).toEqual({ expirationTtl: PRECOMPUTED_TTL_SECONDS });
     expect(PRECOMPUTED_TTL_SECONDS).toBe(604800);
     const envelope = JSON.parse(value as string);
@@ -70,9 +70,9 @@ describe('runPrecompute', () => {
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
-      { error: 'upstream 502', key: 'tasks-core-json-v1-en-regular' },
+      { error: 'upstream 502', key: 'tasks-core-json-v2-en-regular' },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
+    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
     expect(kv.put).toHaveBeenCalledTimes(1);
   });
   it('records a KV write failure without aborting the run', async () => {
@@ -80,9 +80,9 @@ describe('runPrecompute', () => {
     kv.put.mockRejectedValueOnce(new Error('KV write failed')).mockResolvedValue(undefined);
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
-      { error: 'KV write failed', key: 'tasks-core-json-v1-en-regular' },
+      { error: 'KV write failed', key: 'tasks-core-json-v2-en-regular' },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
+    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
   });
   it('refuses to write a structurally empty payload to KV', async () => {
     applyOverlayMock
@@ -93,10 +93,10 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([
       {
         error: 'Sanity check failed: payload has no tasks; refusing to write to KV',
-        key: 'tasks-core-json-v1-en-regular',
+        key: 'tasks-core-json-v2-en-regular',
       },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v1-en-pve']);
+    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
     expect(kv.put).toHaveBeenCalledTimes(1);
   });
 });
