@@ -4,8 +4,9 @@
 // No puppeteer/playwright/lighthouse — uses node's global WebSocket + /usr/bin/google-chrome.
 // Upgrade path: swap in Lighthouse if you need FCP/LCP/TBT category scores.
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { createServer as createNetServer } from 'node:net';
 import { extname, join, resolve as resolvePath, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 const log = (...a) => process.stderr.write(`[measure] ${a.join(' ')}\n`);
@@ -88,24 +89,48 @@ function startServer() {
     server.listen(PORT, '127.0.0.1', () => resolve(server));
   });
 }
-function startChrome() {
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createNetServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      probe.close(() => {
+        if (address && typeof address === 'object') resolve(address.port);
+        else reject(new Error('Could not allocate Chrome CDP port'));
+      });
+    });
+  });
+}
+function startChrome(cdpPort) {
   const args = [
     '--headless=new',
     '--disable-gpu',
     '--no-sandbox',
-    '--remote-debugging-port=0',
+    `--remote-debugging-port=${cdpPort}`,
     `--user-data-dir=${CHROME_DIR}`,
     'about:blank',
   ];
   const proc = spawn(CHROME, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   return proc;
 }
-async function getWsUrl() {
-  const activePortFile = join(CHROME_DIR, 'DevToolsActivePort');
+async function getWsUrl(cdpPort) {
+  const endpoint = `http://127.0.0.1:${cdpPort}/json/version`;
   for (let i = 0; i < 50; i++) {
     try {
-      const [port, path] = readFileSync(activePortFile, 'utf8').trim().split('\n');
-      if (port && path) return `ws://127.0.0.1:${port}${path}`;
+      const response = await fetch(endpoint);
+      const { webSocketDebuggerUrl } = await response.json();
+      if (typeof webSocketDebuggerUrl === 'string') {
+        const url = new URL(webSocketDebuggerUrl);
+        if (
+          url.protocol === 'ws:' &&
+          url.hostname === '127.0.0.1' &&
+          url.port === String(cdpPort) &&
+          /^\/devtools\/browser\/[a-f0-9-]+$/i.test(url.pathname)
+        ) {
+          return `ws://127.0.0.1:${cdpPort}${url.pathname}`;
+        }
+      }
     } catch {
       // not ready
     }
@@ -206,8 +231,9 @@ async function main() {
   }
   log('starting static server on', PORT);
   const server = await startServer();
-  log('launching chrome', CHROME);
-  const chrome = startChrome();
+  const cdpPort = await getFreePort();
+  log('launching chrome', CHROME, 'cdp', cdpPort);
+  const chrome = startChrome(cdpPort);
   chrome.stderr?.on('data', (d) => {
     const s = d.toString();
     if (/error|fail|crash/i.test(s)) log('chrome:', s.trim().slice(0, 200));
@@ -221,7 +247,7 @@ async function main() {
   let ws;
   try {
     log('waiting for CDP endpoint');
-    const wsUrl = await getWsUrl();
+    const wsUrl = await getWsUrl(cdpPort);
     log('CDP up:', wsUrl);
     ws = await connect(wsUrl);
     log('websocket connected');
