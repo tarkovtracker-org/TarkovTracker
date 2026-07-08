@@ -1727,7 +1727,8 @@
         "show_xp": "Zobrazit XP odměny",
         "show_next": "Zobrazit další úkoly",
         "show_prev": "Zobrazit předchozí úkoly",
-        "density": "Hustota karty"
+        "density": "Hustota karty",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "Výchozí zobrazení"
