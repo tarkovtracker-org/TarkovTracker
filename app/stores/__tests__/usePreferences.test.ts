@@ -100,6 +100,7 @@ describe('usePreferencesStore', () => {
       expect(store.hideoutRequireStationLevels).toBe(true);
       expect(store.hideoutRequireSkillLevels).toBe(true);
       expect(store.hideoutRequireTraderLoyalty).toBe(true);
+      expect(store.tasksRequireTraderLevels).toBe(true);
     });
     it('should initialize task filter settings with correct defaults', () => {
       const store = usePreferencesStore();
@@ -1211,6 +1212,11 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.setHideoutRequireTraderLoyalty(false);
       expect(store.hideoutRequireTraderLoyalty).toBe(false);
+    });
+    it('should set tasks require trader levels', () => {
+      const store = usePreferencesStore();
+      store.setTasksRequireTraderLevels(false);
+      expect(store.tasksRequireTraderLevels).toBe(false);
     });
   });
   describe('Actions - Locale', () => {

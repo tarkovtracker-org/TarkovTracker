@@ -1727,7 +1727,8 @@
         "show_xp": "Show XP Rewards",
         "show_next": "Show Next Quests",
         "show_prev": "Show Previous Quests",
-        "density": "Card Density"
+        "density": "Card Density",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "Default Views"

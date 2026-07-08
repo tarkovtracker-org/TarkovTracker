@@ -13,7 +13,7 @@
  */
 export const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
 export const PRECOMPUTED_ENVELOPE_VERSION = 1;
-export const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v1';
+export const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v2';
 export type PrecomputedEnvelope<T> = {
   payload: T;
   storedAt: number;

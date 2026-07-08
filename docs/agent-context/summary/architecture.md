@@ -117,7 +117,7 @@ graph TD
 ```
 
 - **Two-phase task loading:** core → objectives → rewards, so the UI renders early then hydrates.
-- **Cache keys** encode endpoint + game mode + language (e.g., `tasks-core-json-v1-regular-en`).
+- **Cache keys** encode endpoint + game mode + language (e.g., `tasks-core-json-v2-regular-en`).
 - **Purge coordination:** `cache-meta` (never cached) advertises a server purge timestamp; the
   client clears stale IndexedDB entries accordingly.
 - Implementation: `app/utils/tarkovCache.ts` (client), `app/server/utils/{tarkov-json,overlay,edgeCache,sharedEdgeStore}.ts` (server).

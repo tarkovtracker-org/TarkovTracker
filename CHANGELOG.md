@@ -1,3 +1,31 @@
+# [1.55.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.3...v1.55.0) (2026-07-08)
+
+
+### Features
+
+* **test:** add zero-dep page-load measurement scripts ([#507](https://github.com/tarkovtracker-org/TarkovTracker/issues/507)) ([f522a39](https://github.com/tarkovtracker-org/TarkovTracker/commit/f522a39e51123738c4b714dbd6568fbba3635f6a))
+
+## [1.54.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.2...v1.54.3) (2026-07-08)
+
+
+### Bug Fixes
+
+* **tasks:** gate task availability on requiredPrestige from tarkov.dev ([#513](https://github.com/tarkovtracker-org/TarkovTracker/issues/513)) ([31d690c](https://github.com/tarkovtracker-org/TarkovTracker/commit/31d690cb02b028bf777532b8cad5fb56157f3f4f)), closes [#508](https://github.com/tarkovtracker-org/TarkovTracker/issues/508)
+
+## [1.54.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.1...v1.54.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* **tasks:** enforce trader level and reputation requirements in task availability ([#514](https://github.com/tarkovtracker-org/TarkovTracker/issues/514)) ([782699a](https://github.com/tarkovtracker-org/TarkovTracker/commit/782699a2bf0bb036874defab0ae51b54af4eb6c3)), closes [#512](https://github.com/tarkovtracker-org/TarkovTracker/issues/512)
+
+## [1.54.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.0...v1.54.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **maps:** align Labs tile map and add tile-map floor switching ([#467](https://github.com/tarkovtracker-org/TarkovTracker/issues/467)) ([1b538b4](https://github.com/tarkovtracker-org/TarkovTracker/commit/1b538b438c6498e561e4ef4e65fbd1410af862a9)), closes [#276](https://github.com/tarkovtracker-org/TarkovTracker/issues/276)
+
 # [1.54.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.53.0...v1.54.0) (2026-07-08)
 
 

@@ -181,6 +181,7 @@ const buildPreferencesSyncPayload = (
     hideout_require_station_levels: preferencesState.hideoutRequireStationLevels,
     hideout_require_skill_levels: preferencesState.hideoutRequireSkillLevels,
     hideout_require_trader_loyalty: preferencesState.hideoutRequireTraderLoyalty,
+    tasks_require_trader_levels: preferencesState.tasksRequireTraderLevels,
     locale_override: preferencesState.localeOverride,
     enable_manual_task_fail: preferencesState.enableManualTaskFail,
     hide_completed_task_objectives: preferencesState.hideCompletedTaskObjectives,

@@ -366,6 +366,7 @@ describe('tarkov JSON adapters', () => {
         name: 'Debut',
         trader: 'trader1',
         map: 'map1',
+        requiredPrestige: 'prestige1',
         taskRequirements: [{ task: 'task0', status: ['complete'] }],
         traderRequirements: [{ trader: 'trader1', value: 0.2 }],
         objectives: [
@@ -411,6 +412,7 @@ describe('tarkov JSON adapters', () => {
       id: 'task1',
       map: { id: 'map1', name: 'Customs' },
       trader: { id: 'trader1', name: 'Prapor' },
+      requiredPrestige: { id: 'prestige1' },
     });
     expect(result.maps[0]?.spawns).toHaveLength(1);
     expect(result.traders[0]?.levels).toHaveLength(1);

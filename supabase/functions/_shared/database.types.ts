@@ -355,6 +355,7 @@ export type Database = {
           task_team_hide_all: boolean | null
           task_trader_view: string | null
           task_user_view: string | null
+          tasks_require_trader_levels: boolean
           team_hide: Json | null
           trader_sort_direction: string | null
           trader_sort_mode: string | null
@@ -427,6 +428,7 @@ export type Database = {
           task_team_hide_all?: boolean | null
           task_trader_view?: string | null
           task_user_view?: string | null
+          tasks_require_trader_levels?: boolean
           team_hide?: Json | null
           trader_sort_direction?: string | null
           trader_sort_mode?: string | null
@@ -499,6 +501,7 @@ export type Database = {
           task_team_hide_all?: boolean | null
           task_trader_view?: string | null
           task_user_view?: string | null
+          tasks_require_trader_levels?: boolean
           team_hide?: Json | null
           trader_sort_direction?: string | null
           trader_sort_mode?: string | null

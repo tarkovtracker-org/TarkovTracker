@@ -787,6 +787,13 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
     trader: adaptTraderRef(raw.trader, context),
   });
 }
+// json.tarkov.dev serializes requiredPrestige as a bare Prestige id string, while
+// the GraphQL API returns an object ref. Accept both.
+function adaptRequiredPrestigeRef(value: unknown): { id: string } | undefined {
+  if (typeof value === 'string' && value) return { id: value };
+  if (isRecord(value) && value.id != null) return { id: String(value.id) };
+  return undefined;
+}
 function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
   return compactObject({
     id: stringId(raw) ?? '',
@@ -799,6 +806,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
     wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
+    requiredPrestige: adaptRequiredPrestigeRef(raw.requiredPrestige),
     taskRequirements: Array.isArray(raw.taskRequirements)
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))
       : undefined,
