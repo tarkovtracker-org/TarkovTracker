@@ -201,6 +201,51 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(afterRefund.remaining).toBe(0);
   });
 
+  it('does not refund across a UTC-day rollover when resetAt no longer matches', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T23:59:58Z'));
+    const limiter = new ApiGatewayRateLimiter(makeState());
+    const payload = { limit: 1, windowSec: 86400, anchor: 'utc-day' };
+    const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+      resetAt: number;
+    };
+    expect(consumed.allowed).toBe(true);
+    expect(consumed.resetAt).toBe(Date.parse('2026-07-06T00:00:00Z'));
+    // Roll into the next UTC day and consume the new window's only slot.
+    vi.setSystemTime(new Date('2026-07-06T00:00:02Z'));
+    const newDay = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+      resetAt: number;
+    };
+    expect(newDay.allowed).toBe(true);
+    expect(newDay.resetAt).toBe(Date.parse('2026-07-07T00:00:00Z'));
+    // A delayed refund for the previous day must not steal the new day's slot.
+    await limiter.fetch(limiterRequest({ refund: true, resetAt: consumed.resetAt }));
+    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+    };
+    expect(blocked.allowed).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('still refunds when resetAt matches the current window', async () => {
+    const limiter = new ApiGatewayRateLimiter(makeState());
+    const payload = { limit: 1, windowSec: 86400, anchor: 'utc-day' };
+    const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+      resetAt: number;
+    };
+    expect(consumed.allowed).toBe(true);
+    await limiter.fetch(limiterRequest({ refund: true, resetAt: consumed.resetAt }));
+    const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+      allowed: boolean;
+      remaining: number;
+    };
+    expect(afterRefund.allowed).toBe(true);
+    expect(afterRefund.remaining).toBe(0);
+  });
+
   it('keeps legacy fixed-window behavior for payloads without mode or anchor', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const payload = { limit: 2, windowSec: 60 };

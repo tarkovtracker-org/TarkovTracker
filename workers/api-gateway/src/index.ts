@@ -107,7 +107,8 @@ export class ApiGatewayRateLimiter {
       anchor?: string;
       mode?: string;
       refund?: boolean;
-    } = {};
+      resetAt?: number;
+    };
     try {
       payload = (await request.json()) as {
         limit?: number;
@@ -115,6 +116,7 @@ export class ApiGatewayRateLimiter {
         anchor?: string;
         mode?: string;
         refund?: boolean;
+        resetAt?: number;
       };
     } catch {
       return new Response('Bad Request', { status: 400 });
@@ -122,9 +124,18 @@ export class ApiGatewayRateLimiter {
     if (payload.refund === true) {
       // Return one previously consumed fixed-window slot (e.g. when a request
       // that passed the daily check is then rejected by the burst limiter).
+      // The caller passes the resetAt of the window it consumed from so a
+      // refund delayed past a UTC-day rollover cannot decrement the new day.
       await this.load();
       const now = Date.now();
-      if (this.data && !this.data.mode && now < this.data.resetAt && this.data.count > 0) {
+      const expectedResetAt = payload.resetAt;
+      if (
+        this.data &&
+        !this.data.mode &&
+        now < this.data.resetAt &&
+        this.data.count > 0 &&
+        (typeof expectedResetAt !== 'number' || this.data.resetAt === expectedResetAt)
+      ) {
         this.data.count -= 1;
         await this.state.storage.put('state', this.data);
       }
@@ -284,8 +295,16 @@ async function rateLimit(
 /**
  * Best-effort refund of one fixed-window slot (used when the daily counter was
  * consumed but the request was subsequently rejected by the burst limiter).
+ * `consumedResetAt` is the resetAt of the window the slot was taken from; the
+ * Durable Object only decrements when its current window still matches, so a
+ * refund delayed past a UTC-day rollover cannot steal a slot from the new day.
  */
-async function refundRateLimit(env: Env, key: string, action: string): Promise<void> {
+async function refundRateLimit(
+  env: Env,
+  key: string,
+  action: string,
+  consumedResetAt?: number
+): Promise<void> {
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
   const stub = env.API_GATEWAY_LIMITER.get(id);
   const controller = new AbortController();
@@ -294,7 +313,7 @@ async function refundRateLimit(env: Env, key: string, action: string): Promise<v
     await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ refund: true }),
+      body: JSON.stringify({ refund: true, resetAt: consumedResetAt }),
       signal: controller.signal,
     });
   } catch (error) {
@@ -511,7 +530,12 @@ async function authenticateAndRateLimit(
   if (!burst.allowed) {
     // Give back the daily slot consumed above so burst-throttled attempts do
     // not drain the daily quota.
-    const refund = refundRateLimit(env, dailyKey, `daily-${kind}`);
+    const refund = refundRateLimit(
+      env,
+      dailyKey,
+      `daily-${kind}`,
+      typeof daily.resetAt === 'number' ? daily.resetAt : undefined
+    );
     if (ctx) ctx.waitUntil(refund);
     track(true);
     // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
