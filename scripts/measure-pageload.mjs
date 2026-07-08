@@ -51,7 +51,13 @@ function startServer() {
     return existsSync(requested) ? requested : indexHtml;
   };
   const server = createServer((req, res) => {
-    const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    let urlPath;
+    try {
+      urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    } catch {
+      res.statusCode = 400;
+      return res.end('bad request');
+    }
     const filePath = resolveRequest(urlPath);
     if (!filePath) {
       res.statusCode = 403;
@@ -206,6 +212,11 @@ async function main() {
     if (/error|fail|crash/i.test(s)) log('chrome:', s.trim().slice(0, 200));
   });
   chrome.on('exit', (c) => log('chrome exited code', c));
+  chrome.on('error', (e) => {
+    log('chrome spawn error', e.message);
+    server.close();
+    process.exit(1);
+  });
   let ws;
   try {
     log('waiting for CDP endpoint');
