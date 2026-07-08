@@ -43,6 +43,7 @@ const setupMocks = ({
   teammateState,
   tasks = [{ id: 'task-1', name: 'Task One' }],
   traders = [],
+  tasksRequireTraderLevels,
 }: {
   selfCompletions?: Record<string, unknown>;
   teammateCompletions?: Record<string, unknown>;
@@ -50,6 +51,7 @@ const setupMocks = ({
   teammateState?: ReturnType<typeof createStoreState>;
   tasks?: Array<Record<string, unknown>>;
   traders?: Array<Record<string, unknown>>;
+  tasksRequireTraderLevels?: boolean;
 }) => {
   vi.resetModules();
   setActivePinia(createPinia());
@@ -71,6 +73,7 @@ const setupMocks = ({
       teamIsHidden: () => false,
       taskTeamAllHidden: false,
       getUseAutomaticLevelCalculation: false,
+      getTasksRequireTraderLevels: tasksRequireTraderLevels ?? true,
     }),
   }));
   vi.doMock('@/stores/useMetadata', () => ({
@@ -265,6 +268,53 @@ describe('useProgressStore', () => {
       const { useProgressStore } = await import('@/stores/useProgress');
       const store = useProgressStore();
       expect(store.unlockedTasks['negative-rep-task']?.self).toBe(true);
+    });
+    it('skips loyalty level gating when the preference is disabled', async () => {
+      setupMocks({
+        selfState: createStoreState({ pvpTraders: { [praporId]: { level: 1 } } }),
+        tasks: [praporLevelTask],
+        traders: metadataTraders,
+        tasksRequireTraderLevels: false,
+      });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const store = useProgressStore();
+      expect(store.unlockedTasks['prapor-ll2-task']?.self).toBe(true);
+    });
+    it('skips reputation gating when the preference is disabled', async () => {
+      const repTask = {
+        id: 'prapor-rep-task',
+        name: 'Prapor Rep Task',
+        factionName: 'Any',
+        trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
+        traderRequirements: [{ id: 'req-2', trader: { id: praporId, name: 'Prapor' }, value: 0.5 }],
+      };
+      setupMocks({
+        selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.2 } } }),
+        tasks: [repTask],
+        traders: metadataTraders,
+        tasksRequireTraderLevels: false,
+      });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const store = useProgressStore();
+      expect(store.unlockedTasks['prapor-rep-task']?.self).toBe(true);
+    });
+    it('skips Fence negative-reputation gating when the preference is disabled', async () => {
+      const lowKarmaTask = {
+        id: 'fence-low-karma-task',
+        name: 'Low Karma Task',
+        factionName: 'Any',
+        trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
+        traderRequirements: [{ id: 'req-3', trader: { id: 'fence', name: 'Fence' }, value: -3 }],
+      };
+      setupMocks({
+        selfState: createStoreState({ pvpTraders: { fence: { reputation: 0 } } }),
+        tasks: [lowKarmaTask],
+        traders: metadataTraders,
+        tasksRequireTraderLevels: false,
+      });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      const store = useProgressStore();
+      expect(store.unlockedTasks['fence-low-karma-task']?.self).toBe(true);
     });
   });
   it('does not lock Ref tasks when unlock task is missing from loaded task payload', async () => {

@@ -276,38 +276,43 @@ export const useProgressStore = defineStore('progress', () => {
           visiting.delete(taskId);
           return false;
         }
-        // Trader loyalty level check - user's trader level must meet each requirement
-        if (task.traderLevelRequirements?.length) {
-          for (const req of task.traderLevelRequirements) {
-            const traderId = req?.trader?.id;
-            if (!traderId) continue;
-            const userTraderLevel = teamData.traders?.[traderId]?.level ?? 1;
-            if (userTraderLevel < req.level) {
-              memo.set(taskId, false);
-              visiting.delete(taskId);
-              return false;
-            }
-          }
-        }
-        // Trader reputation check - positive requirements gate for every trader:
-        // user needs at least this much reputation.
-        // Negative requirements are Fence-specific (low-karma path): user needs
-        // at most this much (or worse) karma.
-        if (task.traderRequirements?.length) {
-          for (const req of task.traderRequirements) {
-            const traderId = req?.trader?.id;
-            if (!traderId) continue;
-            const userRep = teamData.traders?.[traderId]?.reputation ?? 0;
-            if (req.value >= 0) {
-              if (userRep < req.value) {
+        // Trader loyalty level and reputation checks - gated behind a user
+        // preference (defaults on, mirroring hideout's require-trader-loyalty).
+        // When disabled, trader standing requirements are display-only.
+        if (preferencesStore.getTasksRequireTraderLevels) {
+          // Trader loyalty level check - user's trader level must meet each requirement
+          if (task.traderLevelRequirements?.length) {
+            for (const req of task.traderLevelRequirements) {
+              const traderId = req?.trader?.id;
+              if (!traderId) continue;
+              const userTraderLevel = teamData.traders?.[traderId]?.level ?? 1;
+              if (userTraderLevel < req.level) {
                 memo.set(taskId, false);
                 visiting.delete(taskId);
                 return false;
               }
-            } else if (fenceTrader && traderId === fenceTrader.id && userRep > req.value) {
-              memo.set(taskId, false);
-              visiting.delete(taskId);
-              return false;
+            }
+          }
+          // Trader reputation check - positive requirements gate for every trader:
+          // user needs at least this much reputation.
+          // Negative requirements are Fence-specific (low-karma path): user needs
+          // at most this much (or worse) karma.
+          if (task.traderRequirements?.length) {
+            for (const req of task.traderRequirements) {
+              const traderId = req?.trader?.id;
+              if (!traderId) continue;
+              const userRep = teamData.traders?.[traderId]?.reputation ?? 0;
+              if (req.value >= 0) {
+                if (userRep < req.value) {
+                  memo.set(taskId, false);
+                  visiting.delete(taskId);
+                  return false;
+                }
+              } else if (fenceTrader && traderId === fenceTrader.id && userRep > req.value) {
+                memo.set(taskId, false);
+                visiting.delete(taskId);
+                return false;
+              }
             }
           }
         }
