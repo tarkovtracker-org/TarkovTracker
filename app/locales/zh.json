@@ -1727,7 +1727,8 @@
         "show_xp": "显示经验奖励",
         "show_next": "显示后续任务",
         "show_prev": "显示前置任务",
-        "density": "卡片密度"
+        "density": "卡片密度",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "默认视图"
