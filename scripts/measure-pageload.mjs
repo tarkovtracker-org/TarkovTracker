@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, resolve, sep } from 'node:path';
+import { extname, join, resolve as resolvePath, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 const log = (...a) => process.stderr.write(`[measure] ${a.join(' ')}\n`);
 const DIST = join(process.cwd(), process.env.MEASURE_DIST || '.output/public');
@@ -35,16 +35,7 @@ function startServer() {
   const indexHtml = join(distReal, 'index.html');
   const server = createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-    let filePath;
-    try {
-      filePath = resolve(realpathSync(join(DIST, urlPath)));
-    } catch {
-      filePath = null;
-    }
-    if (!filePath) {
-      // SPA fallback for paths that don't exist
-      filePath = indexHtml;
-    }
+    let filePath = resolvePath(join(distReal, urlPath));
     if (filePath === distReal) {
       filePath = indexHtml;
     }
@@ -53,15 +44,22 @@ function startServer() {
       return res.end('forbidden');
     }
     if (existsSync(filePath) && statSync(filePath).isDirectory()) {
-      try {
-        filePath = resolve(realpathSync(join(filePath, 'index.html')));
-      } catch {
-        filePath = indexHtml;
-      }
-      if (!filePath.startsWith(distPrefix)) {
-        res.statusCode = 403;
-        return res.end('forbidden');
-      }
+      filePath = join(filePath, 'index.html');
+    }
+    if (!existsSync(filePath)) {
+      // SPA fallback
+      filePath = indexHtml;
+    }
+    // Reject symlinks that resolve outside dist (realpath used for validation only).
+    let realPath;
+    try {
+      realPath = realpathSync(filePath);
+    } catch {
+      realPath = null;
+    }
+    if (!realPath || !realPath.startsWith(distPrefix)) {
+      res.statusCode = 404;
+      return res.end('not found');
     }
     res.setHeader('content-type', MIME[extname(filePath)] || 'application/octet-stream');
     createReadStream(filePath)
