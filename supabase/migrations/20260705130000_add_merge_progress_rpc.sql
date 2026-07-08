@@ -77,6 +77,12 @@ BEGIN
       v_data := jsonb_set(v_data, '{taskObjectives}', '{}'::jsonb);
     END IF;
     FOR v_key, v_value IN SELECT key, value FROM jsonb_each(p_task_objectives) LOOP
+      -- Each objective value is deep-merged with || onto the existing entry;
+      -- a non-object value would array-concatenate and corrupt the blob, so
+      -- reject it loudly (the caller only ever sends objects).
+      IF jsonb_typeof(v_value) <> 'object' THEN
+        RAISE EXCEPTION 'p_task_objectives values must be JSON objects';
+      END IF;
       v_data := jsonb_set(
         v_data,
         ARRAY['taskObjectives', v_key],
