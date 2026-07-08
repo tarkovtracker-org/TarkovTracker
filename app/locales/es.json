@@ -1727,7 +1727,8 @@
         "show_xp": "Mostrar recompensas de XP",
         "show_next": "Mostrar misiones siguientes",
         "show_prev": "Mostrar misiones anteriores",
-        "density": "Densidad de tarjetas"
+        "density": "Densidad de tarjetas",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "Vistas predeterminadas"
