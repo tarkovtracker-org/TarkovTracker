@@ -1727,7 +1727,8 @@
         "show_xp": "Mostra ricompense XP",
         "show_next": "Mostra missioni successive",
         "show_prev": "Mostra missioni precedenti",
-        "density": "Densità pannello"
+        "density": "Densità pannello",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "Viste predefinite"
