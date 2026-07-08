@@ -14,12 +14,15 @@ interface SupporterRow {
 /**
  * Resolve the API tier for a user from public.supporters.
  * Fails open to 'free' so a Supabase hiccup never blocks authenticated traffic.
+ * Only the result of a successful lookup is cached, so a transient outage does
+ * not pin a paid user to free limits for the cache TTL.
  */
 export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
   const cacheKey = `tier:${userId}`;
   const cached = getMemoryCache<ApiTier>(cacheKey);
   if (cached) return cached;
   let tier: ApiTier = 'free';
+  let cacheable = false;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIER_FETCH_TIMEOUT_MS);
   try {
@@ -38,6 +41,7 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
         const value = (row.tier || '').toLowerCase();
         if (isKnownTier(value)) tier = value;
       }
+      cacheable = true;
     } else {
       console.warn('resolveTier supabase error', { status: response.status });
     }
@@ -46,12 +50,16 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
   } finally {
     clearTimeout(timeout);
   }
-  setMemoryCache(cacheKey, tier, TIER_CACHE_TTL_SECONDS);
+  if (cacheable) {
+    setMemoryCache(cacheKey, tier, TIER_CACHE_TTL_SECONDS);
+  }
   return tier;
 }
 
 function isExpired(expiresAt: string | null | undefined): boolean {
   if (!expiresAt) return false;
   const ts = Date.parse(expiresAt);
-  return Number.isFinite(ts) && ts <= Date.now();
+  // Fail closed: an unparseable expiry is treated as expired so a malformed
+  // supporter row cannot grant elevated limits indefinitely.
+  return !Number.isFinite(ts) || ts <= Date.now();
 }
