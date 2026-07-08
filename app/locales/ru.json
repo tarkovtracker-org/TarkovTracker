@@ -1727,7 +1727,8 @@
         "show_xp": "Показывать награды опыта",
         "show_next": "Показывать следующие задания",
         "show_prev": "Показывать предыдущие задания",
-        "density": "Плотность карточек"
+        "density": "Плотность карточек",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "Виды по умолчанию"
