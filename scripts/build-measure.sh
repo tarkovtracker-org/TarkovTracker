@@ -11,5 +11,8 @@ GENERATE_EXIT=$?
 set -e
 echo "GENERATE_EXIT=$GENERATE_EXIT"
 tail -5 /tmp/generate.log
+if [ "$GENERATE_EXIT" != "0" ]; then
+  exit "$GENERATE_EXIT"
+fi
 echo "=== output html ==="
 find .output/public -maxdepth 1 -name '*.html' 2>/dev/null

@@ -4,9 +4,9 @@
 // No puppeteer/playwright/lighthouse — uses node's global WebSocket + /usr/bin/google-chrome.
 // Upgrade path: swap in Lighthouse if you need FCP/LCP/TBT category scores.
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 const log = (...a) => process.stderr.write(`[measure] ${a.join(' ')}\n`);
 const DIST = join(process.cwd(), process.env.MEASURE_DIST || '.output/public');
@@ -30,19 +30,30 @@ const MIME = {
   '.woff': 'font/woff',
 };
 function startServer() {
+  const distReal = realpathSync(DIST);
   const server = createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-    let filePath = normalize(join(DIST, urlPath));
-    if (filePath !== DIST && !filePath.startsWith(DIST + sep)) {
+    let filePath;
+    try {
+      filePath = realpathSync(join(DIST, urlPath));
+      if (statSync(filePath).isDirectory()) {
+        filePath = realpathSync(join(filePath, 'index.html'));
+      }
+    } catch {
+      filePath = null;
+    }
+    if (!filePath) {
+      // SPA fallback
+      try {
+        filePath = realpathSync(join(DIST, 'index.html'));
+      } catch {
+        res.statusCode = 404;
+        return res.end('not found');
+      }
+    }
+    if (filePath !== distReal && !filePath.startsWith(distReal + sep)) {
       res.statusCode = 403;
       return res.end('forbidden');
-    }
-    if (existsSync(filePath) && statSync(filePath).isDirectory()) {
-      filePath = join(filePath, 'index.html');
-    }
-    if (!existsSync(filePath)) {
-      // SPA fallback
-      filePath = join(DIST, 'index.html');
     }
     res.setHeader('content-type', MIME[extname(filePath)] || 'application/octet-stream');
     createReadStream(filePath)
@@ -213,8 +224,8 @@ async function main() {
       }
       const ls = stats(loads);
       const rs = stats(readys);
-      const fs = fcps.length ? stats(fcps) : { median: null };
-      results.push({ page, load: ls.median, ready: rs.median, fcp: fs.median, transferKB });
+      const fcpStats = fcps.length ? stats(fcps) : { median: null };
+      results.push({ page, load: ls.median, ready: rs.median, fcp: fcpStats.median, transferKB });
     }
     console.log(
       `\nPage-load (cold cache, ${RUNS} runs, ${CPU_THROTTLE}x CPU throttle, headless Chrome, static SPA)`
