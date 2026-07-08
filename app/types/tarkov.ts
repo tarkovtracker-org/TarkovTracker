@@ -233,6 +233,7 @@ export interface Task {
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
   minPlayerLevel?: number;
+  requiredPrestige?: { id: string };
   failedRequirements?: TaskRequirement[];
   traderLevelRequirements?: TaskTraderLevelRequirement[];
   traderRequirements?: TraderRequirement[];

@@ -799,6 +799,10 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
     wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
+    requiredPrestige:
+      isRecord(raw.requiredPrestige) && raw.requiredPrestige.id != null
+        ? { id: String(raw.requiredPrestige.id) }
+        : undefined,
     taskRequirements: Array.isArray(raw.taskRequirements)
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))
       : undefined,
