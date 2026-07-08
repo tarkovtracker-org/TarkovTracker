@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, sep } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 const log = (...a) => process.stderr.write(`[measure] ${a.join(' ')}\n`);
 const DIST = join(process.cwd(), process.env.MEASURE_DIST || '.output/public');
@@ -37,7 +37,7 @@ function startServer() {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
     let filePath;
     try {
-      filePath = realpathSync(join(DIST, urlPath));
+      filePath = resolve(realpathSync(join(DIST, urlPath)));
     } catch {
       filePath = null;
     }
@@ -54,7 +54,7 @@ function startServer() {
     }
     if (existsSync(filePath) && statSync(filePath).isDirectory()) {
       try {
-        filePath = realpathSync(join(filePath, 'index.html'));
+        filePath = resolve(realpathSync(join(filePath, 'index.html')));
       } catch {
         filePath = indexHtml;
       }
