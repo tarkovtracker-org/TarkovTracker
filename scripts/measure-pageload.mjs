@@ -4,7 +4,7 @@
 // No puppeteer/playwright/lighthouse — uses node's global WebSocket + /usr/bin/google-chrome.
 // Upgrade path: swap in Lighthouse if you need FCP/LCP/TBT category scores.
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve as resolvePath, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -14,9 +14,10 @@ const PORT = Number(process.env.MEASURE_PORT || 4178);
 const RUNS = Number(process.env.MEASURE_RUNS || 5);
 const CPU_THROTTLE = Number(process.env.MEASURE_CPU_THROTTLE || 4);
 const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome';
-const PAGES = (process.env.MEASURE_PAGES || '/,/tasks,/hideout,/needed-items,/settings,/team').split(
-  ','
-);
+const CHROME_DIR = `/tmp/measure-chrome-${process.pid}`;
+const PAGES = (
+  process.env.MEASURE_PAGES || '/,/tasks,/hideout,/needed-items,/settings,/team'
+).split(',');
 const MIME = {
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -84,7 +85,7 @@ function startServer() {
   });
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(PORT, () => resolve(server));
+    server.listen(PORT, '127.0.0.1', () => resolve(server));
   });
 }
 function startChrome() {
@@ -92,19 +93,19 @@ function startChrome() {
     '--headless=new',
     '--disable-gpu',
     '--no-sandbox',
-    '--remote-debugging-port=9333',
-    `--user-data-dir=/tmp/measure-chrome-${process.pid}`,
+    '--remote-debugging-port=0',
+    `--user-data-dir=${CHROME_DIR}`,
     'about:blank',
   ];
   const proc = spawn(CHROME, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   return proc;
 }
 async function getWsUrl() {
+  const activePortFile = join(CHROME_DIR, 'DevToolsActivePort');
   for (let i = 0; i < 50; i++) {
     try {
-      const r = await fetch('http://127.0.0.1:9333/json/version');
-      const j = await r.json();
-      if (j.webSocketDebuggerUrl) return j.webSocketDebuggerUrl;
+      const [port, path] = readFileSync(activePortFile, 'utf8').trim().split('\n');
+      if (port && path) return `ws://127.0.0.1:${port}${path}`;
     } catch {
       // not ready
     }

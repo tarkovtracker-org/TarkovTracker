@@ -5,12 +5,14 @@
 cd "$(dirname "$0")/.." || exit 1
 export NITRO_PRESET=static
 export NODE_ENV=production
+GENERATE_LOG="$(mktemp)"
+trap 'rm -f "$GENERATE_LOG"' EXIT
 set +e
-npx nuxt generate >/tmp/generate.log 2>&1
+npx nuxt generate >"$GENERATE_LOG" 2>&1
 GENERATE_EXIT=$?
 set -e
 echo "GENERATE_EXIT=$GENERATE_EXIT"
-tail -5 /tmp/generate.log
+tail -5 "$GENERATE_LOG"
 if [ "$GENERATE_EXIT" != "0" ]; then
   exit "$GENERATE_EXIT"
 fi
