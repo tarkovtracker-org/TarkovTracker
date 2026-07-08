@@ -10,10 +10,11 @@ import { createServer as createNetServer } from 'node:net';
 import { extname, join, resolve as resolvePath, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 const log = (...a) => process.stderr.write(`[measure] ${a.join(' ')}\n`);
+const num = (v, d) => (v == null || v === '' || Number.isNaN(Number(v)) ? d : Number(v));
 const DIST = join(process.cwd(), process.env.MEASURE_DIST || '.output/public');
-const PORT = Number(process.env.MEASURE_PORT || 4178);
-const RUNS = Number(process.env.MEASURE_RUNS || 5);
-const CPU_THROTTLE = Number(process.env.MEASURE_CPU_THROTTLE || 4);
+const PORT = num(process.env.MEASURE_PORT, 4178);
+const RUNS = num(process.env.MEASURE_RUNS, 5);
+const CPU_THROTTLE = num(process.env.MEASURE_CPU_THROTTLE, 4);
 const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome';
 const CHROME_DIR = `/tmp/measure-chrome-${process.pid}`;
 const PAGES = (
