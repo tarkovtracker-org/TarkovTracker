@@ -1727,7 +1727,8 @@
         "show_xp": "XP-Belohnungen anzeigen",
         "show_next": "Nächste Aufgaben anzeigen",
         "show_prev": "Vorherige Aufgaben anzeigen",
-        "density": "Kartendichte"
+        "density": "Kartendichte",
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "defaults": {
         "title": "Standardansichten"
