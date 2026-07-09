@@ -1,11 +1,17 @@
-export type SeasonalModifierType = 'hardcore' | 'positive' | 'negative';
-export interface SeasonalModifier {
+export interface PersonalModifier {
   id: string;
   name: string;
-  type: SeasonalModifierType;
-  points: number | null;
+  type: 'positive' | 'negative';
+  points: number;
   description: string;
 }
+export interface HardcoreModifier {
+  id: string;
+  name: string;
+  type: 'hardcore';
+  description: string;
+}
+export type SeasonalModifier = PersonalModifier | HardcoreModifier;
 export interface SeasonPlannerState {
   selectedModifiers: string[];
 }

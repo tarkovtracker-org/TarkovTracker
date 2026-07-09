@@ -43,11 +43,14 @@
             color="error"
             variant="soft"
             :title="t('page.season_planner.invalid_total_title')"
-            :description="t('page.season_planner.invalid_total_description')"
+            :description="
+              t('page.season_planner.points_needed', {
+                points: Math.abs(plannerStore.totalPoints),
+              })
+            "
           />
         </div>
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <!-- Positive Modifiers -->
           <div class="lg:col-span-1">
             <h2 class="text-surface-100 mb-4 flex items-center gap-2 text-lg font-semibold">
               <UIcon name="i-heroicons-plus-circle" class="text-primary-400 h-5 w-5" />
@@ -58,12 +61,11 @@
                 v-for="modifier in positiveModifiers"
                 :key="modifier.id"
                 :modifier="modifier"
-                :selected="plannerStore.selectedModifiers.includes(modifier.id)"
+                :selected="plannerStore.isSelected(modifier.id)"
                 @toggle="plannerStore.toggleModifier(modifier.id)"
               />
             </div>
           </div>
-          <!-- Negative Modifiers -->
           <div class="lg:col-span-1">
             <h2 class="text-surface-100 mb-4 flex items-center gap-2 text-lg font-semibold">
               <UIcon name="i-heroicons-minus-circle" class="h-5 w-5 text-red-400" />
@@ -74,12 +76,11 @@
                 v-for="modifier in negativeModifiers"
                 :key="modifier.id"
                 :modifier="modifier"
-                :selected="plannerStore.selectedModifiers.includes(modifier.id)"
+                :selected="plannerStore.isSelected(modifier.id)"
                 @toggle="plannerStore.toggleModifier(modifier.id)"
               />
             </div>
           </div>
-          <!-- Hardcore Modifiers -->
           <div class="lg:col-span-1">
             <h2 class="text-surface-100 mb-4 flex items-center gap-2 text-lg font-semibold">
               <UIcon name="i-heroicons-fire" class="h-5 w-5 text-orange-400" />
@@ -109,20 +110,30 @@
 <script setup lang="ts">
   import ModifierCard from '@/features/season-planner/ModifierCard.vue';
   import { useSeasonPlannerStore } from '@/stores/useSeasonPlanner';
+  import type { HardcoreModifier, PersonalModifier } from '@/types/season';
   const { t } = useI18n({ useScope: 'global' });
+  definePageMeta({
+    usesWindowScroll: true,
+  });
   useSeoMeta({
-    title: 'Season Planner - Kord Breach',
-    description:
-      'Plan your Escape from Tarkov Kord Breach seasonal character modifiers and point balance.',
+    title: () => t('page.season_planner.seo_title', 'Season Planner - Kord Breach'),
+    description: () =>
+      t(
+        'page.season_planner.seo_description',
+        'Plan your Escape from Tarkov Kord Breach seasonal character modifiers and point balance.'
+      ),
   });
   const plannerStore = useSeasonPlannerStore();
+  onMounted(() => {
+    plannerStore.normalizeSelection();
+  });
   const positiveModifiers = computed(() =>
-    plannerStore.allModifiers.filter((m) => m.type === 'positive')
+    plannerStore.personalModifiers.filter((m): m is PersonalModifier => m.type === 'positive')
   );
   const negativeModifiers = computed(() =>
-    plannerStore.allModifiers.filter((m) => m.type === 'negative')
+    plannerStore.personalModifiers.filter((m): m is PersonalModifier => m.type === 'negative')
   );
   const hardcoreModifiers = computed(() =>
-    plannerStore.allModifiers.filter((m) => m.type === 'hardcore')
+    plannerStore.allModifiers.filter((m): m is HardcoreModifier => m.type === 'hardcore')
   );
 </script>

@@ -1652,6 +1652,8 @@
     "season_planner": {
       "title": "Season Planner",
       "description": "Plan your Kord Breach seasonal character modifiers and balance your point budget.",
+      "seo_title": "Season Planner - Kord Breach",
+      "seo_description": "Plan your Escape from Tarkov Kord Breach seasonal character modifiers and point balance.",
       "positive_modifiers": "Positive Modifiers",
       "negative_modifiers": "Negative Modifiers",
       "hardcore_modifiers": "Hardcore Rules",
@@ -1659,8 +1661,7 @@
       "total_points": "Total Points",
       "reset": "Reset Plan",
       "invalid_total_title": "Invalid Point Total",
-      "invalid_total_description": "Your point total must be 0 or higher to create a seasonal character. Add negative modifiers to gain more points.",
-      "unknown_points": "TBD"
+      "points_needed": "Add {points} more points to make this plan valid."
     }
   },
   "footer": {

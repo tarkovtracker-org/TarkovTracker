@@ -1,6 +1,7 @@
 <template>
   <button
     type="button"
+    :aria-pressed="selected"
     class="group focus:ring-primary-500 focus:ring-offset-surface-900 relative flex w-full flex-col gap-1.5 rounded-lg border p-4 text-left transition-all duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none"
     :class="[
       selected
@@ -17,7 +18,6 @@
         {{ modifier.name }}
       </span>
       <span
-        v-if="modifier.points !== null"
         class="text-xs font-bold tabular-nums"
         :class="[
           modifier.points > 0 ? 'text-primary-400' : 'text-red-400',
@@ -25,9 +25,6 @@
         ]"
       >
         {{ modifier.points > 0 ? '+' : '' }}{{ modifier.points }}
-      </span>
-      <span v-else class="text-surface-500 text-[10px] font-medium tracking-wider uppercase">
-        {{ t('page.season_planner.unknown_points') }}
       </span>
     </div>
     <p class="text-surface-400 line-clamp-2 text-xs leading-relaxed">
@@ -37,10 +34,9 @@
   </button>
 </template>
 <script setup lang="ts">
-  import type { SeasonalModifier } from '@/types/season';
-  const { t } = useI18n({ useScope: 'global' });
+  import type { PersonalModifier } from '@/types/season';
   defineProps<{
-    modifier: SeasonalModifier;
+    modifier: PersonalModifier;
     selected: boolean;
   }>();
   defineEmits(['toggle']);
