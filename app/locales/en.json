@@ -1648,6 +1648,19 @@
           "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
         }
       }
+    },
+    "season_planner": {
+      "title": "Season Planner",
+      "description": "Plan your Kord Breach seasonal character modifiers and balance your point budget.",
+      "positive_modifiers": "Positive Modifiers",
+      "negative_modifiers": "Negative Modifiers",
+      "hardcore_modifiers": "Hardcore Rules",
+      "hardcore_description": "Global rules that apply to all seasonal characters. They don't affect your points but define the season's challenge.",
+      "total_points": "Total Points",
+      "reset": "Reset Plan",
+      "invalid_total_title": "Invalid Point Total",
+      "invalid_total_description": "Your point total must be 0 or higher to create a seasonal character. Add negative modifiers to gain more points.",
+      "unknown_points": "TBD"
     }
   },
   "footer": {

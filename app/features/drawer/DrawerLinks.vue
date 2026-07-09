@@ -20,6 +20,12 @@
         :badge="t('page.storyline.wip_badge')"
       ></DrawerItem>
       <DrawerItem
+        icon="i-heroicons-sparkles"
+        locale-key="season_planner"
+        to="/season-planner"
+        :is-collapsed="props.isCollapsed"
+      ></DrawerItem>
+      <DrawerItem
         icon="i-heroicons-clipboard-document-list"
         locale-key="tasks"
         to="/tasks"

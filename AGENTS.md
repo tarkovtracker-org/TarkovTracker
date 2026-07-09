@@ -55,7 +55,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 ## Project Map
 
 - `app/` — Nuxt 4 source. Pages, components, features, stores, composables, plugins, server routes, locales, shell.
-- `app/features/` — Domain slices: `admin`, `dashboard`, `drawer`, `hideout`, `maps`, `neededitems`, `profile`, `settings`, `storyline`, `streamer-tools`, `supporter`, `tasks`, `team`.
+- `app/features/` — Domain slices: `admin`, `dashboard`, `drawer`, `hideout`, `maps`, `neededitems`, `profile`, `settings`, `storyline`, `streamer-tools`, `supporter`, `tasks`, `team`, `season-planner`.
 - `app/server/api/` — Nitro server routes. `app/server/api/tarkov/` for tarkov.dev proxy.
 - `app/shell/` — App chrome (AppBar, NavDrawer, AppFooter).
 - `app/stores/` — Pinia stores. Core state: `useTarkovStore` with `useMetadataStore`, `useProgressStore`, `usePreferencesStore`.
