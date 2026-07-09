@@ -6,6 +6,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { logger } from '@/utils/logger';
 import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
@@ -52,8 +53,32 @@ export const toProgressEpoch = (modeData: UserProgressData | undefined): number 
   }
   return Math.max(0, Math.trunc(modeData.progressEpoch));
 };
+// Contract: progressEpoch is bumped ONLY by a full progress reset/prestige wipe
+// (resetOnlineProfile, performReset, buildPrestigeResetData). mergeProgressData
+// treats a higher epoch as an authoritative win and discards the losing side's
+// data, including storyChapters. Bumping it for a non-wiping change (e.g. a
+// prestige-level-only edit) silently loses the other device's storyline progress.
 export const getNextProgressEpoch = (modeData: UserProgressData | undefined): number => {
   return Math.min(2147483647, toProgressEpoch(modeData) + 1);
+};
+const countStoryChapters = (chapters: UserProgressData['storyChapters'] | undefined): number =>
+  chapters ? Object.keys(chapters).length : 0;
+const warnDroppedStoryChapters = (
+  winner: 'local' | 'remote',
+  dropped: UserProgressData['storyChapters'] | undefined,
+  kept: UserProgressData['storyChapters'] | undefined,
+  localEpoch: number,
+  remoteEpoch: number
+): void => {
+  const droppedCount = countStoryChapters(dropped);
+  if (droppedCount === 0) return;
+  logger.warn('[progressMerge] epoch early-return dropped non-empty storyChapters', {
+    winner,
+    droppedStoryChapters: droppedCount,
+    keptStoryChapters: countStoryChapters(kept),
+    localEpoch,
+    remoteEpoch,
+  });
 };
 export const mergeTimestampedCompletion = <T extends TimestampedCompletionEntry>(
   local: T | undefined,
@@ -262,9 +287,23 @@ export function mergeProgressData(
   const localEpoch = toProgressEpoch(local);
   const remoteEpoch = toProgressEpoch(remote);
   if (remoteEpoch > localEpoch) {
+    warnDroppedStoryChapters(
+      'remote',
+      local.storyChapters,
+      remote.storyChapters,
+      localEpoch,
+      remoteEpoch
+    );
     return { ...structuredClone(remote), progressEpoch: remoteEpoch };
   }
   if (localEpoch > remoteEpoch) {
+    warnDroppedStoryChapters(
+      'local',
+      remote.storyChapters,
+      local.storyChapters,
+      localEpoch,
+      remoteEpoch
+    );
     return { ...structuredClone(local), progressEpoch: localEpoch };
   }
   const mergeTaskCompletion = (
