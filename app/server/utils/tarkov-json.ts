@@ -2,6 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { $fetch } from 'ofetch';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
+import { buildSkillImageUrl } from '@/utils/tarkovUrls';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
@@ -756,7 +757,7 @@ function adaptObjective(raw: JsonRecord, context: AdapterContext): TaskObjective
         ? {
             name: skillName,
             level: skillLevelValue,
-            skill: { id: skillName, name: skillName },
+            skill: { id: skillName, name: skillName, imageLink: buildSkillImageUrl(skillName) },
           }
         : raw.skillLevel,
     task: raw.task ? adaptTaskRef(raw.task, context) : undefined,
@@ -863,6 +864,7 @@ function adaptReward(raw: unknown, context: AdapterContext): FinishRewards | und
                 ? {
                     id: skillName,
                     name: skillName,
+                    imageLink: buildSkillImageUrl(skillName),
                   }
                 : undefined,
           });

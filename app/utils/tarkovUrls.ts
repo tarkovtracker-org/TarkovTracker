@@ -36,3 +36,11 @@ export function buildItemPageUrl(itemId: string): string {
 export function buildTaskPageUrl(taskId: string): string {
   return `${TARKOV_DEV_SITE_BASE}/task/${encodeURIComponent(taskId)}`;
 }
+/**
+ * Build a URL for a skill icon from the tarkov.dev CDN
+ * @param skillId - The skill ID (matches the json.tarkov.dev skill string)
+ * @returns Full URL to the skill icon image
+ */
+export function buildSkillImageUrl(skillId: string): string {
+  return `${TARKOV_DEV_ASSETS_BASE}/skill-${encodeURIComponent(skillId)}-icon.webp`;
+}
