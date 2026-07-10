@@ -36,8 +36,10 @@ describe('season planner page', () => {
     const wrapper = await mountSuspended(SeasonPlannerPage, {
       global: globalConfig,
     });
-    expect(wrapper.text()).toContain('page.season_planner.title');
-    expect(wrapper.text()).toContain('page.season_planner.description');
+    expect(wrapper.text()).toContain('Season Planner');
+    expect(wrapper.text()).toContain(
+      'Plan your Kord Breach seasonal character modifiers and balance your point budget.'
+    );
     const cards = wrapper.findAll('[data-testid="modifier-card"]');
     expect(cards.length).toBeGreaterThan(0);
   });
@@ -49,7 +51,7 @@ describe('season planner page', () => {
     store.selectedModifiers = ['marathon_runner'];
     // Find button that contains reset text or is the button element
     const buttons = wrapper.findAll('button');
-    const resetButton = buttons.find((b) => b.text().includes('page.season_planner.reset'));
+    const resetButton = buttons.find((b) => b.text().includes('Reset Plan'));
     expect(resetButton).toBeDefined();
     await resetButton!.trigger('click');
     expect(store.selectedModifiers).toEqual([]);
@@ -66,7 +68,7 @@ describe('season planner page', () => {
     await wrapper.vm.$nextTick();
     const alert = wrapper.find('[data-testid="u-alert"]');
     expect(alert.exists()).toBe(true);
-    expect(alert.attributes('data-title')).toBe('page.season_planner.invalid_total_title');
+    expect(alert.attributes('data-title')).toBe('Invalid Point Total');
   });
   it('disables incompatible modifiers when their counterpart is selected', async () => {
     const wrapper = await mountSuspended(SeasonPlannerPage, {
@@ -87,7 +89,7 @@ describe('season planner page', () => {
     await wrapper.vm.$nextTick();
     const alert = wrapper.find('[data-testid="u-alert"]');
     expect(alert.exists()).toBe(true);
-    expect(alert.attributes('data-title')).toBe('page.season_planner.conflict_title');
+    expect(alert.attributes('data-title')).toBe('Modifier Conflict');
   });
   it('sets SEO metadata', async () => {
     await mountSuspended(SeasonPlannerPage, {

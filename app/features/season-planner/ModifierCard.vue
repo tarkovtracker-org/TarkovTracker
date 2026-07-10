@@ -29,7 +29,7 @@
         {{ modifier.points > 0 ? '+' : '' }}{{ modifier.points }}
       </span>
     </div>
-    <p class="text-surface-400 line-clamp-2 text-xs leading-relaxed">
+    <p class="text-surface-400 text-xs leading-relaxed">
       {{ t(modifierDescriptionKey, modifier.description) }}
     </p>
     <div v-if="selected" class="bg-primary-500 absolute top-2 right-2 h-1.5 w-1.5 rounded-full" />

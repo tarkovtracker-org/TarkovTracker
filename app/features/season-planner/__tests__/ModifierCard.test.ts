@@ -19,7 +19,8 @@ const mockModifier: PersonalModifier = {
 };
 describe('ModifierCard', () => {
   beforeEach(() => {
-    translateMock.mockClear();
+    translateMock.mockReset();
+    translateMock.mockImplementation((_key: string, fallback: string) => fallback);
   });
   it('renders modifier details correctly', () => {
     const wrapper = mount(ModifierCard, {
