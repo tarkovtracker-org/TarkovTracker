@@ -1661,7 +1661,155 @@
       "total_points": "Total Points",
       "reset": "Reset Plan",
       "invalid_total_title": "Invalid Point Total",
-      "points_needed": "Add {points} more points to make this plan valid."
+      "points_needed": "Add {points} more points to make this plan valid.",
+      "conflict_title": "Modifier Conflict",
+      "conflict_description": "Some selected modifiers cannot be used together. Remove one of the conflicting modifiers.",
+      "modifiers": {
+        "no_insurance": {
+          "name": "No Insurance",
+          "description": "Cannot insure items before raid."
+        },
+        "black_division": {
+          "name": "Black Division",
+          "description": "Black Division operatives can be encountered on specific locations."
+        },
+        "no_fir_hideout": {
+          "name": "No FiR for Hideout",
+          "description": "Hideout zones don't require the Found in Raid status."
+        },
+        "armor_shortage": {
+          "name": "Armor Shortage",
+          "description": "Traders across Tarkov are experiencing an armor shortage."
+        },
+        "handyman": {
+          "name": "Handyman",
+          "description": "Item crafting time is reduced by 50%. Crafting skill starts at level 51."
+        },
+        "seasoned_pmcs": {
+          "name": "Seasoned PMCs",
+          "description": "Your character gains 25% more raid experience."
+        },
+        "marathon_runner": {
+          "name": "Marathon Runner",
+          "description": "Arm and leg stamina is consumed 15% slower."
+        },
+        "safecracker": {
+          "name": "Safecracker",
+          "description": "Mechanical keys have a 20% chance not to lose durability when used."
+        },
+        "bushborne": {
+          "name": "Bushborne",
+          "description": "Walking in vegetation generates 50% less noise and movement slowdown."
+        },
+        "juice_time": {
+          "name": "Juice Time",
+          "description": "Consuming a juice drink grants the Painkiller effect for 60 seconds."
+        },
+        "sailors_nostalgia": {
+          "name": "Sailor's Nostalgia",
+          "description": "Consuming canned fish grants the Health Regeneration (+2) effect for 10 seconds."
+        },
+        "youth": {
+          "name": "Youth",
+          "description": "Energy is consumed 20% slower. Arm and leg stamina is increased by 10."
+        },
+        "street_tax": {
+          "name": "Street Tax",
+          "description": "Once per week, some Scavs pay you protection money."
+        },
+        "the_tarkov_shooter": {
+          "name": "The Tarkov Shooter",
+          "description": "Bolt-action Rifles skill leveling speed is increased by 100%. Bolt-action Rifles skill starts at level 10."
+        },
+        "diet": {
+          "name": "Diet",
+          "description": "All provisions consume 50% less resource."
+        },
+        "hercules": {
+          "name": "Hercules",
+          "description": "Strength and Endurance skills start at level 15."
+        },
+        "sprinter": {
+          "name": "Sprinter",
+          "description": "Running speed is increased by 5%."
+        },
+        "thrombophilia": {
+          "name": "Thrombophilia",
+          "description": "Bleeding chance is decreased by 25%."
+        },
+        "hypodipsia": {
+          "name": "Hypodipsia",
+          "description": "Hydration is consumed 15% slower."
+        },
+        "polyphagia": {
+          "name": "Polyphagia",
+          "description": "Energy is consumed 15% slower."
+        },
+        "sturdy_bones": {
+          "name": "Sturdy Bones",
+          "description": "Limb fracture chance is decreased by 15%. Falling from heights deals 15% less damage."
+        },
+        "average": {
+          "name": "Average",
+          "description": "All character skills start at level 25 but cannot be increased further (Excluding Crafting)."
+        },
+        "kappa_protocol": {
+          "name": "Kappa Protocol",
+          "description": "Immediately receive Secure container Kappa."
+        },
+        "hemophilia": {
+          "name": "Hemophilia",
+          "description": "Bleeding chance is increased by 25%."
+        },
+        "osteoporosis": {
+          "name": "Osteoporosis",
+          "description": "Limb fracture chance is increased by 15%. Falling from heights deals 15% more damage."
+        },
+        "exhaustion": {
+          "name": "Exhaustion",
+          "description": "Arm and leg stamina recovers 15% slower. Arm and leg stamina is reduced by 10."
+        },
+        "well_that_hurt": {
+          "name": "Well That Hurt!",
+          "description": "All medkit uses consume 25% more resource."
+        },
+        "incompetent": {
+          "name": "Incompetent",
+          "description": "All character skills are leveled 25% slower (Excluding Bolt-action Rifles). All character skills can only be increased up to level 30 (Excluding Crafting)."
+        },
+        "polydipsia": {
+          "name": "Polydipsia",
+          "description": "Hydration is consumed 15% faster."
+        },
+        "chronic_fatigue_syndrome": {
+          "name": "Chronic Fatigue Syndrome",
+          "description": "Energy is consumed 15% faster."
+        },
+        "personality_vacuum": {
+          "name": "Personality Vacuum",
+          "description": "Charisma skill cannot be increased. All trader items cost 20% more."
+        },
+        "dr_jekyll": {
+          "name": "Dr. Jekyll",
+          "description": "After gaining the Fresh Wound status, it cannot be removed until the end of the raid."
+        },
+        "allergic": {
+          "name": "Allergic",
+          "description": "Become allergic to 2 random items from the Provisions or Medication category."
+        },
+        "broken_secure_container": {
+          "name": "Broken Secure Container",
+          "description": "Secure container is restricted to cash, keys, dogtags, special equipment, and certain containers."
+        },
+        "no_flea_market": {
+          "name": "No Flea Market",
+          "description": "Trading with players on the Flea Market is disabled."
+        },
+        "third_leg": {
+          "name": "Third Leg",
+          "description": "Movement speed is decreased by 1%. Buying items at Therapist is 5% cheaper."
+        }
+      }
     }
   },
   "footer": {

@@ -18,9 +18,9 @@ describe('season planner page', () => {
   const globalConfig = {
     stubs: {
       ModifierCard: {
-        props: ['modifier', 'selected'],
+        props: ['modifier', 'selected', 'disabled'],
         template:
-          '<div data-testid="modifier-card" :data-selected="selected" :data-id="modifier.id">{{ modifier.name }}</div>',
+          '<div data-testid="modifier-card" :data-selected="selected" :data-disabled="disabled" :data-id="modifier.id">{{ modifier.name }}</div>',
       },
       UButton: {
         template: '<button @click="$emit(\'click\')"><slot /></button>',
@@ -67,6 +67,27 @@ describe('season planner page', () => {
     const alert = wrapper.find('[data-testid="u-alert"]');
     expect(alert.exists()).toBe(true);
     expect(alert.attributes('data-title')).toBe('page.season_planner.invalid_total_title');
+  });
+  it('disables incompatible modifiers when their counterpart is selected', async () => {
+    const wrapper = await mountSuspended(SeasonPlannerPage, {
+      global: globalConfig,
+    });
+    const store = useSeasonPlannerStore();
+    store.selectedModifiers = ['sturdy_bones'];
+    await wrapper.vm.$nextTick();
+    const osteoporosisCard = wrapper.find('[data-id="osteoporosis"]');
+    expect(osteoporosisCard.attributes('data-disabled')).toBe('true');
+  });
+  it('displays conflict alert when incompatible modifiers are persisted', async () => {
+    const wrapper = await mountSuspended(SeasonPlannerPage, {
+      global: globalConfig,
+    });
+    const store = useSeasonPlannerStore();
+    store.$patch({ selectedModifiers: ['sturdy_bones', 'osteoporosis'] });
+    await wrapper.vm.$nextTick();
+    const alert = wrapper.find('[data-testid="u-alert"]');
+    expect(alert.exists()).toBe(true);
+    expect(alert.attributes('data-title')).toBe('page.season_planner.conflict_title');
   });
   it('sets SEO metadata', async () => {
     await mountSuspended(SeasonPlannerPage, {

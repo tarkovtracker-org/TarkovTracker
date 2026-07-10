@@ -37,7 +37,16 @@
             </UButton>
           </div>
         </div>
-        <div v-if="!plannerStore.isValid" class="mb-6">
+        <div v-if="plannerStore.hasConflicts" class="mb-6">
+          <UAlert
+            icon="i-heroicons-exclamation-triangle"
+            color="error"
+            variant="soft"
+            :title="t('page.season_planner.conflict_title')"
+            :description="t('page.season_planner.conflict_description')"
+          />
+        </div>
+        <div v-else-if="!plannerStore.isValid" class="mb-6">
           <UAlert
             icon="i-heroicons-exclamation-triangle"
             color="error"
@@ -62,6 +71,7 @@
                 :key="modifier.id"
                 :modifier="modifier"
                 :selected="plannerStore.isSelected(modifier.id)"
+                :disabled="isModifierDisabled(modifier)"
                 @toggle="plannerStore.toggleModifier(modifier.id)"
               />
             </div>
@@ -77,6 +87,7 @@
                 :key="modifier.id"
                 :modifier="modifier"
                 :selected="plannerStore.isSelected(modifier.id)"
+                :disabled="isModifierDisabled(modifier)"
                 @toggle="plannerStore.toggleModifier(modifier.id)"
               />
             </div>
@@ -96,8 +107,17 @@
                   :key="modifier.id"
                   class="bg-surface-900/50 border-surface-700 flex flex-col gap-1 rounded-md border p-3"
                 >
-                  <span class="text-surface-100 text-sm font-semibold">{{ modifier.name }}</span>
-                  <span class="text-surface-400 text-xs">{{ modifier.description }}</span>
+                  <span class="text-surface-100 text-sm font-semibold">
+                    {{ t(`page.season_planner.modifiers.${modifier.id}.name`, modifier.name) }}
+                  </span>
+                  <span class="text-surface-400 text-xs">
+                    {{
+                      t(
+                        `page.season_planner.modifiers.${modifier.id}.description`,
+                        modifier.description
+                      )
+                    }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -136,4 +156,12 @@
   const hardcoreModifiers = computed(() =>
     plannerStore.allModifiers.filter((m): m is HardcoreModifier => m.type === 'hardcore')
   );
+  const isModifierDisabled = (modifier: PersonalModifier): boolean => {
+    if (plannerStore.isSelected(modifier.id)) {
+      return false;
+    }
+    return Boolean(
+      modifier.incompatibleWith?.some((conflictId) => plannerStore.isSelected(conflictId))
+    );
+  };
 </script>

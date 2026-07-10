@@ -1,8 +1,15 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ModifierCard from '@/features/season-planner/ModifierCard.vue';
 import type { PersonalModifier } from '@/types/season';
+const { translateMock } = vi.hoisted(() => ({
+  translateMock: vi.fn((_key: string, fallback: string) => fallback),
+}));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({ t: translateMock }),
+}));
 const mockModifier: PersonalModifier = {
   id: 'marathon_runner',
   name: 'Marathon Runner',
@@ -11,6 +18,9 @@ const mockModifier: PersonalModifier = {
   description: 'Arm and leg stamina is consumed 15% slower.',
 };
 describe('ModifierCard', () => {
+  beforeEach(() => {
+    translateMock.mockClear();
+  });
   it('renders modifier details correctly', () => {
     const wrapper = mount(ModifierCard, {
       props: {
@@ -35,6 +45,22 @@ describe('ModifierCard', () => {
       },
     });
     expect(wrapper.text()).toContain('+4');
+  });
+  it('renders localized modifier text when a translation is available', () => {
+    translateMock.mockImplementation((key: string, fallback: string) =>
+      key.endsWith('.name') ? 'Localized Marathon Runner' : fallback
+    );
+    const wrapper = mount(ModifierCard, {
+      props: {
+        modifier: mockModifier,
+        selected: false,
+      },
+    });
+    expect(wrapper.text()).toContain('Localized Marathon Runner');
+    expect(translateMock).toHaveBeenCalledWith(
+      'page.season_planner.modifiers.marathon_runner.name',
+      'Marathon Runner'
+    );
   });
   it('applies correct classes and accessibility attributes when selected', () => {
     const wrapper = mount(ModifierCard, {
@@ -69,5 +95,19 @@ describe('ModifierCard', () => {
     });
     await wrapper.find('button').trigger('click');
     expect(wrapper.emitted('toggle')).toHaveLength(1);
+  });
+  it('disables incompatible modifier choices', async () => {
+    const wrapper = mount(ModifierCard, {
+      props: {
+        modifier: mockModifier,
+        selected: false,
+        disabled: true,
+      },
+    });
+    const button = wrapper.find('button');
+    expect(button.attributes('disabled')).toBeDefined();
+    expect(button.classes()).toContain('cursor-not-allowed');
+    await button.trigger('click');
+    expect(wrapper.emitted('toggle')).toBeUndefined();
   });
 });
