@@ -175,8 +175,6 @@
     if (plannerStore.isSelected(modifier.id)) {
       return false;
     }
-    return Boolean(
-      modifier.incompatibleWith?.some((conflictId) => plannerStore.isSelected(conflictId))
-    );
+    return plannerStore.conflictsWithSelection(modifier.id, plannerStore.selectedModifiers);
   };
 </script>

@@ -45,11 +45,7 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
         this.selectedModifiers.splice(index, 1);
         return;
       }
-      const selectedIds = new Set(this.selectedModifiers);
-      const conflictsWithSelection = modifier.incompatibleWith?.some((conflictId) =>
-        selectedIds.has(conflictId)
-      );
-      if (!conflictsWithSelection) {
+      if (!this.conflictsWithSelection(id, this.selectedModifiers)) {
         this.selectedModifiers.push(id);
       }
     },
@@ -57,14 +53,10 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
       const knownIds = new Set(this.personalModifiers.map((m) => m.id));
       const normalizedIds: string[] = [];
       for (const id of this.selectedModifiers) {
-        const modifier = this.personalModifiers.find((candidate) => candidate.id === id);
-        if (!knownIds.has(id) || !modifier) {
+        if (!knownIds.has(id)) {
           continue;
         }
-        const conflictsWithSelection = modifier.incompatibleWith?.some((conflictId) =>
-          normalizedIds.includes(conflictId)
-        );
-        if (!conflictsWithSelection && !normalizedIds.includes(id)) {
+        if (!this.conflictsWithSelection(id, normalizedIds) && !normalizedIds.includes(id)) {
           normalizedIds.push(id);
         }
       }
@@ -72,6 +64,16 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
     },
     reset() {
       this.selectedModifiers = [];
+    },
+    conflictsWithSelection(id: string, selectedIds: readonly string[]): boolean {
+      const modifier = this.personalModifiers.find((candidate) => candidate.id === id);
+      if (modifier?.incompatibleWith?.some((conflictId) => selectedIds.includes(conflictId))) {
+        return true;
+      }
+      return selectedIds.some((selectedId) => {
+        const selected = this.personalModifiers.find((candidate) => candidate.id === selectedId);
+        return selected?.incompatibleWith?.includes(id);
+      });
     },
   },
   persist: {

@@ -50,6 +50,12 @@ describe('useSeasonPlannerStore', () => {
       store.toggleModifier('osteoporosis');
       expect(store.selectedModifiers).toEqual(['sturdy_bones']);
     });
+    it('prevents incompatible modifiers regardless of selection order', () => {
+      const store = useSeasonPlannerStore();
+      store.toggleModifier('osteoporosis');
+      store.toggleModifier('sturdy_bones');
+      expect(store.selectedModifiers).toEqual(['osteoporosis']);
+    });
   });
   describe('totalPoints', () => {
     it('returns 0 when no modifiers are selected', () => {
@@ -145,6 +151,12 @@ describe('useSeasonPlannerStore', () => {
       });
       store.normalizeSelection();
       expect(store.selectedModifiers).toEqual(['sturdy_bones']);
+    });
+    it('removes incompatible modifiers regardless of persisted order', () => {
+      const store = useSeasonPlannerStore();
+      store.$patch({ selectedModifiers: ['osteoporosis', 'sturdy_bones'] });
+      store.normalizeSelection();
+      expect(store.selectedModifiers).toEqual(['osteoporosis']);
     });
     it('handles empty selection gracefully', () => {
       const store = useSeasonPlannerStore();
