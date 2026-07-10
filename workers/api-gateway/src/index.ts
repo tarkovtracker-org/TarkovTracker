@@ -8,7 +8,14 @@ import {
 } from './handlers/progress';
 import { handleGetTeamProgress } from './handlers/team';
 import { handleGetToken } from './handlers/token';
-import { BURST_WINDOW_SEC, DAILY_WINDOW_SEC, TIER_LIMITS, upgradeMessage } from './limits';
+import {
+  BURST_WINDOW_SEC,
+  DAILY_WINDOW_SEC,
+  IP_BACKSTOP_LIMITS,
+  IP_BACKSTOP_WINDOW_SEC,
+  TIER_LIMITS,
+  upgradeMessage,
+} from './limits';
 import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
@@ -360,6 +367,10 @@ function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
   }
   return headers;
 }
+function retryAfterS(rl: RateLimitResult): number | undefined {
+  if (typeof rl.resetAt !== 'number') return undefined;
+  return Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+}
 function docsResponse(envOrigin?: string, requestOrigin?: string): Response {
   const html = `<!doctype html>
 <html>
@@ -476,6 +487,45 @@ type AuthSuccess = {
   validation: { valid: true; token: ApiToken };
   rlHeaders: Record<string, string>;
 };
+type ThrottleBucket = 'daily' | 'burst' | 'ip';
+function resolveClientIp(request: Request): string | null {
+  const cfIp = request.headers.get('CF-Connecting-IP');
+  if (cfIp) return cfIp.trim();
+  const xff = request.headers.get('X-Forwarded-For');
+  if (xff) return xff.split(',')[0].trim();
+  return null;
+}
+async function hashIp(ip: string): Promise<string> {
+  const data = new TextEncoder().encode(ip);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+function tokenSuffix(rawToken: string): string {
+  return rawToken.length > 8 ? rawToken.slice(-8) : rawToken;
+}
+function logThrottle(
+  action: Action,
+  bucket: ThrottleBucket,
+  userId: string,
+  ipHash: string | null,
+  suffix: string,
+  retryAfterS: number | undefined
+): void {
+  console.log(
+    JSON.stringify({
+      event: 'rate_limit_429',
+      action,
+      bucket,
+      user_id: userId,
+      ip_hash: ipHash,
+      token_suffix: suffix,
+      retry_after_s: retryAfterS ?? null,
+    })
+  );
+}
 async function authenticateAndRateLimit(
   env: Env,
   request: Request,
@@ -495,6 +545,9 @@ async function authenticateAndRateLimit(
   const tier = await resolveTier(env, token.user_id);
   const limits = TIER_LIMITS[tier];
   const dailyLimit = kind === 'write' ? limits.writesPerDay : limits.readsPerDay;
+  const clientIp = resolveClientIp(request);
+  const ipHashPromise = clientIp ? hashIp(clientIp) : Promise.resolve(null);
+  const suffix = tokenSuffix(rawToken);
   const track = (throttled: boolean) => {
     const promise = recordUsage(env, {
       userId: token.user_id,
@@ -517,6 +570,8 @@ async function authenticateAndRateLimit(
   const dailyHeaders = rateLimitHeaders(daily);
   if (!daily.allowed) {
     track(true);
+    const ipHash = await ipHashPromise;
+    logThrottle(action, 'daily', token.user_id, ipHash, suffix, retryAfterS(daily));
     const message =
       daily.status === 429 && tier === 'free'
         ? upgradeMessage(kind)
@@ -541,6 +596,8 @@ async function authenticateAndRateLimit(
     );
     if (ctx) ctx.waitUntil(refund);
     track(true);
+    const ipHash = await ipHashPromise;
+    logThrottle(action, 'burst', token.user_id, ipHash, suffix, retryAfterS(burst));
     // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
     // remaining for the refund. Retry-After reflects when burst capacity frees.
     const headers = rateLimitHeaders({
@@ -557,6 +614,55 @@ async function authenticateAndRateLimit(
       requestOrigin,
       headers
     );
+  }
+  // Per-IP backstop: catches "many accounts from one IP" abuse. Tuned
+  // generously (600 reads/hour, 200 writes/hour) so shared NAT users are not
+  // impacted. Uses a 1-hour sliding window.
+  if (clientIp) {
+    const ipLimit = kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
+    const ipKey = `ip-${kind}:${clientIp}`;
+    const ipResult = await rateLimit(env, ipKey, ipLimit, IP_BACKSTOP_WINDOW_SEC, {
+      mode: 'sliding',
+    });
+    if (!ipResult.allowed) {
+      // Refund both the daily and burst slots so IP-throttled requests do not
+      // drain per-user quotas.
+      const refundBurst = refundRateLimit(
+        env,
+        `burst-${kind}:${token.user_id}`,
+        `burst-${kind}`,
+        typeof burst.resetAt === 'number' ? burst.resetAt : undefined
+      );
+      const refundDaily = refundRateLimit(
+        env,
+        dailyKey,
+        `daily-${kind}`,
+        typeof daily.resetAt === 'number' ? daily.resetAt : undefined
+      );
+      if (ctx) {
+        ctx.waitUntil(refundBurst);
+        ctx.waitUntil(refundDaily);
+      }
+      track(true);
+      const ipHash = await ipHashPromise;
+      logThrottle(action, 'ip', token.user_id, ipHash, suffix, retryAfterS(ipResult));
+      const headers = rateLimitHeaders({
+        ...daily,
+        remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
+      });
+      if (typeof ipResult.resetAt === 'number') {
+        headers['Retry-After'] = String(
+          Math.max(1, Math.ceil((ipResult.resetAt - Date.now()) / 1000))
+        );
+      }
+      return errorResponse(
+        ipResult.message || 'Rate limit exceeded',
+        ipResult.status || 429,
+        envOrigin,
+        requestOrigin,
+        headers
+      );
+    }
   }
   track(false);
   return { validation, rlHeaders: dailyHeaders };

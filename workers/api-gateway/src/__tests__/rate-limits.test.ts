@@ -440,4 +440,172 @@ describe('tiered quotas in the worker', () => {
       p_throttled: 0,
     });
   });
+
+  it('checks the per-IP backstop when CF-Connecting-IP is present', async () => {
+    const calls: LimiterCall[] = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const ipCall = calls.find((c) => c.key.startsWith('ip-read:'));
+    expect(ipCall).toBeDefined();
+    expect(ipCall?.body).toMatchObject({ mode: 'sliding', windowSec: 3600 });
+  });
+
+  it('returns 429 and refunds daily+burst when the per-IP backstop trips', async () => {
+    const calls: LimiterCall[] = [];
+    const rpcCalls: Array<Record<string, unknown>> = [];
+    const ipResetAt = Date.now() + 1800_000;
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
+        if (call.body.refund === true) {
+          return { allowed: true, remaining: 0, resetAt: ipResetAt };
+        }
+        if (String(call.key).startsWith('ip-')) {
+          return { allowed: false, remaining: 0, resetAt: ipResetAt };
+        }
+        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000 };
+      }),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(429);
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    expect(retryAfter).toBeGreaterThan(0);
+    await flushAsync();
+    const refunds = calls.filter((c) => c.body.refund === true);
+    expect(refunds).toHaveLength(2);
+    expect(refunds.some((r) => r.key === 'daily-read:user-free')).toBe(true);
+    expect(refunds.some((r) => r.key === 'burst-read:user-free')).toBe(true);
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
+  });
+
+  it('emits a structured 429 log line with hashed IP on daily throttle', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => ({
+        allowed: !String(call.key).startsWith('daily-'),
+        remaining: 0,
+        resetAt: Date.now() + 1000,
+      })),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    const throttleLog = logSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('rate_limit_429'));
+    expect(throttleLog).toBeDefined();
+    const parsed = JSON.parse(throttleLog!);
+    expect(parsed).toMatchObject({
+      event: 'rate_limit_429',
+      action: 'token-info',
+      bucket: 'daily',
+      user_id: 'user-free',
+    });
+    expect(parsed.ip_hash).toMatch(/^[0-9a-f]{16}$/);
+    expect(parsed.token_suffix).toBe('PVP_abc123'.slice(-8));
+    logSpy.mockRestore();
+  });
+
+  it('emits a structured 429 log line with bucket=ip on IP backstop throttle', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const ipResetAt = Date.now() + 1800_000;
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
+        if (call.body.refund === true) {
+          return { allowed: true, remaining: 0, resetAt: ipResetAt };
+        }
+        if (String(call.key).startsWith('ip-')) {
+          return { allowed: false, remaining: 0, resetAt: ipResetAt };
+        }
+        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000 };
+      }),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    const throttleLog = logSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('rate_limit_429'));
+    expect(throttleLog).toBeDefined();
+    const parsed = JSON.parse(throttleLog!);
+    expect(parsed).toMatchObject({
+      event: 'rate_limit_429',
+      action: 'token-info',
+      bucket: 'ip',
+      user_id: 'user-free',
+    });
+    expect(parsed.ip_hash).toMatch(/^[0-9a-f]{16}$/);
+    logSpy.mockRestore();
+  });
+
+  it('does not check the per-IP backstop when no IP header is present', async () => {
+    const calls: LimiterCall[] = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      env
+    );
+    expect(res.status).toBe(200);
+    expect(calls.filter((c) => c.key.startsWith('ip-'))).toHaveLength(0);
+  });
 });
