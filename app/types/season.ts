@@ -1,5 +1,6 @@
 export interface PersonalModifier {
   id: string;
+  incompatibleWith?: readonly string[];
   name: string;
   type: 'positive' | 'negative';
   points: number;

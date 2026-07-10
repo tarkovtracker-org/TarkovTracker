@@ -5,6 +5,17 @@ describe('useSeasonPlannerStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
+  describe('modifier data', () => {
+    it('assigns the crafting bonuses to Handyman and the experience bonus to Seasoned PMCs', () => {
+      const store = useSeasonPlannerStore();
+      const handyman = store.allModifiers.find((modifier) => modifier.id === 'handyman');
+      const seasonedPmcs = store.allModifiers.find((modifier) => modifier.id === 'seasoned_pmcs');
+      expect(handyman?.description).toBe(
+        'Item crafting time is reduced by 50%. Crafting skill starts at level 51.'
+      );
+      expect(seasonedPmcs?.description).toBe('Your character gains 25% more raid experience.');
+    });
+  });
   describe('toggleModifier', () => {
     it('adds a modifier when not selected', () => {
       const store = useSeasonPlannerStore();
@@ -26,6 +37,18 @@ describe('useSeasonPlannerStore', () => {
       expect(store.selectedModifiers).toHaveLength(2);
       store.toggleModifier('kappa_protocol');
       expect(store.selectedModifiers).toEqual(['no_flea_market']);
+    });
+    it('ignores unknown and hardcore modifier IDs', () => {
+      const store = useSeasonPlannerStore();
+      store.toggleModifier('nonexistent_modifier');
+      store.toggleModifier('no_insurance');
+      expect(store.selectedModifiers).toEqual([]);
+    });
+    it('prevents incompatible modifiers from being selected together', () => {
+      const store = useSeasonPlannerStore();
+      store.toggleModifier('sturdy_bones');
+      store.toggleModifier('osteoporosis');
+      expect(store.selectedModifiers).toEqual(['sturdy_bones']);
     });
   });
   describe('totalPoints', () => {
@@ -76,6 +99,13 @@ describe('useSeasonPlannerStore', () => {
       expect(store.totalPoints).toBe(-3 + 2 + 1);
       expect(store.isValid).toBe(true);
     });
+    it('is invalid when persisted state contains incompatible modifiers', () => {
+      const store = useSeasonPlannerStore();
+      store.$patch({ selectedModifiers: ['sturdy_bones', 'osteoporosis'] });
+      expect(store.totalPoints).toBe(0);
+      expect(store.hasConflicts).toBe(true);
+      expect(store.isValid).toBe(false);
+    });
   });
   describe('hardcore modifier exclusion', () => {
     it('does not include hardcore modifiers in personalModifiers', () => {
@@ -107,6 +137,14 @@ describe('useSeasonPlannerStore', () => {
       store.$patch({ selectedModifiers: ['no_insurance', 'kappa_protocol'] });
       store.normalizeSelection();
       expect(store.selectedModifiers).toEqual(['kappa_protocol']);
+    });
+    it('removes duplicate and incompatible persisted IDs', () => {
+      const store = useSeasonPlannerStore();
+      store.$patch({
+        selectedModifiers: ['sturdy_bones', 'osteoporosis', 'sturdy_bones'],
+      });
+      store.normalizeSelection();
+      expect(store.selectedModifiers).toEqual(['sturdy_bones']);
     });
     it('handles empty selection gracefully', () => {
       const store = useSeasonPlannerStore();

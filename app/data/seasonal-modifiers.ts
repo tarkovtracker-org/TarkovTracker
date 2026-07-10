@@ -28,14 +28,13 @@ export const seasonalModifiers: SeasonalModifier[] = [
     id: 'handyman',
     name: 'Handyman',
     type: 'hardcore',
-    description: 'Item crafting time is reduced.',
+    description: 'Item crafting time is reduced by 50%. Crafting skill starts at level 51.',
   },
   {
     id: 'seasoned_pmcs',
     name: 'Seasoned PMCs',
     type: 'hardcore',
-    description:
-      'Your character gains 25% more raid experience. Crafting skill starts at level 51.',
+    description: 'Your character gains 25% more raid experience.',
   },
   {
     id: 'marathon_runner',
@@ -141,6 +140,7 @@ export const seasonalModifiers: SeasonalModifier[] = [
     name: 'Sturdy Bones',
     type: 'positive',
     points: -3,
+    incompatibleWith: ['osteoporosis'],
     description:
       'Limb fracture chance is decreased by 15%. Falling from heights deals 15% less damage.',
   },
@@ -171,6 +171,7 @@ export const seasonalModifiers: SeasonalModifier[] = [
     name: 'Osteoporosis',
     type: 'negative',
     points: 3,
+    incompatibleWith: ['sturdy_bones'],
     description:
       'Limb fracture chance is increased by 15%. Falling from heights deals 15% more damage.',
   },

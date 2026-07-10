@@ -21,8 +21,14 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
     totalPoints(): number {
       return this.selectedModifierObjects.reduce((acc, m) => acc + (m.points ?? 0), 0);
     },
+    hasConflicts(): boolean {
+      const selectedIds = new Set(this.selectedModifiers);
+      return this.selectedModifierObjects.some((modifier) =>
+        modifier.incompatibleWith?.some((id) => selectedIds.has(id))
+      );
+    },
     isValid(): boolean {
-      return this.totalPoints >= 0;
+      return this.totalPoints >= 0 && !this.hasConflicts;
     },
   },
   actions: {
@@ -30,16 +36,39 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
       return this.selectedModifiers.includes(id);
     },
     toggleModifier(id: string) {
+      const modifier = this.personalModifiers.find((candidate) => candidate.id === id);
+      if (!modifier) {
+        return;
+      }
       const index = this.selectedModifiers.indexOf(id);
       if (index > -1) {
         this.selectedModifiers.splice(index, 1);
-      } else {
+        return;
+      }
+      const selectedIds = new Set(this.selectedModifiers);
+      const conflictsWithSelection = modifier.incompatibleWith?.some((conflictId) =>
+        selectedIds.has(conflictId)
+      );
+      if (!conflictsWithSelection) {
         this.selectedModifiers.push(id);
       }
     },
     normalizeSelection() {
       const knownIds = new Set(this.personalModifiers.map((m) => m.id));
-      this.selectedModifiers = this.selectedModifiers.filter((id) => knownIds.has(id));
+      const normalizedIds: string[] = [];
+      for (const id of this.selectedModifiers) {
+        const modifier = this.personalModifiers.find((candidate) => candidate.id === id);
+        if (!knownIds.has(id) || !modifier) {
+          continue;
+        }
+        const conflictsWithSelection = modifier.incompatibleWith?.some((conflictId) =>
+          normalizedIds.includes(conflictId)
+        );
+        if (!conflictsWithSelection && !normalizedIds.includes(id)) {
+          normalizedIds.push(id);
+        }
+      }
+      this.selectedModifiers = normalizedIds;
     },
     reset() {
       this.selectedModifiers = [];
