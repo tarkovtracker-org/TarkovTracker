@@ -383,6 +383,12 @@ describe('tarkov JSON adapters', () => {
             type: 'findQuestItem',
             questItem: 'questItem1',
           },
+          {
+            id: 'objective3',
+            type: 'skill',
+            skill: 'Vitality',
+            level: 5,
+          },
         ],
         failConditions: [{ id: 'fail1', type: 'taskStatus', task: 'task2' }],
         startRewards: { items: [{ item: 'item2', count: 1000 }] },
@@ -445,6 +451,30 @@ describe('tarkov JSON adapters', () => {
     expect(rewards?.finishRewards?.items?.[0]?.item).toEqual({ id: 'item1' });
     expect(rewards?.failureOutcome?.skillLevelReward?.[0]?.skill).toMatchObject({
       name: 'Strength',
+    });
+  });
+  it('populates imageLink for skill objectives and skill level rewards', () => {
+    const objectives = adaptTaskObjectivesResponse(tasksPayload, {
+      hideoutPayload,
+      tradersPayload,
+    }).data.tasks[0];
+    expect(objectives?.objectives?.[2]).toMatchObject({
+      __typename: 'TaskObjectiveSkill',
+      skillLevel: {
+        name: 'Vitality',
+        level: 5,
+        skill: {
+          id: 'Vitality',
+          name: 'Vitality',
+          imageLink: 'https://assets.tarkov.dev/skill-Vitality-icon.webp',
+        },
+      },
+    });
+    const rewards = adaptTaskRewardsResponse(tasksPayload, { tradersPayload }).data.tasks[0];
+    expect(rewards?.failureOutcome?.skillLevelReward?.[0]?.skill).toMatchObject({
+      id: 'Strength',
+      name: 'Strength',
+      imageLink: 'https://assets.tarkov.dev/skill-Strength-icon.webp',
     });
   });
   it('adapts task objectives with full item/map lookups when provided', () => {
