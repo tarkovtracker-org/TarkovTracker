@@ -4,53 +4,72 @@ function normalize(str: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 }
+const MAX_INITIALISM_LENGTH = 6;
+function getInitialism(text: string): string {
+  return (text.match(/[\p{L}\p{N}]+/gu) ?? []).map((word) => word[0]).join('');
+}
+function getSubsequenceScore(text: string, query: string): number {
+  let bestGapCount = Number.POSITIVE_INFINITY;
+  let bestConsecutiveCount = 0;
+  let startIndex = text.indexOf(query.charAt(0));
+  while (startIndex !== -1) {
+    let lastMatchIndex = startIndex;
+    let maxConsecutiveCount = 1;
+    let consecutiveCount = 1;
+    let queryIndex = 1;
+    for (let textIndex = startIndex + 1; textIndex < text.length; textIndex++) {
+      if (text[textIndex] !== query[queryIndex]) continue;
+      consecutiveCount = textIndex === lastMatchIndex + 1 ? consecutiveCount + 1 : 1;
+      maxConsecutiveCount = Math.max(maxConsecutiveCount, consecutiveCount);
+      lastMatchIndex = textIndex;
+      queryIndex++;
+      if (queryIndex === query.length) break;
+    }
+    if (queryIndex === query.length) {
+      const gapCount = lastMatchIndex - startIndex + 1 - query.length;
+      if (
+        gapCount < bestGapCount ||
+        (gapCount === bestGapCount && maxConsecutiveCount > bestConsecutiveCount)
+      ) {
+        bestGapCount = gapCount;
+        bestConsecutiveCount = maxConsecutiveCount;
+      }
+    }
+    startIndex = text.indexOf(query.charAt(0), startIndex + 1);
+  }
+  const maxGapCount = Math.max(2, Math.floor(query.length / 2));
+  if (bestGapCount > maxGapCount) return 0;
+  const compactness = query.length / (query.length + bestGapCount);
+  const consecutiveRatio = bestConsecutiveCount / query.length;
+  return 0.3 + compactness * 0.2 + consecutiveRatio * 0.2;
+}
 export function fuzzyMatch(text: string, query: string): boolean {
-  if (!query) return true;
+  const queryLower = normalize(query).trim();
+  if (!queryLower) return true;
   if (!text) return false;
   const textLower = normalize(text);
-  const queryLower = normalize(query);
   if (textLower.includes(queryLower)) return true;
   const words = queryLower.split(/\s+/).filter(Boolean);
   if (words.length > 1) {
     return words.every((word) => textLower.includes(word));
   }
-  let textIndex = 0;
-  let queryIndex = 0;
-  while (textIndex < textLower.length && queryIndex < queryLower.length) {
-    if (textLower[textIndex] === queryLower[queryIndex]) {
-      queryIndex++;
-    }
-    textIndex++;
-  }
-  return queryIndex === queryLower.length;
+  const initialism = getInitialism(textLower);
+  if (queryLower.length <= MAX_INITIALISM_LENGTH && initialism.startsWith(queryLower)) return true;
+  return getSubsequenceScore(textLower, queryLower) > 0;
 }
 export function fuzzyMatchScore(text: string, query: string): number {
-  if (!query) return 1;
+  const queryLower = normalize(query).trim();
+  if (!queryLower) return 1;
   if (!text) return 0;
   const textLower = normalize(text);
-  const queryLower = normalize(query);
   if (textLower === queryLower) return 1;
   if (textLower.startsWith(queryLower)) return 0.9;
   if (textLower.includes(queryLower)) return 0.8;
   const words = queryLower.split(/\s+/).filter(Boolean);
   if (words.length > 1) {
-    const matchedWords = words.filter((word) => textLower.includes(word));
-    return (matchedWords.length / words.length) * 0.7;
+    return words.every((word) => textLower.includes(word)) ? 0.7 : 0;
   }
-  let textIndex = 0;
-  let queryIndex = 0;
-  let consecutiveMatches = 0;
-  let maxConsecutive = 0;
-  while (textIndex < textLower.length && queryIndex < queryLower.length) {
-    if (textLower[textIndex] === queryLower[queryIndex]) {
-      queryIndex++;
-      consecutiveMatches++;
-      maxConsecutive = Math.max(maxConsecutive, consecutiveMatches);
-    } else {
-      consecutiveMatches = 0;
-    }
-    textIndex++;
-  }
-  if (queryIndex < queryLower.length) return 0;
-  return 0.3 + (maxConsecutive / queryLower.length) * 0.3;
+  const initialism = getInitialism(textLower);
+  if (queryLower.length <= MAX_INITIALISM_LENGTH && initialism.startsWith(queryLower)) return 0.7;
+  return getSubsequenceScore(textLower, queryLower);
 }
