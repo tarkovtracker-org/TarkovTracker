@@ -13,7 +13,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Mark inactive issues and PRs
-        uses: actions/stale@eb5cf3af3ac0a1aa4c9c45633dd1ae542a27a899
+        uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629
         with:
           stale-issue-message: 'This issue has been inactive for 60 days. Please review whether it is already addressed, should be prioritized, or needs a status update. Add the `never-stale` label if it should remain open without auto-close.'
           stale-pr-message: 'This PR has been inactive for 60 days. Please review whether it is still needed, blocked, ready to close, or needs a status update. Add the `never-stale` label if it should remain open without auto-close.'
@@ -33,7 +33,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Close stale items unless protected
-        uses: actions/stale@eb5cf3af3ac0a1aa4c9c45633dd1ae542a27a899
+        uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629
         with:
           close-issue-message: 'This issue was closed because it has been stalled for 14 days with no activity after being marked stale.'
           close-pr-message: 'This PR was closed because it has been stalled for 14 days with no activity after being marked stale.'
