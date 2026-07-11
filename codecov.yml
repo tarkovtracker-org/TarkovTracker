@@ -1,0 +1,24 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+    patch:
+      default:
+        target: auto
+        threshold: 10%
+
+comment:
+  layout: 'condensed-header, condensed-files, footer'
+  require_changes: true
+
+ignore:
+  - 'app/locales/**'
+  - 'app/**/*.d.ts'
+  - 'supabase/**'
+  - 'workers/**'
+  - 'scripts/**'
+  - 'tests/**'
+  - 'docs/**'
+  - 'public/**'

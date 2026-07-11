@@ -64,6 +64,7 @@ Before finishing any agent task:
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
 - Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `npm run format` manually unless the hook is bypassed.
+- Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Public-repo uploads are tokenless; no `CODECOV_TOKEN` secret is required.
 
 ## Hard Rules
 
