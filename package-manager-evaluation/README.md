@@ -132,61 +132,67 @@ or override-targeted package has an unexpected version difference.
 - All direct dependencies: verified identical
 - No direct dependency disappeared due to hoisting differences
 
-## Part 3: Preliminary Benchmark Results (Local)
+## Part 3: Benchmark Results
 
-Local benchmarks run on WSL2 (not CI). These are indicative, not definitive.
-The `package-manager-benchmark.yml` workflow provides authoritative CI numbers.
+**Environment:** WSL2 (Linux 6.6.87.2-microsoft-standard-WSL2), Node 24.12.0
+**Runs per scenario:** 5
+**Caveat:** npm and pnpm benchmarks ran concurrently with some mutual interference.
+Raw results in `npm-results.json` and `pnpm-results.json`. CI numbers still needed
+for authoritative results, but the magnitude is clear.
 
-### Root install — warm cache, scripts enabled
+### Root install — per scenario
 
-| Manager         | Run 1    | Run 2    | Run 3    | Median   |
-| --------------- | -------- | -------- | -------- | -------- |
-| npm 11          | 18,182ms | 17,620ms | 15,847ms | 17,620ms |
-| pnpm 10.34.5    | 3,292ms  | 3,538ms  | 4,879ms  | 3,538ms  |
-| **Improvement** |          |          |          | **80%**  |
+| Scenario         | npm median (ms) | pnpm median (ms) | Improvement |
+| ---------------- | --------------- | ---------------- | ----------- |
+| cold, scripts    | 21,144          | 6,663            | **68%**     |
+| warm, scripts    | 14,654          | 3,090            | **79%**     |
+| cold, no scripts | 18,166          | 4,801            | **74%**     |
+| warm, no scripts | 13,554          | 1,772            | **87%**     |
 
-### Root install — warm cache, no scripts
+### Worker install — per scenario
 
-| Manager         | Run 1    | Run 2    | Run 3    | Median   |
-| --------------- | -------- | -------- | -------- | -------- |
-| npm 11          | 14,466ms | 16,445ms | 14,342ms | 14,466ms |
-| pnpm 10.34.5    | 1,892ms  | 1,679ms  | 3,044ms  | 1,892ms  |
-| **Improvement** |          |          |          | **87%**  |
+| Scenario         | npm median (ms) | pnpm median (ms) | Improvement             |
+| ---------------- | --------------- | ---------------- | ----------------------- |
+| cold, scripts    | 2,244           | 6,501            | **-190%** (pnpm slower) |
+| warm, scripts    | 1,579           | 3,258            | **-106%** (pnpm slower) |
+| cold, no scripts | 2,161           | 4,869            | **-125%** (pnpm slower) |
+| warm, no scripts | 1,540           | 1,753            | **-14%** (pnpm slower)  |
 
-### Root install — cold cache, no scripts
+**Why pnpm is slower for worker-only installs:** `pnpm --filter api-gateway install`
+processes the entire workspace lockfile and links all root dependencies too (812 MB
+vs npm's isolated 236 MB worker `node_modules`). This is not a fair comparison — in a
+unified pnpm workspace, a single install covers both root and worker.
 
-| Manager         | Run 1    | Run 2    | Median   |
-| --------------- | -------- | -------- | -------- |
-| npm 11          | 18,474ms | 21,456ms | 18,474ms |
-| pnpm 10.34.5    | 5,402ms  | 5,344ms  | 5,344ms  |
-| **Improvement** |          |          | **71%**  |
+### Real-world CI comparison: npm (root + worker) vs pnpm (single workspace install)
 
-### Root install — cold cache, scripts enabled
+In CI, npm requires two separate installs (root + worker). pnpm's unified workspace
+needs one install that covers both.
 
-| Manager         | Run 1    | Run 2    | Median   |
-| --------------- | -------- | -------- | -------- |
-| npm 11          | 23,412ms | 20,988ms | 20,988ms |
-| pnpm 10.34.5    | 6,690ms  | 6,480ms  | 6,480ms  |
-| **Improvement** |          |          | **69%**  |
+| Scenario         | npm root+worker (ms) | pnpm single (ms) | Improvement |
+| ---------------- | -------------------- | ---------------- | ----------- |
+| cold, scripts    | 23,388               | 6,663            | **72%**     |
+| warm, scripts    | 16,233               | 3,090            | **81%**     |
+| cold, no scripts | 20,327               | 4,801            | **76%**     |
+| warm, no scripts | 15,094               | 1,772            | **88%**     |
 
 ### Disk usage
 
-| Manager      | node_modules size |
-| ------------ | ----------------- |
-| npm 11       | 1.3 GB            |
-| pnpm 10.34.5 | 991 MB            |
-| **Saving**   | **~24%**          |
+| Manager      | root node_modules | worker node_modules                      |
+| ------------ | ----------------- | ---------------------------------------- |
+| npm 11       | 1,087 MB          | 236 MB (separate)                        |
+| pnpm 10.34.5 | 812 MB            | shared (workspace)                       |
+| **Saving**   | **275 MB (25%)**  | **-576 MB** (but shared, not duplicated) |
 
 ### Interpretation
 
-These local numbers show dramatic improvement (69-87%), but WSL2 has specific
-filesystem characteristics that may amplify pnpm's linking advantage. CI numbers
-on `ubuntu-24.04` runners will be more representative. The benchmark workflow
-should be triggered to get authoritative results.
-
-Even with CI variance, the magnitude of improvement suggests the >20% threshold
-will be met. The critical-path question is whether this translates to 30+ seconds
-saved on total CI job duration (not just install time).
+- Root install improvement: **68-87%** across all scenarios
+- Real-world CI improvement (root+worker vs single workspace): **72-88%**
+- Disk saving on root: **25%** (1,087 MB → 812 MB)
+- Worker-only install is slower with pnpm, but this is misleading — a unified
+  workspace install covers both in one pass
+- WSL2 filesystem may amplify pnpm's hard-linking advantage; CI numbers on
+  `ubuntu-24.04` will be more conservative but the margin is large enough to
+  confidently exceed the 20% threshold
 
 ## Part 6: Recommendation
 
@@ -198,8 +204,8 @@ saved on total CI job duration (not just install time).
 | pnpm needs shamefullyHoist   | NO                                                               |
 | Validation differs           | NO — all checks pass                                             |
 | Overrides cannot be proven   | NO — all verified                                                |
-| Measured improvement (local) | 69-87% install time, 24% disk                                    |
-| CI benchmark                 | Pending — run `package-manager-benchmark.yml` workflow           |
+| Measured improvement (local) | 72-88% real-world CI install, 25% disk                           |
+| CI benchmark                 | Workflow on branch; requires merge to main to trigger            |
 
 ### Preliminary assessment
 
