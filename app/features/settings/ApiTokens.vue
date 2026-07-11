@@ -31,8 +31,13 @@
         v-if="tokenCapReached"
         color="warning"
         variant="soft"
-        :title="t('page.settings.card.apitokens.token_cap_reached')"
-        :description="t('page.settings.card.apitokens.token_cap_reached_desc')"
+        :title="t('page.settings.card.apitokens.token_cap_reached', 'Token limit reached')"
+        :description="
+          t(
+            'page.settings.card.apitokens.token_cap_reached_desc',
+            'You can have at most 3 active API tokens. Revoke an existing token to create a new one.'
+          )
+        "
       />
       <div v-if="loading" class="space-y-2">
         <div class="h-12 animate-pulse rounded-lg bg-white/5"></div>
@@ -587,8 +592,11 @@
         (error as { message?: string })?.message?.includes('Token limit reached');
       if (isTokenCapError) {
         toast.add({
-          title: t('page.settings.card.apitokens.token_cap_reached'),
-          description: t('page.settings.card.apitokens.token_cap_reached_desc'),
+          title: t('page.settings.card.apitokens.token_cap_reached', 'Token limit reached'),
+          description: t(
+            'page.settings.card.apitokens.token_cap_reached_desc',
+            'You can have at most 3 active API tokens. Revoke an existing token to create a new one.'
+          ),
           color: 'warning',
         });
       } else {

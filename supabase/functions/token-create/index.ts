@@ -78,7 +78,7 @@ serve(async (req) => {
       ;({ data, error } = await attemptInsert())
     }
     if (error) {
-      if (error.code === "check_violation" || error.message?.includes("Token limit reached")) {
+      if (error.code === "23514" || error.message?.includes("Token limit reached")) {
         return createErrorResponse("Token limit reached (3 active)", 409, req)
       }
       console.error("token-create insert failed:", error)

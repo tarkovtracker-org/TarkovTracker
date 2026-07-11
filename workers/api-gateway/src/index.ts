@@ -75,6 +75,7 @@ type RateLimitResponse = {
   allowed: boolean;
   remaining: number;
   resetAt: number;
+  consumedAt?: number;
 };
 type RateLimitResult = {
   allowed: boolean;
@@ -83,6 +84,7 @@ type RateLimitResult = {
   limit?: number;
   remaining?: number;
   resetAt?: number;
+  consumedAt?: number;
 };
 const RATE_LIMIT_TIMEOUT_MS = 3000;
 const RATE_LIMIT_SLOW_MS = 200;
@@ -118,6 +120,7 @@ export class ApiGatewayRateLimiter {
       mode?: string;
       refund?: boolean;
       resetAt?: number;
+      consumedAt?: number;
     };
     try {
       payload = (await request.json()) as {
@@ -127,17 +130,39 @@ export class ApiGatewayRateLimiter {
         mode?: string;
         refund?: boolean;
         resetAt?: number;
+        consumedAt?: number;
       };
     } catch {
       return new Response('Bad Request', { status: 400 });
     }
     if (payload.refund === true) {
-      // Return one previously consumed fixed-window slot (e.g. when a request
-      // that passed the daily check is then rejected by the burst limiter).
-      // The caller passes the resetAt of the window it consumed from so a
-      // refund delayed past a UTC-day rollover cannot decrement the new day.
+      // Return one previously consumed slot. For fixed-window buckets the
+      // caller passes the resetAt of the window it consumed from so a refund
+      // delayed past a UTC-day rollover cannot decrement the new day. For
+      // sliding-window buckets the caller passes the consumedAt timestamp so
+      // the exact entry can be removed from the log.
       await this.load();
       const now = Date.now();
+      if (
+        this.data &&
+        this.data.mode === 'sliding' &&
+        typeof payload.consumedAt === 'number' &&
+        Array.isArray(this.data.timestamps)
+      ) {
+        const idx = this.data.timestamps.indexOf(payload.consumedAt);
+        if (idx >= 0) {
+          this.data.timestamps.splice(idx, 1);
+          this.data.count = this.data.timestamps.length;
+          if (this.data.timestamps.length > 0) {
+            this.data.resetAt = this.data.timestamps[0] + this.data.windowSec * 1000;
+          } else {
+            this.data.resetAt = now + this.data.windowSec * 1000;
+          }
+          await this.state.storage.put('state', this.data);
+          await this.scheduleCleanup(this.data.resetAt);
+        }
+        return this.json({ allowed: true, remaining: 0, resetAt: this.data.resetAt });
+      }
       const expectedResetAt = payload.resetAt;
       if (
         this.data &&
@@ -184,6 +209,7 @@ export class ApiGatewayRateLimiter {
         allowed: true,
         remaining: Math.max(limit - timestamps.length, 0),
         resetAt: this.data.resetAt,
+        consumedAt: now,
       });
     }
     const configChanged =
@@ -263,9 +289,14 @@ async function rateLimit(
         message: 'Rate limiter unavailable',
       };
     }
-    let data: { allowed?: boolean; remaining?: number; resetAt?: number } = {};
+    let data: { allowed?: boolean; remaining?: number; resetAt?: number; consumedAt?: number } = {};
     try {
-      data = (await res.json()) as { allowed?: boolean; remaining?: number; resetAt?: number };
+      data = (await res.json()) as {
+        allowed?: boolean;
+        remaining?: number;
+        resetAt?: number;
+        consumedAt?: number;
+      };
     } catch {
       return {
         allowed: false,
@@ -275,6 +306,7 @@ async function rateLimit(
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
+    const consumedAt = typeof data.consumedAt === 'number' ? data.consumedAt : undefined;
     if (data.allowed === false) {
       return {
         allowed: false,
@@ -285,7 +317,7 @@ async function rateLimit(
         resetAt,
       };
     }
-    return { allowed: true, limit, remaining, resetAt };
+    return { allowed: true, limit, remaining, resetAt, consumedAt };
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     if (error instanceof Error && error.name === 'AbortError') {
@@ -303,17 +335,19 @@ async function rateLimit(
   }
 }
 /**
- * Best-effort refund of one fixed-window slot (used when the daily counter was
- * consumed but the request was subsequently rejected by the burst limiter).
+ * Best-effort refund of one previously consumed slot. For fixed-window buckets
  * `consumedResetAt` is the resetAt of the window the slot was taken from; the
  * Durable Object only decrements when its current window still matches, so a
  * refund delayed past a UTC-day rollover cannot steal a slot from the new day.
+ * For sliding-window buckets `consumedAt` is the timestamp of the entry to
+ * remove from the log.
  */
 async function refundRateLimit(
   env: Env,
   key: string,
   action: string,
-  consumedResetAt?: number
+  consumedResetAt?: number,
+  consumedAt?: number
 ): Promise<void> {
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
   const stub = env.API_GATEWAY_LIMITER.get(id);
@@ -323,7 +357,7 @@ async function refundRateLimit(
     await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ refund: true, resetAt: consumedResetAt }),
+      body: JSON.stringify({ refund: true, resetAt: consumedResetAt, consumedAt }),
       signal: controller.signal,
     });
   } catch (error) {
@@ -490,9 +524,7 @@ type AuthSuccess = {
 type ThrottleBucket = 'daily' | 'burst' | 'ip';
 function resolveClientIp(request: Request): string | null {
   const cfIp = request.headers.get('CF-Connecting-IP');
-  if (cfIp) return cfIp.trim();
-  const xff = request.headers.get('X-Forwarded-For');
-  if (xff) return xff.split(',')[0].trim();
+  if (cfIp && cfIp.trim()) return cfIp.trim();
   return null;
 }
 async function hashIp(ip: string): Promise<string> {
@@ -503,15 +535,12 @@ async function hashIp(ip: string): Promise<string> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
-function tokenSuffix(rawToken: string): string {
-  return rawToken.length > 8 ? rawToken.slice(-8) : rawToken;
-}
 function logThrottle(
   action: Action,
   bucket: ThrottleBucket,
   userId: string,
+  tokenId: string,
   ipHash: string | null,
-  suffix: string,
   retryAfterS: number | undefined
 ): void {
   console.log(
@@ -520,8 +549,8 @@ function logThrottle(
       action,
       bucket,
       user_id: userId,
+      token_id: tokenId,
       ip_hash: ipHash,
-      token_suffix: suffix,
       retry_after_s: retryAfterS ?? null,
     })
   );
@@ -546,8 +575,6 @@ async function authenticateAndRateLimit(
   const limits = TIER_LIMITS[tier];
   const dailyLimit = kind === 'write' ? limits.writesPerDay : limits.readsPerDay;
   const clientIp = resolveClientIp(request);
-  const ipHashPromise = clientIp ? hashIp(clientIp) : Promise.resolve(null);
-  const suffix = tokenSuffix(rawToken);
   const track = (throttled: boolean) => {
     const promise = recordUsage(env, {
       userId: token.user_id,
@@ -570,8 +597,8 @@ async function authenticateAndRateLimit(
   const dailyHeaders = rateLimitHeaders(daily);
   if (!daily.allowed) {
     track(true);
-    const ipHash = await ipHashPromise;
-    logThrottle(action, 'daily', token.user_id, ipHash, suffix, retryAfterS(daily));
+    const ipHash = clientIp ? await hashIp(clientIp) : null;
+    logThrottle(action, 'daily', token.user_id, token.token_id, ipHash, retryAfterS(daily));
     const message =
       daily.status === 429 && tier === 'free'
         ? upgradeMessage(kind)
@@ -596,8 +623,8 @@ async function authenticateAndRateLimit(
     );
     if (ctx) ctx.waitUntil(refund);
     track(true);
-    const ipHash = await ipHashPromise;
-    logThrottle(action, 'burst', token.user_id, ipHash, suffix, retryAfterS(burst));
+    const ipHash = clientIp ? await hashIp(clientIp) : null;
+    logThrottle(action, 'burst', token.user_id, token.token_id, ipHash, retryAfterS(burst));
     // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
     // remaining for the refund. Retry-After reflects when burst capacity frees.
     const headers = rateLimitHeaders({
@@ -617,21 +644,33 @@ async function authenticateAndRateLimit(
   }
   // Per-IP backstop: catches "many accounts from one IP" abuse. Tuned
   // generously (600 reads/hour, 200 writes/hour) so shared NAT users are not
-  // impacted. Uses a 1-hour sliding window.
+  // impacted. Uses a 1-hour sliding window. Only checked when CF-Connecting-IP
+  // is present (Cloudflare overwrites any inbound spoof).
+  //
+  // Availability policy: the daily and burst limiters are the primary rate
+  // limiting mechanism and remain fail-closed — if they are unavailable the
+  // request is rejected because there is no other protection. The IP backstop
+  // is a secondary abuse signal; when its Durable Object is unavailable
+  // (status 503) it fails open so a transient infrastructure issue does not
+  // take down the API for everyone behind a given IP. A genuine 429 from the
+  // IP backstop still rejects the request and refunds the primary slots.
   if (clientIp) {
-    const ipLimit = kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
+    const ipLimit =
+      kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
     const ipKey = `ip-${kind}:${clientIp}`;
     const ipResult = await rateLimit(env, ipKey, ipLimit, IP_BACKSTOP_WINDOW_SEC, {
       mode: 'sliding',
     });
-    if (!ipResult.allowed) {
-      // Refund both the daily and burst slots so IP-throttled requests do not
-      // drain per-user quotas.
+    if (!ipResult.allowed && ipResult.status !== 503) {
+      // Genuine IP throttle (429): refund both the daily (fixed-window) and
+      // burst (sliding-window) slots so IP-throttled requests do not drain
+      // per-user quotas.
       const refundBurst = refundRateLimit(
         env,
         `burst-${kind}:${token.user_id}`,
         `burst-${kind}`,
-        typeof burst.resetAt === 'number' ? burst.resetAt : undefined
+        undefined,
+        burst.consumedAt
       );
       const refundDaily = refundRateLimit(
         env,
@@ -644,8 +683,8 @@ async function authenticateAndRateLimit(
         ctx.waitUntil(refundDaily);
       }
       track(true);
-      const ipHash = await ipHashPromise;
-      logThrottle(action, 'ip', token.user_id, ipHash, suffix, retryAfterS(ipResult));
+      const ipHash = await hashIp(clientIp);
+      logThrottle(action, 'ip', token.user_id, token.token_id, ipHash, retryAfterS(ipResult));
       const headers = rateLimitHeaders({
         ...daily,
         remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
@@ -661,6 +700,22 @@ async function authenticateAndRateLimit(
         envOrigin,
         requestOrigin,
         headers
+      );
+    }
+    if (!ipResult.allowed && ipResult.status === 503) {
+      // IP backstop limiter unavailable: fail open. The primary daily and
+      // burst checks already passed, so the request proceeds. Do not refund
+      // the primary slots (the request is being served) and do not surface
+      // the 503 to the client. Log a warning so the infrastructure failure
+      // remains observable and is not counted as a throttle.
+      console.warn(
+        JSON.stringify({
+          event: 'ip_backstop_unavailable',
+          action,
+          user_id: token.user_id,
+          token_id: token.token_id,
+          ip_key: ipKey,
+        })
       );
     }
   }
