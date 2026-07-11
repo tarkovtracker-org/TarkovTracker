@@ -17,6 +17,14 @@ describe('active API token cap migration', () => {
     expect(migrationSql).toMatch(/rn\s*>\s*3/);
   });
 
+  it('locks api_tokens before reconciliation to block concurrent inserts', () => {
+    expect(migrationSql).toContain('LOCK TABLE public.api_tokens IN SHARE ROW EXCLUSIVE MODE');
+  });
+
+  it('orders reconciliation with NULLS LAST and a deterministic tiebreaker', () => {
+    expect(migrationSql).toContain('ORDER BY created_at DESC NULLS LAST, token_id DESC');
+  });
+
   it('uses a transaction advisory lock to prevent concurrent-creation races', () => {
     expect(migrationSql).toContain('pg_advisory_xact_lock');
     expect(migrationSql).toContain('hashtext');

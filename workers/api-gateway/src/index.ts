@@ -715,14 +715,17 @@ async function authenticateAndRateLimit(
       // burst checks already passed, so the request proceeds. Do not refund
       // the primary slots (the request is being served) and do not surface
       // the 503 to the client. Log a warning so the infrastructure failure
-      // remains observable and is not counted as a throttle.
+      // remains observable and is not counted as a throttle. Log the hashed
+      // IP (never the raw CF-Connecting-IP) so the privacy control is
+      // consistent with the 429 path.
+      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
       console.warn(
         JSON.stringify({
           event: 'ip_backstop_unavailable',
           action,
           user_id: token.user_id,
           token_id: token.token_id,
-          ip_key: ipKey,
+          ip_hash: ipHash,
         })
       );
     }

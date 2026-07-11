@@ -636,7 +636,57 @@ describe('tiered quotas in the worker', () => {
       user_id: 'user-free',
       token_id: 'token-1',
     });
-    expect(parsed.ip_key).toBe('ip-read:203.0.113.1');
+    // The warning must never leak the raw client IP or the ip_key (which
+    // embeds the raw IP). Only the HMAC-derived ip_hash is allowed.
+    expect(parsed.ip_key).toBeUndefined();
+    expect(parsed.ip_hash).toBeNull();
+    expect(warnLog).not.toContain('203.0.113.1');
+    warnSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+
+  it('ip_backstop_unavailable warning uses hashed IP when secret is set', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Env = {
+      API_GATEWAY_LIMITER: {
+        idFromName: (name: string) => name,
+        get: (id: unknown) => ({
+          fetch: async (_url: string, init?: RequestInit) => {
+            const key = String(id);
+            if (key.startsWith('ip-')) {
+              return new Response('Internal Error', { status: 500 });
+            }
+            return new Response(
+              JSON.stringify({ allowed: true, remaining: 5, resetAt: Date.now() + 1000 }),
+              { status: 200, headers: { 'content-type': 'application/json' } }
+            );
+          },
+        }),
+      } as unknown as Env['API_GATEWAY_LIMITER'],
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: 'test-secret',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('ip_backstop_unavailable'));
+    expect(warnLog).toBeDefined();
+    const parsed = JSON.parse(warnLog!);
+    expect(parsed.ip_key).toBeUndefined();
+    expect(parsed.ip_hash).toMatch(/^[0-9a-f]{16}$/);
+    expect(warnLog).not.toContain('203.0.113.1');
     warnSpy.mockRestore();
     logSpy.mockRestore();
   });
