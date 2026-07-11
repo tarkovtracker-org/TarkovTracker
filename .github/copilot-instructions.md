@@ -101,7 +101,7 @@ pnpm run dev         # Dev server at localhost:3000
 pnpm run build       # Production build
 pnpm run lint        # ESLint (zero warnings enforced)
 pnpm run format      # Prettier + ESLint fix
-pnpm exec vitest          # Unit tests
+pnpm run test        # Unit tests
 ```
 
 ## Pitfalls

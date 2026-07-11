@@ -47,7 +47,7 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 
 ## Pre-Deploy Validation
 
-1. `pnpm run format`
+1. `pnpm run format:check`
 2. `pnpm run lint`
 3. `pnpm run typecheck`
 4. `pnpm run test`

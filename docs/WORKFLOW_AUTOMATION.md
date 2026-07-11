@@ -334,7 +334,7 @@ pnpm run lint:fix
 
 - Verify Cloudflare Worker Git deployment status or deploy with `wrangler`
 - Check worker-specific secrets and bindings
-- Validate `wrangler.toml` and test locally with `pnpm run dev`
+- Validate `wrangler.toml` and test locally with `pnpm --filter api-gateway run dev`
 
 ## Best Practices
 
