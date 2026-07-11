@@ -14,6 +14,11 @@ const args = parseArgs({
 const inputDir = args.values['input-dir'];
 const outputFile = args.values.output;
 
+if (!inputDir) {
+  console.error('Error: --input-dir is required');
+  process.exit(1);
+}
+
 const files = readdirSync(inputDir).filter((f) => f.endsWith('.json'));
 
 const allResults = [];
@@ -53,14 +58,24 @@ md += '|---|---|---|---|---|---|---|---|---|---|\n';
 const sortedScenarios = Object.keys(scenarios).sort();
 for (const scenario of sortedScenarios) {
   const results = scenarios[scenario];
-  const times = results.map((r) => r.elapsedMs);
-  const disks = results.map((r) => r.diskUsageBytes);
   const successes = results.map((r) => r.success);
   const allSuccess = successes.every((s) => s);
+  const validResults = results.filter((r) => r.success);
+  const validTimes = validResults.map((r) => r.elapsedMs);
+  const validDisks = validResults.filter((r) => r.diskMeasured && r.diskUsageBytes != null).map((r) => r.diskUsageBytes);
 
   md += `| ${scenario} | ${results[0].manager} | ${results[0].workspace} | ${results[0].cache} | ${results[0].scripts} | `;
-  md += `${median(times)} | ${min(times)} | ${max(times)} | `;
-  md += `${Math.round(median(disks) / 1024 / 1024)} | ${allSuccess ? 'ALL PASS' : 'SOME FAIL'} |\n`;
+  if (validTimes.length > 0) {
+    md += `${median(validTimes)} | ${min(validTimes)} | ${max(validTimes)} | `;
+  } else {
+    md += 'N/A | N/A | N/A | ';
+  }
+  if (validDisks.length > 0) {
+    md += `${Math.round(median(validDisks) / 1024 / 1024)} | `;
+  } else {
+    md += 'N/A | ';
+  }
+  md += `${allSuccess ? 'ALL PASS' : 'SOME FAIL'} |\n`;
 }
 
 md += '\n## npm vs pnpm Comparison\n\n';
@@ -72,20 +87,28 @@ for (const npmSc of npmScenarios) {
   const pnpmSc = npmSc.replace('npm-', 'pnpm-');
   if (!scenarios[pnpmSc]) continue;
 
-  const npmTimes = scenarios[npmSc].map((r) => r.elapsedMs);
-  const pnpmTimes = scenarios[pnpmSc].map((r) => r.elapsedMs);
-  const npmDisks = scenarios[npmSc].map((r) => r.diskUsageBytes);
-  const pnpmDisks = scenarios[pnpmSc].map((r) => r.diskUsageBytes);
+  const npmValid = scenarios[npmSc].filter((r) => r.success);
+  const pnpmValid = scenarios[pnpmSc].filter((r) => r.success);
+  const npmTimes = npmValid.map((r) => r.elapsedMs);
+  const pnpmTimes = pnpmValid.map((r) => r.elapsedMs);
+  const npmDisks = npmValid.filter((r) => r.diskMeasured && r.diskUsageBytes != null).map((r) => r.diskUsageBytes);
+  const pnpmDisks = pnpmValid.filter((r) => r.diskMeasured && r.diskUsageBytes != null).map((r) => r.diskUsageBytes);
+
+  const label = npmSc.replace('npm-', '');
+
+  if (npmTimes.length === 0 || pnpmTimes.length === 0) {
+    md += `| ${label} | N/A | N/A | N/A | N/A | N/A | N/A |\n`;
+    continue;
+  }
 
   const npmMed = median(npmTimes);
   const pnpmMed = median(pnpmTimes);
   const improvement = npmMed > 0 ? Math.round(((npmMed - pnpmMed) / npmMed) * 100) : 0;
-  const npmDiskMb = Math.round(median(npmDisks) / 1024 / 1024);
-  const pnpmDiskMb = Math.round(median(pnpmDisks) / 1024 / 1024);
-  const diskSaving = npmDiskMb - pnpmDiskMb;
+  const npmDiskMb = npmDisks.length > 0 ? Math.round(median(npmDisks) / 1024 / 1024) : 'N/A';
+  const pnpmDiskMb = pnpmDisks.length > 0 ? Math.round(median(pnpmDisks) / 1024 / 1024) : 'N/A';
+  const diskSaving = typeof npmDiskMb === 'number' && typeof pnpmDiskMb === 'number' ? `${npmDiskMb - pnpmDiskMb} MB` : 'N/A';
 
-  const label = npmSc.replace('npm-', '').replace('root-', '').replace('worker-', '');
-  md += `| ${label} | ${npmMed} | ${pnpmMed} | ${improvement}% | ${npmDiskMb} | ${pnpmDiskMb} | ${diskSaving} MB |\n`;
+  md += `| ${label} | ${npmMed} | ${pnpmMed} | ${improvement}% | ${npmDiskMb} | ${pnpmDiskMb} | ${diskSaving} |\n`;
 }
 
 md += '\n## Decision Criteria\n\n';
@@ -95,10 +118,16 @@ md += '|---|---|---|\n';
 const npmWarmScripts = scenarios['npm-root-warm-scripts'];
 const pnpmWarmScripts = scenarios['pnpm-root-warm-scripts'];
 if (npmWarmScripts && pnpmWarmScripts) {
-  const npmMed = median(npmWarmScripts.map((r) => r.elapsedMs));
-  const pnpmMed = median(pnpmWarmScripts.map((r) => r.elapsedMs));
-  const improvement = Math.round(((npmMed - pnpmMed) / npmMed) * 100);
-  md += `| Warm install improvement | >20% proceed, <15% stay, 15-20% decide | ${improvement}% |\n`;
+  const npmValid = npmWarmScripts.filter((r) => r.success).map((r) => r.elapsedMs);
+  const pnpmValid = pnpmWarmScripts.filter((r) => r.success).map((r) => r.elapsedMs);
+  if (npmValid.length > 0 && pnpmValid.length > 0) {
+    const npmMed = median(npmValid);
+    const pnpmMed = median(pnpmValid);
+    const improvement = Math.round(((npmMed - pnpmMed) / npmMed) * 100);
+    md += `| Warm install improvement | >20% proceed, <15% stay, 15-20% decide | ${improvement}% |\n`;
+  } else {
+    md += `| Warm install improvement | >20% proceed, <15% stay, 15-20% decide | N/A (failed trials) |\n`;
+  }
 }
 
 md += '\n## Raw Results\n\n';

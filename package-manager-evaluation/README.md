@@ -94,7 +94,7 @@ but `workerd` is needed for `wrangler pages dev` in the pr-checks workflow.
 
 ## Part 4: pnpm Validation Matrix
 
-All checks pass. See Part 1 table above.
+All pnpm validation checks pass. See Part 1 table above.
 
 ## Part 5: Dependency Comparison
 
@@ -216,7 +216,7 @@ pnpm 10.34.5 is technically compatible with this repository:
 3. All direct dependencies resolve to the same versions
 4. The ghost dependency that broke the linked probe does NOT break pnpm
 5. No `shamefullyHoist` or peer-dep suppression needed
-6. Local benchmarks show 69-87% install time improvement
+6. Local benchmarks show 68-87% install time improvement
 
 ### Recommendation: PROCEED (pending CI benchmark confirmation)
 

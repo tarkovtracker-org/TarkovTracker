@@ -8,6 +8,9 @@ on:
         required: false
         default: '5'
 
+permissions:
+  contents: read
+
 jobs:
   benchmark:
     runs-on: ubuntu-24.04
@@ -99,6 +102,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -121,13 +126,19 @@ jobs:
           corepack prepare pnpm@10.34.5 --activate
 
       - name: Run benchmark trials
+        env:
+          BENCHMARK_RUNS: ${{ inputs.runs || '5' }}
         run: |
+          if ! [[ "$BENCHMARK_RUNS" =~ ^[1-9][0-9]*$ ]]; then
+            echo "runs must be a positive integer"
+            exit 1
+          fi
           node scripts/package-manager-benchmark.mjs \
             --manager "${{ matrix.manager }}" \
             --cache "${{ matrix.cache }}" \
             --scripts "${{ matrix.scripts }}" \
             --workspace "${{ matrix.workspace }}" \
-            --runs ${{ github.event.inputs.runs || 5 }} \
+            --runs "$BENCHMARK_RUNS" \
             --output results-${{ matrix.scenario }}.json
 
       - name: Upload results
@@ -142,6 +153,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/download-artifact@v4
         with:
