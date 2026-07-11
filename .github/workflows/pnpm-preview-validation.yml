@@ -1,9 +1,6 @@
 name: pnpm Preview Validation
 
 on:
-  push:
-    branches:
-      - chore/package-manager-evaluation
   workflow_dispatch:
 
 permissions:

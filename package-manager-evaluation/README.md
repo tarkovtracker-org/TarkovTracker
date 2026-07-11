@@ -126,9 +126,25 @@ Only 2 pre-existing warnings (not caused by migration):
 
 All pnpm validation checks pass. See Part 1 table above.
 
-**Pending:** `wrangler pages dev` and Lighthouse validation with `onlyBuiltDependencies`
-configuration. A temporary CI validation job has been added to verify the Cloudflare
-preview path under pnpm.
+### Cloudflare preview validation (CI)
+
+The `pnpm-preview-validation.yml` workflow validates the complete production-like
+preview path under pnpm with `onlyBuiltDependencies` enabled.
+
+**CI run:** https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/29145324062
+**Commit:** `ea4373e2`
+**Result:** ALL PASS (8m0s)
+
+| Step                                | Status |
+| ----------------------------------- | ------ |
+| `pnpm install --frozen-lockfile`    | PASS   |
+| `pnpm run build`                    | PASS   |
+| `pnpm exec wrangler pages dev dist` | PASS   |
+| Readiness checks (5 URLs)           | PASS   |
+| Lighthouse CI                       | PASS   |
+
+This confirms that `workerd`, `sharp`, `esbuild`, and all other approved build
+dependencies function correctly under pnpm on `ubuntu-24.04`.
 
 ## Part 5: Dependency Comparison
 
@@ -263,7 +279,7 @@ important than post-install directory size.
 | ---------------------------------------- | ----------------------------------------------------------------------------- |
 | Linked probe                             | Failed (upstream ghost dep in nuxt-define) — but pnpm handles it              |
 | pnpm needs shamefullyHoist               | NO                                                                            |
-| Validation differs                       | NO — all checks pass (pending wrangler pages dev / Lighthouse CI validation)  |
+| Validation differs                       | NO — all checks pass including wrangler pages dev / Lighthouse CI validation   |
 | Overrides cannot be proven               | NO — all verified (ajv override corrected and verified)                       |
 | Build scripts equivalent                 | YES — all 6 blocked packages approved via `onlyBuiltDependencies`             |
 | Direct dependency changes                | 0 — all 62 match (lru-cache pinned to 11.3.5 via override)                   |
@@ -285,17 +301,24 @@ pnpm 10.34.5 is technically compatible with this repository:
 
 ### Recommendation: PROCEED with migration to pnpm 10.34.5
 
-Subject to one final Cloudflare/Lighthouse runtime validation.
+All validation is complete. The Cloudflare preview path (build, wrangler pages dev,
+Lighthouse) passes under pnpm with `onlyBuiltDependencies` enabled.
 
-The benchmarking phase is complete. The corrected CI benchmark confirms:
+The corrected CI benchmark confirms:
 - 58% warm root install improvement (22.7s → 9.4s)
 - 62% Workers pattern improvement (25.0s → 9.4s)
 - Zero failed trials across 80 paired measurements
 
-### Remaining step before migration approval
+### Migration approval status: APPROVED
 
-1. Validate `wrangler pages dev` and Lighthouse with `onlyBuiltDependencies` config in CI
-   (temporary validation job added to this branch)
+All criteria are met:
+- Technical compatibility: confirmed
+- Override preservation: confirmed (ajv corrected, lru-cache pinned)
+- Direct dependency parity: 62/62 identical
+- Build script equivalence: confirmed (all 6 packages approved)
+- CI benchmark: 58% warm install improvement (exceeds 20% threshold)
+- Cloudflare preview validation: PASS (build, wrangler pages dev, Lighthouse)
+- Zero failed trials across 80 paired measurements
 
 ### Migration plan
 
