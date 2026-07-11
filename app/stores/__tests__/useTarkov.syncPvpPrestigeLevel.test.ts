@@ -4,12 +4,10 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
 const { from, upsert, supabaseContext } = vi.hoisted(() => {
-  const upsert = vi.fn(
-    async (): Promise<{ data: null; error: { message: string } | null }> => ({
-      data: null,
-      error: null,
-    })
-  );
+  const upsert = vi.fn(async (): Promise<{ data: null; error: { message: string } | null }> => ({
+    data: null,
+    error: null,
+  }));
   const from = vi.fn(() => ({
     upsert,
   }));
@@ -43,7 +41,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
     supabaseContext.user.id = 'user-1';
     upsert.mockResolvedValue({ data: null, error: null });
   });
-  it('updates only PvP prestige data and bumps the PvP epoch', async () => {
+  it('updates only PvP prestige data without bumping the PvP epoch', async () => {
     const store = useTarkovStore();
     store.$patch((state) => {
       state.currentGameMode = 'pve';
@@ -80,7 +78,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
           displayName: 'Raider',
           level: 33,
           prestigeLevel: 2,
-          progressEpoch: 10,
+          progressEpoch: 9,
         }),
         tarkov_uid: 12345,
         user_id: 'user-1',
@@ -88,7 +86,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
     );
     expect(store.pvp.level).toBe(33);
     expect(store.pvp.prestigeLevel).toBe(2);
-    expect(store.pvp.progressEpoch).toBe(10);
+    expect(store.pvp.progressEpoch).toBe(9);
     expect(store.pve.level).toBe(21);
     expect(store.pve.progressEpoch).toBe(2);
   });
@@ -103,7 +101,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
     await store.syncPvpPrestigeLevel(3);
     expect(from).not.toHaveBeenCalled();
     expect(store.pvp.prestigeLevel).toBe(3);
-    expect(store.pvp.progressEpoch).toBe(5);
+    expect(store.pvp.progressEpoch).toBe(4);
   });
   it('keeps local PvP state unchanged when the remote update fails', async () => {
     const store = useTarkovStore();

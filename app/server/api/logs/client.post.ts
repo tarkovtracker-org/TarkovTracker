@@ -18,7 +18,7 @@ type ClientLogBody = {
 const clientLogLevels: ClientLogLevel[] = ['debug', 'info', 'warn', 'error'];
 const logger = createLogger('ClientLogsApi');
 const CLIENT_LOG_RATE_LIMIT_PREFIX = 'client-logs-rate';
-const CLIENT_LOG_RATE_LIMIT_PER_MINUTE = 60;
+const CLIENT_LOG_RATE_LIMIT_PER_MINUTE = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const toClientLogLevel = (value: unknown): ClientLogLevel => {
   if (typeof value === 'string' && clientLogLevels.includes(value as ClientLogLevel)) {

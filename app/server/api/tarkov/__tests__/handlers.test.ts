@@ -251,10 +251,10 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-core-json-v1-en-regular',
+      'tasks-core-json-v2-en-regular',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', precomputed: true }
     );
   });
   it('applies overlay for tasks-objectives with versioned cache key', async () => {

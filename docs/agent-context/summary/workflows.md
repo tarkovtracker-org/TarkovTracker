@@ -208,14 +208,14 @@ residual data. Rate-limited and audited.
 
 - `app/locales/en.json` is the **only** file to edit (source locale).
 - Non-English locales are **Crowdin-owned** exports — never hand-edit or copy English in as a fallback.
-- Add user-facing copy as snake_case keys with `t('key', 'Fallback')`, then run `npm run i18n:check`
+- Add user-facing copy as snake_case keys with `t('key', 'Fallback')`, then run `pnpm run i18n:check`
   (fatal only on snake_case violations in `en.json`). vue-i18n falls back to `en`.
 
 ## 11. Build, Validate, Deploy
 
 ```mermaid
 graph LR
-    Dev[npm run dev] --> Code[edit app/]
+    Dev[pnpm run dev] --> Code[edit app/]
     Code --> Hook[husky + lint-staged: prettier + eslint --fix]
     Hook --> Commit[conventional commit]
     Commit --> CI[lint / typecheck / test / validate:openapi]

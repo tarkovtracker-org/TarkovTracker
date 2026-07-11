@@ -1,3 +1,101 @@
+## [1.55.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.5...v1.55.6) (2026-07-11)
+
+
+### Bug Fixes
+
+* **app:** throttle client log beacons and cache CORS preflights ([#527](https://github.com/tarkovtracker-org/TarkovTracker/issues/527)) ([2e39283](https://github.com/tarkovtracker-org/TarkovTracker/commit/2e3928316fa6ab3dbdfa120812d385f8cb3b9934))
+
+## [1.55.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.4...v1.55.5) (2026-07-11)
+
+
+### Bug Fixes
+
+* **app:** populate skill image links from tarkov.dev CDN ([#522](https://github.com/tarkovtracker-org/TarkovTracker/issues/522)) ([5ea73ff](https://github.com/tarkovtracker-org/TarkovTracker/commit/5ea73ffc75a59b2f42a0f01d79e18813bc336346))
+
+## [1.55.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.3...v1.55.4) (2026-07-10)
+
+
+### Bug Fixes
+
+* **app:** tighten fuzzy search matching ([#519](https://github.com/tarkovtracker-org/TarkovTracker/issues/519)) ([78759f0](https://github.com/tarkovtracker-org/TarkovTracker/commit/78759f09fdb9e30596266d88911405254483fc40))
+
+## [1.55.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.2...v1.55.3) (2026-07-10)
+
+
+### Bug Fixes
+
+* **tasks:** backfill trader standing when marking available ([#518](https://github.com/tarkovtracker-org/TarkovTracker/issues/518)) ([592771d](https://github.com/tarkovtracker-org/TarkovTracker/commit/592771d24c3827fb08d9e296b39fe0a30f37efdd))
+
+## [1.55.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.1...v1.55.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **app:** stop syncPvpPrestigeLevel bumping progressEpoch to preserve storyline across devices ([#515](https://github.com/tarkovtracker-org/TarkovTracker/issues/515)) ([abd47ad](https://github.com/tarkovtracker-org/TarkovTracker/commit/abd47ad79b0b91d9f2439becf792b513de18edc9))
+
+## [1.55.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.0...v1.55.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **api:** atomic progress writes via merge_progress_data rpc ([#501](https://github.com/tarkovtracker-org/TarkovTracker/issues/501)) ([e67ddd3](https://github.com/tarkovtracker-org/TarkovTracker/commit/e67ddd3d0d44c841282473f0ff32629bd7b4f144))
+
+# [1.55.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.3...v1.55.0) (2026-07-08)
+
+
+### Features
+
+* **test:** add zero-dep page-load measurement scripts ([#507](https://github.com/tarkovtracker-org/TarkovTracker/issues/507)) ([f522a39](https://github.com/tarkovtracker-org/TarkovTracker/commit/f522a39e51123738c4b714dbd6568fbba3635f6a))
+
+## [1.54.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.2...v1.54.3) (2026-07-08)
+
+
+### Bug Fixes
+
+* **tasks:** gate task availability on requiredPrestige from tarkov.dev ([#513](https://github.com/tarkovtracker-org/TarkovTracker/issues/513)) ([31d690c](https://github.com/tarkovtracker-org/TarkovTracker/commit/31d690cb02b028bf777532b8cad5fb56157f3f4f)), closes [#508](https://github.com/tarkovtracker-org/TarkovTracker/issues/508)
+
+## [1.54.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.1...v1.54.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* **tasks:** enforce trader level and reputation requirements in task availability ([#514](https://github.com/tarkovtracker-org/TarkovTracker/issues/514)) ([782699a](https://github.com/tarkovtracker-org/TarkovTracker/commit/782699a2bf0bb036874defab0ae51b54af4eb6c3)), closes [#512](https://github.com/tarkovtracker-org/TarkovTracker/issues/512)
+
+## [1.54.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.54.0...v1.54.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **maps:** align Labs tile map and add tile-map floor switching ([#467](https://github.com/tarkovtracker-org/TarkovTracker/issues/467)) ([1b538b4](https://github.com/tarkovtracker-org/TarkovTracker/commit/1b538b438c6498e561e4ef4e65fbd1410af862a9)), closes [#276](https://github.com/tarkovtracker-org/TarkovTracker/issues/276)
+
+# [1.54.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.53.0...v1.54.0) (2026-07-08)
+
+
+### Features
+
+* **tasks:** search task reward items ([#497](https://github.com/tarkovtracker-org/TarkovTracker/issues/497)) ([c09a2ba](https://github.com/tarkovtracker-org/TarkovTracker/commit/c09a2ba8e7c93723cba823c2babbbdc80aa1c6e3))
+
+# [1.53.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.52.1...v1.53.0) (2026-07-08)
+
+
+### Features
+
+* **api:** add tiered daily rate limits and burst smoothing ([#499](https://github.com/tarkovtracker-org/TarkovTracker/issues/499)) ([4d6f6e2](https://github.com/tarkovtracker-org/TarkovTracker/commit/4d6f6e24cdcfe2b42fad9240e2bb0aa9d1f54b39))
+
+## [1.52.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.52.0...v1.52.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **api:** precompute tasks-core to KV to eliminate Error 1102 on cold colos ([#502](https://github.com/tarkovtracker-org/TarkovTracker/issues/502)) ([dedc523](https://github.com/tarkovtracker-org/TarkovTracker/commit/dedc523e467334e07beabe48897a648fe91cad82))
+
+# [1.52.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.51.0...v1.52.0) (2026-07-01)
+
+
+### Features
+
+* **ui:** remember map panel collapsed state ([cad8df4](https://github.com/tarkovtracker-org/TarkovTracker/commit/cad8df4f5359958379034dcd9e67ce70e4bfd656))
+
 # [1.51.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.50.8...v1.51.0) (2026-07-01)
 
 

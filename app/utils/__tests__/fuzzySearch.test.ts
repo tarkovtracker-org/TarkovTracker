@@ -13,7 +13,8 @@ describe('fuzzySearch', () => {
     });
     it('returns true for subsequence match', () => {
       expect(fuzzyMatch('Salewa First Aid Kit', 'salewa')).toBe(true);
-      expect(fuzzyMatch('Salewa First Aid Kit', 'sfak')).toBe(true); // s-f-a-k
+      expect(fuzzyMatch('Salewa First Aid Kit', 'sfak')).toBe(true);
+      expect(fuzzyMatch('Salewa', 'slea')).toBe(true);
     });
     it('returns false when words are missing', () => {
       expect(fuzzyMatch('AK-74M', 'ak 47')).toBe(false);
@@ -28,6 +29,15 @@ describe('fuzzySearch', () => {
       expect(fuzzyMatch('café', 'cafe')).toBe(true);
       expect(fuzzyMatch('Crème Brûlée', 'creme brulee')).toBe(true);
     });
+    it('rejects widely scattered subsequence matches', () => {
+      expect(fuzzyMatch('Kill 7 scavs on Interchange from over 40 meters', '7n40')).toBe(false);
+      expect(
+        fuzzyMatch(
+          'Secure keycard is buried in dorms inside the old Interchange loot extraction tunnel',
+          'skibiditoilet'
+        )
+      ).toBe(false);
+    });
   });
   describe('fuzzyMatchScore', () => {
     it('scores exact match highest', () => {
@@ -39,11 +49,13 @@ describe('fuzzySearch', () => {
     it('scores includes high', () => {
       expect(fuzzyMatchScore('my testing', 'test')).toBe(0.8);
     });
-    it('scores partial word matches', () => {
-      // "ak" matches, "47" does not match "AK-74"
-      const score = fuzzyMatchScore('AK-74', 'ak 47');
-      expect(score).toBeGreaterThan(0);
-      expect(score).toBeLessThan(0.8);
+    it('requires every word in a multi-word query', () => {
+      expect(fuzzyMatchScore('AK-74', 'ak 47')).toBe(0);
+      expect(fuzzyMatchScore('AK-74M assault rifle', 'ak 74m')).toBe(0.7);
+    });
+    it('scores initialisms while rejecting scattered subsequences', () => {
+      expect(fuzzyMatchScore('Salewa First Aid Kit', 'sfak')).toBe(0.7);
+      expect(fuzzyMatchScore('Kill 7 scavs on Interchange from over 40 meters', '7n40')).toBe(0);
     });
   });
 });

@@ -6,7 +6,9 @@ import {
   getMapSvgCdnUrl,
   getMapSvgFallbackUrl,
   isValidMapSvgConfig,
+  resolveFloorTilePath,
   rotateGameCoordinates,
+  type MapTileConfig,
 } from '@/utils/mapCoordinates';
 describe('mapCoordinates', () => {
   describe('rotateGameCoordinates', () => {
@@ -243,6 +245,54 @@ describe('mapCoordinates', () => {
       const preEncoded = 'customs%20east.svg';
       expect(getMapSvgFallbackUrl(preEncoded)).toBe(
         'https://tarkovtracker.github.io/tarkovdata/maps/customs%2520east.svg'
+      );
+    });
+  });
+  describe('resolveFloorTilePath', () => {
+    const tileConfig: MapTileConfig = {
+      tilePath: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+      floorTilePaths: {
+        Technical: 'https://tiles.example.com/lab/technical/{z}/{x}/{y}.png',
+        First_Level: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+        Second_Level: 'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+      },
+      floors: ['Technical', 'First_Level', 'Second_Level'],
+      defaultFloor: 'First_Level',
+      coordinateRotation: 0,
+      bounds: [
+        [0, 0],
+        [100, 100],
+      ],
+    };
+    it('returns the floor-specific path for each configured floor', () => {
+      expect(resolveFloorTilePath(tileConfig, 'Technical')).toBe(
+        'https://tiles.example.com/lab/technical/{z}/{x}/{y}.png'
+      );
+      expect(resolveFloorTilePath(tileConfig, 'First_Level')).toBe(
+        'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png'
+      );
+      expect(resolveFloorTilePath(tileConfig, 'Second_Level')).toBe(
+        'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png'
+      );
+    });
+    it('falls back to tilePath when the floor has no dedicated tile set', () => {
+      expect(resolveFloorTilePath(tileConfig, 'Unknown_Floor')).toBe(tileConfig.tilePath);
+    });
+    it('falls back to tilePath when no floor is selected', () => {
+      expect(resolveFloorTilePath(tileConfig)).toBe(tileConfig.tilePath);
+      expect(resolveFloorTilePath(tileConfig, '')).toBe(tileConfig.tilePath);
+    });
+    it('falls back to tilePath when the map has no floorTilePaths', () => {
+      const singleFloorConfig: MapTileConfig = {
+        tilePath: 'https://tiles.example.com/interchange/{z}/{x}/{y}.png',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      };
+      expect(resolveFloorTilePath(singleFloorConfig, 'First_Level')).toBe(
+        singleFloorConfig.tilePath
       );
     });
   });

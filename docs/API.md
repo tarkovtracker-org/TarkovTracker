@@ -10,6 +10,23 @@ Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatib
 - **Development:** `http://localhost:3000/api`
 - **Production:** `https://tarkovtracker.org/api`
 
+## Progress API Host Migration (api.tarkovtracker.org)
+
+The progress API gateway (token, progress, team progress) is served on `https://api.tarkovtracker.org` (clean paths, `/api/v2/*` also accepted). The legacy `https://tarkovtracker.org/api/v2/*` routes remain served during the deprecation window.
+
+Migration plan:
+
+1. TarkovMonitor >= the release containing tarkovtracker-org/TarkovMonitor#3 calls `api.tarkovtracker.org` directly.
+2. Once that release has propagated, ops flip the gateway var `LEGACY_API_REDIRECT` to `"true"` (see `workers/api-gateway/wrangler.toml`); legacy `/api` and `/api/v2` requests then receive a `308` redirect to the subdomain with `Deprecation` and `Link: rel="successor-version"` headers.
+3. Clients should migrate proactively rather than relying on the redirect: .NET `HttpClient` (and several other HTTP stacks) drop the `Authorization` header on cross-host redirects, so authenticated calls through the redirect will fail with `401`.
+
+Migration example:
+
+```diff
+-POST https://tarkovtracker.org/api/v2/progress/task/{taskId}
++POST https://api.tarkovtracker.org/progress/task/{taskId}
+```
+
 ## Authentication
 
 Most tarkov data endpoints are public. Team endpoints require Supabase authentication.
@@ -334,6 +351,21 @@ The `returnUrl` host must match the configured app URL host. Mismatched hosts fa
 
 ---
 
+## Rate Limits (API Gateway)
+
+Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC; burst limits use a 60-second sliding window so batch updates near a minute boundary are not spuriously throttled.
+
+| Tier  | Reads/day | Writes/day | Burst/min |
+| ----- | --------- | ---------- | --------- |
+| Free  | 1,000     | 100        | 30        |
+| Scav  | 2,000     | 250        | 60        |
+| Timmy | 3,000     | 400        | 90        |
+| Chad  | 5,000     | 600        | 120       |
+
+Every gateway response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (Unix seconds) for the daily quota, plus `Retry-After` on `429` responses. On burst `429`s the `X-RateLimit-*` headers still describe the daily quota (burst-throttled requests do not consume it) while `Retry-After` indicates when burst capacity frees. When a free-tier user exhausts a daily quota, the `429` body includes an upgrade link. Admins can inspect the top consumers via `GET /api/admin/api-usage`; usage is bucketed by UTC day, so the report covers the current and previous UTC day (the `since` field gives the exact starting day).
+
+---
+
 ## Error Responses
 
 All endpoints return errors in this format:
@@ -354,7 +386,7 @@ All endpoints return errors in this format:
 
 The client caches API responses in IndexedDB with keys like:
 
-- `tasks-core-json-v1-regular-en`
+- `tasks-core-json-v2-regular-en`
 - `hideout-json-v1-pve-de`
 - `items-lite-json-v1-regular-en`
 - `prestige-all-json-v1-en`

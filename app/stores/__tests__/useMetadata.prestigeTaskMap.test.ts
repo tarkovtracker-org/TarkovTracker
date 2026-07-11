@@ -119,4 +119,67 @@ describe('useMetadataStore prestigeTaskMap', () => {
     expect(map.get('custom-new-beginning-tier')).toBe(4);
     expect(map.size).toBe(1);
   });
+  it('maps tasks by requiredPrestige even when names and wiki links are localized', () => {
+    const store = useMetadataStore();
+    store.tasks = [
+      {
+        id: NEW_BEGINNING_TASK_IDS[1],
+        name: 'Neuanfang',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Neuanfang',
+        requiredPrestige: { id: 'prestige-1' },
+      },
+      {
+        id: NEW_BEGINNING_TASK_IDS[2],
+        name: 'Neuanfang',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Neuanfang',
+        requiredPrestige: { id: 'prestige-2' },
+      },
+      {
+        id: 'regular-task',
+        name: 'Debut',
+      },
+    ] as Task[];
+    store.prestigeLevels = [
+      createPrestigeLevel(1, []),
+      createPrestigeLevel(2, []),
+      createPrestigeLevel(3, []),
+    ];
+    const map = store.prestigeTaskMap;
+    expect(map.get(NEW_BEGINNING_TASK_IDS[1])).toBe(1);
+    expect(map.get(NEW_BEGINNING_TASK_IDS[2])).toBe(2);
+    expect(map.has('regular-task')).toBe(false);
+    expect(map.size).toBe(2);
+  });
+  it('prefers requiredPrestige over prestige condition inference for the same task', () => {
+    const store = useMetadataStore();
+    store.tasks = [
+      {
+        id: NEW_BEGINNING_TASK_IDS[1],
+        name: 'New Beginning',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/New_Beginning',
+        requiredPrestige: { id: 'prestige-1' },
+      },
+    ] as Task[];
+    store.prestigeLevels = [
+      createPrestigeLevel(1, []),
+      createPrestigeLevel(2, [createCondition(NEW_BEGINNING_TASK_IDS[1], 'New Beginning')]),
+    ];
+    const map = store.prestigeTaskMap;
+    expect(map.get(NEW_BEGINNING_TASK_IDS[1])).toBe(1);
+    expect(map.size).toBe(1);
+  });
+  it('ignores requiredPrestige ids that do not resolve to a known prestige level', () => {
+    const store = useMetadataStore();
+    store.tasks = [
+      {
+        id: 'unknown-ref-task',
+        name: 'Localized Name',
+        requiredPrestige: { id: 'prestige-missing' },
+      },
+    ] as Task[];
+    store.prestigeLevels = [createPrestigeLevel(1, [])];
+    const map = store.prestigeTaskMap;
+    expect(map.has('unknown-ref-task')).toBe(false);
+    expect(map.size).toBe(0);
+  });
 });

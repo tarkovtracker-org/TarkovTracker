@@ -63,12 +63,7 @@ export type UserPrestigeRunRow = {
 };
 export type PrestigeRequirementStatus = 'manual' | 'met' | 'unmet';
 export type PrestigeRequirementKind =
-  | 'hideoutStation'
-  | 'item'
-  | 'playerLevel'
-  | 'skill'
-  | 'storyChapter'
-  | 'task';
+  'hideoutStation' | 'item' | 'playerLevel' | 'skill' | 'storyChapter' | 'task';
 export type PrestigeRequirementSource = 'overlay' | 'tarkov.dev' | 'wiki';
 export type PrestigeRequirementTaskRole = 'collector' | 'newBeginning' | 'task';
 export type PrestigeRequirementRow = {

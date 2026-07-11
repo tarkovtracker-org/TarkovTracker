@@ -65,6 +65,13 @@
   "lab": {
     "tile": {
       "tilePath": "https://assets.tarkov.dev/maps/labs_v4/1st/{z}/{x}/{y}.png",
+      "floorTilePaths": {
+        "Technical": "https://assets.tarkov.dev/maps/labs_v4/technical/{z}/{x}/{y}.png",
+        "First_Level": "https://assets.tarkov.dev/maps/labs_v4/1st/{z}/{x}/{y}.png",
+        "Second_Level": "https://assets.tarkov.dev/maps/labs_v4/2nd/{z}/{x}/{y}.png"
+      },
+      "floors": ["Technical", "First_Level", "Second_Level"],
+      "defaultFloor": "First_Level",
       "coordinateRotation": 270,
       "transform": [0.575, 281.2, 0.575, 193.7],
       "bounds": [
@@ -72,7 +79,8 @@
         [-287, -193]
       ],
       "minZoom": 2,
-      "maxZoom": 6
+      "maxZoom": 6,
+      "tileSize": 175
     }
   },
   "labyrinth": {

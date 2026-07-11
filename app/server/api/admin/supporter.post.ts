@@ -1,4 +1,5 @@
 import { createError, defineEventHandler, readBody } from 'h3';
+import { adminSupabaseFetch, getIsAdmin } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import { VALID_TIERS } from '@/server/utils/stripeCheckoutValidation';
 const logger = createLogger('AdminSupporter');
@@ -42,7 +43,7 @@ export default defineEventHandler(async (event) => {
     has_ever_supported: true,
     expires_at: expiresAt,
   };
-  const updatedRows = await supabaseFetch<SupabaseRow[]>(
+  const updatedRows = await adminSupabaseFetch<SupabaseRow[]>(
     supabaseUrl,
     serviceKey,
     `/rest/v1/supporters?on_conflict=user_id`,
@@ -54,7 +55,7 @@ export default defineEventHandler(async (event) => {
       },
     }
   );
-  const updated = updatedRows[0];
+  const updated = updatedRows?.[0];
   if (!updated) {
     throw createError({ statusCode: 502, message: 'Supporter update returned no row' });
   }
@@ -79,18 +80,6 @@ export default defineEventHandler(async (event) => {
     },
   };
 });
-async function getIsAdmin(
-  supabaseUrl: string,
-  serviceKey: string,
-  userId: string
-): Promise<boolean> {
-  const rows = await supabaseFetch<Array<{ is_admin: boolean | null }>>(
-    supabaseUrl,
-    serviceKey,
-    `/rest/v1/user_system?select=is_admin&user_id=eq.${encodeURIComponent(userId)}&limit=1`
-  );
-  return rows[0]?.is_admin === true;
-}
 async function writeAuditLog(
   supabaseUrl: string,
   serviceKey: string,
@@ -101,7 +90,7 @@ async function writeAuditLog(
   }
 ): Promise<void> {
   try {
-    await supabaseFetch(supabaseUrl, serviceKey, '/rest/v1/admin_audit_log', {
+    await adminSupabaseFetch(supabaseUrl, serviceKey, '/rest/v1/admin_audit_log', {
       method: 'POST',
       body: JSON.stringify({
         action: payload.action,
@@ -115,46 +104,6 @@ async function writeAuditLog(
   } catch (error) {
     logger.warn('[AdminSupporter] Failed to write audit log', { error, action: payload.action });
   }
-}
-async function supabaseFetch<T>(
-  supabaseUrl: string,
-  serviceKey: string,
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${supabaseUrl}${path}`, {
-      ...init,
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...(init.headers || {}),
-      },
-    });
-  } catch (error) {
-    logger.error('[AdminSupporter] Supabase request failed', { path, error });
-    throw createError({ statusCode: 502, message: 'Supabase request failed' });
-  }
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    logger.warn('[AdminSupporter] Supabase request failed', {
-      path,
-      status: response.status,
-      detail,
-    });
-    throw createError({ statusCode: 502, message: 'Supabase request failed' });
-  }
-  if (response.status === 204) {
-    return null as T;
-  }
-  const text = await response.text();
-  if (!text.trim()) {
-    return null as T;
-  }
-  return JSON.parse(text) as T;
 }
 function readUuid(value: unknown, field: string): string {
   if (typeof value !== 'string' || !UUID_REGEX.test(value)) {

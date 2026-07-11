@@ -303,7 +303,10 @@ const tarkovActions = {
     }
     const nextPvpData = cloneStateSnapshot(this.pvp);
     nextPvpData.prestigeLevel = nextPrestigeLevel;
-    nextPvpData.progressEpoch = getNextProgressEpoch(this.pvp);
+    // ponytail: do NOT bump progressEpoch here. The epoch contract is "a full
+    // reset/prestige wipe happened and wins over older progress"; bumping it for
+    // a prestige-level-only edit makes mergeProgressData's epoch early-return
+    // silently drop the other device's storyChapters (storyline progress loss).
     const { $supabase } = useNuxtApp();
     if ($supabase.user.loggedIn && $supabase.user.id) {
       const nextState = cloneStateSnapshot(this.$state);
@@ -648,8 +651,7 @@ const tarkovActions = {
     const shouldRemainFailed = (
       task: Task | undefined,
       completion:
-        | { complete?: boolean; failed?: boolean; manual?: boolean; timestamp?: number }
-        | undefined
+        { complete?: boolean; failed?: boolean; manual?: boolean; timestamp?: number } | undefined
     ) => {
       if (completion?.manual === true) return true;
       if (!task) return true;

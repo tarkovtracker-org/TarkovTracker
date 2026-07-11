@@ -11,6 +11,9 @@ const createTarkovStore = (options: {
   isTaskComplete?: boolean | ((taskId: string) => boolean);
   isTaskFailed?: boolean;
   taskCompletions?: Record<string, unknown>;
+  traderLevels?: Record<string, number>;
+  traderReputations?: Record<string, number>;
+  traders?: Array<{ id: string; name: string; normalizedName: string }>;
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
@@ -26,6 +29,10 @@ const createTarkovStore = (options: {
     getCurrentGameMode: vi.fn(() => 'pvp'),
     playerLevel: vi.fn(() => options.playerLevel ?? 1),
     setLevel: vi.fn(),
+    getTraderLevel: vi.fn((traderId: string) => options.traderLevels?.[traderId] ?? 1),
+    setTraderLevel: vi.fn(),
+    getTraderReputation: vi.fn((traderId: string) => options.traderReputations?.[traderId] ?? 0),
+    setTraderReputation: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => {
       if (typeof options.isTaskComplete === 'function') {
         return options.isTaskComplete(taskId);
@@ -48,8 +55,12 @@ const createTarkovStore = (options: {
     })),
   };
 };
-const createMetadataStore = (tasks: Task[]) => ({
+const createMetadataStore = (
+  tasks: Task[],
+  traders: Array<{ id: string; name: string; normalizedName: string }> = []
+) => ({
   tasks,
+  traders,
 });
 const setup = async (
   task: Task,
@@ -57,14 +68,16 @@ const setup = async (
   options: Parameters<typeof createTarkovStore>[0],
   preferencesOverrides: Partial<{
     getPinnedTaskIds: string[];
+    getTasksRequireTraderLevels: boolean;
   }> = {}
 ) => {
   const onAction = vi.fn();
   const tarkovStore = createTarkovStore(options);
-  const metadataStore = createMetadataStore(tasks);
+  const metadataStore = createMetadataStore(tasks, options.traders);
   const togglePinnedTask = vi.fn();
   const preferencesStore = {
     getPinnedTaskIds: [],
+    getTasksRequireTraderLevels: true,
     togglePinnedTask,
     ...preferencesOverrides,
   };
@@ -213,6 +226,94 @@ describe('useTaskActions', () => {
     expect(onAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'available', taskId: 'task-main' })
     );
+  });
+  it('marks the Fence-gated Is This a Reference task available', async () => {
+    const fenceId = '579dc571d53a0658a154fbec';
+    const task: Task = {
+      id: '66d9cbb67b491f9d5304f6e6',
+      name: 'Is This a Reference?',
+      minPlayerLevel: 25,
+      taskRequirements: [],
+      traderRequirements: [
+        {
+          id: '66dace4d03b34844877a50fc',
+          trader: { id: fenceId, name: 'Fence' },
+          value: 1,
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {
+      playerLevel: 28,
+      traderReputations: { [fenceId]: 0 },
+      traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
+    });
+    actions.markTaskAvailable();
+    expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(fenceId, 1);
+  });
+  it('backfills trader loyalty and positive reputation without lowering met values', async () => {
+    const praporId = '54cb50c76803fa8b248b4571';
+    const skierId = '58330581ace78e27b8b10cee';
+    const task: Task = {
+      id: 'trader-gated-task',
+      traderLevelRequirements: [
+        { id: 'level-prapor', trader: { id: praporId, name: 'Prapor' }, level: 2 },
+        { id: 'level-skier', trader: { id: skierId, name: 'Skier' }, level: 2 },
+      ],
+      traderRequirements: [
+        { id: 'rep-prapor', trader: { id: praporId, name: 'Prapor' }, value: 0.5 },
+        { id: 'rep-skier', trader: { id: skierId, name: 'Skier' }, value: 0.2 },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {
+      traderLevels: { [praporId]: 1, [skierId]: 3 },
+      traderReputations: { [praporId]: 0.2, [skierId]: 0.4 },
+    });
+    actions.markTaskAvailable();
+    expect(tarkovStore.setTraderLevel).toHaveBeenCalledWith(praporId, 2);
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalledWith(skierId, expect.any(Number));
+    expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(praporId, 0.5);
+    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(skierId, expect.any(Number));
+  });
+  it('backfills Fence negative reputation requirements only', async () => {
+    const fenceId = '579dc571d53a0658a154fbec';
+    const praporId = '54cb50c76803fa8b248b4571';
+    const task: Task = {
+      id: 'low-karma-task',
+      traderRequirements: [
+        { id: 'rep-fence', trader: { id: fenceId, name: 'Fence' }, value: -2 },
+        { id: 'rep-prapor', trader: { id: praporId, name: 'Prapor' }, value: -1 },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {
+      traderReputations: { [fenceId]: 0, [praporId]: 0 },
+      traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
+    });
+    actions.markTaskAvailable();
+    expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(fenceId, -2);
+    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(praporId, expect.any(Number));
+  });
+  it('does not backfill trader requirements when gating is disabled', async () => {
+    const fenceId = '579dc571d53a0658a154fbec';
+    const task: Task = {
+      id: 'optional-trader-gating-task',
+      traderLevelRequirements: [
+        { id: 'level-fence', trader: { id: fenceId, name: 'Fence' }, level: 2 },
+      ],
+      traderRequirements: [{ id: 'rep-fence', trader: { id: fenceId, name: 'Fence' }, value: 1 }],
+    };
+    const { actions, tarkovStore } = await setup(
+      task,
+      [task],
+      {
+        traderLevels: { [fenceId]: 1 },
+        traderReputations: { [fenceId]: 0 },
+        traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
+      },
+      { getTasksRequireTraderLevels: false }
+    );
+    actions.markTaskAvailable();
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
   });
   it('marks a task failed and invokes onAction', async () => {
     const task: Task = {

@@ -135,4 +135,33 @@ describe('mergeProgressData progress epoch', () => {
     expect(merged.prestigeLevel).toBe(2);
     expect(merged.progressEpoch).toBe(5);
   });
+  it('wipes storyChapters when a higher-epoch reset wins (prestige/reset contract)', () => {
+    const local = createProgressData({
+      'chapter-1': { complete: true, timestamp: 1000 },
+    });
+    local.progressEpoch = 2;
+    const remote = createProgressData({});
+    remote.progressEpoch = 3;
+    const merged = mergeProgressData(local, remote);
+    expect(merged.progressEpoch).toBe(3);
+    expect(merged.storyChapters).toEqual({});
+  });
+  it('merges storyChapters when epochs are equal and only prestigeLevel differs', () => {
+    const local = createProgressData({
+      'chapter-1': { complete: true, timestamp: 1000 },
+    });
+    local.prestigeLevel = 1;
+    local.progressEpoch = 2;
+    const remote = createProgressData({
+      'chapter-2': { complete: true, timestamp: 2000 },
+    });
+    remote.prestigeLevel = 2;
+    remote.progressEpoch = 2;
+    const merged = mergeProgressData(local, remote);
+    expect(merged.progressEpoch).toBe(2);
+    expect(merged.storyChapters).toMatchObject({
+      'chapter-1': { complete: true, timestamp: 1000 },
+      'chapter-2': { complete: true, timestamp: 2000 },
+    });
+  });
 });

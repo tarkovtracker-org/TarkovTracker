@@ -8,7 +8,10 @@ import {
 } from './handlers/progress';
 import { handleGetTeamProgress } from './handlers/team';
 import { handleGetToken } from './handlers/token';
+import { BURST_WINDOW_SEC, DAILY_WINDOW_SEC, TIER_LIMITS, upgradeMessage } from './limits';
 import { OPENAPI_JSON } from './openapi';
+import { resolveTier } from './services/supporter';
+import { recordUsage } from './services/usage';
 import type {
   ApiToken,
   Env,
@@ -46,15 +49,20 @@ function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
   return null;
 }
 type Action = 'progress-read' | 'progress-write' | 'token-info';
-const RATE_LIMITS: Record<Action, { limit: number; windowSec: number }> = {
-  'progress-read': { limit: 60, windowSec: 60 },
-  'progress-write': { limit: 30, windowSec: 60 },
-  'token-info': { limit: 60, windowSec: 60 },
+type UsageKind = 'read' | 'write';
+type RateLimitAnchor = 'utc-day';
+type RateLimitMode = 'sliding';
+type RateLimitOptions = {
+  anchor?: RateLimitAnchor;
+  mode?: RateLimitMode;
 };
 type RateLimitState = {
   count: number;
   resetAt: number;
   windowSec: number;
+  anchor?: RateLimitAnchor;
+  mode?: RateLimitMode;
+  timestamps?: number[];
 };
 type RateLimitResponse = {
   allowed: boolean;
@@ -71,6 +79,13 @@ type RateLimitResult = {
 };
 const RATE_LIMIT_TIMEOUT_MS = 3000;
 const RATE_LIMIT_SLOW_MS = 200;
+const DAY_MS = 86400000;
+function nextUtcMidnight(now: number): number {
+  return Math.floor(now / DAY_MS) * DAY_MS + DAY_MS;
+}
+// RFC 9745 Deprecation header value: structured-field Date for
+// 2026-07-06T00:00:00Z, when the api.tarkovtracker.org migration shipped.
+const LEGACY_API_DEPRECATION_DATE = '@1783296000';
 export class ApiGatewayRateLimiter {
   private data?: RateLimitState;
   constructor(private state: DurableObjectState) {}
@@ -89,45 +104,115 @@ export class ApiGatewayRateLimiter {
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405 });
     }
-    let payload: { limit?: number; windowSec?: number } = {};
+    let payload: {
+      limit?: number;
+      windowSec?: number;
+      anchor?: string;
+      mode?: string;
+      refund?: boolean;
+      resetAt?: number;
+    };
     try {
-      payload = (await request.json()) as { limit?: number; windowSec?: number };
+      payload = (await request.json()) as {
+        limit?: number;
+        windowSec?: number;
+        anchor?: string;
+        mode?: string;
+        refund?: boolean;
+        resetAt?: number;
+      };
     } catch {
       return new Response('Bad Request', { status: 400 });
+    }
+    if (payload.refund === true) {
+      // Return one previously consumed fixed-window slot (e.g. when a request
+      // that passed the daily check is then rejected by the burst limiter).
+      // The caller passes the resetAt of the window it consumed from so a
+      // refund delayed past a UTC-day rollover cannot decrement the new day.
+      await this.load();
+      const now = Date.now();
+      const expectedResetAt = payload.resetAt;
+      if (
+        this.data &&
+        !this.data.mode &&
+        now < this.data.resetAt &&
+        this.data.count > 0 &&
+        (typeof expectedResetAt !== 'number' || this.data.resetAt === expectedResetAt)
+      ) {
+        this.data.count -= 1;
+        await this.state.storage.put('state', this.data);
+      }
+      return this.json({ allowed: true, remaining: 0, resetAt: this.data?.resetAt ?? now });
     }
     const limit = Number(payload.limit);
     const windowSec = Number(payload.windowSec);
     if (!Number.isFinite(limit) || !Number.isFinite(windowSec) || limit <= 0 || windowSec <= 0) {
       return new Response('Bad Request', { status: 400 });
     }
+    const anchor: RateLimitAnchor | undefined = payload.anchor === 'utc-day' ? 'utc-day' : undefined;
+    const mode: RateLimitMode | undefined = payload.mode === 'sliding' ? 'sliding' : undefined;
     await this.load();
     const now = Date.now();
     const windowMs = windowSec * 1000;
-    if (!this.data || this.data.windowSec !== windowSec || now >= this.data.resetAt) {
-      this.data = { count: 0, resetAt: now + windowMs, windowSec };
+    if (mode === 'sliding') {
+      // Sliding-window log: bounded by `limit` entries, so short bursts across
+      // a fixed-window boundary are not spuriously throttled.
+      const cutoff = now - windowMs;
+      const timestamps = (this.data?.timestamps ?? []).filter((ts) => ts > cutoff);
+      const resetAt = timestamps.length ? timestamps[0] + windowMs : now + windowMs;
+      if (timestamps.length >= limit) {
+        // Deny path: refresh in-memory state but skip the storage write. The
+        // pruned timestamps/resetAt are recomputed from storage on the next
+        // load, so persisting on every throttled hit would only add Durable
+        // Object write amplification under sustained bursts.
+        this.data = { count: timestamps.length, resetAt, windowSec, mode, timestamps };
+        await this.scheduleCleanup(resetAt);
+        return this.json({ allowed: false, remaining: 0, resetAt });
+      }
+      timestamps.push(now);
+      this.data = { count: timestamps.length, resetAt: timestamps[0] + windowMs, windowSec, mode, timestamps };
+      await this.state.storage.put('state', this.data);
+      await this.scheduleCleanup(this.data.resetAt);
+      return this.json({
+        allowed: true,
+        remaining: Math.max(limit - timestamps.length, 0),
+        resetAt: this.data.resetAt,
+      });
     }
-    // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
-    // pre-auth rate-limit keys) do not retain billable storage forever. The
-    // alarm fires shortly after the window resets and wipes all storage.
-    const cleanupAt = this.data.resetAt + 1000;
+    const configChanged =
+      !this.data ||
+      this.data.windowSec !== windowSec ||
+      this.data.anchor !== anchor ||
+      this.data.mode !== undefined;
+    if (configChanged || now >= this.data!.resetAt) {
+      const resetAt = anchor === 'utc-day' ? nextUtcMidnight(now) : now + windowMs;
+      this.data = { count: 0, resetAt, windowSec, anchor };
+    }
+    await this.scheduleCleanup(this.data!.resetAt);
+    if (this.data!.count >= limit) {
+      return this.json({
+        allowed: false,
+        remaining: 0,
+        resetAt: this.data!.resetAt,
+      });
+    }
+    this.data!.count += 1;
+    await this.state.storage.put('state', this.data);
+    return this.json({
+      allowed: true,
+      remaining: Math.max(limit - this.data!.count, 0),
+      resetAt: this.data!.resetAt,
+    });
+  }
+  // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
+  // pre-auth rate-limit keys) do not retain billable storage forever. The
+  // alarm fires shortly after the window resets and wipes all storage.
+  private async scheduleCleanup(resetAt: number): Promise<void> {
+    const cleanupAt = resetAt + 1000;
     const existingAlarm = await this.state.storage.getAlarm();
     if (existingAlarm !== cleanupAt) {
       await this.state.storage.setAlarm(cleanupAt);
     }
-    if (this.data.count >= limit) {
-      return this.json({
-        allowed: false,
-        remaining: 0,
-        resetAt: this.data.resetAt,
-      });
-    }
-    this.data.count += 1;
-    await this.state.storage.put('state', this.data);
-    return this.json({
-      allowed: true,
-      remaining: Math.max(limit - this.data.count, 0),
-      resetAt: this.data.resetAt,
-    });
   }
   async alarm(): Promise<void> {
     const stored = await this.state.storage.get<RateLimitState>('state');
@@ -144,7 +229,8 @@ async function rateLimit(
   env: Env,
   key: string,
   limit: number,
-  windowSec: number
+  windowSec: number,
+  options?: RateLimitOptions
 ): Promise<RateLimitResult> {
   const action = key.split(':', 1)[0] || 'unknown';
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
@@ -156,7 +242,7 @@ async function rateLimit(
     const res = await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ limit, windowSec }),
+      body: JSON.stringify({ limit, windowSec, anchor: options?.anchor, mode: options?.mode }),
       signal: controller.signal,
     });
     const durationMs = Date.now() - startedAt;
@@ -209,6 +295,36 @@ async function rateLimit(
     clearTimeout(timeout);
   }
 }
+/**
+ * Best-effort refund of one fixed-window slot (used when the daily counter was
+ * consumed but the request was subsequently rejected by the burst limiter).
+ * `consumedResetAt` is the resetAt of the window the slot was taken from; the
+ * Durable Object only decrements when its current window still matches, so a
+ * refund delayed past a UTC-day rollover cannot steal a slot from the new day.
+ */
+async function refundRateLimit(
+  env: Env,
+  key: string,
+  action: string,
+  consumedResetAt?: number
+): Promise<void> {
+  const id = env.API_GATEWAY_LIMITER.idFromName(key);
+  const stub = env.API_GATEWAY_LIMITER.get(id);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RATE_LIMIT_TIMEOUT_MS);
+  try {
+    await stub.fetch('https://rate-limit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refund: true, resetAt: consumedResetAt }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    console.warn('rateLimit refund failed', { action, error });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 function resolveOrigin(envOrigin?: string, requestOrigin?: string): string {
   if (!envOrigin || envOrigin === '*') return '*';
   const list = envOrigin
@@ -224,6 +340,7 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
     'Access-Control-Allow-Origin': resolveOrigin(envOrigin, requestOrigin),
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
       'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };
@@ -367,26 +484,83 @@ async function authenticateAndRateLimit(
   permission: Permission,
   action: Action,
   envOrigin?: string,
-  requestOrigin?: string
+  requestOrigin?: string,
+  ctx?: ExecutionContext
 ): Promise<AuthSuccess | Response> {
   const validation = await validateToken(env, rawToken, permission);
   if (!validation.valid) {
     return errorResponse(validation.error, validation.status, envOrigin, requestOrigin);
   }
-  const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rlKey = `${action}:${clientIp}:${rawToken.slice(-16)}`;
-  const rl = await rateLimit(env, rlKey, RATE_LIMITS[action].limit, RATE_LIMITS[action].windowSec);
-  const rlHeaders = rateLimitHeaders(rl);
-  if (!rl.allowed) {
+  const token = validation.token;
+  const kind: UsageKind = action === 'progress-write' ? 'write' : 'read';
+  const tier = await resolveTier(env, token.user_id);
+  const limits = TIER_LIMITS[tier];
+  const dailyLimit = kind === 'write' ? limits.writesPerDay : limits.readsPerDay;
+  const track = (throttled: boolean) => {
+    const promise = recordUsage(env, {
+      userId: token.user_id,
+      tokenId: token.token_id,
+      tier,
+      kind,
+      throttled,
+    });
+    if (ctx) {
+      ctx.waitUntil(promise);
+    }
+  };
+  // Daily quota first, so a request rejected by the daily quota does not
+  // consume a burst slot. Both counters key on user_id so extra tokens do not
+  // multiply a user's quota.
+  const dailyKey = `daily-${kind}:${token.user_id}`;
+  const daily = await rateLimit(env, dailyKey, dailyLimit, DAILY_WINDOW_SEC, {
+    anchor: 'utc-day',
+  });
+  const dailyHeaders = rateLimitHeaders(daily);
+  if (!daily.allowed) {
+    track(true);
+    const message =
+      daily.status === 429 && tier === 'free'
+        ? upgradeMessage(kind)
+        : daily.message || 'Rate limit exceeded';
+    return errorResponse(message, daily.status || 429, envOrigin, requestOrigin, dailyHeaders);
+  }
+  const burst = await rateLimit(
+    env,
+    `burst-${kind}:${token.user_id}`,
+    limits.burstPerMinute,
+    BURST_WINDOW_SEC,
+    { mode: 'sliding' }
+  );
+  if (!burst.allowed) {
+    // Give back the daily slot consumed above so burst-throttled attempts do
+    // not drain the daily quota.
+    const refund = refundRateLimit(
+      env,
+      dailyKey,
+      `daily-${kind}`,
+      typeof daily.resetAt === 'number' ? daily.resetAt : undefined
+    );
+    if (ctx) ctx.waitUntil(refund);
+    track(true);
+    // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
+    // remaining for the refund. Retry-After reflects when burst capacity frees.
+    const headers = rateLimitHeaders({
+      ...daily,
+      remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
+    });
+    if (typeof burst.resetAt === 'number') {
+      headers['Retry-After'] = String(Math.max(1, Math.ceil((burst.resetAt - Date.now()) / 1000)));
+    }
     return errorResponse(
-      rl.message || 'Rate limit exceeded',
-      rl.status || 429,
+      burst.message || 'Rate limit exceeded',
+      burst.status || 429,
       envOrigin,
       requestOrigin,
-      rlHeaders
+      headers
     );
   }
-  return { validation, rlHeaders };
+  track(false);
+  return { validation, rlHeaders: dailyHeaders };
 }
 function decodeUrlParam(
   raw: string,
@@ -429,7 +603,7 @@ async function parseJsonObjectBody(
   return parsedBody as Record<string, unknown>;
 }
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const host = url.hostname.toLowerCase();
     const path = '/' + url.pathname.split('/').filter(Boolean).join('/');
@@ -463,6 +637,18 @@ export default {
     if (isApiHost && path === '/openapi.json') {
       return openApiResponse(origin, reqOrigin);
     }
+    // robots.txt — keep crawlers off the API surface; docs/openapi remain public
+    if (isApiHost && path === '/robots.txt') {
+      const body = 'User-agent: *\nDisallow: /\n\nSitemap: https://tarkovtracker.org/sitemap.xml\n';
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+          ...headers,
+        },
+      });
+    }
     // Extract the API path based on host
     let apiPath: string | null = null;
     if (isApiHost) {
@@ -482,6 +668,23 @@ export default {
       const apiMatch = path.match(/^\/api(?:\/v2)?(.*)$/);
       if (apiMatch) {
         apiPath = apiMatch[1] || '/';
+        // Host migration: once LEGACY_API_REDIRECT is flipped to "true",
+        // legacy /api and /api/v2 routes permanently redirect to the api
+        // subdomain. Clients should migrate proactively: some HTTP stacks
+        // (e.g. .NET HttpClient) drop Authorization on cross-host redirects.
+        if ((env.LEGACY_API_REDIRECT || '').trim().toLowerCase() === 'true') {
+          const target = `https://${apiHost}${apiPath}${url.search}`;
+          return new Response(null, {
+            status: 308,
+            headers: {
+              ...headers,
+              Location: target,
+              Deprecation: LEGACY_API_DEPRECATION_DATE,
+              Link: `<${target}>; rel="successor-version"`,
+              'Cache-Control': 'no-store',
+            },
+          });
+        }
       }
     }
     if (!apiPath) {
@@ -503,7 +706,8 @@ export default {
           'GP',
           'token-info',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -519,7 +723,8 @@ export default {
           'GP',
           'progress-read',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -536,7 +741,8 @@ export default {
           'TP',
           'progress-read',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -554,7 +760,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -584,7 +791,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -643,7 +851,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -682,7 +891,8 @@ export default {
           'WP',
           'progress-write',
           origin,
-          reqOrigin
+          reqOrigin,
+          ctx
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;

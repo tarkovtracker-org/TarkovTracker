@@ -383,13 +383,13 @@ runtimeConfig: {
 
 ```bash
 # Run all tests
-npm run test
+pnpm run test
 
 # Watch mode
-npm run test:watch
+pnpm run test:watch
 
 # API Gateway tests
-npm run test:api-gateway
+pnpm run test:api-gateway
 ```
 
 **Test Organization:**
@@ -403,10 +403,12 @@ npm run test:api-gateway
 ### Cloudflare Pages
 
 ```yaml
-Build command: npm run build
+Build command: pnpm run build
 Build output: dist
 Root directory: /
 Node.js version: 24.x
+Environment variables:
+  PNPM_VERSION: 10.34.5
 ```
 
 ### Environment Variables

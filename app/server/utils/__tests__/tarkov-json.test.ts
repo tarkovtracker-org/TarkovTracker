@@ -366,6 +366,7 @@ describe('tarkov JSON adapters', () => {
         name: 'Debut',
         trader: 'trader1',
         map: 'map1',
+        requiredPrestige: 'prestige1',
         taskRequirements: [{ task: 'task0', status: ['complete'] }],
         traderRequirements: [{ trader: 'trader1', value: 0.2 }],
         objectives: [
@@ -381,6 +382,12 @@ describe('tarkov JSON adapters', () => {
             id: 'objective2',
             type: 'findQuestItem',
             questItem: 'questItem1',
+          },
+          {
+            id: 'objective3',
+            type: 'skill',
+            skill: 'Vitality',
+            level: 5,
           },
         ],
         failConditions: [{ id: 'fail1', type: 'taskStatus', task: 'task2' }],
@@ -411,6 +418,7 @@ describe('tarkov JSON adapters', () => {
       id: 'task1',
       map: { id: 'map1', name: 'Customs' },
       trader: { id: 'trader1', name: 'Prapor' },
+      requiredPrestige: { id: 'prestige1' },
     });
     expect(result.maps[0]?.spawns).toHaveLength(1);
     expect(result.traders[0]?.levels).toHaveLength(1);
@@ -443,6 +451,30 @@ describe('tarkov JSON adapters', () => {
     expect(rewards?.finishRewards?.items?.[0]?.item).toEqual({ id: 'item1' });
     expect(rewards?.failureOutcome?.skillLevelReward?.[0]?.skill).toMatchObject({
       name: 'Strength',
+    });
+  });
+  it('populates imageLink for skill objectives and skill level rewards', () => {
+    const objectives = adaptTaskObjectivesResponse(tasksPayload, {
+      hideoutPayload,
+      tradersPayload,
+    }).data.tasks[0];
+    expect(objectives?.objectives?.[2]).toMatchObject({
+      __typename: 'TaskObjectiveSkill',
+      skillLevel: {
+        name: 'Vitality',
+        level: 5,
+        skill: {
+          id: 'Vitality',
+          name: 'Vitality',
+          imageLink: 'https://assets.tarkov.dev/skill-Vitality-icon.webp',
+        },
+      },
+    });
+    const rewards = adaptTaskRewardsResponse(tasksPayload, { tradersPayload }).data.tasks[0];
+    expect(rewards?.failureOutcome?.skillLevelReward?.[0]?.skill).toMatchObject({
+      id: 'Strength',
+      name: 'Strength',
+      imageLink: 'https://assets.tarkov.dev/skill-Strength-icon.webp',
     });
   });
   it('adapts task objectives with full item/map lookups when provided', () => {

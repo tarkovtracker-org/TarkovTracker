@@ -120,6 +120,7 @@ export interface PreferencesState {
   hideoutRequireStationLevels: boolean;
   hideoutRequireSkillLevels: boolean;
   hideoutRequireTraderLoyalty: boolean;
+  tasksRequireTraderLevels: boolean;
   localeOverride: string | null;
   // External links
   wikiUseAntifandom: boolean;
@@ -207,6 +208,7 @@ export const preferencesDefaultState: PreferencesState = {
   hideoutRequireStationLevels: true,
   hideoutRequireSkillLevels: true,
   hideoutRequireTraderLoyalty: true,
+  tasksRequireTraderLevels: true,
   localeOverride: null,
   // External links
   wikiUseAntifandom: false,
@@ -538,6 +540,9 @@ export const usePreferencesStore = defineStore('preferences', {
     getHideoutRequireTraderLoyalty: (state) => {
       return state.hideoutRequireTraderLoyalty ?? true;
     },
+    getTasksRequireTraderLevels: (state) => {
+      return state.tasksRequireTraderLevels ?? true;
+    },
     getMapZoomSpeed: (state) => {
       return state.mapZoomSpeed ?? 1;
     },
@@ -822,6 +827,9 @@ export const usePreferencesStore = defineStore('preferences', {
     setHideoutRequireTraderLoyalty(enabled: boolean) {
       this.hideoutRequireTraderLoyalty = enabled;
     },
+    setTasksRequireTraderLevels(enabled: boolean) {
+      this.tasksRequireTraderLevels = enabled;
+    },
     setLocaleOverride(locale: string | null) {
       this.localeOverride = locale;
     },
@@ -1024,6 +1032,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'hideoutRequireStationLevels',
       'hideoutRequireSkillLevels',
       'hideoutRequireTraderLoyalty',
+      'tasksRequireTraderLevels',
       'showMapExtracts',
       'mapMarkerColors',
       'mapZoomSpeed',

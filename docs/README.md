@@ -30,7 +30,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 **Agent-facing**
 
 - [`/AGENTS.md`](../AGENTS.md) — canonical agent contract and conventions (source of truth).
-- [`/DESIGN.md`](../DESIGN.md) — design contract (validate with `npm run design:lint`).
+- [`/DESIGN.md`](../DESIGN.md) — design contract (validate with `pnpm run design:lint`).
 - [`agent-context/`](./agent-context/) — deeper agent guidance and the generated codebase
   knowledge base; start at [`agent-context/summary/index.md`](./agent-context/summary/index.md).
 

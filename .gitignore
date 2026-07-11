@@ -6,6 +6,7 @@
 .cache
 coverage
 dist
+test-report.junit.xml
 .wrangler
 .claude/*
 !.claude/CLAUDE.md

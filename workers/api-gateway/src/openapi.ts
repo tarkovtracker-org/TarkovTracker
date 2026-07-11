@@ -7,10 +7,13 @@ export const OPENAPI_SPEC = {
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
       'Tokens use prefixes `PVP_` or `PVE_`.\n\n' +
-      'Rate limits: enforced per IP + token. Read endpoints are ~60/min, write endpoints are ~30/min. ' +
+      'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
+      '100 writes/day; supporter tiers scale up), resetting at 00:00 UTC, plus a per-minute ' +
+      'burst limit using a 60-second sliding window. ' +
       'Every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` ' +
-      '(unix seconds). On `429` responses a `Retry-After` header (seconds) is also returned, so clients ' +
-      'should queue and retry after that delay rather than busy-looping.\n\n' +
+      '(unix seconds) describing the daily quota. On `429` responses a `Retry-After` header (seconds) ' +
+      'is also returned, so clients should queue and retry after that delay rather than busy-looping. ' +
+      'Burst-throttled requests do not consume the daily quota.\n\n' +
       'Docs: https://api.tarkovtracker.org/docs (or / on the api subdomain).',
     contact: {
       name: 'TarkovTracker',
@@ -85,22 +88,23 @@ export const OPENAPI_SPEC = {
         },
       },
       RateLimited: {
-        description: 'Rate limit exceeded',
+        description: 'Rate limit exceeded (daily quota or per-minute burst limit)',
         headers: {
           'Retry-After': {
-            description: 'Seconds the client should wait before retrying.',
+            description:
+              'Seconds the client should wait before retrying (daily reset, or when burst capacity frees).',
             schema: { type: 'integer', minimum: 1 },
           },
           'X-RateLimit-Limit': {
-            description: 'Maximum requests permitted in the current window.',
+            description: 'Maximum requests permitted per UTC day for the account tier.',
             schema: { type: 'integer', minimum: 1 },
           },
           'X-RateLimit-Remaining': {
-            description: 'Requests remaining in the current window (0 on a 429).',
+            description: 'Requests remaining in the daily quota.',
             schema: { type: 'integer', minimum: 0 },
           },
           'X-RateLimit-Reset': {
-            description: 'Unix timestamp (seconds) when the current window resets.',
+            description: 'Unix timestamp (seconds) when the daily quota resets (00:00 UTC).',
             schema: { type: 'integer', minimum: 0 },
           },
         },
@@ -109,6 +113,15 @@ export const OPENAPI_SPEC = {
             schema: { $ref: '#/components/schemas/ErrorResponse' },
             examples: {
               rateLimited: { value: { success: false, error: 'Rate limit exceeded' } },
+              dailyQuotaUpgrade: {
+                summary: 'Free-tier daily quota exhausted',
+                value: {
+                  success: false,
+                  error:
+                    'Daily read quota exceeded for the free tier. Quotas reset at 00:00 UTC. ' +
+                    'Upgrade your account for higher limits: https://tarkovtracker.org/supporter',
+                },
+              },
             },
           },
         },
@@ -280,9 +293,7 @@ export const OPENAPI_SPEC = {
             success: true,
             data: {
               tasksProgress: [{ id: 'task-1', complete: true, failed: false, invalid: false }],
-              taskObjectivesProgress: [
-                { id: 'obj-1', complete: true, count: 2, invalid: false },
-              ],
+              taskObjectivesProgress: [{ id: 'obj-1', complete: true, count: 2, invalid: false }],
               hideoutModulesProgress: [],
               hideoutPartsProgress: [],
               displayName: 'Tracker',
@@ -348,7 +359,12 @@ export const OPENAPI_SPEC = {
       TaskUpdateArray: {
         type: 'array',
         items: { $ref: '#/components/schemas/BatchTaskUpdateItem' },
-        examples: [[{ id: 'task-1', state: 'completed' }, { id: 'task-2', state: 'failed' }]],
+        examples: [
+          [
+            { id: 'task-1', state: 'completed' },
+            { id: 'task-2', state: 'failed' },
+          ],
+        ],
       },
       ObjectiveUpdateRequest: {
         type: 'object',
@@ -526,7 +542,8 @@ export const OPENAPI_SPEC = {
       get: {
         tags: ['tokens'],
         summary: 'Get token info',
-        description: 'Requires GP permission. Rate limit: ~60/min per IP + token.',
+        description:
+          'Requires GP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
         operationId: 'getTokenInfo',
         security: [{ bearerAuth: [] }],
         responses: {
@@ -549,7 +566,8 @@ export const OPENAPI_SPEC = {
       get: {
         tags: ['progress'],
         summary: 'Get user progress',
-        description: 'Requires GP permission. Rate limit: ~60/min per IP + token.',
+        description:
+          'Requires GP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
         operationId: 'getProgress',
         security: [{ bearerAuth: [] }],
         responses: {
@@ -572,7 +590,8 @@ export const OPENAPI_SPEC = {
       get: {
         tags: ['team'],
         summary: 'Get team progress',
-        description: 'Requires TP permission. Rate limit: ~60/min per IP + token.',
+        description:
+          'Requires TP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
         operationId: 'getTeamProgress',
         security: [{ bearerAuth: [] }],
         responses: {
@@ -595,7 +614,8 @@ export const OPENAPI_SPEC = {
       post: {
         tags: ['progress'],
         summary: 'Update player level',
-        description: 'Requires WP permission. Rate limit: ~30/min per IP + token.',
+        description:
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
         operationId: 'updatePlayerLevel',
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -629,7 +649,8 @@ export const OPENAPI_SPEC = {
       post: {
         tags: ['progress'],
         summary: 'Update single task state',
-        description: 'Requires WP permission. Rate limit: ~30/min per IP + token.',
+        description:
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
         operationId: 'updateTask',
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -675,7 +696,8 @@ export const OPENAPI_SPEC = {
       post: {
         tags: ['progress'],
         summary: 'Update a task objective',
-        description: 'Requires WP permission. Rate limit: ~30/min per IP + token.',
+        description:
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
         operationId: 'updateTaskObjective',
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -721,7 +743,8 @@ export const OPENAPI_SPEC = {
       post: {
         tags: ['progress'],
         summary: 'Batch update tasks',
-        description: 'Requires WP permission. Rate limit: ~30/min per IP + token.',
+        description:
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
         operationId: 'updateTasksBatch',
         security: [{ bearerAuth: [] }],
         requestBody: {

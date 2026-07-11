@@ -122,6 +122,9 @@ vi.mock('@/utils/mapCoordinates', () => ({
   isValidMapSvgConfig: vi.fn((config) => !!config?.file),
   isValidMapTileConfig: vi.fn((config) => !!config?.tilePath),
   normalizeTileConfig: vi.fn((config) => config),
+  resolveFloorTilePath: vi.fn(
+    (config, floor) => (floor && config?.floorTilePaths?.[floor]) || config?.tilePath
+  ),
 }));
 const waitFor = async (predicate: () => boolean, maxIterations = 10) => {
   for (let index = 0; index < maxIterations; index++) {
@@ -619,6 +622,105 @@ describe('useLeafletMap', () => {
       } as TarkovMap;
       await nextTick();
       expect(result.floors.value).toEqual(['ground', 'upper']);
+      wrapper.unmount();
+    });
+    it('initializes tile maps with the configured default floor and tileSize', async () => {
+      const leafletModule = await import('leaflet');
+      const tileLayerSpy = vi.spyOn(leafletModule.default, 'tileLayer');
+      const mapData = {
+        id: 'lab',
+        name: 'The Lab',
+        normalizedName: 'lab',
+        tile: {
+          tilePath: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+          floorTilePaths: {
+            Technical: 'https://tiles.example.com/lab/technical/{z}/{x}/{y}.png',
+            First_Level: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+            Second_Level: 'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+          },
+          floors: ['Technical', 'First_Level', 'Second_Level'],
+          defaultFloor: 'First_Level',
+          coordinateRotation: 0,
+          tileSize: 175,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as unknown as TarkovMap;
+      const { result, wrapper } = await mountUseLeafletMap(mapData);
+      expect(result.selectedFloor.value).toBe('First_Level');
+      expect(result.floors.value).toEqual(['Technical', 'First_Level', 'Second_Level']);
+      expect(result.hasMultipleFloors.value).toBe(true);
+      expect(tileLayerSpy).toHaveBeenCalledWith(
+        'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+        expect.objectContaining({ tileSize: 175 })
+      );
+      wrapper.unmount();
+    });
+    it('respects an explicit initial floor for tile maps', async () => {
+      const leafletModule = await import('leaflet');
+      const tileLayerSpy = vi.spyOn(leafletModule.default, 'tileLayer');
+      const mapData = {
+        id: 'lab',
+        name: 'The Lab',
+        normalizedName: 'lab',
+        tile: {
+          tilePath: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+          floorTilePaths: {
+            First_Level: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+            Second_Level: 'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+          },
+          floors: ['First_Level', 'Second_Level'],
+          defaultFloor: 'First_Level',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as unknown as TarkovMap;
+      const { result, wrapper } = await mountUseLeafletMap(mapData, 'Second_Level');
+      expect(result.selectedFloor.value).toBe('Second_Level');
+      expect(tileLayerSpy).toHaveBeenCalledWith(
+        'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+        expect.any(Object)
+      );
+      wrapper.unmount();
+    });
+    it('rebuilds the tile layer with the new floor path when switching floors', async () => {
+      const leafletModule = await import('leaflet');
+      const tileLayerSpy = vi.spyOn(leafletModule.default, 'tileLayer');
+      const mapData = {
+        id: 'lab',
+        name: 'The Lab',
+        normalizedName: 'lab',
+        tile: {
+          tilePath: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+          floorTilePaths: {
+            First_Level: 'https://tiles.example.com/lab/1st/{z}/{x}/{y}.png',
+            Second_Level: 'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+          },
+          floors: ['First_Level', 'Second_Level'],
+          defaultFloor: 'First_Level',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as unknown as TarkovMap;
+      const { result, wrapper } = await mountUseLeafletMap(mapData);
+      tileLayerSpy.mockClear();
+      result.setFloor('Second_Level');
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(1000);
+      await nextTick();
+      expect(result.selectedFloor.value).toBe('Second_Level');
+      expect(tileLayerSpy).toHaveBeenCalledWith(
+        'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
+        expect.any(Object)
+      );
       wrapper.unmount();
     });
   });

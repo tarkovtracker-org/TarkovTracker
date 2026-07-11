@@ -9,8 +9,7 @@ export interface TarkovDevProfileSource {
   tarkovUid: number;
 }
 export type TarkovDevProfileSourceResult =
-  | { ok: true; data: TarkovDevProfileSource }
-  | { ok: false; error: string };
+  { ok: true; data: TarkovDevProfileSource } | { ok: false; error: string };
 function parseProfileId(value: string | undefined): number | null {
   if (!value) return null;
   const normalized = value.replace(/\.json$/i, '');

@@ -9,11 +9,18 @@ import { useRuntimeConfig } from '#imports';
 import { buildEdgeCacheRequest } from '@/server/utils/edgeCacheKey';
 import { sanitizeErrorMessage } from '@/server/utils/edgeCacheSanitizers';
 import { createLogger } from '@/server/utils/logger';
+import { getPrecomputedStore, isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
+import type { PrecomputedKvReader } from '@/server/utils/precomputedTarkov';
 import type { H3Event } from 'h3';
 const logger = createLogger('EdgeCache');
 type CacheOptions = {
   cacheKeyPrefix?: string;
   deps?: EdgeCacheDependencies;
+  // When true, first try the globally-replicated KV store populated by the
+  // scheduled GitHub Actions precompute workflow (scripts/precompute) before
+  // touching the per-colo Cache API. Missing binding or entry falls through
+  // to the regular edge-cache path.
+  precomputed?: boolean;
   staleTtl?: number;
 };
 type CfExecutionContext = { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
@@ -32,6 +39,7 @@ type EdgeCacheDependencies = {
   appUrl?: string;
   cache?: CacheLike;
   createErrorFn?: typeof createError;
+  precomputedStore?: PrecomputedKvReader | null;
   setResponseHeadersFn?: typeof setResponseHeaders;
 };
 function getOverlayHeadersMeta(payload: unknown): OverlayHeadersMeta | null {
@@ -53,12 +61,14 @@ function setCacheResponseHeaders(
   event: H3Event,
   setHeaders: typeof setResponseHeaders,
   fullCacheKey: string,
-  status: 'BYPASS' | 'DEV' | 'HIT' | 'MISS' | 'STALE',
+  status: 'BYPASS' | 'DEV' | 'HIT' | 'MISS' | 'PRECOMPUTE' | 'STALE',
   ttl: number,
   overlayMeta: OverlayHeadersMeta | null
 ) {
   const cacheControl =
-    status === 'HIT' || status === 'MISS' ? `public, max-age=${ttl}, s-maxage=${ttl}` : 'no-cache';
+    status === 'HIT' || status === 'MISS' || status === 'PRECOMPUTE'
+      ? `public, max-age=${ttl}, s-maxage=${ttl}`
+      : 'no-cache';
   setHeaders(event, {
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
@@ -173,8 +183,36 @@ export async function edgeCache<T>(
   const isCacheAvailable = Boolean(cache);
   const fullCacheKey = `${cacheKeyPrefix}-${key}`;
   try {
+    const bypassRequested = shouldBypassCache(event);
+    if (options.precomputed && !bypassRequested) {
+      const precomputedStore =
+        deps?.precomputedStore !== undefined ? deps.precomputedStore : getPrecomputedStore(event);
+      if (precomputedStore) {
+        try {
+          const envelope = await precomputedStore.get(key, 'json');
+          if (isPrecomputedEnvelope<T>(envelope)) {
+            const overlayMeta = getOverlayHeadersMeta(envelope.payload);
+            setCacheResponseHeaders(
+              event,
+              setHeaders,
+              fullCacheKey,
+              'PRECOMPUTE',
+              ttl,
+              overlayMeta
+            );
+            return envelope.payload;
+          }
+          logger.info(`No precomputed entry for ${key}; falling back to edge cache`);
+        } catch (precomputedError) {
+          logger.warn(
+            `Precomputed store read failed for ${key}; falling back to edge cache`,
+            precomputedError
+          );
+        }
+      }
+    }
     if (isCacheAvailable && cache) {
-      if (shouldBypassCache(event)) {
+      if (bypassRequested) {
         const response = await fetcher();
         const overlayMeta = getOverlayHeadersMeta(response);
         setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'BYPASS', ttl, overlayMeta);

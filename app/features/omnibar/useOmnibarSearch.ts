@@ -1,5 +1,6 @@
 import { refDebounced } from '@vueuse/core';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { getTaskRewardItems } from '@/utils/taskRewards';
 import type { ComputedRef, Ref } from '#imports';
 import type { Task, TarkovItem, HideoutStation } from '@/types/tarkov';
 export interface SearchResult {
@@ -7,6 +8,14 @@ export interface SearchResult {
   items: TarkovItem[];
   hideout: HideoutStation[];
 }
+const taskRewardsMatchQuery = (task: Task, query: string): boolean => {
+  return getTaskRewardItems(task).some(
+    (item) =>
+      item.name?.toLowerCase().includes(query) ||
+      item.shortName?.toLowerCase().includes(query) ||
+      item.normalizedName?.toLowerCase().includes(query)
+  );
+};
 export function useOmnibarSearch(): {
   searchQuery: Ref<string>;
   results: ComputedRef<SearchResult>;
@@ -26,7 +35,8 @@ export function useOmnibarSearch(): {
       (task) =>
         task.name?.toLowerCase().includes(query) ||
         task.map?.name?.toLowerCase().includes(query) ||
-        task.trader?.name?.toLowerCase().includes(query)
+        task.trader?.name?.toLowerCase().includes(query) ||
+        taskRewardsMatchQuery(task, query)
     );
     // 2. Search Items
     const matchedItems = metadataStore.items.filter(

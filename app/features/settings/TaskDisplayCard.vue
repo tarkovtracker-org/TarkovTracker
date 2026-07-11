@@ -25,6 +25,13 @@
           />
         </div>
         <USeparator />
+        <div class="grid gap-4 md:grid-cols-2">
+          <UCheckbox
+            v-model="tasksRequireTraderLevels"
+            :label="$t('settings.interface.tasks.require_trader_levels')"
+          />
+        </div>
+        <USeparator />
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div class="space-y-2">
             <p class="text-surface-200 text-sm font-semibold">
@@ -84,6 +91,10 @@
   const showPreviousQuests = computed({
     get: () => preferencesStore.getShowPreviousQuests,
     set: (val) => preferencesStore.setShowPreviousQuests(val),
+  });
+  const tasksRequireTraderLevels = computed({
+    get: () => preferencesStore.getTasksRequireTraderLevels,
+    set: (val) => preferencesStore.setTasksRequireTraderLevels(val),
   });
   const taskCardDensity = computed({
     get: () => preferencesStore.getTaskCardDensity,

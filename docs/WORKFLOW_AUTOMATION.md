@@ -34,7 +34,7 @@ Weekly security audits:
 
 **Jobs:**
 
-- `security-scan` - npm audit (prod and all deps), outdated check, checksum-verified Gitleaks secret detection
+- `security-scan` - pnpm audit (prod and all deps), outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
 **Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
@@ -46,7 +46,7 @@ Semantic versioning with automated releases:
 **Jobs:**
 
 - Runs tests and build
-- Validates local Supabase migrations with `npm run supabase:check`
+- Validates local Supabase migrations with `pnpm run supabase:check`
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
@@ -89,7 +89,7 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 - Dependabot-only, `main`-targeted PRs only
 - No repository checkout in the privileged `pull_request_target` workflow
 - Only package lockfiles, package manifests, and workflow files are allowed
-- Runtime Nuxt, Cloudflare, TypeScript compiler, and catch-all npm updates stay manual
+- Runtime Nuxt, Cloudflare, TypeScript compiler, and catch-all dependency updates stay manual
 - PR must be mergeable and all standard CI/security checks must finish without failures
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
@@ -123,8 +123,8 @@ Git hooks via Husky enforce quality standards:
 ### Setup
 
 ```bash
-npm install
-npm run prepare
+pnpm install
+pnpm run prepare
 ```
 
 ### Hooks
@@ -169,14 +169,14 @@ Automated via Dependabot (`.github/dependabot.yml`):
 
 **Features:**
 
-- Weekly npm update batches across the app root and `workers/api-gateway`
+- Weekly dependency update batches for the pnpm workspace (root + `workers/api-gateway`)
 - Monthly grouped GitHub Actions updates
 - Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
 - Patch cooldown is short so safe patch updates do not sit for a full week
 - Grouped minor/patch updates for low-risk tooling families
 - Version updates limited to direct dependencies; vulnerable transitives still surface through security updates
-- Maximum 3 concurrent npm PRs and 1 GitHub Actions PR
+- Maximum 3 concurrent dependency PRs and 1 GitHub Actions PR
 - Conservative auto-merge for allowlisted low-risk Dependabot groups after CI/security checks pass
 - Gitleaks runs via a pinned CLI download in CI with release checksum verification instead of the deprecated `gitleaks-action` runtime
 
@@ -189,7 +189,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - tailwind tooling
 - cloudflare tooling
 - release tooling
-- remaining npm minor/patch updates
+- remaining dependency minor/patch updates
 
 **Review strategy:**
 
@@ -198,7 +198,7 @@ Automated via Dependabot (`.github/dependabot.yml`):
 - Keep major upgrades explicit
 - Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
-- Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, and catch-all npm updates manual
+- Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, and catch-all dependency updates manual
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
 
 ## Development Environment Setup
@@ -206,12 +206,12 @@ Automated via Dependabot (`.github/dependabot.yml`):
 Automated setup script for new contributors:
 
 ```bash
-npm run setup
+pnpm run setup
 ```
 
 **Script performs:**
 
-1. Prerequisites check (Node.js, npm, git)
+1. Prerequisites check (Node.js, pnpm via Corepack, git)
 2. Install dependencies
 3. Setup git hooks (Husky)
 4. Create `.env.local` with local development defaults
@@ -220,7 +220,7 @@ npm run setup
 **Manual steps after setup:**
 
 1. Update `.env.local` with Supabase credentials
-2. Run `npm run dev`
+2. Run `pnpm run dev`
 3. Visit http://localhost:3000
 
 ## Deployment Process
@@ -238,8 +238,8 @@ Push to `main` triggers:
 
 ```bash
 # Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)
-npm run build
-cd workers/api-gateway && npx wrangler deploy
+pnpm run build
+pnpm --filter api-gateway exec wrangler deploy
 ```
 
 > **Note:** All local deployment commands assume you are in the project root directory.
@@ -260,7 +260,7 @@ Coverage reporting can be enabled by:
 
 ```bash
 # Start development
-npm run dev
+pnpm run dev
 
 # Make changes
 git add .
@@ -279,17 +279,17 @@ git push  # GitHub Actions runs CI
 ### Testing
 
 ```bash
-npm run test           # Run all tests
-npm run test:watch     # Watch mode
-npx vitest --ui        # UI dashboard
+pnpm run test           # Run all tests
+pnpm run test:watch     # Watch mode
+pnpm exec vitest --ui        # UI dashboard
 ```
 
 ### Format & Lint
 
 ```bash
-npm run format         # Prettier + ESLint fix
-npm run lint           # Lint check
-npm run lint:fix       # Auto-fix issues
+pnpm run format         # Prettier + ESLint fix
+pnpm run lint           # Lint check
+pnpm run lint:fix       # Auto-fix issues
 ```
 
 ## Troubleshooting
@@ -301,25 +301,25 @@ npm run lint:fix       # Auto-fix issues
 git commit --no-verify -m "message"
 
 # Fix issues
-npm run format
-npm run lint:fix
+pnpm run format
+pnpm run lint:fix
 ```
 
 ### CI Failing
 
 **Quality job:**
 
-- Run `npm run lint` locally
-- Check type errors with `npm run typecheck`
+- Run `pnpm run lint` locally
+- Check type errors with `pnpm run typecheck`
 
 **Test job:**
 
-- Run `npm run test` locally
+- Run `pnpm run test` locally
 - Check test coverage
 
 **Build job:**
 
-- Run `npm run build` locally
+- Run `pnpm run build` locally
 - Verify environment variables
 
 ### Deployment Failing
@@ -334,7 +334,7 @@ npm run lint:fix
 
 - Verify Cloudflare Worker Git deployment status or deploy with `wrangler`
 - Check worker-specific secrets and bindings
-- Validate `wrangler.toml` and test locally with `npm run dev`
+- Validate `wrangler.toml` and test locally with `pnpm --filter api-gateway run dev`
 
 ## Best Practices
 
@@ -361,7 +361,7 @@ npm run lint:fix
 
 - Never commit secrets to repository
 - Review Dependabot security PRs immediately
-- Run `npm audit` before releases
+- Run `pnpm audit` before releases
 
 ## Configuration Files
 

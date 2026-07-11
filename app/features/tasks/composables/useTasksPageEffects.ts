@@ -7,7 +7,6 @@ type TasksPageEffectsInputs = {
   checkAndLoadMore: () => Promise<void> | void;
   filteredTasks: ComputedRefLike<Task[]>;
   handleTaskQueryParam: () => Promise<void> | void;
-  isMapPanelExpanded: RefLike<boolean>;
   metadataStore: {
     fetchMapSpawnsData: () => Promise<unknown>;
   };
@@ -25,7 +24,6 @@ export function useTasksPageEffects({
   checkAndLoadMore,
   filteredTasks,
   handleTaskQueryParam,
-  isMapPanelExpanded,
   metadataStore,
   route,
   selectedMapData,
@@ -47,7 +45,6 @@ export function useTasksPageEffects({
   );
   watch(showMapDisplay, (isVisible) => {
     if (!isVisible) {
-      isMapPanelExpanded.value = true;
       stopResize();
     }
   });

@@ -15,6 +15,20 @@ name = "API_GATEWAY_LIMITER"
 class_name = "ApiGatewayRateLimiter"
 script_name = "api-gateway"
 
+# Globally-replicated store for precomputed heavy-route payloads (tasks-core).
+# Written by the scheduled GitHub Actions workflow
+# (.github/workflows/precompute-tarkov-data.yml, via scripts/precompute); read
+# by the Nitro request handlers via edgeCache's `precomputed` option. When this
+# binding is absent the handlers fall back to the per-colo Cache API path, so a
+# misconfigured deploy degrades instead of breaking.
+# kv_namespaces is non-inheritable, so it must also be repeated under
+# [env.preview].
+# The same ID must be set as the TARKOV_DATA_KV_NAMESPACE_ID repository
+# variable so the Actions precompute writes where Pages reads.
+[[kv_namespaces]]
+binding = "TARKOV_DATA"
+id = "6034d8d7b7534946bf04110c33ac3b88"
+
 [vars]
 NODE_ENV = "production"
 APP_URL = "https://tarkovtracker.org"
@@ -59,3 +73,11 @@ STRIPE_PRICE_CHAD_YEARLY = "price_1TaNKwLaRBke56G2IXA28xmv"
 name = "API_GATEWAY_LIMITER"
 class_name = "ApiGatewayRateLimiter"
 script_name = "api-gateway"
+
+# kv_namespaces is non-inheritable, so the binding is repeated for preview.
+# Previews read the same precomputed data as production; the payload is
+# identical upstream data, so sharing the namespace is safe and keeps preview
+# deploys warm too.
+[[env.preview.kv_namespaces]]
+binding = "TARKOV_DATA"
+id = "6034d8d7b7534946bf04110c33ac3b88"

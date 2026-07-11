@@ -14,8 +14,33 @@ mockNuxtImport('useRoute', () => () => routeState);
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => metadataState,
 }));
-const createTask = (id: string, name: string, mapName?: string, traderName?: string): Task =>
+const createTask = (
+  id: string,
+  name: string,
+  mapName?: string,
+  traderName?: string,
+  rewardName?: string,
+  offerUnlockName?: string
+): Task =>
   ({
+    finishRewards:
+      rewardName || offerUnlockName
+        ? {
+            items: rewardName
+              ? [{ count: 1, item: { id: `${id}-reward`, name: rewardName } }]
+              : undefined,
+            offerUnlock: offerUnlockName
+              ? [
+                  {
+                    id: `${id}-unlock`,
+                    item: { id: `${id}-unlock-item`, name: offerUnlockName },
+                    level: 1,
+                    trader: { id: 'trader', name: 'Trader' },
+                  },
+                ]
+              : undefined,
+          }
+        : undefined,
     id,
     name,
     map: mapName ? { name: mapName } : undefined,
@@ -31,7 +56,15 @@ describe('useOmnibarSearch', () => {
     metadataState.tasks = [
       createTask('t1', 'Debut', 'Customs', 'Prapor'),
       createTask('t2', 'Shooter Born in Heaven', 'Lighthouse'),
-      createTask('t3', 'Gunsmith', 'Factory', 'Mechanic'),
+      createTask('t3', 'Gunsmith', 'Factory', 'Mechanic', 'Graphics card'),
+      createTask(
+        't4',
+        'Postman Pat',
+        'Streets of Tarkov',
+        'Peacekeeper',
+        undefined,
+        'Ledx Skin Transilluminator'
+      ),
     ];
     metadataState.items = [
       createItem('i1', 'Bitcoin', 'BTC'),
@@ -51,6 +84,18 @@ describe('useOmnibarSearch', () => {
     searchQuery.value = 'b';
     await vi.advanceTimersByTimeAsync(250);
     expect(results.value).toEqual({ tasks: [], items: [], hideout: [] });
+  });
+  it('matches task reward items', async () => {
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'graphics';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.tasks.map((task) => task.id)).toEqual(['t3']);
+  });
+  it('matches task offer unlock reward items', async () => {
+    const { searchQuery, results } = useOmnibarSearch();
+    searchQuery.value = 'ledx';
+    await vi.advanceTimersByTimeAsync(250);
+    expect(results.value.tasks.map((task) => task.id)).toEqual(['t4']);
   });
   it('matches tasks by name, map, and trader', async () => {
     const { searchQuery, results } = useOmnibarSearch();

@@ -184,8 +184,7 @@
             <div v-if="log.details" class="text-surface-400 mt-2 text-xs">
               <pre
                 class="bg-surface-900 overflow-x-auto rounded p-2 font-mono text-xs whitespace-pre-wrap"
-                >{{ JSON.stringify(log.details, null, 2) }}</pre
-              >
+                >{{ JSON.stringify(log.details, null, 2) }}</pre>
             </div>
           </div>
         </div>

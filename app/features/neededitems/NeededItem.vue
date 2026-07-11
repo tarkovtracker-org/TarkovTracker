@@ -304,8 +304,7 @@
         if (completed || taskCompletions[user]) return;
         // Get the teammate's store and count
         const teammateStore = progressStore.teamStores?.[user] as
-          | { getObjectiveCount?: (id: string) => number }
-          | undefined;
+          { getObjectiveCount?: (id: string) => number } | undefined;
         if (teammateStore) {
           needingUsers.push({
             user: user,
@@ -324,8 +323,7 @@
         if (completed) return;
         // Get the teammate's store and count
         const teammateStore = progressStore.teamStores?.[user] as
-          | { getHideoutPartCount?: (id: string) => number }
-          | undefined;
+          { getHideoutPartCount?: (id: string) => number } | undefined;
         if (teammateStore) {
           needingUsers.push({
             user: user,

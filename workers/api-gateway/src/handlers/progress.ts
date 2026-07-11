@@ -15,6 +15,76 @@ import type {
   ApiUpdateMeta,
 } from '../types';
 const DISPLAY_NAME_CACHE_TTL_SECONDS = 86400;
+interface ProgressMergePayload {
+  taskCompletions?: Record<string, TaskCompletion>;
+  taskObjectives?: Record<string, Record<string, unknown>>;
+  set?: Record<string, unknown>;
+}
+function snapshotCompletions(taskCompletions: Record<string, TaskCompletion>): Map<string, string> {
+  return new Map(Object.entries(taskCompletions).map(([id, value]) => [id, JSON.stringify(value)]));
+}
+function diffCompletions(
+  taskCompletions: Record<string, TaskCompletion>,
+  before: Map<string, string>
+): Record<string, TaskCompletion> {
+  const changed: Record<string, TaskCompletion> = {};
+  for (const [id, value] of Object.entries(taskCompletions)) {
+    if (before.get(id) !== JSON.stringify(value)) {
+      changed[id] = value;
+    }
+  }
+  return changed;
+}
+/**
+ * Persist a partial progress update atomically via the merge_progress_data
+ * RPC. Only the supplied keys are merged server-side, so concurrent writers
+ * cannot overwrite each other's unrelated changes, and a write against a
+ * missing progress row fails loudly instead of silently updating nothing.
+ */
+async function mergeProgressData(
+  env: Env,
+  token: ApiToken,
+  dataField: 'pvp_data' | 'pve_data',
+  payload: ProgressMergePayload,
+  logContext: { action: string; taskIds?: string[] }
+): Promise<void> {
+  const startedAt = Date.now();
+  const body = JSON.stringify({
+    p_user_id: token.user_id,
+    p_field: dataField,
+    p_task_completions: payload.taskCompletions ?? null,
+    p_task_objectives: payload.taskObjectives ?? null,
+    p_set: payload.set ?? null,
+  });
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/merge_progress_data`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body,
+  });
+  const logEntry = {
+    action: logContext.action,
+    userId: token.user_id,
+    tokenId: token.token_id,
+    taskIds: logContext.taskIds,
+    payloadBytes: body.length,
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+  };
+  if (!res.ok) {
+    logger.error('progress write failed', logEntry);
+    throw new Error(`Failed to save progress update (HTTP ${res.status})`);
+  }
+  const updatedRows = Number(await res.text());
+  if (!Number.isFinite(updatedRows) || updatedRows < 1) {
+    logger.error('progress write matched no row', logEntry);
+    throw new Error('Progress row not found for user');
+  }
+  logger.info('progress write', logEntry);
+}
 function getMetaString(metadata: Record<string, unknown>, key: string): string | null {
   return typeof metadata[key] === 'string' ? (metadata[key] as string) : null;
 }
@@ -282,34 +352,7 @@ export async function handleUpdateLevel(
   gameMode: 'pvp' | 'pve'
 ): Promise<{ level: number; message: string }> {
   const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
-  // Fetch current data
-  const getUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=${dataField}`;
-  const getRes = await fetch(getUrl, {
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!getRes.ok) {
-    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
-  }
-  const rows = (await getRes.json()) as Array<Record<string, unknown>>;
-  const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
-  currentData.level = level;
-  const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  const patchRes = await fetch(patchUrl, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ [dataField]: currentData }),
-  });
-  if (!patchRes.ok) {
-    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
-  }
+  await mergeProgressData(env, token, dataField, { set: { level } }, { action: 'update-level' });
   return { level, message: 'Level updated successfully' };
 }
 /**
@@ -324,50 +367,27 @@ export async function handleUpdateObjective(
 ): Promise<{ objectiveId: string; state?: string; count?: number; message: string }> {
   const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
   const updateTime = Date.now();
-  // Fetch current data
-  const getUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=${dataField}`;
-  const getRes = await fetch(getUrl, {
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!getRes.ok) {
-    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
-  }
-  const rows = (await getRes.json()) as Array<Record<string, unknown>>;
-  const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
-  const taskObjectives =
-    (currentData.taskObjectives as Record<string, Record<string, unknown>>) || {};
-  const objectiveData = taskObjectives[objectiveId] || {};
-  // Update state if provided
+  // Build the patch from `update` only and let the RPC's per-key objective
+  // merge preserve untouched fields server-side. Reading the current objective
+  // here would race a concurrent writer and could carry a stale `complete` or
+  // `count` back into the merge, reintroducing the lost-update this refactor
+  // fixes. Every objective write bumps `timestamp` to mark last touch.
+  const objectiveData: Record<string, unknown> = {};
   if (update.state !== undefined) {
     objectiveData.complete = update.state === 'completed';
     objectiveData.timestamp = updateTime;
   }
-  // Update count if provided
   if (update.count !== undefined) {
     objectiveData.count = update.count;
-    if (!objectiveData.timestamp) {
-      objectiveData.timestamp = updateTime;
-    }
+    objectiveData.timestamp = updateTime;
   }
-  taskObjectives[objectiveId] = objectiveData;
-  currentData.taskObjectives = taskObjectives;
-  const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  const patchRes = await fetch(patchUrl, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ [dataField]: currentData }),
-  });
-  if (!patchRes.ok) {
-    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
-  }
+  await mergeProgressData(
+    env,
+    token,
+    dataField,
+    { taskObjectives: { [objectiveId]: objectiveData } },
+    { action: 'update-objective', taskIds: [objectiveId] }
+  );
   return {
     objectiveId,
     ...(update.state !== undefined && { state: update.state }),
@@ -400,6 +420,7 @@ export async function handleUpdateTask(
   const rows = (await getRes.json()) as Array<Record<string, unknown>>;
   const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
+  const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
   setTaskCompletion(
     taskCompletions,
@@ -417,27 +438,21 @@ export async function handleUpdateTask(
       updateAlternativeTasks(changedTask, state, taskCompletions, updateTime, updateMap);
     }
   }
-  currentData.taskCompletions = taskCompletions;
+  const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
+  const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
-    currentData.lastApiUpdate = buildApiUpdateMeta(
+    set.lastApiUpdate = buildApiUpdateMeta(
       Array.from(updateMap.entries()).map(([id, taskState]) => ({ id, state: taskState })),
       updateTime
     );
   }
-  const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  const patchRes = await fetch(patchUrl, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ [dataField]: currentData }),
-  });
-  if (!patchRes.ok) {
-    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
-  }
+  await mergeProgressData(
+    env,
+    token,
+    dataField,
+    { taskCompletions: changedCompletions, ...(updateMap.size > 0 && { set }) },
+    { action: 'update-task', taskIds: [taskId] }
+  );
   return { taskId, state, message: 'Task updated successfully' };
 }
 /**
@@ -465,6 +480,7 @@ export async function handleUpdateTasks(
   const rows = (await getRes.json()) as Array<Record<string, unknown>>;
   const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
+  const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
   const explicitTaskIds = new Set(updates.map((update) => update.id));
   const tasks = await getTasks();
@@ -500,26 +516,20 @@ export async function handleUpdateTasks(
       }
     }
   }
-  currentData.taskCompletions = taskCompletions;
+  const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
+  const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
-    currentData.lastApiUpdate = buildApiUpdateMeta(
+    set.lastApiUpdate = buildApiUpdateMeta(
       Array.from(updateMap.entries()).map(([id, taskState]) => ({ id, state: taskState })),
       updateTime
     );
   }
-  const patchUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}`;
-  const patchRes = await fetch(patchUrl, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ [dataField]: currentData }),
-  });
-  if (!patchRes.ok) {
-    throw new Error(`Failed to save progress update (HTTP ${patchRes.status})`);
-  }
+  await mergeProgressData(
+    env,
+    token,
+    dataField,
+    { taskCompletions: changedCompletions, ...(updateMap.size > 0 && { set }) },
+    { action: 'update-tasks', taskIds: updates.map((u) => u.id) }
+  );
   return { updatedTasks: updates.map((u) => u.id), message: 'Tasks updated successfully' };
 }

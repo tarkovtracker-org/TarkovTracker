@@ -118,6 +118,28 @@ export function useTaskActions(
       tarkovStore.setLevel(minLevel);
     }
   };
+  const ensureTraderRequirements = () => {
+    if (!preferencesStore.getTasksRequireTraderLevels) return;
+    const currentTask = task();
+    for (const requirement of currentTask.traderLevelRequirements ?? []) {
+      const traderId = requirement.trader?.id;
+      if (!traderId) continue;
+      if (tarkovStore.getTraderLevel(traderId) < requirement.level) {
+        tarkovStore.setTraderLevel(traderId, requirement.level);
+      }
+    }
+    const fenceId = metadataStore.traders.find((trader) => trader.normalizedName === 'fence')?.id;
+    for (const requirement of currentTask.traderRequirements ?? []) {
+      const traderId = requirement.trader?.id;
+      if (!traderId) continue;
+      const reputation = tarkovStore.getTraderReputation(traderId);
+      if (requirement.value >= 0 && reputation < requirement.value) {
+        tarkovStore.setTraderReputation(traderId, requirement.value);
+      } else if (requirement.value < 0 && traderId === fenceId && reputation > requirement.value) {
+        tarkovStore.setTraderReputation(traderId, requirement.value);
+      }
+    }
+  };
   const isTaskManuallyFailed = (taskId: string) => {
     const completion = tarkovStore.getCurrentProgressData().taskCompletions?.[taskId];
     if (!completion || typeof completion !== 'object') return false;
@@ -220,6 +242,7 @@ export function useTaskActions(
       task: currentTask,
     });
     ensureMinLevel();
+    ensureTraderRequirements();
     emitAction({
       taskId: currentTask.id,
       taskName,

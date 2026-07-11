@@ -47,13 +47,13 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 
 ## Pre-Deploy Validation
 
-1. `npm run format`
-2. `npm run lint`
-3. `npm run typecheck`
-4. `npm run test`
-5. `npm run supabase:check`
-6. `npm run build`
-7. `npm audit --omit=dev`
+1. `pnpm run format:check`
+2. `pnpm run lint`
+3. `pnpm run typecheck`
+4. `pnpm run test`
+5. `pnpm run supabase:check`
+6. `pnpm run build`
+7. `pnpm audit --prod`
 8. For the tarkov.dev profile cleanup rollout, snapshot `public.user_progress` before applying the
    destructive cleanup migration.
 
@@ -67,6 +67,10 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    supabase db push --linked          # apply pending migrations to production
    ```
    Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
+   **Ordering caveat:** workers auto-deploy from `main` (step 3) while migrations are manual, so
+   a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
+   for the gap between merge and `db push`. For such changes, apply the pending migration to
+   production **before** merging the worker change; adding a function ahead of its caller is safe.
 3. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
 4. Confirm workers are serving the expected revision:
    - `workers/api-gateway`

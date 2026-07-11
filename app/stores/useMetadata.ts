@@ -71,7 +71,7 @@ import type {
   Trader,
 } from '@/types/tarkov';
 const BOOTSTRAP_CACHE_VERSION = 'json-v1';
-const TASKS_CORE_CACHE_VERSION = 'json-v1';
+const TASKS_CORE_CACHE_VERSION = 'json-v2';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
 const ITEMS_CACHE_VERSION = 'json-v1';
 const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
@@ -153,6 +153,9 @@ const NEW_BEGINNING_ID_PATTERN = /^new_beginning_prestige_(\d+)$/i;
 const NEW_BEGINNING_WIKI_PATTERN = /\/New_Beginning(?:_\(Prestige_(\d+)\))?(?:[?#].*)?$/i;
 const isNewBeginningTask = (task: Task): boolean => {
   if (!task?.id) return false;
+  // Only the prestige-ladder New Beginning tasks carry requiredPrestige, and the
+  // field survives localization, unlike the name/wiki-link heuristics below.
+  if (task.requiredPrestige?.id) return true;
   if (NEW_BEGINNING_ID_PATTERN.test(task.id)) return true;
   if (typeof task.wikiLink === 'string' && NEW_BEGINNING_WIKI_PATTERN.test(task.wikiLink)) {
     return true;
@@ -410,6 +413,24 @@ export const useMetadataStore = defineStore('metadata', {
      */
     prestigeTaskMap: (state): Map<string, number> => {
       const map = new Map<string, number>();
+      // Authoritative source: tarkov.dev's Task.requiredPrestige references the
+      // prestige the user must currently be AT to see the task (e.g. the New
+      // Beginning task completed to reach prestige 2 requires prestige 1).
+      const prestigeLevelById = new Map<string, number>();
+      for (const prestige of state.prestigeLevels) {
+        const level = prestige.prestigeLevel ?? prestige.level;
+        if (prestige.id && typeof level === 'number') {
+          prestigeLevelById.set(prestige.id, level);
+        }
+      }
+      for (const task of state.tasks) {
+        const requiredId = task.requiredPrestige?.id;
+        if (!requiredId) continue;
+        const userPrestigeLevel = prestigeLevelById.get(requiredId);
+        if (userPrestigeLevel !== undefined && userPrestigeLevel >= 0) {
+          map.set(task.id, userPrestigeLevel);
+        }
+      }
       const newBeginningTaskIds = new Set(
         state.tasks.filter((task) => isNewBeginningTask(task)).map((task) => task.id)
       );
@@ -419,7 +440,7 @@ export const useMetadataStore = defineStore('metadata', {
         // Find TaskObjectiveTaskStatus conditions that reference tasks
         for (const condition of prestige.conditions || []) {
           const taskId = condition.task?.id;
-          if (!taskId) continue;
+          if (!taskId || map.has(taskId)) continue;
           // Check if this is a task status condition with a task reference
           if (newBeginningTaskIds.size > 0 && !newBeginningTaskIds.has(taskId)) continue;
           if (newBeginningTaskIds.size === 0 && condition.task?.name !== 'New Beginning') continue;
