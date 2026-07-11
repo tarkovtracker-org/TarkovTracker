@@ -1,0 +1,165 @@
+name: Package Manager Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'Number of runs per scenario'
+        required: false
+        default: '5'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: npm-root-cold-scripts
+            manager: npm
+            cache: cold
+            scripts: enabled
+            workspace: root
+          - scenario: npm-root-warm-scripts
+            manager: npm
+            cache: warm
+            scripts: enabled
+            workspace: root
+          - scenario: npm-root-cold-no-scripts
+            manager: npm
+            cache: cold
+            scripts: disabled
+            workspace: root
+          - scenario: npm-root-warm-no-scripts
+            manager: npm
+            cache: warm
+            scripts: disabled
+            workspace: root
+          - scenario: npm-worker-cold-scripts
+            manager: npm
+            cache: cold
+            scripts: enabled
+            workspace: worker
+          - scenario: npm-worker-warm-scripts
+            manager: npm
+            cache: warm
+            scripts: enabled
+            workspace: worker
+          - scenario: npm-worker-cold-no-scripts
+            manager: npm
+            cache: cold
+            scripts: disabled
+            workspace: worker
+          - scenario: npm-worker-warm-no-scripts
+            manager: npm
+            cache: warm
+            scripts: disabled
+            workspace: worker
+          - scenario: pnpm-root-cold-scripts
+            manager: pnpm
+            cache: cold
+            scripts: enabled
+            workspace: root
+          - scenario: pnpm-root-warm-scripts
+            manager: pnpm
+            cache: warm
+            scripts: enabled
+            workspace: root
+          - scenario: pnpm-root-cold-no-scripts
+            manager: pnpm
+            cache: cold
+            scripts: disabled
+            workspace: root
+          - scenario: pnpm-root-warm-no-scripts
+            manager: pnpm
+            cache: warm
+            scripts: disabled
+            workspace: root
+          - scenario: pnpm-worker-cold-scripts
+            manager: pnpm
+            cache: cold
+            scripts: enabled
+            workspace: worker
+          - scenario: pnpm-worker-warm-scripts
+            manager: pnpm
+            cache: warm
+            scripts: enabled
+            workspace: worker
+          - scenario: pnpm-worker-cold-no-scripts
+            manager: pnpm
+            cache: cold
+            scripts: disabled
+            workspace: worker
+          - scenario: pnpm-worker-warm-no-scripts
+            manager: pnpm
+            cache: warm
+            scripts: disabled
+            workspace: worker
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore npm configuration
+        if: matrix.manager == 'npm'
+        run: |
+          git fetch origin main
+          git show origin/main:package.json > package.json
+          git show origin/main:package-lock.json > package-lock.json
+          git show origin/main:workers/api-gateway/package.json > workers/api-gateway/package.json
+          git show origin/main:workers/api-gateway/package-lock.json > workers/api-gateway/package-lock.json
+          rm -f pnpm-lock.yaml pnpm-workspace.yaml
+
+      - name: Install pnpm
+        if: matrix.manager == 'pnpm'
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.5 --activate
+
+      - name: Run benchmark trials
+        run: |
+          node scripts/package-manager-benchmark.mjs \
+            --manager "${{ matrix.manager }}" \
+            --cache "${{ matrix.cache }}" \
+            --scripts "${{ matrix.scripts }}" \
+            --workspace "${{ matrix.workspace }}" \
+            --runs ${{ github.event.inputs.runs || 5 }} \
+            --output results-${{ matrix.scenario }}.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ matrix.scenario }}
+          path: results-${{ matrix.scenario }}.json
+          retention-days: 30
+
+  summarize:
+    needs: benchmark
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+          pattern: benchmark-*
+          merge-multiple: true
+
+      - name: Generate summary
+        run: |
+          node scripts/package-manager-benchmark-summary.mjs \
+            --input-dir results \
+            --output benchmark-summary.md
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-summary
+          path: |
+            benchmark-summary.md
+            results/
+          retention-days: 90
