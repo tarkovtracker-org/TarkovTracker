@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       runs:
-        description: 'Number of runs per scenario'
+        description: 'Number of paired trials per scenario'
         required: false
         default: '5'
+  push:
+    branches:
+      - chore/package-manager-evaluation
 
 permissions:
   contents: read
@@ -19,130 +22,101 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - scenario: npm-root-cold-scripts
-            manager: npm
+          - scenario: root-cold-scripts
             cache: cold
             scripts: enabled
             workspace: root
-          - scenario: npm-root-warm-scripts
-            manager: npm
+          - scenario: root-warm-scripts
             cache: warm
             scripts: enabled
             workspace: root
-          - scenario: npm-root-cold-no-scripts
-            manager: npm
+          - scenario: root-cold-no-scripts
             cache: cold
             scripts: disabled
             workspace: root
-          - scenario: npm-root-warm-no-scripts
-            manager: npm
+          - scenario: root-warm-no-scripts
             cache: warm
             scripts: disabled
             workspace: root
-          - scenario: npm-worker-cold-scripts
-            manager: npm
+          - scenario: worker-cold-scripts
             cache: cold
             scripts: enabled
             workspace: worker
-          - scenario: npm-worker-warm-scripts
-            manager: npm
+          - scenario: worker-warm-scripts
             cache: warm
             scripts: enabled
             workspace: worker
-          - scenario: npm-worker-cold-no-scripts
-            manager: npm
+          - scenario: worker-cold-no-scripts
             cache: cold
             scripts: disabled
             workspace: worker
-          - scenario: npm-worker-warm-no-scripts
-            manager: npm
-            cache: warm
-            scripts: disabled
-            workspace: worker
-          - scenario: pnpm-root-cold-scripts
-            manager: pnpm
-            cache: cold
-            scripts: enabled
-            workspace: root
-          - scenario: pnpm-root-warm-scripts
-            manager: pnpm
-            cache: warm
-            scripts: enabled
-            workspace: root
-          - scenario: pnpm-root-cold-no-scripts
-            manager: pnpm
-            cache: cold
-            scripts: disabled
-            workspace: root
-          - scenario: pnpm-root-warm-no-scripts
-            manager: pnpm
-            cache: warm
-            scripts: disabled
-            workspace: root
-          - scenario: pnpm-worker-cold-scripts
-            manager: pnpm
-            cache: cold
-            scripts: enabled
-            workspace: worker
-          - scenario: pnpm-worker-warm-scripts
-            manager: pnpm
-            cache: warm
-            scripts: enabled
-            workspace: worker
-          - scenario: pnpm-worker-cold-no-scripts
-            manager: pnpm
-            cache: cold
-            scripts: disabled
-            workspace: worker
-          - scenario: pnpm-worker-warm-no-scripts
-            manager: pnpm
+          - scenario: worker-warm-no-scripts
             cache: warm
             scripts: disabled
             workspace: worker
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .nvmrc
 
-      - name: Restore npm configuration
-        if: matrix.manager == 'npm'
+      - name: Prepare paired config directories
+        env:
+          SCENARIO: ${{ matrix.scenario }}
         run: |
-          git fetch origin main
-          git show origin/main:package.json > package.json
-          git show origin/main:package-lock.json > package-lock.json
-          git show origin/main:workers/api-gateway/package.json > workers/api-gateway/package.json
-          git show origin/main:workers/api-gateway/package-lock.json > workers/api-gateway/package-lock.json
-          rm -f pnpm-lock.yaml pnpm-workspace.yaml
+          set -euo pipefail
+
+          git fetch origin main --depth=1
+          BASE_SHA="$(git merge-base origin/main HEAD)"
+          echo "Base commit (npm fixtures): $BASE_SHA"
+
+          mkdir -p .npm-config/workers/api-gateway
+          git show "$BASE_SHA:package.json" > .npm-config/package.json
+          git show "$BASE_SHA:package-lock.json" > .npm-config/package-lock.json
+          git show "$BASE_SHA:workers/api-gateway/package.json" > .npm-config/workers/api-gateway/package.json
+          git show "$BASE_SHA:workers/api-gateway/package-lock.json" > .npm-config/workers/api-gateway/package-lock.json
+
+          mkdir -p .pnpm-config/workers/api-gateway
+          cp package.json .pnpm-config/package.json
+          cp pnpm-lock.yaml .pnpm-config/pnpm-lock.yaml
+          cp pnpm-workspace.yaml .pnpm-config/pnpm-workspace.yaml
+          cp workers/api-gateway/package.json .pnpm-config/workers/api-gateway/package.json
 
       - name: Install pnpm
-        if: matrix.manager == 'pnpm'
         run: |
           corepack enable
           corepack prepare pnpm@10.34.5 --activate
 
-      - name: Run benchmark trials
+      - name: Run paired benchmark trials
         env:
           BENCHMARK_RUNS: ${{ inputs.runs || '5' }}
+          SCENARIO_CACHE: ${{ matrix.cache }}
+          SCENARIO_SCRIPTS: ${{ matrix.scripts }}
+          SCENARIO_WORKSPACE: ${{ matrix.workspace }}
+          SCENARIO_NAME: ${{ matrix.scenario }}
         run: |
+          set -euo pipefail
           if ! [[ "$BENCHMARK_RUNS" =~ ^[1-9][0-9]*$ ]]; then
             echo "runs must be a positive integer"
             exit 1
           fi
           node scripts/package-manager-benchmark.mjs \
-            --manager "${{ matrix.manager }}" \
-            --cache "${{ matrix.cache }}" \
-            --scripts "${{ matrix.scripts }}" \
-            --workspace "${{ matrix.workspace }}" \
+            --cache "$SCENARIO_CACHE" \
+            --scripts "$SCENARIO_SCRIPTS" \
+            --workspace "$SCENARIO_WORKSPACE" \
             --runs "$BENCHMARK_RUNS" \
-            --output results-${{ matrix.scenario }}.json
+            --npm-config-dir .npm-config \
+            --pnpm-config-dir .pnpm-config \
+            --output "results-$SCENARIO_NAME.json"
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: benchmark-${{ matrix.scenario }}
           path: results-${{ matrix.scenario }}.json
@@ -152,11 +126,11 @@ jobs:
     needs: benchmark
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: results
           pattern: benchmark-*
@@ -169,7 +143,7 @@ jobs:
             --output benchmark-summary.md
 
       - name: Upload summary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: benchmark-summary
           path: |

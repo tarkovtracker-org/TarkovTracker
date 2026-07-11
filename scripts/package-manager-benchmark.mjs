@@ -1,33 +1,34 @@
 #!/usr/bin/env node
 
 import { execSync, spawnSync } from 'node:child_process';
-import { rmSync, existsSync, writeFileSync } from 'node:fs';
+import { rmSync, existsSync, writeFileSync, copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 const args = parseArgs({
   options: {
-    manager: { type: 'string' },
     cache: { type: 'string' },
     scripts: { type: 'string' },
     workspace: { type: 'string' },
     runs: { type: 'string', default: '5' },
     output: { type: 'string', default: 'results.json' },
+    'npm-config-dir': { type: 'string' },
+    'pnpm-config-dir': { type: 'string' },
   },
 });
 
-const { manager, cache, scripts, workspace, runs, output } = args.values;
+const { cache, scripts, workspace, runs, output, 'npm-config-dir': npmConfigDir, 'pnpm-config-dir': pnpmConfigDir } = args.values;
 
-const VALID_MANAGERS = ['npm', 'pnpm'];
 const VALID_CACHES = ['cold', 'warm'];
 const VALID_SCRIPTS = ['enabled', 'disabled'];
 const VALID_WORKSPACES = ['root', 'worker'];
 
 const errors = [];
-if (!VALID_MANAGERS.includes(manager)) errors.push(`--manager must be one of: ${VALID_MANAGERS.join(', ')}`);
 if (!VALID_CACHES.includes(cache)) errors.push(`--cache must be one of: ${VALID_CACHES.join(', ')}`);
 if (!VALID_SCRIPTS.includes(scripts)) errors.push(`--scripts must be one of: ${VALID_SCRIPTS.join(', ')}`);
 if (!VALID_WORKSPACES.includes(workspace)) errors.push(`--workspace must be one of: ${VALID_WORKSPACES.join(', ')}`);
+if (!npmConfigDir) errors.push('--npm-config-dir is required');
+if (!pnpmConfigDir) errors.push('--pnpm-config-dir is required');
 const numRuns = Number.parseInt(runs, 10);
 if (!Number.isInteger(numRuns) || numRuns < 1) errors.push(`--runs must be a positive integer (got "${runs}")`);
 if (errors.length > 0) {
@@ -38,132 +39,212 @@ if (errors.length > 0) {
 const scriptsEnabled = scripts === 'enabled';
 const isCold = cache === 'cold';
 const isWorker = workspace === 'worker';
-const isPnpm = manager === 'pnpm';
-
-const workerDir = join(process.cwd(), 'workers', 'api-gateway');
+const cwd = process.cwd();
+const workerDir = join(cwd, 'workers', 'api-gateway');
 
 function cleanNodeModules() {
-  rmSync(join(process.cwd(), 'node_modules'), { recursive: true, force: true });
+  rmSync(join(cwd, 'node_modules'), { recursive: true, force: true });
   rmSync(join(workerDir, 'node_modules'), { recursive: true, force: true });
 }
 
-let activeCacheDir = null;
+function swapConfig(manager) {
+  const configDir = manager === 'npm' ? npmConfigDir : pnpmConfigDir;
 
-function cleanCache() {
-  if (isPnpm) {
-    activeCacheDir = join(process.cwd(), `.pnpm-store-${Date.now()}`);
-    rmSync(activeCacheDir, { recursive: true, force: true });
+  if (manager === 'npm') {
+    copyFileSync(join(configDir, 'package.json'), join(cwd, 'package.json'));
+    copyFileSync(join(configDir, 'package-lock.json'), join(cwd, 'package-lock.json'));
+    mkdirSync(workerDir, { recursive: true });
+    copyFileSync(join(configDir, 'workers/api-gateway/package.json'), join(workerDir, 'package.json'));
+    copyFileSync(join(configDir, 'workers/api-gateway/package-lock.json'), join(workerDir, 'package-lock.json'));
+    rmSync(join(cwd, 'pnpm-lock.yaml'), { force: true });
+    rmSync(join(cwd, 'pnpm-workspace.yaml'), { force: true });
   } else {
-    activeCacheDir = join(process.cwd(), `.npm-cache-${Date.now()}`);
-    rmSync(activeCacheDir, { recursive: true, force: true });
-    process.env.npm_config_cache = activeCacheDir;
+    copyFileSync(join(configDir, 'package.json'), join(cwd, 'package.json'));
+    copyFileSync(join(configDir, 'pnpm-lock.yaml'), join(cwd, 'pnpm-lock.yaml'));
+    copyFileSync(join(configDir, 'pnpm-workspace.yaml'), join(cwd, 'pnpm-workspace.yaml'));
+    mkdirSync(workerDir, { recursive: true });
+    copyFileSync(join(configDir, 'workers/api-gateway/package.json'), join(workerDir, 'package.json'));
+    rmSync(join(cwd, 'package-lock.json'), { force: true });
+    rmSync(join(workerDir, 'package-lock.json'), { force: true });
   }
 }
 
-function cleanActiveCache() {
-  if (activeCacheDir) {
-    rmSync(activeCacheDir, { recursive: true, force: true });
-    activeCacheDir = null;
+function duBytes(dir) {
+  if (!existsSync(dir)) return null;
+  try {
+    const out = execSync(`du -sb "${dir}" 2>/dev/null | cut -f1`, { encoding: 'utf8' }).trim();
+    return out ? parseInt(out, 10) : null;
+  } catch {
+    return null;
   }
 }
 
-function measureInstall() {
+function measureInstall(manager, opts = {}) {
+  const { storeDir, cacheDir, prime = false } = opts;
+
+  let cmd, cmdArgs, installCwd;
+  if (manager === 'pnpm') {
+    if (isWorker) {
+      cmd = 'pnpm';
+      cmdArgs = ['--filter', 'api-gateway', 'install', '--frozen-lockfile'];
+      installCwd = cwd;
+    } else {
+      cmd = 'pnpm';
+      cmdArgs = ['install', '--frozen-lockfile'];
+      installCwd = cwd;
+    }
+    if (!scriptsEnabled) cmdArgs.push('--ignore-scripts');
+    if (storeDir) cmdArgs.push('--store-dir', storeDir);
+  } else {
+    if (isWorker) {
+      cmd = 'npm';
+      cmdArgs = ['ci'];
+      installCwd = workerDir;
+    } else {
+      cmd = 'npm';
+      cmdArgs = ['ci'];
+      installCwd = cwd;
+    }
+    if (!scriptsEnabled) cmdArgs.push('--ignore-scripts');
+  }
+
+  const env = { ...process.env };
+  if (manager === 'npm' && cacheDir) {
+    env.npm_config_cache = cacheDir;
+  }
+
   const start = performance.now();
-
-  let cmd, args, cwd;
-  if (isPnpm) {
-    if (isWorker) {
-      cmd = 'pnpm';
-      args = ['--filter', 'api-gateway', 'install', '--frozen-lockfile'];
-      cwd = process.cwd();
-    } else {
-      cmd = 'pnpm';
-      args = ['install', '--frozen-lockfile'];
-      cwd = process.cwd();
-    }
-    if (!scriptsEnabled) args.push('--ignore-scripts');
-    if (isCold && activeCacheDir) args.push('--store-dir', activeCacheDir);
-  } else {
-    if (isWorker) {
-      cmd = 'npm';
-      args = ['ci'];
-      cwd = workerDir;
-    } else {
-      cmd = 'npm';
-      args = ['ci'];
-      cwd = process.cwd();
-    }
-    if (!scriptsEnabled) args.push('--ignore-scripts');
-  }
-
-  const result = spawnSync(cmd, args, {
-    cwd,
+  const result = spawnSync(cmd, cmdArgs, {
+    cwd: installCwd,
     stdio: 'pipe',
-    env: { ...process.env },
+    env,
     timeout: 300000,
   });
-
   const elapsed = performance.now() - start;
   const success = result.status === 0;
 
-  let diskUsage = null;
-  let diskMeasured = false;
-  const targetDir = isWorker ? join(workerDir, 'node_modules') : join(process.cwd(), 'node_modules');
-  if (existsSync(targetDir)) {
-    try {
-      const output = execSync(`du -sb "${targetDir}" 2>/dev/null | cut -f1`, { encoding: 'utf8' }).trim();
-      if (output) {
-        diskUsage = parseInt(output, 10);
-        diskMeasured = true;
-      }
-    } catch {
-      // du failed — leave diskUsage as null so summary can exclude it
-    }
+  if (prime) {
+    return { success, elapsedMs: Math.round(elapsed) };
   }
+
+  const targetDir = isWorker ? join(workerDir, 'node_modules') : join(cwd, 'node_modules');
+  const nodeModulesBytes = duBytes(targetDir);
+  const pnpmStoreBytes = manager === 'pnpm' && storeDir ? duBytes(storeDir) : null;
+  const npmCacheBytes = manager === 'npm' && cacheDir ? duBytes(cacheDir) : null;
 
   return {
     elapsedMs: Math.round(elapsed),
-    diskUsageBytes: diskUsage,
-    diskMeasured,
+    nodeModulesBytes,
+    pnpmStoreBytes,
+    npmCacheBytes,
+    diskMeasured: nodeModulesBytes != null,
     success,
     stdout: result.stdout?.toString().substring(0, 500),
     stderr: result.stderr?.toString().substring(0, 500),
   };
 }
 
-const results = [];
 const scriptsLabel = scriptsEnabled ? 'scripts' : 'no-scripts';
-const scenarioName = `${manager}-${workspace}-${cache}-${scriptsLabel}`;
+const scenarioName = `${workspace}-${cache}-${scriptsLabel}`;
 
-console.log(`\n=== Scenario: ${scenarioName} (${numRuns} runs) ===\n`);
+console.log(`\n=== Paired Scenario: ${scenarioName} (${numRuns} trials, alternating order) ===\n`);
 
-for (let i = 0; i < numRuns; i++) {
-  console.log(`Run ${i + 1}/${numRuns}...`);
+const results = [];
+
+const npmCacheBase = join(cwd, '.benchmark-npm-cache');
+const pnpmStoreBase = join(cwd, '.benchmark-pnpm-store');
+
+if (isCold) {
+  for (let i = 0; i < numRuns; i++) {
+    const order = i % 2 === 0 ? ['npm', 'pnpm'] : ['pnpm', 'npm'];
+    console.log(`Trial ${i + 1}/${numRuns} (order: ${order.join(' -> ')})`);
+
+    for (const manager of order) {
+      const npmCacheDir = join(cwd, `.benchmark-npm-cache-${Date.now()}-${manager}`);
+      const pnpmStoreDir = join(cwd, `.benchmark-pnpm-store-${Date.now()}-${manager}`);
+      rmSync(npmCacheDir, { recursive: true, force: true });
+      rmSync(pnpmStoreDir, { recursive: true, force: true });
+
+      cleanNodeModules();
+      swapConfig(manager);
+
+      const result = measureInstall(manager, {
+        cacheDir: npmCacheDir,
+        storeDir: pnpmStoreDir,
+      });
+
+      results.push({
+        run: i + 1,
+        scenario: `${manager}-${scenarioName}`,
+        manager,
+        workspace,
+        cache,
+        scripts: scriptsEnabled ? 'enabled' : 'disabled',
+        trialOrder: order.indexOf(manager) === 0 ? 'first' : 'second',
+        ...result,
+      });
+
+      rmSync(npmCacheDir, { recursive: true, force: true });
+      rmSync(pnpmStoreDir, { recursive: true, force: true });
+
+      console.log(`  ${manager}: ${result.elapsedMs}ms, success: ${result.success}`);
+    }
+  }
+} else {
+  rmSync(npmCacheBase, { recursive: true, force: true });
+  rmSync(pnpmStoreBase, { recursive: true, force: true });
+
+  console.log('Priming isolated caches (untimed)...');
 
   cleanNodeModules();
-  if (isCold) cleanCache();
+  swapConfig('npm');
+  const npmPrime = measureInstall('npm', { cacheDir: npmCacheBase, prime: true });
+  console.log(`  npm prime: ${npmPrime.elapsedMs}ms, success: ${npmPrime.success}`);
 
-  let result;
-  try {
-    result = measureInstall();
-  } finally {
-    if (isCold) cleanActiveCache();
+  cleanNodeModules();
+  swapConfig('pnpm');
+  const pnpmPrime = measureInstall('pnpm', { storeDir: pnpmStoreBase, prime: true });
+  console.log(`  pnpm prime: ${pnpmPrime.elapsedMs}ms, success: ${pnpmPrime.success}`);
+
+  if (!npmPrime.success || !pnpmPrime.success) {
+    console.error('Priming failed — aborting');
+    rmSync(npmCacheBase, { recursive: true, force: true });
+    rmSync(pnpmStoreBase, { recursive: true, force: true });
+    process.exit(1);
   }
-  results.push({
-    run: i + 1,
-    scenario: scenarioName,
-    manager,
-    workspace,
-    cache,
-    scripts: scriptsEnabled ? 'enabled' : 'disabled',
-    ...result,
-  });
 
-  console.log(
-    `  elapsed: ${result.elapsedMs}ms, disk: ${result.diskUsageBytes ?? 'N/A'} bytes, success: ${result.success}`,
-  );
+  for (let i = 0; i < numRuns; i++) {
+    const order = i % 2 === 0 ? ['npm', 'pnpm'] : ['pnpm', 'npm'];
+    console.log(`Trial ${i + 1}/${numRuns} (order: ${order.join(' -> ')})`);
+
+    for (const manager of order) {
+      cleanNodeModules();
+      swapConfig(manager);
+
+      const result = measureInstall(manager, {
+        cacheDir: npmCacheBase,
+        storeDir: pnpmStoreBase,
+      });
+
+      results.push({
+        run: i + 1,
+        scenario: `${manager}-${scenarioName}`,
+        manager,
+        workspace,
+        cache,
+        scripts: scriptsEnabled ? 'enabled' : 'disabled',
+        trialOrder: order.indexOf(manager) === 0 ? 'first' : 'second',
+        ...result,
+      });
+
+      console.log(`  ${manager}: ${result.elapsedMs}ms, success: ${result.success}`);
+    }
+  }
+
+  rmSync(npmCacheBase, { recursive: true, force: true });
+  rmSync(pnpmStoreBase, { recursive: true, force: true });
 }
 
-const outputFile = join(process.cwd(), output);
+const outputFile = join(cwd, output);
 writeFileSync(outputFile, JSON.stringify(results, null, 2));
 console.log(`\nResults written to ${outputFile}`);

@@ -2,6 +2,14 @@ packages:
   - .
   - workers/api-gateway
 
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - vue-demi
+  - workerd
+
 overrides:
   '@nuxt/test-utils>h3-next': 'npm:h3@2.0.1-rc.20'
   '@nuxt/test-utils>srvx': '^0.11.15'
@@ -40,4 +48,4 @@ overrides:
   vue-i18n: '$vue-i18n'
   ws: '^8.20.1'
   yaml: '^2.8.3'
-  api-gateway>ajv: '^8.18.0'
+  '@apidevtools/swagger-parser>ajv': '^8.18.0'

@@ -1,0 +1,405 @@
+{
+  "generatedAt": "2026-07-11T07:21:29.617Z",
+  "baseCommit": "7ec139375f1a7231124f9ff31ab42c9691156559",
+  "branchCommit": "9a7014438f17891fb660031b1770f89c1ec67395",
+  "summary": {
+    "totalDirectDependencies": 62,
+    "matched": 61,
+    "mismatched": 1
+  },
+  "mismatches": [
+    {
+      "package": "lru-cache",
+      "npm": "11.3.5",
+      "pnpm": "11.5.1"
+    }
+  ],
+  "lruCacheDrift": {
+    "npm": "11.3.5",
+    "pnpm": "11.5.1",
+    "declaredRange": "^11.3.3",
+    "explanation": "pnpm import re-resolved lru-cache to 11.5.1 within the ^11.3.3 range. npm lockfile pinned 11.3.5. Both satisfy the declared range. This is a compatible version bump, not a security concern."
+  },
+  "ajvOverride": {
+    "npmOverride": "ajv: ^8.18.0 (tree-wide in workers/api-gateway/package.json overrides)",
+    "originalPnpmOverride": "api-gateway>ajv: ^8.18.0 (ineffective — api-gateway does not directly declare ajv)",
+    "correctedPnpmOverride": "@apidevtools/swagger-parser>ajv: ^8.18.0 (targets the actual package declaring ajv)",
+    "resolvedVersion": "8.20.0",
+    "verification": "Removed the override and regenerated lockfile — ajv stayed at 8.20.0, confirming the override is a no-op (natural resolution already satisfies ^8.18.0). The corrected targeting ensures the override is structurally correct as a version floor.",
+    "verified": true
+  },
+  "allDependencies": [
+    {
+      "package": "@cloudflare/workers-types",
+      "npm": "4.20260630.1",
+      "pnpm": "4.20260630.1",
+      "match": true
+    },
+    {
+      "package": "@commitlint/cli",
+      "npm": "20.5.3",
+      "pnpm": "20.5.3",
+      "match": true
+    },
+    {
+      "package": "@commitlint/config-conventional",
+      "npm": "20.5.3",
+      "pnpm": "20.5.3",
+      "match": true
+    },
+    {
+      "package": "@google/design.md",
+      "npm": "0.1.1",
+      "pnpm": "0.1.1",
+      "match": true
+    },
+    {
+      "package": "@iconify-json/mdi",
+      "npm": "1.2.3",
+      "pnpm": "1.2.3",
+      "match": true
+    },
+    {
+      "package": "@nuxt/eslint",
+      "npm": "1.16.0",
+      "pnpm": "1.16.0",
+      "match": true
+    },
+    {
+      "package": "@nuxt/image",
+      "npm": "2.0.0",
+      "pnpm": "2.0.0",
+      "match": true
+    },
+    {
+      "package": "@nuxt/test-utils",
+      "npm": "4.0.3",
+      "pnpm": "4.0.3",
+      "match": true
+    },
+    {
+      "package": "@nuxt/ui",
+      "npm": "4.9.0",
+      "pnpm": "4.9.0",
+      "match": true
+    },
+    {
+      "package": "@nuxtjs/i18n",
+      "npm": "10.4.0",
+      "pnpm": "10.4.0",
+      "match": true
+    },
+    {
+      "package": "@nuxtjs/sitemap",
+      "npm": "8.2.2",
+      "pnpm": "8.2.2",
+      "match": true
+    },
+    {
+      "package": "@pinia/nuxt",
+      "npm": "0.11.3",
+      "pnpm": "0.11.3",
+      "match": true
+    },
+    {
+      "package": "@semantic-release/changelog",
+      "npm": "6.0.3",
+      "pnpm": "6.0.3",
+      "match": true
+    },
+    {
+      "package": "@semantic-release/git",
+      "npm": "10.0.1",
+      "pnpm": "10.0.1",
+      "match": true
+    },
+    {
+      "package": "@semantic-release/npm",
+      "npm": "13.1.5",
+      "pnpm": "13.1.5",
+      "match": true
+    },
+    {
+      "package": "@supabase/supabase-js",
+      "npm": "2.103.0",
+      "pnpm": "2.103.0",
+      "match": true
+    },
+    {
+      "package": "@tailwindcss/postcss",
+      "npm": "4.3.2",
+      "pnpm": "4.3.2",
+      "match": true
+    },
+    {
+      "package": "@types/leaflet",
+      "npm": "1.9.21",
+      "pnpm": "1.9.21",
+      "match": true
+    },
+    {
+      "package": "@types/node",
+      "npm": "25.9.4",
+      "pnpm": "25.9.4",
+      "match": true
+    },
+    {
+      "package": "@vitest/coverage-v8",
+      "npm": "4.1.9",
+      "pnpm": "4.1.9",
+      "match": true
+    },
+    {
+      "package": "@vitest/ui",
+      "npm": "4.1.9",
+      "pnpm": "4.1.9",
+      "match": true
+    },
+    {
+      "package": "@vue-flow/controls",
+      "npm": "1.1.3",
+      "pnpm": "1.1.3",
+      "match": true
+    },
+    {
+      "package": "@vue-flow/core",
+      "npm": "1.48.2",
+      "pnpm": "1.48.2",
+      "match": true
+    },
+    {
+      "package": "@vue-flow/minimap",
+      "npm": "1.5.4",
+      "pnpm": "1.5.4",
+      "match": true
+    },
+    {
+      "package": "@vue/test-utils",
+      "npm": "2.4.11",
+      "pnpm": "2.4.11",
+      "match": true
+    },
+    {
+      "package": "@vueuse/core",
+      "npm": "14.3.0",
+      "pnpm": "14.3.0",
+      "match": true
+    },
+    {
+      "package": "autoprefixer",
+      "npm": "10.5.2",
+      "pnpm": "10.5.2",
+      "match": true
+    },
+    {
+      "package": "defu",
+      "npm": "6.1.7",
+      "pnpm": "6.1.7",
+      "match": true
+    },
+    {
+      "package": "eslint",
+      "npm": "10.6.0",
+      "pnpm": "10.6.0",
+      "match": true
+    },
+    {
+      "package": "eslint-plugin-import-x",
+      "npm": "4.17.1",
+      "pnpm": "4.17.1",
+      "match": true
+    },
+    {
+      "package": "fake-indexeddb",
+      "npm": "6.2.5",
+      "pnpm": "6.2.5",
+      "match": true
+    },
+    {
+      "package": "fflate",
+      "npm": "0.8.2",
+      "pnpm": "0.8.2",
+      "match": true
+    },
+    {
+      "package": "h3",
+      "npm": "1.15.11",
+      "pnpm": "1.15.11",
+      "match": true
+    },
+    {
+      "package": "happy-dom",
+      "npm": "20.10.6",
+      "pnpm": "20.10.6",
+      "match": true
+    },
+    {
+      "package": "husky",
+      "npm": "9.1.7",
+      "pnpm": "9.1.7",
+      "match": true
+    },
+    {
+      "package": "ipaddr.js",
+      "npm": "2.3.0",
+      "pnpm": "2.3.0",
+      "match": true
+    },
+    {
+      "package": "jsonpath-plus",
+      "npm": "10.4.0",
+      "pnpm": "10.4.0",
+      "match": true
+    },
+    {
+      "package": "knip",
+      "npm": "6.11.0",
+      "pnpm": "6.11.0",
+      "match": true
+    },
+    {
+      "package": "leaflet",
+      "npm": "1.9.4",
+      "pnpm": "1.9.4",
+      "match": true
+    },
+    {
+      "package": "lint-staged",
+      "npm": "16.4.0",
+      "pnpm": "16.4.0",
+      "match": true
+    },
+    {
+      "package": "lru-cache",
+      "npm": "11.3.5",
+      "pnpm": "11.5.1",
+      "match": false
+    },
+    {
+      "package": "nuxt",
+      "npm": "4.4.8",
+      "pnpm": "4.4.8",
+      "match": true
+    },
+    {
+      "package": "ofetch",
+      "npm": "1.5.1",
+      "pnpm": "1.5.1",
+      "match": true
+    },
+    {
+      "package": "pinia",
+      "npm": "3.0.4",
+      "pnpm": "3.0.4",
+      "match": true
+    },
+    {
+      "package": "pinia-plugin-persistedstate",
+      "npm": "4.7.1",
+      "pnpm": "4.7.1",
+      "match": true
+    },
+    {
+      "package": "postcss",
+      "npm": "8.5.16",
+      "pnpm": "8.5.16",
+      "match": true
+    },
+    {
+      "package": "prettier",
+      "npm": "3.9.3",
+      "pnpm": "3.9.3",
+      "match": true
+    },
+    {
+      "package": "prettier-plugin-tailwindcss",
+      "npm": "0.8.0",
+      "pnpm": "0.8.0",
+      "match": true
+    },
+    {
+      "package": "semantic-release",
+      "npm": "25.0.5",
+      "pnpm": "25.0.5",
+      "match": true
+    },
+    {
+      "package": "stripe",
+      "npm": "22.1.1",
+      "pnpm": "22.1.1",
+      "match": true
+    },
+    {
+      "package": "supabase",
+      "npm": "2.105.0",
+      "pnpm": "2.105.0",
+      "match": true
+    },
+    {
+      "package": "tailwindcss",
+      "npm": "4.3.2",
+      "pnpm": "4.3.2",
+      "match": true
+    },
+    {
+      "package": "taze",
+      "npm": "19.11.0",
+      "pnpm": "19.11.0",
+      "match": true
+    },
+    {
+      "package": "tsx",
+      "npm": "4.22.5",
+      "pnpm": "4.22.5",
+      "match": true
+    },
+    {
+      "package": "typescript",
+      "npm": "5.9.3",
+      "pnpm": "5.9.3",
+      "match": true
+    },
+    {
+      "package": "vitest",
+      "npm": "4.1.9",
+      "pnpm": "4.1.9",
+      "match": true
+    },
+    {
+      "package": "vue",
+      "npm": "3.5.39",
+      "pnpm": "3.5.39",
+      "match": true
+    },
+    {
+      "package": "vue-i18n",
+      "npm": "11.4.6",
+      "pnpm": "11.4.6",
+      "match": true
+    },
+    {
+      "package": "vue-router",
+      "npm": "5.1.0",
+      "pnpm": "5.1.0",
+      "match": true
+    },
+    {
+      "package": "vue-tsc",
+      "npm": "3.2.7",
+      "pnpm": "3.2.7",
+      "match": true
+    },
+    {
+      "package": "wait-on",
+      "npm": "9.0.10",
+      "pnpm": "9.0.10",
+      "match": true
+    },
+    {
+      "package": "wrangler",
+      "npm": "4.105.0",
+      "pnpm": "4.105.0",
+      "match": true
+    }
+  ]
+}

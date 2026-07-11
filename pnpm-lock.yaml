@@ -42,7 +42,7 @@ overrides:
   vue-i18n: ^11.3.2
   ws: ^8.20.1
   yaml: ^2.8.3
-  api-gateway>ajv: ^8.18.0
+  '@apidevtools/swagger-parser>ajv': ^8.18.0
 
 importers:
 
