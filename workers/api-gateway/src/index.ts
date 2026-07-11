@@ -340,6 +340,7 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
     'Access-Control-Allow-Origin': resolveOrigin(envOrigin, requestOrigin),
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
       'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };

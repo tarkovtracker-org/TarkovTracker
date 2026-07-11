@@ -89,11 +89,37 @@ const resolveLogLevel = (): LogLevel => {
 };
 const shouldClientLog = (level: LogLevel): boolean =>
   levelPriority[level] >= levelPriority[resolveLogLevel()];
+const CLIENT_LOG_MAX_PER_SESSION = 30;
+const CLIENT_LOG_MAX_PER_MINUTE = 5;
+const CLIENT_LOG_WINDOW_MS = 60_000;
+let clientLogSessionCount = 0;
+let clientLogWindowTimestamps: number[] = [];
+const canSendClientLog = (): boolean => {
+  if (clientLogSessionCount >= CLIENT_LOG_MAX_PER_SESSION) {
+    return false;
+  }
+  const now = Date.now();
+  clientLogWindowTimestamps = clientLogWindowTimestamps.filter(
+    (ts) => now - ts < CLIENT_LOG_WINDOW_MS
+  );
+  if (clientLogWindowTimestamps.length >= CLIENT_LOG_MAX_PER_MINUTE) {
+    return false;
+  }
+  clientLogWindowTimestamps.push(now);
+  clientLogSessionCount++;
+  return true;
+};
 const sendClientLog = (level: LogLevel, args: unknown[]): void => {
   if (import.meta.env.MODE === 'test') {
     return;
   }
   if (typeof window === 'undefined') {
+    return;
+  }
+  if (!shouldClientLog(level)) {
+    return;
+  }
+  if (!canSendClientLog()) {
     return;
   }
   const sinkUrl = resolveClientLogSinkUrl();
