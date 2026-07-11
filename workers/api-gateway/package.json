@@ -16,9 +16,5 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "wrangler": "^4.81.0"
-  },
-  "overrides": {
-    "ajv": "^8.18.0",
-    "esbuild": "^0.28.1"
   }
 }

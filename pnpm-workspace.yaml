@@ -1,0 +1,52 @@
+packages:
+  - .
+  - workers/api-gateway
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - vue-demi
+  - workerd
+
+overrides:
+  '@nuxt/test-utils>h3-next': 'npm:h3@2.0.1-rc.20'
+  '@nuxt/test-utils>srvx': '^0.11.15'
+  '@tiptap/core': '3.14.0'
+  '@tiptap/pm': '3.14.0'
+  aggregate-error: 'npm:@socketregistry/aggregate-error@^1'
+  brace-expansion: '^5.0.6'
+  es-define-property: 'npm:@socketregistry/es-define-property@^1'
+  es-set-tostringtag: 'npm:@socketregistry/es-set-tostringtag@^1'
+  esbuild: '^0.28.1'
+  fast-xml-parser: '^5.7.1'
+  function-bind: 'npm:@socketregistry/function-bind@^1'
+  gopd: 'npm:@socketregistry/gopd@^1'
+  handlebars: '^4.7.9'
+  has-symbols: 'npm:@socketregistry/has-symbols@^1'
+  has-tostringtag: 'npm:@socketregistry/has-tostringtag@^1'
+  hasown: 'npm:@socketregistry/hasown@^1'
+  indent-string: 'npm:@socketregistry/indent-string@^1'
+  is-core-module: 'npm:@socketregistry/is-core-module@^1'
+  is-unicode-supported: 'npm:@socketregistry/is-unicode-supported@^1'
+  isarray: 'npm:@socketregistry/isarray@^1'
+  launch-editor: '^2.14.1'
+  lodash: '^4.18.1'
+  lodash-es: '^4.18.1'
+  lru-cache: '11.3.5'
+  node-forge: '^1.4.0'
+  npm: '^11.18.0'
+  'npm>picomatch': '^4.0.4'
+  object-assign: 'npm:@socketregistry/object-assign@^1'
+  path-parse: 'npm:@socketregistry/path-parse@^1'
+  safe-buffer: 'npm:@socketregistry/safe-buffer@^1'
+  safer-buffer: 'npm:@socketregistry/safer-buffer@^1'
+  serialize-javascript: '^7.0.5'
+  shell-quote: 'npm:shell-quote@^1'
+  tar: '^7.5.19'
+  vite: '^7.3.5'
+  vue-i18n: '$vue-i18n'
+  ws: '^8.20.1'
+  yaml: '^2.8.3'
+  '@apidevtools/swagger-parser>ajv': '^8.18.0'
