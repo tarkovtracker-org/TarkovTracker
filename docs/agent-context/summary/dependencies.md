@@ -2,7 +2,7 @@
 
 > External dependencies and how/why they are used. Versions live in `package.json` (root and
 > `workers/api-gateway/`) — this file explains _roles_, not exact versions, to stay durable.
-> Engines: Node `>=24.12.0`, npm `>=11.6.2` (`packageManager: npm@11.16.0`).
+> Engines: Node `>=24.12.0`, pnpm `>=10.34.5 <11` (`packageManager: pnpm@10.34.5`).
 
 ## Runtime Dependencies (root)
 
@@ -80,31 +80,31 @@
 | `@commitlint/cli`, `@commitlint/config-conventional`             | Conventional commit enforcement.                        |
 | `semantic-release`, `@semantic-release/*`                        | Automated versioning/changelog/release.                 |
 | `knip`                                                           | Detect unused files/exports/deps.                       |
-| `taze`                                                           | Dependency update checks (`npm run deps`).              |
+| `taze`                                                           | Dependency update checks (`pnpm run deps`).             |
 | `supabase`                                                       | Supabase CLI (type gen, local checks).                  |
 | `wrangler`                                                       | Cloudflare Workers/Pages CLI.                           |
 | `@cloudflare/workers-types`                                      | Worker type definitions.                                |
 | `@types/node`, `defu`                                            | Node types + config merging.                            |
-| `@google/design.md`                                              | DESIGN.md linting (`npm run design:lint`).              |
+| `@google/design.md`                                              | DESIGN.md linting (`pnpm run design:lint`).             |
 | `wait-on`                                                        | Wait for services in CI/dev scripts.                    |
 
 ## `workers/api-gateway/` Dependencies
 
 Independent package with its own lockfile. Key dev/runtime tools:
 
-| Package                                                               | Role                                                    |
-| --------------------------------------------------------------------- | ------------------------------------------------------- |
-| `wrangler`, `miniflare`, `workerd`                                    | Worker dev/runtime + local emulation.                   |
-| `@cloudflare/workers-types`                                           | Types for Worker + Durable Objects.                     |
-| `@apidevtools/swagger-parser`, `openapi-types`, `ajv`, `ajv-draft-04` | Validate the OpenAPI spec (`npm run validate:openapi`). |
-| `tsx`, `typescript`                                                   | TS execution + type checking.                           |
-| `vitest`                                                              | Gateway tests (`npm run test:api-gateway`).             |
+| Package                                                               | Role                                                     |
+| --------------------------------------------------------------------- | -------------------------------------------------------- |
+| `wrangler`, `miniflare`, `workerd`                                    | Worker dev/runtime + local emulation.                    |
+| `@cloudflare/workers-types`                                           | Types for Worker + Durable Objects.                      |
+| `@apidevtools/swagger-parser`, `openapi-types`, `ajv`, `ajv-draft-04` | Validate the OpenAPI spec (`pnpm run validate:openapi`). |
+| `tsx`, `typescript`                                                   | TS execution + type checking.                            |
+| `vitest`                                                              | Gateway tests (`pnpm run test:api-gateway`).             |
 
 ## Supabase Edge Functions
 
 Run on **Deno** (not the Node dependency tree). They import via URL/`deno.json` import maps; local
 shims live in `supabase/functions/{deno-stubs.d.ts,npm-shims.d.ts}`. Shared logic in `_shared/`.
-Generated DB types: `supabase/functions/_shared/database.types.ts` (via `npm run supabase:types`).
+Generated DB types: `supabase/functions/_shared/database.types.ts` (via `pnpm run supabase:types`).
 
 ## Dependency Diagram (high level)
 

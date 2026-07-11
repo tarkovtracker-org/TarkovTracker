@@ -28,7 +28,7 @@ and multi-device sync.
 | Public API | Cloudflare Worker (`workers/api-gateway`)    | Token auth + Durable Object rate limiter |
 | Payments   | Stripe                                       | Supporter subscriptions + one-time       |
 | Tests      | Vitest + Vue Test Utils + `@nuxt/test-utils` | happy-dom environment                    |
-| Deploy     | Cloudflare Pages/Workers                     | Node `>=24.12.0`, npm `>=11.6.2`         |
+| Deploy     | Cloudflare Pages/Workers                     | Node `>=24.12.0`, pnpm `>=10.34.5 <11`   |
 
 **Languages:** TypeScript (strict) is dominant for app, server, workers; Vue SFCs for components;
 Deno/TypeScript for Supabase Edge Functions; small Node `.mjs` scripts; SQL migrations; shell scripts.
@@ -141,7 +141,7 @@ hideout prereqs, conflict detection, reset engine).
 Public token-authenticated API. `src/index.ts` defines the `ApiGatewayRateLimiter` Durable Object
 and request routing; `src/handlers/{progress,team,token}.ts` implement endpoints; `src/auth.ts`
 validates SHA-256 hashed API tokens; `src/openapi.ts` holds the OpenAPI spec
-(`npm run validate:openapi`).
+(`pnpm run validate:openapi`).
 
 ## Codebase Map (Hierarchical)
 
@@ -180,7 +180,7 @@ graph TD
 
 | Concern            | Tooling                                                                      |
 | ------------------ | ---------------------------------------------------------------------------- |
-| Package manager    | npm `>=11.6.2` (`packageManager: npm@11.16.0`), Node `>=24.12.0`             |
+| Package manager    | pnpm `>=10.34.5 <11` (`packageManager: pnpm@10.34.5`), Node `>=24.12.0`      |
 | Dev/build          | `nuxt dev`, `nuxt build`, `nuxt generate`, `nuxt preview`                    |
 | Lint               | ESLint flat config (`eslint app --max-warnings=0`) + DESIGN.md lint          |
 | Format             | Prettier (+ `prettier-plugin-tailwindcss`), enforced via husky + lint-staged |

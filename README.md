@@ -27,10 +27,11 @@ A comprehensive Escape from Tarkov progress tracker built with Nuxt 4, featuring
 
 ## Setup
 
-Install dependencies:
+Install dependencies (Node >=24.12.0, enables pnpm via Corepack):
 
 ```bash
-npm install
+corepack enable
+pnpm install
 ```
 
 ## Environment Variables
@@ -84,14 +85,14 @@ The project uses one Cloudflare Worker for the public API surface:
 Start the development server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 The application will be available at `http://localhost:3000`.
 
 ## Code Quality
 
-Run `npm run lint`, `npm run typecheck`, and `npm test` before pushing. See
+Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm test` before pushing. See
 [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) and
 [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md) for the full command list, pre-commit
 hooks, and CI details.
@@ -107,13 +108,13 @@ legacy blobs, but regenerate backups after upgrading if you want future exports 
 Build for production:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Preview production build locally:
 
 ```bash
-npm run preview
+pnpm run preview
 ```
 
 ## Project Structure

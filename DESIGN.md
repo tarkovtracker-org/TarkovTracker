@@ -201,7 +201,7 @@ when a standard icon button is clearer.
 Do keep UI changes consistent with the current dark surface ladder, tan primary action color, teal
 accent language, and compact app ergonomics.
 
-Do run `npm run design:lint` after editing this file and `npm run format` before leaving code.
+Do run `pnpm run design:lint` after editing this file and `pnpm run format` before leaving code.
 
 Don't generate Tailwind config from this file unless the repository intentionally switches
 `DESIGN.md` from documentation to build input.

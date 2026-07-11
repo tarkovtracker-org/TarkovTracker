@@ -110,13 +110,23 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .nvmrc
-          cache: 'npm'
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.5 --activate
+
+      - name: Setup pnpm cache
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Validate commit messages
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
   lighthouse:
     name: Lighthouse
@@ -134,13 +144,23 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .nvmrc
-          cache: 'npm'
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.5 --activate
+
+      - name: Setup pnpm cache
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Cloudflare Pages app
-        run: npm run build
+        run: pnpm run build
         env:
           NODE_ENV: production
           APP_URL: http://localhost:3000
@@ -154,14 +174,14 @@ jobs:
 
       - name: Start preview server
         run: |
-          npx wrangler pages dev dist \
+          pnpm exec wrangler pages dev dist \
             --port 3000 \
             --ip 127.0.0.1 \
             --local-protocol http \
             --show-interactive-dev-session=false \
             --log-level error &
           echo $! > /tmp/server.pid
-          npx wait-on \
+          pnpm exec wait-on \
             http-get://localhost:3000 \
             http-get://localhost:3000/api/tarkov/cache-meta \
             http-get://localhost:3000/api/tarkov/bootstrap?lang=en \
