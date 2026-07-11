@@ -80,7 +80,7 @@ CodeRabbit automatic reviews are disabled in `.coderabbit.yaml`; invoke it on de
 gh run list              # List recent runs
 gh run view <run-id>     # View run details
 gh run watch             # Watch running workflow
-npm run supabase:check   # Validate local Supabase migration reset + lint
+pnpm run supabase:check   # Validate local Supabase migration reset + lint
 ```
 
 ## Local Testing

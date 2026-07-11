@@ -97,11 +97,11 @@ try {
 ## Commands
 
 ```bash
-npm run dev         # Dev server at localhost:3000
-npm run build       # Production build
-npm run lint        # ESLint (zero warnings enforced)
-npm run format      # Prettier + ESLint fix
-npx vitest          # Unit tests
+pnpm run dev         # Dev server at localhost:3000
+pnpm run build       # Production build
+pnpm run lint        # ESLint (zero warnings enforced)
+pnpm run format      # Prettier + ESLint fix
+pnpm run test        # Unit tests
 ```
 
 ## Pitfalls

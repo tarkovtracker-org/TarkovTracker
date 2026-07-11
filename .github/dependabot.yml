@@ -1,9 +1,8 @@
 version: 2
 updates:
+  # package-ecosystem remains "npm" for pnpm projects; Dependabot detects pnpm-lock.yaml.
   - package-ecosystem: npm
-    directories:
-      - /
-      - /workers/api-gateway
+    directory: /
     schedule:
       interval: weekly
       day: monday

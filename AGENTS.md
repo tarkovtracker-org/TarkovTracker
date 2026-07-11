@@ -26,7 +26,7 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 ## Project Snapshot
 
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
-- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.16.0).
+- **Runtime:** Node >=24.12.0, packageManager `pnpm@10.34.5` (engines allow `pnpm >=10.34.5 <11`).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
 - **Deployment:** Cloudflare Pages/Workers.
 
@@ -47,13 +47,13 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 
 ## Commands
 
-Install: `npm install` | Dev: `npm run dev` (localhost:3000) | Build: `npm run build` | Preview: `npm run preview` | Static: `npm run generate`
+Install: `pnpm install` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `npm run test` | Watch: `npm run test:watch` | Coverage: `npm run test:coverage` | API gateway: `npm run test:api-gateway`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
 
-Lint: `npm run lint` (zero warnings) | Fix: `npm run lint:fix` | Format: `npm run format` (Prettier + ESLint fix) | Typecheck: `npm run typecheck`
+Lint: `pnpm run lint` (zero warnings) | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint fix) | Typecheck: `pnpm run typecheck`
 
-i18n check: `npm run i18n:check` | Supabase types: `npm run supabase:types` | OpenAPI validate: `npm run validate:openapi` | Deps: `npm run deps` | KV precompute: `npm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
+i18n check: `pnpm run i18n:check` | Supabase types: `pnpm run supabase:types` | OpenAPI validate: `pnpm run validate:openapi` | Deps: `pnpm run deps` | KV precompute: `pnpm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
 
 ## Validation Policy
 
@@ -63,7 +63,10 @@ Before finishing any agent task:
 - State what validation was run and what passed/failed.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
-- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `npm run format` manually unless the hook is bypassed.
+- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `pnpm run format` manually unless the hook is bypassed.
+- Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
+- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
+- Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report-type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
 
 ## Hard Rules
 
@@ -115,9 +118,9 @@ Naming:
 - `app/locales/en.json` is the source locale. Only edit this file.
 - Non-English files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) are Crowdin-owned exports.
 - vue-i18n fallback locale is `en` (`app/i18n.config.ts`). Missing non-English keys render English automatically.
-- `npm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
+- `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
 - Locale keys must be snake_case. Provide fallback strings in `t('key', 'Fallback')` calls.
-- When adding user-facing copy: add key to `en.json` only, run `npm run i18n:check`. Crowdin handles propagation.
+- When adding user-facing copy: add key to `en.json` only, run `pnpm run i18n:check`. Crowdin handles propagation.
 - Add keys consistently with existing namespace patterns. Keep locale keys stable to avoid churn.
 - Avoid hard-coded user-facing strings in components.
 - The sole exception to not editing non-English locale files is fixing a broken Crowdin export PR; even then, only touch the file(s) Crowdin produced.
@@ -125,7 +128,7 @@ Naming:
 ## State, Data, and APIs
 
 - Pinia stores in `app/stores/`, auto-registered by Nuxt. Use `pinia-plugin-persistedstate` where applicable.
-- Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `npm run supabase:types`.
+- Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 

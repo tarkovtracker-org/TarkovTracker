@@ -23,13 +23,13 @@ Please be respectful and constructive in all interactions. We're building a tool
 
 ## Getting Started
 
-**Prerequisites:** Node.js >= 24.12.0, npm >= 11.6.2, Git.
+**Prerequisites:** Node.js >= 24.12.0, pnpm 10.34.5 (via Corepack; matches `packageManager`), Git.
 
 1. **Fork the repository** and clone your fork locally
-2. **Install dependencies**: `npm install`
+2. **Install dependencies**: `corepack enable && corepack prepare pnpm@10.34.5 --activate && pnpm install`
 3. **Set up environment**: Copy `.env.example` to `.env` and add your Supabase credentials.
    Full env-var reference: [`docs/runbook.md`](../docs/runbook.md) and [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
-4. **Start dev server**: `npm run dev`
+4. **Start dev server**: `pnpm run dev`
 5. **Read [`AGENTS.md`](../AGENTS.md)** for detailed development guidelines
 
 > Most features work without Supabase configured; auth and sync are simply disabled.
@@ -119,9 +119,9 @@ Workflow status (inbox, blocked, in progress, etc.) is tracked by Project board 
 
 2. **Test thoroughly**
    - Test manually in browser
-   - Run `npm run lint` (must pass with zero warnings)
-   - Run `npm run typecheck`
-   - Run `npm test` if your change touches executable code
+   - Run `pnpm run lint` (must pass with zero warnings)
+   - Run `pnpm run typecheck`
+   - Run `pnpm test` if your change touches executable code
    - Test in both PvP and PvE modes if relevant
 
 3. **Update documentation**
@@ -247,7 +247,7 @@ Issues move automatically based on actions:
 - Write tests for new features
 - Keep tests deterministic
 - Mock network/Supabase calls
-- Run `npm test` before submitting
+- Run `pnpm test` before submitting
 
 ### Git Commits
 
@@ -262,7 +262,7 @@ Issues move automatically based on actions:
 - **Add a feature:** create a slice in `app/features/`, add a route in `app/pages/`, and a nav link in `app/shell/NavDrawer.vue`.
 - **Add a store:** create it in `app/stores/`; configure persistence if it should survive reloads.
 - **Add an API endpoint:** create the route in `app/server/api/` and add types in `app/types/`.
-- **Add translations:** add snake_case keys to `app/locales/en.json` **only**, then run `npm run i18n:check`. Use `$t('key.path', 'Fallback')`. Crowdin propagates the other locales — never edit them by hand.
+- **Add translations:** add snake_case keys to `app/locales/en.json` **only**, then run `pnpm run i18n:check`. Use `$t('key.path', 'Fallback')`. Crowdin propagates the other locales — never edit them by hand.
 - **Tarkov.dev import/linking:** follow the rules in [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) (persist only `tarkovUid`; the import destination mode is chosen at import time, not stored).
 
 ## Debugging

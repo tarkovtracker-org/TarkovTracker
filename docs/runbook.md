@@ -47,13 +47,13 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 
 ## Pre-Deploy Validation
 
-1. `npm run format`
-2. `npm run lint`
-3. `npm run typecheck`
-4. `npm run test`
-5. `npm run supabase:check`
-6. `npm run build`
-7. `npm audit --omit=dev`
+1. `pnpm run format:check`
+2. `pnpm run lint`
+3. `pnpm run typecheck`
+4. `pnpm run test`
+5. `pnpm run supabase:check`
+6. `pnpm run build`
+7. `pnpm audit --prod`
 8. For the tarkov.dev profile cleanup rollout, snapshot `public.user_progress` before applying the
    destructive cleanup migration.
 

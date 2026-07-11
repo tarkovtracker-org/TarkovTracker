@@ -8,7 +8,7 @@ export NODE_ENV=production
 GENERATE_LOG="$(mktemp)"
 trap 'rm -f "$GENERATE_LOG"' EXIT
 set +e
-npx nuxt generate >"$GENERATE_LOG" 2>&1
+pnpm exec nuxt generate >"$GENERATE_LOG" 2>&1
 GENERATE_EXIT=$?
 set -e
 echo "GENERATE_EXIT=$GENERATE_EXIT"

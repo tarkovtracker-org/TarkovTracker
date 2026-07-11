@@ -77,7 +77,7 @@ Responses are wrapped as `{ "data": { ... } }`. See `docs/API.md` for shapes.
 `workers/api-gateway` — a standalone REST API for third-party clients, authenticated by
 **Bearer API tokens** (SHA-256 hashed; created/revoked via Edge Functions). It uses a Durable
 Object (`ApiGatewayRateLimiter`) for rate limiting and ships an OpenAPI document
-(`workers/api-gateway/src/openapi.ts`, validated by `npm run validate:openapi`).
+(`workers/api-gateway/src/openapi.ts`, validated by `pnpm run validate:openapi`).
 
 ```mermaid
 sequenceDiagram

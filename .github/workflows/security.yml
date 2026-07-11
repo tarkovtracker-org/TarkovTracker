@@ -26,19 +26,29 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .nvmrc
-          cache: 'npm'
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.5 --activate
+
+      - name: Setup pnpm cache
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=critical
+        run: pnpm audit --prod --audit-level=critical
 
       - name: Audit all dependencies (informational)
-        run: npm audit --audit-level=high || true
+        run: pnpm audit --audit-level=high || true
 
       - name: Check for outdated dependencies
-        run: npm outdated || true
+        run: pnpm outdated || true
 
       - name: Install Gitleaks CLI
         shell: bash

@@ -72,9 +72,9 @@ jobs:
               while IFS= read -r file; do
                 case "$file" in
                   package.json | \
-                  package-lock.json | \
+                  pnpm-lock.yaml | \
+                  pnpm-workspace.yaml | \
                   workers/api-gateway/package.json | \
-                  workers/api-gateway/package-lock.json | \
                   .github/workflows/*.yml | \
                   .github/workflows/*.yaml)
                     ;;

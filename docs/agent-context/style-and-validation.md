@@ -11,14 +11,14 @@ Deeper conventions for agents. Root `AGENTS.md` links here for reference; these 
 
 ## Test Invocation
 
-- All tests: `npm run test`
-- Watch mode: `npm run test:watch`
-- Coverage: `npm run test:coverage`
-- API gateway tests: `npm run test:api-gateway`
-- Single file: `npx vitest path/to/file.test.ts`
-- By name pattern: `npx vitest -t "pattern"`
-- Interactive dashboard: `npx vitest --ui`
-- Ad hoc coverage: `npx vitest --coverage`
+- All tests: `pnpm run test`
+- Watch mode: `pnpm run test:watch`
+- Coverage: `pnpm run test:coverage`
+- API gateway tests: `pnpm run test:api-gateway`
+- Single file: `pnpm exec vitest path/to/file.test.ts`
+- By name pattern: `pnpm exec vitest -t "pattern"`
+- Interactive dashboard: `pnpm exec vitest --ui`
+- Ad hoc coverage: `pnpm exec vitest --coverage`
 
 ## Styling Details
 

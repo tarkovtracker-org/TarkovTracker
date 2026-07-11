@@ -27,7 +27,8 @@ export default defineVitestConfig({
     testTimeout: 30000,
     hookTimeout: 60000,
     watch: false,
-    reporters: ['default'],
+    reporters: process.env.CI ? ['default', 'junit'] : ['default'],
+    outputFile: 'test-report.junit.xml',
     passWithNoTests: false,
     coverage: {
       provider: 'v8',
