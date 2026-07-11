@@ -26,7 +26,7 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 ## Project Snapshot
 
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
-- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.16.0).
+- **Runtime:** Node >=24.12.0, npm >=11.6.2 (packageManager: npm@11.16.0). `.npmrc` sets `legacy-peer-deps=true` for `@codecov/nuxt-plugin` peer dep compatibility (Nuxt 4 vs plugin's `nuxt@3.x` constraint).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
 - **Deployment:** Cloudflare Pages/Workers.
 
@@ -64,7 +64,9 @@ Before finishing any agent task:
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
 - Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `npm run format` manually unless the hook is bypassed.
-- Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Public-repo uploads are tokenless; no `CODECOV_TOKEN` secret is required.
+- Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
+- Bundle analysis is uploaded by the CI `validate` job during `npm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
+- Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report-type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
 
 ## Hard Rules
 

@@ -9,9 +9,15 @@ coverage:
         target: auto
         threshold: 10%
 
+bundle_analysis:
+  status: informational
+  warning_threshold: 5%
+
 comment:
   layout: 'condensed-header, condensed-files, footer'
   require_changes: true
+  require_bundle_changes: true
+  bundle_change_threshold: '1Kb'
 
 ignore:
   - 'app/locales/**'

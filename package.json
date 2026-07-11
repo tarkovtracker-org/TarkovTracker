@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260409.1",
+    "@codecov/nuxt-plugin": "^2.0.1",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@google/design.md": "^0.1.1",
@@ -142,8 +143,8 @@
     "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:check": "bash scripts/check-supabase-db.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
-    "test": "vitest run --reporter=default --maxWorkers=2",
-    "test:coverage": "vitest run --coverage --reporter=default --maxWorkers=2",
+    "test": "vitest run --maxWorkers=2",
+    "test:coverage": "vitest run --coverage --maxWorkers=2",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
     "validate:openapi": "npm --prefix workers/api-gateway run validate:openapi"
