@@ -89,7 +89,7 @@
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",
-    "lint": "npm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
+    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix",
     "lint:unused": "knip --reporter compact",
@@ -104,7 +104,7 @@
     "test:coverage": "vitest run --coverage --maxWorkers=2",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
-    "validate:openapi": "npm --prefix workers/api-gateway run validate:openapi"
+    "validate:openapi": "pnpm --filter api-gateway run validate:openapi"
   },
   "type": "module",
   "lint-staged": {

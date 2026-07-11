@@ -5,16 +5,16 @@ started_local_stack=false
 
 cleanup() {
   if [ "${started_local_stack}" = true ]; then
-    npx supabase stop --no-backup >/dev/null 2>&1 || true
+    pnpm exec supabase stop --no-backup >/dev/null 2>&1 || true
   fi
 }
 
 trap cleanup EXIT
 
-if ! npx supabase status >/dev/null 2>&1; then
-  npx supabase db start
+if ! pnpm exec supabase status >/dev/null 2>&1; then
+  pnpm exec supabase db start
   started_local_stack=true
 fi
 
-npx supabase db reset --no-seed
-npx supabase db lint --schema public --fail-on error
+pnpm exec supabase db reset --no-seed
+pnpm exec supabase db lint --schema public --fail-on error

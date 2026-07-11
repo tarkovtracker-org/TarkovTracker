@@ -7,7 +7,7 @@ echo "Setting up TarkovTracker development environment..."
 check_prerequisites() {
     echo "Checking prerequisites..."
 
-    commands=("git" "node" "npm")
+    commands=("git" "node" "corepack")
     for cmd in "${commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
             echo "ERROR: $cmd is not installed"
@@ -26,10 +26,13 @@ check_prerequisites() {
         echo "WARNING: Node.js version $node_version found, but $required_version or higher is recommended"
     fi
 
-    npm_version=$(npm -v)
-    required_npm="11.6.2"
-    if ! printf '%s\n' "$required_npm" "$npm_version" | sort -V -C; then
-        echo "WARNING: npm version $npm_version found, but $required_npm or higher is recommended"
+    corepack enable
+    corepack prepare pnpm@10.34.5 --activate
+
+    pnpm_version=$(pnpm -v)
+    required_pnpm="10.34.5"
+    if ! printf '%s\n' "$required_pnpm" "$pnpm_version" | sort -V -C; then
+        echo "WARNING: pnpm version $pnpm_version found, but $required_pnpm or higher is recommended"
     fi
 
     echo "All prerequisites installed"
@@ -37,10 +40,10 @@ check_prerequisites() {
 
 install_dependencies() {
     echo "Installing dependencies..."
-    npm ci
+    pnpm install --frozen-lockfile
 
     echo "Setting up git hooks..."
-    npx husky
+    pnpm exec husky
     find .husky -maxdepth 1 -type f -name '[!_]*' -exec chmod +x {} \;
 }
 
@@ -71,40 +74,21 @@ EOF
     fi
 }
 
-setup_workers() {
-    echo "Setting up Cloudflare Workers..."
-
-    if [ ! -d workers ]; then
-        echo "INFO: workers directory not found, skipping worker setup"
-        return
-    fi
-
-    shopt -s nullglob
-    for worker in workers/*/; do
-        if [ -f "$worker/package.json" ]; then
-            echo "Installing dependencies for $(basename "$worker")..."
-            (cd "$worker" && npm ci)
-        fi
-    done
-    shopt -u nullglob
-}
-
 main() {
     check_prerequisites
     install_dependencies
     setup_environment
-    setup_workers
 
     echo ""
     echo "Development environment setup complete!"
     echo ""
     echo "Next steps:"
     echo "1. Update .env.local with your Supabase credentials"
-    echo "2. Run 'npm run dev' to start the development server"
+    echo "2. Run 'pnpm run dev' to start the development server"
     echo "3. Visit http://localhost:3000"
     echo ""
     echo "For workers development:"
-    echo "  cd workers/api-gateway && npm run dev"
+    echo "  pnpm --filter api-gateway run dev"
     echo ""
     echo "For CI/CD (maintainers):"
     echo "  Configure these GitHub secrets:"
