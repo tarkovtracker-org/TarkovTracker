@@ -475,6 +475,15 @@ canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISC
 `DISCORD_SUPPORTER_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` are Edge-only.
 See `supabase/functions/.env.example`.
 
+**Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
+
+| Variable                    | Description                                             | Required   |
+| --------------------------- | ------------------------------------------------------- | ---------- |
+| `SUPABASE_URL`              | Supabase project URL                                    | Yes        |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                       | Yes        |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                               | Yes        |
+| `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in 429 log lines | Yes (prod) |
+
 ## Code Conventions
 
 - **Indent:** 2 spaces

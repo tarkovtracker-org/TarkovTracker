@@ -385,6 +385,9 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
       'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };
 }
+function retryAfterSeconds(resetAt: number): number {
+  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+}
 function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
   const headers: Record<string, string> = {};
   if (typeof rl.limit === 'number') {
@@ -396,14 +399,14 @@ function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
   if (typeof rl.resetAt === 'number') {
     headers['X-RateLimit-Reset'] = String(Math.ceil(rl.resetAt / 1000));
     if (!rl.allowed) {
-      headers['Retry-After'] = String(Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)));
+      headers['Retry-After'] = String(retryAfterSeconds(rl.resetAt));
     }
   }
   return headers;
 }
 function retryAfterS(rl: RateLimitResult): number | undefined {
   if (typeof rl.resetAt !== 'number') return undefined;
-  return Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+  return retryAfterSeconds(rl.resetAt);
 }
 function docsResponse(envOrigin?: string, requestOrigin?: string): Response {
   const html = `<!doctype html>
@@ -527,10 +530,17 @@ function resolveClientIp(request: Request): string | null {
   if (cfIp && cfIp.trim()) return cfIp.trim();
   return null;
 }
-async function hashIp(ip: string): Promise<string> {
-  const data = new TextEncoder().encode(ip);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
+async function hashIp(ip: string, secret?: string): Promise<string | null> {
+  if (!secret) return null;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(sig))
     .slice(0, 8)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
@@ -597,7 +607,7 @@ async function authenticateAndRateLimit(
   const dailyHeaders = rateLimitHeaders(daily);
   if (!daily.allowed) {
     track(true);
-    const ipHash = clientIp ? await hashIp(clientIp) : null;
+    const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
     logThrottle(action, 'daily', token.user_id, token.token_id, ipHash, retryAfterS(daily));
     const message =
       daily.status === 429 && tier === 'free'
@@ -623,7 +633,7 @@ async function authenticateAndRateLimit(
     );
     if (ctx) ctx.waitUntil(refund);
     track(true);
-    const ipHash = clientIp ? await hashIp(clientIp) : null;
+    const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
     logThrottle(action, 'burst', token.user_id, token.token_id, ipHash, retryAfterS(burst));
     // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
     // remaining for the refund. Retry-After reflects when burst capacity frees.
@@ -632,7 +642,7 @@ async function authenticateAndRateLimit(
       remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
     });
     if (typeof burst.resetAt === 'number') {
-      headers['Retry-After'] = String(Math.max(1, Math.ceil((burst.resetAt - Date.now()) / 1000)));
+      headers['Retry-After'] = String(retryAfterSeconds(burst.resetAt));
     }
     return errorResponse(
       burst.message || 'Rate limit exceeded',
@@ -683,16 +693,14 @@ async function authenticateAndRateLimit(
         ctx.waitUntil(refundDaily);
       }
       track(true);
-      const ipHash = await hashIp(clientIp);
+      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
       logThrottle(action, 'ip', token.user_id, token.token_id, ipHash, retryAfterS(ipResult));
       const headers = rateLimitHeaders({
         ...daily,
         remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
       });
       if (typeof ipResult.resetAt === 'number') {
-        headers['Retry-After'] = String(
-          Math.max(1, Math.ceil((ipResult.resetAt - Date.now()) / 1000))
-        );
+        headers['Retry-After'] = String(retryAfterSeconds(ipResult.resetAt));
       }
       return errorResponse(
         ipResult.message || 'Rate limit exceeded',

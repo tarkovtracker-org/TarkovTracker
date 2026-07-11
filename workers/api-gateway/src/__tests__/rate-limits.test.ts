@@ -654,6 +654,7 @@ describe('tiered quotas in the worker', () => {
       SUPABASE_ANON_KEY: 'anon',
       SUPABASE_SERVICE_ROLE_KEY: 'service',
       ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: 'test-secret',
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
     await worker.fetch(
@@ -680,6 +681,37 @@ describe('tiered quotas in the worker', () => {
     logSpy.mockRestore();
   });
 
+  it('logs ip_hash as null when IP_HASH_SECRET is not set', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => ({
+        allowed: !String(call.key).startsWith('daily-'),
+        remaining: 0,
+        resetAt: Date.now() + 1000,
+      })),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    const throttleLog = logSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('rate_limit_429'));
+    expect(throttleLog).toBeDefined();
+    const parsed = JSON.parse(throttleLog!);
+    expect(parsed.ip_hash).toBeNull();
+    logSpy.mockRestore();
+  });
+
   it('emits a structured 429 log line with bucket=ip on IP backstop throttle', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
@@ -698,6 +730,7 @@ describe('tiered quotas in the worker', () => {
       SUPABASE_ANON_KEY: 'anon',
       SUPABASE_SERVICE_ROLE_KEY: 'service',
       ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: 'test-secret',
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
     await worker.fetch(

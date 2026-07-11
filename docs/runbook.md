@@ -72,6 +72,8 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    for the gap between merge and `db push`. For such changes, apply the pending migration to
    production **before** merging the worker change; adding a function ahead of its caller is safe.
 3. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
+   - Ensure `IP_HASH_SECRET` is set on the api-gateway Worker (`wrangler secret list` to verify;
+     `wrangler secret put IP_HASH_SECRET` to set). Without it, `ip_hash` in 429 log lines is `null`.
 4. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
 5. Smoke test:
