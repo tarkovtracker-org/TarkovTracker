@@ -326,12 +326,11 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxtjs/i18n',
     process.env.NODE_ENV === 'test' ? undefined : '@nuxtjs/sitemap',
-    process.env.NODE_ENV === 'test'
-      ? undefined
-      : ([
+    process.env.CODECOV_TOKEN !== undefined
+      ? ([
           '@codecov/nuxt-plugin',
           {
-            enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
+            enableBundleAnalysis: true,
             bundleName: 'tarkovtracker',
             uploadToken: process.env.CODECOV_TOKEN,
             uploadOverrides: {
@@ -339,7 +338,8 @@ export default defineNuxtConfig({
             },
             telemetry: false,
           },
-        ] as [string, Record<string, unknown>]),
+        ] as [string, Record<string, unknown>])
+      : undefined,
   ].filter(Boolean) as (string | [string, Record<string, unknown>])[],
   site: {
     url: 'https://tarkovtracker.org',
