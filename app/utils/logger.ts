@@ -119,11 +119,11 @@ const sendClientLog = (level: LogLevel, args: unknown[]): void => {
   if (!shouldClientLog(level)) {
     return;
   }
-  if (!canSendClientLog()) {
-    return;
-  }
   const sinkUrl = resolveClientLogSinkUrl();
   if (!sinkUrl) {
+    return;
+  }
+  if (!canSendClientLog()) {
     return;
   }
   const payload: ClientLogPayload = {
