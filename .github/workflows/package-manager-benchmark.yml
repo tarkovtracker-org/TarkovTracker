@@ -7,9 +7,6 @@ on:
         description: 'Number of paired trials per scenario'
         required: false
         default: '5'
-  push:
-    branches:
-      - chore/package-manager-evaluation
 
 permissions:
   contents: read

@@ -1,24 +1,18 @@
 {
-  "generatedAt": "2026-07-11T07:21:29.617Z",
+  "generatedAt": "2026-07-11T07:56:04.079Z",
   "baseCommit": "7ec139375f1a7231124f9ff31ab42c9691156559",
-  "branchCommit": "9a7014438f17891fb660031b1770f89c1ec67395",
+  "branchCommit": "9bb5d2fb3c34deb335e33b44fd875ab256062acf",
   "summary": {
     "totalDirectDependencies": 62,
-    "matched": 61,
-    "mismatched": 1
+    "matched": 62,
+    "mismatched": 0
   },
-  "mismatches": [
-    {
-      "package": "lru-cache",
-      "npm": "11.3.5",
-      "pnpm": "11.5.1"
-    }
-  ],
-  "lruCacheDrift": {
+  "mismatches": [],
+  "lruCacheResolution": {
     "npm": "11.3.5",
-    "pnpm": "11.5.1",
+    "pnpm": "11.3.5",
     "declaredRange": "^11.3.3",
-    "explanation": "pnpm import re-resolved lru-cache to 11.5.1 within the ^11.3.3 range. npm lockfile pinned 11.3.5. Both satisfy the declared range. This is a compatible version bump, not a security concern."
+    "action": "Pinned via pnpm override (lru-cache: 11.3.5) to match npm lockfile exactly. No version drift in migration."
   },
   "ajvOverride": {
     "npmOverride": "ajv: ^8.18.0 (tree-wide in workers/api-gateway/package.json overrides)",
@@ -272,8 +266,8 @@
     {
       "package": "lru-cache",
       "npm": "11.3.5",
-      "pnpm": "11.5.1",
-      "match": false
+      "pnpm": "11.3.5",
+      "match": true
     },
     {
       "package": "nuxt",

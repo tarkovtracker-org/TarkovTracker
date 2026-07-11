@@ -2,7 +2,7 @@
 
 **Branch:** `chore/package-manager-evaluation`
 **Date:** 2026-07-11
-**Status:** Experimental — not for production use
+**Status:** Evaluation record — not for production merge. Open a clean migration PR referencing #530.
 
 ## Part 1: npm Linked-Install Probe
 
@@ -63,11 +63,7 @@ blocked and have been explicitly approved in `pnpm-workspace.yaml` via `onlyBuil
 - `workerd` — Cloudflare Workers runtime (needed for `wrangler pages dev`)
 
 This ensures pnpm's lifecycle script behavior matches npm's. The `scripts enabled` benchmark
-scenarios are now equivalent between npm and pnpm.
-
-**Pending validation:** `wrangler pages dev` and the Lighthouse workflow must be validated
-with this configuration before migration approval. This requires running the pr-checks
-Lighthouse job with pnpm-installed dependencies.
+scenarios are equivalent between npm and pnpm.
 
 ### Override translation
 
@@ -105,6 +101,14 @@ the override was a no-op (the natural resolution from `@apidevtools/swagger-pars
 package that declares the `ajv` dependency. This is structurally correct as a version floor,
 even though the current registry state makes it a no-op.
 
+### lru-cache version drift
+
+`pnpm import` re-resolved `lru-cache` from 11.3.5 (npm lockfile) to 11.5.1 within the
+declared `^11.3.3` range. This is the only direct dependency version mismatch (61 of 62
+match). Both versions satisfy the declared range. This has been resolved by pinning
+`lru-cache: 11.3.5` in the pnpm overrides to match the npm lockfile exactly, so the
+migration contains no version changes.
+
 ### Peer-dependency warnings
 
 Only 2 pre-existing warnings (not caused by migration):
@@ -123,7 +127,8 @@ Only 2 pre-existing warnings (not caused by migration):
 All pnpm validation checks pass. See Part 1 table above.
 
 **Pending:** `wrangler pages dev` and Lighthouse validation with `onlyBuiltDependencies`
-configuration (requires `workerd` build script, which is now approved).
+configuration. A temporary CI validation job has been added to verify the Cloudflare
+preview path under pnpm.
 
 ## Part 5: Dependency Comparison
 
@@ -146,17 +151,7 @@ Machine-readable comparison: `dependency-comparison.json`
 | vue-i18n              | 11.4.6       | 11.4.6        | YES   |
 | @nuxtjs/i18n          | 10.4.0       | 10.4.0        | YES   |
 | h3                    | 1.15.11      | 1.15.11       | YES   |
-
-### Version drift: lru-cache
-
-| Package    | npm resolved | pnpm resolved | Declared range | Match |
-| ---------- | ------------ | ------------- | -------------- | ----- |
-| lru-cache  | 11.3.5       | 11.5.1        | ^11.3.3        | **NO** |
-
-This is the only direct dependency version mismatch. `pnpm import` re-resolved `lru-cache`
-to 11.5.1 within the `^11.3.3` range, while the npm lockfile pinned 11.3.5. Both versions
-satisfy the declared range. This is a compatible version bump, not a security concern.
-If exact version parity is required, add `lru-cache: 11.3.5` to the pnpm overrides.
+| lru-cache             | 11.3.5       | 11.3.5        | YES (pinned via override) |
 
 ### Version differences (transitive)
 
@@ -168,67 +163,74 @@ or override-targeted package has an unexpected version difference.
 ### Summary
 
 - Total direct dependencies compared: 62
-- Matched: 61
-- Mismatched: 1 (`lru-cache`: compatible version drift within semver range)
+- Matched: 62 (lru-cache pinned to match npm lockfile)
+- Mismatched: 0
 - npm unique packages: 1664
 - pnpm unique packages: 978 (fewer due to better deduplication)
 - All overridden packages: verified identical
 - All Socket Registry substitutions: verified active
 - No direct dependency disappeared due to hoisting differences
 
-## Part 3: Benchmark Results
+## Part 3: Benchmark Results (Authoritative CI)
 
-**Status:** Local results are preliminary and have known methodology limitations.
-The committed raw results were produced by the previous (single-manager) script version
-and cannot be reproduced by the current paired-trial script. They establish the **direction**
-of the performance difference but not a trustworthy magnitude.
+### Environment
 
-**Methodology issues in committed results:**
-- npm and pnpm ran concurrently with mutual interference
-- Warm-cache runs used ambient (uncontrolled) caches
-- npm and pnpm were not paired on the same machine
-- Build scripts were not equivalent (pnpm blocked 6 packages)
+| Parameter              | Value                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| CI run                 | https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/29144471579    |
+| Benchmark commit       | `9bb5d2fb3c34deb335e33b44fd875ab256062acf`                                     |
+| npm baseline (merge-base) | `7ec139375f1a7231124f9ff31ab42c9691156559`                                  |
+| Runner                 | `ubuntu-24.04`                                                                 |
+| Node                   | 24.12.0                                                                        |
+| pnpm                   | 10.34.5                                                                        |
+| Paired trials per scenario | 5                                                                          |
+| Total paired measurements | 80                                                                         |
+| Failed trials          | 0                                                                              |
 
-The corrected benchmark script and workflow are now committed. CI results from the
-corrected workflow will replace these numbers.
+### Methodology
 
-**Environment:** WSL2 (Linux 6.6.87.2-microsoft-standard-WSL2), Node 24.12.0
-**Runs per scenario:** 5
+Paired trials on the same runner, alternating order (npm→pnpm, pnpm→npm) to control
+for ordering effects. Warm caches use isolated, pre-primed cache directories (untimed
+priming run, then reuse). Cold caches are freshly created per trial. npm fixtures are
+pinned to the merge-base commit. Build scripts are equivalent (all 6 pnpm-blocked
+packages approved via `onlyBuiltDependencies`).
 
-### Root install — per scenario (preliminary, uncontrolled)
+Raw CI results: `ci-results/` directory.
 
-| Scenario         | npm median (ms) | pnpm median (ms) | Improvement |
-| ---------------- | --------------- | ---------------- | ----------- |
-| cold, scripts    | 21,144          | 6,663            | **68%**     |
-| warm, scripts    | 14,654          | 3,090            | **79%**     |
-| cold, no scripts | 18,166          | 4,801            | **74%**     |
-| warm, no scripts | 13,554          | 1,772            | **87%**     |
+### Root install — per scenario
 
-### Worker install — per scenario (preliminary, uncontrolled)
+| Scenario         | npm median (ms) | npm range (ms)   | pnpm median (ms) | pnpm range (ms)  | Improvement |
+| ---------------- | --------------- | ---------------- | ---------------- | ---------------- | ----------- |
+| cold, scripts    | 28,376          | 28,055–29,594    | 10,942           | 10,812–11,658    | **61%**     |
+| warm, scripts    | 22,652          | 22,575–22,851    | 9,429            | 9,254–9,442      | **58%**     |
+| cold, no scripts | 27,163          | 26,547–27,494    | 8,323            | 8,223–8,371      | **69%**     |
+| warm, no scripts | 19,205          | 19,131–19,694    | 3,307            | 3,234–3,377      | **83%**     |
 
-| Scenario         | npm median (ms) | pnpm median (ms) | Improvement             |
-| ---------------- | --------------- | ---------------- | ----------------------- |
-| cold, scripts    | 2,244           | 6,501            | **-190%** (pnpm slower) |
-| warm, scripts    | 1,579           | 3,258            | **-106%** (pnpm slower) |
-| cold, no scripts | 2,161           | 4,869            | **-125%** (pnpm slower) |
-| warm, no scripts | 1,540           | 1,753            | **-14%** (pnpm slower)  |
+### Worker install — per scenario
 
-**Why pnpm is slower for worker-only installs:** `pnpm --filter api-gateway install`
-processes the entire workspace lockfile and links all root dependencies too (812 MB
-vs npm's isolated 236 MB worker `node_modules`). This is not a fair comparison — in a
-unified pnpm workspace, a single install covers both root and worker.
+| Scenario         | npm median (ms) | npm range (ms) | pnpm median (ms) | pnpm range (ms) | Improvement             |
+| ---------------- | --------------- | -------------- | ---------------- | --------------- | ----------------------- |
+| cold, scripts    | 3,048           | 2,998–3,436    | 11,407           | 11,052–13,010   | **-274%** (pnpm slower) |
+| warm, scripts    | 2,380           | 2,371–2,527    | 9,141            | 9,105–9,358     | **-284%** (pnpm slower) |
+| cold, no scripts | 2,993           | 2,906–3,071    | 8,167            | 7,970–9,512     | **-173%** (pnpm slower) |
+| warm, no scripts | 2,269           | 2,246–2,434    | 3,353            | 3,244–3,681     | **-48%** (pnpm slower)  |
 
-### CI job pattern comparison (preliminary, uncontrolled)
+**Worker-only pnpm installation is not the intended production pattern.**
+`pnpm --filter api-gateway install` processes the entire workspace lockfile and links
+all root dependencies. In the unified pnpm workspace, a single `pnpm install` covers
+both root and worker — the worker-only scenario exists only for methodology completeness.
+
+### CI job pattern comparison (decision-relevant)
 
 Most CI jobs install only the root project. The Workers job installs root + worker
 sequentially. Under pnpm workspace, a single `pnpm install` covers both.
 
 | CI Pattern                          | npm (ms) | pnpm (ms) | Improvement |
 | ----------------------------------- | -------- | --------- | ----------- |
-| Typical root job (warm, scripts)    | 14,654   | 3,090     | **79%**     |
-| Workers job (root+worker, warm)     | 16,233   | 3,090     | **81%**     |
-| Typical root job (warm, no scripts) | 13,554   | 1,772     | **87%**     |
-| Workers job (root+worker, warm)     | 15,094   | 1,772     | **88%**     |
+| **Typical root job (warm, scripts)**    | 22,652   | 9,429     | **58%**     |
+| **Workers job (root+worker, warm, scripts)** | 25,032   | 9,429     | **62%**     |
+| Typical root job (warm, no scripts) | 19,205   | 3,307     | **83%**     |
+| Workers job (root+worker, warm, no scripts) | 21,474   | 3,307     | **85%**     |
 
 ### Disk usage (node_modules apparent size only)
 
@@ -237,69 +239,85 @@ the pnpm store, npm cache, or GitHub cache archive size. For developer disk foot
 the incremental package-manager cache/store growth. For CI, installation duration is more
 important than post-install directory size.
 
-| Manager      | root node_modules | worker node_modules                      |
-| ------------ | ----------------- | ---------------------------------------- |
-| npm 11       | 1,087 MB          | 236 MB (separate)                        |
-| pnpm 10.34.5 | 812 MB            | shared (workspace)                       |
-| **Saving**   | **275 MB (25%)**  | **-576 MB** (but shared, not duplicated) |
+| Manager      | root node_modules | npm cache | pnpm store | worker node_modules |
+| ------------ | ----------------- | --------- | ---------- | ------------------- |
+| npm 11       | 1,096 MB          | 357 MB    | N/A        | 236 MB (separate)   |
+| pnpm 10.34.5 | 812 MB            | N/A       | 821 MB     | shared (workspace)  |
+| **Saving**   | **284 MB (26%)**  | —         | —          | —                   |
 
 ### Interpretation
 
-- Root install improvement: **68-87%** across all scenarios (preliminary)
-- The percentage will likely shrink after enabling equivalent lifecycle scripts,
-  eliminating ambient-cache advantages, and running paired CI trials
-- WSL2 filesystem may amplify pnpm's hard-linking advantage; CI numbers on
-  `ubuntu-24.04` will be more conservative
-- Worker-only install is slower with pnpm, but this is misleading — a unified
-  workspace install covers both in one pass
+- Warm root install improvement: **58%** with equivalent lifecycle scripts (22.7s → 9.4s)
+- Workers pattern improvement: **62%** (25.0s → 9.4s)
+- All 80 paired trials completed successfully — zero failures
+- The percentage shrank from the preliminary 79% to 58% for warm-scripts, as expected
+  after enabling equivalent lifecycle scripts, eliminating ambient-cache advantages,
+  and running paired CI trials
+- Worker-only pnpm install is slower, but this is not the intended production pattern
 
 ## Part 6: Recommendation
 
 ### Decision criteria
 
-| Criterion                              | Result                                                                     |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| Linked probe                           | Failed (upstream ghost dep in nuxt-define) — but pnpm handles it           |
-| pnpm needs shamefullyHoist             | NO                                                                         |
-| Validation differs                     | NO — all checks pass (pending wrangler pages dev / Lighthouse)             |
-| Overrides cannot be proven             | NO — all verified (ajv override corrected and verified)                    |
-| Build scripts equivalent               | YES — all 6 blocked packages approved via `onlyBuiltDependencies`          |
-| No unexplained direct dependency changes | 1 drift: `lru-cache` 11.3.5→11.5.1 (compatible, within semver range)    |
-| Measured improvement (local)           | 68-87% (preliminary, uncontrolled — not decision-grade)                    |
-| CI benchmark                           | Workflow corrected and on branch; pending CI execution                     |
+| Criterion                                | Result                                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
+| Linked probe                             | Failed (upstream ghost dep in nuxt-define) — but pnpm handles it              |
+| pnpm needs shamefullyHoist               | NO                                                                            |
+| Validation differs                       | NO — all checks pass (pending wrangler pages dev / Lighthouse CI validation)  |
+| Overrides cannot be proven               | NO — all verified (ajv override corrected and verified)                       |
+| Build scripts equivalent                 | YES — all 6 blocked packages approved via `onlyBuiltDependencies`             |
+| Direct dependency changes                | 0 — all 62 match (lru-cache pinned to 11.3.5 via override)                   |
+| CI benchmark (warm root, scripts)        | **58% improvement** — exceeds 20% threshold                                   |
+| CI benchmark (Workers pattern, scripts)  | **62% improvement** — exceeds 20% threshold                                   |
+| Failed trials                            | 0 of 80                                                                       |
 
-### Preliminary assessment
+### Assessment
 
 pnpm 10.34.5 is technically compatible with this repository:
 
 1. All validation passes without compatibility flags
 2. All overrides and security substitutions are preserved (ajv override corrected)
-3. All direct dependencies resolve to the same versions except `lru-cache` (compatible drift)
+3. All 62 direct dependencies resolve to identical versions (lru-cache pinned)
 4. The ghost dependency that broke the linked probe does NOT break pnpm
 5. No `shamefullyHoist` or peer-dep suppression needed
-6. Build scripts are now equivalent (all 6 packages approved)
-7. Local benchmarks show 68-87% install time improvement (preliminary, uncontrolled)
+6. Build scripts are equivalent (all 6 packages approved)
+7. CI benchmarks show 58% warm install improvement on paired same-runner trials
 
-### Recommendation: PROVISIONALLY CONFIRMED (pending corrected CI benchmark)
+### Recommendation: PROCEED with migration to pnpm 10.34.5
 
-**Technical feasibility: provisionally confirmed.**
-**Performance benefit: pending corrected CI benchmark.**
+Subject to one final Cloudflare/Lighthouse runtime validation.
 
-The PR supports "pnpm is feasible and promising," not yet "pnpm migration approved."
+The benchmarking phase is complete. The corrected CI benchmark confirms:
+- 58% warm root install improvement (22.7s → 9.4s)
+- 62% Workers pattern improvement (25.0s → 9.4s)
+- Zero failed trials across 80 paired measurements
 
-### Remaining steps before migration approval
+### Remaining step before migration approval
 
-1. Run the corrected `package-manager-benchmark.yml` workflow via temporary branch push
-2. Validate `wrangler pages dev` and Lighthouse with `onlyBuiltDependencies` config
-3. Replace committed raw results with CI-produced results from the corrected workflow
-4. Confirm ≥20% improvement in representative warm CI installs on paired same-runner trials
-5. Confirm no critical-path duration regression
+1. Validate `wrangler pages dev` and Lighthouse with `onlyBuiltDependencies` config in CI
+   (temporary validation job added to this branch)
 
-### Migration plan (if CI benchmark confirms)
+### Migration plan
 
-1. **Commit 1: Dependency resolution** — pnpm-workspace.yaml, translated overrides,
-   `onlyBuiltDependencies`, pnpm-lock.yaml, updated packageManager/engines, removed npm lockfiles
-2. **Commit 2: Command migration** — package scripts, npx→pnpm exec, husky hooks,
-   setup script
-3. **Commit 3: Infrastructure** — GitHub Actions, Dependabot, Cloudflare PNPM_VERSION,
-   documentation
+This PR is an evaluation record. Close it and open a clean migration PR referencing #530,
+structured as three reviewable commits:
+
+**Commit 1 — dependency resolution:**
+- `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `onlyBuiltDependencies`
+- Correct overrides (including `@apidevtools/swagger-parser>ajv` and `lru-cache: 11.3.5`)
+- `packageManager`, pnpm engine constraint
+- Removal of npm lockfiles
+
+**Commit 2 — commands:**
+- `npm run` → `pnpm run`, `npx` → `pnpm exec`, `npm --prefix` → `pnpm --filter`
+- Husky hooks, setup scripts, local documentation
+
+**Commit 3 — infrastructure:**
+- Package-manager-dependent workflows, `actions/setup-node` pnpm caching
+- Dependabot, Cloudflare `PNPM_VERSION=10.34.5`
+- Release and security commands, contributor documentation
+
+**Rollback plan:**
+Restore npm manifests (`package.json`, `package-lock.json`), remove `pnpm-workspace.yaml`
+and `pnpm-lock.yaml`, revert `packageManager` to `npm@11.16.0`, revert command changes
+in scripts and workflows, and remove pnpm-specific CI configuration.

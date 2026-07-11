@@ -1,0 +1,81 @@
+name: pnpm Preview Validation
+
+on:
+  push:
+    branches:
+      - chore/package-manager-evaluation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-validation:
+    name: pnpm Build + Wrangler Pages Dev + Lighthouse
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      API_ALLOWED_HOSTS: localhost,127.0.0.1
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Cloudflare Pages app
+        run: pnpm run build
+        env:
+          NODE_ENV: production
+          APP_URL: http://localhost:3000
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED: 'false'
+
+      - name: Start preview server
+        run: |
+          pnpm exec wrangler pages dev dist \
+            --port 3000 \
+            --ip 127.0.0.1 \
+            --local-protocol http \
+            --show-interactive-dev-session=false \
+            --log-level error &
+          echo $! > /tmp/server.pid
+          pnpm exec wait-on \
+            http-get://localhost:3000 \
+            http-get://localhost:3000/api/tarkov/cache-meta \
+            http-get://localhost:3000/api/tarkov/bootstrap?lang=en \
+            http-get://localhost:3000/tasks \
+            http-get://localhost:3000/hideout \
+            --timeout 120000 \
+            --httpTimeout 20000
+
+      - name: Lighthouse CI
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18
+        with:
+          configPath: lighthouserc.json
+          urls: |
+            http://localhost:3000
+            http://localhost:3000/tasks
+            http://localhost:3000/hideout
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill "$(cat /tmp/server.pid)" 2>/dev/null || true
+            rm -f /tmp/server.pid
+          fi
