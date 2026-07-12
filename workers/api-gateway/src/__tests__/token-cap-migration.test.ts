@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const migrationPath = resolve(
-  __dirname,
+  dirname(fileURLToPath(import.meta.url)),
   '../../../../supabase/migrations/20260710120000_enforce_active_api_token_cap.sql'
 );
 const migrationSql = readFileSync(migrationPath, 'utf-8');

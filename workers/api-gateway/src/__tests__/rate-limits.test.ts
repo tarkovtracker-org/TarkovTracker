@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import worker, { ApiGatewayRateLimiter } from '../index';
+import worker, { ApiGatewayRateLimiter, type RateLimitState } from '../index';
 import { isKnownTier, TIER_LIMITS, UPGRADE_URL } from '../limits';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
@@ -18,6 +18,9 @@ const makeState = () => {
       getAlarm: async () => alarm,
       setAlarm: async (at: number) => {
         alarm = at;
+      },
+      deleteAlarm: async () => {
+        alarm = null;
       },
       deleteAll: async () => {
         store.clear();
@@ -264,57 +267,445 @@ describe('ApiGatewayRateLimiter durable object', () => {
 
   it('refunds a sliding-window slot by removing the consumedAt timestamp', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-    const limiter = new ApiGatewayRateLimiter(makeState());
-    const payload = { limit: 2, windowSec: 60, mode: 'sliding' };
-    const first = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      remaining: number;
-      consumedAt: number;
-    };
-    expect(first.allowed).toBe(true);
-    expect(first.consumedAt).toBeDefined();
-    const second = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      remaining: number;
-      consumedAt: number;
-    };
-    expect(second.allowed).toBe(true);
-    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(blocked.allowed).toBe(false);
-    // Refund the first slot using its consumedAt timestamp.
-    await limiter.fetch(limiterRequest({ refund: true, consumedAt: first.consumedAt }));
-    const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      remaining: number;
-    };
-    expect(afterRefund.allowed).toBe(true);
-    expect(afterRefund.remaining).toBe(0);
-    vi.useRealTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const limiter = new ApiGatewayRateLimiter(makeState());
+      const payload = { limit: 2, windowSec: 60, mode: 'sliding' };
+      const first = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+        remaining: number;
+        consumedAt: number;
+      };
+      expect(first.allowed).toBe(true);
+      expect(first.consumedAt).toBeDefined();
+      const second = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+        remaining: number;
+        consumedAt: number;
+      };
+      expect(second.allowed).toBe(true);
+      const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+      };
+      expect(blocked.allowed).toBe(false);
+      // Refund the first slot using its consumedAt timestamp.
+      await limiter.fetch(limiterRequest({ refund: true, consumedAt: first.consumedAt }));
+      const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+        remaining: number;
+      };
+      expect(afterRefund.allowed).toBe(true);
+      expect(afterRefund.remaining).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not refund a sliding-window slot when consumedAt is missing', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-    const limiter = new ApiGatewayRateLimiter(makeState());
-    const payload = { limit: 1, windowSec: 60, mode: 'sliding' };
-    const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(consumed.allowed).toBe(true);
-    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(blocked.allowed).toBe(false);
-    // Refund without consumedAt should be a no-op for sliding windows.
-    await limiter.fetch(limiterRequest({ refund: true }));
-    const stillBlocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(stillBlocked.allowed).toBe(false);
-    vi.useRealTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const limiter = new ApiGatewayRateLimiter(makeState());
+      const payload = { limit: 1, windowSec: 60, mode: 'sliding' };
+      const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+      };
+      expect(consumed.allowed).toBe(true);
+      const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+      };
+      expect(blocked.allowed).toBe(false);
+      // Refund without consumedAt should be a no-op for sliding windows.
+      await limiter.fetch(limiterRequest({ refund: true }));
+      const stillBlocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
+        allowed: boolean;
+      };
+      expect(stillBlocked.allowed).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('treats expired fixed-window persisted state as absent on load', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      await state.storage.put('state', {
+        count: 1,
+        resetAt: Date.parse('2026-07-05T11:00:00Z'),
+        windowSec: 3600,
+        anchor: 'utc-day',
+      });
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = (await (await limiter.fetch(
+        limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' })
+      )).json()) as { allowed: boolean; remaining: number };
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('treats expired sliding-window persisted state as absent on load', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      await state.storage.put('state', {
+        count: 3,
+        resetAt: Date.parse('2026-07-05T11:59:00Z'),
+        windowSec: 60,
+        mode: 'sliding',
+        timestamps: [Date.parse('2026-07-05T11:58:00Z')],
+      });
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = (await (await limiter.fetch(
+        limiterRequest({ limit: 3, windowSec: 60, mode: 'sliding' })
+      )).json()) as { allowed: boolean; remaining: number };
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prunes expired timestamps from a sliding window with mixed entries', async () => {
+    vi.useFakeTimers();
+    try {
+      const baseTime = new Date('2026-07-05T12:00:00Z');
+      vi.setSystemTime(baseTime);
+      const state = makeState();
+      const expiredTs = Date.parse('2026-07-05T11:58:30Z');
+      const validTs = Date.parse('2026-07-05T11:59:30Z');
+      await state.storage.put('state', {
+        count: 2,
+        resetAt: validTs + 60_000,
+        windowSec: 60,
+        mode: 'sliding',
+        timestamps: [expiredTs, validTs],
+      });
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = (await (await limiter.fetch(
+        limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' })
+      )).json()) as { allowed: boolean; remaining: number };
+      expect(res.allowed).toBe(true);
+      expect(res.remaining).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps younger sliding hits when stored resetAt has already elapsed', async () => {
+    vi.useFakeTimers();
+    try {
+      // resetAt = oldest + window. At cold load the oldest is past cutoff but
+      // two younger hits remain; discarding whole state would under-enforce.
+      vi.setSystemTime(new Date('2026-07-05T12:00:00.100Z'));
+      const state = makeState();
+      const olderTs = Date.parse('2026-07-05T11:59:00Z');
+      const midTs = Date.parse('2026-07-05T11:59:20Z');
+      const youngerTs = Date.parse('2026-07-05T11:59:40Z');
+      await state.storage.put('state', {
+        count: 3,
+        resetAt: olderTs + 60_000,
+        windowSec: 60,
+        mode: 'sliding',
+        timestamps: [olderTs, midTs, youngerTs],
+      });
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = (await (await limiter.fetch(
+        limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' })
+      )).json()) as { allowed: boolean; remaining: number };
+      expect(res.allowed).toBe(false);
+      expect(res.remaining).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('handles config change from sliding to fixed-window on expired state', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      await state.storage.put('state', {
+        count: 5,
+        resetAt: Date.parse('2026-07-05T11:00:00Z'),
+        windowSec: 60,
+        mode: 'sliding',
+        timestamps: [Date.parse('2026-07-05T10:59:00Z')],
+      });
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = (await (await limiter.fetch(
+        limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' })
+      )).json()) as { allowed: boolean; resetAt: number };
+      expect(res.allowed).toBe(true);
+      expect(res.resetAt).toBe(Date.parse('2026-07-06T00:00:00Z'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not re-read storage on repeated calls within one object lifetime', async () => {
+    const state = makeState();
+    const getSpy = vi.spyOn(state.storage, 'get');
+    const limiter = new ApiGatewayRateLimiter(state);
+    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
+    const firstCallCount = getSpy.mock.calls.length;
+    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
+    expect(getSpy.mock.calls.length).toBe(firstCallCount);
+  });
+
+  it('does not call setAlarm when retain is set', async () => {
+    const state = makeState();
+    const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+    const limiter = new ApiGatewayRateLimiter(state);
+    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding', retain: true }));
+    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, anchor: 'utc-day', retain: true }));
+    await limiter.fetch(limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true }));
+    const throttled = (await (await limiter.fetch(
+      limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true })
+    )).json()) as { allowed: boolean };
+    expect(throttled.allowed).toBe(false);
+    expect(setAlarmSpy).not.toHaveBeenCalled();
+  });
+
+  it('schedules cleanup alarm by default when retain is omitted', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
+      const body = (await res.json()) as { allowed: boolean; resetAt: number };
+      expect(body.allowed).toBe(true);
+      expect(setAlarmSpy).toHaveBeenCalledTimes(1);
+      expect(setAlarmSpy).toHaveBeenCalledWith(body.resetAt + 1000);
+      const stored = await state.storage.get<RateLimitState>('state');
+      expect(stored?.ephemeral).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('schedules cleanup alarm for default sliding-window requests', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = await limiter.fetch(
+        limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding' })
+      );
+      const body = (await res.json()) as { allowed: boolean; resetAt: number };
+      expect(body.allowed).toBe(true);
+      expect(setAlarmSpy).toHaveBeenCalledTimes(1);
+      expect(setAlarmSpy).toHaveBeenCalledWith(body.resetAt + 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('schedules cleanup alarm for default fixed-window requests', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
+      const body = (await res.json()) as { allowed: boolean; resetAt: number };
+      expect(body.allowed).toBe(true);
+      expect(setAlarmSpy).toHaveBeenCalledTimes(1);
+      expect(setAlarmSpy).toHaveBeenCalledWith(body.resetAt + 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps cleanup alarm scheduled on throttled sliding-window deny path', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      const limiter = new ApiGatewayRateLimiter(state);
+      const payload = { limit: 1, windowSec: 60, mode: 'sliding' };
+      const first = await limiter.fetch(limiterRequest(payload));
+      const firstBody = (await first.json()) as { allowed: boolean; resetAt: number };
+      expect(firstBody.allowed).toBe(true);
+      const alarmAfterAllow = await state.storage.getAlarm();
+      expect(alarmAfterAllow).toBe(firstBody.resetAt + 1000);
+      const throttled = await limiter.fetch(limiterRequest(payload));
+      const body = (await throttled.json()) as { allowed: boolean; resetAt: number };
+      expect(body.allowed).toBe(false);
+      const alarmAfterDeny = await state.storage.getAlarm();
+      expect(alarmAfterDeny).toBe(body.resetAt + 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-stamps ephemeral on fixed-window increment of pre-flag stored state', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      const resetAt = Date.parse('2026-07-05T12:01:00Z');
+      await state.storage.put('state', {
+        count: 1,
+        resetAt,
+        windowSec: 60,
+      });
+      const limiter = new ApiGatewayRateLimiter(state);
+      const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
+      const body = (await res.json()) as { allowed: boolean; resetAt: number };
+      expect(body.allowed).toBe(true);
+      const stored = await state.storage.get<RateLimitState>('state');
+      expect(stored?.ephemeral).toBe(true);
+      expect(stored?.count).toBe(2);
+      expect(await state.storage.getAlarm()).toBe(body.resetAt + 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('alarm reschedules when ephemeral state is still active', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
+      const state = makeState();
+      const resetAt = Date.parse('2026-07-05T12:01:00Z');
+      await state.storage.put('state', {
+        count: 1,
+        resetAt,
+        windowSec: 60,
+        ephemeral: true,
+      });
+      await state.storage.setAlarm(resetAt + 1000);
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const limiter = new ApiGatewayRateLimiter(state);
+      await limiter.alarm();
+      expect(setAlarmSpy).toHaveBeenCalledWith(resetAt + 1000);
+      const stored = await state.storage.get<RateLimitState>('state');
+      expect(stored).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('alarm keeps younger sliding hits when stored resetAt has already elapsed', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:00.100Z'));
+      const state = makeState();
+      const olderTs = Date.parse('2026-07-05T11:59:00Z');
+      const midTs = Date.parse('2026-07-05T11:59:20Z');
+      const youngerTs = Date.parse('2026-07-05T11:59:40Z');
+      const staleResetAt = olderTs + 60_000;
+      await state.storage.put('state', {
+        count: 3,
+        resetAt: staleResetAt,
+        windowSec: 60,
+        mode: 'sliding',
+        timestamps: [olderTs, midTs, youngerTs],
+        ephemeral: true,
+      });
+      const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
+      const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const limiter = new ApiGatewayRateLimiter(state);
+      await limiter.alarm();
+      expect(deleteAlarmSpy).not.toHaveBeenCalled();
+      expect(deleteAllSpy).not.toHaveBeenCalled();
+      expect(setAlarmSpy).toHaveBeenCalledWith(midTs + 60_000 + 1000);
+      const stored = await state.storage.get<RateLimitState>('state');
+      expect(stored).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('alarm deletes storage when ephemeral state is expired', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:02:00Z'));
+      const state = makeState();
+      const resetAt = Date.parse('2026-07-05T12:00:00Z');
+      await state.storage.put('state', {
+        count: 1,
+        resetAt,
+        windowSec: 60,
+        ephemeral: true,
+      });
+      const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
+      const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const limiter = new ApiGatewayRateLimiter(state);
+      await limiter.alarm();
+      expect(deleteAlarmSpy).toHaveBeenCalledTimes(1);
+      expect(deleteAllSpy).toHaveBeenCalledTimes(1);
+      expect(deleteAlarmSpy.mock.invocationCallOrder[0]).toBeLessThan(
+        deleteAllSpy.mock.invocationCallOrder[0]
+      );
+      expect(setAlarmSpy).not.toHaveBeenCalled();
+      const stored = await state.storage.get<RateLimitState>('state');
+      expect(stored).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('alarm does not reschedule for non-ephemeral state (transitional drain)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:00:30Z'));
+      const state = makeState();
+      const resetAt = Date.parse('2026-07-05T12:01:00Z');
+      await state.storage.put('state', {
+        count: 1,
+        resetAt,
+        windowSec: 60,
+      });
+      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
+      const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
+      const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
+      const limiter = new ApiGatewayRateLimiter(state);
+      await limiter.alarm();
+      expect(setAlarmSpy).not.toHaveBeenCalled();
+      expect(deleteAlarmSpy).not.toHaveBeenCalled();
+      expect(deleteAllSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('alarm deletes storage for expired non-ephemeral state', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-05T12:02:00Z'));
+      const state = makeState();
+      const resetAt = Date.parse('2026-07-05T12:00:00Z');
+      await state.storage.put('state', {
+        count: 1,
+        resetAt,
+        windowSec: 60,
+      });
+      const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
+      const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
+      const limiter = new ApiGatewayRateLimiter(state);
+      await limiter.alarm();
+      expect(deleteAlarmSpy).toHaveBeenCalledTimes(1);
+      expect(deleteAllSpy).toHaveBeenCalledTimes(1);
+      expect(deleteAlarmSpy.mock.invocationCallOrder[0]).toBeLessThan(
+        deleteAllSpy.mock.invocationCallOrder[0]
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -353,12 +744,14 @@ describe('tiered quotas in the worker', () => {
       limit: TIER_LIMITS.free.readsPerDay,
       windowSec: 86400,
       anchor: 'utc-day',
+      retain: true,
     });
     expect(calls[1].key).toBe('burst-read:user-free');
     expect(calls[1].body).toMatchObject({
       limit: TIER_LIMITS.free.burstPerMinute,
       windowSec: 60,
       mode: 'sliding',
+      retain: true,
     });
   });
 

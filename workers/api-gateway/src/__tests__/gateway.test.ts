@@ -801,6 +801,9 @@ describe('api-gateway', () => {
   });
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   const createStorageMock = () => {
     const store = new Map<string, unknown>();
     let alarm: number | null = null;
@@ -817,6 +820,9 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
         setAlarm: vi.fn(async (time: number) => {
           alarm = time;
         }),
+        deleteAlarm: vi.fn(async () => {
+          alarm = null;
+        }),
         deleteAll: vi.fn(async () => {
           store.clear();
           alarm = null;
@@ -824,26 +830,37 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
       },
     };
   };
-  const callLimit = (limiter: ApiGatewayRateLimiter, limit = 5, windowSec = 60) =>
+  const callLimit = (
+    limiter: ApiGatewayRateLimiter,
+    limit = 5,
+    windowSec = 60,
+    options: { retain?: boolean } = {}
+  ) =>
     limiter.fetch(
       new Request('https://rate-limit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ limit, windowSec }),
+        body: JSON.stringify({ limit, windowSec, ...options }),
       })
     );
-  it('schedules a cleanup alarm after the window when a request is counted', async () => {
+  it('does not schedule a cleanup alarm when retain is set', async () => {
     const mock = createStorageMock();
     const limiter = new ApiGatewayRateLimiter({
       storage: mock.storage,
     } as unknown as DurableObjectState);
-    const before = Date.now();
-    await callLimit(limiter);
-    expect(mock.storage.setAlarm).toHaveBeenCalledTimes(1);
-    const scheduled = mock.storage.setAlarm.mock.calls[0]?.[0] as number;
-    expect(scheduled).toBeGreaterThan(before + 60_000);
+    await callLimit(limiter, 5, 60, { retain: true });
+    expect(mock.storage.setAlarm).not.toHaveBeenCalled();
   });
-  it('wipes all storage when the cleanup alarm fires after the window', async () => {
+  it('schedules a cleanup alarm by default when retain is omitted', async () => {
+    const mock = createStorageMock();
+    const limiter = new ApiGatewayRateLimiter({
+      storage: mock.storage,
+    } as unknown as DurableObjectState);
+    const res = await callLimit(limiter);
+    const body = (await res.json()) as { resetAt: number };
+    expect(mock.storage.setAlarm).toHaveBeenCalledWith(body.resetAt + 1000);
+  });
+  it('wipes all storage when a cleanup alarm fires after expiry', async () => {
     const mock = createStorageMock();
     const limiter = new ApiGatewayRateLimiter({
       storage: mock.storage,
@@ -853,22 +870,54 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
     const stored = mock.store.get('state') as { resetAt: number };
     vi.spyOn(Date, 'now').mockReturnValue(stored.resetAt + 5000);
     await limiter.alarm();
+    expect(mock.storage.deleteAlarm).toHaveBeenCalledTimes(1);
     expect(mock.storage.deleteAll).toHaveBeenCalledTimes(1);
     expect(mock.store.has('state')).toBe(false);
-    vi.restoreAllMocks();
   });
-  it('reschedules cleanup instead of wiping when a newer window is still active', async () => {
+  it('retained active state is preserved by transitional alarm without rescheduling', async () => {
+    const mock = createStorageMock();
+    const limiter = new ApiGatewayRateLimiter({
+      storage: mock.storage,
+    } as unknown as DurableObjectState);
+    await callLimit(limiter, 5, 60, { retain: true });
+    // Seed a legacy alarm over retained state (pre-deploy transitional drain).
+    const stored = mock.store.get('state') as { resetAt: number };
+    mock.storage.setAlarm.mockClear();
+    vi.spyOn(Date, 'now').mockReturnValue(stored.resetAt - 1000);
+    await limiter.alarm();
+    expect(mock.storage.deleteAlarm).not.toHaveBeenCalled();
+    expect(mock.storage.deleteAll).not.toHaveBeenCalled();
+    expect(mock.store.has('state')).toBe(true);
+    expect(mock.storage.setAlarm).not.toHaveBeenCalled();
+  });
+  it('ephemeral active state is preserved and rescheduled by alarm', async () => {
     const mock = createStorageMock();
     const limiter = new ApiGatewayRateLimiter({
       storage: mock.storage,
     } as unknown as DurableObjectState);
     await callLimit(limiter, 5, 60);
     const stored = mock.store.get('state') as { resetAt: number };
+    mock.storage.setAlarm.mockClear();
     vi.spyOn(Date, 'now').mockReturnValue(stored.resetAt - 1000);
     await limiter.alarm();
+    expect(mock.storage.deleteAlarm).not.toHaveBeenCalled();
     expect(mock.storage.deleteAll).not.toHaveBeenCalled();
     expect(mock.store.has('state')).toBe(true);
-    expect(mock.storage.setAlarm).toHaveBeenLastCalledWith(stored.resetAt + 1000);
-    vi.restoreAllMocks();
+    expect(mock.storage.setAlarm).toHaveBeenCalledWith(stored.resetAt + 1000);
+  });
+  it('cleanup alarm wipes expired state without rescheduling', async () => {
+    const mock = createStorageMock();
+    const limiter = new ApiGatewayRateLimiter({
+      storage: mock.storage,
+    } as unknown as DurableObjectState);
+    await callLimit(limiter, 5, 60);
+    const stored = mock.store.get('state') as { resetAt: number };
+    mock.storage.setAlarm.mockClear();
+    vi.spyOn(Date, 'now').mockReturnValue(stored.resetAt + 5000);
+    await limiter.alarm();
+    expect(mock.storage.deleteAlarm).toHaveBeenCalledTimes(1);
+    expect(mock.storage.deleteAll).toHaveBeenCalledTimes(1);
+    expect(mock.store.has('state')).toBe(false);
+    expect(mock.storage.setAlarm).not.toHaveBeenCalled();
   });
 });

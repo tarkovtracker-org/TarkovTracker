@@ -1,3 +1,20 @@
+## [1.55.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.6...v1.55.7) (2026-07-11)
+
+
+### Bug Fixes
+
+* **workers:** address review — safe load retry and conditional alarm wipe ([619ac81](https://github.com/tarkovtracker-org/TarkovTracker/commit/619ac81b86ea16786b2ae7b333c04561b1bdfe92))
+* **workers:** address review — safe test cleanup, storage error logging, throttled path coverage ([6b4f0a6](https://github.com/tarkovtracker-org/TarkovTracker/commit/6b4f0a68969a78a8aa20e06a47f0c00fc1d2d8b5))
+* **workers:** clear DO alarm metadata on rate-limit cleanup ([e7f644f](https://github.com/tarkovtracker-org/TarkovTracker/commit/e7f644f666de9ad5c9bdc8d9e0db3c90dcfa2c37))
+* **workers:** default DO rate-limit cleanup unless retain is set ([f521024](https://github.com/tarkovtracker-org/TarkovTracker/commit/f52102457e5d759c263ae8971ac6cc5119e48543)), closes [hi#cardinality](https://github.com/hi/issues/cardinality)
+* **workers:** keep sliding rate-limit hits past stored resetAt ([0855aa5](https://github.com/tarkovtracker-org/TarkovTracker/commit/0855aa5fea170bb3f5fd417adfc254904309d15c))
+* **workers:** restore bounded retention for ephemeral DO rate-limit keys ([6641b48](https://github.com/tarkovtracker-org/TarkovTracker/commit/6641b484e9c2d98522dcb370f0c9919558c66272)), closes [hi#cardinality](https://github.com/hi/issues/cardinality)
+
+
+### Performance Improvements
+
+* **workers:** eliminate DO cleanup alarms via lazy expiration ([ad51e62](https://github.com/tarkovtracker-org/TarkovTracker/commit/ad51e620f9f85cc1348fa892d0961044dd98080e))
+
 ## [1.55.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.5...v1.55.6) (2026-07-11)
 
 

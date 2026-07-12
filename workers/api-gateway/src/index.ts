@@ -19,6 +19,7 @@ import {
 import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
+import { logger } from './utils/logger';
 import type {
   ApiToken,
   Env,
@@ -63,13 +64,14 @@ type RateLimitOptions = {
   anchor?: RateLimitAnchor;
   mode?: RateLimitMode;
 };
-type RateLimitState = {
+export type RateLimitState = {
   count: number;
   resetAt: number;
   windowSec: number;
   anchor?: RateLimitAnchor;
   mode?: RateLimitMode;
   timestamps?: number[];
+  ephemeral?: boolean;
 };
 type RateLimitResponse = {
   allowed: boolean;
@@ -97,6 +99,7 @@ function nextUtcMidnight(now: number): number {
 const LEGACY_API_DEPRECATION_DATE = '@1783296000';
 export class ApiGatewayRateLimiter {
   private data?: RateLimitState;
+  private loaded = false;
   constructor(private state: DurableObjectState) {}
   private json(body: RateLimitResponse) {
     return new Response(JSON.stringify(body), {
@@ -105,9 +108,27 @@ export class ApiGatewayRateLimiter {
     });
   }
   private async load() {
-    if (this.data) return;
-    const stored = await this.state.storage.get<RateLimitState>('state');
-    if (stored) this.data = stored;
+    if (this.loaded) return;
+    try {
+      const stored = await this.state.storage.get<RateLimitState>('state');
+      this.loaded = true;
+      // Sliding-window resetAt is oldestTimestamp + windowMs, so it can elapse
+      // while younger timestamps are still inside the window. Keep sliding
+      // state for the fetch path to prune; only fixed windows may discard by
+      // resetAt alone.
+      if (stored) {
+        if (stored.mode === 'sliding' || Date.now() < stored.resetAt) {
+          this.data = stored;
+        } else {
+          this.data = undefined;
+        }
+      } else {
+        this.data = undefined;
+      }
+    } catch (error) {
+      logger.error('rate limiter storage load failed', { id: this.state.id.toString(), error });
+      throw error;
+    }
   }
   async fetch(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
@@ -121,6 +142,7 @@ export class ApiGatewayRateLimiter {
       refund?: boolean;
       resetAt?: number;
       consumedAt?: number;
+      retain?: boolean;
     };
     try {
       payload = (await request.json()) as {
@@ -131,6 +153,7 @@ export class ApiGatewayRateLimiter {
         refund?: boolean;
         resetAt?: number;
         consumedAt?: number;
+        retain?: boolean;
       };
     } catch {
       return new Response('Bad Request', { status: 400 });
@@ -183,6 +206,10 @@ export class ApiGatewayRateLimiter {
     }
     const anchor: RateLimitAnchor | undefined = payload.anchor === 'utc-day' ? 'utc-day' : undefined;
     const mode: RateLimitMode | undefined = payload.mode === 'sliding' ? 'sliding' : undefined;
+    // Cleanup is the default for high-cardinality callers (Pages, legacy, unknown).
+    // Authenticated gateway quotas opt in to long retention via retain: true so a
+    // Worker-first deploy never drops cleanup for keys that omit the flag.
+    const ephemeral = payload.retain !== true;
     await this.load();
     const now = Date.now();
     const windowMs = windowSec * 1000;
@@ -197,14 +224,28 @@ export class ApiGatewayRateLimiter {
         // pruned timestamps/resetAt are recomputed from storage on the next
         // load, so persisting on every throttled hit would only add Durable
         // Object write amplification under sustained bursts.
-        this.data = { count: timestamps.length, resetAt, windowSec, mode, timestamps };
-        await this.scheduleCleanup(resetAt);
+        this.data = {
+          count: timestamps.length,
+          resetAt,
+          windowSec,
+          mode,
+          timestamps,
+          ...(ephemeral && { ephemeral: true }),
+        };
+        if (ephemeral) await this.scheduleCleanup(resetAt);
         return this.json({ allowed: false, remaining: 0, resetAt });
       }
       timestamps.push(now);
-      this.data = { count: timestamps.length, resetAt: timestamps[0] + windowMs, windowSec, mode, timestamps };
+      this.data = {
+        count: timestamps.length,
+        resetAt: timestamps[0] + windowMs,
+        windowSec,
+        mode,
+        timestamps,
+        ...(ephemeral && { ephemeral: true }),
+      };
       await this.state.storage.put('state', this.data);
-      await this.scheduleCleanup(this.data.resetAt);
+      if (ephemeral) await this.scheduleCleanup(this.data.resetAt);
       return this.json({
         allowed: true,
         remaining: Math.max(limit - timestamps.length, 0),
@@ -219,9 +260,13 @@ export class ApiGatewayRateLimiter {
       this.data.mode !== undefined;
     if (configChanged || now >= this.data!.resetAt) {
       const resetAt = anchor === 'utc-day' ? nextUtcMidnight(now) : now + windowMs;
-      this.data = { count: 0, resetAt, windowSec, anchor };
+      this.data = { count: 0, resetAt, windowSec, anchor, ...(ephemeral && { ephemeral: true }) };
+    } else if (ephemeral) {
+      // Re-stamp cleanup eligibility on an existing window so a pre-flag stored
+      // state still reschedules when its alarm fires mid-window.
+      this.data!.ephemeral = true;
     }
-    await this.scheduleCleanup(this.data!.resetAt);
+    if (ephemeral) await this.scheduleCleanup(this.data!.resetAt);
     if (this.data!.count >= limit) {
       return this.json({
         allowed: false,
@@ -237,9 +282,15 @@ export class ApiGatewayRateLimiter {
       resetAt: this.data!.resetAt,
     });
   }
-  // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
-  // pre-auth rate-limit keys) do not retain billable storage forever. The
-  // alarm fires shortly after the window resets and wipes all storage.
+  // Schedule self-cleanup by default for high-cardinality keys (IP-derived,
+  // requester-target-mode combinations from Pages endpoints) so abandoned
+  // objects do not retain billable storage forever. The alarm fires shortly
+  // after the window resets and wipes all storage.
+  // Bounded authenticated keys (daily-*/burst-* keyed by user_id) pass
+  // retain: true so they skip alarms; load() treats expired state as absent
+  // for rate-limiting correctness.
+  // Alarms from previous deployments without the ephemeral flag in stored
+  // state are drained without rescheduling while the window is still active.
   private async scheduleCleanup(resetAt: number): Promise<void> {
     const cleanupAt = resetAt + 1000;
     const existingAlarm = await this.state.storage.getAlarm();
@@ -247,15 +298,42 @@ export class ApiGatewayRateLimiter {
       await this.state.storage.setAlarm(cleanupAt);
     }
   }
-  async alarm(): Promise<void> {
-    const stored = await this.state.storage.get<RateLimitState>('state');
-    // If a newer window is still active, reschedule cleanup instead of wiping it.
-    if (stored && Date.now() < stored.resetAt) {
-      await this.state.storage.setAlarm(stored.resetAt + 1000);
-      return;
+  private isStateActive(stored: RateLimitState, now: number): { active: boolean; resetAt: number } {
+    if (stored.mode === 'sliding') {
+      const windowMs = (stored.windowSec || 0) * 1000;
+      const cutoff = now - windowMs;
+      const timestamps = (stored.timestamps ?? []).filter((ts) => ts > cutoff);
+      if (!timestamps.length) {
+        return { active: false, resetAt: stored.resetAt };
+      }
+      return { active: true, resetAt: timestamps[0] + windowMs };
     }
-    this.data = undefined;
-    await this.state.storage.deleteAll();
+    return { active: now < stored.resetAt, resetAt: stored.resetAt };
+  }
+  async alarm(): Promise<void> {
+    try {
+      const stored = await this.state.storage.get<RateLimitState>('state');
+      const now = Date.now();
+      if (stored) {
+        const { active, resetAt } = this.isStateActive(stored, now);
+        if (active) {
+          if (stored.ephemeral === true) {
+            await this.state.storage.setAlarm(resetAt + 1000);
+            return;
+          }
+          this.data = undefined;
+          this.loaded = false;
+          return;
+        }
+      }
+      this.data = undefined;
+      this.loaded = false;
+      await this.state.storage.deleteAlarm();
+      await this.state.storage.deleteAll();
+    } catch (error) {
+      logger.error('rate limiter alarm cleanup failed', { id: this.state.id.toString(), error });
+      throw error;
+    }
   }
 }
 async function rateLimit(
@@ -275,7 +353,13 @@ async function rateLimit(
     const res = await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ limit, windowSec, anchor: options?.anchor, mode: options?.mode }),
+      body: JSON.stringify({
+        limit,
+        windowSec,
+        anchor: options?.anchor,
+        mode: options?.mode,
+        retain: true,
+      }),
       signal: controller.signal,
     });
     const durationMs = Date.now() - startedAt;

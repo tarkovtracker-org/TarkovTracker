@@ -599,6 +599,7 @@
           ),
           color: 'warning',
         });
+        await loadTokens();
       } else {
         showErrorToast({
           title: t('page.settings.card.apitokens.create_token_error'),
