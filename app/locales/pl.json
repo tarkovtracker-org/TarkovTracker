@@ -1221,6 +1221,8 @@
           "token_value_missing": "Token value unavailable",
           "token_value_unavailable": "Token value display unavailable",
           "token_value_unavailable_desc": "Your current API does not expose token values for existing tokens.",
+          "token_cap_reached": "Token limit reached",
+          "token_cap_reached_desc": "You can have at most 3 active API tokens. Revoke an existing token to create a new one.",
           "revoke_button": "Revoke",
           "report": {
             "load_failed": "API token load failed",
