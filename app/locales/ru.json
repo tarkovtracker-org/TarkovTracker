@@ -1221,6 +1221,8 @@
           "token_value_missing": "Значение токена недоступно",
           "token_value_unavailable": "Невозможно отобразить токен",
           "token_value_unavailable_desc": "Ваш текущий API не показывает значения токена для существующих токенов.",
+          "token_cap_reached": "Token limit reached",
+          "token_cap_reached_desc": "You can have at most 3 active API tokens. Revoke an existing token to create a new one.",
           "revoke_button": "Отозвать",
           "report": {
             "load_failed": "Не удалось загрузить API токены",
