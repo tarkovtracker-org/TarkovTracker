@@ -16,7 +16,8 @@ export const OPENAPI_SPEC = {
       'is also returned, so clients should queue and retry after that delay rather than busy-looping. ' +
       'Burst-throttled and IP-throttled requests do not consume the daily quota.\n\n' +
       'Token cap: each account may have at most 3 active API tokens. Revoke an existing ' +
-      'token before creating a new one if the cap is reached.\n\n' +
+      'token before creating a new one if the cap is reached. Token creation is only ' +
+      'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
       'Docs: https://api.tarkovtracker.org/docs (or / on the api subdomain).',
     contact: {
       name: 'TarkovTracker',

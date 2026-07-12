@@ -68,8 +68,10 @@ BEGIN
 END;
 $$;
 
+-- Trigger functions fire as the table owner; callers do not need EXECUTE.
+-- Matches revoke_only posture from 20260629120000 (no authenticated EXECUTE
+-- on SECURITY DEFINER trigger helpers).
 REVOKE ALL ON FUNCTION public.enforce_api_token_cap() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.enforce_api_token_cap() TO service_role, authenticated;
 
 -- Drop the old trigger if it exists from a partial prior migration attempt.
 DROP TRIGGER IF EXISTS trg_enforce_api_token_cap ON public.api_tokens;
@@ -81,3 +83,12 @@ CREATE TRIGGER trg_enforce_api_token_cap
 
 COMMENT ON FUNCTION public.enforce_api_token_cap() IS
   'Enforces a maximum of 3 active API tokens per user account. Uses a transaction advisory lock to prevent concurrent-creation races.';
+
+-- Force all token creation through the token-create Edge Function so the
+-- 3/hour per-account mutation rate limit cannot be bypassed via PostgREST
+-- inserts under the authenticated role. service_role (used by token-create)
+-- retains INSERT. Authenticated users keep SELECT/UPDATE/DELETE for list
+-- and soft-management; revoke still goes through token-revoke (service role)
+-- or direct DELETE under the remaining privilege.
+REVOKE INSERT ON public.api_tokens FROM PUBLIC, anon, authenticated;
+DROP POLICY IF EXISTS "Users can create own API tokens" ON public.api_tokens;

@@ -96,7 +96,9 @@ const createWrapper = async () => {
     global: {
       stubs: {
         UAlert: {
-          template: '<div><slot /></div>',
+          props: ['title', 'description'],
+          template:
+            '<div data-testid="alert"><span>{{ title }}</span><p>{{ description }}</p><slot /></div>',
         },
         UBadge: {
           template: '<span><slot /></span>',
@@ -148,21 +150,40 @@ const createWrapper = async () => {
     },
   });
 };
+const makeTokenRow = (
+  userId: string,
+  note: string,
+  overrides: Partial<{
+    created_at: string;
+    game_mode: 'pvp' | 'pve';
+    is_active: boolean;
+    last_used_at: string | null;
+    permissions: string[];
+    token_id: string;
+    token_value: string | null;
+    usage_count: number;
+  }> = {}
+) => ({
+  created_at: '2026-03-10T12:00:00.000Z',
+  game_mode: 'pvp' as const,
+  is_active: true,
+  last_used_at: null,
+  note,
+  permissions: ['GP'],
+  token_id: `${userId}-token`,
+  token_value: `${userId}-value`,
+  usage_count: 0,
+  ...overrides,
+});
 const resolveLoad = (userId: string, note: string) => {
   pendingLoads.get(userId)?.({
-    data: [
-      {
-        created_at: '2026-03-10T12:00:00.000Z',
-        game_mode: 'pvp',
-        is_active: true,
-        last_used_at: null,
-        note,
-        permissions: ['GP'],
-        token_id: `${userId}-token`,
-        token_value: `${userId}-value`,
-        usage_count: 0,
-      },
-    ],
+    data: [makeTokenRow(userId, note)],
+    error: null,
+  });
+};
+const resolveLoadMany = (userId: string, rows: Array<ReturnType<typeof makeTokenRow>>) => {
+  pendingLoads.get(userId)?.({
+    data: rows,
     error: null,
   });
 };
@@ -348,5 +369,48 @@ describe('ApiTokens', () => {
       )
     ).toHaveLength(1);
     expect(wrapper.text()).toContain('Fallback Token');
+  });
+  it('disables create and shows the token cap alert when the account has 3 active tokens', async () => {
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoadMany('user-a', [
+      makeTokenRow('user-a', 'Token 1', { token_id: 'user-a-token-1' }),
+      makeTokenRow('user-a', 'Token 2', { token_id: 'user-a-token-2' }),
+      makeTokenRow('user-a', 'Token 3', { token_id: 'user-a-token-3' }),
+    ]);
+    await flushPromises();
+    const createButton = wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'page.settings.card.apitokens.new_token_expand');
+    expect(createButton).toBeTruthy();
+    expect(createButton!.attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('page.settings.card.apitokens.token_cap_reached');
+    expect(wrapper.text()).toContain('page.settings.card.apitokens.token_cap_reached_desc');
+  });
+  it('shows a warning toast when token-create returns 409 for the active token cap', async () => {
+    mockCreateToken.mockRejectedValueOnce({
+      status: 409,
+      message: 'Token limit reached (3 active)',
+    });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Existing Token');
+    await flushPromises();
+    await clickButton(wrapper, 'page.settings.card.apitokens.new_token_expand');
+    await clickButton(wrapper, 'page.settings.card.apitokens.submit_new_token');
+    await flushPromises();
+    expect(mockCreateToken).toHaveBeenCalledTimes(1);
+    expect(mockToast.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'page.settings.card.apitokens.token_cap_reached',
+        description: 'page.settings.card.apitokens.token_cap_reached_desc',
+        color: 'warning',
+      })
+    );
+    expect(
+      mockToast.add.mock.calls.filter(
+        ([payload]) => payload.title === 'page.settings.card.apitokens.create_token_error'
+      )
+    ).toHaveLength(0);
   });
 });

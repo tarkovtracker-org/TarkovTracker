@@ -49,16 +49,25 @@ describe('active API token cap migration', () => {
     expect(migrationSql).toContain('WHERE user_id = v_target_user');
   });
 
-  it('revokes execute from public/anon/authenticated and grants to service_role', () => {
+  it('revokes execute from public/anon/authenticated and does not grant to authenticated', () => {
     expect(migrationSql).toContain(
       'REVOKE ALL ON FUNCTION public.enforce_api_token_cap() FROM PUBLIC, anon, authenticated'
     );
-    expect(migrationSql).toContain(
-      'GRANT EXECUTE ON FUNCTION public.enforce_api_token_cap() TO service_role, authenticated'
+    expect(migrationSql).not.toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.enforce_api_token_cap\(\)\s+TO\s+[^;]*authenticated/i
     );
   });
 
   it('drops any prior trigger before creating the new one', () => {
     expect(migrationSql).toContain('DROP TRIGGER IF EXISTS trg_enforce_api_token_cap');
+  });
+
+  it('revokes authenticated INSERT so creates must use token-create', () => {
+    expect(migrationSql).toContain(
+      'REVOKE INSERT ON public.api_tokens FROM PUBLIC, anon, authenticated'
+    );
+    expect(migrationSql).toContain(
+      'DROP POLICY IF EXISTS "Users can create own API tokens" ON public.api_tokens'
+    );
   });
 });
