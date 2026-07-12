@@ -28,7 +28,8 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 - **Runtime:** Node >=24.12.0, packageManager `pnpm@10.34.5` (engines allow `pnpm >=10.34.5 <11`).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
-- **Deployment:** Cloudflare Pages/Workers.
+- **Deployment:** Cloudflare Pages/Workers. The Pages build emits a static SPA shell and routes only
+  `/api/*` plus `/overlay/*` through Pages Functions.
 
 ## Project Map
 
@@ -172,6 +173,8 @@ Naming:
 - Use one canonical env var name per concept.
 - Use `NUXT_PUBLIC_*` for browser-exposed Nuxt runtime config.
 - Use `NUXT_*` for private Nuxt runtime config (server-only).
+- Browser log forwarding is opt-in: keep `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` empty unless the sink is
+  external or `/api/logs/client` is protected by an edge rate-limit rule.
 - Use platform-native names for Supabase Edge Functions (`SUPABASE_*`, `STRIPE_*`, `DISCORD_*`).
 - Do not add legacy aliases or fallback chains without explicit approval.
 - If an env var is renamed, update source, docs, examples, CI/deploy references, and tests in the same change.

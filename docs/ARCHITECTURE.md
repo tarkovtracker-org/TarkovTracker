@@ -311,7 +311,7 @@ All game data is fetched through Nuxt server routes that proxy to `json.tarkov.d
 | `/api/tarkov/items`            | Items (full)         | 24h       |
 | `/api/tarkov/prestige`         | Prestige levels      | 24h       |
 | `/api/tarkov/map-spawns`       | Map spawn points     | 12h       |
-| `/api/tarkov/cache-meta`       | Cache purge status   | no-store  |
+| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   |
 
 ### Team API
 
@@ -409,6 +409,8 @@ Build command: pnpm run build
 Build output: dist
 Root directory: /
 Node.js version: 24.x
+# Pages Functions only handle /api/* and /overlay/*; the build promotes Nuxt's
+# 200.html SPA fallback to index.html so Pages serves all app routes statically.
 # Optional build-tool pin (Pages build image). Detection also works from
 # pnpm-lock.yaml + packageManager without this env var.
 # PNPM_VERSION: 10.34.5
@@ -424,11 +426,12 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
 **Client-side (browser) — Nuxt public runtime config:**
 
-| Variable                        | Description                            | Required   |
-| ------------------------------- | -------------------------------------- | ---------- |
-| `NUXT_PUBLIC_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹       |
-| `NUXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹       |
-| `NUXT_PUBLIC_APP_URL`           | Application URL                        | Yes (prod) |
+| Variable                          | Description                                              | Required   |
+| --------------------------------- | -------------------------------------------------------- | ---------- |
+| `NUXT_PUBLIC_SUPABASE_URL`        | Supabase project URL for auth and sync                   | Yes¹       |
+| `NUXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anon key for auth and sync                      | Yes¹       |
+| `NUXT_PUBLIC_APP_URL`             | Application URL                                          | Yes (prod) |
+| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` | Optional browser log collector URL (disabled by default) | No         |
 
 > **¹ Required in production.** `SUPABASE_URL` and `SUPABASE_ANON_KEY` work as cross-platform
 > build-time fallbacks. Without Supabase configuration, auth, sync, realtime, and team features

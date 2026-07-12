@@ -23,7 +23,7 @@
               ? t('promoted_stream.shrink', 'Shrink player')
               : t('promoted_stream.expand', 'Expand player')
           "
-          @click="isExpanded = !isExpanded"
+          @click="toggleExpanded"
         />
         <UButton
           icon="i-mdi-open-in-new"
@@ -94,6 +94,9 @@
       muted: 'true',
     });
     return `https://player.twitch.tv/?${params.toString()}`;
+  };
+  const toggleExpanded = (): void => {
+    isExpanded.value = !isExpanded.value;
   };
   const dismiss = (): void => {
     dismissed.value = true;

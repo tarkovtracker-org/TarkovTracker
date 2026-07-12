@@ -2,14 +2,22 @@
 import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  writeCFRoutes,
+  writeCFHeaders,
+  writeCFPagesRedirects,
+} from 'nitropack/presets/cloudflare/utils';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
+  assertCloudflarePagesOutput,
   buildContentSecurityPolicyRouteRules,
+  promoteSpaFallback,
   resolveNitroPreset,
 } from './app/utils/nuxtSecurityConfig';
 import {
   GITHUB_IMAGE_DOMAINS,
+  resolveClientLogSinkUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
@@ -20,6 +28,7 @@ const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
 const appVersion = packageJson.version ?? 'dev';
+const clientLogSinkUrl = resolveClientLogSinkUrl(process.env);
 const isNonProduction = process.env.NODE_ENV !== 'production';
 const CONFIGURED_NITRO_PRESET = process.env.NITRO_PRESET;
 const NITRO_PRESET = resolveNitroPreset(CONFIGURED_NITRO_PRESET);
@@ -59,7 +68,7 @@ if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
   }
 }
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
-  clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
+  clientLogSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
   gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
@@ -213,7 +222,7 @@ export default defineNuxtConfig({
       microsoftClarityProjectId: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
       supabaseUrl: PUBLIC_SUPABASE_URL,
-      clientLogSinkUrl: process.env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL || '/api/logs/client',
+      clientLogSinkUrl,
       allowDirectTokenCreateFallback:
         process.env.NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK === 'true',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,
@@ -238,14 +247,15 @@ export default defineNuxtConfig({
     preset: NITRO_PRESET,
     cloudflare: {
       pages: {
+        defaultRoutes: false,
         routes: {
-          include: ['/*'],
-          exclude: ['/_fonts/*', '/_nuxt/*', '/img/*', '/favicon.ico', '/robots.txt'],
+          include: ['/api/*', '/overlay/*'],
+          exclude: [],
         },
       },
     },
     hooks: {
-      compiled(nitro) {
+      async compiled(nitro) {
         if (!String(nitro.options.preset || '').includes('cloudflare')) {
           return;
         }
@@ -279,6 +289,7 @@ export default defineNuxtConfig({
   routeRules: {
     '/neededitems': { redirect: { to: '/needed-items', statusCode: 301 } },
     '/streamer-tools': { redirect: { to: '/settings#streamer-tools', statusCode: 301 } },
+    '/200.html': { prerender: true },
     // Explicit long-term caching for build assets
     '/_nuxt/**': {
       headers: { 'cache-control': 'public,max-age=31536000,immutable' },
@@ -416,6 +427,18 @@ export default defineNuxtConfig({
     vueI18n: 'i18n.config.ts',
   },
   hooks: {
+    'nitro:init': (nitro) => {
+      if (!String(nitro.options.preset || '').includes('cloudflare')) {
+        return;
+      }
+      nitro.hooks.hook('compiled', async () => {
+        promoteSpaFallback(nitro.options.output.publicDir);
+        await writeCFRoutes(nitro);
+        await writeCFHeaders(nitro, 'output');
+        await writeCFPagesRedirects(nitro);
+        assertCloudflarePagesOutput(nitro.options.output.dir, ['/api/*', '/overlay/*']);
+      });
+    },
     'imports:extend': (imports: Array<{ as?: string; from?: string; name: string }>) => {
       const blockedImports = [
         { names: new Set(['meta']), sourcePattern: '/app/utils/perf' },

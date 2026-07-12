@@ -1,8 +1,13 @@
 import { defineEventHandler, setResponseHeaders } from 'h3';
 import { createLogger } from '~/server/utils/logger';
 const logger = createLogger('TarkovCacheMeta');
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=0, must-revalidate',
+  'Cloudflare-CDN-Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
+  Vary: 'Origin',
+};
 export default defineEventHandler(async (event) => {
-  setResponseHeaders(event, { 'Cache-Control': 'no-store' });
+  setResponseHeaders(event, CACHE_HEADERS);
   const config = useRuntimeConfig(event);
   const supabaseUrl = config.supabaseUrl;
   const supabaseServiceKey = config.supabaseServiceKey;

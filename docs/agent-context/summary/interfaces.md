@@ -46,7 +46,7 @@ Public, cached proxies to `json.tarkov.dev` with overlay corrections. Common que
 | `GET /api/tarkov/items`            | Full item data                                          | 24h       |
 | `GET /api/tarkov/prestige`         | Prestige levels (sourced from `regular`, lang-only key) | 24h       |
 | `GET /api/tarkov/map-spawns`       | Map spawn points                                        | 12h       |
-| `GET /api/tarkov/cache-meta`       | Server purge timestamp                                  | no-store  |
+| `GET /api/tarkov/cache-meta`       | Server purge timestamp                                  | 5m edge   |
 
 Responses are wrapped as `{ "data": { ... } }`. See `docs/API.md` for shapes.
 

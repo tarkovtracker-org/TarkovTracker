@@ -38,7 +38,9 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 ## Optional Environment Variables
 
 - `NUXT_LOG_SINK_URL` — centralized server logs (Sentry/Datadog/HTTP collector)
-- `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` — browser error forwarding (default `/api/logs/client`)
+- `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` — browser error forwarding; disabled when unset. Set it at
+  build time to `/api/logs/client` only when the edge/WAF rate limit for that path is enabled, or
+  use an external collector URL.
 - `NUXT_PUBLIC_LOG_LEVEL` — client log level (debug, info, warn, error)
 - `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`
 - `NUXT_TEAM_MEMBERS_CACHE_TTL_MS`
@@ -60,18 +62,20 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 ## Deployment
 
 1. Merge to `main` and verify CI workflow `Validate`, `Supabase DB`, and `Workers` jobs are green.
-2. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
+2. Confirm the Pages project remains **fail open** so the static SPA shell still serves if the
+   Functions daily quota is exhausted.
+3. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
    intentionally disabled to avoid per-preview billing):
    ```bash
    supabase migration list --linked   # any row with a blank REMOTE column is pending
    supabase db push --linked          # apply pending migrations to production
    ```
    Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
-   **Ordering caveat:** workers auto-deploy from `main` (step 3) while migrations are manual, so
+   **Ordering caveat:** workers auto-deploy from `main` (step 1) while migrations are manual, so
    a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
    for the gap between merge and `db push`. For such changes, apply the pending migration to
    production **before** merging the worker change; adding a function ahead of its caller is safe.
-3. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
+4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to IP-backstop logging), confirm the secret is already
    provisioned on the production `api-gateway` Worker:
    ```bash
@@ -82,13 +86,13 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    deploy time, every 429 and `ip_backstop_unavailable` log line emits `ip_hash: null`, defeating
    the IP-level abuse observability the change introduced. Provision the secret **before** merging
    so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
-4. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
-5. Confirm workers are serving the expected revision:
+5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
+6. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
-6. Smoke test:
+7. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
-7. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
+8. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
 ## Known Benign Database Signals
