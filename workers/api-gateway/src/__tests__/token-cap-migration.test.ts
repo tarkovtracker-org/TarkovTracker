@@ -20,6 +20,8 @@ describe('active API token cap migration', () => {
 
   it('locks api_tokens before reconciliation to block concurrent inserts', () => {
     expect(migrationSql).toContain('LOCK TABLE public.api_tokens IN SHARE ROW EXCLUSIVE MODE');
+    expect(migrationSql).toMatch(/BEGIN;\s*\n\s*LOCK TABLE public\.api_tokens/s);
+    expect(migrationSql).toContain('COMMIT;');
   });
 
   it('orders reconciliation with NULLS LAST and a deterministic tiebreaker', () => {

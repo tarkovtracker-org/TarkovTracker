@@ -2,13 +2,6 @@
 -- The UI previously relied on a client-side check only; this makes the
 -- invariant server-side so token rotation cannot bypass it.
 
--- Acquire a lock that conflicts with writers (INSERT/UPDATE) so the
--- reconciliation and trigger installation are atomic with respect to
--- concurrent token creation. Without this, an insert that commits between
--- the reconciliation snapshot and trigger creation would escape both,
--- leaving the account above the cap.
-LOCK TABLE public.api_tokens IN SHARE ROW EXCLUSIVE MODE;
-
 -- Preflight: revoke excess active tokens for accounts already above the cap.
 -- We revoke the oldest tokens beyond the limit (lowest created_at) so the
 -- most recently created tokens are preserved. NULLS LAST ensures tokens
@@ -18,6 +11,9 @@ LOCK TABLE public.api_tokens IN SHARE ROW EXCLUSIVE MODE;
 -- deterministic tiebreaker for rows sharing a created_at timestamp.
 -- This is a one-time reconciliation; the trigger below prevents future
 -- violations.
+BEGIN;
+LOCK TABLE public.api_tokens IN SHARE ROW EXCLUSIVE MODE;
+
 WITH ranked AS (
   SELECT
     token_id,
@@ -31,6 +27,7 @@ SET is_active = FALSE
 FROM ranked r
 WHERE t.token_id = r.token_id
   AND r.rn > 3;
+COMMIT;
 
 CREATE OR REPLACE FUNCTION public.enforce_api_token_cap()
 RETURNS TRIGGER
