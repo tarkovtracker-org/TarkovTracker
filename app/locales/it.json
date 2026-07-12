@@ -1221,8 +1221,8 @@
           "token_value_missing": "Valore token non disponibile",
           "token_value_unavailable": "Valore token non disponibile",
           "token_value_unavailable_desc": "La tua API attuale non espone i valori token per i token esistenti.",
-          "token_cap_reached": "Token limit reached",
-          "token_cap_reached_desc": "You can have at most 3 active API tokens. Revoke an existing token to create a new one.",
+          "token_cap_reached": "Limite token raggiunto",
+          "token_cap_reached_desc": "Puoi avere al massimo 3 token API attivi. Revoca un token esistente per crearne uno nuovo.",
           "revoke_button": "Revoca",
           "report": {
             "load_failed": "Caricamento del token API fallito",
