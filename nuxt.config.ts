@@ -2,11 +2,6 @@
 import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  writeCFRoutes,
-  writeCFHeaders,
-  writeCFPagesRedirects,
-} from 'nitropack/presets/cloudflare/utils';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
@@ -431,11 +426,12 @@ export default defineNuxtConfig({
       if (!String(nitro.options.preset || '').includes('cloudflare')) {
         return;
       }
-      nitro.hooks.hook('compiled', async () => {
+      nitro.hooks.hook('compiled', () => {
         promoteSpaFallback(nitro.options.output.publicDir);
-        await writeCFRoutes(nitro);
-        await writeCFHeaders(nitro, 'output');
-        await writeCFPagesRedirects(nitro);
+        writeFileSync(
+          resolve(nitro.options.output.dir, '_routes.json'),
+          JSON.stringify({ version: 1, include: ['/api/*', '/overlay/*'], exclude: [] }, null, 2)
+        );
         assertCloudflarePagesOutput(nitro.options.output.dir, ['/api/*', '/overlay/*']);
       });
     },
