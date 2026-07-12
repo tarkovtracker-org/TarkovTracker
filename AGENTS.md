@@ -68,6 +68,16 @@ Before finishing any agent task:
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
 - Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report-type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
 
+## Production Readiness Review
+
+When asked to "review for production readiness", "deep review", "is this safe to merge", or similar:
+
+- Invoke the `production-readiness-review` skill if available. It performs a read-only code and behavior review, not a CI/merge-status check.
+- The skill loads `code_review.md` at the repo root for repo-specific validation commands and risk areas. This file is the authoritative review policy for this repo.
+- The skill is read-only: it does not edit, commit, push, approve, or merge. Findings are handed off to a separate fix task.
+- Do NOT substitute `coderabbit-code-review` or `pr-loop` for a production-readiness review. Those delegate to external bot reviews or CI status; this skill inspects the code directly.
+- For a dedicated security audit of the diff, use `security-diff-scan` instead. For a fix-and-loop workflow, use `pr-loop` after the review.
+
 ## Hard Rules
 
 - **SPA-only.** SSR is disabled. Do not use SSR-only features (`useAsyncData` SSR options, server-only middleware, etc.).

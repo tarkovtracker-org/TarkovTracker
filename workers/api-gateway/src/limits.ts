@@ -32,6 +32,12 @@ export const UPGRADE_URL = 'https://tarkovtracker.org/supporter';
 export const DAILY_WINDOW_SEC = 86400;
 export const BURST_WINDOW_SEC = 60;
 
+export const IP_BACKSTOP_WINDOW_SEC = 3600;
+export const IP_BACKSTOP_LIMITS = {
+  readsPerHour: 600,
+  writesPerHour: 200,
+} as const;
+
 export function upgradeMessage(kind: 'read' | 'write'): string {
   return `Daily ${kind} quota exceeded for the free tier. Quotas reset at 00:00 UTC. Upgrade your account for higher limits: ${UPGRADE_URL}`;
 }

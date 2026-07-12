@@ -71,13 +71,24 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
    for the gap between merge and `db push`. For such changes, apply the pending migration to
    production **before** merging the worker change; adding a function ahead of its caller is safe.
-3. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
-4. Confirm workers are serving the expected revision:
+3. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
+   `IP_HASH_SECRET` (e.g. any change to IP-backstop logging), confirm the secret is already
+   provisioned on the production `api-gateway` Worker:
+   ```bash
+   wrangler secret list --config workers/api-gateway/wrangler.toml   # confirm IP_HASH_SECRET is listed
+   wrangler secret put IP_HASH_SECRET --config workers/api-gateway/wrangler.toml   # set if missing
+   ```
+   The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
+   deploy time, every 429 and `ip_backstop_unavailable` log line emits `ip_hash: null`, defeating
+   the IP-level abuse observability the change introduced. Provision the secret **before** merging
+   so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
+4. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
+5. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
-5. Smoke test:
+6. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
-6. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
+7. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
 ## Known Benign Database Signals

@@ -8,10 +8,18 @@ import {
 } from './handlers/progress';
 import { handleGetTeamProgress } from './handlers/team';
 import { handleGetToken } from './handlers/token';
-import { BURST_WINDOW_SEC, DAILY_WINDOW_SEC, TIER_LIMITS, upgradeMessage } from './limits';
+import {
+  BURST_WINDOW_SEC,
+  DAILY_WINDOW_SEC,
+  IP_BACKSTOP_LIMITS,
+  IP_BACKSTOP_WINDOW_SEC,
+  TIER_LIMITS,
+  upgradeMessage,
+} from './limits';
 import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
+import { logger } from './utils/logger';
 import type {
   ApiToken,
   Env,
@@ -56,18 +64,20 @@ type RateLimitOptions = {
   anchor?: RateLimitAnchor;
   mode?: RateLimitMode;
 };
-type RateLimitState = {
+export type RateLimitState = {
   count: number;
   resetAt: number;
   windowSec: number;
   anchor?: RateLimitAnchor;
   mode?: RateLimitMode;
   timestamps?: number[];
+  ephemeral?: boolean;
 };
 type RateLimitResponse = {
   allowed: boolean;
   remaining: number;
   resetAt: number;
+  consumedAt?: number;
 };
 type RateLimitResult = {
   allowed: boolean;
@@ -76,6 +86,7 @@ type RateLimitResult = {
   limit?: number;
   remaining?: number;
   resetAt?: number;
+  consumedAt?: number;
 };
 const RATE_LIMIT_TIMEOUT_MS = 3000;
 const RATE_LIMIT_SLOW_MS = 200;
@@ -88,6 +99,7 @@ function nextUtcMidnight(now: number): number {
 const LEGACY_API_DEPRECATION_DATE = '@1783296000';
 export class ApiGatewayRateLimiter {
   private data?: RateLimitState;
+  private loaded = false;
   constructor(private state: DurableObjectState) {}
   private json(body: RateLimitResponse) {
     return new Response(JSON.stringify(body), {
@@ -96,9 +108,27 @@ export class ApiGatewayRateLimiter {
     });
   }
   private async load() {
-    if (this.data) return;
-    const stored = await this.state.storage.get<RateLimitState>('state');
-    if (stored) this.data = stored;
+    if (this.loaded) return;
+    try {
+      const stored = await this.state.storage.get<RateLimitState>('state');
+      this.loaded = true;
+      // Sliding-window resetAt is oldestTimestamp + windowMs, so it can elapse
+      // while younger timestamps are still inside the window. Keep sliding
+      // state for the fetch path to prune; only fixed windows may discard by
+      // resetAt alone.
+      if (stored) {
+        if (stored.mode === 'sliding' || Date.now() < stored.resetAt) {
+          this.data = stored;
+        } else {
+          this.data = undefined;
+        }
+      } else {
+        this.data = undefined;
+      }
+    } catch (error) {
+      logger.error('rate limiter storage load failed', { id: this.state.id.toString(), error });
+      throw error;
+    }
   }
   async fetch(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
@@ -111,6 +141,8 @@ export class ApiGatewayRateLimiter {
       mode?: string;
       refund?: boolean;
       resetAt?: number;
+      consumedAt?: number;
+      retain?: boolean;
     };
     try {
       payload = (await request.json()) as {
@@ -120,17 +152,40 @@ export class ApiGatewayRateLimiter {
         mode?: string;
         refund?: boolean;
         resetAt?: number;
+        consumedAt?: number;
+        retain?: boolean;
       };
     } catch {
       return new Response('Bad Request', { status: 400 });
     }
     if (payload.refund === true) {
-      // Return one previously consumed fixed-window slot (e.g. when a request
-      // that passed the daily check is then rejected by the burst limiter).
-      // The caller passes the resetAt of the window it consumed from so a
-      // refund delayed past a UTC-day rollover cannot decrement the new day.
+      // Return one previously consumed slot. For fixed-window buckets the
+      // caller passes the resetAt of the window it consumed from so a refund
+      // delayed past a UTC-day rollover cannot decrement the new day. For
+      // sliding-window buckets the caller passes the consumedAt timestamp so
+      // the exact entry can be removed from the log.
       await this.load();
       const now = Date.now();
+      if (
+        this.data &&
+        this.data.mode === 'sliding' &&
+        typeof payload.consumedAt === 'number' &&
+        Array.isArray(this.data.timestamps)
+      ) {
+        const idx = this.data.timestamps.indexOf(payload.consumedAt);
+        if (idx >= 0) {
+          this.data.timestamps.splice(idx, 1);
+          this.data.count = this.data.timestamps.length;
+          if (this.data.timestamps.length > 0) {
+            this.data.resetAt = this.data.timestamps[0] + this.data.windowSec * 1000;
+          } else {
+            this.data.resetAt = now + this.data.windowSec * 1000;
+          }
+          await this.state.storage.put('state', this.data);
+          await this.scheduleCleanup(this.data.resetAt);
+        }
+        return this.json({ allowed: true, remaining: 0, resetAt: this.data.resetAt });
+      }
       const expectedResetAt = payload.resetAt;
       if (
         this.data &&
@@ -151,6 +206,10 @@ export class ApiGatewayRateLimiter {
     }
     const anchor: RateLimitAnchor | undefined = payload.anchor === 'utc-day' ? 'utc-day' : undefined;
     const mode: RateLimitMode | undefined = payload.mode === 'sliding' ? 'sliding' : undefined;
+    // Cleanup is the default for high-cardinality callers (Pages, legacy, unknown).
+    // Authenticated gateway quotas opt in to long retention via retain: true so a
+    // Worker-first deploy never drops cleanup for keys that omit the flag.
+    const ephemeral = payload.retain !== true;
     await this.load();
     const now = Date.now();
     const windowMs = windowSec * 1000;
@@ -165,18 +224,33 @@ export class ApiGatewayRateLimiter {
         // pruned timestamps/resetAt are recomputed from storage on the next
         // load, so persisting on every throttled hit would only add Durable
         // Object write amplification under sustained bursts.
-        this.data = { count: timestamps.length, resetAt, windowSec, mode, timestamps };
-        await this.scheduleCleanup(resetAt);
+        this.data = {
+          count: timestamps.length,
+          resetAt,
+          windowSec,
+          mode,
+          timestamps,
+          ...(ephemeral && { ephemeral: true }),
+        };
+        if (ephemeral) await this.scheduleCleanup(resetAt);
         return this.json({ allowed: false, remaining: 0, resetAt });
       }
       timestamps.push(now);
-      this.data = { count: timestamps.length, resetAt: timestamps[0] + windowMs, windowSec, mode, timestamps };
+      this.data = {
+        count: timestamps.length,
+        resetAt: timestamps[0] + windowMs,
+        windowSec,
+        mode,
+        timestamps,
+        ...(ephemeral && { ephemeral: true }),
+      };
       await this.state.storage.put('state', this.data);
-      await this.scheduleCleanup(this.data.resetAt);
+      if (ephemeral) await this.scheduleCleanup(this.data.resetAt);
       return this.json({
         allowed: true,
         remaining: Math.max(limit - timestamps.length, 0),
         resetAt: this.data.resetAt,
+        consumedAt: now,
       });
     }
     const configChanged =
@@ -186,9 +260,13 @@ export class ApiGatewayRateLimiter {
       this.data.mode !== undefined;
     if (configChanged || now >= this.data!.resetAt) {
       const resetAt = anchor === 'utc-day' ? nextUtcMidnight(now) : now + windowMs;
-      this.data = { count: 0, resetAt, windowSec, anchor };
+      this.data = { count: 0, resetAt, windowSec, anchor, ...(ephemeral && { ephemeral: true }) };
+    } else if (ephemeral) {
+      // Re-stamp cleanup eligibility on an existing window so a pre-flag stored
+      // state still reschedules when its alarm fires mid-window.
+      this.data!.ephemeral = true;
     }
-    await this.scheduleCleanup(this.data!.resetAt);
+    if (ephemeral) await this.scheduleCleanup(this.data!.resetAt);
     if (this.data!.count >= limit) {
       return this.json({
         allowed: false,
@@ -204,9 +282,15 @@ export class ApiGatewayRateLimiter {
       resetAt: this.data!.resetAt,
     });
   }
-  // Schedule self-cleanup so abandoned keys (e.g. rotated teamId/userId in
-  // pre-auth rate-limit keys) do not retain billable storage forever. The
-  // alarm fires shortly after the window resets and wipes all storage.
+  // Schedule self-cleanup by default for high-cardinality keys (IP-derived,
+  // requester-target-mode combinations from Pages endpoints) so abandoned
+  // objects do not retain billable storage forever. The alarm fires shortly
+  // after the window resets and wipes all storage.
+  // Bounded authenticated keys (daily-*/burst-* keyed by user_id) pass
+  // retain: true so they skip alarms; load() treats expired state as absent
+  // for rate-limiting correctness.
+  // Alarms from previous deployments without the ephemeral flag in stored
+  // state are drained without rescheduling while the window is still active.
   private async scheduleCleanup(resetAt: number): Promise<void> {
     const cleanupAt = resetAt + 1000;
     const existingAlarm = await this.state.storage.getAlarm();
@@ -214,15 +298,42 @@ export class ApiGatewayRateLimiter {
       await this.state.storage.setAlarm(cleanupAt);
     }
   }
-  async alarm(): Promise<void> {
-    const stored = await this.state.storage.get<RateLimitState>('state');
-    // If a newer window is still active, reschedule cleanup instead of wiping it.
-    if (stored && Date.now() < stored.resetAt) {
-      await this.state.storage.setAlarm(stored.resetAt + 1000);
-      return;
+  private isStateActive(stored: RateLimitState, now: number): { active: boolean; resetAt: number } {
+    if (stored.mode === 'sliding') {
+      const windowMs = (stored.windowSec || 0) * 1000;
+      const cutoff = now - windowMs;
+      const timestamps = (stored.timestamps ?? []).filter((ts) => ts > cutoff);
+      if (!timestamps.length) {
+        return { active: false, resetAt: stored.resetAt };
+      }
+      return { active: true, resetAt: timestamps[0] + windowMs };
     }
-    this.data = undefined;
-    await this.state.storage.deleteAll();
+    return { active: now < stored.resetAt, resetAt: stored.resetAt };
+  }
+  async alarm(): Promise<void> {
+    try {
+      const stored = await this.state.storage.get<RateLimitState>('state');
+      const now = Date.now();
+      if (stored) {
+        const { active, resetAt } = this.isStateActive(stored, now);
+        if (active) {
+          if (stored.ephemeral === true) {
+            await this.state.storage.setAlarm(resetAt + 1000);
+            return;
+          }
+          this.data = undefined;
+          this.loaded = false;
+          return;
+        }
+      }
+      this.data = undefined;
+      this.loaded = false;
+      await this.state.storage.deleteAlarm();
+      await this.state.storage.deleteAll();
+    } catch (error) {
+      logger.error('rate limiter alarm cleanup failed', { id: this.state.id.toString(), error });
+      throw error;
+    }
   }
 }
 async function rateLimit(
@@ -242,7 +353,13 @@ async function rateLimit(
     const res = await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ limit, windowSec, anchor: options?.anchor, mode: options?.mode }),
+      body: JSON.stringify({
+        limit,
+        windowSec,
+        anchor: options?.anchor,
+        mode: options?.mode,
+        retain: true,
+      }),
       signal: controller.signal,
     });
     const durationMs = Date.now() - startedAt;
@@ -256,9 +373,14 @@ async function rateLimit(
         message: 'Rate limiter unavailable',
       };
     }
-    let data: { allowed?: boolean; remaining?: number; resetAt?: number } = {};
+    let data: { allowed?: boolean; remaining?: number; resetAt?: number; consumedAt?: number } = {};
     try {
-      data = (await res.json()) as { allowed?: boolean; remaining?: number; resetAt?: number };
+      data = (await res.json()) as {
+        allowed?: boolean;
+        remaining?: number;
+        resetAt?: number;
+        consumedAt?: number;
+      };
     } catch {
       return {
         allowed: false,
@@ -268,6 +390,7 @@ async function rateLimit(
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
+    const consumedAt = typeof data.consumedAt === 'number' ? data.consumedAt : undefined;
     if (data.allowed === false) {
       return {
         allowed: false,
@@ -278,7 +401,7 @@ async function rateLimit(
         resetAt,
       };
     }
-    return { allowed: true, limit, remaining, resetAt };
+    return { allowed: true, limit, remaining, resetAt, consumedAt };
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     if (error instanceof Error && error.name === 'AbortError') {
@@ -296,17 +419,19 @@ async function rateLimit(
   }
 }
 /**
- * Best-effort refund of one fixed-window slot (used when the daily counter was
- * consumed but the request was subsequently rejected by the burst limiter).
+ * Best-effort refund of one previously consumed slot. For fixed-window buckets
  * `consumedResetAt` is the resetAt of the window the slot was taken from; the
  * Durable Object only decrements when its current window still matches, so a
  * refund delayed past a UTC-day rollover cannot steal a slot from the new day.
+ * For sliding-window buckets `consumedAt` is the timestamp of the entry to
+ * remove from the log.
  */
 async function refundRateLimit(
   env: Env,
   key: string,
   action: string,
-  consumedResetAt?: number
+  consumedResetAt?: number,
+  consumedAt?: number
 ): Promise<void> {
   const id = env.API_GATEWAY_LIMITER.idFromName(key);
   const stub = env.API_GATEWAY_LIMITER.get(id);
@@ -316,7 +441,7 @@ async function refundRateLimit(
     await stub.fetch('https://rate-limit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ refund: true, resetAt: consumedResetAt }),
+      body: JSON.stringify({ refund: true, resetAt: consumedResetAt, consumedAt }),
       signal: controller.signal,
     });
   } catch (error) {
@@ -345,6 +470,9 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
       'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };
 }
+function retryAfterSeconds(resetAt: number): number {
+  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+}
 function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
   const headers: Record<string, string> = {};
   if (typeof rl.limit === 'number') {
@@ -356,10 +484,14 @@ function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
   if (typeof rl.resetAt === 'number') {
     headers['X-RateLimit-Reset'] = String(Math.ceil(rl.resetAt / 1000));
     if (!rl.allowed) {
-      headers['Retry-After'] = String(Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)));
+      headers['Retry-After'] = String(retryAfterSeconds(rl.resetAt));
     }
   }
   return headers;
+}
+function retryAfterS(rl: RateLimitResult): number | undefined {
+  if (typeof rl.resetAt !== 'number') return undefined;
+  return retryAfterSeconds(rl.resetAt);
 }
 function docsResponse(envOrigin?: string, requestOrigin?: string): Response {
   const html = `<!doctype html>
@@ -477,6 +609,47 @@ type AuthSuccess = {
   validation: { valid: true; token: ApiToken };
   rlHeaders: Record<string, string>;
 };
+type ThrottleBucket = 'daily' | 'burst' | 'ip';
+function resolveClientIp(request: Request): string | null {
+  const cfIp = request.headers.get('CF-Connecting-IP');
+  if (cfIp && cfIp.trim()) return cfIp.trim();
+  return null;
+}
+async function hashIp(ip: string, secret?: string): Promise<string | null> {
+  if (!secret) return null;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(sig))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+function logThrottle(
+  action: Action,
+  bucket: ThrottleBucket,
+  userId: string,
+  tokenId: string,
+  ipHash: string | null,
+  retryAfterS: number | undefined
+): void {
+  console.log(
+    JSON.stringify({
+      event: 'rate_limit_429',
+      action,
+      bucket,
+      user_id: userId,
+      token_id: tokenId,
+      ip_hash: ipHash,
+      retry_after_s: retryAfterS ?? null,
+    })
+  );
+}
 async function authenticateAndRateLimit(
   env: Env,
   request: Request,
@@ -496,6 +669,7 @@ async function authenticateAndRateLimit(
   const tier = await resolveTier(env, token.user_id);
   const limits = TIER_LIMITS[tier];
   const dailyLimit = kind === 'write' ? limits.writesPerDay : limits.readsPerDay;
+  const clientIp = resolveClientIp(request);
   const track = (throttled: boolean) => {
     const promise = recordUsage(env, {
       userId: token.user_id,
@@ -518,6 +692,8 @@ async function authenticateAndRateLimit(
   const dailyHeaders = rateLimitHeaders(daily);
   if (!daily.allowed) {
     track(true);
+    const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
+    logThrottle(action, 'daily', token.user_id, token.token_id, ipHash, retryAfterS(daily));
     const message =
       daily.status === 429 && tier === 'free'
         ? upgradeMessage(kind)
@@ -542,6 +718,8 @@ async function authenticateAndRateLimit(
     );
     if (ctx) ctx.waitUntil(refund);
     track(true);
+    const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
+    logThrottle(action, 'burst', token.user_id, token.token_id, ipHash, retryAfterS(burst));
     // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
     // remaining for the refund. Retry-After reflects when burst capacity frees.
     const headers = rateLimitHeaders({
@@ -549,7 +727,7 @@ async function authenticateAndRateLimit(
       remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
     });
     if (typeof burst.resetAt === 'number') {
-      headers['Retry-After'] = String(Math.max(1, Math.ceil((burst.resetAt - Date.now()) / 1000)));
+      headers['Retry-After'] = String(retryAfterSeconds(burst.resetAt));
     }
     return errorResponse(
       burst.message || 'Rate limit exceeded',
@@ -558,6 +736,84 @@ async function authenticateAndRateLimit(
       requestOrigin,
       headers
     );
+  }
+  // Per-IP backstop: catches "many accounts from one IP" abuse. Tuned
+  // generously (600 reads/hour, 200 writes/hour) so shared NAT users are not
+  // impacted. Uses a 1-hour sliding window. Only checked when CF-Connecting-IP
+  // is present (Cloudflare overwrites any inbound spoof).
+  //
+  // Availability policy: the daily and burst limiters are the primary rate
+  // limiting mechanism and remain fail-closed — if they are unavailable the
+  // request is rejected because there is no other protection. The IP backstop
+  // is a secondary abuse signal; when its Durable Object is unavailable
+  // (status 503) it fails open so a transient infrastructure issue does not
+  // take down the API for everyone behind a given IP. A genuine 429 from the
+  // IP backstop still rejects the request and refunds the primary slots.
+  if (clientIp) {
+    const ipLimit =
+      kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
+    const ipKey = `ip-${kind}:${clientIp}`;
+    const ipResult = await rateLimit(env, ipKey, ipLimit, IP_BACKSTOP_WINDOW_SEC, {
+      mode: 'sliding',
+    });
+    if (!ipResult.allowed && ipResult.status !== 503) {
+      // Genuine IP throttle (429): refund both the daily (fixed-window) and
+      // burst (sliding-window) slots so IP-throttled requests do not drain
+      // per-user quotas.
+      const refundBurst = refundRateLimit(
+        env,
+        `burst-${kind}:${token.user_id}`,
+        `burst-${kind}`,
+        undefined,
+        burst.consumedAt
+      );
+      const refundDaily = refundRateLimit(
+        env,
+        dailyKey,
+        `daily-${kind}`,
+        typeof daily.resetAt === 'number' ? daily.resetAt : undefined
+      );
+      if (ctx) {
+        ctx.waitUntil(refundBurst);
+        ctx.waitUntil(refundDaily);
+      }
+      track(true);
+      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
+      logThrottle(action, 'ip', token.user_id, token.token_id, ipHash, retryAfterS(ipResult));
+      const headers = rateLimitHeaders({
+        ...daily,
+        remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
+      });
+      if (typeof ipResult.resetAt === 'number') {
+        headers['Retry-After'] = String(retryAfterSeconds(ipResult.resetAt));
+      }
+      return errorResponse(
+        ipResult.message || 'Rate limit exceeded',
+        ipResult.status || 429,
+        envOrigin,
+        requestOrigin,
+        headers
+      );
+    }
+    if (!ipResult.allowed && ipResult.status === 503) {
+      // IP backstop limiter unavailable: fail open. The primary daily and
+      // burst checks already passed, so the request proceeds. Do not refund
+      // the primary slots (the request is being served) and do not surface
+      // the 503 to the client. Log a warning so the infrastructure failure
+      // remains observable and is not counted as a throttle. Log the hashed
+      // IP (never the raw CF-Connecting-IP) so the privacy control is
+      // consistent with the 429 path.
+      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
+      console.warn(
+        JSON.stringify({
+          event: 'ip_backstop_unavailable',
+          action,
+          user_id: token.user_id,
+          token_id: token.token_id,
+          ip_hash: ipHash,
+        })
+      );
+    }
   }
   track(false);
   return { validation, rlHeaders: dailyHeaders };

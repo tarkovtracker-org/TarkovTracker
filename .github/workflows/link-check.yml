@@ -5,11 +5,15 @@ on:
     paths:
       - 'docs/**/*.md'
       - '*.md'
+      - 'lychee.toml'
+      - '.github/workflows/link-check.yml'
   push:
     branches: [main]
     paths:
       - 'docs/**/*.md'
       - '*.md'
+      - 'lychee.toml'
+      - '.github/workflows/link-check.yml'
   schedule:
     - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
   workflow_dispatch:
@@ -30,18 +34,12 @@ jobs:
       - name: Link Checker
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411
         with:
+          # Config (accept, retries, exclude_path/exclude) lives in lychee.toml so
+          # regexes are not mangled by YAML/shell escaping (see exclude_path for
+          # CHANGELOG.md). Only input globs stay here.
           args: >-
+            --config lychee.toml
             --verbose
-            --no-progress
-            --accept 200,204,206,301,302,308
-            --max-concurrency 4
-            --max-retries 3
-            --retry-wait-time 2
-            --exclude-path '(^|/)CHANGELOG\\.md$'
-            --exclude 'localhost'
-            --exclude '127\.0\.0\.1'
-            --exclude 'tarkovtracker\.org'
-            --exclude 'gnu\.org'
             './docs/**/*.md'
             './*.md'
           fail: true

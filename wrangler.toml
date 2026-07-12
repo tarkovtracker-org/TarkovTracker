@@ -46,16 +46,18 @@ STRIPE_PRICE_CHAD_MONTHLY = "price_1Ta4aGLaRBke56G2ncgwP5DO"
 STRIPE_PRICE_CHAD_6MONTH = "price_1Ta4aHLaRBke56G2oKmYuqvl"
 STRIPE_PRICE_CHAD_YEARLY = "price_1Ta4aILaRBke56G2pxce76Pi"
 
-# Preview deployments: omit APP_URL so CF_PAGES_URL is used instead.
-# This gives each preview its own edge cache namespace, correct API
-# host trust, and correct Stripe redirect URLs.
-# Analytics IDs are intentionally omitted: previews run on *.pages.dev
-# hostnames which `shouldEnableAnalyticsIntegrations` already filters out
-# at runtime, but leaving the IDs unset in preview vars is defense in
-# depth so preview traffic can never reach production GA/Clarity.
-# vars is non-inheritable so all keys must be repeated here.
+# Preview deployments: vars is non-inheritable, so keys are repeated here.
+# APP_URL is present but empty so CF_PAGES_URL is used for per-preview URLs,
+# edge cache namespaces, API host trust, and Stripe redirects.
+# Analytics IDs are present but empty so preview builds never instrument
+# production GA/Clarity (defense in depth beyond hostname checks).
+# Empty string values also silence Wrangler's "missing env.preview.vars" warnings
+# without copying production values into preview.
 [env.preview.vars]
 NODE_ENV = "production"
+APP_URL = ""
+GA_MEASUREMENT_ID = ""
+CLARITY_PROJECT_ID = ""
 SUPABASE_URL = "https://knptqelvsodccnoehmbj.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHRxZWx2c29kY2Nub2VobWJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NTQ2OTMsImV4cCI6MjA3OTAzMDY5M30.jnlspZYu4J7i7bKfJ0p7j5R_r0YmvJj0ph5uw3XUPeY"
 STRIPE_PRICE_SCAV_MONTHLY = "price_1TaNKuLaRBke56G21GOVCUbK"

@@ -41,8 +41,9 @@ export async function validateToken(
     }
     // Hash the token for lookup
     const tokenHash = await sha256(token);
-    // Query api_tokens table by hash
-    const url = `${env.SUPABASE_URL}/rest/v1/api_tokens?token_hash=eq.${tokenHash}&select=*&limit=1`;
+    const select =
+      'token_id,user_id,permissions,game_mode,is_active,usage_count,last_used_at,created_at,expires_at,note';
+    const url = `${env.SUPABASE_URL}/rest/v1/api_tokens?token_hash=eq.${tokenHash}&select=${select}&limit=1`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -56,26 +57,39 @@ export async function validateToken(
     if (!tokens.length) {
       return { valid: false, error: 'Invalid token', status: 401 };
     }
-    const apiToken = tokens[0];
+    const row = tokens[0];
     // Check if token is active
-    if (!apiToken.is_active) {
+    if (!row.is_active) {
       return { valid: false, error: 'Token is inactive', status: 401 };
     }
     // Check expiration
-    if (apiToken.expires_at && new Date(apiToken.expires_at) < new Date()) {
+    if (row.expires_at && new Date(row.expires_at) < new Date()) {
       return { valid: false, error: 'Token has expired', status: 401 };
     }
     // Check required permission
-    if (requiredPermission && !apiToken.permissions.includes(requiredPermission)) {
+    if (requiredPermission && !row.permissions.includes(requiredPermission)) {
       return {
         valid: false,
         error: `Missing required permission: ${requiredPermission}`,
         status: 403,
       };
     }
+    const safeToken: ApiToken = {
+      token_id: row.token_id,
+      user_id: row.user_id,
+      token_hash: '',
+      permissions: row.permissions,
+      game_mode: row.game_mode,
+      note: row.note,
+      is_active: row.is_active,
+      usage_count: row.usage_count,
+      last_used_at: row.last_used_at,
+      created_at: row.created_at,
+      expires_at: row.expires_at,
+    };
     // Update usage stats (non-blocking)
-    updateTokenUsage(env, apiToken.token_id).catch(() => {});
-    return { valid: true, token: apiToken };
+    updateTokenUsage(env, safeToken.token_id).catch(() => {});
+    return { valid: true, token: safeToken };
   } catch (error) {
     console.error('Token validation error:', error);
     return { valid: false, error: 'Token validation failed', status: 500 };

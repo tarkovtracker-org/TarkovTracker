@@ -13,7 +13,7 @@
         color="primary"
         variant="soft"
         icon="i-mdi-key-plus"
-        :disabled="!userLoggedIn || creating"
+        :disabled="!userLoggedIn || creating || tokenCapReached"
         @click="showCreateDialog = true"
       >
         {{ t('page.settings.card.apitokens.new_token_expand') }}
@@ -26,6 +26,18 @@
         variant="soft"
         :title="t('page.settings.card.apitokens.token_value_unavailable')"
         :description="t('page.settings.card.apitokens.token_value_unavailable_desc')"
+      />
+      <UAlert
+        v-if="tokenCapReached"
+        color="warning"
+        variant="soft"
+        :title="t('page.settings.card.apitokens.token_cap_reached', 'Token limit reached')"
+        :description="
+          t(
+            'page.settings.card.apitokens.token_cap_reached_desc',
+            'You can have at most 3 active API tokens. Revoke an existing token to create a new one.'
+          )
+        "
       />
       <div v-if="loading" class="space-y-2">
         <div class="h-12 animate-pulse rounded-lg bg-white/5"></div>
@@ -332,8 +344,15 @@
       value: mode.value as GameMode,
     }))
   );
+  const MAX_ACTIVE_TOKENS = 3;
+  const activeTokenCount = computed(() => tokens.value.filter((token) => token.isActive).length);
+  const tokenCapReached = computed(() => activeTokenCount.value >= MAX_ACTIVE_TOKENS);
   const canSubmit = computed(
-    () => userLoggedIn.value && selectedPermissions.value.length > 0 && !!selectedGameMode.value
+    () =>
+      userLoggedIn.value &&
+      selectedPermissions.value.length > 0 &&
+      !!selectedGameMode.value &&
+      !tokenCapReached.value
   );
   const allowDirectTokenCreateFallback = computed(
     () => runtimeConfig.public.allowDirectTokenCreateFallback === true
@@ -567,18 +586,34 @@
         return;
       }
       logger.error('[ApiTokens] Failed to create token:', error);
-      showErrorToast({
-        title: t('page.settings.card.apitokens.create_token_error'),
-        error,
-        context: {
-          action: 'create',
-          area: 'api_tokens',
-          gameMode: selectedGameMode.value,
-          permissionCount: selectedPermissions.value.length,
-          userId,
-        },
-        reportTitle: t('page.settings.card.apitokens.report.create_failed'),
-      });
+      const isTokenCapError =
+        (error as { status?: number; statusCode?: number; message?: string })?.status === 409 ||
+        (error as { status?: number; statusCode?: number; message?: string })?.statusCode === 409 ||
+        (error as { message?: string })?.message?.includes('Token limit reached');
+      if (isTokenCapError) {
+        toast.add({
+          title: t('page.settings.card.apitokens.token_cap_reached', 'Token limit reached'),
+          description: t(
+            'page.settings.card.apitokens.token_cap_reached_desc',
+            'You can have at most 3 active API tokens. Revoke an existing token to create a new one.'
+          ),
+          color: 'warning',
+        });
+        await loadTokens();
+      } else {
+        showErrorToast({
+          title: t('page.settings.card.apitokens.create_token_error'),
+          error,
+          context: {
+            action: 'create',
+            area: 'api_tokens',
+            gameMode: selectedGameMode.value,
+            permissionCount: selectedPermissions.value.length,
+            userId,
+          },
+          reportTitle: t('page.settings.card.apitokens.report.create_failed'),
+        });
+      }
     } finally {
       if (requestId === createTokenRequestId) {
         creating.value = false;

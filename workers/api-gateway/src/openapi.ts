@@ -2,18 +2,22 @@ export const OPENAPI_SPEC = {
   openapi: '3.1.0',
   info: {
     title: 'TarkovTracker API Gateway',
-    version: '2.1.0',
+    version: '2.2.0',
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
       'Tokens use prefixes `PVP_` or `PVE_`.\n\n' +
       'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
       '100 writes/day; supporter tiers scale up), resetting at 00:00 UTC, plus a per-minute ' +
-      'burst limit using a 60-second sliding window. ' +
+      'burst limit using a 60-second sliding window. A per-IP backstop (600 reads/hour, ' +
+      '200 writes/hour) catches abuse from many accounts sharing one IP. ' +
       'Every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` ' +
       '(unix seconds) describing the daily quota. On `429` responses a `Retry-After` header (seconds) ' +
       'is also returned, so clients should queue and retry after that delay rather than busy-looping. ' +
-      'Burst-throttled requests do not consume the daily quota.\n\n' +
+      'Burst-throttled and IP-throttled requests do not consume the daily quota.\n\n' +
+      'Token cap: each account may have at most 3 active API tokens. Revoke an existing ' +
+      'token before creating a new one if the cap is reached. Token creation is only ' +
+      'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
       'Docs: https://api.tarkovtracker.org/docs (or / on the api subdomain).',
     contact: {
       name: 'TarkovTracker',
@@ -88,7 +92,8 @@ export const OPENAPI_SPEC = {
         },
       },
       RateLimited: {
-        description: 'Rate limit exceeded (daily quota or per-minute burst limit)',
+        description:
+          'Rate limit exceeded (daily quota, per-minute burst limit, or per-IP backstop)',
         headers: {
           'Retry-After': {
             description:

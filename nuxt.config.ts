@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
@@ -14,6 +14,7 @@ import {
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
+import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
@@ -243,6 +244,37 @@ export default defineNuxtConfig({
         },
       },
     },
+    hooks: {
+      compiled(nitro) {
+        if (!String(nitro.options.preset || '').includes('cloudflare')) {
+          return;
+        }
+        const walk = (dir: string) => {
+          let entries: Dirent[];
+          try {
+            entries = readdirSync(dir, { withFileTypes: true, encoding: 'utf8' });
+          } catch {
+            return;
+          }
+          for (const entry of entries) {
+            const full = join(dir, entry.name);
+            if (entry.isDirectory()) {
+              walk(full);
+              continue;
+            }
+            if (!/\.(m?js|cjs)$/.test(entry.name)) continue;
+            try {
+              const source = readFileSync(full, 'utf8');
+              const next = stripBareNodeImports(source);
+              if (next !== source) writeFileSync(full, next);
+            } catch {
+              // Skip if the path vanished mid-walk (should not happen mid-build).
+            }
+          }
+        };
+        walk(nitro.options.output.serverDir);
+      },
+    },
   },
   routeRules: {
     '/neededitems': { redirect: { to: '/needed-items', statusCode: 301 } },
@@ -346,6 +378,7 @@ export default defineNuxtConfig({
     name: 'Tarkov Tracker',
   },
   sitemap: {
+    zeroRuntime: true,
     xslColumns: [
       { label: 'URL', width: '65%' },
       { label: 'Last Modified', select: 'sitemap:lastmod', width: '25%' },

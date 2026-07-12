@@ -7,6 +7,7 @@ export interface Env {
   ALLOWED_ORIGIN?: string;
   API_HOST?: string;
   LEGACY_API_REDIRECT?: string;
+  IP_HASH_SECRET?: string;
 }
 // API Token from database
 export interface ApiToken {

@@ -403,12 +403,15 @@ pnpm run test:api-gateway
 ### Cloudflare Pages
 
 ```yaml
+# Cloudflare Pages project build configuration (dashboard / CI build settings).
+# Runtime app vars live in wrangler.toml [vars], not here.
 Build command: pnpm run build
 Build output: dist
 Root directory: /
 Node.js version: 24.x
-Environment variables:
-  PNPM_VERSION: 10.34.5
+# Optional build-tool pin (Pages build image). Detection also works from
+# pnpm-lock.yaml + packageManager without this env var.
+# PNPM_VERSION: 10.34.5
 ```
 
 ### Environment Variables
@@ -476,6 +479,15 @@ Functions. (`SUPABASE_SERVICE_ROLE_KEY` is deprecated only as a Nuxt app fallbac
 canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`,
 `DISCORD_SUPPORTER_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` are Edge-only.
 See `supabase/functions/.env.example`.
+
+**Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
+
+| Variable                    | Description                                             | Required   |
+| --------------------------- | ------------------------------------------------------- | ---------- |
+| `SUPABASE_URL`              | Supabase project URL                                    | Yes        |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                       | Yes        |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                               | Yes        |
+| `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in 429 log lines | Yes (prod) |
 
 ## Code Conventions
 
