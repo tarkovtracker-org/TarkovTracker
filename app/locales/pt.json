@@ -1466,6 +1466,180 @@
     },
     "privacy": {
       "title": "Privacy Policy"
+    },
+    "resources": {
+      "title": "Resources & Guides",
+      "subtitle": "Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.",
+      "search_placeholder": "Search tools and guides...",
+      "clear_search": "Clear search",
+      "clear_filters": "Clear filters",
+      "no_results": "No resources match your search.",
+      "results_count": "{count} resources found",
+      "results_count_one": "1 resource found",
+      "filter_label": "Filter resources by category",
+      "more": "More",
+      "more_actions": "More actions",
+      "suggest_title": "Know a useful Tarkov resource?",
+      "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
+      "suggest_cta": "Suggest a resource",
+      "filters": {
+        "all": "All"
+      },
+      "categories": {
+        "companion_apps": "Companion Apps",
+        "data_and_apis": "Data & Developer Tools",
+        "calculators_and_reference": "Calculators & Reference"
+      },
+      "category_badges": {
+        "companion_apps": "Desktop App",
+        "data_and_apis": "Data Platform",
+        "calculators_and_reference": "Reference"
+      },
+      "actions": {
+        "setup_guide": "Setup guide",
+        "read_guide": "Read guide",
+        "api_documentation": "API documentation",
+        "open_calculator": "Open calculator",
+        "view_changes": "View changes",
+        "open_tool": "Open tool",
+        "download_release": "Download latest release"
+      },
+      "view_guide": "Setup guide",
+      "back_to_hub": "Back to Resources",
+      "breadcrumb": "Breadcrumb",
+      "guide_label": "Guide",
+      "on_this_page": "On this page",
+      "compatibility_label": "Compatibility",
+      "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
+      "guide_title_template": "{name} Guide",
+      "meta": {
+        "windows": "Windows",
+        "setup_time": "5-minute setup",
+        "community_data": "Community maintained",
+        "web_tool": "Web tool",
+        "companion_app": "Companion App"
+      },
+      "link_types": {
+        "website": "Open website",
+        "project_website": "Project website",
+        "github": "View source",
+        "discord": "Community support",
+        "api": "API documentation",
+        "download": "Download"
+      },
+      "guide_sections": {
+        "overview": "Overview",
+        "setup": "Getting Started",
+        "troubleshooting": "Troubleshooting",
+        "tips": "Tips & Tricks",
+        "faq": "Common Questions"
+      },
+      "items": {
+        "tarkovdev": {
+          "name": "Tarkov.dev",
+          "description": "Community-maintained item, quest, trader, and market data for players and developers."
+        },
+        "tarkovmonitor": {
+          "name": "TarkovMonitor",
+          "description": "Read live raid data and automatically sync supported progress to TarkovTracker."
+        },
+        "ratscanner": {
+          "name": "RatScanner",
+          "description": "Scan in-game item tooltips to see market value, barter uses, and quest relevance."
+        },
+        "cultistcircle": {
+          "name": "CultistCircle",
+          "description": "Calculate possible Cultist Circle rewards from the items you contribute."
+        },
+        "tarkovchanges": {
+          "name": "Tarkov Changes",
+          "description": "Review item, quest, and gameplay changes between Tarkov updates."
+        }
+      },
+      "guides": {
+        "tarkovdev": {
+          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through a free GraphQL API. TarkovTracker itself uses this API to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
+          "step_1_title": "Browse the website",
+          "step_1_desc": "Visit tarkov.dev to search items, check quest requirements, view trader inventories, and explore hideout station data in a clean, ad-free interface.",
+          "step_2_title": "Use the GraphQL API",
+          "step_2_desc": "If you are a developer, point your GraphQL client at api.tarkov.dev. The API is free, requires no authentication for read queries, and has full schema documentation available at the endpoint.",
+          "step_3_title": "Join the community",
+          "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
+          "tip_1": "The GraphQL API is rate-limited but generous. For production apps, cache responses client-side to avoid redundant queries.",
+          "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
+          "faq_1_q": "Is the Tarkov.dev API free to use?",
+          "faq_1_a": "Yes, the GraphQL API is completely free for read queries. No API key or authentication is required for standard usage.",
+          "faq_2_q": "How often is the data updated?",
+          "faq_2_a": "Data is maintained by community contributors and updated as changes are discovered in-game. During active wipe periods, updates can happen multiple times per day."
+        },
+        "tarkovmonitor": {
+          "overview": "TarkovMonitor is a desktop application by The Hideout team that watches Escape from Tarkov log files and can automatically mark completed quests in TarkovTracker. It also provides audio notifications, local statistics, and optional Tarkov.dev website integration.",
+          "compatibility": "Keep TarkovMonitor running while you play so it can watch new game log entries. It does not read game memory.",
+          "step_1_title": "Download TarkovMonitor",
+          "step_1_desc": "Download the latest Windows release ZIP from the official GitHub Releases page.",
+          "step_2_title": "Extract and launch",
+          "step_2_desc": "Extract the archive to a permanent folder, then run TarkovMonitor.exe. Do not run it directly from inside the ZIP file.",
+          "step_3_title": "Connect your TarkovTracker account",
+          "step_3_desc": "In TarkovMonitor settings, open the TarkovTracker integration section. Create a read-write API token in TarkovTracker Settings, then paste it into TarkovMonitor.",
+          "step_4_title": "Play with TarkovMonitor open",
+          "step_4_desc": "Play normally while TarkovMonitor stays open. When the game writes a supported quest-completion event to its logs, TarkovMonitor can mark that quest complete in TarkovTracker.",
+          "troubleshooting_1_title": "Progress is not syncing",
+          "troubleshooting_1_desc": "Confirm the API token is read-write, has not expired, and that TarkovMonitor is running the latest release.",
+          "troubleshooting_2_title": "Earlier progress is missing",
+          "troubleshooting_2_desc": "Use Read Past Logs in Initial Setup, then choose the correct wipe and profile breakpoint.",
+          "troubleshooting_3_title": "Game mode looks wrong",
+          "troubleshooting_3_desc": "Match your TarkovTracker game mode setting to the mode you are playing, either PvP or PvE.",
+          "tip_1": "Generate a read-write API token in TarkovTracker settings. A read-only token cannot update progress.",
+          "tip_2": "Normal monitoring only processes new logs written while TarkovMonitor is running.",
+          "faq_1_q": "Is TarkovMonitor safe to use?",
+          "faq_1_a": "TarkovMonitor watches the log files that Escape from Tarkov writes locally. It does not read game memory, and the logs are not updated while a raid is in progress. Any third-party tool carries some risk, so use it at your own discretion.",
+          "faq_2_q": "Does TarkovMonitor work with PvE mode?",
+          "faq_2_a": "Yes. It supports both PvP and PvE. Match your TarkovTracker game mode setting to the mode you are playing.",
+          "faq_3_q": "Do I need TarkovMonitor to use TarkovTracker?",
+          "faq_3_a": "No. TarkovTracker works fully with manual input. TarkovMonitor only automates supported progress updates."
+        },
+        "ratscanner": {
+          "overview": "RatScanner is an open-source desktop tool that identifies Escape from Tarkov items from screenshots and displays item data in an overlay. It operates externally and does not access game memory.",
+          "compatibility": "Use borderless or windowed mode. Exclusive fullscreen may prevent the overlay from appearing.",
+          "step_1_title": "Download the latest ZIP",
+          "step_1_desc": "Download RatScanner.zip from the official GitHub Releases page. The project website may lag behind the latest release.",
+          "step_2_title": "Extract and launch",
+          "step_2_desc": "Extract the ZIP to a permanent folder, then run RatScanner.exe. Do not launch it directly from inside the archive.",
+          "step_3_title": "Configure the overlay",
+          "step_3_desc": "Choose which item details appear in the overlay, set opacity, and confirm your scan hotkeys.",
+          "step_4_title": "Scan an item",
+          "step_4_desc": "Name scanning: open an item inspection window and click the magnifier. Icon scanning: hold the configured modifier key and left-click an item. RatScanner screenshots the item and displays its data.",
+          "troubleshooting_1_title": "RatScanner does not start",
+          "troubleshooting_1_desc": "Extract the full release folder first, then run the executable from that folder. If Windows or antivirus blocks it, confirm the file came from the official repository.",
+          "troubleshooting_2_title": "No item is detected",
+          "troubleshooting_2_desc": "Make sure the item inspection UI is fully visible, then try name scanning from the magnifier or icon scanning with the configured modifier.",
+          "troubleshooting_3_title": "Overlay does not appear",
+          "troubleshooting_3_desc": "Switch Tarkov to borderless or windowed mode. Exclusive fullscreen often hides overlays.",
+          "troubleshooting_4_title": "Prices look outdated",
+          "troubleshooting_4_desc": "RatScanner pulls market data from a third-party source, so values can lag behind live flea-market changes.",
+          "tip_1": "Use settings to choose which item details appear and adjust overlay opacity.",
+          "tip_2": "Displayed market values may lag behind live game or market changes.",
+          "faq_1_q": "Will RatScanner get me banned?",
+          "faq_1_a": "RatScanner reads item tooltips using screen capture and does not modify the game client or interact with game servers. Battlestate Games' stance on third-party tools can change, so use at your own risk.",
+          "faq_2_q": "Does RatScanner work with the flea market?",
+          "faq_2_a": "Yes. It shows current flea-market prices and can help compare flea versus trader value.",
+          "faq_3_q": "Can RatScanner show items needed for TarkovTracker?",
+          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page."
+        },
+        "cultistcircle": {
+          "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
+          "step_1_title": "Visit the website",
+          "step_1_desc": "Go to cultistcircle.com to access the calculator. No account or download is required — it works entirely in your browser.",
+          "step_2_title": "Search for recipes",
+          "step_2_desc": "Use the search or browse functionality to find recipes by input item or output result. The calculator shows the trade ratios and possible outcomes for each combination.",
+          "tip_1": "Check the calculator before sacrificing rare items — some trades have much better value ratios than others.",
+          "tip_2": "Recipe data may lag behind game patches. If a recipe seems missing or incorrect, check back after the site has been updated.",
+          "faq_1_q": "Is CultistCircle free to use?",
+          "faq_1_a": "Yes, CultistCircle is completely free and runs in your browser with no account required.",
+          "faq_2_q": "Is CultistCircle affiliated with TarkovTracker?",
+          "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
+        }
+      }
     }
   },
   "footer": {
@@ -1503,6 +1677,7 @@
     "tarkovchanges": "Tarkov Changes",
     "tarkovmonitor": "Tarkov Monitor",
     "credits": "Credits",
+    "resources": "Resources",
     "settings": "Settings",
     "profile": "Profile",
     "kappa": "Kappa & Lightkeeper",
