@@ -6,7 +6,7 @@
  */
 import { isPlainObject } from './deepMerge';
 /** Prefix-to-type mapping for objective inference (ordered by length descending for correct startsWith matching) */
-export const OBJECTIVE_TYPE_PREFIXES: Array<{ prefix: string; type: string }> = [
+const OBJECTIVE_TYPE_PREFIXES: Array<{ prefix: string; type: string }> = [
   { prefix: 'find and hand over', type: 'giveItem' },
   { prefix: 'locate and mark', type: 'mark' },
   { prefix: 'eliminate', type: 'shoot' },

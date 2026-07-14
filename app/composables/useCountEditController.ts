@@ -1,4 +1,4 @@
-export interface CountEditControllerOptions {
+interface CountEditControllerOptions {
   current: MaybeRefOrGetter<number>;
   max: MaybeRefOrGetter<number>;
   min?: MaybeRefOrGetter<number>;
@@ -6,7 +6,7 @@ export interface CountEditControllerOptions {
   externalChangeBehavior?: 'cancel' | 'replace';
   onExternalChange?: (value: number, previous: number | undefined) => void;
 }
-export interface CountEditController {
+interface CountEditController {
   isEditing: Ref<boolean>;
   editValue: Ref<number>;
   inputRef: Ref<HTMLInputElement | null>;

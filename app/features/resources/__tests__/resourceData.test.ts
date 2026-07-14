@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CATEGORY_LABEL_FALLBACKS,
   getGuidePrimaryAction,
+  getGuideSecondaryLinks,
   getPrimaryAction,
   getSecondaryActions,
   matchesResourceSearch,
@@ -178,5 +179,16 @@ describe('resourceData locale parity', () => {
     const primary = getGuidePrimaryAction(ratScanner);
     expect(primary?.href).toBe('https://github.com/RatScanner/RatScanner/releases');
     expect(primary?.labelFallback).toBe('Download latest release');
+  });
+  it('labels the project website as a secondary link on API guides', () => {
+    const tarkovdev = RESOURCES.find((resource) => resource.slug === 'tarkovdev');
+    if (!tarkovdev) throw new Error('tarkovdev missing');
+    const website = getGuideSecondaryLinks(tarkovdev).find(
+      (action) => action.href === 'https://tarkov.dev/'
+    );
+    expect(website).toMatchObject({
+      labelKey: 'page.resources.link_types.project_website',
+      labelFallback: 'Project website',
+    });
   });
 });

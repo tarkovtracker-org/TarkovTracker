@@ -5,7 +5,7 @@
       'bg-surface-900 cursor-pointer rounded-lg border border-white/12 px-4 py-3 shadow-md',
       'transition-all duration-150',
       'focus-visible:ring-surface-700/50 outline-none hover:shadow-lg focus-visible:ring-2',
-      hoverBorderClass,
+      colorClasses.hover,
     ]"
     :aria-label="buttonAriaLabel"
     @click="$emit('click')"
@@ -14,9 +14,9 @@
       <div class="flex items-center gap-3">
         <div
           class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg"
-          :class="iconBgClass"
+          :class="colorClasses.iconBg"
         >
-          <UIcon :name="icon" class="h-7 w-7" :class="iconColorClass" />
+          <UIcon :name="icon" class="h-7 w-7" :class="colorClasses.icon" />
         </div>
         <div>
           <div class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
@@ -25,14 +25,19 @@
           <div class="text-xl font-bold text-white">{{ completedDisplay }}/{{ totalDisplay }}</div>
         </div>
       </div>
-      <div class="text-3xl font-bold" :class="percentageColorClass">{{ percentageDisplay }}%</div>
+      <div class="text-3xl font-bold" :class="colorClasses.percentage">
+        {{ percentageDisplay }}%
+      </div>
     </div>
     <DashboardProgressBar :percentage="percentage" :color="color" :aria-label="progressAriaLabel" />
   </button>
 </template>
 <script setup lang="ts">
+  import {
+    PROGRESS_CARD_COLOR_CLASSES,
+    type ProgressCardColor,
+  } from '@/features/dashboard/progressCard';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
-  import type { ProgressCardColor } from '@/features/dashboard/progressCard';
   const props = defineProps<{
     icon: string;
     label: string;
@@ -58,51 +63,7 @@
   const progressAriaLabel = computed(() =>
     t('page.dashboard.progress_card.progress_label', { label: normalizedLabel.value })
   );
-  const colorClasses: Record<
-    ProgressCardColor,
-    { hover: string; iconBg: string; icon: string; percentage: string }
-  > = {
-    primary: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-primary-600/15',
-      icon: 'text-primary-400',
-      percentage: 'text-primary-400',
-    },
-    neutral: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-surface-700',
-      icon: 'text-surface-300',
-      percentage: 'text-surface-50',
-    },
-    info: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-info-600/15',
-      icon: 'text-info-400',
-      percentage: 'text-info-400',
-    },
-    success: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-success-600/15',
-      icon: 'text-success-400',
-      percentage: 'text-success-400',
-    },
-    kappa: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-kappa-600/15',
-      icon: 'text-kappa-400',
-      percentage: 'text-kappa-400',
-    },
-    lightkeeper: {
-      hover: 'hover:border-surface-600',
-      iconBg: 'bg-lightkeeper-600/15',
-      icon: 'text-lightkeeper-400',
-      percentage: 'text-lightkeeper-400',
-    },
-  };
-  const hoverBorderClass = computed(() => colorClasses[props.color].hover);
-  const iconBgClass = computed(() => colorClasses[props.color].iconBg);
-  const iconColorClass = computed(() => colorClasses[props.color].icon);
-  const percentageColorClass = computed(() => colorClasses[props.color].percentage);
+  const colorClasses = computed(() => PROGRESS_CARD_COLOR_CLASSES[props.color]);
   const percentageDisplay = computed(() => props.percentage.toFixed(2));
   const completedDisplay = computed(() => formatNumber(props.completed));
   const totalDisplay = computed(() => formatNumber(props.total));

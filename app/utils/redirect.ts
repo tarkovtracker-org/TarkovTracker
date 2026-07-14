@@ -1,4 +1,7 @@
 type RedirectInput = string | null | undefined | Array<string | null>;
+export function openExternalUrl(url: string): void {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
 function getRedirectCandidate(redirect: RedirectInput): string | null {
   if (Array.isArray(redirect)) {
     const firstValue = redirect.find((value) => typeof value === 'string');

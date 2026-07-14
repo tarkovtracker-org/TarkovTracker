@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { sanitizeInternalRedirect } from '@/utils/redirect';
+import { describe, expect, it, vi } from 'vitest';
+import { openExternalUrl, sanitizeInternalRedirect } from '@/utils/redirect';
+describe('openExternalUrl', () => {
+  it('opens an isolated browser tab', () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    openExternalUrl('https://example.com');
+    expect(open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer');
+    open.mockRestore();
+  });
+});
 describe('sanitizeInternalRedirect', () => {
   it('returns valid internal path', () => {
     expect(sanitizeInternalRedirect('/tasks?task=abc#header')).toBe('/tasks?task=abc#header');

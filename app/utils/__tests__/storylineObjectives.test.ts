@@ -25,6 +25,24 @@ describe('storylineObjectives', () => {
   it('returns only non-route-choice objective ids', () => {
     expect(getAutoCompletableObjectiveIds(objectives)).toEqual(['obj-3', 'obj-4']);
   });
+  it('applies default route-choice links when source data omits them', () => {
+    expect(
+      getAutoCompletableObjectiveIds([
+        {
+          id: 'falling-skies-main-19',
+          order: 1,
+          type: 'main',
+          description: 'Route A',
+        },
+        {
+          id: 'falling-skies-main-20',
+          order: 2,
+          type: 'main',
+          description: 'Route B',
+        },
+      ])
+    ).toEqual([]);
+  });
   it('completes chapter and only incomplete linear objectives', () => {
     const setChapterComplete = vi.fn();
     const setChapterUncomplete = vi.fn();

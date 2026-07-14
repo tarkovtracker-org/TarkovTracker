@@ -65,7 +65,7 @@ app/
 ├── middleware/       # Route middleware (auth, admin)
 ├── types/            # TypeScript definitions (tarkov.ts, progress.ts, ...)
 ├── utils/            # Client/shared utilities
-├── data/             # Static data (maps.json, overrides)
+├── data/             # Static data (maps.json)
 ├── locales/          # i18n JSON (en.json is source; others Crowdin-owned)
 ├── layouts/          # Page layouts (default.vue)
 ├── assets/css/       # tailwind.css (theme + keyframes)
