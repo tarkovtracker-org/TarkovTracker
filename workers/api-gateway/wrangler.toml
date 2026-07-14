@@ -34,7 +34,9 @@ ip = "0.0.0.0"
 enabled = true
 
 [durable_objects]
-bindings = [{ name = "API_GATEWAY_LIMITER", class_name = "ApiGatewayRateLimiter" }]
+bindings = [
+  { name = "API_GATEWAY_LIMITER", class_name = "ApiGatewayRateLimiter" },
+]
 
 [[migrations]]
 tag = "v1"

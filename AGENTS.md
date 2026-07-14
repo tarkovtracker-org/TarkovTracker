@@ -67,7 +67,7 @@ Before finishing any agent task:
 - Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `pnpm run format` manually unless the hook is bypassed or cannot run (missing `node_modules` / husky harness). CI `format:check` is the gate; never commit knowing hooks were skipped without formatting staged paths yourself.
 - Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
-- Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report-type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
+- Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
 
 ## Production Readiness Review
 

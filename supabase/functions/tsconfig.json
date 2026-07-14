@@ -1,19 +1,16 @@
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ESNext"
-    ],
+    "baseUrl": ".",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "paths": {
+      "shared/auth": ["./_shared/auth.ts"]
+    },
     "skipLibCheck": true,
     "target": "ES2020"
   },
-  "include": [
-    "./**/*.ts",
-    "./deno-stubs.d.ts"
-  ]
+  "include": ["./**/*.ts", "./deno-stubs.d.ts", "./npm-shims.d.ts"]
 }

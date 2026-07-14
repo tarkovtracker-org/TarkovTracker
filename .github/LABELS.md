@@ -78,67 +78,53 @@ Issues and PRs should typically have:
 
 **Bug in task display:**
 
-```
-
+```text
 Issue Type: bug
 Labels: area:ui, priority:medium
-
 ```
 
 **API endpoint missing CORS headers:**
 
-```
-
+```text
 Issue Type: bug
 Labels: area:api, priority:high
-
 ```
 
 **Team page shows wrong level:**
 
-```
-
+```text
 Issue Type: bug
 Labels: area:ui, area:realtime, priority:medium
-
 ```
 
 **New feature spanning multiple areas:**
 
-```
-
+```text
 Issue Type: feature
 Labels: area:api, area:database, area:auth, priority:high
-
 ```
 
 **Enhancement to UI:**
 
-```
-
+```text
 Issue Type: enhancement
 Labels: area:ui, priority:low, good-first-issue
-
 ```
 
 **Missing quest data (send to data-overlay):**
 
-```
-
+```text
 Issue Type: bug (or feature, depending on what's wrong)
 Labels: upstream
-
 ```
 
 Close the issue with a comment explaining it belongs in the data-overlay repo and link to where they should report it.
 
 **Dependency update PR:**
 
-```
-
+```text
 Issue Type: dependencies
 Labels: (none needed, Dependabot handles these)
-
 ```
 
 ### Workflow States (Use Project Board, NOT Labels)
@@ -211,17 +197,17 @@ When someone reports incorrect quest requirements, missing items, wrong item pro
 
 **Total Labels: 13** (down from 31!)
 
-**By Category:**
+### By Category
 
 - Area: 6 labels (area:ui, area:api, area:database, area:auth, area:realtime, area:i18n)
 - Priority: 3 labels (priority:high, priority:medium, priority:low)
 - Special: 4 labels (good-first-issue, help-wanted, never-stale, upstream)
 
-**Issue Types (not labels): 5**
+### Issue Types (not labels): 5
 
 - bug, feature, enhancement, dependencies, documentation
 
-**Most Common Patterns:**
+### Most Common Patterns
 
 - Issue Type: `bug` + Labels: `area:ui, priority:medium`
 - Issue Type: `enhancement` + Labels: `area:ui, priority:low`

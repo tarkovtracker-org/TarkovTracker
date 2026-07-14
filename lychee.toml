@@ -1,25 +1,13 @@
 # Shared lychee config for CI (.github/workflows/link-check.yml) and local runs.
 # Prefer this file for exclude patterns so YAML/shell escaping cannot corrupt regexes.
-
 #############################  Runtime  #############################
-
 no_progress = true
 max_concurrency = 4
 max_retries = 3
 retry_wait_time = 2
 accept = ["200", "204", "206", "301", "302", "308"]
-
 #############################  Exclusions  ##########################
-
 # Generated release notes: issue shortrefs and historical URLs churn often.
-exclude_path = [
-  '(^|/)CHANGELOG\.md$',
-]
-
+exclude_path = ['(^|/)CHANGELOG\.md$']
 # Local/dev hosts and production app origin (checked by deploy, not docs).
-exclude = [
-  'localhost',
-  '127\.0\.0\.1',
-  'tarkovtracker\.org',
-  'gnu\.org',
-]
+exclude = ['localhost', '127\.0\.0\.1', 'tarkovtracker\.org', 'gnu\.org']

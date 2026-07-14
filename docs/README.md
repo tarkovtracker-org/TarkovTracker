@@ -19,7 +19,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 ## Document map
 
-**Human-facing**
+### Human-facing
 
 - [`/README.md`](../README.md) — public overview, features, quick start.
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow, issues, labels, project board.
@@ -29,7 +29,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
 - [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
 
-**Agent-facing**
+### Agent-facing
 
 - [`/AGENTS.md`](../AGENTS.md) — canonical agent contract and conventions (source of truth).
 - [`/DESIGN.md`](../DESIGN.md) — design contract (validate with `pnpm run design:lint`).

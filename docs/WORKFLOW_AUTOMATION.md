@@ -236,7 +236,7 @@ pnpm run setup
 
 1. Update `.env.local` with Supabase credentials
 2. Run `pnpm run dev`
-3. Visit http://localhost:3000
+3. Visit <http://localhost:3000>
 
 ## Deployment Process
 

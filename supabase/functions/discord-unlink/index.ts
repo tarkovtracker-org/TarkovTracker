@@ -4,7 +4,7 @@ import {
   createSuccessResponse,
   handleCorsPreflight,
   validateMethod,
-} from '../_shared/auth.ts';
+} from 'shared/auth';
 import {
   isDiscordNotInGuildError,
   removeAllTierRoles,
