@@ -29,17 +29,20 @@ GRANT SELECT ON public.discord_account_links TO authenticated;
 GRANT ALL ON public.discord_account_links TO service_role;
 GRANT ALL ON public.account_ip_audit TO service_role;
 
+DROP POLICY IF EXISTS "Users can view own Discord account link" ON public.discord_account_links;
 CREATE POLICY "Users can view own Discord account link" ON public.discord_account_links
   FOR SELECT
   TO authenticated
   USING ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "Service role full access" ON public.discord_account_links;
 CREATE POLICY "Service role full access" ON public.discord_account_links
   FOR ALL
   TO service_role
   USING (true)
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Service role full access" ON public.account_ip_audit;
 CREATE POLICY "Service role full access" ON public.account_ip_audit
   FOR ALL
   TO service_role
@@ -88,34 +91,40 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  discord_user_id TEXT;
-  discord_username TEXT;
-  discord_display_name TEXT;
+  v_discord_user_id TEXT;
+  v_discord_username TEXT;
+  v_discord_display_name TEXT;
 BEGIN
   IF NEW.provider <> 'discord' THEN
     RETURN NEW;
   END IF;
 
-  discord_user_id := COALESCE(
+  v_discord_user_id := COALESCE(
     NULLIF(NEW.identity_data ->> 'provider_id', ''),
     NULLIF(NEW.identity_data ->> 'sub', '')
   );
 
-  IF discord_user_id IS NULL THEN
+  IF v_discord_user_id IS NULL THEN
     RETURN NEW;
   END IF;
 
-  discord_username := COALESCE(
+  v_discord_username := COALESCE(
     NULLIF(NEW.identity_data ->> 'username', ''),
     NULLIF(NEW.identity_data ->> 'preferred_username', ''),
     NULLIF(NEW.identity_data ->> 'global_name', ''),
-    discord_user_id
+    v_discord_user_id
   );
-  discord_display_name := COALESCE(
+  v_discord_display_name := COALESCE(
     NULLIF(NEW.identity_data ->> 'global_name', ''),
     NULLIF(NEW.identity_data ->> 'full_name', ''),
     NULLIF(NEW.identity_data ->> 'name', '')
   );
+
+  -- Reassign the Discord identity if it was previously linked to another user
+  -- so the unique(discord_user_id) constraint cannot abort this auth write.
+  DELETE FROM public.discord_account_links
+  WHERE discord_user_id = v_discord_user_id
+    AND user_id <> NEW.user_id;
 
   INSERT INTO public.discord_account_links (
     user_id,
@@ -126,9 +135,9 @@ BEGIN
   )
   VALUES (
     NEW.user_id,
-    discord_user_id,
-    discord_username,
-    discord_display_name,
+    v_discord_user_id,
+    v_discord_username,
+    v_discord_display_name,
     COALESCE(NEW.created_at, NOW())
   )
   ON CONFLICT (user_id) DO UPDATE
@@ -151,6 +160,15 @@ CREATE TRIGGER trg_sync_discord_account_link
   AFTER INSERT OR UPDATE OF provider, identity_data ON auth.identities
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_discord_account_link();
+
+DELETE FROM public.discord_account_links AS existing
+USING auth.identities AS identities
+WHERE identities.provider = 'discord'
+  AND existing.discord_user_id = COALESCE(
+    NULLIF(identities.identity_data ->> 'provider_id', ''),
+    NULLIF(identities.identity_data ->> 'sub', '')
+  )
+  AND existing.user_id <> identities.user_id;
 
 INSERT INTO public.discord_account_links (
   user_id,
@@ -193,6 +211,14 @@ SET
   discord_display_name = EXCLUDED.discord_display_name,
   linked_at = LEAST(public.discord_account_links.linked_at, EXCLUDED.linked_at);
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.supporters;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'supporters'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.supporters;
+  END IF;
+END $$;
 
 COMMIT;

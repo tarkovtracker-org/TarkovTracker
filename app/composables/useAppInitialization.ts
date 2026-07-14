@@ -97,7 +97,10 @@ export function useAppInitialization() {
         accountActivityRecordedForUserId = authenticatedUserId;
       }
     } catch (error) {
-      logger.warn('[useAppInitialization] Failed to record account activity:', error);
+      logger.warn('[useAppInitialization] Failed to record account activity:', {
+        userId: authenticatedUserId,
+        error,
+      });
     }
   };
   const startSyncIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {

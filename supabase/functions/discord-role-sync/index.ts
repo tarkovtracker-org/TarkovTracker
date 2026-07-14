@@ -1,4 +1,10 @@
-import { authenticateUser, createErrorResponse, createSuccessResponse } from '../_shared/auth.ts';
+import {
+  authenticateUser,
+  createErrorResponse,
+  createSuccessResponse,
+  handleCorsPreflight,
+  validateMethod,
+} from '../_shared/auth.ts';
 import { syncLinkedAccountRole, syncRolesForSupporter } from '../_shared/discord.ts';
 
 type DiscordAccountLink = {
@@ -20,9 +26,11 @@ function isActive(supporter: Supporter | null): supporter is Supporter {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== 'POST') {
-    return createErrorResponse('Method not allowed', 405, req);
-  }
+  const cors = handleCorsPreflight(req);
+  if (cors) return cors;
+
+  const methodError = validateMethod(req, ['POST']);
+  if (methodError) return methodError;
 
   const auth = await authenticateUser(req);
   if ('error' in auth) {

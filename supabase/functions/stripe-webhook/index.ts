@@ -7,6 +7,7 @@ import {
   syncLinkedAccountRole,
   syncRolesForSupporter,
 } from '../_shared/discord.ts';
+import { resolveSubscriptionTier } from '../_shared/stripeTier.ts';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
@@ -158,26 +159,39 @@ async function getDiscordUserId(userId: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * Prefer live Discord identity (discord_account_links / auth.identities) over
+ * the denormalized supporters.discord_user_id column so users who link Discord
+ * after checkout still get role updates on portal/refund/cancel events.
+ */
+// deno-lint-ignore no-explicit-any
+async function resolveDiscordUserIdForSupporter(supporter: any): Promise<string | null> {
+  const userId = typeof supporter?.user_id === 'string' ? supporter.user_id : null;
+  if (!userId) return null;
+
+  const resolved = await getDiscordUserId(userId);
+  if (!resolved) return null;
+
+  if (supporter.discord_user_id !== resolved) {
+    const { error } = await supabase
+      .from('supporters')
+      .update({ discord_user_id: resolved })
+      .eq('user_id', userId);
+    if (error) {
+      console.warn('[stripe-webhook] Failed to backfill supporters.discord_user_id:', {
+        userId,
+        error,
+      });
+    } else {
+      supporter.discord_user_id = resolved;
+    }
+  }
+
+  return resolved;
+}
+
 function resolveTier(metadata: Record<string, string> | null | undefined): string {
   return metadata?.tier || 'supporter';
-}
-
-function resolveTierFromPriceId(priceId: unknown): string | null {
-  if (typeof priceId !== 'string') return null;
-  for (const [tier, priceIds] of Object.entries(TIER_PRICE_IDS)) {
-    if (priceIds.includes(priceId)) return tier;
-  }
-  return null;
-}
-
-// deno-lint-ignore no-explicit-any
-function resolveSubscriptionTier(subscription: any, fallbackTier: string): string {
-  const priceId = subscription?.items?.data?.[0]?.price?.id;
-  const metadataTier = subscription?.metadata?.tier;
-  return (
-    resolveTierFromPriceId(priceId) ||
-    (typeof metadataTier === 'string' && metadataTier ? metadataTier : fallbackTier)
-  );
 }
 
 const TIER_RANK: Record<string, number> = { supporter: 0, scav: 1, timmy: 2, chad: 3 };
@@ -332,7 +346,7 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
   const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
   if (!supporter) return;
 
-  const newTier = resolveSubscriptionTier(subscription, supporter.tier);
+  const newTier = resolveSubscriptionTier(subscription, supporter.tier, TIER_PRICE_IDS);
   const isActive = subscription.status === 'active' || subscription.status === 'trialing';
   const isPastDue = subscription.status === 'past_due';
 
@@ -362,18 +376,19 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
     throw new Error(`Failed to update subscription for ${supporter.user_id}: ${error.message}`);
   }
 
-  if (supporter.discord_user_id) {
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (discordUserId) {
     if (isActive) {
       await safeDiscordCall(
         'role sync (subscription updated)',
-        { userId: supporter.user_id, discordUserId: supporter.discord_user_id, tier: newTier },
-        () => syncRolesForSupporter(supporter.discord_user_id, newTier, true)
+        { userId: supporter.user_id, discordUserId, tier: newTier },
+        () => syncRolesForSupporter(discordUserId, newTier, true)
       );
     } else if (!isPastDue) {
       await safeDiscordCall(
         'remove tier roles (subscription updated)',
-        { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-        () => removeAllTierRoles(supporter.discord_user_id)
+        { userId: supporter.user_id, discordUserId },
+        () => removeAllTierRoles(discordUserId)
       );
     }
   }
@@ -398,11 +413,12 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
     throw new Error(`Failed to expire subscription for ${supporter.user_id}: ${error.message}`);
   }
 
-  if (supporter.discord_user_id) {
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (discordUserId) {
     await safeDiscordCall(
       'remove tier roles (subscription deleted)',
-      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-      () => removeAllTierRoles(supporter.discord_user_id)
+      { userId: supporter.user_id, discordUserId },
+      () => removeAllTierRoles(discordUserId)
     );
   }
 
@@ -569,11 +585,12 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
     throw new Error(`Failed to expire async-failed supporter for ${userId}: ${error.message}`);
   }
 
-  if (supporter.discord_user_id) {
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (discordUserId) {
     await safeDiscordCall(
       'remove tier roles (async payment failed)',
-      { userId, discordUserId: supporter.discord_user_id },
-      () => removeAllTierRoles(supporter.discord_user_id)
+      { userId, discordUserId },
+      () => removeAllTierRoles(discordUserId)
     );
   }
 }
@@ -626,23 +643,24 @@ async function revokeSupporter(
     throw new Error(`Supporter row for ${supporter.user_id} changed during ${reason}; will retry`);
   }
 
-  if (!supporter.discord_user_id) return;
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (!discordUserId) return;
 
   await safeDiscordCall(
     `remove tier roles (${reason})`,
-    { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-    () => removeAllTierRoles(supporter.discord_user_id)
+    { userId: supporter.user_id, discordUserId },
+    () => removeAllTierRoles(discordUserId)
   );
 
   if (fullRevoke) {
     const config = getDiscordRoleConfig();
     await safeDiscordCall(
       `remove supporter role (${reason})`,
-      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
+      { userId: supporter.user_id, discordUserId },
       () =>
         removeRole({
           guildId: config.guildId,
-          userId: supporter.discord_user_id,
+          userId: discordUserId,
           roleId: config.supporterRoleId,
         })
     );
@@ -744,7 +762,7 @@ async function handleChargeDisputeCreated(dispute: any): Promise<void> {
 
 type StripeEvent = { id: string; type: string; data: { object: unknown } };
 
-async function dispatchEvent(event: StripeEvent): Promise<void> {
+function dispatchEvent(event: StripeEvent): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed':
       return handleCheckoutCompleted(event.data.object);
@@ -764,6 +782,7 @@ async function dispatchEvent(event: StripeEvent): Promise<void> {
       return handleChargeDisputeCreated(event.data.object);
     default:
       console.info(`[stripe-webhook] Unhandled event: ${event.type}`);
+      return Promise.resolve();
   }
 }
 

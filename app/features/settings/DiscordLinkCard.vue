@@ -4,27 +4,38 @@
     icon-color="primary"
     highlight-color="primary"
     :fill-height="false"
-    :title="t('settings.discord_link.title')"
+    :title="t('settings.discord_link.title', 'Discord Account')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
       <div class="space-y-4 px-4 py-4">
         <p class="text-surface-300 text-sm">
-          {{ t('settings.discord_link.description') }}
+          {{
+            t(
+              'settings.discord_link.description',
+              'Link your Discord account to receive the Linked role and keep supporter perks synchronized.'
+            )
+          }}
         </p>
         <UAlert
           v-if="errorMessage"
           color="error"
           variant="soft"
           icon="i-mdi-alert-circle"
-          :title="t('settings.discord_link.error_title')"
+          :title="t('settings.discord_link.error_title', 'Discord link unavailable')"
           :description="errorMessage"
         />
         <div v-if="link" class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-2 text-sm">
             <UIcon name="i-mdi-link-variant" class="text-success-400 size-5" />
             <span class="text-surface-100 font-medium">
-              {{ t('settings.discord_link.linked_as', { username: link.discord_username }) }}
+              {{
+                t(
+                  'settings.discord_link.linked_as',
+                  { username: link.discord_username },
+                  'Linked as {username}'
+                )
+              }}
             </span>
           </div>
           <UButton
@@ -34,7 +45,7 @@
             :loading="syncing"
             @click="synchronizeRoles"
           >
-            {{ t('settings.discord_link.sync_roles') }}
+            {{ t('settings.discord_link.sync_roles', 'Sync Discord roles') }}
           </UButton>
         </div>
         <UButton
@@ -44,7 +55,7 @@
           :loading="linking || loading"
           @click="linkDiscord"
         >
-          {{ t('settings.discord_link.link_account') }}
+          {{ t('settings.discord_link.link_account', 'Link Discord account') }}
         </UButton>
       </div>
     </template>
@@ -55,6 +66,8 @@
   interface DiscordAccountLink {
     discord_username: string;
   }
+  const LINK_LOAD_RETRY_ATTEMPTS = 4;
+  const LINK_LOAD_RETRY_DELAY_MS = 400;
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
@@ -64,6 +77,7 @@
   const linking = ref(false);
   const syncing = ref(false);
   const errorMessage = ref<string | null>(null);
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const loadLink = async () => {
     const userId = $supabase.user?.id;
     if (!userId) return;
@@ -78,10 +92,25 @@
       if (error) throw error;
       link.value = data;
     } catch (error) {
-      logger.error('[DiscordLinkCard] Failed to load Discord account link', error);
-      errorMessage.value = t('settings.discord_link.load_error');
+      logger.error('[DiscordLinkCard] Failed to load Discord account link', { userId, error });
+      errorMessage.value = t(
+        'settings.discord_link.load_error',
+        'We could not load your Discord account link.'
+      );
     } finally {
       loading.value = false;
+    }
+  };
+  const loadLinkWithRetry = async () => {
+    for (let attempt = 0; attempt < LINK_LOAD_RETRY_ATTEMPTS; attempt += 1) {
+      await loadLink();
+      if (link.value) return;
+      // Transient PostgREST / trigger races after OAuth should not stop retries.
+      // Keep the last error only after the final attempt.
+      if (attempt < LINK_LOAD_RETRY_ATTEMPTS - 1) {
+        errorMessage.value = null;
+        await sleep(LINK_LOAD_RETRY_DELAY_MS);
+      }
     }
   };
   const synchronizeRoles = async () => {
@@ -94,8 +123,14 @@
       });
       if (error) throw error;
     } catch (error) {
-      logger.error('[DiscordLinkCard] Failed to synchronize Discord roles', error);
-      errorMessage.value = t('settings.discord_link.sync_error');
+      logger.error('[DiscordLinkCard] Failed to synchronize Discord roles', {
+        userId: $supabase.user?.id,
+        error,
+      });
+      errorMessage.value = t(
+        'settings.discord_link.sync_error',
+        'Your account is linked, but we could not synchronize Discord roles. Please try again later.'
+      );
     } finally {
       syncing.value = false;
     }
@@ -114,18 +149,41 @@
       if (!data.url) throw new Error('Discord did not return a linking URL');
       window.location.assign(data.url);
     } catch (error) {
-      logger.error('[DiscordLinkCard] Failed to start Discord account link', error);
-      errorMessage.value = t('settings.discord_link.link_error');
+      logger.error('[DiscordLinkCard] Failed to start Discord account link', {
+        userId: $supabase.user?.id,
+        error,
+      });
+      errorMessage.value = t(
+        'settings.discord_link.link_error',
+        'We could not start Discord account linking. Please try again.'
+      );
       linking.value = false;
     }
   };
+  const clearDiscordLinkedQuery = async () => {
+    if (route.query.discord_linked !== '1') return;
+    const query = { ...route.query };
+    delete query.discord_linked;
+    // Preserve the account tab hash so query cleanup does not bounce the tab.
+    await router.replace({ query, hash: route.hash || '#account' });
+  };
   onMounted(async () => {
-    await loadLink();
-    if (route.query.discord_linked === '1' && link.value) {
-      await synchronizeRoles();
-      const query = { ...route.query };
-      delete query.discord_linked;
-      await router.replace({ query });
+    if (route.query.discord_linked === '1') {
+      try {
+        await $supabase.ready?.();
+      } catch (error) {
+        logger.warn('[DiscordLinkCard] Supabase ready failed after Discord link return', {
+          userId: $supabase.user?.id,
+          error,
+        });
+      }
+      await loadLinkWithRetry();
+      if (link.value) {
+        await synchronizeRoles();
+      }
+      await clearDiscordLinkedQuery();
+      return;
     }
+    await loadLink();
   });
 </script>
