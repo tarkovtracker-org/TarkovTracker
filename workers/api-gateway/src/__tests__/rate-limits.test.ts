@@ -3,9 +3,7 @@ import worker, { ApiGatewayRateLimiter, type RateLimitState } from '../index';
 import { isKnownTier, TIER_LIMITS, UPGRADE_URL } from '../limits';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
-
 const DAY_MS = 86400000;
-
 const makeState = () => {
   const store = new Map<string, unknown>();
   let alarm: number | null = null;
@@ -29,16 +27,13 @@ const makeState = () => {
     },
   } as unknown as DurableObjectState;
 };
-
 const limiterRequest = (body: Record<string, unknown>) =>
   new Request('https://rate-limit', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-
 type LimiterCall = { key: string; body: Record<string, unknown> };
-
 const makeCapturingLimiter = (
   calls: LimiterCall[],
   respond: (call: LimiterCall) => { allowed: boolean; remaining: number; resetAt: number }
@@ -56,13 +51,11 @@ const makeCapturingLimiter = (
       },
     }),
   }) as unknown as Env['API_GATEWAY_LIMITER'];
-
 const jsonResponse = (payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
     status,
     headers: { 'content-type': 'application/json' },
   });
-
 const makeFetchMock = ({
   userId,
   supporter,
@@ -107,17 +100,13 @@ const makeFetchMock = ({
     }
     return new Response('Not Found', { status: 404 });
   });
-
 const buildRequest = (path: string, init?: RequestInit) =>
   new Request(`https://api.tarkovtracker.org${path}`, init);
-
 const flushAsync = () => new Promise((resolve) => setTimeout(resolve, 0));
-
 describe('ApiGatewayRateLimiter durable object', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
-
   it('anchors utc-day windows to the next UTC midnight', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const expectedReset = Math.floor(Date.now() / DAY_MS) * DAY_MS + DAY_MS;
@@ -135,7 +124,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(thirdBody.allowed).toBe(false);
     expect(thirdBody.resetAt).toBe(expectedReset);
   });
-
   it('resets utc-day counters after midnight', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T23:59:30Z'));
@@ -157,7 +145,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(afterMidnight.allowed).toBe(true);
     expect(afterMidnight.resetAt).toBe(Date.parse('2026-07-07T00:00:00Z'));
   });
-
   it('sliding mode frees capacity as old requests age out', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
@@ -185,7 +172,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     };
     expect(allowedAgain.allowed).toBe(true);
   });
-
   it('refunds a consumed fixed-window slot on demand', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const payload = { limit: 2, windowSec: 86400, anchor: 'utc-day' };
@@ -203,7 +189,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(afterRefund.allowed).toBe(true);
     expect(afterRefund.remaining).toBe(0);
   });
-
   it('does not refund across a UTC-day rollover when resetAt no longer matches', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T23:59:58Z'));
@@ -231,7 +216,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(blocked.allowed).toBe(false);
     vi.useRealTimers();
   });
-
   it('still refunds when resetAt matches the current window', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const payload = { limit: 1, windowSec: 86400, anchor: 'utc-day' };
@@ -248,7 +232,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(afterRefund.allowed).toBe(true);
     expect(afterRefund.remaining).toBe(0);
   });
-
   it('keeps legacy fixed-window behavior for payloads without mode or anchor', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const payload = { limit: 2, windowSec: 60 };
@@ -264,7 +247,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     };
     expect(blocked.allowed).toBe(false);
   });
-
   it('refunds a sliding-window slot by removing the consumedAt timestamp', async () => {
     vi.useFakeTimers();
     try {
@@ -300,7 +282,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('does not refund a sliding-window slot when consumedAt is missing', async () => {
     vi.useFakeTimers();
     try {
@@ -325,7 +306,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('treats expired fixed-window persisted state as absent on load', async () => {
     vi.useFakeTimers();
     try {
@@ -338,16 +318,15 @@ describe('ApiGatewayRateLimiter durable object', () => {
         anchor: 'utc-day',
       });
       const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (await limiter.fetch(
-        limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' })
-      )).json()) as { allowed: boolean; remaining: number };
+      const res = (await (
+        await limiter.fetch(limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' }))
+      ).json()) as { allowed: boolean; remaining: number };
       expect(res.allowed).toBe(true);
       expect(res.remaining).toBe(0);
     } finally {
       vi.useRealTimers();
     }
   });
-
   it('treats expired sliding-window persisted state as absent on load', async () => {
     vi.useFakeTimers();
     try {
@@ -361,16 +340,15 @@ describe('ApiGatewayRateLimiter durable object', () => {
         timestamps: [Date.parse('2026-07-05T11:58:00Z')],
       });
       const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (await limiter.fetch(
-        limiterRequest({ limit: 3, windowSec: 60, mode: 'sliding' })
-      )).json()) as { allowed: boolean; remaining: number };
+      const res = (await (
+        await limiter.fetch(limiterRequest({ limit: 3, windowSec: 60, mode: 'sliding' }))
+      ).json()) as { allowed: boolean; remaining: number };
       expect(res.allowed).toBe(true);
       expect(res.remaining).toBe(2);
     } finally {
       vi.useRealTimers();
     }
   });
-
   it('prunes expired timestamps from a sliding window with mixed entries', async () => {
     vi.useFakeTimers();
     try {
@@ -387,16 +365,15 @@ describe('ApiGatewayRateLimiter durable object', () => {
         timestamps: [expiredTs, validTs],
       });
       const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (await limiter.fetch(
-        limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' })
-      )).json()) as { allowed: boolean; remaining: number };
+      const res = (await (
+        await limiter.fetch(limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' }))
+      ).json()) as { allowed: boolean; remaining: number };
       expect(res.allowed).toBe(true);
       expect(res.remaining).toBe(0);
     } finally {
       vi.useRealTimers();
     }
   });
-
   it('keeps younger sliding hits when stored resetAt has already elapsed', async () => {
     vi.useFakeTimers();
     try {
@@ -415,16 +392,15 @@ describe('ApiGatewayRateLimiter durable object', () => {
         timestamps: [olderTs, midTs, youngerTs],
       });
       const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (await limiter.fetch(
-        limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' })
-      )).json()) as { allowed: boolean; remaining: number };
+      const res = (await (
+        await limiter.fetch(limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' }))
+      ).json()) as { allowed: boolean; remaining: number };
       expect(res.allowed).toBe(false);
       expect(res.remaining).toBe(0);
     } finally {
       vi.useRealTimers();
     }
   });
-
   it('handles config change from sliding to fixed-window on expired state', async () => {
     vi.useFakeTimers();
     try {
@@ -438,16 +414,15 @@ describe('ApiGatewayRateLimiter durable object', () => {
         timestamps: [Date.parse('2026-07-05T10:59:00Z')],
       });
       const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (await limiter.fetch(
-        limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' })
-      )).json()) as { allowed: boolean; resetAt: number };
+      const res = (await (
+        await limiter.fetch(limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' }))
+      ).json()) as { allowed: boolean; resetAt: number };
       expect(res.allowed).toBe(true);
       expect(res.resetAt).toBe(Date.parse('2026-07-06T00:00:00Z'));
     } finally {
       vi.useRealTimers();
     }
   });
-
   it('does not re-read storage on repeated calls within one object lifetime', async () => {
     const state = makeState();
     const getSpy = vi.spyOn(state.storage, 'get');
@@ -457,21 +432,23 @@ describe('ApiGatewayRateLimiter durable object', () => {
     await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
     expect(getSpy.mock.calls.length).toBe(firstCallCount);
   });
-
   it('does not call setAlarm when retain is set', async () => {
     const state = makeState();
     const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
     const limiter = new ApiGatewayRateLimiter(state);
     await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding', retain: true }));
-    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, anchor: 'utc-day', retain: true }));
+    await limiter.fetch(
+      limiterRequest({ limit: 5, windowSec: 60, anchor: 'utc-day', retain: true })
+    );
     await limiter.fetch(limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true }));
-    const throttled = (await (await limiter.fetch(
-      limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true })
-    )).json()) as { allowed: boolean };
+    const throttled = (await (
+      await limiter.fetch(
+        limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true })
+      )
+    ).json()) as { allowed: boolean };
     expect(throttled.allowed).toBe(false);
     expect(setAlarmSpy).not.toHaveBeenCalled();
   });
-
   it('schedules cleanup alarm by default when retain is omitted', async () => {
     vi.useFakeTimers();
     try {
@@ -490,7 +467,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('schedules cleanup alarm for default sliding-window requests', async () => {
     vi.useFakeTimers();
     try {
@@ -498,9 +474,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       const state = makeState();
       const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
       const limiter = new ApiGatewayRateLimiter(state);
-      const res = await limiter.fetch(
-        limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding' })
-      );
+      const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding' }));
       const body = (await res.json()) as { allowed: boolean; resetAt: number };
       expect(body.allowed).toBe(true);
       expect(setAlarmSpy).toHaveBeenCalledTimes(1);
@@ -509,7 +483,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('schedules cleanup alarm for default fixed-window requests', async () => {
     vi.useFakeTimers();
     try {
@@ -526,7 +499,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('keeps cleanup alarm scheduled on throttled sliding-window deny path', async () => {
     vi.useFakeTimers();
     try {
@@ -548,7 +520,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('re-stamps ephemeral on fixed-window increment of pre-flag stored state', async () => {
     vi.useFakeTimers();
     try {
@@ -572,7 +543,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('alarm reschedules when ephemeral state is still active', async () => {
     vi.useFakeTimers();
     try {
@@ -596,7 +566,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('alarm keeps younger sliding hits when stored resetAt has already elapsed', async () => {
     vi.useFakeTimers();
     try {
@@ -628,7 +597,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('alarm deletes storage when ephemeral state is expired', async () => {
     vi.useFakeTimers();
     try {
@@ -658,7 +626,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('alarm does not reschedule for non-ephemeral state (transitional drain)', async () => {
     vi.useFakeTimers();
     try {
@@ -682,7 +649,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-
   it('alarm deletes storage for expired non-ephemeral state', async () => {
     vi.useFakeTimers();
     try {
@@ -708,7 +674,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     }
   });
 });
-
 describe('tiered quotas in the worker', () => {
   beforeEach(() => {
     deleteMemoryCache('tier:user-free');
@@ -718,7 +683,6 @@ describe('tiered quotas in the worker', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-
   it('applies free-tier daily and burst limits keyed by user id', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {
@@ -754,7 +718,6 @@ describe('tiered quotas in the worker', () => {
       retain: true,
     });
   });
-
   it('applies paid-tier limits from the supporters table', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {
@@ -784,7 +747,6 @@ describe('tiered quotas in the worker', () => {
     expect(calls[0].body).toMatchObject({ limit: TIER_LIMITS.chad.readsPerDay });
     expect(calls[1].body).toMatchObject({ limit: TIER_LIMITS.chad.burstPerMinute });
   });
-
   it('returns an upgrade message when a free user exhausts the daily quota', async () => {
     const calls: LimiterCall[] = [];
     const rpcCalls: Array<Record<string, unknown>> = [];
@@ -814,13 +776,11 @@ describe('tiered quotas in the worker', () => {
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
   });
-
   it('rejects inherited object keys as tiers', () => {
     expect(isKnownTier('__proto__')).toBe(false);
     expect(isKnownTier('constructor')).toBe(false);
     expect(isKnownTier('chad')).toBe(true);
   });
-
   it('refunds the daily slot and returns daily headers when burst throttles', async () => {
     const calls: LimiterCall[] = [];
     const burstResetAt = Date.now() + 30_000;
@@ -856,7 +816,6 @@ describe('tiered quotas in the worker', () => {
     expect(refunds).toHaveLength(1);
     expect(refunds[0].key).toBe('daily-read:user-free');
   });
-
   it('records successful usage through the record_api_usage rpc', async () => {
     const calls: LimiterCall[] = [];
     const rpcCalls: Array<Record<string, unknown>> = [];
@@ -888,7 +847,6 @@ describe('tiered quotas in the worker', () => {
       p_throttled: 0,
     });
   });
-
   it('checks the per-IP backstop when CF-Connecting-IP is present', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {
@@ -915,7 +873,6 @@ describe('tiered quotas in the worker', () => {
     expect(ipCall).toBeDefined();
     expect(ipCall?.body).toMatchObject({ mode: 'sliding', windowSec: 3600 });
   });
-
   it('returns 429 and refunds daily+burst when the per-IP backstop trips', async () => {
     const calls: LimiterCall[] = [];
     const rpcCalls: Array<Record<string, unknown>> = [];
@@ -929,7 +886,12 @@ describe('tiered quotas in the worker', () => {
         if (String(call.key).startsWith('ip-')) {
           return { allowed: false, remaining: 0, resetAt: ipResetAt };
         }
-        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000, consumedAt: burstConsumedAt };
+        return {
+          allowed: true,
+          remaining: 5,
+          resetAt: Date.now() + 1000,
+          consumedAt: burstConsumedAt,
+        };
       }),
       SUPABASE_URL: 'https://supabase.example',
       SUPABASE_ANON_KEY: 'anon',
@@ -957,7 +919,6 @@ describe('tiered quotas in the worker', () => {
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
   });
-
   it('fails open when the per-IP backstop limiter is unavailable (503)', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -1037,7 +998,6 @@ describe('tiered quotas in the worker', () => {
     warnSpy.mockRestore();
     logSpy.mockRestore();
   });
-
   it('ip_backstop_unavailable warning uses hashed IP when secret is set', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -1045,7 +1005,7 @@ describe('tiered quotas in the worker', () => {
       API_GATEWAY_LIMITER: {
         idFromName: (name: string) => name,
         get: (id: unknown) => ({
-          fetch: async (_url: string, init?: RequestInit) => {
+          fetch: async (_url: string, _init?: RequestInit) => {
             const key = String(id);
             if (key.startsWith('ip-')) {
               return new Response('Internal Error', { status: 500 });
@@ -1083,7 +1043,6 @@ describe('tiered quotas in the worker', () => {
     warnSpy.mockRestore();
     logSpy.mockRestore();
   });
-
   it('emits a structured 429 log line with hashed IP on daily throttle', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
@@ -1123,7 +1082,6 @@ describe('tiered quotas in the worker', () => {
     expect(parsed.token_suffix).toBeUndefined();
     logSpy.mockRestore();
   });
-
   it('logs ip_hash as null when IP_HASH_SECRET is not set', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
@@ -1154,7 +1112,6 @@ describe('tiered quotas in the worker', () => {
     expect(parsed.ip_hash).toBeNull();
     logSpy.mockRestore();
   });
-
   it('emits a structured 429 log line with bucket=ip on IP backstop throttle', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
@@ -1199,7 +1156,6 @@ describe('tiered quotas in the worker', () => {
     expect(parsed.token_suffix).toBeUndefined();
     logSpy.mockRestore();
   });
-
   it('does not check the per-IP backstop when no IP header is present', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {
@@ -1221,7 +1177,6 @@ describe('tiered quotas in the worker', () => {
     expect(res.status).toBe(200);
     expect(calls.filter((c) => c.key.startsWith('ip-'))).toHaveLength(0);
   });
-
   it('does not check the per-IP backstop when only X-Forwarded-For is present', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {

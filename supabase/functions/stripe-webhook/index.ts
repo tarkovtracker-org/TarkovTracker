@@ -1,9 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeadersFor } from '../_shared/cors.ts';
 import {
-  getDiscordRoleConfig,
   removeAllTierRoles,
-  removeRole,
+  removeSupporterRole,
   syncLinkedAccountRole,
   syncRolesForSupporter,
 } from '../_shared/discord.ts';
@@ -653,16 +652,10 @@ async function revokeSupporter(
   );
 
   if (fullRevoke) {
-    const config = getDiscordRoleConfig();
     await safeDiscordCall(
       `remove supporter role (${reason})`,
       { userId: supporter.user_id, discordUserId },
-      () =>
-        removeRole({
-          guildId: config.guildId,
-          userId: discordUserId,
-          roleId: config.supporterRoleId,
-        })
+      () => removeSupporterRole(discordUserId)
     );
   }
 }

@@ -2134,7 +2134,9 @@
       "error_title": "Discord link unavailable",
       "load_error": "We could not load your Discord account link.",
       "link_error": "We could not start Discord account linking. Please try again.",
-      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
+      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later.",
+      "not_in_guild_title": "Join the Discord server",
+      "not_in_guild": "Your Discord account is linked, but you are not in the TarkovTracker Discord server. Join the server to receive roles."
     },
     "prestige": {
       "title": "Prestige",

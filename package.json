@@ -1,7 +1,5 @@
 {
   "__pinnedNotes": {
-    "@nuxt/test-utils": "Unpinned to ^4.0.2 on 2026-04-23 after vitest-environment-nuxt@2.0.0 was published and the upstream workspace dependency issue was fixed.",
-    "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
   "version": "1.57.0",
@@ -151,11 +149,9 @@
     ]
   },
   "pnpm": {
-    "packageExtensions": {
-      "@codecov/nuxt-plugin@*": {
-        "peerDependencies": {
-          "nuxt": ">=3.0.0 <5.0.0"
-        }
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@codecov/nuxt-plugin>nuxt": "4"
       }
     }
   }

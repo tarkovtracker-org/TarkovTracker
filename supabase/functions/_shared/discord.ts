@@ -7,6 +7,31 @@ const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const MAX_RATE_LIMIT_RETRIES = 2;
 const MAX_RATE_LIMIT_WAIT_MS = 10_000;
 
+/** Discord JSON error code: Unknown Member (user not in guild). */
+export const DISCORD_ERROR_UNKNOWN_MEMBER = 10007;
+/** Discord JSON error code: Unknown User. */
+export const DISCORD_ERROR_UNKNOWN_USER = 10013;
+
+export type RoleApplyResult = 'ok' | 'not_in_guild' | 'failed';
+
+export class DiscordNotInGuildError extends Error {
+  readonly code = 'not_in_guild' as const;
+
+  constructor(discordUserId: string) {
+    super(`Discord user ${discordUserId} is not a member of the configured guild`);
+    this.name = 'DiscordNotInGuildError';
+  }
+}
+
+export function isDiscordNotInGuildError(error: unknown): error is DiscordNotInGuildError {
+  return (
+    error instanceof DiscordNotInGuildError ||
+    (typeof error === 'object' &&
+      error !== null &&
+      (error as { code?: unknown }).code === 'not_in_guild')
+  );
+}
+
 interface RoleAction {
   guildId: string;
   userId: string;
@@ -57,23 +82,51 @@ async function discordFetch(url: string, init: RequestInit): Promise<Response> {
   return fetch(url, init);
 }
 
+async function readDiscordErrorCode(res: Response): Promise<number | null> {
+  try {
+    const body = (await res.json()) as { code?: unknown };
+    return typeof body?.code === 'number' ? body.code : null;
+  } catch {
+    return null;
+  }
+}
+
+function isNotInGuildErrorCode(code: number | null): boolean {
+  return code === DISCORD_ERROR_UNKNOWN_MEMBER || code === DISCORD_ERROR_UNKNOWN_USER;
+}
+
 async function applyRole(
   method: 'PUT' | 'DELETE',
   { guildId, userId, roleId }: RoleAction
-): Promise<boolean> {
+): Promise<RoleApplyResult> {
   const url = `${DISCORD_API_BASE}/guilds/${guildId}/members/${userId}/roles/${roleId}`;
   const res = await discordFetch(url, { method, headers: getDiscordHeaders() });
-  if (res.status === 204 || res.status === 200) return true;
+  if (res.status === 204 || res.status === 200) return 'ok';
+  const errorCode = await readDiscordErrorCode(res);
+  if (isNotInGuildErrorCode(errorCode)) {
+    return 'not_in_guild';
+  }
   const verb = method === 'PUT' ? 'add' : 'remove';
-  console.error(`[Discord] Failed to ${verb} role ${roleId} for user ${userId}: ${res.status}`);
-  return false;
+  console.error(
+    `[Discord] Failed to ${verb} role ${roleId} for user ${userId}: ${res.status}` +
+      (errorCode !== null ? ` code=${errorCode}` : '')
+  );
+  return 'failed';
 }
 
-export function addRole(action: RoleAction): Promise<boolean> {
+function assertRoleResult(result: RoleApplyResult, discordUserId: string, action: string): void {
+  if (result === 'ok') return;
+  if (result === 'not_in_guild') {
+    throw new DiscordNotInGuildError(discordUserId);
+  }
+  throw new Error(`Unable to ${action} for Discord user ${discordUserId}`);
+}
+
+export function addRole(action: RoleAction): Promise<RoleApplyResult> {
   return applyRole('PUT', action);
 }
 
-export function removeRole(action: RoleAction): Promise<boolean> {
+export function removeRole(action: RoleAction): Promise<RoleApplyResult> {
   return applyRole('DELETE', action);
 }
 
@@ -131,14 +184,15 @@ export async function syncRolesForSupporter(
   if (!discordUserId) return;
   const config = getDiscordRoleConfig();
 
-  const supporterRoleAdded = await addRole({
-    guildId: config.guildId,
-    userId: discordUserId,
-    roleId: config.supporterRoleId,
-  });
-  if (!supporterRoleAdded) {
-    throw new Error(`Unable to add supporter role for Discord user ${discordUserId}`);
-  }
+  assertRoleResult(
+    await addRole({
+      guildId: config.guildId,
+      userId: discordUserId,
+      roleId: config.supporterRoleId,
+    }),
+    discordUserId,
+    'add supporter role'
+  );
 
   const tierRoleId = getTierRoleId(tier, config);
   if (!tierRoleId) return;
@@ -151,23 +205,31 @@ export async function syncRolesForSupporter(
         removeRole({ guildId: config.guildId, userId: discordUserId, roleId })
       )
     );
-    const tierRoleAdded = await addRole({
-      guildId: config.guildId,
-      userId: discordUserId,
-      roleId: tierRoleId,
-    });
-    if (staleRoleResults.some((result) => !result) || !tierRoleAdded) {
+    if (staleRoleResults.some((result) => result === 'not_in_guild')) {
+      throw new DiscordNotInGuildError(discordUserId);
+    }
+    if (staleRoleResults.some((result) => result !== 'ok')) {
       throw new Error(`Unable to synchronize tier roles for Discord user ${discordUserId}`);
     }
+    assertRoleResult(
+      await addRole({
+        guildId: config.guildId,
+        userId: discordUserId,
+        roleId: tierRoleId,
+      }),
+      discordUserId,
+      'add tier role'
+    );
   } else {
-    const tierRoleRemoved = await removeRole({
-      guildId: config.guildId,
-      userId: discordUserId,
-      roleId: tierRoleId,
-    });
-    if (!tierRoleRemoved) {
-      throw new Error(`Unable to remove tier role for Discord user ${discordUserId}`);
-    }
+    assertRoleResult(
+      await removeRole({
+        guildId: config.guildId,
+        userId: discordUserId,
+        roleId: tierRoleId,
+      }),
+      discordUserId,
+      'remove tier role'
+    );
   }
 }
 
@@ -177,14 +239,15 @@ export async function syncLinkedAccountRole(discordUserId: string): Promise<void
   if (!config.linkedRoleId) {
     throw new Error('Missing DISCORD_LINKED_ROLE_ID env');
   }
-  const linkedRoleAdded = await addRole({
-    guildId: config.guildId,
-    userId: discordUserId,
-    roleId: config.linkedRoleId,
-  });
-  if (!linkedRoleAdded) {
-    throw new Error(`Unable to add linked role for Discord user ${discordUserId}`);
-  }
+  assertRoleResult(
+    await addRole({
+      guildId: config.guildId,
+      userId: discordUserId,
+      roleId: config.linkedRoleId,
+    }),
+    discordUserId,
+    'add linked role'
+  );
 }
 
 /**
@@ -201,7 +264,28 @@ export async function removeAllTierRoles(discordUserId: string): Promise<void> {
       removeRole({ guildId: config.guildId, userId: discordUserId, roleId })
     )
   );
-  if (results.some((result) => !result)) {
+  if (results.some((result) => result === 'not_in_guild')) {
+    throw new DiscordNotInGuildError(discordUserId);
+  }
+  if (results.some((result) => result !== 'ok')) {
     throw new Error(`Unable to remove tier roles for Discord user ${discordUserId}`);
   }
+}
+
+/**
+ * Remove the base Supporter role after full revoke / inactive reconcile.
+ * Leaves Linked role intact.
+ */
+export async function removeSupporterRole(discordUserId: string): Promise<void> {
+  if (!discordUserId) return;
+  const config = getDiscordRoleConfig();
+  assertRoleResult(
+    await removeRole({
+      guildId: config.guildId,
+      userId: discordUserId,
+      roleId: config.supporterRoleId,
+    }),
+    discordUserId,
+    'remove supporter role'
+  );
 }

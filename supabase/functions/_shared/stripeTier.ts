@@ -14,14 +14,26 @@ export function resolveTierFromPriceId(
   return null;
 }
 
-// deno-lint-ignore no-explicit-any
+export type StripeSubscriptionLike = {
+  items?: {
+    data?: Array<{
+      price?: {
+        id?: unknown;
+      };
+    }>;
+  };
+  metadata?: {
+    tier?: unknown;
+  };
+};
+
 export function resolveSubscriptionTier(
-  subscription: any,
+  subscription: StripeSubscriptionLike,
   fallbackTier: string,
   priceIdsByTier: Record<string, string[]>
 ): string {
-  const priceId = subscription?.items?.data?.[0]?.price?.id;
-  const metadataTier = subscription?.metadata?.tier;
+  const priceId = subscription.items?.data?.[0]?.price?.id;
+  const metadataTier = subscription.metadata?.tier;
   return (
     resolveTierFromPriceId(priceId, priceIdsByTier) ||
     (typeof metadataTier === 'string' && metadataTier ? metadataTier : fallbackTier)

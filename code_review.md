@@ -16,21 +16,21 @@ Its validation commands and risk areas override the skill's defaults.
 Run these in order. All must pass before a READY verdict.
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run i18n:check
-npm run validate:openapi
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run i18n:check
+pnpm run validate:openapi
 ```
 
 If the change touches `workers/api-gateway`, also run:
 
 ```bash
-npm run test:api-gateway
+pnpm run test:api-gateway
 ```
 
 If the change touches `supabase/functions/`, note that edge functions run on
-Deno and are not covered by `npm run test`. Inspect them manually for Deno API
+Deno and are not covered by `pnpm run test`. Inspect them manually for Deno API
 compatibility.
 
 ## Mandatory Checks
@@ -107,7 +107,7 @@ Hard rules the reviewer must verify for every diff:
 - **Where:** `app/locales/`, `app/i18n.config.ts`
 - **Check:** Fallback locale is `en`. Missing non-English keys render English
   automatically — do not copy English into non-English files. Key names are
-  snake_case (`npm run i18n:check` is fatal for violations). `t('key', 'Fallback')`
+  snake_case (`pnpm run i18n:check` is fatal for violations). `t('key', 'Fallback')`
   calls must have fallback strings. New user-facing strings must add the key to
   `en.json` only; Crowdin handles propagation.
 

@@ -104,9 +104,9 @@ Why:
 ${XDG_CONFIG_HOME:-$HOME/.config}/codex/google-analytics-service-account.json
 ```
 
-5. Add the service account email to the GA4 property with read access.
-6. If using BigQuery export, grant that same service account read access to the exported dataset.
-7. Save `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_PROJECT_ID` in `${XDG_CONFIG_HOME:-$HOME/.config}/codex/analytics.env`.
+1. Add the service account email to the GA4 property with read access.
+2. If using BigQuery export, grant that same service account read access to the exported dataset.
+3. Save `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_PROJECT_ID` in `${XDG_CONFIG_HOME:-$HOME/.config}/codex/analytics.env`.
 
 Add the GA4 MCP server:
 

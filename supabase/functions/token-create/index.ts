@@ -5,7 +5,7 @@ import {
   handleCorsPreflight,
   validateMethod,
   type AuthSuccess,
-} from "../_shared/auth.ts"
+} from "shared/auth"
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
 
 const generateToken = (gameMode: string) => {

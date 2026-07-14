@@ -5,7 +5,13 @@ import {
   handleCorsPreflight,
   validateMethod,
 } from '../_shared/auth.ts';
-import { syncLinkedAccountRole, syncRolesForSupporter } from '../_shared/discord.ts';
+import {
+  isDiscordNotInGuildError,
+  removeAllTierRoles,
+  removeSupporterRole,
+  syncLinkedAccountRole,
+  syncRolesForSupporter,
+} from '../_shared/discord.ts';
 
 type DiscordAccountLink = {
   discord_user_id: string;
@@ -62,10 +68,25 @@ Deno.serve(async (req: Request) => {
       console.error('[discord-role-sync] Supporter lookup failed:', supporterError);
       return createErrorResponse('Unable to load supporter status', 502, req);
     }
+
     if (isActive(supporter)) {
       await syncRolesForSupporter(link.discord_user_id, supporter.tier, true);
+    } else {
+      await removeAllTierRoles(link.discord_user_id);
+      await removeSupporterRole(link.discord_user_id);
     }
   } catch (error) {
+    if (isDiscordNotInGuildError(error)) {
+      console.info('[discord-role-sync] Discord user is not in the guild:', {
+        userId: auth.user.id,
+        discordUserId: link.discord_user_id,
+      });
+      return createSuccessResponse(
+        { synced: false, reason: 'not_in_guild' },
+        200,
+        req
+      );
+    }
     console.error('[discord-role-sync] Discord role synchronization failed:', error);
     return createErrorResponse('Unable to synchronize Discord roles', 502, req);
   }

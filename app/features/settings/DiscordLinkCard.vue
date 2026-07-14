@@ -19,10 +19,10 @@
         </p>
         <UAlert
           v-if="errorMessage"
-          color="error"
+          :color="alertColor"
           variant="soft"
-          icon="i-mdi-alert-circle"
-          :title="t('settings.discord_link.error_title', 'Discord link unavailable')"
+          :icon="alertIcon"
+          :title="alertTitle"
           :description="errorMessage"
         />
         <div v-if="link" class="flex flex-wrap items-center justify-between gap-3">
@@ -72,17 +72,40 @@
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
+  type AlertTone = 'error' | 'warning';
+  type RoleSyncResponse = {
+    reason?: string;
+    synced?: boolean;
+  };
   const link = ref<DiscordAccountLink | null>(null);
   const loading = ref(false);
   const linking = ref(false);
   const syncing = ref(false);
   const errorMessage = ref<string | null>(null);
+  const alertTone = ref<AlertTone>('error');
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const alertColor = computed(() => (alertTone.value === 'warning' ? 'warning' : 'error'));
+  const alertIcon = computed(() =>
+    alertTone.value === 'warning' ? 'i-mdi-information-outline' : 'i-mdi-alert-circle'
+  );
+  const alertTitle = computed(() =>
+    alertTone.value === 'warning'
+      ? t('settings.discord_link.not_in_guild_title', 'Join the Discord server')
+      : t('settings.discord_link.error_title', 'Discord link unavailable')
+  );
+  const setError = (message: string, tone: AlertTone = 'error') => {
+    alertTone.value = tone;
+    errorMessage.value = message;
+  };
+  const clearError = () => {
+    errorMessage.value = null;
+    alertTone.value = 'error';
+  };
   const loadLink = async () => {
     const userId = $supabase.user?.id;
     if (!userId) return;
     loading.value = true;
-    errorMessage.value = null;
+    clearError();
     try {
       const { data, error } = await $supabase.client
         .from('discord_account_links')
@@ -93,9 +116,8 @@
       link.value = data;
     } catch (error) {
       logger.error('[DiscordLinkCard] Failed to load Discord account link', { userId, error });
-      errorMessage.value = t(
-        'settings.discord_link.load_error',
-        'We could not load your Discord account link.'
+      setError(
+        t('settings.discord_link.load_error', 'We could not load your Discord account link.')
       );
     } finally {
       loading.value = false;
@@ -108,7 +130,7 @@
       // Transient PostgREST / trigger races after OAuth should not stop retries.
       // Keep the last error only after the final attempt.
       if (attempt < LINK_LOAD_RETRY_ATTEMPTS - 1) {
-        errorMessage.value = null;
+        clearError();
         await sleep(LINK_LOAD_RETRY_DELAY_MS);
       }
     }
@@ -116,20 +138,34 @@
   const synchronizeRoles = async () => {
     if (!link.value || syncing.value) return;
     syncing.value = true;
-    errorMessage.value = null;
+    clearError();
     try {
-      const { error } = await $supabase.client.functions.invoke('discord-role-sync', {
-        body: {},
-      });
+      const { data, error } = await $supabase.client.functions.invoke<RoleSyncResponse>(
+        'discord-role-sync',
+        {
+          body: {},
+        }
+      );
       if (error) throw error;
+      if (data?.reason === 'not_in_guild') {
+        setError(
+          t(
+            'settings.discord_link.not_in_guild',
+            'Your Discord account is linked, but you are not in the TarkovTracker Discord server. Join the server to receive roles.'
+          ),
+          'warning'
+        );
+      }
     } catch (error) {
       logger.error('[DiscordLinkCard] Failed to synchronize Discord roles', {
         userId: $supabase.user?.id,
         error,
       });
-      errorMessage.value = t(
-        'settings.discord_link.sync_error',
-        'Your account is linked, but we could not synchronize Discord roles. Please try again later.'
+      setError(
+        t(
+          'settings.discord_link.sync_error',
+          'Your account is linked, but we could not synchronize Discord roles. Please try again later.'
+        )
       );
     } finally {
       syncing.value = false;
@@ -138,7 +174,7 @@
   const linkDiscord = async () => {
     if (linking.value) return;
     linking.value = true;
-    errorMessage.value = null;
+    clearError();
     try {
       const redirectTo = `${window.location.origin}/settings?discord_linked=1#account`;
       const { data, error } = await $supabase.client.auth.linkIdentity({
@@ -153,9 +189,11 @@
         userId: $supabase.user?.id,
         error,
       });
-      errorMessage.value = t(
-        'settings.discord_link.link_error',
-        'We could not start Discord account linking. Please try again.'
+      setError(
+        t(
+          'settings.discord_link.link_error',
+          'We could not start Discord account linking. Please try again.'
+        )
       );
       linking.value = false;
     }

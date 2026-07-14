@@ -1,8 +1,6 @@
 import type { ApiTier } from '../limits';
 import type { Env } from '../types';
-
 const USAGE_RPC_TIMEOUT_MS = 3000;
-
 export interface UsageRecord {
   userId: string;
   tokenId: string;
@@ -10,7 +8,6 @@ export interface UsageRecord {
   kind: 'read' | 'write';
   throttled: boolean;
 }
-
 /**
  * Record one API request into public.api_usage_daily via the atomic
  * record_api_usage RPC. Best-effort: failures are logged, never surfaced.

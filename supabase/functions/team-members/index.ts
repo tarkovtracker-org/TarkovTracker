@@ -6,7 +6,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess,
-} from "../_shared/auth.ts";
+} from "shared/auth";
 const TEAM_ID_REGEX = /^[a-zA-Z0-9-]{1,64}$/;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

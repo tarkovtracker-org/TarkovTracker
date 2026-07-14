@@ -59,7 +59,10 @@ const GenericCard = {
   template: '<div><slot name="content" /></div>',
   props: ['icon', 'iconColor', 'highlightColor', 'fillHeight', 'title', 'titleClasses'],
 };
-const UAlert = { template: '<div />', props: ['color', 'variant', 'icon', 'title', 'description'] };
+const UAlert = {
+  template: '<div data-testid="alert" :data-color="color">{{ description }}</div>',
+  props: ['color', 'variant', 'icon', 'title', 'description'],
+};
 const UButton = {
   template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
   props: ['color', 'variant', 'icon', 'loading'],
@@ -136,5 +139,37 @@ describe('DiscordLinkCard', () => {
     expect(invokeMock).toHaveBeenCalledWith('discord-role-sync', { body: {} });
     expect(replaceMock).toHaveBeenCalledWith({ query: {}, hash: '#account' });
     expect(wrapper.text()).toContain('Linked as linked-user');
+  });
+  it('shows a non-retryable warning when the linked user is not in the guild', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_username: 'linked-user' },
+      error: null,
+    });
+    invokeMock.mockResolvedValue({
+      data: { synced: false, reason: 'not_in_guild' },
+      error: null,
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    const alert = wrapper.get('[data-testid="alert"]');
+    expect(alert.attributes('data-color')).toBe('warning');
+    expect(alert.text()).toBe('settings.discord_link.not_in_guild');
+  });
+  it('shows a retryable error when role sync fails', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_username: 'linked-user' },
+      error: null,
+    });
+    invokeMock.mockResolvedValue({
+      data: null,
+      error: new Error('upstream failed'),
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    const alert = wrapper.get('[data-testid="alert"]');
+    expect(alert.attributes('data-color')).toBe('error');
+    expect(alert.text()).toBe('settings.discord_link.sync_error');
   });
 });
