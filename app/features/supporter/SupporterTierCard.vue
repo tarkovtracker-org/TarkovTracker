@@ -120,13 +120,13 @@
         :color="tier.featured ? 'primary' : 'neutral'"
         :variant="tier.featured ? 'solid' : 'soft'"
         size="lg"
-        :loading="checkoutLoading || !authResolved"
+        :loading="(isActiveSubscriber ? manageLoading : checkoutLoading) || !authResolved"
         :disabled="!authResolved"
-        @click="handleCheckout"
+        @click="isActiveSubscriber ? handleManage() : handleCheckout()"
       >
         {{
           isActiveSubscriber
-            ? t('page.supporter.tier_change_cta', 'Switch to this tier')
+            ? t('page.supporter.tier_change_cta', 'Change plan in billing portal')
             : t('page.supporter.tier_cta')
         }}
       </UButton>

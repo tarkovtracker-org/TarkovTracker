@@ -5,7 +5,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess,
-} from 'shared/auth';
+} from '../_shared/auth.ts';
 
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';

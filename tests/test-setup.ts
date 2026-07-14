@@ -1,6 +1,7 @@
 import { enableAutoUnmount } from '@vue/test-utils';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, vi } from 'vitest';
+
 // ponytail: Vue hardcodes this experimental-Suspense notice (console.info, gated only on
 // non-prod) and Vitest's isolated forked workers reload Vue per file, so it spams every run.
 // Drop just that one line; pass everything else through.
@@ -13,6 +14,7 @@ for (const method of ['info', 'log'] as const) {
     original(...args);
   };
 }
+
 type FetchInput = string | Request | URL;
 type MockFetchResponse =
   | { data: { playerLevels: unknown[] } }
@@ -104,6 +106,7 @@ const mockFetch = vi.fn(
   }
 );
 vi.stubGlobal('$fetch', mockFetch);
+
 // Auto-unmount VTU wrappers after each test
 try {
   enableAutoUnmount(afterEach);
@@ -112,6 +115,7 @@ try {
     throw error;
   }
 }
+
 afterAll(() => {
   vi.restoreAllMocks();
 });

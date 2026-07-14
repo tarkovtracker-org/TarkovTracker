@@ -19,9 +19,9 @@
         </p>
         <UAlert
           v-if="errorMessage"
-          :color="alertColor"
+          :color="alertTone"
           variant="soft"
-          :icon="alertIcon"
+          icon="i-mdi-alert-circle"
           :title="alertTitle"
           :description="errorMessage"
         />
@@ -49,13 +49,16 @@
           </UButton>
         </div>
         <UButton
-          v-else
+          v-else-if="currentUserId"
           color="primary"
           icon="i-mdi-discord"
           :loading="linking || loading"
           @click="linkDiscord"
         >
           {{ t('settings.discord_link.link_account', 'Link Discord account') }}
+        </UButton>
+        <UButton v-else color="primary" icon="i-mdi-login" to="/login?redirect=/settings#account">
+          {{ t('settings.discord_link.login_to_link', 'Log in to link Discord') }}
         </UButton>
       </div>
     </template>
@@ -66,46 +69,35 @@
   interface DiscordAccountLink {
     discord_username: string;
   }
+  interface RoleSyncResponse {
+    reason?: string;
+    synced?: boolean;
+  }
   const LINK_LOAD_RETRY_ATTEMPTS = 4;
   const LINK_LOAD_RETRY_DELAY_MS = 400;
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
-  type AlertTone = 'error' | 'warning';
-  type RoleSyncResponse = {
-    reason?: string;
-    synced?: boolean;
-  };
   const link = ref<DiscordAccountLink | null>(null);
   const loading = ref(false);
   const linking = ref(false);
   const syncing = ref(false);
   const errorMessage = ref<string | null>(null);
-  const alertTone = ref<AlertTone>('error');
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  const alertColor = computed(() => (alertTone.value === 'warning' ? 'warning' : 'error'));
-  const alertIcon = computed(() =>
-    alertTone.value === 'warning' ? 'i-mdi-information-outline' : 'i-mdi-alert-circle'
-  );
+  const alertTone = ref<'error' | 'warning'>('error');
   const alertTitle = computed(() =>
     alertTone.value === 'warning'
       ? t('settings.discord_link.not_in_guild_title', 'Join the Discord server')
       : t('settings.discord_link.error_title', 'Discord link unavailable')
   );
-  const setError = (message: string, tone: AlertTone = 'error') => {
-    alertTone.value = tone;
-    errorMessage.value = message;
-  };
-  const clearError = () => {
-    errorMessage.value = null;
-    alertTone.value = 'error';
-  };
+  const currentUserId = computed(() => $supabase.user?.id ?? null);
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const loadLink = async () => {
     const userId = $supabase.user?.id;
     if (!userId) return;
     loading.value = true;
-    clearError();
+    errorMessage.value = null;
+    alertTone.value = 'error';
     try {
       const { data, error } = await $supabase.client
         .from('discord_account_links')
@@ -116,8 +108,9 @@
       link.value = data;
     } catch (error) {
       logger.error('[DiscordLinkCard] Failed to load Discord account link', { userId, error });
-      setError(
-        t('settings.discord_link.load_error', 'We could not load your Discord account link.')
+      errorMessage.value = t(
+        'settings.discord_link.load_error',
+        'We could not load your Discord account link.'
       );
     } finally {
       loading.value = false;
@@ -130,7 +123,7 @@
       // Transient PostgREST / trigger races after OAuth should not stop retries.
       // Keep the last error only after the final attempt.
       if (attempt < LINK_LOAD_RETRY_ATTEMPTS - 1) {
-        clearError();
+        errorMessage.value = null;
         await sleep(LINK_LOAD_RETRY_DELAY_MS);
       }
     }
@@ -138,7 +131,8 @@
   const synchronizeRoles = async () => {
     if (!link.value || syncing.value) return;
     syncing.value = true;
-    clearError();
+    errorMessage.value = null;
+    alertTone.value = 'error';
     try {
       const { data, error } = await $supabase.client.functions.invoke<RoleSyncResponse>(
         'discord-role-sync',
@@ -147,13 +141,11 @@
         }
       );
       if (error) throw error;
-      if (data?.reason === 'not_in_guild') {
-        setError(
-          t(
-            'settings.discord_link.not_in_guild',
-            'Your Discord account is linked, but you are not in the TarkovTracker Discord server. Join the server to receive roles.'
-          ),
-          'warning'
+      if (data?.synced === false && data.reason === 'not_in_guild') {
+        alertTone.value = 'warning';
+        errorMessage.value = t(
+          'settings.discord_link.not_in_guild',
+          'Your account is linked, but you must join the TarkovTracker Discord server before roles can be synchronized.'
         );
       }
     } catch (error) {
@@ -161,11 +153,9 @@
         userId: $supabase.user?.id,
         error,
       });
-      setError(
-        t(
-          'settings.discord_link.sync_error',
-          'Your account is linked, but we could not synchronize Discord roles. Please try again later.'
-        )
+      errorMessage.value = t(
+        'settings.discord_link.sync_error',
+        'Your account is linked, but we could not synchronize Discord roles. Please try again later.'
       );
     } finally {
       syncing.value = false;
@@ -174,7 +164,8 @@
   const linkDiscord = async () => {
     if (linking.value) return;
     linking.value = true;
-    clearError();
+    errorMessage.value = null;
+    alertTone.value = 'error';
     try {
       const redirectTo = `${window.location.origin}/settings?discord_linked=1#account`;
       const { data, error } = await $supabase.client.auth.linkIdentity({
@@ -189,11 +180,9 @@
         userId: $supabase.user?.id,
         error,
       });
-      setError(
-        t(
-          'settings.discord_link.link_error',
-          'We could not start Discord account linking. Please try again.'
-        )
+      errorMessage.value = t(
+        'settings.discord_link.link_error',
+        'We could not start Discord account linking. Please try again.'
       );
       linking.value = false;
     }

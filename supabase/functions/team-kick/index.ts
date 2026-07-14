@@ -7,7 +7,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess,
-} from 'shared/auth';
+} from '../_shared/auth.ts';
 import { enforceUserMutationRateLimit } from '../_shared/rate-limit.ts';
 
 Deno.serve(async (req) => {

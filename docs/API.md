@@ -273,7 +273,9 @@ Authorization: Bearer <supabase_jwt_token>
 
 ### POST /api/stripe/checkout
 
-Creates a Stripe Checkout session for supporter subscriptions or one-time payments. Requires authentication.
+Creates a Stripe Checkout session for a first supporter subscription or a one-time payment.
+Existing active or past-due subscribers must use `/api/stripe/portal` to change plans. Requires
+authentication.
 
 **Request Body (subscription):**
 
@@ -309,12 +311,14 @@ Creates a Stripe Checkout session for supporter subscriptions or one-time paymen
 
 **Errors:**
 
-| Status | Message                           | Cause                      |
-| ------ | --------------------------------- | -------------------------- |
-| 400    | Invalid tier / Invalid interval   | Bad request body           |
-| 401    | Authentication required           | Missing or invalid session |
-| 500    | Stripe not configured             | Server missing Stripe keys |
-| 502    | Failed to create checkout session | Stripe API error           |
+| Status | Message                                                 | Cause                                        |
+| ------ | ------------------------------------------------------- | -------------------------------------------- |
+| 400    | Invalid tier / Invalid interval                         | Bad request body                             |
+| 401    | Authentication required                                 | Missing or invalid session                   |
+| 409    | Manage your existing subscription in the billing portal | Active or past-due subscription exists       |
+| 500    | Stripe not configured                                   | Server missing Stripe keys                   |
+| 502    | Failed to create checkout session                       | Stripe API error                             |
+| 503    | Unable to verify existing subscription                  | Supabase billing-state lookup is unavailable |
 
 ---
 

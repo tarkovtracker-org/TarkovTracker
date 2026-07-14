@@ -4,7 +4,7 @@ import {
   validateMethod,
   createErrorResponse,
   createSuccessResponse,
-} from 'shared/auth';
+} from '../_shared/auth.ts';
 import type { Database } from '../_shared/database.types.ts';
 
 const AUTH_DELETE_MAX_ATTEMPTS = 4;

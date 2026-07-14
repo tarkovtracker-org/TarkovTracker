@@ -39,10 +39,22 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
   (per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID`
   are optional)
 - `DISCORD_LINKED_ROLE_ID` for the role applied after a user links Discord from Settings.
-- Unlinking a Discord identity (Auth dashboard or unlink API) deletes the matching
-  `discord_account_links` row via trigger. Settings → Sync Discord roles also revokes
-  tier/supporter roles when the user is no longer an active supporter, and surfaces a
-  non-retryable message when the linked Discord user is not in the guild.
+
+Configure the Stripe webhook endpoint to send:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+- `charge.refunded`
+- `charge.dispute.created`
+
+Checkout is only for the first subscription. Existing active or past-due subscribers change tiers,
+cancel, and update payment methods through Stripe Customer Portal. A partial refund does not revoke
+access; full refunds and chargebacks follow the revocation policy in the webhook.
 
 ### Account IP audit
 
@@ -81,41 +93,33 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    Functions daily quota is exhausted.
 3. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
    intentionally disabled to avoid per-preview billing):
-
    ```bash
    supabase migration list --linked   # any row with a blank REMOTE column is pending
    supabase db push --linked          # apply pending migrations to production
    ```
-
    Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
    **Ordering caveat:** workers auto-deploy from `main` (step 1) while migrations are manual, so
    a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
    for the gap between merge and `db push`. For such changes, apply the pending migration to
    production **before** merging the worker change; adding a function ahead of its caller is safe.
-
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to IP-backstop logging), confirm the secret is already
    provisioned on the production `api-gateway` Worker:
-
    ```bash
    wrangler secret list --config workers/api-gateway/wrangler.toml   # confirm IP_HASH_SECRET is listed
    wrangler secret put IP_HASH_SECRET --config workers/api-gateway/wrangler.toml   # set if missing
    ```
-
    The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
    deploy time, every 429 and `ip_backstop_unavailable` log line emits `ip_hash: null`, defeating
    the IP-level abuse observability the change introduced. Provision the secret **before** merging
    so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
-
 5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
 6. Deploy Supabase Edge Functions after every change under `supabase/functions/`:
-
    ```bash
-   supabase functions deploy stripe-webhook discord-role-sync --no-verify-jwt --use-api
+   supabase functions deploy --use-api
    ```
-
-   Then confirm both functions report the expected version in the Supabase dashboard.
-
+   This deploys all functions using the per-function JWT settings in `supabase/config.toml`. Confirm
+   every changed function reports the expected version in the Supabase dashboard.
 7. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
 8. Smoke test:
@@ -123,6 +127,11 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    - `https://api.tarkovtracker.org/health`
 9. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
+
+When a user unlinks their Discord identity, the database trigger removes the corresponding
+`discord_account_links` row. Manual role sync removes stale tier roles, preserves the base
+Supporter role for users with paid support history, and reports a join-server warning when the
+Discord account is not a member of the configured guild.
 
 ## Known Benign Database Signals
 
@@ -165,14 +174,11 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   (`supabase:check` = local reset + lint); no workflow runs `db push`. Supabase branch/preview
   auto-deploy is intentionally **disabled** (it bills per ephemeral preview DB). Applying to prod
   is a **manual step** after merge to `main` (see Deployment checklist):
-
   ```bash
   supabase migration list --linked   # confirm the new migration is pending (blank REMOTE column)
   supabase db push --linked          # applies pending migrations to production
   ```
-
   Then verify the change landed (e.g. catalog query / `has_column_privilege`).
-
 - Verify migrations reproduce prod: `supabase db reset --local`, then dump both and compare
   (`supabase db dump --local` vs `--linked`). Catalog-level checks (columns, constraints,
   indexes, grants, policies, functions, triggers via `information_schema` / `pg_catalog`) are

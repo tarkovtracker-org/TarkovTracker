@@ -3,29 +3,38 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount, flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
-const { invokeMock, maybeSingleMock, readyMock, replaceMock, routeState, selectMock, userState } =
-  vi.hoisted(() => {
-    const maybeSingleMock = vi.fn();
-    const selectMock = vi.fn(() => ({
-      eq: () => ({
-        maybeSingle: maybeSingleMock,
-      }),
-    }));
-    return {
-      invokeMock: vi.fn(),
-      maybeSingleMock,
-      readyMock: vi.fn().mockResolvedValue(undefined),
-      replaceMock: vi.fn().mockResolvedValue(undefined),
-      routeState: {
-        query: {} as Record<string, string | undefined>,
-        hash: '',
-      },
-      selectMock,
-      userState: {
-        id: 'user-1' as string | null,
-      },
-    };
-  });
+const {
+  invokeMock,
+  linkIdentityMock,
+  maybeSingleMock,
+  readyMock,
+  replaceMock,
+  routeState,
+  selectMock,
+  userState,
+} = vi.hoisted(() => {
+  const maybeSingleMock = vi.fn();
+  const selectMock = vi.fn(() => ({
+    eq: () => ({
+      maybeSingle: maybeSingleMock,
+    }),
+  }));
+  return {
+    invokeMock: vi.fn(),
+    linkIdentityMock: vi.fn(),
+    maybeSingleMock,
+    readyMock: vi.fn().mockResolvedValue(undefined),
+    replaceMock: vi.fn().mockResolvedValue(undefined),
+    routeState: {
+      query: {} as Record<string, string | undefined>,
+      hash: '',
+    },
+    selectMock,
+    userState: {
+      id: 'user-1' as string | null,
+    },
+  };
+});
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: {
     user: userState,
@@ -38,7 +47,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
         invoke: invokeMock,
       },
       auth: {
-        linkIdentity: vi.fn(),
+        linkIdentity: linkIdentityMock,
       },
     },
   },
@@ -60,12 +69,13 @@ const GenericCard = {
   props: ['icon', 'iconColor', 'highlightColor', 'fillHeight', 'title', 'titleClasses'],
 };
 const UAlert = {
-  template: '<div data-testid="alert" :data-color="color">{{ description }}</div>',
+  template: '<div :data-color="color">{{ title }} {{ description }}</div>',
   props: ['color', 'variant', 'icon', 'title', 'description'],
 };
 const UButton = {
-  template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
-  props: ['color', 'variant', 'icon', 'loading'],
+  template:
+    '<a v-if="to" :href="to"><slot /></a><button v-else type="button" @click="$emit(\'click\')"><slot /></button>',
+  props: ['color', 'variant', 'icon', 'loading', 'to'],
 };
 const UIcon = { template: '<span />', props: ['name', 'class'] };
 describe('DiscordLinkCard', () => {
@@ -77,6 +87,7 @@ describe('DiscordLinkCard', () => {
     readyMock.mockClear().mockResolvedValue(undefined);
     replaceMock.mockClear().mockResolvedValue(undefined);
     invokeMock.mockClear().mockResolvedValue({ data: { synced: true }, error: null });
+    linkIdentityMock.mockClear();
     maybeSingleMock.mockReset();
     selectMock.mockClear();
   });
@@ -140,7 +151,7 @@ describe('DiscordLinkCard', () => {
     expect(replaceMock).toHaveBeenCalledWith({ query: {}, hash: '#account' });
     expect(wrapper.text()).toContain('Linked as linked-user');
   });
-  it('shows a non-retryable warning when the linked user is not in the guild', async () => {
+  it('shows a warning when the linked Discord account has not joined the server', async () => {
     maybeSingleMock.mockResolvedValue({
       data: { discord_username: 'linked-user' },
       error: null,
@@ -152,24 +163,15 @@ describe('DiscordLinkCard', () => {
     const wrapper = await mountCard();
     await wrapper.get('button').trigger('click');
     await flushPromises();
-    const alert = wrapper.get('[data-testid="alert"]');
-    expect(alert.attributes('data-color')).toBe('warning');
-    expect(alert.text()).toBe('settings.discord_link.not_in_guild');
+    expect(wrapper.get('[data-color="warning"]').text()).toContain(
+      'settings.discord_link.not_in_guild'
+    );
   });
-  it('shows a retryable error when role sync fails', async () => {
-    maybeSingleMock.mockResolvedValue({
-      data: { discord_username: 'linked-user' },
-      error: null,
-    });
-    invokeMock.mockResolvedValue({
-      data: null,
-      error: new Error('upstream failed'),
-    });
+  it('sends logged-out users to login without starting identity linking', async () => {
+    userState.id = null;
     const wrapper = await mountCard();
-    await wrapper.get('button').trigger('click');
-    await flushPromises();
-    const alert = wrapper.get('[data-testid="alert"]');
-    expect(alert.attributes('data-color')).toBe('error');
-    expect(alert.text()).toBe('settings.discord_link.sync_error');
+    expect(wrapper.get('a').attributes('href')).toBe('/login?redirect=/settings#account');
+    expect(wrapper.text()).toContain('settings.discord_link.login_to_link');
+    expect(linkIdentityMock).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/knip/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": [
     "supabase/functions/**",
     "app/server/api/changelog.get.ts",

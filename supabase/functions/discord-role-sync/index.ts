@@ -19,11 +19,12 @@ type DiscordAccountLink = {
 
 type Supporter = {
   expires_at: string | null;
+  has_ever_supported: boolean;
   status: 'active' | 'past_due' | 'expired' | 'cancelled';
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
 };
 
-function isActive(supporter: Supporter | null): supporter is Supporter {
+function isActive(supporter: Supporter | null): boolean {
   if (!supporter) return false;
   if (supporter.status === 'active') return true;
   if (supporter.status !== 'past_due' || !supporter.expires_at) return false;
@@ -61,31 +62,26 @@ Deno.serve(async (req: Request) => {
 
     const { data: supporter, error: supporterError } = await auth.supabase
       .from('supporters')
-      .select('tier, status, expires_at')
+      .select('tier, status, expires_at, has_ever_supported')
       .eq('user_id', auth.user.id)
       .maybeSingle<Supporter>();
     if (supporterError) {
       console.error('[discord-role-sync] Supporter lookup failed:', supporterError);
       return createErrorResponse('Unable to load supporter status', 502, req);
     }
-
     if (isActive(supporter)) {
       await syncRolesForSupporter(link.discord_user_id, supporter.tier, true);
     } else {
       await removeAllTierRoles(link.discord_user_id);
-      await removeSupporterRole(link.discord_user_id);
+      if (supporter?.has_ever_supported) {
+        await syncRolesForSupporter(link.discord_user_id, 'supporter', true);
+      } else {
+        await removeSupporterRole(link.discord_user_id);
+      }
     }
   } catch (error) {
     if (isDiscordNotInGuildError(error)) {
-      console.info('[discord-role-sync] Discord user is not in the guild:', {
-        userId: auth.user.id,
-        discordUserId: link.discord_user_id,
-      });
-      return createSuccessResponse(
-        { synced: false, reason: 'not_in_guild' },
-        200,
-        req
-      );
+      return createSuccessResponse({ synced: false, reason: 'not_in_guild' }, 200, req);
     }
     console.error('[discord-role-sync] Discord role synchronization failed:', error);
     return createErrorResponse('Unable to synchronize Discord roles', 502, req);

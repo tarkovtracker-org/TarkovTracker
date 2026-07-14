@@ -11,16 +11,20 @@ export class SupporterCustomerLookupUnavailableError extends Error {
 interface SupporterCustomerLookupOptions {
   throwOnUnavailable?: boolean;
 }
+export interface SupporterBillingState {
+  status: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  type: string | null;
+}
 /**
- * Look up the supporter's Stripe customer id via Supabase service role.
- * Returns null on missing config, missing row, or any error so callers can
- * decide whether to fall back (checkout) or fail loudly (billing portal).
+ * Look up the supporter's Stripe billing state via Supabase service role.
  */
-export async function getSupporterStripeCustomerId(
+export async function getSupporterBillingState(
   event: H3Event,
   userId: string,
   options: SupporterCustomerLookupOptions = {}
-): Promise<string | null> {
+): Promise<SupporterBillingState | null> {
   const config = useRuntimeConfig(event);
   const supabaseUrl = (config.supabaseUrl as string) || '';
   const serviceKey = (config.supabaseServiceKey as string) || '';
@@ -33,9 +37,7 @@ export async function getSupporterStripeCustomerId(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
   try {
-    const url =
-      `${supabaseUrl}/rest/v1/supporters` +
-      `?select=stripe_customer_id&user_id=eq.${encodeURIComponent(userId)}&limit=1`;
+    const url = `${supabaseUrl}/rest/v1/supporters?select=stripe_customer_id,stripe_subscription_id,status,type&user_id=eq.${encodeURIComponent(userId)}&limit=1`;
     const resp = await fetch(url, {
       headers: {
         apikey: serviceKey,
@@ -52,9 +54,20 @@ export async function getSupporterStripeCustomerId(
       }
       return null;
     }
-    const rows = (await resp.json()) as Array<{ stripe_customer_id: string | null }>;
-    const cid = rows?.[0]?.stripe_customer_id;
-    return typeof cid === 'string' && cid.length > 0 ? cid : null;
+    const rows = (await resp.json()) as Array<{
+      status: string | null;
+      stripe_customer_id: string | null;
+      stripe_subscription_id: string | null;
+      type: string | null;
+    }>;
+    const row = rows?.[0];
+    if (!row) return null;
+    return {
+      status: row.status,
+      stripeCustomerId: row.stripe_customer_id,
+      stripeSubscriptionId: row.stripe_subscription_id,
+      type: row.type,
+    };
   } catch (err) {
     clearTimeout(timeout);
     if (err instanceof Error && err.name === 'AbortError') {
@@ -73,4 +86,13 @@ export async function getSupporterStripeCustomerId(
     }
     return null;
   }
+}
+export async function getSupporterStripeCustomerId(
+  event: H3Event,
+  userId: string,
+  options: SupporterCustomerLookupOptions = {}
+): Promise<string | null> {
+  const state = await getSupporterBillingState(event, userId, options);
+  const customerId = state?.stripeCustomerId;
+  return typeof customerId === 'string' && customerId.length > 0 ? customerId : null;
 }

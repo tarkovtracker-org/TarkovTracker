@@ -9,6 +9,9 @@ import {
   useTarkovStore,
 } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
+interface AccountActivityResponse {
+  recorded: boolean;
+}
 /**
  * Handles app-level initialization:
  * - Locale setup from user preferences
@@ -89,11 +92,11 @@ export function useAppInitialization() {
       const { data } = await $supabase.client.auth.getSession();
       const token = data.session?.access_token;
       if (!token) return;
-      await $fetch('/api/account/activity', {
+      const response = await $fetch<AccountActivityResponse>('/api/account/activity', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (getAuthenticatedUserId() === authenticatedUserId) {
+      if (response.recorded && getAuthenticatedUserId() === authenticatedUserId) {
         accountActivityRecordedForUserId = authenticatedUserId;
       }
     } catch (error) {

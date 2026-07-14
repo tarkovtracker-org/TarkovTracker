@@ -45,6 +45,8 @@ overrides:
   yaml: ^2.8.3
   '@apidevtools/swagger-parser>ajv': ^8.18.0
 
+packageExtensionsChecksum: sha256-2eaVFnSq8pFu4K2x1IxkYQlr77abxhs42agaCyMhDQI=
+
 importers:
 
   .:

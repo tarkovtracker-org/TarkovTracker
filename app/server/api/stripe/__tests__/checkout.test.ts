@@ -10,8 +10,9 @@ const runtimeConfig = {
   supabaseUrl: 'https://test.supabase.co',
 } as Record<string, unknown> & { public: { appUrl: string } };
 const mockReadBody = vi.fn();
-const mockGetSupporterStripeCustomerId = vi.fn();
+const mockGetSupporterBillingState = vi.fn();
 const mockCreateCheckoutSession = vi.fn();
+class MockSupporterCustomerLookupUnavailableError extends Error {}
 vi.mock('h3', async () => {
   const actual = await vi.importActual<typeof import('h3')>('h3');
   return {
@@ -38,7 +39,8 @@ vi.mock('@/server/utils/logger', () => ({
   }),
 }));
 vi.mock('@/server/utils/supporterCustomerLookup', () => ({
-  getSupporterStripeCustomerId: (...args: unknown[]) => mockGetSupporterStripeCustomerId(...args),
+  SupporterCustomerLookupUnavailableError: MockSupporterCustomerLookupUnavailableError,
+  getSupporterBillingState: (...args: unknown[]) => mockGetSupporterBillingState(...args),
 }));
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 function makeEvent(authUser: { id?: string; email?: string } | null): H3Event {
@@ -67,7 +69,7 @@ function firstSessionArgs(): CheckoutSessionArgs {
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     mockReadBody.mockReset();
-    mockGetSupporterStripeCustomerId.mockReset();
+    mockGetSupporterBillingState.mockReset();
     mockCreateCheckoutSession.mockReset();
     runtimeConfig.stripeSecretKey = 'sk_test_123';
     runtimeConfig.stripePriceScavMonthly = 'price_scav_monthly';
@@ -86,14 +88,19 @@ describe('POST /api/stripe/checkout', () => {
     await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });
   });
   it('rejects an invalid request body with 400', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'nonsense' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 400 });
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it('creates a one-time payment session and reuses an existing customer', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue('cus_existing');
+    mockGetSupporterBillingState.mockResolvedValue({
+      status: 'expired',
+      stripeCustomerId: 'cus_existing',
+      stripeSubscriptionId: null,
+      type: 'one_time',
+    });
     mockReadBody.mockResolvedValue({ mode: 'payment', amount: 10 });
     mockCreateCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
@@ -109,7 +116,7 @@ describe('POST /api/stripe/checkout', () => {
     expect(args.line_items[0].price_data?.unit_amount).toBe(1000);
   });
   it('falls back to customer_email for a first-time one-time supporter', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'payment', amount: 5 });
     mockCreateCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
@@ -119,21 +126,21 @@ describe('POST /api/stripe/checkout', () => {
     expect(args.customer_email).toBe('user@example.com');
   });
   it('rejects a one-time amount below the minimum with 400', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'payment', amount: 1 });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 400 });
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it('throws 502 when Stripe rejects a one-time session', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'payment', amount: 10 });
     mockCreateCheckoutSession.mockRejectedValue(new Error('stripe down'));
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 502 });
   });
   it('rejects the generic supporter tier in subscription mode with 400', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({
       mode: 'subscription',
       tier: 'supporter',
@@ -144,7 +151,7 @@ describe('POST /api/stripe/checkout', () => {
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it('throws 400 when interval is missing in subscription mode', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 400 });
@@ -152,14 +159,19 @@ describe('POST /api/stripe/checkout', () => {
   });
   it('throws 500 when the resolved price is not configured', async () => {
     runtimeConfig.stripePriceScavMonthly = '';
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav', interval: 'monthly' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 500 });
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it('creates a subscription session with the configured price', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue('cus_existing');
+    mockGetSupporterBillingState.mockResolvedValue({
+      status: 'expired',
+      stripeCustomerId: 'cus_existing',
+      stripeSubscriptionId: null,
+      type: 'one_time',
+    });
     mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav', interval: 'monthly' });
     mockCreateCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/sub' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
@@ -174,8 +186,29 @@ describe('POST /api/stripe/checkout', () => {
     expect(args.line_items[0].price).toBe('price_scav_monthly');
     expect(args.metadata).toMatchObject({ tier: 'scav', interval: 'monthly' });
   });
+  it('rejects a second Checkout subscription for an active subscriber', async () => {
+    mockGetSupporterBillingState.mockResolvedValue({
+      status: 'active',
+      stripeCustomerId: 'cus_existing',
+      stripeSubscriptionId: 'sub_existing',
+      type: 'subscription',
+    });
+    mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav', interval: 'monthly' });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 409 });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+  it('fails closed when existing subscription state cannot be verified', async () => {
+    mockGetSupporterBillingState.mockRejectedValue(
+      new MockSupporterCustomerLookupUnavailableError('network unavailable')
+    );
+    mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav', interval: 'monthly' });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 503 });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
   it('throws 502 when Stripe rejects a subscription session', async () => {
-    mockGetSupporterStripeCustomerId.mockResolvedValue(null);
+    mockGetSupporterBillingState.mockResolvedValue(null);
     mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav', interval: 'monthly' });
     mockCreateCheckoutSession.mockRejectedValue(new Error('stripe down'));
     const { default: handler } = await import('@/server/api/stripe/checkout.post');

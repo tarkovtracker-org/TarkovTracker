@@ -72,6 +72,7 @@
 <script setup lang="ts">
   import { useCyclingItem } from '@/composables/useCyclingItem';
   import { useWikiLink } from '@/composables/useWikiLink';
+  import { resolveObjectiveItemIcon } from '@/features/tasks/task-objective-item-overrides';
   import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
   import type { TarkovItem } from '@/types/tarkov';
   const props = defineProps<{
@@ -109,6 +110,7 @@
     const img = imageItem.value;
     const item = currentItem.value;
     return (
+      resolveObjectiveItemIcon(img?.id || item?.id) ||
       img?.iconLink ||
       img?.image512pxLink ||
       img?.image8xLink ||
