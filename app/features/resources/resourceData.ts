@@ -188,6 +188,13 @@ const linkAction = (link: ResourceLink, projectWebsite = false): ResourceAction 
     LINK_ICONS[link.type]
   );
 };
+const defaultAction = (resource: Resource): ResourceAction | null => {
+  if (resource.primaryAction === 'api') {
+    const action = apiAction(resource);
+    if (action) return action;
+  }
+  return websiteAction(resource);
+};
 export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
   if (resource.primaryAction === 'guide' && resource.hasGuide) {
     return {
@@ -199,11 +206,7 @@ export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
       external: false,
     };
   }
-  if (resource.primaryAction === 'api') {
-    const action = apiAction(resource);
-    if (action) return action;
-  }
-  return websiteAction(resource);
+  return defaultAction(resource);
 };
 export const getSecondaryActions = (resource: Resource): ResourceAction[] => {
   const primary = getPrimaryAction(resource);
@@ -251,11 +254,7 @@ export const getGuidePrimaryAction = (resource: Resource): ResourceAction | null
       );
     }
   }
-  if (resource.primaryAction === 'api') {
-    const action = apiAction(resource);
-    if (action) return action;
-  }
-  return websiteAction(resource);
+  return defaultAction(resource);
 };
 export const getGuideSecondaryLinks = (resource: Resource): ResourceAction[] => {
   const primary = getGuidePrimaryAction(resource);
