@@ -57,7 +57,12 @@
         >
           {{ t('settings.discord_link.link_account', 'Link Discord account') }}
         </UButton>
-        <UButton v-else color="primary" icon="i-mdi-login" to="/login?redirect=/settings#account">
+        <UButton
+          v-else
+          color="primary"
+          icon="i-mdi-login"
+          to="/login?redirect=%2Fsettings%23account"
+        >
           {{ t('settings.discord_link.login_to_link', 'Log in to link Discord') }}
         </UButton>
       </div>

@@ -12,6 +12,7 @@ const runtimeConfig = {
 const mockReadBody = vi.fn();
 const mockGetSupporterBillingState = vi.fn();
 const mockCreateCheckoutSession = vi.fn();
+const mockLoggerError = vi.fn();
 class MockSupporterCustomerLookupUnavailableError extends Error {}
 vi.mock('h3', async () => {
   const actual = await vi.importActual<typeof import('h3')>('h3');
@@ -33,7 +34,7 @@ vi.mock('stripe', () => {
 vi.mock('@/server/utils/logger', () => ({
   createLogger: () => ({
     debug: vi.fn(),
-    error: vi.fn(),
+    error: (...args: unknown[]) => mockLoggerError(...args),
     info: vi.fn(),
     warn: vi.fn(),
   }),
@@ -71,6 +72,7 @@ describe('POST /api/stripe/checkout', () => {
     mockReadBody.mockReset();
     mockGetSupporterBillingState.mockReset();
     mockCreateCheckoutSession.mockReset();
+    mockLoggerError.mockReset();
     runtimeConfig.stripeSecretKey = 'sk_test_123';
     runtimeConfig.stripePriceScavMonthly = 'price_scav_monthly';
     runtimeConfig.public.appUrl = 'https://tarkovtracker.org';
@@ -198,6 +200,18 @@ describe('POST /api/stripe/checkout', () => {
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 409 });
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
+  it('rejects a second Checkout subscription for a trialing subscriber', async () => {
+    mockGetSupporterBillingState.mockResolvedValue({
+      status: 'trialing',
+      stripeCustomerId: 'cus_existing',
+      stripeSubscriptionId: 'sub_existing',
+      type: 'subscription',
+    });
+    mockReadBody.mockResolvedValue({ mode: 'subscription', tier: 'scav', interval: 'monthly' });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 409 });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
   it('fails closed when existing subscription state cannot be verified', async () => {
     mockGetSupporterBillingState.mockRejectedValue(
       new MockSupporterCustomerLookupUnavailableError('network unavailable')
@@ -206,6 +220,14 @@ describe('POST /api/stripe/checkout', () => {
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 503 });
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      '[Stripe Checkout] Supporter customer lookup unavailable',
+      expect.objectContaining({
+        userId: 'user-1',
+        mode: 'subscription',
+        error: expect.any(MockSupporterCustomerLookupUnavailableError),
+      })
+    );
   });
   it('throws 502 when Stripe rejects a subscription session', async () => {
     mockGetSupporterBillingState.mockResolvedValue(null);

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSubscriptionTier, resolveTierFromPriceId } from './stripeTier.ts';
+import {
+  getTierPriceConfig,
+  resolveSubscriptionTier,
+  resolveTierFromPriceId,
+  TIER_PRICE_ENV_NAMES,
+} from './stripeTier.ts';
 
 const PRICE_IDS: Record<string, string[]> = {
   scav: ['price_scav_monthly', 'price_scav_yearly'],
@@ -45,5 +50,32 @@ describe('resolveSubscriptionTier', () => {
 
   it('uses supporter when no valid tier source is available', () => {
     expect(resolveSubscriptionTier({}, 'invalid', PRICE_IDS)).toBe('supporter');
+  });
+
+  it('uses the fallback tier when the subscription is not an object', () => {
+    expect(resolveSubscriptionTier(null, 'scav', PRICE_IDS)).toBe('scav');
+  });
+});
+
+describe('getTierPriceConfig', () => {
+  it('loads every configured tier price ID', () => {
+    const environment = Object.fromEntries(
+      Object.values(TIER_PRICE_ENV_NAMES)
+        .flat()
+        .map((name) => [name, `price_${name.toLowerCase()}`])
+    );
+    const config = getTierPriceConfig((name) => environment[name]);
+    expect(config.missing).toEqual([]);
+    expect(config.priceIdsByTier.scav).toHaveLength(3);
+    expect(config.priceIdsByTier.timmy).toHaveLength(3);
+    expect(config.priceIdsByTier.chad).toHaveLength(3);
+  });
+
+  it('reports unset and blank tier price variables', () => {
+    const config = getTierPriceConfig((name) =>
+      name === 'STRIPE_PRICE_TIMMY_6MONTH' ? ' ' : undefined
+    );
+    expect(config.missing).toContain('STRIPE_PRICE_TIMMY_6MONTH');
+    expect(config.missing).toContain('STRIPE_PRICE_SCAV_MONTHLY');
   });
 });

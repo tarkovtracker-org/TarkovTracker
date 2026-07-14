@@ -43,6 +43,11 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     if (error instanceof SupporterCustomerLookupUnavailableError) {
+      logger.error('[Stripe Checkout] Supporter customer lookup unavailable', {
+        userId,
+        mode,
+        error,
+      });
       throw createError({
         statusCode: 503,
         message: 'Unable to verify existing subscription',
@@ -93,7 +98,7 @@ export default defineEventHandler(async (event) => {
   }
   if (
     billingState?.stripeSubscriptionId &&
-    ['active', 'past_due'].includes(billingState.status ?? '')
+    ['active', 'past_due', 'trialing'].includes(billingState.status ?? '')
   ) {
     throw createError({
       statusCode: 409,

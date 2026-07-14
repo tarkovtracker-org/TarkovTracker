@@ -11,7 +11,11 @@ import {
   getStripeReferenceId,
   isFullRefund,
 } from '../_shared/stripeBilling.ts';
-import { isSupporterTier, resolveSubscriptionTier } from '../_shared/stripeTier.ts';
+import {
+  getTierPriceConfig,
+  isSupporterTier,
+  resolveSubscriptionTier,
+} from '../_shared/stripeTier.ts';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
@@ -29,27 +33,20 @@ type StripeSubscription = {
   status?: string;
 };
 
-const TIER_PRICE_IDS: Record<string, string[]> = {
-  scav: [
-    Deno.env.get('STRIPE_PRICE_SCAV_MONTHLY'),
-    Deno.env.get('STRIPE_PRICE_SCAV_6MONTH'),
-    Deno.env.get('STRIPE_PRICE_SCAV_YEARLY'),
-  ].filter((priceId): priceId is string => Boolean(priceId)),
-  timmy: [
-    Deno.env.get('STRIPE_PRICE_TIMMY_MONTHLY'),
-    Deno.env.get('STRIPE_PRICE_TIMMY_6MONTH'),
-    Deno.env.get('STRIPE_PRICE_TIMMY_YEARLY'),
-  ].filter((priceId): priceId is string => Boolean(priceId)),
-  chad: [
-    Deno.env.get('STRIPE_PRICE_CHAD_MONTHLY'),
-    Deno.env.get('STRIPE_PRICE_CHAD_6MONTH'),
-    Deno.env.get('STRIPE_PRICE_CHAD_YEARLY'),
-  ].filter((priceId): priceId is string => Boolean(priceId)),
-};
+const { missing: missingTierPriceEnvVars, priceIdsByTier: TIER_PRICE_IDS } = getTierPriceConfig(
+  (name) => Deno.env.get(name)
+);
+const missingRequiredEnvVars = [
+  !SUPABASE_URL ? 'SUPABASE_URL' : null,
+  !SUPABASE_SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
+  !STRIPE_WEBHOOK_SECRET ? 'STRIPE_WEBHOOK_SECRET' : null,
+  !STRIPE_SECRET_KEY ? 'STRIPE_SECRET_KEY' : null,
+  ...missingTierPriceEnvVars,
+].filter((name): name is string => Boolean(name));
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !STRIPE_WEBHOOK_SECRET || !STRIPE_SECRET_KEY) {
+if (missingRequiredEnvVars.length > 0) {
   throw new Error(
-    '[stripe-webhook] Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY must be set. STRIPE_SECRET_KEY is required to correlate refund/dispute charges back to the originating subscription/customer.'
+    `[stripe-webhook] Missing required env vars: ${missingRequiredEnvVars.join(', ')}`
   );
 }
 

@@ -6,6 +6,17 @@
 export const SUPPORTER_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
 export type SupporterTier = (typeof SUPPORTER_TIERS)[number];
 
+export const TIER_PRICE_ENV_NAMES = {
+  scav: ['STRIPE_PRICE_SCAV_MONTHLY', 'STRIPE_PRICE_SCAV_6MONTH', 'STRIPE_PRICE_SCAV_YEARLY'],
+  timmy: ['STRIPE_PRICE_TIMMY_MONTHLY', 'STRIPE_PRICE_TIMMY_6MONTH', 'STRIPE_PRICE_TIMMY_YEARLY'],
+  chad: ['STRIPE_PRICE_CHAD_MONTHLY', 'STRIPE_PRICE_CHAD_6MONTH', 'STRIPE_PRICE_CHAD_YEARLY'],
+} as const;
+
+type StripeSubscriptionLike = {
+  items?: { data?: Array<{ price?: { id?: unknown } }> };
+  metadata?: { tier?: unknown };
+};
+
 export function isSupporterTier(value: unknown): value is SupporterTier {
   return typeof value === 'string' && SUPPORTER_TIERS.includes(value as SupporterTier);
 }
@@ -21,14 +32,33 @@ export function resolveTierFromPriceId(
   return null;
 }
 
-// deno-lint-ignore no-explicit-any
+export function getTierPriceConfig(getEnv: (name: string) => string | undefined): {
+  missing: string[];
+  priceIdsByTier: Record<string, string[]>;
+} {
+  const missing: string[] = [];
+  const priceIdsByTier: Record<string, string[]> = {};
+  for (const [tier, envNames] of Object.entries(TIER_PRICE_ENV_NAMES)) {
+    priceIdsByTier[tier] = envNames.map((envName) => {
+      const value = getEnv(envName)?.trim() ?? '';
+      if (!value) missing.push(envName);
+      return value;
+    });
+  }
+  return { missing, priceIdsByTier };
+}
+
 export function resolveSubscriptionTier(
-  subscription: any,
+  subscription: unknown,
   fallbackTier: unknown,
   priceIdsByTier: Record<string, string[]>
 ): SupporterTier {
-  const priceId = subscription?.items?.data?.[0]?.price?.id;
-  const metadataTier = subscription?.metadata?.tier;
+  const subscriptionLike =
+    typeof subscription === 'object' && subscription !== null
+      ? (subscription as StripeSubscriptionLike)
+      : null;
+  const priceId = subscriptionLike?.items?.data?.[0]?.price?.id;
+  const metadataTier = subscriptionLike?.metadata?.tier;
   return (
     resolveTierFromPriceId(priceId, priceIdsByTier) ||
     (isSupporterTier(metadataTier) ? metadataTier : null) ||

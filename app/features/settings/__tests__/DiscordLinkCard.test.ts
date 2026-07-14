@@ -170,7 +170,7 @@ describe('DiscordLinkCard', () => {
   it('sends logged-out users to login without starting identity linking', async () => {
     userState.id = null;
     const wrapper = await mountCard();
-    expect(wrapper.get('a').attributes('href')).toBe('/login?redirect=/settings#account');
+    expect(wrapper.get('a').attributes('href')).toBe('/login?redirect=%2Fsettings%23account');
     expect(wrapper.text()).toContain('settings.discord_link.login_to_link');
     expect(linkIdentityMock).not.toHaveBeenCalled();
   });
