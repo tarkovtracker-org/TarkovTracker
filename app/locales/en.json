@@ -2125,6 +2125,17 @@
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
       "go_to_dashboard": "Go to Dashboard"
     },
+    "discord_link": {
+      "title": "Discord Account",
+      "description": "Link your Discord account to receive the Linked role and keep supporter perks synchronized.",
+      "link_account": "Link Discord account",
+      "linked_as": "Linked as {username}",
+      "sync_roles": "Sync Discord roles",
+      "error_title": "Discord link unavailable",
+      "load_error": "We could not load your Discord account link.",
+      "link_error": "We could not start Discord account linking. Please try again.",
+      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
+    },
     "prestige": {
       "title": "Prestige",
       "pvp_only_title": "Prestige Is PvP Only",

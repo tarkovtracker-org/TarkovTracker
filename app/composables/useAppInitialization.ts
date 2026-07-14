@@ -57,6 +57,7 @@ export function useAppInitialization() {
   };
   let syncStarted = false;
   let migrationAttempted = false;
+  let accountActivityRecordedForUserId: string | null = null;
   let supporterLoadedForUserId: string | null = null;
   let authChangeToken = 0;
   const resetTarkovState = (reason: string, previousUserId: string | null = null) => {
@@ -77,6 +78,26 @@ export function useAppInitialization() {
       supporterLoadedForUserId = authenticatedUserId;
     } catch (error) {
       logger.error('[useAppInitialization] Failed to load supporter status:', error);
+    }
+  };
+  const recordAccountActivityIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
+    const authenticatedUserId = getAuthenticatedUserId();
+    if (expectedUserId && authenticatedUserId !== expectedUserId) return;
+    if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
+    if (!authenticatedUserId || accountActivityRecordedForUserId === authenticatedUserId) return;
+    try {
+      const { data } = await $supabase.client.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      await $fetch('/api/account/activity', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (getAuthenticatedUserId() === authenticatedUserId) {
+        accountActivityRecordedForUserId = authenticatedUserId;
+      }
+    } catch (error) {
+      logger.warn('[useAppInitialization] Failed to record account activity:', error);
     }
   };
   const startSyncIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
@@ -131,6 +152,7 @@ export function useAppInitialization() {
         }
         syncStarted = false;
         migrationAttempted = false;
+        accountActivityRecordedForUserId = null;
         supporterLoadedForUserId = null;
         supporter.reset();
         return;
@@ -139,6 +161,7 @@ export function useAppInitialization() {
         resetTarkovState('user switched', prevUserId);
         syncStarted = false;
         migrationAttempted = false;
+        accountActivityRecordedForUserId = null;
         supporterLoadedForUserId = null;
         supporter.reset();
       }
@@ -147,6 +170,8 @@ export function useAppInitialization() {
       await runMigrationIfNeeded(userId, token);
       if (token !== authChangeToken) return;
       await loadSupporterStatusIfNeeded(userId, token);
+      if (token !== authChangeToken) return;
+      await recordAccountActivityIfNeeded(userId, token);
     },
     { immediate: true }
   );

@@ -4,6 +4,7 @@ import {
   getDiscordRoleConfig,
   removeAllTierRoles,
   removeRole,
+  syncLinkedAccountRole,
   syncRolesForSupporter,
 } from '../_shared/discord.ts';
 
@@ -15,12 +16,25 @@ const GRACE_PERIOD_DAYS = 7;
 const STRIPE_API_VERSION = '2024-06-20';
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
-if (
-  !SUPABASE_URL ||
-  !SUPABASE_SERVICE_ROLE_KEY ||
-  !STRIPE_WEBHOOK_SECRET ||
-  !STRIPE_SECRET_KEY
-) {
+const TIER_PRICE_IDS: Record<string, string[]> = {
+  scav: [
+    Deno.env.get('STRIPE_PRICE_SCAV_MONTHLY'),
+    Deno.env.get('STRIPE_PRICE_SCAV_6MONTH'),
+    Deno.env.get('STRIPE_PRICE_SCAV_YEARLY'),
+  ].filter((priceId): priceId is string => Boolean(priceId)),
+  timmy: [
+    Deno.env.get('STRIPE_PRICE_TIMMY_MONTHLY'),
+    Deno.env.get('STRIPE_PRICE_TIMMY_6MONTH'),
+    Deno.env.get('STRIPE_PRICE_TIMMY_YEARLY'),
+  ].filter((priceId): priceId is string => Boolean(priceId)),
+  chad: [
+    Deno.env.get('STRIPE_PRICE_CHAD_MONTHLY'),
+    Deno.env.get('STRIPE_PRICE_CHAD_6MONTH'),
+    Deno.env.get('STRIPE_PRICE_CHAD_YEARLY'),
+  ].filter((priceId): priceId is string => Boolean(priceId)),
+};
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !STRIPE_WEBHOOK_SECRET || !STRIPE_SECRET_KEY) {
   throw new Error(
     '[stripe-webhook] Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY must be set. STRIPE_SECRET_KEY is required to correlate refund/dispute charges back to the originating subscription/customer.'
   );
@@ -120,6 +134,19 @@ async function claimEvent(eventId: string, eventType: string): Promise<boolean> 
  * depending on auth client version, not the Discord-side user id.
  */
 async function getDiscordUserId(userId: string): Promise<string | null> {
+  const { data: linkedAccount, error: linkedAccountError } = await supabase
+    .from('discord_account_links')
+    .select('discord_user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (linkedAccount?.discord_user_id) return linkedAccount.discord_user_id;
+  if (linkedAccountError) {
+    console.warn('[stripe-webhook] Discord link lookup failed:', {
+      userId,
+      error: linkedAccountError,
+    });
+  }
+
   const { data } = await supabase.auth.admin.getUserById(userId);
   if (!data?.user?.identities) return null;
   const discordIdentity = data.user.identities.find((i) => i.provider === 'discord');
@@ -135,10 +162,28 @@ function resolveTier(metadata: Record<string, string> | null | undefined): strin
   return metadata?.tier || 'supporter';
 }
 
+function resolveTierFromPriceId(priceId: unknown): string | null {
+  if (typeof priceId !== 'string') return null;
+  for (const [tier, priceIds] of Object.entries(TIER_PRICE_IDS)) {
+    if (priceIds.includes(priceId)) return tier;
+  }
+  return null;
+}
+
+// deno-lint-ignore no-explicit-any
+function resolveSubscriptionTier(subscription: any, fallbackTier: string): string {
+  const priceId = subscription?.items?.data?.[0]?.price?.id;
+  const metadataTier = subscription?.metadata?.tier;
+  return (
+    resolveTierFromPriceId(priceId) ||
+    (typeof metadataTier === 'string' && metadataTier ? metadataTier : fallbackTier)
+  );
+}
+
 const TIER_RANK: Record<string, number> = { supporter: 0, scav: 1, timmy: 2, chad: 3 };
 
 function higherTier(a: string | null | undefined, b: string): string {
-  return (TIER_RANK[a || 'supporter'] ?? 0) >= (TIER_RANK[b] ?? 0) ? (a || 'supporter') : b;
+  return (TIER_RANK[a || 'supporter'] ?? 0) >= (TIER_RANK[b] ?? 0) ? a || 'supporter' : b;
 }
 
 /**
@@ -199,9 +244,7 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     existing?.stripe_subscription_id;
 
   const effectiveTier =
-    hasLiveSubscription && !isSubscription
-      ? higherTier(existing.tier, tier)
-      : tier;
+    hasLiveSubscription && !isSubscription ? higherTier(existing.tier, tier) : tier;
 
   // Preserve stripe_customer_id from the existing row when the session doesn't
   // provide one (e.g., guest one-time checkout linked later).
@@ -213,9 +256,10 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     status: hasLiveSubscription && !isSubscription ? existing.status : 'active',
     type: hasLiveSubscription || isSubscription ? 'subscription' : 'one_time',
     stripe_customer_id: effectiveCustomerId,
-    stripe_subscription_id: hasLiveSubscription && !isSubscription
-      ? existing.stripe_subscription_id
-      : session.subscription || null,
+    stripe_subscription_id:
+      hasLiveSubscription && !isSubscription
+        ? existing.stripe_subscription_id
+        : session.subscription || null,
     has_ever_supported: true,
     discord_user_id: discordUserId,
     amount_total: session.amount_total || 0,
@@ -224,17 +268,20 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from('supporters')
-    .upsert(record, { onConflict: 'user_id' });
+  const { error } = await supabase.from('supporters').upsert(record, { onConflict: 'user_id' });
 
   if (error) {
     throw new Error(`Failed to upsert supporter for ${userId}: ${error.message}`);
   }
 
   if (discordUserId) {
-    await safeDiscordCall(`role sync (${source})`, { userId, discordUserId, tier: effectiveTier }, () =>
-      syncRolesForSupporter(discordUserId, effectiveTier, true)
+    await safeDiscordCall(`linked role sync (${source})`, { userId, discordUserId }, () =>
+      syncLinkedAccountRole(discordUserId)
+    );
+    await safeDiscordCall(
+      `role sync (${source})`,
+      { userId, discordUserId, tier: effectiveTier },
+      () => syncRolesForSupporter(discordUserId, effectiveTier, true)
     );
   }
 
@@ -285,7 +332,7 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
   const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
   if (!supporter) return;
 
-  const newTier = subscription.metadata?.tier || supporter.tier;
+  const newTier = resolveSubscriptionTier(subscription, supporter.tier);
   const isActive = subscription.status === 'active' || subscription.status === 'trialing';
   const isPastDue = subscription.status === 'past_due';
 
@@ -424,9 +471,7 @@ async function stripeGet<T>(path: string): Promise<T | null> {
  */
 async function getCustomerPaymentCount(stripeCustomerId: string): Promise<number | null> {
   if (!STRIPE_SECRET_KEY) {
-    console.warn(
-      '[stripe-webhook] STRIPE_SECRET_KEY missing; cannot determine charge history.'
-    );
+    console.warn('[stripe-webhook] STRIPE_SECRET_KEY missing; cannot determine charge history.');
     return null;
   }
 
@@ -504,9 +549,9 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
   );
   const matchesOneTime = Boolean(
     !sessionSubscriptionId &&
-      supporter.type === 'one_time' &&
-      sessionCustomerId &&
-      supporter.stripe_customer_id === sessionCustomerId
+    supporter.type === 'one_time' &&
+    sessionCustomerId &&
+    supporter.stripe_customer_id === sessionCustomerId
   );
 
   if (!matchesSubscription && !matchesOneTime) {
@@ -578,9 +623,7 @@ async function revokeSupporter(
   if (!data) {
     // Row was modified between our read and write — re-read and let Stripe
     // retry if state still warrants revocation. Treat as transient.
-    throw new Error(
-      `Supporter row for ${supporter.user_id} changed during ${reason}; will retry`
-    );
+    throw new Error(`Supporter row for ${supporter.user_id} changed during ${reason}; will retry`);
   }
 
   if (!supporter.discord_user_id) return;

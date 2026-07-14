@@ -46,10 +46,7 @@ async function discordFetch(url: string, init: RequestInit): Promise<Response> {
     const res = await fetch(url, init);
     if (res.status !== 429) return res;
     const retryAfter = parseRetryAfterSecs(res.headers.get('retry-after'));
-    const waitMs = Math.min(
-      Math.max(retryAfter * 1000, 250),
-      MAX_RATE_LIMIT_WAIT_MS
-    );
+    const waitMs = Math.min(Math.max(retryAfter * 1000, 250), MAX_RATE_LIMIT_WAIT_MS);
     if (attempt === MAX_RATE_LIMIT_RETRIES) return res;
     console.warn(
       `[Discord] 429 on ${url}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES})`
@@ -83,6 +80,7 @@ export function removeRole(action: RoleAction): Promise<boolean> {
 export interface DiscordRoleConfig {
   guildId: string;
   supporterRoleId: string;
+  linkedRoleId: string;
   scavRoleId: string;
   timmyRoleId: string;
   chadRoleId: string;
@@ -100,6 +98,7 @@ export function getDiscordRoleConfig(): DiscordRoleConfig {
   return {
     guildId: guildId as string,
     supporterRoleId: supporterRoleId as string,
+    linkedRoleId: Deno.env.get('DISCORD_LINKED_ROLE_ID') || '',
     scavRoleId: Deno.env.get('DISCORD_SCAV_ROLE_ID') || '',
     timmyRoleId: Deno.env.get('DISCORD_TIMMY_ROLE_ID') || '',
     chadRoleId: Deno.env.get('DISCORD_CHAD_ROLE_ID') || '',
@@ -132,11 +131,14 @@ export async function syncRolesForSupporter(
   if (!discordUserId) return;
   const config = getDiscordRoleConfig();
 
-  await addRole({
+  const supporterRoleAdded = await addRole({
     guildId: config.guildId,
     userId: discordUserId,
     roleId: config.supporterRoleId,
   });
+  if (!supporterRoleAdded) {
+    throw new Error(`Unable to add supporter role for Discord user ${discordUserId}`);
+  }
 
   const tierRoleId = getTierRoleId(tier, config);
   if (!tierRoleId) return;
@@ -144,14 +146,44 @@ export async function syncRolesForSupporter(
   if (active) {
     const allTierRoles = [config.scavRoleId, config.timmyRoleId, config.chadRoleId].filter(Boolean);
     const staleRoles = allTierRoles.filter((id) => id !== tierRoleId);
-    await Promise.all(
+    const staleRoleResults = await Promise.all(
       staleRoles.map((roleId) =>
         removeRole({ guildId: config.guildId, userId: discordUserId, roleId })
       )
     );
-    await addRole({ guildId: config.guildId, userId: discordUserId, roleId: tierRoleId });
+    const tierRoleAdded = await addRole({
+      guildId: config.guildId,
+      userId: discordUserId,
+      roleId: tierRoleId,
+    });
+    if (staleRoleResults.some((result) => !result) || !tierRoleAdded) {
+      throw new Error(`Unable to synchronize tier roles for Discord user ${discordUserId}`);
+    }
   } else {
-    await removeRole({ guildId: config.guildId, userId: discordUserId, roleId: tierRoleId });
+    const tierRoleRemoved = await removeRole({
+      guildId: config.guildId,
+      userId: discordUserId,
+      roleId: tierRoleId,
+    });
+    if (!tierRoleRemoved) {
+      throw new Error(`Unable to remove tier role for Discord user ${discordUserId}`);
+    }
+  }
+}
+
+export async function syncLinkedAccountRole(discordUserId: string): Promise<void> {
+  if (!discordUserId) return;
+  const config = getDiscordRoleConfig();
+  if (!config.linkedRoleId) {
+    throw new Error('Missing DISCORD_LINKED_ROLE_ID env');
+  }
+  const linkedRoleAdded = await addRole({
+    guildId: config.guildId,
+    userId: discordUserId,
+    roleId: config.linkedRoleId,
+  });
+  if (!linkedRoleAdded) {
+    throw new Error(`Unable to add linked role for Discord user ${discordUserId}`);
   }
 }
 
@@ -164,9 +196,12 @@ export async function removeAllTierRoles(discordUserId: string): Promise<void> {
 
   const tierRoles = [config.scavRoleId, config.timmyRoleId, config.chadRoleId].filter(Boolean);
   if (tierRoles.length === 0) return;
-  await Promise.all(
+  const results = await Promise.all(
     tierRoles.map((roleId) =>
       removeRole({ guildId: config.guildId, userId: discordUserId, roleId })
     )
   );
+  if (results.some((result) => !result)) {
+    throw new Error(`Unable to remove tier roles for Discord user ${discordUserId}`);
+  }
 }

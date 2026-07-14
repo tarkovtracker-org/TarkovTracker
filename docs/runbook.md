@@ -30,10 +30,21 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 - `STRIPE_SECRET_KEY` (Stripe Dashboard → Developers → API keys); required so refund and
   dispute events can correlate the charge back to its subscription/customer before revoking
   supporter access. The function refuses to start without it.
+- `STRIPE_PRICE_SCAV_MONTHLY`, `STRIPE_PRICE_SCAV_6MONTH`, `STRIPE_PRICE_SCAV_YEARLY`
+- `STRIPE_PRICE_TIMMY_MONTHLY`, `STRIPE_PRICE_TIMMY_6MONTH`, `STRIPE_PRICE_TIMMY_YEARLY`
+- `STRIPE_PRICE_CHAD_MONTHLY`, `STRIPE_PRICE_CHAD_6MONTH`, `STRIPE_PRICE_CHAD_YEARLY`; the
+  webhook uses these IDs as the source of truth when a customer changes plans in Stripe's portal.
 - `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` (auto-injected in hosted Supabase)
 - `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID` for role sync
   (per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID`
   are optional)
+- `DISCORD_LINKED_ROLE_ID` for the role applied after a user links Discord from Settings.
+
+### Account IP audit
+
+- `NUXT_ACCOUNT_IP_HASH_SECRET` for the Nuxt `/api/account/activity` route. It stores an HMAC
+  digest of each authenticated user's IP address, never the raw address. Use a unique, long random
+  value and retain it while historical hashes need to remain comparable.
 
 ## Optional Environment Variables
 
@@ -87,12 +98,17 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
    the IP-level abuse observability the change introduced. Provision the secret **before** merging
    so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
 5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
-6. Confirm workers are serving the expected revision:
+6. Deploy Supabase Edge Functions after every change under `supabase/functions/`:
+   ```bash
+   supabase functions deploy stripe-webhook discord-role-sync --no-verify-jwt --use-api
+   ```
+   Then confirm both functions report the expected version in the Supabase dashboard.
+7. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
-7. Smoke test:
+8. Smoke test:
    - `https://tarkovtracker.org`
    - `https://api.tarkovtracker.org/health`
-8. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
+9. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
 ## Known Benign Database Signals

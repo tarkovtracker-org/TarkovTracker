@@ -169,6 +169,7 @@ export default defineNuxtConfig({
     stripePriceChadMonthly: (process.env.STRIPE_PRICE_CHAD_MONTHLY ?? '').trim(),
     stripePriceChad6month: (process.env.STRIPE_PRICE_CHAD_6MONTH ?? '').trim(),
     stripePriceChadYearly: (process.env.STRIPE_PRICE_CHAD_YEARLY ?? '').trim(),
+    accountIpHashSecret: (process.env.NUXT_ACCOUNT_IP_HASH_SECRET ?? '').trim(),
     sharedProfileCacheTtlMs:
       Number(
         process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS ||
