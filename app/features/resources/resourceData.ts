@@ -111,14 +111,14 @@ export const RESOURCES: Resource[] = [
 ];
 export const getResourceBySlug = (slug: string): Resource | undefined =>
   RESOURCES.find((r) => r.slug === slug);
-export const LINK_ICONS: Record<ResourceLinkType, string> = {
+const LINK_ICONS: Record<ResourceLinkType, string> = {
   website: 'i-mdi-web',
   github: 'i-mdi-github',
   discord: 'i-mdi-discord',
   api: 'i-mdi-api',
   download: 'i-mdi-download',
 };
-export const LINK_LABEL_FALLBACKS: Record<ResourceLinkType, string> = {
+const LINK_LABEL_FALLBACKS: Record<ResourceLinkType, string> = {
   website: 'Open website',
   github: 'View source',
   discord: 'Community support',
@@ -135,6 +135,59 @@ const PRIMARY_WEBSITE_LABELS: Record<string, { key: string; fallback: string }> 
     fallback: 'View changes',
   },
 };
+const externalAction = (
+  href: string,
+  labelKey: string,
+  labelFallback: string,
+  icon: string
+): ResourceAction => ({
+  kind: 'external',
+  href,
+  labelKey,
+  labelFallback,
+  icon,
+  external: true,
+});
+const apiAction = (resource: Resource): ResourceAction | null => {
+  const apiLink = resource.links.find((link) => link.type === 'api');
+  if (!apiLink) return null;
+  return externalAction(
+    apiLink.url,
+    'page.resources.actions.api_documentation',
+    'API documentation',
+    LINK_ICONS.api
+  );
+};
+const websiteAction = (resource: Resource): ResourceAction | null => {
+  const websiteLink = resource.links.find((link) => link.type === 'website');
+  if (!websiteLink) return null;
+  const websiteLabel = PRIMARY_WEBSITE_LABELS[resource.slug] ?? {
+    key: 'page.resources.actions.open_tool',
+    fallback: 'Open tool',
+  };
+  return externalAction(
+    websiteLink.url,
+    websiteLabel.key,
+    websiteLabel.fallback,
+    LINK_ICONS.website
+  );
+};
+const linkAction = (link: ResourceLink, projectWebsite = false): ResourceAction => {
+  if (projectWebsite && link.type === 'website') {
+    return externalAction(
+      link.url,
+      'page.resources.link_types.project_website',
+      'Project website',
+      LINK_ICONS.website
+    );
+  }
+  return externalAction(
+    link.url,
+    `page.resources.link_types.${link.type}`,
+    LINK_LABEL_FALLBACKS[link.type],
+    LINK_ICONS[link.type]
+  );
+};
 export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
   if (resource.primaryAction === 'guide' && resource.hasGuide) {
     return {
@@ -147,32 +200,10 @@ export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
     };
   }
   if (resource.primaryAction === 'api') {
-    const apiLink = resource.links.find((link) => link.type === 'api');
-    if (apiLink) {
-      return {
-        kind: 'external',
-        href: apiLink.url,
-        labelKey: 'page.resources.actions.api_documentation',
-        labelFallback: 'API documentation',
-        icon: LINK_ICONS.api,
-        external: true,
-      };
-    }
+    const action = apiAction(resource);
+    if (action) return action;
   }
-  const websiteLink = resource.links.find((link) => link.type === 'website');
-  if (!websiteLink) return null;
-  const websiteLabel = PRIMARY_WEBSITE_LABELS[resource.slug] ?? {
-    key: 'page.resources.actions.open_tool',
-    fallback: 'Open tool',
-  };
-  return {
-    kind: 'external',
-    href: websiteLink.url,
-    labelKey: websiteLabel.key,
-    labelFallback: websiteLabel.fallback,
-    icon: LINK_ICONS.website,
-    external: true,
-  };
+  return websiteAction(resource);
 };
 export const getSecondaryActions = (resource: Resource): ResourceAction[] => {
   const primary = getPrimaryAction(resource);
@@ -189,14 +220,7 @@ export const getSecondaryActions = (resource: Resource): ResourceAction[] => {
   }
   for (const link of resource.links) {
     if (primary?.external && primary.href === link.url) continue;
-    secondary.push({
-      kind: 'external',
-      href: link.url,
-      labelKey: `page.resources.link_types.${link.type}`,
-      labelFallback: LINK_LABEL_FALLBACKS[link.type],
-      icon: LINK_ICONS[link.type],
-      external: true,
-    });
+    secondary.push(linkAction(link));
   }
   return secondary;
 };
@@ -219,73 +243,26 @@ export const getGuidePrimaryAction = (resource: Resource): ResourceAction | null
   if (resource.category === 'companion_apps') {
     const github = resource.links.find((link) => link.type === 'github');
     if (github) {
-      return {
-        kind: 'external',
-        href: `${github.url.replace(/\/$/, '')}/releases`,
-        labelKey: 'page.resources.actions.download_release',
-        labelFallback: 'Download latest release',
-        icon: 'i-mdi-download',
-        external: true,
-      };
+      return externalAction(
+        `${github.url.replace(/\/$/, '')}/releases`,
+        'page.resources.actions.download_release',
+        'Download latest release',
+        'i-mdi-download'
+      );
     }
   }
   if (resource.primaryAction === 'api') {
-    const apiLink = resource.links.find((link) => link.type === 'api');
-    if (apiLink) {
-      return {
-        kind: 'external',
-        href: apiLink.url,
-        labelKey: 'page.resources.actions.api_documentation',
-        labelFallback: 'API documentation',
-        icon: LINK_ICONS.api,
-        external: true,
-      };
-    }
+    const action = apiAction(resource);
+    if (action) return action;
   }
-  const websiteLink = resource.links.find((link) => link.type === 'website');
-  if (!websiteLink) return null;
-  const websiteLabel = PRIMARY_WEBSITE_LABELS[resource.slug] ?? {
-    key: 'page.resources.actions.open_tool',
-    fallback: 'Open tool',
-  };
-  return {
-    kind: 'external',
-    href: websiteLink.url,
-    labelKey: websiteLabel.key,
-    labelFallback: websiteLabel.fallback,
-    icon: LINK_ICONS.website,
-    external: true,
-  };
+  return websiteAction(resource);
 };
 export const getGuideSecondaryLinks = (resource: Resource): ResourceAction[] => {
   const primary = getGuidePrimaryAction(resource);
   return resource.links
     .filter((link) => !(primary?.external && primary.href === link.url))
-    .map((link) => {
-      if (link.type === 'website') {
-        return {
-          kind: 'external' as const,
-          href: link.url,
-          labelKey: 'page.resources.link_types.project_website',
-          labelFallback: 'Project website',
-          icon: LINK_ICONS.website,
-          external: true,
-        };
-      }
-      return {
-        kind: 'external' as const,
-        href: link.url,
-        labelKey: `page.resources.link_types.${link.type}`,
-        labelFallback: LINK_LABEL_FALLBACKS[link.type],
-        icon: LINK_ICONS[link.type],
-        external: true,
-      };
-    });
+    .map((link) => linkAction(link, true));
 };
-export const getResourcesByCategory = (
-  resources: Resource[],
-  category: ResourceCategory
-): Resource[] => resources.filter((resource) => resource.category === category);
 export const matchesResourceSearch = (
   resource: Resource,
   query: string,

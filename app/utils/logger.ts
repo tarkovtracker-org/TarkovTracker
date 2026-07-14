@@ -145,10 +145,6 @@ const sendClientLog = (level: LogLevel, args: unknown[]): void => {
     method: 'POST',
   }).catch(() => undefined);
 };
-export const resetCachedLogLevel = (): void => {
-  cachedLogLevel = null;
-  cachedClientLogSinkUrl = null;
-};
 export const logger: Logger = {
   debug: (...args: unknown[]) => {
     if (shouldClientLog('debug')) console.debug(...args);
@@ -165,11 +161,3 @@ export const logger: Logger = {
     sendClientLog('warn', args);
   },
 };
-function createDevLogger(method: 'debug' | 'warn' | 'error') {
-  return (message: string, ...args: unknown[]): void => {
-    if (import.meta.env.DEV) {
-      console[method](`[DEV] ${message}`, ...args);
-    }
-  };
-}
-export const devLog = createDevLogger('debug');

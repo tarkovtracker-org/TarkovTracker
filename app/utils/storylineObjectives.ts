@@ -1,6 +1,14 @@
-import { getDefaultStoryObjectiveLinks } from '@/data/storyObjectiveLinks';
 import type { StoryChapter, StoryObjective } from '@/types/tarkov';
-const defaultStoryObjectiveLinks = getDefaultStoryObjectiveLinks();
+const defaultStoryObjectiveLinks: Readonly<Record<string, readonly string[]>> = {
+  'falling-skies-main-19': ['falling-skies-main-20'],
+  'falling-skies-main-20': ['falling-skies-main-19'],
+  'the-ticket-main-12': ['the-ticket-main-13'],
+  'the-ticket-main-13': ['the-ticket-main-12'],
+  'the-ticket-main-22': ['the-ticket-main-23'],
+  'the-ticket-main-23': ['the-ticket-main-22'],
+  'the-ticket-main-25': ['the-ticket-main-26'],
+  'the-ticket-main-26': ['the-ticket-main-25'],
+};
 type StoryObjectiveInput = StoryChapter['objectives'] | StoryObjective[] | null | undefined;
 type StoryObjectiveLike = Partial<StoryObjective> & { id?: string };
 const normalizeObjectiveType = (type: StoryObjectiveLike['type']): StoryObjective['type'] => {

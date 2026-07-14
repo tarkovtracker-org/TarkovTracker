@@ -8,13 +8,15 @@
   ],
   "ignore": [
     "supabase/functions/**",
-    "app/components/PromotedTwitchEmbed.vue",
     "app/i18n.config.ts",
     "app/server/api/changelog.get.ts",
     "app/server/api/contributors.get.ts",
+    "scripts/measure-pageload.mjs",
+    "scripts/precompute/nuxt-imports.ts",
     "scripts/stripe-import-test.mjs"
   ],
   "ignoreDependencies": [
+    "@codecov/nuxt-plugin",
     "@iconify-json/mdi",
     "@semantic-release/npm",
     "@tailwindcss/postcss",
