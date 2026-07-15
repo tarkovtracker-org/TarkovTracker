@@ -237,4 +237,5 @@ These show up in Supabase logs / query performance and are expected. Do not trea
    - `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`
    - For `/api/tarkov-dev/profile`, add or tighten a Cloudflare rule; the app route also has a fixed per-IP limiter.
    - Cache API-backed shared rate limits are best-effort under concurrent bursts; use Cloudflare or Durable Objects for hard enforcement.
+   - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.

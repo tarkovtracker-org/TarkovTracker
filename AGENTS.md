@@ -202,6 +202,7 @@ Naming:
 - Generated codebase knowledge base (start at the index): `docs/agent-context/summary/index.md`
 - Style, testing, and validation details: `docs/agent-context/style-and-validation.md`
 - Architecture: `docs/ARCHITECTURE.md`
+- Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
 - Contributing: `.github/CONTRIBUTING.md`
 - Runbook: `docs/runbook.md`
 - API docs: `docs/API.md`

@@ -57,11 +57,15 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 ├── docs/                     # Documentation
 ├── supabase/                 # Supabase config and functions
 ├── workers/                  # Cloudflare Workers
-│   └── api-gateway/         # Rate limiting gateway
+│   └── api-gateway/         # External API gateway + Durable Object rate limiter
 ├── nuxt.config.ts           # Nuxt configuration
 ├── package.json             # Dependencies
 └── vitest.config.ts         # Test configuration
 ```
+
+Rate limiting is multi-plane (Worker DO, Edge mutation counters, Pages shared limits, Auth
+platform limits). See [`RATE_LIMITING.md`](./RATE_LIMITING.md) for ownership, flows, and when to
+use which enforcer.
 
 ## Architecture Diagram
 

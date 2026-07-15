@@ -11,6 +11,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 | Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)            |
 | Understand the architecture and data flow         | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                             |
 | Use or extend the HTTP/API surface                | [`API.md`](./API.md)                                               |
+| Understand rate limits / abuse controls by layer  | [`RATE_LIMITING.md`](./RATE_LIMITING.md)                           |
 | Deploy, configure env vars, or handle an incident | [`runbook.md`](./runbook.md)                                       |
 | Understand CI/CD, hooks, and releases             | [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md)               |
 | Follow the visual/design system                   | [`/DESIGN.md`](../DESIGN.md)                                       |
@@ -24,6 +25,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow, issues, labels, project board.
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system architecture, state model, sync, caching, and the canonical environment-variable map.
 - [`API.md`](./API.md) — endpoint reference, caching, supported languages, game modes.
+- [`RATE_LIMITING.md`](./RATE_LIMITING.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
 - [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
 
@@ -36,7 +38,8 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 > To avoid drift, each fact has a single owner: code style and commit scopes live in `AGENTS.md`;
 > the environment-variable map lives in `ARCHITECTURE.md` and `runbook.md`; API details live in
-> `API.md`. Other documents link to those owners instead of restating them.
+> `API.md`; rate-limit ownership lives in `RATE_LIMITING.md`. Other documents link to those owners
+> instead of restating them.
 
 ## Maintainer notes
 

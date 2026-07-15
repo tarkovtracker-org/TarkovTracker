@@ -357,6 +357,10 @@ The `returnUrl` host must match the configured app URL host. Mismatched hosts fa
 
 ## Rate Limits (API Gateway)
 
+This section covers **external progress API quotas only** (Worker + Durable Object). App mutation
+limits, shared profile limits, Auth limits, and DB hard caps live in a separate ownership map:
+[`RATE_LIMITING.md`](./RATE_LIMITING.md).
+
 Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC; burst limits use a 60-second sliding window so batch updates near a minute boundary are not spuriously throttled.
 
 | Tier      | Reads/day | Writes/day | Burst/min |
