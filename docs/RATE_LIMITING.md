@@ -150,7 +150,7 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
 
 **Known bypass gaps**
 
-- **Token create** is Edge-only by default. Direct `api_tokens` insert is only used when
+- **Token create** is Edge-only by default. A direct insert into `api_tokens` is used only when
   `NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=true` (default **false** in `nuxt.config.ts` /
   `ApiTokens.vue`). Keep that flag off in production so create stays on the Edge limiter.
 - **Token revoke** has an automatic unavailable-function fallback to direct delete in
@@ -370,7 +370,7 @@ Checklist for every new limiter:
 | System                          | On limiter failure                                                                               |
 | ------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                  |
-| Worker DO timeout / error       | Request gets limiter-unavailable **503** path (or IP backstop may fail open depending on branch) |
+| Worker DO timeout / error       | Primary daily/burst DOs fail closed with limiter-unavailable **503**. Per-IP backstop DO: **503** fails open (request proceeds after daily/burst pass; no primary refund); genuine **429** rejects and refunds primary slots |
 | Pages shared limiter without DO | Falls back to in-memory best effort                                                              |
 
 Treat these deliberately; do not “make everything fail open” without understanding abuse impact.
