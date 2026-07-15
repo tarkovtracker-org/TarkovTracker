@@ -48,7 +48,7 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 
 ## Commands
 
-Install: `pnpm install` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
+Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
 Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
 
@@ -64,7 +64,7 @@ Before finishing any agent task:
 - State what validation was run and what passed/failed.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
-- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `pnpm run format` manually unless the hook is bypassed.
+- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `pnpm run format` manually unless the hook is bypassed or cannot run (missing `node_modules` / husky harness). CI `format:check` is the gate; never commit knowing hooks were skipped without formatting staged paths yourself.
 - Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
 - Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report-type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
@@ -159,11 +159,12 @@ Naming:
 
 ## Git Workflow
 
-- Prefer a normal branch in the current checkout.
+- Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks).
 - Before edits, run `git status --short --branch`.
 - Never mix unrelated changes in one commit or PR.
 - Do not use `git stash` for normal context switching unless the user asks.
-- Do not create a worktree unless the user explicitly asks, the current checkout is unsafe, or an existing PR/branch must be tested separately. If a worktree is truly needed, explain why, name the exact path and branch, and keep repeating that path in status updates.
+- Do not create a worktree unless the user explicitly asks, the current checkout is unsafe, or an existing PR/branch must be tested separately. If a worktree is truly needed, explain why, name the exact path and branch, keep repeating that path in status updates, and run `bash scripts/setup-worktree.sh` before the first commit so husky + lint-staged actually run.
+- Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `wip`.
 - Header max 100 chars. Subject must not be UPPER_CASE.

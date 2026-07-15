@@ -118,14 +118,29 @@ Validates external links in documentation:
 
 ## Pre-commit Hooks
 
-Git hooks via Husky enforce quality standards:
+Git hooks via Husky enforce quality standards. They are a local convenience; CI
+`pnpm run format:check` remains the merge gate.
 
-### Setup
+### Setup (main checkout)
 
 ```bash
 pnpm install
 pnpm run prepare
 ```
+
+### Setup (git worktree)
+
+Bare worktrees often lack `node_modules` and husky’s `.husky/_` harness, so
+pre-commit becomes a silent no-op. After `git worktree add`, from the worktree
+root:
+
+```bash
+bash scripts/setup-worktree.sh
+```
+
+That runs `pnpm install --frozen-lockfile` and `pnpm exec husky`. If install is
+impossible, format staged paths yourself before committing (for example
+`prettier --write` on touched markdown, `eslint --fix` on touched app files).
 
 ### Hooks
 
