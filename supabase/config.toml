@@ -406,6 +406,9 @@ verify_jwt = false
 [functions.discord-role-sync]
 verify_jwt = false
 
+[functions.discord-unlink]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

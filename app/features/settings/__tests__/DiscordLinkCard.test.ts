@@ -11,7 +11,9 @@ const {
   replaceMock,
   routeState,
   selectMock,
+  unlinkIdentityMock,
   userState,
+  userGetMock,
 } = vi.hoisted(() => {
   const maybeSingleMock = vi.fn();
   const selectMock = vi.fn(() => ({
@@ -30,6 +32,8 @@ const {
       hash: '',
     },
     selectMock,
+    unlinkIdentityMock: vi.fn(),
+    userGetMock: vi.fn(),
     userState: {
       id: 'user-1' as string | null,
     },
@@ -47,7 +51,9 @@ mockNuxtImport('useNuxtApp', () => () => ({
         invoke: invokeMock,
       },
       auth: {
+        getUser: userGetMock,
         linkIdentity: linkIdentityMock,
+        unlinkIdentity: unlinkIdentityMock,
       },
     },
   },
@@ -88,6 +94,18 @@ describe('DiscordLinkCard', () => {
     replaceMock.mockClear().mockResolvedValue(undefined);
     invokeMock.mockClear().mockResolvedValue({ data: { synced: true }, error: null });
     linkIdentityMock.mockClear();
+    unlinkIdentityMock.mockClear().mockResolvedValue({ error: null });
+    userGetMock.mockClear().mockResolvedValue({
+      data: {
+        user: {
+          identities: [
+            { id: 'identity-1', provider: 'discord' },
+            { id: 'identity-2', provider: 'email' },
+          ],
+        },
+      },
+      error: null,
+    });
     maybeSingleMock.mockReset();
     selectMock.mockClear();
   });
@@ -166,6 +184,71 @@ describe('DiscordLinkCard', () => {
     expect(wrapper.get('[data-color="warning"]').text()).toContain(
       'settings.discord_link.not_in_guild'
     );
+  });
+  it('unlinks the identity after revoking the Linked role', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_username: 'linked-user' },
+      error: null,
+    });
+    invokeMock.mockResolvedValue({ data: { revoked: true }, error: null });
+    const wrapper = await mountCard();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(invokeMock).toHaveBeenCalledWith('discord-unlink', { body: {} });
+    expect(unlinkIdentityMock).toHaveBeenCalledWith({ id: 'identity-1', provider: 'discord' });
+    expect(wrapper.text()).toContain('settings.discord_link.link_account');
+  });
+  it('restores the Linked role when identity unlinking fails', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_username: 'linked-user' },
+      error: null,
+    });
+    invokeMock
+      .mockResolvedValueOnce({ data: { revoked: true }, error: null })
+      .mockResolvedValueOnce({ data: { synced: true }, error: null });
+    unlinkIdentityMock.mockResolvedValue({ error: new Error('identity unlink failed') });
+    const wrapper = await mountCard();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(invokeMock.mock.calls).toEqual([
+      ['discord-unlink', { body: {} }],
+      ['discord-role-sync', { body: {} }],
+    ]);
+    expect(wrapper.text()).toContain('settings.discord_link.unlink_error');
+  });
+  it('restores managed roles and keeps the identity linked when role revocation fails', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_username: 'linked-user' },
+      error: null,
+    });
+    invokeMock
+      .mockResolvedValueOnce({ data: null, error: new Error('Discord unavailable') })
+      .mockResolvedValueOnce({ data: { synced: true }, error: null });
+    const wrapper = await mountCard();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+    expect(invokeMock.mock.calls).toEqual([
+      ['discord-unlink', { body: {} }],
+      ['discord-role-sync', { body: {} }],
+    ]);
+    expect(wrapper.text()).toContain('settings.discord_link.unlink_error');
+  });
+  it('does not revoke roles when Discord is the only login identity', async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: { discord_username: 'linked-user' },
+      error: null,
+    });
+    userGetMock.mockResolvedValue({
+      data: { user: { identities: [{ id: 'identity-1', provider: 'discord' }] } },
+      error: null,
+    });
+    const wrapper = await mountCard();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('settings.discord_link.unlink_requires_login');
   });
   it('sends logged-out users to login without starting identity linking', async () => {
     userState.id = null;

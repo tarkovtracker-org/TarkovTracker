@@ -2137,6 +2137,9 @@
       "not_in_guild": "Your account is linked, but you must join the TarkovTracker Discord server before roles can be synchronized.",
       "load_error": "We could not load your Discord account link.",
       "link_error": "We could not start Discord account linking. Please try again.",
+      "unlink_account": "Unlink Discord account",
+      "unlink_requires_login": "Add another login method before unlinking your only sign-in identity.",
+      "unlink_error": "We could not unlink your Discord account. Your link remains active.",
       "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
     },
     "prestige": {

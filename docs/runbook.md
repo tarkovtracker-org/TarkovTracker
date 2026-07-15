@@ -45,6 +45,7 @@ Configure the Stripe webhook endpoint to send:
 - `checkout.session.completed`
 - `checkout.session.async_payment_succeeded`
 - `checkout.session.async_payment_failed`
+- `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 - `invoice.paid`
@@ -55,6 +56,11 @@ Configure the Stripe webhook endpoint to send:
 Checkout is only for the first subscription. Existing active or past-due subscribers change tiers,
 cancel, and update payment methods through Stripe Customer Portal. A partial refund does not revoke
 access; full refunds and chargebacks follow the revocation policy in the webhook.
+Configure one Stripe product per tier (Scav, Timmy, and Chad), with that tier's monthly, six-month,
+and yearly prices. Enable Customer Portal subscription updates across those three products, with
+`price` as an allowed update and immediate invoicing for prorations. Stripe rejects a portal product
+that contains multiple prices with the same billing interval, so do not collapse tiers into one
+product.
 
 ### Account IP audit
 
@@ -128,10 +134,13 @@ access; full refunds and chargebacks follow the revocation policy in the webhook
 9. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
 
-When a user unlinks their Discord identity, the database trigger removes the corresponding
-`discord_account_links` row. Manual role sync removes stale tier roles, preserves the base
-Supporter role for users with paid support history, and reports a join-server warning when the
-Discord account is not a member of the configured guild.
+When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
+managed roles from that Discord account, then the client removes the identity and the database
+trigger deletes the corresponding `discord_account_links` row and clears the denormalized supporter
+Discord ID. Eligible lifetime and active-subscription roles are restored when an identity is linked
+again. Manual role sync removes stale tier roles, preserves the base Supporter role for users with
+paid support history, and reports a join-server warning when the Discord account is not a member of
+the configured guild.
 
 ## Known Benign Database Signals
 

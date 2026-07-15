@@ -47,6 +47,15 @@
           >
             {{ t('settings.discord_link.sync_roles', 'Sync Discord roles') }}
           </UButton>
+          <UButton
+            color="error"
+            variant="soft"
+            icon="i-mdi-link-variant-off"
+            :loading="unlinking"
+            @click="unlinkDiscord"
+          >
+            {{ t('settings.discord_link.unlink_account', 'Unlink Discord account') }}
+          </UButton>
         </div>
         <UButton
           v-else-if="currentUserId"
@@ -78,6 +87,10 @@
     reason?: string;
     synced?: boolean;
   }
+  interface DiscordUnlinkResponse {
+    reason?: string;
+    revoked?: boolean;
+  }
   const LINK_LOAD_RETRY_ATTEMPTS = 4;
   const LINK_LOAD_RETRY_DELAY_MS = 400;
   const { $supabase } = useNuxtApp();
@@ -88,6 +101,7 @@
   const loading = ref(false);
   const linking = ref(false);
   const syncing = ref(false);
+  const unlinking = ref(false);
   const errorMessage = ref<string | null>(null);
   const alertTone = ref<'error' | 'warning'>('error');
   const alertTitle = computed(() =>
@@ -164,6 +178,53 @@
       );
     } finally {
       syncing.value = false;
+    }
+  };
+  const unlinkDiscord = async () => {
+    if (!link.value || unlinking.value) return;
+    unlinking.value = true;
+    errorMessage.value = null;
+    alertTone.value = 'error';
+    let restoreRolesOnFailure = false;
+    try {
+      const { data: userData, error: userError } = await $supabase.client.auth.getUser();
+      if (userError) throw userError;
+      const identities = userData.user?.identities ?? [];
+      const discordIdentity = identities.find((identity) => identity.provider === 'discord');
+      if (!discordIdentity) {
+        throw new Error('Discord identity was not found');
+      }
+      if (identities.length < 2) {
+        errorMessage.value = t(
+          'settings.discord_link.unlink_requires_login',
+          'Add another login method before unlinking your only sign-in identity.'
+        );
+        return;
+      }
+      restoreRolesOnFailure = true;
+      const { error: revokeError } = await $supabase.client.functions.invoke<DiscordUnlinkResponse>(
+        'discord-unlink',
+        { body: {} }
+      );
+      if (revokeError) throw revokeError;
+      const { error: unlinkError } = await $supabase.client.auth.unlinkIdentity(discordIdentity);
+      if (unlinkError) throw unlinkError;
+      restoreRolesOnFailure = false;
+      link.value = null;
+    } catch (error) {
+      if (restoreRolesOnFailure) {
+        await synchronizeRoles();
+      }
+      logger.error('[DiscordLinkCard] Failed to unlink Discord account', {
+        userId: $supabase.user?.id,
+        error,
+      });
+      errorMessage.value = t(
+        'settings.discord_link.unlink_error',
+        'We could not unlink your Discord account. Your link remains active.'
+      );
+    } finally {
+      unlinking.value = false;
     }
   };
   const linkDiscord = async () => {

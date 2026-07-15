@@ -53,6 +53,7 @@ type CheckoutSessionArgs = {
   mode: string;
   client_reference_id: string;
   customer?: string;
+  customer_creation?: string;
   customer_email?: string;
   metadata?: Record<string, string>;
   line_items: [
@@ -115,6 +116,7 @@ describe('POST /api/stripe/checkout', () => {
       customer: 'cus_existing',
     });
     expect(args.customer_email).toBeUndefined();
+    expect(args.customer_creation).toBeUndefined();
     expect(args.line_items[0].price_data?.unit_amount).toBe(1000);
   });
   it('falls back to customer_email for a first-time one-time supporter', async () => {
@@ -126,6 +128,7 @@ describe('POST /api/stripe/checkout', () => {
     const args = firstSessionArgs();
     expect(args.customer).toBeUndefined();
     expect(args.customer_email).toBe('user@example.com');
+    expect(args.customer_creation).toBe('always');
   });
   it('rejects a one-time amount below the minimum with 400', async () => {
     mockGetSupporterBillingState.mockResolvedValue(null);

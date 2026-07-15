@@ -37,7 +37,7 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
     if (response.ok) {
       const rows = (await response.json()) as SupporterRow[];
       const row = rows[0];
-      if (row && row.status === 'active' && !isExpired(row.expires_at)) {
+      if (row && hasActiveEntitlement(row)) {
         const value = (row.tier || '').toLowerCase();
         if (isKnownTier(value)) tier = value;
       }
@@ -54,6 +54,11 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
     setMemoryCache(cacheKey, tier, TIER_CACHE_TTL_SECONDS);
   }
   return tier;
+}
+
+function hasActiveEntitlement(row: SupporterRow): boolean {
+  if (row.status === 'active') return !isExpired(row.expires_at);
+  return row.status === 'past_due' && Boolean(row.expires_at) && !isExpired(row.expires_at);
 }
 
 function isExpired(expiresAt: string | null | undefined): boolean {

@@ -225,6 +225,22 @@ export async function syncLinkedAccountRole(discordUserId: string): Promise<void
   }
 }
 
+export async function removeLinkedAccountRole(discordUserId: string): Promise<void> {
+  if (!discordUserId) return;
+  const config = getDiscordRoleConfig();
+  if (!config.linkedRoleId) {
+    throw new Error('Missing DISCORD_LINKED_ROLE_ID env');
+  }
+  const removed = await removeRole({
+    guildId: config.guildId,
+    userId: discordUserId,
+    roleId: config.linkedRoleId,
+  });
+  if (!removed) {
+    throw new Error(`Unable to remove linked role for Discord user ${discordUserId}`);
+  }
+}
+
 /**
  * Remove all tier roles (but keep Supporter) when a subscription expires.
  */

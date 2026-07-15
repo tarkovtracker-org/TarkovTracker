@@ -9,7 +9,9 @@ import {
 import {
   getInvoiceSubscriptionId,
   getStripeReferenceId,
+  getSubscriptionUserId,
   isFullRefund,
+  shouldActivateCheckoutSession,
 } from '../_shared/stripeBilling.ts';
 import {
   getTierPriceConfig,
@@ -350,11 +352,12 @@ async function findSupporterBy(
 
 // deno-lint-ignore no-explicit-any
 async function handleCheckoutCompleted(session: any): Promise<void> {
-  // ACH Direct Debit and other delayed methods complete the session before
-  // funds clear. Defer activation until async_payment_succeeded fires.
-  if (session.payment_status === 'processing') {
+  if (session?.mode !== 'payment' && session?.mode !== 'subscription') {
+    throw new PermanentError('checkout.session.completed with invalid mode');
+  }
+  if (!shouldActivateCheckoutSession(session)) {
     console.info(
-      `[stripe-webhook] Payment processing (delayed method), deferring: ${session.client_reference_id}`
+      `[stripe-webhook] Payment not yet paid, deferring: ${session.client_reference_id}`
     );
     return;
   }
@@ -384,13 +387,30 @@ async function fetchLatestSubscription(subscriptionId: string): Promise<StripeSu
   return subscription;
 }
 
-async function reconcileSubscription(subscription: StripeSubscription): Promise<void> {
-  const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
-  if (!supporter) return;
+async function reconcileSubscription(
+  subscription: StripeSubscription,
+  paymentConfirmed = false
+): Promise<void> {
+  let supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
+  const metadataUserId = getSubscriptionUserId(subscription);
+  if (!supporter && metadataUserId) {
+    supporter = await findSupporterBy('user_id', metadataUserId);
+  }
+  const userId = supporter?.user_id || metadataUserId;
+  if (!userId) return;
+  if (
+    supporter?.type === 'subscription' &&
+    supporter.stripe_subscription_id &&
+    supporter.stripe_subscription_id !== subscription.id &&
+    ['active', 'past_due'].includes(supporter.status)
+  ) {
+    return;
+  }
 
-  const newTier = resolveSubscriptionTier(subscription, supporter.tier, TIER_PRICE_IDS);
+  const newTier = resolveSubscriptionTier(subscription, supporter?.tier, TIER_PRICE_IDS);
   const isActive = ['active', 'trialing'].includes(subscription.status ?? '');
   const isPastDue = subscription.status === 'past_due';
+  if (!isActive && !isPastDue && !paymentConfirmed && supporter?.type === 'one_time') return;
 
   let status = 'active';
   let expiresAt: string | null = null;
@@ -405,34 +425,70 @@ async function reconcileSubscription(subscription: StripeSubscription): Promise<
     expiresAt = new Date().toISOString();
   }
 
-  const { error } = await supabase
-    .from('supporters')
-    .update({
-      tier: isActive ? newTier : isPastDue ? supporter.tier : 'supporter',
+  const entitlementTier = isActive
+    ? newTier
+    : isPastDue
+      ? supporter?.tier || newTier
+      : 'supporter';
+  const hasEverSupported = supporter?.has_ever_supported === true || paymentConfirmed;
+  const discordUserId = await getDiscordUserId(userId);
+  const { error } = await supabase.from('supporters').upsert(
+    {
+      user_id: userId,
+      tier: entitlementTier,
       status,
-      expires_at: expiresAt,
+      type: 'subscription',
       stripe_customer_id:
-        getStripeReferenceId(subscription.customer) || supporter.stripe_customer_id,
-    })
-    .eq('user_id', supporter.user_id);
+        getStripeReferenceId(subscription.customer) || supporter?.stripe_customer_id || null,
+      stripe_subscription_id: subscription.id,
+      has_ever_supported: hasEverSupported,
+      discord_user_id: discordUserId || supporter?.discord_user_id || null,
+      amount_total: supporter?.amount_total || 0,
+      started_at: supporter?.started_at || new Date().toISOString(),
+      expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  );
 
   if (error) {
-    throw new Error(`Failed to update subscription for ${supporter.user_id}: ${error.message}`);
+    throw new Error(`Failed to update subscription for ${userId}: ${error.message}`);
   }
 
-  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
-  if (discordUserId) {
+  const resolvedDiscordUserId =
+    discordUserId ||
+    (supporter
+      ? await resolveDiscordUserIdForSupporter({ ...supporter, user_id: userId })
+      : null);
+  if (resolvedDiscordUserId) {
     if (isActive) {
       await safeDiscordCall(
         'role sync (subscription updated)',
-        { userId: supporter.user_id, discordUserId, tier: newTier },
-        () => syncRolesForSupporter(discordUserId, newTier, true)
+        { userId, discordUserId: resolvedDiscordUserId, tier: newTier },
+        () => syncRolesForSupporter(resolvedDiscordUserId, newTier, true)
       );
-    } else if (!isPastDue) {
+    } else if (isPastDue) {
+      await safeDiscordCall(
+        'role sync (subscription grace period)',
+        { userId, discordUserId: resolvedDiscordUserId, tier: entitlementTier },
+        () => syncRolesForSupporter(resolvedDiscordUserId, entitlementTier, true)
+      );
+    } else if (hasEverSupported) {
+      await safeDiscordCall(
+        'lifetime role sync (subscription inactive)',
+        { userId, discordUserId: resolvedDiscordUserId },
+        () => syncRolesForSupporter(resolvedDiscordUserId, 'supporter', true)
+      );
+    } else {
       await safeDiscordCall(
         'remove tier roles (subscription updated)',
-        { userId: supporter.user_id, discordUserId },
-        () => removeAllTierRoles(discordUserId)
+        { userId, discordUserId: resolvedDiscordUserId },
+        () => removeAllTierRoles(resolvedDiscordUserId)
+      );
+      await safeDiscordCall(
+        'remove supporter role (subscription updated)',
+        { userId, discordUserId: resolvedDiscordUserId },
+        () => removeSupporterRole(resolvedDiscordUserId)
       );
     }
   }
@@ -480,7 +536,7 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
 async function handleInvoicePaid(invoice: any): Promise<void> {
   const subscriptionId = getInvoiceSubscriptionId(invoice);
   if (!subscriptionId) return;
-  await reconcileSubscription(await fetchLatestSubscription(subscriptionId));
+  await reconcileSubscription(await fetchLatestSubscription(subscriptionId), true);
 }
 
 /**
@@ -796,6 +852,7 @@ function dispatchEvent(event: StripeEvent): Promise<void> {
       return handleAsyncPaymentSucceeded(event.data.object);
     case 'checkout.session.async_payment_failed':
       return handleAsyncPaymentFailed(event.data.object);
+    case 'customer.subscription.created':
     case 'customer.subscription.updated':
       return handleSubscriptionUpdated(event.data.object);
     case 'customer.subscription.deleted':

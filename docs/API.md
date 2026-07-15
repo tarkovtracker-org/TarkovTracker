@@ -359,12 +359,17 @@ The `returnUrl` host must match the configured app URL host. Mismatched hosts fa
 
 Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC; burst limits use a 60-second sliding window so batch updates near a minute boundary are not spuriously throttled.
 
-| Tier  | Reads/day | Writes/day | Burst/min |
-| ----- | --------- | ---------- | --------- |
-| Free  | 1,000     | 100        | 30        |
-| Scav  | 2,000     | 250        | 60        |
-| Timmy | 3,000     | 400        | 90        |
-| Chad  | 5,000     | 600        | 120       |
+| Tier      | Reads/day | Writes/day | Burst/min |
+| --------- | --------- | ---------- | --------- |
+| Free      | 1,000     | 100        | 30        |
+| Supporter | 2,000     | 250        | 60        |
+| Scav      | 2,000     | 250        | 60        |
+| Timmy     | 3,000     | 400        | 90        |
+| Chad      | 5,000     | 600        | 120       |
+
+The gateway resolves the tier from `public.supporters` for the token owner and caches successful
+lookups for up to 60 seconds. Active subscriptions and past-due subscriptions within their recorded
+grace period keep paid limits; expired subscriptions return to Free limits.
 
 A per-IP backstop applies on top of the per-user quotas: 600 reads/hour and 200 writes/hour per IP address (1-hour sliding window). This catches abuse from many accounts sharing one IP while remaining generous enough for shared NAT users. IP-throttled requests do not consume the daily or burst quotas.
 

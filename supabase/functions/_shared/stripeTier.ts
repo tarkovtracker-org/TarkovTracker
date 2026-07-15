@@ -39,10 +39,13 @@ export function getTierPriceConfig(getEnv: (name: string) => string | undefined)
   const missing: string[] = [];
   const priceIdsByTier: Record<string, string[]> = {};
   for (const [tier, envNames] of Object.entries(TIER_PRICE_ENV_NAMES)) {
-    priceIdsByTier[tier] = envNames.map((envName) => {
+    priceIdsByTier[tier] = envNames.flatMap((envName) => {
       const value = getEnv(envName)?.trim() ?? '';
-      if (!value) missing.push(envName);
-      return value;
+      if (!value) {
+        missing.push(envName);
+        return [];
+      }
+      return [value];
     });
   }
   return { missing, priceIdsByTier };

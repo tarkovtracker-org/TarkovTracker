@@ -77,5 +77,7 @@ describe('getTierPriceConfig', () => {
     );
     expect(config.missing).toContain('STRIPE_PRICE_TIMMY_6MONTH');
     expect(config.missing).toContain('STRIPE_PRICE_SCAV_MONTHLY');
+    expect(Object.values(config.priceIdsByTier).flat()).not.toContain('');
+    expect(resolveTierFromPriceId('', config.priceIdsByTier)).toBeNull();
   });
 });

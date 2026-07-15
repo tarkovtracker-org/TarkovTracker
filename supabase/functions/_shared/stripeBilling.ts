@@ -28,3 +28,17 @@ export function isFullRefund(charge: unknown): boolean {
     value.amount_refunded >= value.amount
   );
 }
+
+export function shouldActivateCheckoutSession(session: unknown): boolean {
+  if (typeof session !== 'object' || session === null) return false;
+  const value = session as { mode?: unknown; payment_status?: unknown };
+  if (value.mode === 'subscription') return true;
+  return value.mode === 'payment' && value.payment_status === 'paid';
+}
+
+export function getSubscriptionUserId(subscription: unknown): string | null {
+  if (typeof subscription !== 'object' || subscription === null) return null;
+  const value = subscription as { metadata?: { user_id?: unknown } };
+  const userId = value.metadata?.user_id;
+  return typeof userId === 'string' && userId ? userId : null;
+}

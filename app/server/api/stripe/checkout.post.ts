@@ -68,6 +68,7 @@ export default defineEventHandler(async (event) => {
         mode: 'payment',
         client_reference_id: userId,
         ...customerFields,
+        ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
         metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
         payment_intent_data: { metadata: { user_id: userId } },
         line_items: [
