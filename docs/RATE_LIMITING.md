@@ -20,14 +20,14 @@ Related docs:
 > Frontend cooldowns are UX only. Database rules are hard invariants. Platform auth limits stay
 > with Supabase Auth.
 
-| Layer | May enforce? | Notes |
-| ----- | ------------ | ----- |
-| Browser UI | UX only | Disable double-submit / toast; never security |
-| Cloudflare Pages / Nitro `/api/*` | Yes (app reads / internal endpoints) | Prefer Durable Object binding when available |
-| Cloudflare Worker (`api-gateway`) | Yes (external token API) | Primary high-QPS enforcer |
-| Supabase Edge Functions | Yes (authenticated mutations) | Critical low-frequency writes |
-| Postgres | Hard caps / durable mutation counters | Not for high-QPS API traffic |
-| Supabase Auth platform | Yes (login / refresh / signup) | Do not reimplement |
+| Layer                             | May enforce?                          | Notes                                         |
+| --------------------------------- | ------------------------------------- | --------------------------------------------- |
+| Browser UI                        | UX only                               | Disable double-submit / toast; never security |
+| Cloudflare Pages / Nitro `/api/*` | Yes (app reads / internal endpoints)  | Prefer Durable Object binding when available  |
+| Cloudflare Worker (`api-gateway`) | Yes (external token API)              | Primary high-QPS enforcer                     |
+| Supabase Edge Functions           | Yes (authenticated mutations)         | Critical low-frequency writes                 |
+| Postgres                          | Hard caps / durable mutation counters | Not for high-QPS API traffic                  |
+| Supabase Auth platform            | Yes (login / refresh / signup)        | Do not reimplement                            |
 
 ---
 
@@ -74,14 +74,14 @@ flowchart TB
 
 ### Ownership matrix
 
-| Traffic class | Examples | Primary enforcer | Secondary / hard stop | Storage / implementation |
-| ------------- | -------- | ---------------- | --------------------- | ------------------------ |
-| External progress API | `/api/v2/*` on `api.tarkovtracker.org` | Worker DO quotas (daily + burst + IP backstop) | Supporter tier resolution, token auth | `ApiGatewayRateLimiter`, `api_usage_daily` |
-| Authenticated app mutations | team create/join/leave/kick, token create/revoke | Edge Function mutation limiter | DB token cap (3 active), RLS | `mutation_rate_limits` + RPC |
-| Public / shared app reads | shared profile, team members | Pages/Nitro shared limiter | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound) |
-| Destructive account ops | account delete | Edge Function (dedicated table for now) | Deletion jobs queue | `account_deletion_attempts` |
-| Auth platform | signup, sign-in, refresh, OTP | Supabase Auth | Captcha (optional) | GoTrue `[auth.rate_limit]` |
-| Outbound third parties | Discord API, Stripe | Provider `Retry-After` / SDK rules | Circuit breakers, job retries | not user quotas |
+| Traffic class               | Examples                                         | Primary enforcer                               | Secondary / hard stop                    | Storage / implementation                   |
+| --------------------------- | ------------------------------------------------ | ---------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`           | Worker DO quotas (daily + burst + IP backstop) | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
+| Authenticated app mutations | team create/join/leave/kick, token create/revoke | Edge Function mutation limiter                 | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
+| Public / shared app reads   | shared profile, team members, tarkov-dev profile | Pages/Nitro shared limiter                     | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
+| Destructive account ops     | account delete                                   | Edge Function (dedicated table for now)        | Deletion jobs queue                      | `account_deletion_attempts`                |
+| Auth platform               | signup, sign-in, refresh, OTP                    | Supabase Auth                                  | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
+| Outbound third parties      | Discord API, Stripe                              | Provider `Retry-After` / SDK rules             | Circuit breakers, job retries            | not user quotas                            |
 
 ---
 
@@ -121,14 +121,14 @@ sequenceDiagram
 
 **Edge Functions (enforced today)**
 
-| Function | Scope key | Limit | Window |
-| -------- | --------- | ----: | ------ |
-| `team-create` | `team-create` | 10 | 1 hour |
-| `team-join` | `team-join` | 30 | 10 min |
-| `team-leave` | `team-leave` | 30 | 1 hour |
-| `team-kick` | `team-kick` | 20 | 1 hour |
-| `token-create` | `token-create` | 3 | 1 hour |
-| `token-revoke` | `token-revoke` | 50 | 10 min |
+| Function       | Scope key      | Limit | Window |
+| -------------- | -------------- | ----: | ------ |
+| `team-create`  | `team-create`  |    10 | 1 hour |
+| `team-join`    | `team-join`    |    30 | 10 min |
+| `team-leave`   | `team-leave`   |    30 | 1 hour |
+| `team-kick`    | `team-kick`    |    20 | 1 hour |
+| `token-create` | `token-create` |     3 | 1 hour |
+| `token-revoke` | `token-revoke` |    50 | 10 min |
 
 Source of truth for limits: `supabase/functions/_shared/rate-limit.ts`  
 RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`
@@ -150,10 +150,14 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
 
 **Known bypass gaps**
 
-- Token create/revoke have optional/unavailable-function fallbacks to direct table access in the
-  client (`useEdgeFunctions` / ApiTokens). Those fallback paths **skip** the Edge limiter.
+- **Token create** is Edge-only by default. Direct `api_tokens` insert is only used when
+  `NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=true` (default **false** in `nuxt.config.ts` /
+  `ApiTokens.vue`). Keep that flag off in production so create stays on the Edge limiter.
+- **Token revoke** has an automatic unavailable-function fallback to direct delete in
+  `useEdgeFunctions.revokeToken`. That path **skips** the Edge limiter; DB/RLS still apply.
 - The DB still enforces the **max 3 active tokens** trigger even if rate limiting is skipped.
-- Prefer keeping create/revoke behind Edge Functions in production and avoid relying on fallbacks.
+- Prefer keeping create/revoke behind Edge Functions in production and avoid enabling create
+  fallbacks.
 
 **Hygiene**
 
@@ -186,12 +190,13 @@ flowchart LR
 
 **Primary limits** (from `workers/api-gateway/src/limits.ts`):
 
-| Tier | Reads/day | Writes/day | Burst/min |
-| ---- | --------: | ---------: | --------: |
-| Free | 1,000 | 100 | 30 |
-| Supporter / Scav | 2,000 | 250 | 60 |
-| Timmy | 3,000 | 400 | 90 |
-| Chad | 5,000 | 600 | 120 |
+| Tier      | Reads/day | Writes/day | Burst/min |
+| --------- | --------: | ---------: | --------: |
+| Free      |     1,000 |        100 |        30 |
+| Supporter |     2,000 |        250 |        60 |
+| Scav      |     2,000 |        250 |        60 |
+| Timmy     |     3,000 |        400 |        90 |
+| Chad      |     5,000 |        600 |       120 |
 
 Plus IP backstop: **600 reads/hour**, **200 writes/hour** per IP.
 
@@ -213,18 +218,19 @@ Used for browser/app read endpoints served by Cloudflare Pages Functions.
 
 ```mermaid
 flowchart TB
-  B[Browser] --> R["/api/team/members<br/>/api/profile/*<br/>/api/logs/client"]
+  B[Browser] --> R["/api/team/members<br/>/api/profile/*<br/>/api/tarkov-dev/profile<br/>/api/logs/client"]
   R --> S[sharedEdgeStore.consumeSharedRateLimit]
   S -->|preferred| DO[API_GATEWAY_LIMITER DO binding]
   S -->|fallback| MEM[In-memory Map in isolate]
   R --> DATA[Supabase REST / app data]
 ```
 
-| Endpoint | Prefix / key style | Default | Env override |
-| -------- | ------------------ | ------- | ------------ |
-| `/api/team/members` | `team-members-rate:*` | 120 / min | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE` |
-| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*` | 120 / min | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE` |
-| `/api/logs/client` | `client-logs-rate:ip:...` | 10 / min / IP | fixed in route |
+| Endpoint                       | Prefix / key style          | Default       | Env override                                |
+| ------------------------------ | --------------------------- | ------------- | ------------------------------------------- |
+| `/api/team/members`            | `team-members-rate:*`       | 120 / min     | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`   |
+| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`     | 120 / min     | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE` |
+| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-rate:*` | 30 / min / IP | fixed in route                              |
+| `/api/logs/client`             | `client-logs-rate:ip:...`   | 10 / min / IP | fixed in route                              |
 
 Implementation: `app/server/utils/sharedEdgeStore.ts`
 
@@ -256,12 +262,12 @@ Preferred future shape: add an `account-delete` scope to the shared mutation lim
 
 These are correctness rules that survive any Edge/Worker outage:
 
-| Rule | Mechanism |
-| ---- | --------- |
-| Max 3 active API tokens | DB trigger / constraint on `api_tokens` |
-| One membership per user+mode | unique index |
-| Row ownership | RLS policies |
-| Discord link uniqueness | unique constraint |
+| Rule                         | Mechanism                               |
+| ---------------------------- | --------------------------------------- |
+| Max 3 active API tokens      | DB trigger / constraint on `api_tokens` |
+| One membership per user+mode | unique index                            |
+| Row ownership                | RLS policies                            |
+| Discord link uniqueness      | unique constraint                       |
 
 Do not replace these with rate limits.
 
@@ -281,15 +287,15 @@ rate limits. They reduce long-lived sessions and refresh-token history growth.
 
 ---
 
-## What does *not* belong where
+## What does _not_ belong where
 
-| Do this | Don’t do this |
-| ------- | ------------- |
-| Put external API QPS limits in the Worker DO | Put high-QPS API throttling in Postgres |
-| Put team/token mutation abuse limits in Edge + durable counter | Rely on client button disables for security |
-| Put public profile scrape limits on the Pages endpoint | Count those requests against supporter daily API quotas |
-| Keep Auth login limits in Supabase Auth | Build a second login limiter in app code without reason |
-| Keep hard token caps in DB triggers | Soften security by “rate limiting instead of enforcing caps” |
+| Do this                                                        | Don’t do this                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------------ |
+| Put external API QPS limits in the Worker DO                   | Put high-QPS API throttling in Postgres                      |
+| Put team/token mutation abuse limits in Edge + durable counter | Rely on client button disables for security                  |
+| Put public profile scrape limits on the Pages endpoint         | Count those requests against supporter daily API quotas      |
+| Keep Auth login limits in Supabase Auth                        | Build a second login limiter in app code without reason      |
+| Keep hard token caps in DB triggers                            | Soften security by “rate limiting instead of enforcing caps” |
 
 ---
 
@@ -314,13 +320,13 @@ You can still get confusing UX if:
 
 When debugging a `429`, identify **which edge returned it** first:
 
-| Symptom source | Likely enforcer |
-| -------------- | --------------- |
-| `api.tarkovtracker.org` response with `X-RateLimit-*` daily headers | Worker DO |
-| Edge Function JSON `{ error: "Too many requests..." }` | `mutation_rate_limits` |
-| Pages `/api/profile` or `/api/team/members` 429 | sharedEdgeStore limiter |
-| Auth/login failures / refresh storms | Supabase Auth |
-| Token create 409 “Token limit reached (3 active)” | DB hard cap, not rate limit |
+| Symptom source                                                      | Likely enforcer             |
+| ------------------------------------------------------------------- | --------------------------- |
+| `api.tarkovtracker.org` response with `X-RateLimit-*` daily headers | Worker DO                   |
+| Edge Function JSON `{ error: "Too many requests..." }`              | `mutation_rate_limits`      |
+| Pages `/api/profile` or `/api/team/members` 429                     | sharedEdgeStore limiter     |
+| Auth/login failures / refresh storms                                | Supabase Auth               |
+| Token create 409 “Token limit reached (3 active)”                   | DB hard cap, not rate limit |
 
 ---
 
@@ -361,50 +367,50 @@ Checklist for every new limiter:
 
 ### Fail behavior
 
-| System | On limiter failure |
-| ------ | ------------------ |
-| Edge mutation RPC error | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation) |
-| Worker DO timeout / error | Request gets limiter-unavailable **503** path (or IP backstop may fail open depending on branch) |
-| Pages shared limiter without DO | Falls back to in-memory best effort |
+| System                          | On limiter failure                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                  |
+| Worker DO timeout / error       | Request gets limiter-unavailable **503** path (or IP backstop may fail open depending on branch) |
+| Pages shared limiter without DO | Falls back to in-memory best effort                                                              |
 
 Treat these deliberately; do not “make everything fail open” without understanding abuse impact.
 
 ### Observability
 
-| System | Where to look |
-| ------ | ------------- |
-| External API throttles | Worker logs (`rate_limit_429`), `api_usage_daily`, admin API usage endpoint |
-| Mutation throttles | Edge Function logs (`[rate-limit] ...`), `mutation_rate_limits.updated_at` |
-| Pages endpoint throttles | Pages/Nitro logs from sharedEdgeStore warnings |
-| Account delete throttles | `account_deletion_attempts` |
-| Auth storms | Supabase Auth logs / dashboard |
+| System                   | Where to look                                                               |
+| ------------------------ | --------------------------------------------------------------------------- |
+| External API throttles   | Worker logs (`rate_limit_429`), `api_usage_daily`, admin API usage endpoint |
+| Mutation throttles       | Edge Function logs (`[rate-limit] ...`), `mutation_rate_limits.updated_at`  |
+| Pages endpoint throttles | Pages/Nitro logs from sharedEdgeStore warnings                              |
+| Account delete throttles | `account_deletion_attempts`                                                 |
+| Auth storms              | Supabase Auth logs / dashboard                                              |
 
 ### Cleanup / retention
 
-| Store | Retention guidance |
-| ----- | ------------------ |
-| `mutation_rate_limits` | Delete rows with `reset_at` older than 1 day periodically |
-| `api_usage_daily` | Keep finite retention (e.g. 90–180 days) for observability |
-| Worker DO state | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic |
-| `account_deletion_attempts` | Existing cleanup function / retention policy |
+| Store                       | Retention guidance                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| `mutation_rate_limits`      | Delete rows with `reset_at` older than 1 day periodically                                |
+| `api_usage_daily`           | Keep finite retention (e.g. 90–180 days) for observability                               |
+| Worker DO state             | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic |
+| `account_deletion_attempts` | Existing cleanup function / retention policy                                             |
 
 ---
 
 ## Source map (code)
 
-| Concern | Location |
-| ------- | -------- |
-| Mutation limit constants + Edge helper | `supabase/functions/_shared/rate-limit.ts` |
-| Mutation RPC + table | `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql` |
-| Edge consumers | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick}/` |
-| Frontend mutation callers | `app/composables/api/useEdgeFunctions.ts` |
-| Worker tier constants | `workers/api-gateway/src/limits.ts` |
-| Worker DO enforcer | `workers/api-gateway/src/index.ts` (`ApiGatewayRateLimiter`) |
-| Pages shared limiter | `app/server/utils/sharedEdgeStore.ts` |
-| Pages consumers | `app/server/api/team/members.ts`, `app/server/api/profile/[userId]/[mode].get.ts`, `app/server/api/logs/client.post.ts` |
-| Account-delete limiter | `supabase/functions/account-delete/index.ts` |
-| Auth platform limits | `supabase/config.toml` `[auth.rate_limit]` |
-| External API docs | `docs/API.md` |
+| Concern                                | Location                                                                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mutation limit constants + Edge helper | `supabase/functions/_shared/rate-limit.ts`                                                                                                                          |
+| Mutation RPC + table                   | `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`                                                                                                |
+| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick}/`                                                                        |
+| Frontend mutation callers              | `app/composables/api/useEdgeFunctions.ts`                                                                                                                           |
+| Worker tier constants                  | `workers/api-gateway/src/limits.ts`                                                                                                                                 |
+| Worker DO enforcer                     | `workers/api-gateway/src/index.ts` (`ApiGatewayRateLimiter`)                                                                                                        |
+| Pages shared limiter                   | `app/server/utils/sharedEdgeStore.ts`                                                                                                                               |
+| Pages consumers                        | `app/server/api/team/members.ts`, `app/server/api/profile/[userId]/[mode].get.ts`, `app/server/api/tarkov-dev/profile.get.ts`, `app/server/api/logs/client.post.ts` |
+| Account-delete limiter                 | `supabase/functions/account-delete/index.ts`                                                                                                                        |
+| Auth platform limits                   | `supabase/config.toml` `[auth.rate_limit]`                                                                                                                          |
+| External API docs                      | `docs/API.md`                                                                                                                                                       |
 
 ---
 

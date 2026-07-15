@@ -110,6 +110,7 @@ product.
    a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
    for the gap between merge and `db push`. For such changes, apply the pending migration to
    production **before** merging the worker change; adding a function ahead of its caller is safe.
+
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to IP-backstop logging), confirm the secret is already
    provisioned on the production `api-gateway` Worker:
@@ -123,6 +124,7 @@ product.
    deploy time, every 429 and `ip_backstop_unavailable` log line emits `ip_hash: null`, defeating
    the IP-level abuse observability the change introduced. Provision the secret **before** merging
    so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
+
 5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
 6. Deploy Supabase Edge Functions after every change under `supabase/functions/`:
 
@@ -132,6 +134,7 @@ product.
 
    This deploys all functions using the per-function JWT settings in `supabase/config.toml`. Confirm
    every changed function reports the expected version in the Supabase dashboard.
+
 7. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
 8. Smoke test:
@@ -196,6 +199,7 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   ```
 
   Then verify the change landed (e.g. catalog query / `has_column_privilege`).
+
 - Verify migrations reproduce prod: `supabase db reset --local`, then dump both and compare
   (`supabase db dump --local` vs `--linked`). Catalog-level checks (columns, constraints,
   indexes, grants, policies, functions, triggers via `information_schema` / `pg_catalog`) are
