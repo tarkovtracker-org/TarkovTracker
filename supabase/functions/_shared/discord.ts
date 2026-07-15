@@ -6,6 +6,7 @@
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const MAX_RATE_LIMIT_RETRIES = 2;
 const MAX_RATE_LIMIT_WAIT_MS = 10_000;
+export const DISCORD_REQUEST_TIMEOUT_MS = 12_000;
 const UNKNOWN_MEMBER_CODE = 10007;
 const UNKNOWN_USER_CODE = 10013;
 
@@ -53,8 +54,37 @@ function getDiscordHeaders(): Record<string, string> {
   };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && error.name === 'AbortError')
+  );
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (!signal.aborted) return;
+  throw new DOMException('The operation was aborted.', 'AbortError');
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('The operation was aborted.', 'AbortError'));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('The operation was aborted.', 'AbortError'));
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function parseRetryAfterSecs(header: string | null): number {
@@ -67,23 +97,51 @@ function parseRetryAfterSecs(header: string | null): number {
 
 /**
  * Discord rate-limit aware fetch. Honours the `Retry-After` header on 429
- * responses for up to MAX_RATE_LIMIT_RETRIES attempts. Does not retry other
- * statuses; callers handle their own non-2xx logic.
+ * responses for up to MAX_RATE_LIMIT_RETRIES attempts. Bounded by a total
+ * wall-clock deadline so stalled connections cannot hang Edge Functions.
+ * Does not retry other statuses; callers handle their own non-2xx logic.
  */
-async function discordFetch(url: string, init: RequestInit): Promise<Response> {
-  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt += 1) {
-    const res = await fetch(url, init);
-    if (res.status !== 429) return res;
-    const retryAfter = parseRetryAfterSecs(res.headers.get('retry-after'));
-    const waitMs = Math.min(Math.max(retryAfter * 1000, 250), MAX_RATE_LIMIT_WAIT_MS);
-    if (attempt === MAX_RATE_LIMIT_RETRIES) return res;
-    console.warn(
-      `[Discord] 429 on ${url}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES})`
-    );
-    await sleep(waitMs);
+async function discordFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DISCORD_REQUEST_TIMEOUT_MS);
+  const parentSignal = init.signal;
+
+  const onParentAbort = () => controller.abort();
+  if (parentSignal?.aborted) {
+    controller.abort();
+  } else {
+    parentSignal?.addEventListener('abort', onParentAbort);
   }
-  // Unreachable but keeps TS happy
-  return fetch(url, init);
+
+  try {
+    for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt += 1) {
+      throwIfAborted(controller.signal);
+
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      if (res.status !== 429) return res;
+
+      const retryAfter = parseRetryAfterSecs(res.headers.get('retry-after'));
+      const waitMs = Math.min(Math.max(retryAfter * 1000, 250), MAX_RATE_LIMIT_WAIT_MS);
+      if (attempt === MAX_RATE_LIMIT_RETRIES) return res;
+
+      console.warn(
+        `[Discord] 429 on ${url}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES})`
+      );
+      await sleep(waitMs, controller.signal);
+    }
+
+    // Unreachable but keeps TS happy
+    throwIfAborted(controller.signal);
+    return fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error(`Discord request timed out after ${DISCORD_REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    parentSignal?.removeEventListener('abort', onParentAbort);
+  }
 }
 
 async function applyRole(
