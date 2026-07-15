@@ -35,7 +35,7 @@ pnpm exec husky
 find .husky -maxdepth 1 -type f -name '[!_]*' -exec chmod +x {} \;
 
 hooks_path="$(git config --get core.hooksPath || true)"
-if [[ -z "${hooks_path}" ]] || [[ ! -d "${hooks_path}" && ! -d ".husky/_" ]]; then
+if [[ ! -d ".husky/_" ]] && { [[ -z "${hooks_path}" ]] || [[ ! -d "${hooks_path}" ]]; }; then
   echo "ERROR: husky harness missing after install (core.hooksPath=${hooks_path:-unset})" >&2
   exit 1
 fi
