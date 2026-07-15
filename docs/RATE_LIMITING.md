@@ -367,11 +367,11 @@ Checklist for every new limiter:
 
 ### Fail behavior
 
-| System                          | On limiter failure                                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                  |
+| System                          | On limiter failure                                                                                                                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                                                                                                                                              |
 | Worker DO timeout / error       | Primary daily/burst DOs fail closed with limiter-unavailable **503**. Per-IP backstop DO: **503** fails open (request proceeds after daily/burst pass; no primary refund); genuine **429** rejects and refunds primary slots |
-| Pages shared limiter without DO | Falls back to in-memory best effort                                                              |
+| Pages shared limiter without DO | Falls back to in-memory best effort                                                                                                                                                                                          |
 
 Treat these deliberately; do not “make everything fail open” without understanding abuse impact.
 
