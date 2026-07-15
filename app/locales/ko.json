@@ -739,7 +739,7 @@
       "tier_cta": "Subscribe",
       "tier_login_cta": "Log in to subscribe",
       "tier_current_cta": "Current tier",
-      "tier_change_cta": "Switch to this tier",
+      "tier_change_cta": "Change plan in billing portal",
       "current_tier_badge": "Current tier",
       "tier_scav_name": "Scav",
       "tier_scav_tagline": "Just trying to get by",
@@ -2124,6 +2124,23 @@
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
       "go_to_dashboard": "Go to Dashboard"
+    },
+    "discord_link": {
+      "title": "Discord Account",
+      "description": "Link your Discord account to receive the Linked role and keep supporter perks synchronized.",
+      "link_account": "Link Discord account",
+      "login_to_link": "Log in to link Discord",
+      "linked_as": "Linked as {username}",
+      "sync_roles": "Sync Discord roles",
+      "error_title": "Discord link unavailable",
+      "not_in_guild_title": "Join the Discord server",
+      "not_in_guild": "Your account is linked, but you must join the TarkovTracker Discord server before roles can be synchronized.",
+      "load_error": "We could not load your Discord account link.",
+      "link_error": "We could not start Discord account linking. Please try again.",
+      "unlink_account": "Unlink Discord account",
+      "unlink_requires_login": "Add another login method before unlinking your only sign-in identity.",
+      "unlink_error": "We could not unlink your Discord account. Your link remains active.",
+      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
     },
     "prestige": {
       "title": "Prestige",
