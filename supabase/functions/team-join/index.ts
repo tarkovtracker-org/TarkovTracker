@@ -6,7 +6,7 @@ import {
     createErrorResponse,
     createSuccessResponse,
     type AuthSuccess
-} from "shared/auth"
+} from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
 
 const VALID_GAME_MODES = ["pvp", "pve"] as const

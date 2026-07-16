@@ -7,7 +7,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess
-} from "shared/auth"
+} from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
 const LEAVE_COOLDOWN_MINUTES = 5
 const VALID_GAME_MODES = ["pvp", "pve"] as const
