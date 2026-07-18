@@ -617,6 +617,7 @@
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav 信誉",
         "unlock_required": "需要解锁:",
+        "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction",
