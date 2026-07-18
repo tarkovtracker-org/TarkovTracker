@@ -617,6 +617,7 @@
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Karma de Scav",
         "unlock_required": "Déblocage requis:",
+        "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction",
