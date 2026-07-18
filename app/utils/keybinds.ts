@@ -4,9 +4,12 @@ const isModifierToken = (token: string): token is ModifierToken =>
   (MODIFIER_TOKENS as readonly string[]).includes(token);
 const normalizeKeyToken = (key: string): string => (key === ' ' ? 'space' : key.toLowerCase());
 export const DEFAULT_KEYBINDS = {
-  omnibar: 'ctrl+q',
+  omnibar: 'ctrl+k',
   undo: 'ctrl+z',
 } as const;
+// Previous shipped default for the omnibar. Used by the preferences migration
+// to move persisted snapshots off the old binding onto the new default.
+export const LEGACY_OMNIBAR_KEYBIND = 'ctrl+q';
 export const serializeKeybindEvent = (event: KeyboardEvent): string => {
   const parts: string[] = [];
   if (event.ctrlKey) parts.push('ctrl');
@@ -66,9 +69,9 @@ export const matchesKeybind = (event: KeyboardEvent, shortcut: string): boolean 
   );
 };
 // Keys that browsers/operating systems commonly reserve when combined with a
-// primary modifier (Ctrl on Windows/Linux, Cmd/Meta on macOS). The app ships
-// Ctrl+Q as a default, so 'q' is intentionally excluded.
-const SYSTEM_RESERVED_PRIMARY_KEYS = ['t', 'w', 'n', 'f', 'r', 'l', 's', 'p', 'd', 'tab'];
+// primary modifier (Ctrl on Windows/Linux, Cmd/Meta on macOS). 'q' is included
+// because Ctrl+Q quits most Linux/Windows browsers.
+const SYSTEM_RESERVED_PRIMARY_KEYS = ['t', 'w', 'n', 'f', 'r', 'l', 's', 'p', 'd', 'q', 'tab'];
 const SYSTEM_RESERVED_ALT_KEYS = ['tab', 'f4'];
 // Reports whether a shortcut is likely to collide with a browser/OS shortcut.
 // Treats Ctrl and Meta (Cmd) equivalently so the check is consistent across platforms.

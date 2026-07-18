@@ -19,7 +19,7 @@
           <UIcon :name="icon" class="h-7 w-7" :class="colorClasses.icon" />
         </div>
         <div>
-          <div class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
+          <div class="text-surface-200 text-xs font-semibold tracking-wider uppercase">
             {{ label }}
           </div>
           <div class="text-xl font-bold text-white">{{ completedDisplay }}/{{ totalDisplay }}</div>

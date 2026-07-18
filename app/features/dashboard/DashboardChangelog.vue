@@ -27,16 +27,16 @@
         </div>
       </div>
       <div v-if="isOpen" :id="PANEL_ID" class="mt-2 space-y-3 text-xs sm:text-sm">
-        <div v-if="pending" class="text-surface-400 text-xs">
+        <div v-if="pending" class="text-surface-300 text-xs">
           {{ t('page.dashboard.changelog.loading') }}
         </div>
-        <div v-else-if="error" class="text-surface-400 flex items-center gap-2 text-xs">
+        <div v-else-if="error" class="text-surface-300 flex items-center gap-2 text-xs">
           <span>{{ t('page.dashboard.changelog.error') }}</span>
           <UButton size="xs" color="neutral" variant="link" @click="retry">
             {{ t('page.dashboard.changelog.retry') }}
           </UButton>
         </div>
-        <div v-else-if="showEmpty" class="text-surface-400 text-xs">
+        <div v-else-if="showEmpty" class="text-surface-300 text-xs">
           {{ t('page.dashboard.changelog.empty') }}
         </div>
         <div v-else class="space-y-3">

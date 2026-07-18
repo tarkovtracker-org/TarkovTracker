@@ -27,7 +27,7 @@ import {
 } from '@/types/taskFilter';
 import { clearPreferencesStorage } from '@/utils/clientStorage';
 import { TRADER_SORT_DIRECTIONS, TRADER_SORT_MODES } from '@/utils/constants';
-import { DEFAULT_KEYBINDS, sanitizeKeybind } from '@/utils/keybinds';
+import { DEFAULT_KEYBINDS, LEGACY_OMNIBAR_KEYBIND, sanitizeKeybind } from '@/utils/keybinds';
 import { logger } from '@/utils/logger';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import {
@@ -384,6 +384,21 @@ export const usePreferencesStore = defineStore('preferences', {
             }
           }
           if (shouldPersistMigratedState) {
+            localStorage.setItem(
+              STORAGE_KEYS.preferences,
+              serializePersistedPreferencesSnapshot(
+                persistedState,
+                persistedSnapshot.ownerUserId,
+                persistedSnapshot.persistedAt
+              )
+            );
+          }
+          if (
+            typeof persistedState.keybindOmnibar === 'string' &&
+            persistedState.keybindOmnibar === LEGACY_OMNIBAR_KEYBIND
+          ) {
+            state.keybindOmnibar = DEFAULT_KEYBINDS.omnibar;
+            persistedState.keybindOmnibar = DEFAULT_KEYBINDS.omnibar;
             localStorage.setItem(
               STORAGE_KEYS.preferences,
               serializePersistedPreferencesSnapshot(

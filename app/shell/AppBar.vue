@@ -145,10 +145,10 @@
         <NuxtLink
           v-else
           to="/supporter"
-          class="border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500 inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-semibold text-white shadow-sm shadow-black/30 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm"
+          class="border-surface-600 hover:border-surface-500 hover:bg-surface-700/60 text-surface-200 inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-medium transition-colors"
           :aria-label="t('footer.support_button')"
         >
-          <UIcon name="i-mdi-heart" class="h-3.5 w-3.5 shrink-0 text-white" />
+          <UIcon name="i-mdi-heart-outline" class="text-success-400 h-3.5 w-3.5 shrink-0" />
           <span class="hidden sm:inline">{{ t('footer.support_button') }}</span>
         </NuxtLink>
         <div class="bg-surface-700/50 mx-1 h-5 w-px" />
@@ -235,7 +235,7 @@
   const tarkovStore = useTarkovStore();
   const Omnibar = defineAsyncComponent(() => import('@/features/omnibar/Omnibar.vue'));
   const ActivityLogPanel = defineAsyncComponent(() => import('@/shell/ActivityLogPanel.vue'));
-  // Initialize global keyboard shortcuts (Undo: CTRL+Z, Search: CTRL+Q or /)
+  // Initialize global keyboard shortcuts (Undo: CTRL+Z, Search: CTRL+K or /)
   useKeybinds();
   const omnibarMounted = ref(false);
   const omnibarOpen = ref(false);
