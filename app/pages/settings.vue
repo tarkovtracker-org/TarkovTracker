@@ -88,7 +88,9 @@
               <TaskDisplayCard />
               <MapSettingsCard />
               <ExternalLinksCard />
-              <KeybindsCard />
+              <div id="keybinds" class="scroll-mt-24">
+                <KeybindsCard />
+              </div>
             </section>
             <section
               v-if="visitedTabs.account"
@@ -224,6 +226,7 @@
   };
   const nestedTabHashes: Record<string, SettingsTabId> = {
     '#skills': 'progression',
+    '#keybinds': 'preferences',
   };
   const legacyTabHashes: Record<string, SettingsTabId> = {
     '#settings-progression': 'progression',

@@ -45,168 +45,143 @@
           </span>
         </button>
       </span>
-      <!-- Right: Status Icons & Settings -->
-      <div class="ml-auto flex items-center gap-1 sm:gap-2">
-        <div class="flex min-w-[3.5rem] items-center justify-end gap-1 sm:min-w-[4rem] sm:gap-2">
-          <span class="flex h-7 w-7 items-center justify-center">
-            <AppTooltip v-if="dataError" :text="t('app_bar.error_loading')">
-              <span class="inline-flex rounded">
-                <UIcon name="i-mdi-database-alert" class="text-error-500 h-5 w-5" />
-              </span>
-            </AppTooltip>
-          </span>
-          <span class="flex h-7 w-7 items-center justify-center">
-            <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">
-              <span class="inline-flex rounded">
-                <UIcon
-                  name="i-heroicons-arrow-path"
-                  class="text-primary-500 h-5 w-5 animate-spin"
+      <!-- Right: Status indicators + two control groups -->
+      <div class="ml-auto flex items-center gap-3">
+        <!-- Status indicators (non-interactive, shown only when active) -->
+        <div class="flex items-center justify-end gap-1">
+          <AppTooltip v-if="dataError" :text="t('app_bar.error_loading')">
+            <span class="flex h-9 w-9 items-center justify-center">
+              <UIcon name="i-mdi-database-alert" class="text-error-500 h-4 w-4" />
+            </span>
+          </AppTooltip>
+          <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">
+            <span class="flex h-9 w-9 items-center justify-center">
+              <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-4 w-4 animate-spin" />
+            </span>
+          </AppTooltip>
+        </div>
+        <!-- Group 1: Utilities (Bell + Help) -->
+        <div class="flex items-center gap-1">
+          <AppTooltip :text="t('activity_log.aria_label', 'Activity Log')">
+            <UPopover :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                size="md"
+                icon="i-heroicons-bell"
+                :aria-label="t('activity_log.aria_label', 'Activity Log')"
+                class="relative h-9 w-9"
+              >
+                <span v-if="activityLogStore.hasUnread" class="sr-only" aria-live="polite">
+                  {{ t('activity_log.unread_indicator', 'You have unread activity') }}
+                </span>
+                <span
+                  v-if="activityLogStore.hasUnread"
+                  aria-hidden="true"
+                  class="bg-error-500 ring-surface-900 absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full ring-2"
                 />
-              </span>
-            </AppTooltip>
-          </span>
-        </div>
-        <div class="shrink-0">
-          <UPopover :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              icon="i-heroicons-bell"
-              :aria-label="t('activity_log.aria_label', 'Activity Log')"
-              class="relative"
-            >
-              <span v-if="activityLogStore.hasUnread" class="sr-only" aria-live="polite">
-                {{ t('activity_log.unread_indicator', 'You have unread activity') }}
-              </span>
-              <span
-                v-if="activityLogStore.hasUnread"
-                aria-hidden="true"
-                class="bg-error-500 ring-surface-900 absolute top-1 right-1 flex h-2 w-2 rounded-full ring-2"
-              />
-            </UButton>
-            <template #content>
-              <ActivityLogPanel />
-            </template>
-          </UPopover>
-        </div>
-        <div class="shrink-0">
+              </UButton>
+              <template #content>
+                <ActivityLogPanel />
+              </template>
+            </UPopover>
+          </AppTooltip>
           <GlobalHelpLauncher />
         </div>
-        <!-- Community Links -->
-        <AppTooltip :text="t('footer.call_to_action.discord')">
-          <a
-            href="https://discord.gg/M8nBgA2sT6"
-            target="_blank"
-            rel="noopener noreferrer"
-            :aria-label="t('footer.call_to_action.discord')"
-            class="hover:bg-surface-700 group flex h-7 w-7 items-center justify-center rounded transition-colors"
+        <!-- Group 2: Preferences & Actions (Language + Support + Account) -->
+        <div class="flex items-center gap-1.5">
+          <SelectMenuFixed
+            id="app-locale-select"
+            v-model="selectedLocale"
+            :items="localeItems"
+            :aria-label="t('settings.locale')"
+            value-key="value"
+            class="hidden shrink-0 sm:block"
+            :ui="localeSelectUi"
           >
-            <DiscordIcon class="text-discord group-hover:text-discord-hover" />
-          </a>
-        </AppTooltip>
-        <AppTooltip :text="t('footer.call_to_action.github')">
-          <a
-            href="https://github.com/tarkovtracker-org/TarkovTracker"
-            target="_blank"
-            rel="noopener noreferrer"
-            :aria-label="t('footer.call_to_action.github')"
-            class="hover:bg-surface-700 flex h-7 w-7 items-center justify-center rounded transition-colors"
-          >
-            <UIcon name="i-mdi-github" class="text-surface-300 h-4.5 w-4.5 hover:text-white" />
-          </a>
-        </AppTooltip>
-        <SelectMenuFixed
-          id="app-locale-select"
-          v-model="selectedLocale"
-          :items="localeItems"
-          :aria-label="t('settings.locale')"
-          value-key="value"
-          class="shrink-0"
-          :ui="localeSelectUi"
-        >
-          <template #leading>
-            <UIcon name="i-mdi-translate" class="text-surface-300 h-4 w-4 shrink-0" />
-          </template>
-        </SelectMenuFixed>
-        <NuxtLink
-          v-if="supporterTier"
-          to="/supporter"
-          :class="[
-            'inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-semibold text-white shadow-sm shadow-black/30 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm',
-            supporterBadgeClass,
-          ]"
-          :aria-label="supporterBadgeAriaLabel"
-          :title="supporterBadgeAriaLabel"
-        >
-          <UIcon :name="supporterBadgeIcon" class="h-3.5 w-3.5 shrink-0 text-white" />
-          <span class="hidden sm:inline">{{ supporterBadgeLabel }}</span>
-        </NuxtLink>
-        <NuxtLink
-          v-else
-          to="/supporter"
-          class="border-surface-600 hover:border-surface-500 hover:bg-surface-700/60 text-surface-200 inline-flex h-7 items-center gap-1.5 rounded border px-2.5 text-xs font-medium transition-colors"
-          :aria-label="t('footer.support_button')"
-        >
-          <UIcon name="i-mdi-heart-outline" class="text-success-400 h-3.5 w-3.5 shrink-0" />
-          <span class="hidden sm:inline">{{ t('footer.support_button') }}</span>
-        </NuxtLink>
-        <div class="bg-surface-700/50 mx-1 h-5 w-px" />
-        <div
-          class="flex items-center justify-end"
-          :class="isLoggedIn ? 'min-w-[2.75rem] sm:min-w-[10rem]' : ''"
-        >
-          <template v-if="isLoggedIn">
-            <UDropdownMenu :items="accountMenuItems" :content="{ align: 'end', sideOffset: 8 }">
+            <template #leading>
+              <UIcon name="i-mdi-translate" class="text-surface-400 h-4 w-4 shrink-0" />
+            </template>
+          </SelectMenuFixed>
+          <span v-if="supporterTier" class="hidden sm:inline-flex">
+            <AppTooltip :text="supporterBadgeAriaLabel">
+              <NuxtLink
+                to="/supporter"
+                :class="[
+                  'inline-flex h-9 items-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold text-white transition-colors md:w-auto md:px-3',
+                  'w-9 justify-center',
+                  supporterBadgeClass,
+                ]"
+                :aria-label="supporterBadgeAriaLabel"
+              >
+                <UIcon :name="supporterBadgeIcon" class="h-4 w-4 shrink-0 text-white" />
+                <span class="hidden md:inline">{{ supporterBadgeLabel }}</span>
+              </NuxtLink>
+            </AppTooltip>
+          </span>
+          <span v-else class="hidden sm:inline-flex">
+            <AppTooltip :text="t('footer.support_button')">
+              <NuxtLink
+                to="/supporter"
+                class="border-success-500/50 bg-success-500/5 text-success-400 hover:bg-success-500/10 hover:border-success-500/70 inline-flex h-9 w-9 items-center justify-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold transition-colors md:w-auto md:px-3"
+                :aria-label="t('footer.support_button')"
+              >
+                <UIcon name="i-mdi-heart" class="h-4 w-4 shrink-0" />
+                <span class="hidden md:inline">{{ t('footer.support_button') }}</span>
+              </NuxtLink>
+            </AppTooltip>
+          </span>
+          <span class="sm:hidden">
+            <AppTooltip :text="t('app_bar.more_aria', 'More')">
+              <UDropdownMenu :items="moreMenuItems" :content="{ align: 'end', sideOffset: 8 }">
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  size="md"
+                  icon="i-mdi-dots-horizontal"
+                  :aria-label="t('app_bar.more_aria', 'More')"
+                  class="h-9 w-9"
+                />
+              </UDropdownMenu>
+            </AppTooltip>
+          </span>
+          <AppTooltip :text="t('navigation_drawer.account_menu')">
+            <UDropdownMenu
+              v-if="isLoggedIn"
+              :items="accountMenuItems"
+              :content="{ align: 'end', sideOffset: 8 }"
+            >
               <button
                 type="button"
-                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex min-h-8 items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors sm:w-full sm:max-w-40"
+                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-9 items-center gap-2 rounded-md border px-2 py-1.5 transition-colors sm:max-w-40"
                 :aria-label="t('navigation_drawer.account_menu')"
               >
                 <img
-                  :src="avatarSrc"
+                  :src="effectiveAvatarSrc"
                   :alt="t('app_bar.user_avatar_alt')"
-                  class="h-4 w-4 shrink-0 rounded-full"
+                  class="h-5 w-5 shrink-0 rounded-full"
                   loading="lazy"
+                  @error="handleAvatarError"
                 />
                 <span
-                  class="text-surface-200 hidden min-w-0 flex-1 truncate text-sm leading-none font-medium sm:inline"
+                  class="text-surface-200 hidden min-w-0 flex-1 truncate text-[13px] leading-none font-medium sm:inline"
                 >
                   {{ userDisplayName }}
                 </span>
-                <UIcon name="i-mdi-chevron-down" class="text-surface-400 h-3.5 w-3.5 shrink-0" />
+                <UIcon name="i-mdi-chevron-down" class="text-surface-400 h-4 w-4 shrink-0" />
               </button>
             </UDropdownMenu>
-          </template>
-          <template v-else>
-            <div class="flex w-full items-center justify-end gap-1 sm:gap-2">
-              <AppTooltip :text="t('navigation_drawer.settings')">
-                <NuxtLink
-                  to="/settings"
-                  class="hover:bg-surface-700 flex h-7 w-7 items-center justify-center rounded transition-colors"
-                  :aria-label="t('navigation_drawer.settings')"
-                >
-                  <UIcon
-                    name="i-mdi-cog-outline"
-                    class="text-surface-300 h-4.5 w-4.5 hover:text-white"
-                  />
-                </NuxtLink>
-              </AppTooltip>
-              <NuxtLink
-                to="/login"
-                class="hover:bg-surface-700 hidden min-h-8 items-center rounded px-2 py-1 text-sm leading-none text-white sm:inline-flex"
-              >
-                <span class="leading-none">{{ t('navigation_drawer.login') }}</span>
-              </NuxtLink>
-              <NuxtLink
-                to="/login"
-                class="hover:bg-surface-700 rounded p-1 text-white sm:hidden"
-                :aria-label="t('navigation_drawer.login')"
-              >
-                <UIcon name="i-mdi-fingerprint" class="h-4 w-4" />
-              </NuxtLink>
-            </div>
-          </template>
+          </AppTooltip>
+          <AppTooltip v-if="!isLoggedIn" :text="t('app_bar.login_aria', 'Log in to your account')">
+            <NuxtLink
+              to="/login"
+              class="bg-primary-600 hover:bg-primary-500 border-primary-500 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold text-white transition-colors"
+              :aria-label="t('app_bar.login_aria', 'Log in to your account')"
+            >
+              <UIcon name="i-mdi-account-outline" class="h-4 w-4 shrink-0" />
+              <span class="leading-none">{{ t('navigation_drawer.login') }}</span>
+            </NuxtLink>
+          </AppTooltip>
         </div>
       </div>
     </div>
@@ -326,6 +301,13 @@
       ? '/img/default-avatar.svg'
       : $supabase.user.photoURL;
   });
+  const avatarFailed = ref(false);
+  const effectiveAvatarSrc = computed(() =>
+    avatarFailed.value ? '/img/default-avatar.svg' : avatarSrc.value
+  );
+  function handleAvatarError() {
+    avatarFailed.value = true;
+  }
   const userDisplayName = computed(() => {
     const fallbackLabel = t('app_bar.user_label');
     const hiddenLabel = t('app_bar.hidden_label');
@@ -356,6 +338,41 @@
         label: t('navigation_drawer.logout'),
         onSelect: () => {
           void logout();
+        },
+      },
+    ],
+  ]);
+  const moreMenuItems = computed<DropdownMenuItem[][]>(() => [
+    [
+      {
+        icon: 'i-mdi-translate',
+        label: t('settings.locale'),
+        children: (availableLocales as readonly string[]).map((localeCode) => ({
+          label: localeCode.toUpperCase(),
+          onSelect: () => {
+            void applyLocaleSelection(localeCode);
+          },
+        })),
+      },
+      {
+        icon: 'i-mdi-heart-outline',
+        label: t('footer.support_button'),
+        to: '/supporter',
+      },
+    ],
+    [
+      {
+        icon: 'i-mdi-discord',
+        label: t('footer.call_to_action.discord'),
+        onSelect: () => {
+          window.open('https://discord.gg/M8nBgA2sT6', '_blank', 'noopener');
+        },
+      },
+      {
+        icon: 'i-mdi-github',
+        label: t('footer.call_to_action.github'),
+        onSelect: () => {
+          window.open('https://github.com/tarkovtracker-org/TarkovTracker', '_blank', 'noopener');
         },
       },
     ],
@@ -517,16 +534,16 @@
     }));
   });
   const localeSelectUi = {
-    base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800/60 border-surface-700 hover:bg-surface-800 flex min-h-8 items-center gap-1 rounded border px-2 py-1 ring-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2',
+    base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800/30 border-surface-700/40 hover:bg-surface-800/60 hover:border-surface-600/60 flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1 ring-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2',
     content:
       'max-h-80 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-[var(--reka-combobox-trigger-width)]',
     item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
     itemLabel: 'whitespace-nowrap uppercase',
     itemTrailingIcon: 'text-surface-400 shrink-0 size-4',
-    leading: 'shrink-0 text-surface-300',
+    leading: 'shrink-0 text-surface-400',
     trailing: 'shrink-0 text-surface-400',
-    trailingIcon: 'text-surface-400 shrink-0 size-4',
-    value: 'text-surface-200 text-xs leading-none font-medium uppercase',
+    trailingIcon: 'text-surface-400 shrink-0 size-3.5',
+    value: 'text-surface-300 text-[13px] leading-none font-medium uppercase',
     viewport: 'p-1 max-h-none overflow-visible',
   } as const;
   let latestLocaleSwitchRequestId = 0;
