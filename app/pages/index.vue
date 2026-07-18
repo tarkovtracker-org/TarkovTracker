@@ -371,6 +371,7 @@
     isTaskComplete: (id: string) => tarkovStore.isTaskComplete(id),
     gameMode: tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP,
   }));
+  const metadataTasksLoaded = computed(() => metadataStore.tasks.length > 0);
   const unlockedTraderStats = computed(() =>
     traderStats.value.filter((trader) => !isTraderLocked(trader, traderLockDeps.value))
   );
@@ -387,6 +388,7 @@
   const focusTraderFromRoute = async () => {
     const traderId = getQueryString(route.query.trader);
     if (!traderId || traderStats.value.length === 0) return;
+    if (!metadataTasksLoaded.value) return;
     const targetTrader = traderStats.value.find((trader) => trader.id === traderId);
     if (!targetTrader) return;
     tradersSectionCollapsed.value = false;
@@ -412,7 +414,7 @@
     });
   };
   watch(
-    [() => route.query.trader, traderStats],
+    [() => route.query.trader, traderStats, metadataTasksLoaded],
     async () => {
       await focusTraderFromRoute();
     },

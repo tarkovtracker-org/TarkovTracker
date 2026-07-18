@@ -235,7 +235,7 @@
   const tarkovStore = useTarkovStore();
   const Omnibar = defineAsyncComponent(() => import('@/features/omnibar/Omnibar.vue'));
   const ActivityLogPanel = defineAsyncComponent(() => import('@/shell/ActivityLogPanel.vue'));
-  // Initialize global keyboard shortcuts (Undo: CTRL+Z, Search: CTRL+K or /)
+  // Initialize global keyboard shortcuts (Undo/Search defaults: Ctrl+Z/Ctrl+K, user-configurable)
   useKeybinds();
   const omnibarMounted = ref(false);
   const omnibarOpen = ref(false);
