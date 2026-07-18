@@ -617,6 +617,7 @@
         "rep_progress_label": "→ LF{level}",
         "scav_karma": "Scav Karma",
         "unlock_required": "Sblocco richiesto:",
+        "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Ordina i trader",
           "direction_aria_label": "Inverti ordinamento",
