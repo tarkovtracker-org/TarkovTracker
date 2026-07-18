@@ -76,7 +76,7 @@
   "omnibar": {
     "title": "Search",
     "description": "Search tasks, needed items, and hideout stations",
-    "trigger_label": "Search...",
+    "trigger_label": "Search tasks, items, traders…",
     "open_aria": "Open global search",
     "aria_label": "Global search",
     "placeholder": "Search tasks, needed items, hideout...",
@@ -617,6 +617,7 @@
         "rep_progress_label": "→ LL{level}",
         "scav_karma": "Scav Karma",
         "unlock_required": "Unlock required:",
+        "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction",
