@@ -239,7 +239,8 @@
       "page_guide": "Guide this page",
       "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
       "onboarding": "New user onboarding",
-      "onboarding_description": "Start with imports, finish the basics, then verify tasks."
+      "onboarding_description": "Start with imports, finish the basics, then verify tasks.",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "Getting set up",

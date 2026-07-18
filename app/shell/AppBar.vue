@@ -308,6 +308,9 @@
   function handleAvatarError() {
     avatarFailed.value = true;
   }
+  watch(avatarSrc, () => {
+    avatarFailed.value = false;
+  });
   const userDisplayName = computed(() => {
     const fallbackLabel = t('app_bar.user_label');
     const hiddenLabel = t('app_bar.hidden_label');

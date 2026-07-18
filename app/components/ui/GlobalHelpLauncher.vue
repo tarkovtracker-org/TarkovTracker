@@ -261,6 +261,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { logger } from '@/utils/logger';
   import type { PageHelpContent, PageHelpKey } from '@/composables/usePageHelpContent';
   type HelpRoute = string | { hash?: string; path: string; query?: Record<string, string> };
   interface OnboardingAction {
@@ -286,6 +287,7 @@
   const { te, t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const { $supabase } = useNuxtApp();
+  const toast = useToast();
   const { getPageHelpContent } = usePageHelpContent();
   const pageHelpStates: Record<PageHelpKey, ReturnType<typeof usePageHelpState>> = {
     dashboard: usePageHelpState('dashboard'),
@@ -517,10 +519,18 @@
     restoreFocusOnOnboardingClose.value = true;
     isOnboardingOpen.value = true;
   };
-  const openKeyboardShortcuts = () => {
+  const openKeyboardShortcuts = async () => {
     isMenuOpen.value = false;
     closeAllPageGuides(false);
-    void navigateTo({ path: '/settings', hash: '#keybinds' });
+    try {
+      await navigateTo({ path: '/settings', hash: '#keybinds' });
+    } catch (error) {
+      logger.error('[GlobalHelpLauncher] Failed to navigate to keyboard shortcuts:', error);
+      toast.add({
+        title: t('page_help.launcher.keyboard_shortcuts_error'),
+        color: 'error',
+      });
+    }
   };
   const closeMenuOnly = () => {
     isMenuOpen.value = false;

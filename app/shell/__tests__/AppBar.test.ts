@@ -160,7 +160,10 @@ const mountAppBar = async () => {
           template:
             '<div><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><button v-for="item in group" :key="item.label" type="button" :data-menu-item="item.label" @click="item.onSelect?.()">{{ item.label }}</button></template></div>',
         },
-        UIcon: true,
+        UIcon: {
+          props: ['name'],
+          template: '<i :class="name" />',
+        },
         UKbd: true,
         UPopover: {
           template: '<div><slot /><slot name="content" /></div>',
@@ -504,7 +507,7 @@ describe('AppBar authenticated state', () => {
     const classAttr = trigger.attributes('class') || '';
     expect(classAttr).toContain('h-9');
     expect(trigger.find('img').exists()).toBe(true);
-    expect(trigger.find('.i-mdi-chevron-down').exists() || trigger.text()).toBeTruthy();
+    expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
     wrapper.unmount();
   });
   it('truncates the display name with sm:inline and truncate class', async () => {
