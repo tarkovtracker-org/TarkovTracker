@@ -14,7 +14,8 @@ export const isTraderLocked = (
     trader.normalizedName,
     deps.gameMode ?? GAME_MODES.PVP
   );
-  if (!unlockTaskIds.length || !deps.tasks?.length) return false;
+  if (!unlockTaskIds.length) return false;
+  if (!deps.tasks?.length) return true;
   const idSet = new Set(unlockTaskIds);
   const unlockTasks = deps.tasks.filter((task) => idSet.has(task.id));
   if (!unlockTasks.length) return false;
