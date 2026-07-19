@@ -72,12 +72,12 @@
     "user_avatar_alt": "Avatar utente",
     "supporter_badge_label": "Supporter",
     "supporter_badge_aria": "Gestisci il tuo abbonamento supporter ({tier})",
-    "help_community_aria": "Help & community",
+    "help_community_aria": "Aiuto & community",
     "community_section": "Community",
-    "keyboard_shortcuts": "Keyboard shortcuts",
-    "report_problem": "Report a problem",
+    "keyboard_shortcuts": "Scorciatoie tastiera",
+    "report_problem": "Segnala un problema",
     "more_aria": "Altro",
-    "login_aria": "Log in to your account"
+    "login_aria": "Accedi al tuo account"
   },
   "omnibar": {
     "title": "Cerca",
@@ -240,7 +240,7 @@
       "page_guide_unavailable": "Guida rapida non disponibile.",
       "onboarding": "Setup iniziale",
       "onboarding_description": "Comincia con gli import, le basi e poi verifica le missioni.",
-      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
+      "keyboard_shortcuts_error": "Impossibile aprire le scorciatoie da tastiera. Riprova."
     },
     "onboarding": {
       "title": "Setup",
@@ -624,7 +624,7 @@
         "rep_progress_label": "→ LF{level}",
         "scav_karma": "Scav Karma",
         "unlock_required": "Sblocco richiesto:",
-        "locked_summary": "{count} traders locked",
+        "locked_summary": "{count} trader bloccati",
         "sort": {
           "aria_label": "Ordina i trader",
           "direction_aria_label": "Inverti ordinamento",
@@ -1476,47 +1476,47 @@
       "title": "Privacy Policy"
     },
     "resources": {
-      "title": "Resources & Guides",
-      "subtitle": "Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.",
-      "search_placeholder": "Search tools and guides...",
+      "title": "Risorse & Guide",
+      "subtitle": "Trova companion apps, community tools, risorse per sviluppatori e guide per ottenere il massimo da TarkovTracker.",
+      "search_placeholder": "Cerca strumenti e guide...",
       "clear_search": "Cancella ricerca",
-      "clear_filters": "Clear filters",
-      "no_results": "No resources match your search.",
-      "results_count": "{count} resources found",
-      "results_count_one": "1 resource found",
-      "filter_label": "Filter resources by category",
+      "clear_filters": "Resetta filtri",
+      "no_results": "Nessuna risorsa corrisponde alla tua ricerca.",
+      "results_count": "{count} risorse trovate",
+      "results_count_one": "1 risorsa trovata",
+      "filter_label": "Filtra risorse per categoria",
       "more": "Altro",
-      "more_actions": "More actions",
-      "suggest_title": "Know a useful Tarkov resource?",
-      "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
-      "suggest_cta": "Suggest a resource",
+      "more_actions": "Altre azioni",
+      "suggest_title": "Conosci una risorsa Tarkov utile?",
+      "suggest_description": "Suggerisci un tool o una guida per l'inclusione in questa pagina.",
+      "suggest_cta": "Suggerisci una risorsa",
       "filters": {
         "all": "Tutte"
       },
       "categories": {
         "companion_apps": "Companion Apps",
-        "data_and_apis": "Data & Developer Tools",
-        "calculators_and_reference": "Calculators & Reference"
+        "data_and_apis": "Dati & Strumenti Sviluppatori",
+        "calculators_and_reference": "Calcolatori & Riferimenti"
       },
       "category_badges": {
-        "companion_apps": "Desktop App",
-        "data_and_apis": "Data Platform",
-        "calculators_and_reference": "Reference"
+        "companion_apps": "App desktop",
+        "data_and_apis": "Piattaforma dati",
+        "calculators_and_reference": "Riferimento"
       },
       "actions": {
-        "setup_guide": "Setup guide",
-        "read_guide": "Read guide",
-        "api_documentation": "API documentation",
-        "open_calculator": "Open calculator",
-        "view_changes": "View changes",
-        "open_tool": "Open tool",
-        "download_release": "Download latest release"
+        "setup_guide": "Guida configurazione",
+        "read_guide": "Leggi la guida",
+        "api_documentation": "Documentazione API",
+        "open_calculator": "Apri calcolatore",
+        "view_changes": "Visualizza modifiche",
+        "open_tool": "Apri lo strumento",
+        "download_release": "Scarica l'ultima versione"
       },
-      "view_guide": "Setup guide",
-      "back_to_hub": "Back to Resources",
+      "view_guide": "Guida configurazione",
+      "back_to_hub": "Torna alle risorse",
       "breadcrumb": "Breadcrumb",
-      "guide_label": "Guide",
-      "on_this_page": "On this page",
+      "guide_label": "Guida",
+      "on_this_page": "Su questa pagina",
       "compatibility_label": "Compatibility",
       "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
       "guide_title_template": "{name} Guide",
@@ -1532,7 +1532,7 @@
         "project_website": "Project website",
         "github": "View source",
         "discord": "Community support",
-        "api": "API documentation",
+        "api": "Documentazione API",
         "download": "Download"
       },
       "guide_sections": {
