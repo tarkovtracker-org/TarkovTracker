@@ -71,7 +71,13 @@
     "user_label": "用户",
     "user_avatar_alt": "用户头像",
     "supporter_badge_label": "Supporter",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})"
+    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
+    "help_community_aria": "Help & community",
+    "community_section": "Community",
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "report_problem": "Report a problem",
+    "more_aria": "更多",
+    "login_aria": "Log in to your account"
   },
   "omnibar": {
     "title": "Search",
@@ -233,7 +239,8 @@
       "page_guide": "讲解此页面",
       "page_guide_unavailable": "这个页面暂时还没有专属指南，请先使用新手引导。",
       "onboarding": "新用户引导",
-      "onboarding_description": "先完成导入，再补齐基础设置，最后核对任务。"
+      "onboarding_description": "先完成导入，再补齐基础设置，最后核对任务。",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "开始设置",
