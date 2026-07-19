@@ -71,7 +71,13 @@
     "user_label": "Benutzer",
     "user_avatar_alt": "Benutzer-Avatar",
     "supporter_badge_label": "Supporter",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})"
+    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
+    "help_community_aria": "Help & community",
+    "community_section": "Community",
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "report_problem": "Report a problem",
+    "more_aria": "Mehr",
+    "login_aria": "Log in to your account"
   },
   "omnibar": {
     "title": "Search",
@@ -233,7 +239,8 @@
       "page_guide": "Diese Seite erklären",
       "page_guide_unavailable": "Für diese Seite gibt es noch keine Anleitung. Nutze stattdessen das Onboarding.",
       "onboarding": "Onboarding für neue Nutzer",
-      "onboarding_description": "Starte mit den Importen, richte die Grundlagen ein und prüfe dann deine Aufgaben."
+      "onboarding_description": "Starte mit den Importen, richte die Grundlagen ein und prüfe dann deine Aufgaben.",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "Einrichtung starten",
