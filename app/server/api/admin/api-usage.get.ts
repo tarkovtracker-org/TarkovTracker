@@ -7,6 +7,7 @@ interface UsageSummaryRow {
   reads: number;
   writes: number;
   throttled: number;
+  user_agent: string | null;
 }
 interface ConsumerSummary {
   userId: string;
@@ -15,6 +16,7 @@ interface ConsumerSummary {
   reads: number;
   writes: number;
   throttled: number;
+  userAgent: string | null;
 }
 interface ApiUsageResponse {
   since: string;
@@ -58,6 +60,7 @@ export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
     reads: Number(row.reads) || 0,
     writes: Number(row.writes) || 0,
     throttled: Number(row.throttled) || 0,
+    userAgent: row.user_agent,
   }));
   return { since: sinceDay, consumers };
 });

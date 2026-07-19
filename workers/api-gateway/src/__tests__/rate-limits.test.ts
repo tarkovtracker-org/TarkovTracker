@@ -832,7 +832,10 @@ describe('tiered quotas in the worker', () => {
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
     const res = await worker.fetch(
-      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'User-Agent': '  TestClient/1.0  ' },
+      }),
       env
     );
     expect(res.status).toBe(200);
@@ -845,6 +848,7 @@ describe('tiered quotas in the worker', () => {
       p_reads: 1,
       p_writes: 0,
       p_throttled: 0,
+      p_user_agent: 'TestClient/1.0',
     });
   });
   it('checks the per-IP backstop when CF-Connecting-IP is present', async () => {

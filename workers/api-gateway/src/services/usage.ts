@@ -9,6 +9,7 @@ export interface UsageRecord {
   tier: ApiTier;
   kind: 'read' | 'write';
   throttled: boolean;
+  userAgent: string | null;
 }
 
 /**
@@ -34,6 +35,7 @@ export async function recordUsage(env: Env, record: UsageRecord): Promise<void> 
         p_reads: record.kind === 'read' && !record.throttled ? 1 : 0,
         p_writes: record.kind === 'write' && !record.throttled ? 1 : 0,
         p_throttled: record.throttled ? 1 : 0,
+        p_user_agent: record.userAgent,
       }),
     });
     if (!response.ok) {

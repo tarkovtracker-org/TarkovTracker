@@ -67,6 +67,7 @@ describe('GET /api/admin/api-usage', () => {
           reads: 1000,
           writes: 60,
           throttled: 12,
+          user_agent: 'TestClient/1.0',
         },
         {
           user_id: 'u2',
@@ -75,6 +76,7 @@ describe('GET /api/admin/api-usage', () => {
           reads: 200,
           writes: 20,
           throttled: 0,
+          user_agent: null,
         },
       ])
     );
@@ -98,7 +100,8 @@ describe('GET /api/admin/api-usage', () => {
       reads: 1000,
       writes: 60,
       throttled: 12,
+      userAgent: 'TestClient/1.0',
     });
-    expect(result.consumers[1]).toMatchObject({ userId: 'u2', tier: 'chad' });
+    expect(result.consumers[1]).toMatchObject({ userId: 'u2', tier: 'chad', userAgent: null });
   });
 });

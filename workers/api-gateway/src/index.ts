@@ -20,6 +20,7 @@ import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
 import { logger } from './utils/logger';
+import { normalizeInboundUserAgent } from './utils/userAgent';
 import type {
   ApiToken,
   Env,
@@ -204,7 +205,8 @@ export class ApiGatewayRateLimiter {
     if (!Number.isFinite(limit) || !Number.isFinite(windowSec) || limit <= 0 || windowSec <= 0) {
       return new Response('Bad Request', { status: 400 });
     }
-    const anchor: RateLimitAnchor | undefined = payload.anchor === 'utc-day' ? 'utc-day' : undefined;
+    const anchor: RateLimitAnchor | undefined =
+      payload.anchor === 'utc-day' ? 'utc-day' : undefined;
     const mode: RateLimitMode | undefined = payload.mode === 'sliding' ? 'sliding' : undefined;
     // Cleanup is the default for high-cardinality callers (Pages, legacy, unknown).
     // Authenticated gateway quotas opt in to long retention via retain: true so a
@@ -677,6 +679,7 @@ async function authenticateAndRateLimit(
       tier,
       kind,
       throttled,
+      userAgent: normalizeInboundUserAgent(request.headers.get('User-Agent')),
     });
     if (ctx) {
       ctx.waitUntil(promise);
