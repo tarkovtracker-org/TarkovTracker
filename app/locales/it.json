@@ -71,7 +71,13 @@
     "user_label": "Utente",
     "user_avatar_alt": "Avatar utente",
     "supporter_badge_label": "Supporter",
-    "supporter_badge_aria": "Gestisci il tuo abbonamento supporter ({tier})"
+    "supporter_badge_aria": "Gestisci il tuo abbonamento supporter ({tier})",
+    "help_community_aria": "Help & community",
+    "community_section": "Community",
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "report_problem": "Report a problem",
+    "more_aria": "Altro",
+    "login_aria": "Log in to your account"
   },
   "omnibar": {
     "title": "Cerca",
@@ -233,7 +239,8 @@
       "page_guide": "Guida rapida",
       "page_guide_unavailable": "Guida rapida non disponibile.",
       "onboarding": "Setup iniziale",
-      "onboarding_description": "Comincia con gli import, le basi e poi verifica le missioni."
+      "onboarding_description": "Comincia con gli import, le basi e poi verifica le missioni.",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "Setup",
