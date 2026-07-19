@@ -28,7 +28,7 @@ and multi-device sync.
 | Public API | Cloudflare Worker (`workers/api-gateway`)    | Token auth + Durable Object rate limiter |
 | Payments   | Stripe                                       | Supporter subscriptions + one-time       |
 | Tests      | Vitest + Vue Test Utils + `@nuxt/test-utils` | happy-dom environment                    |
-| Deploy     | Cloudflare Pages/Workers                     | Node `>=24.12.0`, pnpm `>=10.34.5 <11`   |
+| Deploy     | Cloudflare Pages/Workers                     | Node `>=24.12.0`, pnpm `>=10.34.5 <12`   |
 
 **Languages:** TypeScript (strict) is dominant for app, server, workers; Vue SFCs for components;
 Deno/TypeScript for Supabase Edge Functions; small Node `.mjs` scripts; SQL migrations; shell scripts.
@@ -65,7 +65,7 @@ app/
 ├── middleware/       # Route middleware (auth, admin)
 ├── types/            # TypeScript definitions (tarkov.ts, progress.ts, ...)
 ├── utils/            # Client/shared utilities
-├── data/             # Static data (maps.json, overrides)
+├── data/             # Static data (maps.json)
 ├── locales/          # i18n JSON (en.json is source; others Crowdin-owned)
 ├── layouts/          # Page layouts (default.vue)
 ├── assets/css/       # tailwind.css (theme + keyframes)
@@ -180,7 +180,7 @@ graph TD
 
 | Concern            | Tooling                                                                      |
 | ------------------ | ---------------------------------------------------------------------------- |
-| Package manager    | pnpm `>=10.34.5 <11` (`packageManager: pnpm@10.34.5`), Node `>=24.12.0`      |
+| Package manager    | pnpm `>=10.34.5 <12` (`packageManager: pnpm@11.14.0`), Node `>=24.12.0`      |
 | Dev/build          | `nuxt dev`, `nuxt build`, `nuxt generate`, `nuxt preview`                    |
 | Lint               | ESLint flat config (`eslint app --max-warnings=0`) + DESIGN.md lint          |
 | Format             | Prettier (+ `prettier-plugin-tailwindcss`), enforced via husky + lint-staged |

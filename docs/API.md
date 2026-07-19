@@ -273,7 +273,9 @@ Authorization: Bearer <supabase_jwt_token>
 
 ### POST /api/stripe/checkout
 
-Creates a Stripe Checkout session for supporter subscriptions or one-time payments. Requires authentication.
+Creates a Stripe Checkout session for a first supporter subscription or a one-time payment.
+Existing active or past-due subscribers must use `/api/stripe/portal` to change plans. Requires
+authentication.
 
 **Request Body (subscription):**
 
@@ -309,12 +311,14 @@ Creates a Stripe Checkout session for supporter subscriptions or one-time paymen
 
 **Errors:**
 
-| Status | Message                           | Cause                      |
-| ------ | --------------------------------- | -------------------------- |
-| 400    | Invalid tier / Invalid interval   | Bad request body           |
-| 401    | Authentication required           | Missing or invalid session |
-| 500    | Stripe not configured             | Server missing Stripe keys |
-| 502    | Failed to create checkout session | Stripe API error           |
+| Status | Message                                                 | Cause                                        |
+| ------ | ------------------------------------------------------- | -------------------------------------------- |
+| 400    | Invalid tier / Invalid interval                         | Bad request body                             |
+| 401    | Authentication required                                 | Missing or invalid session                   |
+| 409    | Manage your existing subscription in the billing portal | Active or past-due subscription exists       |
+| 500    | Stripe not configured                                   | Server missing Stripe keys                   |
+| 502    | Failed to create checkout session                       | Stripe API error                             |
+| 503    | Unable to verify existing subscription                  | Supabase billing-state lookup is unavailable |
 
 ---
 
@@ -353,14 +357,23 @@ The `returnUrl` host must match the configured app URL host. Mismatched hosts fa
 
 ## Rate Limits (API Gateway)
 
+This section covers **external progress API quotas only** (Worker + Durable Object). App mutation
+limits, shared profile limits, Auth limits, and DB hard caps live in a separate ownership map:
+[`RATE_LIMITING.md`](./RATE_LIMITING.md).
+
 Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC; burst limits use a 60-second sliding window so batch updates near a minute boundary are not spuriously throttled.
 
-| Tier  | Reads/day | Writes/day | Burst/min |
-| ----- | --------- | ---------- | --------- |
-| Free  | 1,000     | 100        | 30        |
-| Scav  | 2,000     | 250        | 60        |
-| Timmy | 3,000     | 400        | 90        |
-| Chad  | 5,000     | 600        | 120       |
+| Tier      | Reads/day | Writes/day | Burst/min |
+| --------- | --------- | ---------- | --------- |
+| Free      | 1,000     | 100        | 30        |
+| Supporter | 2,000     | 250        | 60        |
+| Scav      | 2,000     | 250        | 60        |
+| Timmy     | 3,000     | 400        | 90        |
+| Chad      | 5,000     | 600        | 120       |
+
+The gateway resolves the tier from `public.supporters` for the token owner and caches successful
+lookups for up to 60 seconds. Active subscriptions and past-due subscriptions within their recorded
+grace period keep paid limits; expired subscriptions return to Free limits.
 
 A per-IP backstop applies on top of the per-user quotas: 600 reads/hour and 200 writes/hour per IP address (1-hour sliding window). This catches abuse from many accounts sharing one IP while remaining generous enough for shared NAT users. IP-throttled requests do not consume the daily or burst quotas.
 

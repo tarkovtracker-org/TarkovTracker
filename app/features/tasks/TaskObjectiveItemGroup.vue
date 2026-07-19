@@ -101,7 +101,6 @@
     trackTaskProgressInteractionKey,
   } from '@/features/tasks/task-context';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
-  import { resolveObjectiveItemIcon } from '@/features/tasks/task-objective-item-overrides';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -198,8 +197,6 @@
       // Prefer defaultPreset image for weapons (shows full gun instead of bare receiver)
       const imageItem = item?.properties?.defaultPreset || item;
       const image8xLink = imageItem?.image8xLink || item?.image8xLink;
-      const itemId = imageItem?.id || item?.id;
-      const overrideItemIcon = resolveObjectiveItemIcon(itemId);
       const linkItem = item?.id ? item : imageItem?.id ? imageItem : undefined;
       map[objective.id] = {
         neededCount,
@@ -207,7 +204,6 @@
         itemName:
           item?.name || item?.shortName || objective.description || t('page.tasks.questcard.item'),
         itemIcon:
-          overrideItemIcon ||
           imageItem?.iconLink ||
           imageItem?.image512pxLink ||
           image8xLink ||
@@ -220,7 +216,6 @@
           item?.image512pxLink ||
           imageItem?.iconLink ||
           item?.iconLink ||
-          overrideItemIcon ||
           undefined,
         itemDevUrl: linkItem ? getKeyDevUrl(linkItem) : undefined,
         itemPrimaryUrl: linkItem ? getKeyPrimaryUrl(linkItem) : undefined,

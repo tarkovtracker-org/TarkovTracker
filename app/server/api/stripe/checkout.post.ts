@@ -5,7 +5,11 @@ import {
   validateCheckoutBody,
   validateOneTimeAmount,
 } from '@/server/utils/stripeCheckoutValidation';
-import { getSupporterStripeCustomerId } from '@/server/utils/supporterCustomerLookup';
+import {
+  getSupporterBillingState,
+  SupporterCustomerLookupUnavailableError,
+} from '@/server/utils/supporterCustomerLookup';
+import type { SupporterBillingState } from '@/server/utils/supporterCustomerLookup';
 const logger = createLogger('StripeCheckout');
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);
@@ -32,7 +36,26 @@ export default defineEventHandler(async (event) => {
   // Reuse the existing Stripe Customer for returning supporters so refund and
   // dispute lookups against stripe_customer_id keep matching after re-subscribe.
   // Falls back to customer_email for first-time supporters (Stripe creates one).
-  const existingCustomerId = await getSupporterStripeCustomerId(event, userId);
+  let billingState: SupporterBillingState | null;
+  try {
+    billingState = await getSupporterBillingState(event, userId, {
+      throwOnUnavailable: mode === 'subscription',
+    });
+  } catch (error) {
+    if (error instanceof SupporterCustomerLookupUnavailableError) {
+      logger.error('[Stripe Checkout] Supporter customer lookup unavailable', {
+        userId,
+        mode,
+        error,
+      });
+      throw createError({
+        statusCode: 503,
+        message: 'Unable to verify existing subscription',
+      });
+    }
+    throw error;
+  }
+  const existingCustomerId = billingState?.stripeCustomerId;
   const customerFields: { customer?: string; customer_email?: string } = existingCustomerId
     ? { customer: existingCustomerId }
     : email
@@ -45,6 +68,7 @@ export default defineEventHandler(async (event) => {
         mode: 'payment',
         client_reference_id: userId,
         ...customerFields,
+        ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
         metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
         payment_intent_data: { metadata: { user_id: userId } },
         line_items: [
@@ -72,6 +96,15 @@ export default defineEventHandler(async (event) => {
   }
   if (!interval) {
     throw createError({ statusCode: 400, message: 'Invalid interval' });
+  }
+  if (
+    billingState?.stripeSubscriptionId &&
+    ['active', 'past_due', 'trialing'].includes(billingState.status ?? '')
+  ) {
+    throw createError({
+      statusCode: 409,
+      message: 'Manage your existing subscription in the billing portal',
+    });
   }
   // Price IDs are configured as env vars: STRIPE_PRICE_{TIER}_{INTERVAL}
   const priceKey = `stripePrice${capitalize(tier)}${capitalize(interval)}` as keyof typeof config;

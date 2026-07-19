@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
+import { buildTasksCorePrecomputedKey, isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
+import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { PRECOMPUTED_TTL_SECONDS, runPrecompute, validatePrecomputeFilter } from '../precompute';
 import type { KvWriter } from '../precompute';
 const { applyOverlayMock, createFetcherMock, fetcherMock } = vi.hoisted(() => {
@@ -43,13 +45,17 @@ describe('runPrecompute', () => {
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([]);
-    expect(result.successes).toEqual([
-      'tasks-core-json-v2-en-regular',
-      'tasks-core-json-v2-en-pve',
-    ]);
+    expect(result.successes).toHaveLength(2);
+    expect(result.successes).toEqual(
+      expect.arrayContaining([
+        'tasks-core-json-v2-en-regular',
+        'tasks-core-json-v2-en-pve',
+      ])
+    );
     expect(kv.put).toHaveBeenCalledTimes(2);
-    const [key, value, options] = kv.put.mock.calls[0];
-    expect(key).toBe('tasks-core-json-v2-en-regular');
+    const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v2-en-regular');
+    expect(putCall).toBeDefined();
+    const [, value, options] = putCall!;
     expect(options).toEqual({ expirationTtl: PRECOMPUTED_TTL_SECONDS });
     expect(PRECOMPUTED_TTL_SECONDS).toBe(604800);
     const envelope = JSON.parse(value as string);
@@ -62,6 +68,17 @@ describe('runPrecompute', () => {
     expect(createFetcherMock).toHaveBeenCalledTimes(1);
     expect(createFetcherMock).toHaveBeenCalledWith({ gameMode: 'pve', lang: 'de' });
     expect(applyOverlayMock).toHaveBeenCalledWith({ raw: true }, { gameMode: 'pve' });
+  });
+  it('expands to all supported lang and gameMode combinations when no filter is provided', async () => {
+    const kv = createKvMock();
+    const result = await runPrecompute(kv, {});
+    const expectedKeys = API_SUPPORTED_LANGUAGES.flatMap((lang) =>
+      VALID_GAME_MODES.map((gameMode) => buildTasksCorePrecomputedKey(lang, gameMode))
+    );
+    expect(result.failures).toEqual([]);
+    expect(result.successes).toHaveLength(expectedKeys.length);
+    expect(result.successes).toEqual(expect.arrayContaining(expectedKeys));
+    expect(kv.put).toHaveBeenCalledTimes(expectedKeys.length);
   });
   it('records a pipeline failure and continues with remaining combinations', async () => {
     applyOverlayMock

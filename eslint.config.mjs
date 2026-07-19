@@ -93,9 +93,13 @@ const AUTO_VUE_IMPORT_NAMES = [
 const AUTO_VUE_IMPORT_NAMES_WITHOUT_REF = AUTO_VUE_IMPORT_NAMES.filter((name) => name !== 'Ref');
 export default withNuxt(
   {
-    ignores: [
-      'supabase/functions/**', // Deno code, not Node.js - different linting rules apply
-    ],
+    // Deno code, not Node.js. This must be its own config object (only `ignores`,
+    // no other keys) so ESLint treats it as a GLOBAL ignore. Bundled with `plugins`
+    // or `rules` it becomes a scoped ignore, and the base configs still lint these
+    // files (which is why the editor flagged @typescript-eslint/no-explicit-any).
+    ignores: ['supabase/functions/**'],
+  },
+  {
     plugins: {
       'import-x': importXPlugin,
     },

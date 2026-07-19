@@ -207,6 +207,7 @@
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
+  import { openExternalUrl } from '@/utils/redirect';
   import type ContextMenu from '@/components/ui/ContextMenu.vue';
   const ItemCountControls = defineAsyncComponent(
     () => import('@/features/neededitems/ItemCountControls.vue')
@@ -382,13 +383,13 @@
   // Action methods
   const openTarkovDevLink = () => {
     if (props.devLink) {
-      window.open(props.devLink, '_blank', 'noopener,noreferrer');
+      openExternalUrl(props.devLink);
     }
   };
   const openWikiLink = () => {
     const url = toWikiUrl(props.wikiLink);
     if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openExternalUrl(url);
     }
   };
   const copyItemName = async () => {
@@ -411,7 +412,7 @@
   const openTaskWiki = () => {
     const url = toWikiUrl(props.taskWikiLink);
     if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openExternalUrl(url);
     }
   };
 </script>

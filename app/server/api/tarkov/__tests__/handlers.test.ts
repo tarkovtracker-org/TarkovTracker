@@ -2,6 +2,11 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event } from 'h3';
+const CACHE_META_HEADERS = {
+  'Cache-Control': 'public, max-age=0, must-revalidate',
+  'Cloudflare-CDN-Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
+  Vary: 'Origin',
+};
 const {
   mockApplyOverlay,
   mockCreateTarkovJsonBootstrapFetcher,
@@ -308,7 +313,7 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);
     expect(result).toEqual({
       data: {
         lastPurgeAt: '2026-02-17T12:00:00.000Z',
@@ -321,7 +326,7 @@ describe('Tarkov API handlers', () => {
     mockFetch.mockRejectedValueOnce(new Error('network-failure'));
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);
     expect(result).toEqual({
       data: {
         lastPurgeAt: null,
@@ -337,7 +342,7 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);
     expect(result).toEqual({
       data: {
         lastPurgeAt: null,
@@ -353,7 +358,7 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);
     expect(result).toEqual({
       data: {
         lastPurgeAt: null,
@@ -369,7 +374,7 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
-    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, { 'Cache-Control': 'no-store' });
+    expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);
     expect(result).toEqual({
       data: {
         lastPurgeAt: null,

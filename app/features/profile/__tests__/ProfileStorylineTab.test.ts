@@ -190,6 +190,9 @@ const createWrapper = async (readOnly: boolean) => {
         UBadge: {
           template: '<span><slot /></span>',
         },
+        UButton: {
+          template: '<button><slot /></button>',
+        },
         UIcon: true,
       },
     },
@@ -254,6 +257,19 @@ describe('ProfileStorylineTab', () => {
     expect(checkbox.attributes('disabled')).toBeUndefined();
     await checkbox.trigger('change');
     expect(wrapper.emitted('toggleObjective')).toEqual([['chapter-2', 'objective-optional-1']]);
+    wrapper.unmount();
+  });
+  it('does not emit chapter toggle events when read-only', async () => {
+    const wrapper = await createWrapper(true);
+    const chapterButton = wrapper.find('button[aria-label="page.storyline.mark_complete"]');
+    expect(chapterButton.exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('emits chapter toggle events when editable', async () => {
+    const wrapper = await createWrapper(false);
+    const chapterButton = wrapper.get('button[aria-label="page.storyline.mark_complete"]');
+    await chapterButton.trigger('click');
+    expect(wrapper.emitted('toggleChapter')).toEqual([['chapter-1']]);
     wrapper.unmount();
   });
 });

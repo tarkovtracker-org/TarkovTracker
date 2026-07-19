@@ -35,7 +35,6 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.reason.filters': 'Current filters are hiding viable tasks',
   'page.dashboard.focus.reason.impact_one': 'Opens 1 follow-up task',
   'page.dashboard.focus.reason.impact_other': 'Opens {count} follow-up tasks',
-  'page.dashboard.focus.stat.progress': 'Progress this adds',
   'page.dashboard.focus.stat.secondary': 'Other good options',
   'page.dashboard.focus.stat.secondary_empty': 'This is the clearest next step right now.',
   'page.dashboard.focus.stat.status': 'Status',

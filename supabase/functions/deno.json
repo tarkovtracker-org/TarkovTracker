@@ -5,7 +5,6 @@
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "@supabase/functions-js/edge-runtime": "jsr:@supabase/functions-js@2/edge-runtime.d.ts",
-    "std/http/server": "https://deno.land/std@0.168.0/http/server.ts",
     "shared/auth": "./_shared/auth.ts"
   },
   "lint": {

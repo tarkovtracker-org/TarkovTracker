@@ -1,3 +1,73 @@
+## [1.59.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.0...v1.59.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **ci:** skip automation for locale-only PRs ([#556](https://github.com/tarkovtracker-org/TarkovTracker/issues/556)) ([a5cf0ae](https://github.com/tarkovtracker-org/TarkovTracker/commit/a5cf0ae30ebca972755d993845d56aaeed31284f))
+
+# [1.59.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.58.0...v1.59.0) (2026-07-18)
+
+
+### Features
+
+* **ui:** rework AppBar right cluster hierarchy and responsive behavior ([#554](https://github.com/tarkovtracker-org/TarkovTracker/issues/554)) ([9deb8db](https://github.com/tarkovtracker-org/TarkovTracker/commit/9deb8db701a3d10655097e64387181d9a80970b3)), closes [settings#keybinds](https://github.com/settings/issues/keybinds) [#keybinds](https://github.com/tarkovtracker-org/TarkovTracker/issues/keybinds)
+
+# [1.58.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.57.1...v1.58.0) (2026-07-18)
+
+
+### Features
+
+* **ui:** improve dashboard empty states, visual hierarchy, and search shortcut ([#553](https://github.com/tarkovtracker-org/TarkovTracker/issues/553)) ([21dff5c](https://github.com/tarkovtracker-org/TarkovTracker/commit/21dff5cfb0543a905054be0ad7f2f9d731d33018))
+
+## [1.57.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.57.0...v1.57.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* **app:** reconcile supporter entitlements and Discord links ([#547](https://github.com/tarkovtracker-org/TarkovTracker/issues/547)) ([172bd02](https://github.com/tarkovtracker-org/TarkovTracker/commit/172bd0227b043004d91261d9d76da19f8ceac4df))
+
+# [1.57.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.56.3...v1.57.0) (2026-07-13)
+
+
+### Bug Fixes
+
+* **app:** add i18n fallbacks for dynamic resource and guide keys ([da91b3e](https://github.com/tarkovtracker-org/TarkovTracker/commit/da91b3eee8cf111212ac924c7a4caeb30fabfc9b))
+* **app:** address PR review — i18n fallbacks, nav active state, SEO description ([0ceb9cf](https://github.com/tarkovtracker-org/TarkovTracker/commit/0ceb9cf638d10ba516199c945d326a63da937405))
+* **app:** address resources PR review findings ([9631f14](https://github.com/tarkovtracker-org/TarkovTracker/commit/9631f14755b3ae75cf37b8abd28e0bd61c2f22c9))
+* **app:** address resources review findings ([776b4a6](https://github.com/tarkovtracker-org/TarkovTracker/commit/776b4a630a2344eb844116599686599590bfca4c))
+* **app:** move resources hub to index.vue to fix nested route conflict ([6f91f41](https://github.com/tarkovtracker-org/TarkovTracker/commit/6f91f41ccab36018e1fb8bb3b702a9c19264d162))
+* **app:** resolve resources review threads ([92def4e](https://github.com/tarkovtracker-org/TarkovTracker/commit/92def4e40916fdc2bf0d7f67b56463aa5a53443c))
+
+
+### Features
+
+* **app:** add Resources Hub with guides for external community tools ([f40574b](https://github.com/tarkovtracker-org/TarkovTracker/commit/f40574b985c37b2b472614a96145c7fcd11f703c))
+* **app:** redesign resources directory and setup guides ([481f97b](https://github.com/tarkovtracker-org/TarkovTracker/commit/481f97b6f0d96e4dd8e3089b637d6ec80ff37953))
+
+## [1.56.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.56.2...v1.56.3) (2026-07-12)
+
+
+### Bug Fixes
+
+* **config:** reduce Cloudflare Pages function usage ([#541](https://github.com/tarkovtracker-org/TarkovTracker/issues/541)) ([50ccdb5](https://github.com/tarkovtracker-org/TarkovTracker/commit/50ccdb53129f892de86c82da90ac80d359b409db))
+
+## [1.56.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.56.1...v1.56.2) (2026-07-12)
+
+
+### Bug Fixes
+
+* **app:** auto-complete non-route objectives on chapter toggle ([b4b2324](https://github.com/tarkovtracker-org/TarkovTracker/commit/b4b23240a4f2c468435e237fd2827bc3ca6d1a3f))
+* **app:** enable storyline chapter completion toggle in profile and default ([661a65f](https://github.com/tarkovtracker-org/TarkovTracker/commit/661a65f0464d7ce586fd74cb75607c7c0e8c8e32))
+
+## [1.56.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.56.0...v1.56.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* **app:** keep subsequence scores below initialism tier ([daa0a9d](https://github.com/tarkovtracker-org/TarkovTracker/commit/daa0a9dfcff4f828629d04d602c6abb773edcfb4))
+* **api:** migrate edge functions from Deno std serve to Deno.serve ([86dac2f](https://github.com/tarkovtracker-org/TarkovTracker/commit/86dac2f279818a0eeaf20150b9cc1cbdc3f37c6a))
+* **api:** return 400 for invalid JSON on batch task updates ([d75a186](https://github.com/tarkovtracker-org/TarkovTracker/commit/d75a186fc71d1b4e31221b05ef154d71be9dd22e))
+
 # [1.56.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.7...v1.56.0) (2026-07-12)
 
 
@@ -6,7 +76,7 @@
 * **config:** address production-readiness review findings ([3af3b2c](https://github.com/tarkovtracker-org/TarkovTracker/commit/3af3b2ccdc6641cdd25917f9404877fde100563b))
 * **config:** avoid CodeQL TOCTOU findings in CF worker postprocess ([921155d](https://github.com/tarkovtracker-org/TarkovTracker/commit/921155d1d2bf397168539758adadd16af3b462b2))
 * **config:** declare empty preview APP_URL and analytics vars ([3c66b51](https://github.com/tarkovtracker-org/TarkovTracker/commit/3c66b517fe18e0d3a3c0735202d95482f3322c3a))
-* **ci:** harden link check and drop bogus changelog issue refs ([959c35e](https://github.com/tarkovtracker-org/TarkovTracker/commit/959c35e86664ac7c83711827eb48a3fa77be35c7)), closes [hi#cardinality](https://github.com/hi/issues/cardinality)
+* **ci:** harden link check and drop bogus changelog issue refs ([959c35e](https://github.com/tarkovtracker-org/TarkovTracker/commit/959c35e86664ac7c83711827eb48a3fa77be35c7))
 * **config:** quiet production build noise from sitemap runtime path ([e3a03a1](https://github.com/tarkovtracker-org/TarkovTracker/commit/e3a03a14df2a24412257b75dcef6c00528276262))
 * **config:** strip bare node: side-effect imports from CF worker ([2725338](https://github.com/tarkovtracker-org/TarkovTracker/commit/27253381fa619de04632b6cc035e4dae2bbdf48a)), closes [nitrojs/nitro#4164](https://github.com/nitrojs/nitro/issues/4164)
 * **config:** type readdir Dirent as utf8 string names ([480a563](https://github.com/tarkovtracker-org/TarkovTracker/commit/480a563ecee7d6881cada92f8134cfc953603046))
@@ -14,7 +84,7 @@
 
 ### Features
 
-* **api:** harden rate limiting with per-IP backstop, token cap, and 429 observability ([#523](https://github.com/tarkovtracker-org/TarkovTracker/issues/523)) ([b34c04d](https://github.com/tarkovtracker-org/TarkovTracker/commit/b34c04daa0625f81b0c33a6f187f8d44c458cf7a)), closes [hi#cardinality](https://github.com/hi/issues/cardinality)
+* **api:** harden rate limiting with per-IP backstop, token cap, and 429 observability ([#523](https://github.com/tarkovtracker-org/TarkovTracker/issues/523)) ([b34c04d](https://github.com/tarkovtracker-org/TarkovTracker/commit/b34c04daa0625f81b0c33a6f187f8d44c458cf7a))
 
 ## [1.55.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.55.6...v1.55.7) (2026-07-11)
 

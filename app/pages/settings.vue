@@ -88,7 +88,9 @@
               <TaskDisplayCard />
               <MapSettingsCard />
               <ExternalLinksCard />
-              <KeybindsCard />
+              <div id="keybinds" class="scroll-mt-24">
+                <KeybindsCard />
+              </div>
             </section>
             <section
               v-if="visitedTabs.account"
@@ -99,6 +101,7 @@
               :aria-label="$t('settings.tabs.account')"
             >
               <ProfileSharingCard />
+              <DiscordLinkCard />
               <DebugStateCard />
               <AccountDeletionCard />
               <div v-if="isAdmin" class="flex justify-center pt-4">
@@ -162,6 +165,7 @@
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import DebugStateCard from '@/features/settings/DebugStateCard.vue';
+  import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
   import ExternalLinksCard from '@/features/settings/ExternalLinksCard.vue';
@@ -222,6 +226,7 @@
   };
   const nestedTabHashes: Record<string, SettingsTabId> = {
     '#skills': 'progression',
+    '#keybinds': 'preferences',
   };
   const legacyTabHashes: Record<string, SettingsTabId> = {
     '#settings-progression': 'progression',

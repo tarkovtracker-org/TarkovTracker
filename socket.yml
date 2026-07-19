@@ -1,0 +1,8 @@
+version: 2
+
+triggerPaths:
+  - 'package.json'
+  - 'pnpm-lock.yaml'
+  - 'pnpm-workspace.yaml'
+  - 'workers/api-gateway/package.json'
+  - 'supabase/functions/deno.json'

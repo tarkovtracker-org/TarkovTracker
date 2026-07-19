@@ -4,10 +4,15 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import StorylinePage from '@/pages/storyline.vue';
-const toggleChapterMock = vi.fn();
+const setStoryChapterCompleteMock = vi.fn();
+const setStoryChapterUncompleteMock = vi.fn();
 const setStoryObjectiveCompleteMock = vi.fn();
 const setStoryObjectiveUncompleteMock = vi.fn();
+let chapterCompletionState: Record<string, boolean> = {};
 let objectiveCompletionState: Record<string, boolean> = {};
+const isStoryChapterCompleteMock = vi.fn((chapterId: string) => {
+  return chapterCompletionState[chapterId] === true;
+});
 const isStoryObjectiveCompleteMock = vi.fn((chapterId: string, objectiveId: string) => {
   return objectiveCompletionState[`${chapterId}:${objectiveId}`] === true;
 });
@@ -18,9 +23,29 @@ vi.mock('@/composables/useStorylineChapters', () => ({
     chapters: ref([
       {
         id: 'chapter-1',
+        objectives: [
+          {
+            id: 'obj-1',
+            order: 1,
+            type: 'main',
+            description: 'Route A',
+            mutuallyExclusiveWith: ['obj-2'],
+          },
+          {
+            id: 'obj-2',
+            order: 2,
+            type: 'main',
+            description: 'Route B',
+            mutuallyExclusiveWith: ['obj-1'],
+          },
+          { id: 'obj-3', order: 3, type: 'main', description: 'Linear objective' },
+          { id: 'obj-4', order: 4, type: 'optional', description: 'Optional linear' },
+        ],
         objectiveMap: {
           'obj-1': { mutuallyExclusiveWith: ['obj-2'] },
           'obj-2': { mutuallyExclusiveWith: ['obj-1'] },
+          'obj-3': {},
+          'obj-4': {},
         },
       },
     ]),
@@ -35,10 +60,12 @@ vi.mock('@/composables/useStorylineChapters', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
+    isStoryChapterComplete: isStoryChapterCompleteMock,
     isStoryObjectiveComplete: isStoryObjectiveCompleteMock,
+    setStoryChapterComplete: setStoryChapterCompleteMock,
+    setStoryChapterUncomplete: setStoryChapterUncompleteMock,
     setStoryObjectiveComplete: setStoryObjectiveCompleteMock,
     setStoryObjectiveUncomplete: setStoryObjectiveUncompleteMock,
-    toggleStoryChapterComplete: toggleChapterMock,
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -50,6 +77,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 describe('storyline page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    chapterCompletionState = {};
     objectiveCompletionState = {};
   });
   const createWrapper = () =>
@@ -72,12 +100,48 @@ describe('storyline page', () => {
         },
       },
     });
-  it('renders storyline chapter cards and forwards chapter toggle', async () => {
+  it('marks chapter complete and auto-completes non-route-choice objectives', async () => {
     const wrapper = createWrapper();
     const chapterCard = wrapper.find('[data-testid="chapter-card"]');
-    expect(chapterCard.exists()).toBe(true);
     await chapterCard.trigger('click');
-    expect(toggleChapterMock).toHaveBeenCalledWith('chapter-1');
+    expect(setStoryChapterCompleteMock).toHaveBeenCalledWith('chapter-1');
+    expect(setStoryChapterUncompleteMock).not.toHaveBeenCalled();
+    expect(setStoryObjectiveCompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-3');
+    expect(setStoryObjectiveCompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-4');
+    expect(setStoryObjectiveCompleteMock).not.toHaveBeenCalledWith('chapter-1', 'obj-1');
+    expect(setStoryObjectiveCompleteMock).not.toHaveBeenCalledWith('chapter-1', 'obj-2');
+    wrapper.unmount();
+  });
+  it('marks chapter incomplete and auto-uncompletes non-route-choice objectives', async () => {
+    chapterCompletionState['chapter-1'] = true;
+    objectiveCompletionState['chapter-1:obj-3'] = true;
+    objectiveCompletionState['chapter-1:obj-4'] = true;
+    const wrapper = createWrapper();
+    const chapterCard = wrapper.find('[data-testid="chapter-card"]');
+    await chapterCard.trigger('click');
+    expect(setStoryChapterUncompleteMock).toHaveBeenCalledWith('chapter-1');
+    expect(setStoryChapterCompleteMock).not.toHaveBeenCalled();
+    expect(setStoryObjectiveUncompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-3');
+    expect(setStoryObjectiveUncompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-4');
+    wrapper.unmount();
+  });
+  it('skips already-complete linear objectives when marking chapter complete', async () => {
+    objectiveCompletionState['chapter-1:obj-3'] = true;
+    const wrapper = createWrapper();
+    await wrapper.get('[data-testid="chapter-card"]').trigger('click');
+    expect(setStoryChapterCompleteMock).toHaveBeenCalledWith('chapter-1');
+    expect(setStoryObjectiveCompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-4');
+    expect(setStoryObjectiveCompleteMock).not.toHaveBeenCalledWith('chapter-1', 'obj-3');
+    wrapper.unmount();
+  });
+  it('skips already-incomplete linear objectives when marking chapter incomplete', async () => {
+    chapterCompletionState['chapter-1'] = true;
+    objectiveCompletionState['chapter-1:obj-3'] = true;
+    const wrapper = createWrapper();
+    await wrapper.get('[data-testid="chapter-card"]').trigger('click');
+    expect(setStoryChapterUncompleteMock).toHaveBeenCalledWith('chapter-1');
+    expect(setStoryObjectiveUncompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-3');
+    expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalledWith('chapter-1', 'obj-4');
     wrapper.unmount();
   });
   it('marks objective complete when no route blocker exists', async () => {

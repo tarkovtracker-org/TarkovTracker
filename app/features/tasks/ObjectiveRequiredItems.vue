@@ -122,6 +122,7 @@
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
   import { logger } from '@/utils/logger';
+  import { openExternalUrl } from '@/utils/redirect';
   import {
     getKeyBackgroundClass,
     getKeyDevUrl,
@@ -188,7 +189,7 @@
   const openPrimaryLink = (item: TarkovItem) => {
     const url = toWikiUrl(getKeyPrimaryUrl(item));
     if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openExternalUrl(url);
     }
   };
   const handleContextMenu = (event: MouseEvent, item: TarkovItem) => {
@@ -197,13 +198,13 @@
   };
   const openDevLink = () => {
     if (activeItem.value) {
-      window.open(getKeyDevUrl(activeItem.value), '_blank', 'noopener,noreferrer');
+      openExternalUrl(getKeyDevUrl(activeItem.value));
     }
   };
   const openWikiLink = () => {
     const url = toWikiUrl(activeItem.value?.wikiLink);
     if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openExternalUrl(url);
     }
   };
   const copyItemName = async () => {

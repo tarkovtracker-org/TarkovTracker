@@ -4,7 +4,7 @@ Maintainer-owned working notes, ideas, and TODOs. Not auto-generated.
 
 --- DO NOT TOUCH ANY OF THIS FILE CONTENT BELOW HERE, IT IS MANUALLY MAINTAINED ---
 
-# PERSONAL NOTES AND THOUGHTS, IDEAS, etc.
+## PERSONAL NOTES AND THOUGHTS, IDEAS, etc
 
 - Finish implementing Team System (Supabase Realtime) and Cloudflare Workers.
 - Figure out the best way to handle the open-source API from the original TarkovTracker project and if there is better alternatives to NodeJS / Express for that service.

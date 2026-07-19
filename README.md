@@ -142,7 +142,7 @@ This repository includes both **contribution workflow guidance** and **technical
 
 [**GitHub Project Board:**](.github/PROJECT_BOARD.md) Issues progress through the board from backlog to completion, with transitions driven by issue and pull request activity.
 
-#### Where to start (new contributors)
+### Where to start (new contributors)
 
 > [!NOTE]
 > If you’re new to the project, look for issues labeled **`good-first-issue`**. These are intentionally scoped to be approachable and are the best way to get familiar with the codebase, contribution process, and review expectations.

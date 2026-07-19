@@ -161,6 +161,7 @@
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
+  import { openExternalUrl } from '@/utils/redirect';
   interface Props {
     requirement: {
       id: string;
@@ -263,13 +264,13 @@
   };
   const openTarkovDev = (): void => {
     if (props.requirement.item.link) {
-      window.open(props.requirement.item.link, '_blank', 'noopener,noreferrer');
+      openExternalUrl(props.requirement.item.link);
     }
   };
   const openWiki = (): void => {
     const url = toWikiUrl(props.requirement.item.wikiLink);
     if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openExternalUrl(url);
     }
   };
 </script>

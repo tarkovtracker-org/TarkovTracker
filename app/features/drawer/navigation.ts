@@ -15,5 +15,8 @@ export const isNavigationRouteActive = (
   if (targetPath === '/settings') {
     return SETTINGS_ROUTE_PATHS.has(routePath);
   }
+  if (targetPath === '/resources') {
+    return routePath === '/resources' || routePath.startsWith('/resources/');
+  }
   return routePath === targetPath;
 };

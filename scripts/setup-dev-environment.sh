@@ -53,8 +53,8 @@ setup_environment() {
     if [ ! -f .env.local ]; then
         cat > .env.local << 'EOF'
 # Supabase Configuration
-VITE_SUPABASE_URL=http://localhost:54321
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
+NUXT_PUBLIC_SUPABASE_URL=http://localhost:54321
+NUXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 
 # App Configuration
 NUXT_PUBLIC_APP_URL=http://localhost:3000
@@ -64,7 +64,7 @@ CLOUDFLARE_ACCOUNT_ID=your_account_id_here
 CLOUDFLARE_API_TOKEN=your_api_token_here
 
 # Development
-VITE_LOG_LEVEL=debug
+NUXT_PUBLIC_LOG_LEVEL=debug
 NODE_ENV=development
 EOF
         echo "Created .env.local"

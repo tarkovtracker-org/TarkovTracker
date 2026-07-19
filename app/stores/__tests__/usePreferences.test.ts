@@ -370,6 +370,32 @@ describe('usePreferencesStore', () => {
         },
       });
     });
+    it('migrates legacy ctrl+q omnibar keybind to ctrl+k', () => {
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage({ keybindOmnibar: 'ctrl+q' }, 'user-1', 1234)
+      );
+      currentUserId.value = 'user-1';
+      const store = usePreferencesStore();
+      expect(store.keybindOmnibar).toBe(DEFAULT_KEYBINDS.omnibar);
+      expect(store.keybindOmnibar).toBe('ctrl+k');
+      const migratedValue = JSON.parse(localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}');
+      expect(migratedValue).toMatchObject({
+        _userId: 'user-1',
+        data: {
+          keybindOmnibar: 'ctrl+k',
+        },
+      });
+    });
+    it('preserves a customized omnibar keybind during migration', () => {
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage({ keybindOmnibar: 'ctrl+shift+p' }, 'user-1', 1234)
+      );
+      currentUserId.value = 'user-1';
+      const store = usePreferencesStore();
+      expect(store.keybindOmnibar).toBe('ctrl+shift+p');
+    });
   });
   describe('Auth Transition Preservation', () => {
     it('preserves the prior scoped snapshot in memory after logout', () => {

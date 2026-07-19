@@ -2,13 +2,13 @@ packages:
   - .
   - workers/api-gateway
 
-onlyBuiltDependencies:
-  - '@parcel/watcher'
-  - esbuild
-  - sharp
-  - unrs-resolver
-  - vue-demi
-  - workerd
+catalog:
+  vue-i18n: ^11.3.2
+
+packageExtensions:
+  '@codecov/nuxt-plugin@*':
+    peerDependencies:
+      nuxt: '>=3.0.0 <5.0.0'
 
 overrides:
   '@nuxt/test-utils>h3-next': 'npm:h3@2.0.1-rc.20'
@@ -46,7 +46,15 @@ overrides:
   shell-quote: 'npm:shell-quote@^1'
   tar: '^7.5.19'
   vite: '^7.3.5'
-  vue-i18n: '$vue-i18n'
+  vue-i18n: 'catalog:'
   ws: '^8.20.1'
   yaml: '^2.8.3'
   '@apidevtools/swagger-parser>ajv': '^8.18.0'
+
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+  vue-demi: true
+  workerd: true

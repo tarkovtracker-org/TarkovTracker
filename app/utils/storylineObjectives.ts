@@ -1,6 +1,14 @@
-import { getDefaultStoryObjectiveLinks } from '@/data/storyObjectiveLinks';
 import type { StoryChapter, StoryObjective } from '@/types/tarkov';
-const defaultStoryObjectiveLinks = getDefaultStoryObjectiveLinks();
+const defaultStoryObjectiveLinks: Readonly<Record<string, readonly string[]>> = {
+  'falling-skies-main-19': ['falling-skies-main-20'],
+  'falling-skies-main-20': ['falling-skies-main-19'],
+  'the-ticket-main-12': ['the-ticket-main-13'],
+  'the-ticket-main-13': ['the-ticket-main-12'],
+  'the-ticket-main-22': ['the-ticket-main-23'],
+  'the-ticket-main-23': ['the-ticket-main-22'],
+  'the-ticket-main-25': ['the-ticket-main-26'],
+  'the-ticket-main-26': ['the-ticket-main-25'],
+};
 type StoryObjectiveInput = StoryChapter['objectives'] | StoryObjective[] | null | undefined;
 type StoryObjectiveLike = Partial<StoryObjective> & { id?: string };
 const normalizeObjectiveType = (type: StoryObjectiveLike['type']): StoryObjective['type'] => {
@@ -92,6 +100,41 @@ export const orderedStoryObjectives = (objectives: StoryObjectiveInput): StoryOb
     }
     return a.id.localeCompare(b.id);
   });
+};
+export const getAutoCompletableObjectiveIds = (objectives: StoryObjectiveInput): string[] => {
+  return orderedStoryObjectives(objectives)
+    .filter((objective) => !objective.mutuallyExclusiveWith?.length)
+    .map((objective) => objective.id);
+};
+export interface ToggleStoryChapterWithLinearObjectivesOptions {
+  chapterId: string;
+  isChapterComplete: boolean;
+  objectives?: StoryObjectiveInput;
+  isObjectiveComplete: (objectiveId: string) => boolean;
+  setChapterComplete: (chapterId: string) => void;
+  setChapterUncomplete: (chapterId: string) => void;
+  setObjectiveComplete: (chapterId: string, objectiveId: string) => void;
+  setObjectiveUncomplete: (chapterId: string, objectiveId: string) => void;
+}
+export const toggleStoryChapterWithLinearObjectives = (
+  options: ToggleStoryChapterWithLinearObjectivesOptions
+): void => {
+  const objectiveIds = getAutoCompletableObjectiveIds(options.objectives);
+  if (options.isChapterComplete) {
+    options.setChapterUncomplete(options.chapterId);
+    for (const objectiveId of objectiveIds) {
+      if (options.isObjectiveComplete(objectiveId)) {
+        options.setObjectiveUncomplete(options.chapterId, objectiveId);
+      }
+    }
+    return;
+  }
+  options.setChapterComplete(options.chapterId);
+  for (const objectiveId of objectiveIds) {
+    if (!options.isObjectiveComplete(objectiveId)) {
+      options.setObjectiveComplete(options.chapterId, objectiveId);
+    }
+  }
 };
 export const normalizeStoryChapter = (chapter: StoryChapter): StoryChapter => {
   return {

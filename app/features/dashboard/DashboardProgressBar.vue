@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-surface-700/50 relative overflow-hidden rounded-full" :class="sizeClass">
+  <div class="bg-surface-700/70 relative overflow-hidden rounded-full" :class="sizeClass">
     <div
       class="absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-300 ease-out"
       :class="fillClass"

@@ -56,7 +56,7 @@
     </div>
     <div
       class="mb-2 flex items-center justify-between text-xs font-medium"
-      :class="isLocked ? 'text-surface-500' : isComplete ? 'text-surface-400' : 'text-surface-300'"
+      :class="isLocked ? 'text-surface-400' : isComplete ? 'text-surface-400' : 'text-surface-300'"
     >
       <span>{{ completedTasks }}/{{ totalTasks }} {{ $t('page.dashboard.traders.tasks') }}</span>
     </div>
@@ -124,7 +124,7 @@
         />
       </div>
       <div v-if="nextLevelInfo" class="pt-0.5">
-        <div class="text-surface-400 flex items-center justify-between text-[11px] tabular-nums">
+        <div class="text-surface-300 flex items-center justify-between text-[11px] tabular-nums">
           <span>
             {{
               $t('page.dashboard.traders.rep_progress_label', { level: nextLevelInfo.nextLevel })
@@ -164,6 +164,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { isTraderLocked } from '@/features/dashboard/traderLockStatus';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -220,10 +221,13 @@
     const firstTask = availableUnlockTasks.value[0];
     return firstTask ?? null;
   });
-  const isLocked = computed(() => {
-    if (!availableUnlockTasks.value.length) return false;
-    return !availableUnlockTasks.value.some((task) => tarkovStore.isTaskComplete(task.id));
-  });
+  const isLocked = computed(() =>
+    isTraderLocked(props.trader, {
+      tasks: metadataStore.tasks,
+      isTaskComplete: (id) => tarkovStore.isTaskComplete(id),
+      gameMode: tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP,
+    })
+  );
   const currentLevel = computed(() => tarkovStore.getTraderLevel(props.trader.id));
   const currentReputation = computed(() => tarkovStore.getTraderReputation(props.trader.id));
   const maxLevel = computed(() => {
@@ -265,12 +269,14 @@
   });
   const percentageTextStyle = computed(() => {
     if (isLocked.value || isComplete.value) return {};
+    if (props.percentage <= 0) return {};
     const hue = (props.percentage / 100) * 120;
     return { color: `hsl(${hue}, 70%, 55%)` };
   });
   const percentageTextClass = computed(() => {
     if (isLocked.value) return 'text-surface-500';
     if (isComplete.value) return 'text-success-400/70';
+    if (props.percentage <= 0) return 'text-surface-400';
     return '';
   });
   const loyaltyButtonClasses = (lvl: number) => {

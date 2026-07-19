@@ -41,7 +41,7 @@ function getSubsequenceScore(text: string, query: string): number {
   if (bestGapCount > maxGapCount) return 0;
   const compactness = query.length / (query.length + bestGapCount);
   const consecutiveRatio = bestConsecutiveCount / query.length;
-  return 0.3 + compactness * 0.2 + consecutiveRatio * 0.2;
+  return 0.3 + compactness * 0.175 + consecutiveRatio * 0.175;
 }
 export function fuzzyMatch(text: string, query: string): boolean {
   const queryLower = normalize(query).trim();

@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import {
   authenticateUser,
   handleCorsPreflight,
@@ -6,7 +5,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess,
-} from '../_shared/auth.ts';
+} from 'shared/auth';
 
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
@@ -301,7 +300,7 @@ async function purgeTarkovDataCache(
   return aggregatedResult;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;

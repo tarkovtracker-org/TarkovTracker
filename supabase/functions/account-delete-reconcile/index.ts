@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import {
   authenticateUser,
   handleCorsPreflight,
@@ -6,7 +5,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess,
-} from '../_shared/auth.ts';
+} from 'shared/auth';
 import type { Database } from '../_shared/database.types.ts';
 
 const AUTH_DELETE_MAX_ATTEMPTS = 4;
@@ -378,7 +377,7 @@ const processDeletionJob = async (
   return { userId, status: 'completed' };
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
   try {

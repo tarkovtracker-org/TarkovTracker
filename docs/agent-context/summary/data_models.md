@@ -245,5 +245,5 @@ erDiagram
 
 ## Static Local Data
 
-- `app/data/maps.json` + `maps-overrides.json` — map SVG/tile configuration and overrides.
-- `app/data/storyObjectiveLinks.ts` — storyline objective linkage.
+- `app/data/maps.json` — map SVG/tile configuration (static).
+- Storyline objective mutual-exclusion defaults live in `app/utils/storylineObjectives.ts`.

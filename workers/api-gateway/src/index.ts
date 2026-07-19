@@ -1152,7 +1152,12 @@ export default {
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
-        const body = await request.json();
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          return errorResponse('Invalid JSON body', 400, origin, reqOrigin, rlHeaders);
+        }
         // Support both legacy object format and new array format
         const updates = normalizeTaskUpdates(body);
         if (!updates) {

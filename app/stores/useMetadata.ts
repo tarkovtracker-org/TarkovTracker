@@ -79,7 +79,7 @@ const TASK_REWARDS_CACHE_VERSION = 'json-v2';
 const HIDEOUT_CACHE_VERSION = 'json-v3';
 const PRESTIGE_CACHE_VERSION = 'json-v2';
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
-const CACHE_PURGE_CHECK_TTL_MS = 60 * 1000;
+const CACHE_PURGE_CHECK_TTL_MS = 5 * 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
 const CACHE_PURGE_CHECK_STORAGE_KEY = STORAGE_KEYS.cachePurgeCheckAt;
 // Exported type for craft sources used by components

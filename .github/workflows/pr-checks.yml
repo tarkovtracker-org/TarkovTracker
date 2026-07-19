@@ -3,6 +3,18 @@ name: PR Checks
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - 'app/locales/cs.json'
+      - 'app/locales/de.json'
+      - 'app/locales/es.json'
+      - 'app/locales/fr.json'
+      - 'app/locales/it.json'
+      - 'app/locales/ko.json'
+      - 'app/locales/pl.json'
+      - 'app/locales/pt.json'
+      - 'app/locales/ru.json'
+      - 'app/locales/uk.json'
+      - 'app/locales/zh.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -114,7 +126,7 @@ jobs:
       - name: Install pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.34.5 --activate
+          corepack prepare pnpm@11.14.0 --activate
 
       - name: Setup pnpm cache
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -148,7 +160,7 @@ jobs:
       - name: Install pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.34.5 --activate
+          corepack prepare pnpm@11.14.0 --activate
 
       - name: Setup pnpm cache
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e

@@ -9,7 +9,6 @@ public/_nuxt
 public/_fonts
 
 # Tooling
-package-lock.json
 .wrangler
 .data
 

@@ -2,7 +2,7 @@
 
 > External dependencies and how/why they are used. Versions live in `package.json` (root and
 > `workers/api-gateway/`) — this file explains _roles_, not exact versions, to stay durable.
-> Engines: Node `>=24.12.0`, pnpm `>=10.34.5 <11` (`packageManager: pnpm@10.34.5`).
+> Engines: Node `>=24.12.0`, pnpm `>=10.34.5 <12` (`packageManager: pnpm@11.14.0`).
 
 ## Runtime Dependencies (root)
 

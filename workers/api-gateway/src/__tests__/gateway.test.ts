@@ -485,6 +485,18 @@ describe('api-gateway', () => {
     const payload = mergePayload as unknown as MergeRpcPayload;
     expect(payload.p_set).toBeNull();
   });
+  it('rejects POST /progress/tasks with malformed JSON body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: '{not json',
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 400, 'Invalid JSON body');
+  });
   it('returns an error when the merge RPC matches no progress row', async () => {
     vi.stubGlobal(
       'fetch',

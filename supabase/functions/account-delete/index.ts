@@ -4,8 +4,7 @@ import {
   validateMethod,
   createErrorResponse,
   createSuccessResponse,
-} from '../_shared/auth.ts';
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+} from 'shared/auth';
 import type { Database } from '../_shared/database.types.ts';
 
 const AUTH_DELETE_MAX_ATTEMPTS = 4;
@@ -245,7 +244,7 @@ const markDeletionCompleted = async (supabase: TypedSupabaseClient, userId: stri
   }
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
   try {

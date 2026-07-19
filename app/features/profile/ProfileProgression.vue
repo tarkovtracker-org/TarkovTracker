@@ -213,7 +213,8 @@
           v-else-if="selectedTabIndex === 3"
           :story-chapter-completion-state="storyChapterCompletionState"
           :story-objective-completion-state="storyObjectiveCompletionState"
-          :read-only="isViewingSharedProfile"
+          :read-only="isViewingSharedProfile || !isViewingCurrentMode"
+          @toggle-chapter="handleStoryChapterToggle"
           @toggle-objective="handleStoryObjectiveToggle"
         />
       </template>
@@ -251,7 +252,10 @@
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { computeInvalidProgress } from '@/utils/progressInvalidation';
-  import { orderedStoryObjectives } from '@/utils/storylineObjectives';
+  import {
+    orderedStoryObjectives,
+    toggleStoryChapterWithLinearObjectives,
+  } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
@@ -805,8 +809,27 @@
     }
     return state;
   });
+  const handleStoryChapterToggle = (chapterId: string) => {
+    if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
+      return;
+    }
+    const chapter = metadataStore.storyChapters.find((value) => value.id === chapterId);
+    toggleStoryChapterWithLinearObjectives({
+      chapterId,
+      isChapterComplete: storyChapterCompletionState.value[chapterId] === true,
+      objectives: chapter?.objectives,
+      isObjectiveComplete: (objectiveId) =>
+        storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true,
+      setChapterComplete: (id) => tarkovStore.setStoryChapterComplete(id),
+      setChapterUncomplete: (id) => tarkovStore.setStoryChapterUncomplete(id),
+      setObjectiveComplete: (id, objectiveId) =>
+        tarkovStore.setStoryObjectiveComplete(id, objectiveId),
+      setObjectiveUncomplete: (id, objectiveId) =>
+        tarkovStore.setStoryObjectiveUncomplete(id, objectiveId),
+    });
+  };
   const handleStoryObjectiveToggle = (chapterId: string, objectiveId: string) => {
-    if (isViewingSharedProfile.value) {
+    if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
       return;
     }
     const objectiveState = storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true;

@@ -83,11 +83,9 @@
                   <span class="leading-none">{{ badge }}</span>
                 </span>
               </div>
-              <div
-                class="grid gap-3 md:grid-cols-[minmax(0,1.12fr)_minmax(0,0.94fr)_minmax(0,0.94fr)]"
-              >
+              <div class="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                 <div :class="['rounded-xl p-4 shadow-lg', toneClasses.proofCard]">
-                  <div class="text-surface-300 text-[11px] tracking-[0.2em] uppercase">
+                  <div class="text-surface-200 text-[11px] tracking-[0.2em] uppercase">
                     {{ t('page.dashboard.focus.stat.why') }}
                   </div>
                   <div class="mt-2 text-sm leading-6 font-medium text-white">
@@ -95,15 +93,7 @@
                   </div>
                 </div>
                 <div class="bg-surface-950/48 rounded-xl border border-white/8 p-4">
-                  <div class="text-surface-400 text-[11px] tracking-[0.2em] uppercase">
-                    {{ t('page.dashboard.focus.stat.progress') }}
-                  </div>
-                  <div class="text-surface-100 mt-2 text-sm leading-6">
-                    {{ primaryContribution }}
-                  </div>
-                </div>
-                <div class="bg-surface-950/48 rounded-xl border border-white/8 p-4">
-                  <div class="text-surface-400 text-[11px] tracking-[0.2em] uppercase">
+                  <div class="text-surface-200 text-[11px] tracking-[0.2em] uppercase">
                     {{ t('page.dashboard.focus.stat.status') }}
                   </div>
                   <div class="text-surface-100 mt-2 text-sm leading-6">
@@ -132,7 +122,7 @@
       <div class="bg-surface-950/60 rounded-2xl border border-white/10 p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div class="text-surface-400 text-[11px] tracking-[0.2em] uppercase">
+            <div class="text-surface-200 text-[11px] tracking-[0.2em] uppercase">
               {{ t('page.dashboard.focus.stat.secondary') }}
             </div>
             <div class="text-surface-200 mt-1 text-sm">
@@ -412,13 +402,6 @@
       'page.dashboard.focus.reason.impact_other',
       { count }
     );
-  const formatImpactContribution = (count: number) =>
-    getCountLabel(
-      count,
-      'page.dashboard.focus.contribution.impact_one',
-      'page.dashboard.focus.contribution.impact_other',
-      { count }
-    );
   const getCompactReasonText = (recommendation: DashboardRecommendation) => {
     if (recommendation.kind === 'filters') return t('page.dashboard.focus.reason.filters');
     if (recommendation.reason === 'complete') return t('page.dashboard.focus.reason.complete');
@@ -529,25 +512,6 @@
       { count: recommendation.progress.remaining }
     );
   };
-  const getContributionText = (recommendation: DashboardRecommendation) => {
-    if (recommendation.kind === 'filters') return t('page.dashboard.focus.contribution.filters');
-    if (recommendation.reason === 'complete')
-      return t('page.dashboard.focus.contribution.complete');
-    if (recommendation.unlockTraderName) {
-      return t('page.dashboard.focus.contribution.unlock_trader', {
-        trader: recommendation.unlockTraderName,
-      });
-    }
-    if (recommendation.impact > 0) return formatImpactContribution(recommendation.impact);
-    if (recommendation.isLightkeeper) return t('page.dashboard.focus.contribution.lightkeeper');
-    if (recommendation.isKappa) return t('page.dashboard.focus.contribution.kappa');
-    if (recommendation.chainTraderName) {
-      return t('page.dashboard.focus.contribution.trader', {
-        trader: recommendation.chainTraderName,
-      });
-    }
-    return t('page.dashboard.focus.contribution.default');
-  };
   const getStatusText = (recommendation: DashboardRecommendation) => {
     const blocker = getPrimaryBlocker(recommendation);
     switch (blocker.type) {
@@ -600,9 +564,6 @@
   );
   const primaryWhy = computed(() =>
     primaryRecommendation.value ? getProofText(primaryRecommendation.value) : ''
-  );
-  const primaryContribution = computed(() =>
-    primaryRecommendation.value ? getContributionText(primaryRecommendation.value) : ''
   );
   const primaryStatus = computed(() =>
     primaryRecommendation.value ? getStatusText(primaryRecommendation.value) : ''

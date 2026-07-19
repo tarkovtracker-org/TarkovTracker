@@ -71,10 +71,11 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     te: () => false,
   }),
 }));
+const windowWidthRef = ref(1280);
 vi.mock('@vueuse/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@vueuse/core')>()),
   useWindowSize: () => ({
-    width: ref(1280),
+    width: windowWidthRef,
   }),
 }));
 vi.mock('@/composables/useKeybinds', () => ({
@@ -159,7 +160,10 @@ const mountAppBar = async () => {
           template:
             '<div><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><button v-for="item in group" :key="item.label" type="button" :data-menu-item="item.label" @click="item.onSelect?.()">{{ item.label }}</button></template></div>',
         },
-        UIcon: true,
+        UIcon: {
+          props: ['name'],
+          template: '<i :class="name" />',
+        },
         UKbd: true,
         UPopover: {
           template: '<div><slot /><slot name="content" /></div>',
@@ -170,6 +174,7 @@ const mountAppBar = async () => {
 };
 describe('AppBar locale switching', () => {
   beforeEach(async () => {
+    windowWidthRef.value = 1280;
     localeRef.value = 'en';
     routeState.name = 'tasks';
     routeState.params = {};
@@ -332,10 +337,11 @@ describe('AppBar logged out actions', () => {
   beforeEach(() => {
     mockSupabase.user.loggedIn = false;
   });
-  it('shows settings icon and login link when not logged in', async () => {
+  it('shows the account login control and no duplicate settings gear when not logged in', async () => {
     const wrapper = await mountAppBar();
-    expect(wrapper.find('[aria-label="navigation_drawer.settings"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="app_bar.login_aria"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('navigation_drawer.login');
+    expect(wrapper.find('[aria-label="navigation_drawer.settings"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });
@@ -354,7 +360,13 @@ describe('AppBar supporter badge', () => {
     const wrapper = await mountAppBar();
     // te() mock returns false, so AppBar falls back to the capitalized tier name
     expect(wrapper.text()).toContain('Chad');
-    expect(wrapper.text()).not.toContain('footer.support_button');
+    // The support CTA (v-else branch) is not rendered when a supporter tier is active.
+    // The More menu always contains the support label, so we check the CTA link specifically.
+    const supportCtaLinks = wrapper.findAll('a').filter((a) => {
+      const text = a.text();
+      return text.includes('footer.support_button') && !a.attributes('data-menu-item');
+    });
+    expect(supportCtaLinks.length).toBe(0);
     wrapper.unmount();
   });
   it('falls back to the generic Supporter label for past supporters', async () => {
@@ -423,6 +435,101 @@ describe('AppBar page title', () => {
     expect(wrapper.text()).not.toContain('OwnDisplayName Profile PVP');
     expect(wrapper.text()).not.toContain('AccountName Profile PVP');
     expect(wrapper.text()).not.toContain('AccountUsername Profile PVP');
+    wrapper.unmount();
+  });
+});
+describe('AppBar responsive layout', () => {
+  beforeEach(() => {
+    mockSupabase.user.loggedIn = false;
+    supporterTierRef.value = null;
+  });
+  it('renders the More menu with Language, Support, Discord, and GitHub items', async () => {
+    const wrapper = await mountAppBar();
+    const moreMenuItems = wrapper.findAll('[data-menu-item]');
+    const labels = moreMenuItems.map((el) => el.attributes('data-menu-item'));
+    expect(labels).toContain('settings.locale');
+    expect(labels).toContain('footer.support_button');
+    expect(labels).toContain('footer.call_to_action.discord');
+    expect(labels).toContain('footer.call_to_action.github');
+    wrapper.unmount();
+  });
+  it('wraps the Support CTA in a hidden sm:inline-flex container for CSS responsive visibility', async () => {
+    const wrapper = await mountAppBar();
+    const supportWrappers = wrapper.findAll('span.hidden').filter((span) => {
+      const classAttr = span.attributes('class') || '';
+      return classAttr.includes('sm:inline-flex');
+    });
+    expect(supportWrappers.length).toBeGreaterThanOrEqual(1);
+    wrapper.unmount();
+  });
+  it('wraps the More menu in a sm:hidden container for CSS responsive visibility', async () => {
+    const wrapper = await mountAppBar();
+    const moreWrappers = wrapper.findAll('span').filter((span) => {
+      const classAttr = span.attributes('class') || '';
+      return classAttr.includes('sm:hidden');
+    });
+    expect(moreWrappers.length).toBe(1);
+    wrapper.unmount();
+  });
+  it('gives the bell a 36x36 hit target with aria-label and tooltip', async () => {
+    const wrapper = await mountAppBar();
+    const bell = wrapper.find('button[aria-label="activity_log.aria_label"]');
+    expect(bell.exists()).toBe(true);
+    const classAttr = bell.attributes('class') || '';
+    expect(classAttr).toContain('h-9');
+    expect(classAttr).toContain('w-9');
+    wrapper.unmount();
+  });
+  it('renders the Log In button with a filled primary background', async () => {
+    const wrapper = await mountAppBar();
+    const loginLink = wrapper.find('a[aria-label="app_bar.login_aria"]');
+    expect(loginLink.exists()).toBe(true);
+    const classAttr = loginLink.attributes('class') || '';
+    expect(classAttr).toContain('bg-primary-600');
+    expect(classAttr).toContain('h-9');
+    wrapper.unmount();
+  });
+});
+describe('AppBar authenticated state', () => {
+  beforeEach(() => {
+    mockSupabase.user.loggedIn = true;
+    mockSupabase.user.id = 'user-1';
+    mockSupabase.user.photoURL = '';
+    mockSupabase.user.displayName = '';
+    mockSupabase.user.username = '';
+    mockTarkovStore.getDisplayName.mockReturnValue('');
+    mockPreferencesStore.getStreamerMode = false;
+  });
+  it('renders the account menu trigger with avatar and chevron', async () => {
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    expect(trigger.exists()).toBe(true);
+    const classAttr = trigger.attributes('class') || '';
+    expect(classAttr).toContain('h-9');
+    expect(trigger.find('img').exists()).toBe(true);
+    expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it('truncates the display name with sm:inline and truncate class', async () => {
+    mockTarkovStore.getDisplayName.mockReturnValue('A'.repeat(50));
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span.truncate');
+    expect(nameSpan.exists()).toBe(true);
+    const classAttr = nameSpan.attributes('class') || '';
+    expect(classAttr).toContain('hidden');
+    expect(classAttr).toContain('sm:inline');
+    wrapper.unmount();
+  });
+  it('falls back to default avatar when avatar image fails to load', async () => {
+    mockSupabase.user.photoURL = 'https://example.com/broken.jpg';
+    const wrapper = await mountAppBar();
+    const img = wrapper.find('button[aria-label="navigation_drawer.account_menu"] img');
+    expect(img.exists()).toBe(true);
+    expect(img.attributes('src')).toBe('https://example.com/broken.jpg');
+    await img.trigger('error');
+    await flushPromises();
+    expect(img.attributes('src')).toBe('/img/default-avatar.svg');
     wrapper.unmount();
   });
 });

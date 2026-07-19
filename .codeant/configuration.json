@@ -1,18 +1,8 @@
 {
-  "review_configuration": {
-    "include": [],
-    "exclude": [
-      "app/locales/cs.json",
-      "app/locales/de.json",
-      "app/locales/es.json",
-      "app/locales/fr.json",
-      "app/locales/it.json",
-      "app/locales/ko.json",
-      "app/locales/pl.json",
-      "app/locales/pt.json",
-      "app/locales/ru.json",
-      "app/locales/uk.json",
-      "app/locales/zh.json"
-    ]
+  "file_filters": {
+    "config": {
+      "include_files": "",
+      "exclude_files": "app/locales/cs.json,app/locales/de.json,app/locales/es.json,app/locales/fr.json,app/locales/it.json,app/locales/ko.json,app/locales/pl.json,app/locales/pt.json,app/locales/ru.json,app/locales/uk.json,app/locales/zh.json"
+    }
   }
 }

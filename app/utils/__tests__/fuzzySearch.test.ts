@@ -57,5 +57,11 @@ describe('fuzzySearch', () => {
       expect(fuzzyMatchScore('Salewa First Aid Kit', 'sfak')).toBe(0.7);
       expect(fuzzyMatchScore('Kill 7 scavs on Interchange from over 40 meters', '7n40')).toBe(0);
     });
+    it('keeps subsequence scores strictly below the initialism tier', () => {
+      const score = fuzzyMatchScore('Salewa', 'slea');
+      expect(score).toBeGreaterThan(0);
+      expect(score).toBeLessThan(0.7);
+      expect(score).toBeLessThanOrEqual(0.65);
+    });
   });
 });

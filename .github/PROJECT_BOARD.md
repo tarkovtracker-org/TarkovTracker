@@ -59,14 +59,14 @@ GitHub Projects supports built-in automation. Configure these:
 
 #### Auto-add to Inbox
 
-```
+```text
 When: Issue is created
 Action: Add to project → Set status to Inbox
 ```
 
 #### Move to In Progress
 
-```
+```text
 When: Pull request is opened
 Action: Set status to In Progress
 
@@ -76,14 +76,14 @@ Action: Set status to In Progress (optional)
 
 #### Move to In Review
 
-```
+```text
 When: Pull request is marked ready for review
 Action: Set status to In Review
 ```
 
 #### Move to Done
 
-```
+```text
 When: Pull request is merged
 Action: Set status to Done
 
@@ -221,14 +221,14 @@ Create these saved views for better workflow management:
 - Use comments for status updates
 - Link related issues and PRs
 
-### For Contributors
+### Contributor Best Practices
 
 - Check **Todo** before starting new work
 - Assign yourself when starting work
 - Keep only 1-2 items **In Progress** at a time
 - Update PR status appropriately
 
-### For Maintainers
+### Maintainer Best Practices
 
 - Triage **Inbox** daily
 - Keep **Todo** curated and prioritized

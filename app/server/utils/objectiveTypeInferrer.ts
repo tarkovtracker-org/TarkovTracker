@@ -6,7 +6,7 @@
  */
 import { isPlainObject } from './deepMerge';
 /** Prefix-to-type mapping for objective inference (ordered by length descending for correct startsWith matching) */
-export const OBJECTIVE_TYPE_PREFIXES: Array<{ prefix: string; type: string }> = [
+const OBJECTIVE_TYPE_PREFIXES: Array<{ prefix: string; type: string }> = [
   { prefix: 'find and hand over', type: 'giveItem' },
   { prefix: 'locate and mark', type: 'mark' },
   { prefix: 'eliminate', type: 'shoot' },
@@ -27,7 +27,7 @@ export const OBJECTIVE_TYPE_PREFIXES: Array<{ prefix: string; type: string }> = 
  * Check if a marker item has valid properties.
  * Valid if it has a non-empty id, type, or position with x/y/z coordinates.
  */
-export function hasValidMarkerItem(entry: Record<string, unknown>): boolean {
+function hasValidMarkerItem(entry: Record<string, unknown>): boolean {
   if (!isPlainObject(entry.markerItem)) return false;
   const markerItem = entry.markerItem;
   // Check for valid id (non-empty string)
@@ -100,7 +100,7 @@ export function inferObjectiveType(entry: Record<string, unknown>): string | und
 /**
  * Normalize an objective entry with inferred type and foundInRaid.
  */
-export function normalizeObjectiveEntry(entry: Record<string, unknown>): Record<string, unknown> {
+function normalizeObjectiveEntry(entry: Record<string, unknown>): Record<string, unknown> {
   const description = typeof entry.description === 'string' ? entry.description : '';
   const inferred = inferObjectiveType(entry);
   const trimmed = typeof inferred === 'string' ? inferred.trim() : '';

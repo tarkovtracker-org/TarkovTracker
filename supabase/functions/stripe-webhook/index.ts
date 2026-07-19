@@ -1,11 +1,23 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeadersFor } from '../_shared/cors.ts';
 import {
-  getDiscordRoleConfig,
   removeAllTierRoles,
-  removeRole,
+  removeSupporterRole,
+  syncLinkedAccountRole,
   syncRolesForSupporter,
 } from '../_shared/discord.ts';
+import {
+  getInvoiceSubscriptionId,
+  getStripeReferenceId,
+  getSubscriptionUserId,
+  isFullRefund,
+  shouldActivateCheckoutSession,
+} from '../_shared/stripeBilling.ts';
+import {
+  getTierPriceConfig,
+  isSupporterTier,
+  resolveSubscriptionTier,
+} from '../_shared/stripeTier.ts';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
@@ -15,14 +27,28 @@ const GRACE_PERIOD_DAYS = 7;
 const STRIPE_API_VERSION = '2024-06-20';
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
-if (
-  !SUPABASE_URL ||
-  !SUPABASE_SERVICE_ROLE_KEY ||
-  !STRIPE_WEBHOOK_SECRET ||
-  !STRIPE_SECRET_KEY
-) {
+type StripeSubscription = {
+  customer?: unknown;
+  id: string;
+  items?: { data?: Array<{ price?: { id?: string } }> };
+  metadata?: Record<string, string>;
+  status?: string;
+};
+
+const { missing: missingTierPriceEnvVars, priceIdsByTier: TIER_PRICE_IDS } = getTierPriceConfig(
+  (name) => Deno.env.get(name)
+);
+const missingRequiredEnvVars = [
+  !SUPABASE_URL ? 'SUPABASE_URL' : null,
+  !SUPABASE_SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
+  !STRIPE_WEBHOOK_SECRET ? 'STRIPE_WEBHOOK_SECRET' : null,
+  !STRIPE_SECRET_KEY ? 'STRIPE_SECRET_KEY' : null,
+  ...missingTierPriceEnvVars,
+].filter((name): name is string => Boolean(name));
+
+if (missingRequiredEnvVars.length > 0) {
   throw new Error(
-    '[stripe-webhook] Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY must be set. STRIPE_SECRET_KEY is required to correlate refund/dispute charges back to the originating subscription/customer.'
+    `[stripe-webhook] Missing required env vars: ${missingRequiredEnvVars.join(', ')}`
   );
 }
 
@@ -51,15 +77,10 @@ async function verifyStripeSignature(
   sigHeader: string,
   secret: string
 ): Promise<boolean> {
-  const parts = Object.fromEntries(
-    sigHeader.split(',').map((p) => {
-      const [k, v] = p.split('=');
-      return [k, v];
-    })
-  );
-  const timestamp = parts['t'];
-  const signature = parts['v1'];
-  if (!timestamp || !signature) return false;
+  const parts = sigHeader.split(',').map((part) => part.split('=', 2));
+  const timestamp = parts.find(([key]) => key === 't')?.[1];
+  const signatures = parts.filter(([key]) => key === 'v1').map(([, value]) => value);
+  if (!timestamp || signatures.length === 0) return false;
 
   // Reject signatures whose timestamp is older than 5 minutes OR set in the future
   // (negative age means the signed timestamp is in the future, which Stripe never produces).
@@ -76,13 +97,15 @@ async function verifyStripeSignature(
   );
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signedPayload));
   const expectedBytes = new Uint8Array(sig);
-  const signatureBytes = hexToBytes(signature);
-  if (!signatureBytes || signatureBytes.length !== expectedBytes.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < expectedBytes.length; i += 1) {
-    mismatch |= expectedBytes[i] ^ signatureBytes[i];
-  }
-  return mismatch === 0;
+  return signatures.some((signature) => {
+    const signatureBytes = hexToBytes(signature);
+    if (!signatureBytes || signatureBytes.length !== expectedBytes.length) return false;
+    let mismatch = 0;
+    for (let i = 0; i < expectedBytes.length; i += 1) {
+      mismatch |= expectedBytes[i] ^ signatureBytes[i];
+    }
+    return mismatch === 0;
+  });
 }
 
 function hexToBytes(hex: string): Uint8Array | null {
@@ -120,6 +143,19 @@ async function claimEvent(eventId: string, eventType: string): Promise<boolean> 
  * depending on auth client version, not the Discord-side user id.
  */
 async function getDiscordUserId(userId: string): Promise<string | null> {
+  const { data: linkedAccount, error: linkedAccountError } = await supabase
+    .from('discord_account_links')
+    .select('discord_user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (linkedAccount?.discord_user_id) return linkedAccount.discord_user_id;
+  if (linkedAccountError) {
+    console.warn('[stripe-webhook] Discord link lookup failed:', {
+      userId,
+      error: linkedAccountError,
+    });
+  }
+
   const { data } = await supabase.auth.admin.getUserById(userId);
   if (!data?.user?.identities) return null;
   const discordIdentity = data.user.identities.find((i) => i.provider === 'discord');
@@ -131,14 +167,49 @@ async function getDiscordUserId(userId: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * Prefer live Discord identity (discord_account_links / auth.identities) over
+ * the denormalized supporters.discord_user_id column so users who link Discord
+ * after checkout still get role updates on portal/refund/cancel events.
+ */
+// deno-lint-ignore no-explicit-any
+async function resolveDiscordUserIdForSupporter(supporter: any): Promise<string | null> {
+  const userId = typeof supporter?.user_id === 'string' ? supporter.user_id : null;
+  if (!userId) return null;
+
+  const persisted =
+    typeof supporter.discord_user_id === 'string' && supporter.discord_user_id
+      ? supporter.discord_user_id
+      : null;
+  const resolved = await getDiscordUserId(userId);
+  if (!resolved) return persisted;
+
+  if (supporter.discord_user_id !== resolved) {
+    const { error } = await supabase
+      .from('supporters')
+      .update({ discord_user_id: resolved })
+      .eq('user_id', userId);
+    if (error) {
+      console.warn('[stripe-webhook] Failed to backfill supporters.discord_user_id:', {
+        userId,
+        error,
+      });
+    } else {
+      supporter.discord_user_id = resolved;
+    }
+  }
+
+  return resolved;
+}
+
 function resolveTier(metadata: Record<string, string> | null | undefined): string {
-  return metadata?.tier || 'supporter';
+  return isSupporterTier(metadata?.tier) ? metadata.tier : 'supporter';
 }
 
 const TIER_RANK: Record<string, number> = { supporter: 0, scav: 1, timmy: 2, chad: 3 };
 
 function higherTier(a: string | null | undefined, b: string): string {
-  return (TIER_RANK[a || 'supporter'] ?? 0) >= (TIER_RANK[b] ?? 0) ? (a || 'supporter') : b;
+  return (TIER_RANK[a || 'supporter'] ?? 0) >= (TIER_RANK[b] ?? 0) ? a || 'supporter' : b;
 }
 
 /**
@@ -175,8 +246,25 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     throw new PermanentError(`${source} without client_reference_id`);
   }
 
-  const tier = resolveTier(session.metadata);
   const isSubscription = session.mode === 'subscription';
+  let tier = resolveTier(session.metadata);
+  let subscriptionId = getStripeReferenceId(session.subscription);
+  let sessionCustomerId = getStripeReferenceId(session.customer);
+  if (isSubscription) {
+    if (!subscriptionId) {
+      throw new PermanentError(`${source} subscription without subscription id`);
+    }
+    const subscription = await fetchLatestSubscription(subscriptionId);
+    if (!['active', 'trialing'].includes(subscription.status ?? '')) {
+      console.info(
+        `[stripe-webhook] ${source} subscription ${subscriptionId} is ${subscription.status}; skipping activation`
+      );
+      return;
+    }
+    tier = resolveSubscriptionTier(subscription, tier, TIER_PRICE_IDS);
+    subscriptionId = subscription.id;
+    sessionCustomerId = getStripeReferenceId(subscription.customer) || sessionCustomerId;
+  }
   const discordUserId = await getDiscordUserId(userId);
 
   // Preserve started_at across re-subscriptions so renewal/upgrade flows
@@ -199,13 +287,11 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     existing?.stripe_subscription_id;
 
   const effectiveTier =
-    hasLiveSubscription && !isSubscription
-      ? higherTier(existing.tier, tier)
-      : tier;
+    hasLiveSubscription && !isSubscription ? higherTier(existing.tier, tier) : tier;
 
   // Preserve stripe_customer_id from the existing row when the session doesn't
   // provide one (e.g., guest one-time checkout linked later).
-  const effectiveCustomerId = session.customer || existing?.stripe_customer_id || null;
+  const effectiveCustomerId = sessionCustomerId || existing?.stripe_customer_id || null;
 
   const record = {
     user_id: userId,
@@ -213,9 +299,8 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     status: hasLiveSubscription && !isSubscription ? existing.status : 'active',
     type: hasLiveSubscription || isSubscription ? 'subscription' : 'one_time',
     stripe_customer_id: effectiveCustomerId,
-    stripe_subscription_id: hasLiveSubscription && !isSubscription
-      ? existing.stripe_subscription_id
-      : session.subscription || null,
+    stripe_subscription_id:
+      hasLiveSubscription && !isSubscription ? existing.stripe_subscription_id : subscriptionId,
     has_ever_supported: true,
     discord_user_id: discordUserId,
     amount_total: session.amount_total || 0,
@@ -224,17 +309,20 @@ async function activateSupporterFromSession(session: any, source: string): Promi
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from('supporters')
-    .upsert(record, { onConflict: 'user_id' });
+  const { error } = await supabase.from('supporters').upsert(record, { onConflict: 'user_id' });
 
   if (error) {
     throw new Error(`Failed to upsert supporter for ${userId}: ${error.message}`);
   }
 
   if (discordUserId) {
-    await safeDiscordCall(`role sync (${source})`, { userId, discordUserId, tier: effectiveTier }, () =>
-      syncRolesForSupporter(discordUserId, effectiveTier, true)
+    await safeDiscordCall(`linked role sync (${source})`, { userId, discordUserId }, () =>
+      syncLinkedAccountRole(discordUserId)
+    );
+    await safeDiscordCall(
+      `role sync (${source})`,
+      { userId, discordUserId, tier: effectiveTier },
+      () => syncRolesForSupporter(discordUserId, effectiveTier, true)
     );
   }
 
@@ -264,11 +352,12 @@ async function findSupporterBy(
 
 // deno-lint-ignore no-explicit-any
 async function handleCheckoutCompleted(session: any): Promise<void> {
-  // ACH Direct Debit and other delayed methods complete the session before
-  // funds clear. Defer activation until async_payment_succeeded fires.
-  if (session.payment_status === 'processing') {
+  if (session?.mode !== 'payment' && session?.mode !== 'subscription') {
+    throw new PermanentError('checkout.session.completed with invalid mode');
+  }
+  if (!shouldActivateCheckoutSession(session)) {
     console.info(
-      `[stripe-webhook] Payment processing (delayed method), deferring: ${session.client_reference_id}`
+      `[stripe-webhook] Payment not yet paid, deferring: ${session.client_reference_id}`
     );
     return;
   }
@@ -282,12 +371,46 @@ async function handleAsyncPaymentSucceeded(session: any): Promise<void> {
 
 // deno-lint-ignore no-explicit-any
 async function handleSubscriptionUpdated(subscription: any): Promise<void> {
-  const supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
-  if (!supporter) return;
+  const subscriptionId = getStripeReferenceId(subscription);
+  if (!subscriptionId) return;
+  const latestSubscription = await fetchLatestSubscription(subscriptionId);
+  await reconcileSubscription(latestSubscription);
+}
 
-  const newTier = subscription.metadata?.tier || supporter.tier;
-  const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+async function fetchLatestSubscription(subscriptionId: string): Promise<StripeSubscription> {
+  const subscription = await stripeGet<StripeSubscription>(
+    `/subscriptions/${encodeURIComponent(subscriptionId)}`
+  );
+  if (!subscription) {
+    throw new Error(`Unable to retrieve Stripe subscription ${subscriptionId}`);
+  }
+  return subscription;
+}
+
+async function reconcileSubscription(
+  subscription: StripeSubscription,
+  paymentConfirmed = false
+): Promise<void> {
+  let supporter = await findSupporterBy('stripe_subscription_id', subscription.id);
+  const metadataUserId = getSubscriptionUserId(subscription);
+  if (!supporter && metadataUserId) {
+    supporter = await findSupporterBy('user_id', metadataUserId);
+  }
+  const userId = supporter?.user_id || metadataUserId;
+  if (!userId) return;
+  if (
+    supporter?.type === 'subscription' &&
+    supporter.stripe_subscription_id &&
+    supporter.stripe_subscription_id !== subscription.id &&
+    ['active', 'past_due'].includes(supporter.status)
+  ) {
+    return;
+  }
+
+  const newTier = resolveSubscriptionTier(subscription, supporter?.tier, TIER_PRICE_IDS);
+  const isActive = ['active', 'trialing'].includes(subscription.status ?? '');
   const isPastDue = subscription.status === 'past_due';
+  if (!isActive && !isPastDue && !paymentConfirmed && supporter?.type === 'one_time') return;
 
   let status = 'active';
   let expiresAt: string | null = null;
@@ -302,31 +425,70 @@ async function handleSubscriptionUpdated(subscription: any): Promise<void> {
     expiresAt = new Date().toISOString();
   }
 
-  const { error } = await supabase
-    .from('supporters')
-    .update({
-      tier: isActive ? newTier : isPastDue ? supporter.tier : 'supporter',
+  const entitlementTier = isActive
+    ? newTier
+    : isPastDue
+      ? supporter?.tier || newTier
+      : 'supporter';
+  const hasEverSupported = supporter?.has_ever_supported === true || paymentConfirmed;
+  const discordUserId = await getDiscordUserId(userId);
+  const { error } = await supabase.from('supporters').upsert(
+    {
+      user_id: userId,
+      tier: entitlementTier,
       status,
+      type: 'subscription',
+      stripe_customer_id:
+        getStripeReferenceId(subscription.customer) || supporter?.stripe_customer_id || null,
+      stripe_subscription_id: subscription.id,
+      has_ever_supported: hasEverSupported,
+      discord_user_id: discordUserId || supporter?.discord_user_id || null,
+      amount_total: supporter?.amount_total || 0,
+      started_at: supporter?.started_at || new Date().toISOString(),
       expires_at: expiresAt,
-    })
-    .eq('user_id', supporter.user_id);
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  );
 
   if (error) {
-    throw new Error(`Failed to update subscription for ${supporter.user_id}: ${error.message}`);
+    throw new Error(`Failed to update subscription for ${userId}: ${error.message}`);
   }
 
-  if (supporter.discord_user_id) {
+  const resolvedDiscordUserId =
+    discordUserId ||
+    (supporter
+      ? await resolveDiscordUserIdForSupporter({ ...supporter, user_id: userId })
+      : null);
+  if (resolvedDiscordUserId) {
     if (isActive) {
       await safeDiscordCall(
         'role sync (subscription updated)',
-        { userId: supporter.user_id, discordUserId: supporter.discord_user_id, tier: newTier },
-        () => syncRolesForSupporter(supporter.discord_user_id, newTier, true)
+        { userId, discordUserId: resolvedDiscordUserId, tier: newTier },
+        () => syncRolesForSupporter(resolvedDiscordUserId, newTier, true)
       );
-    } else if (!isPastDue) {
+    } else if (isPastDue) {
+      await safeDiscordCall(
+        'role sync (subscription grace period)',
+        { userId, discordUserId: resolvedDiscordUserId, tier: entitlementTier },
+        () => syncRolesForSupporter(resolvedDiscordUserId, entitlementTier, true)
+      );
+    } else if (hasEverSupported) {
+      await safeDiscordCall(
+        'lifetime role sync (subscription inactive)',
+        { userId, discordUserId: resolvedDiscordUserId },
+        () => syncRolesForSupporter(resolvedDiscordUserId, 'supporter', true)
+      );
+    } else {
       await safeDiscordCall(
         'remove tier roles (subscription updated)',
-        { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-        () => removeAllTierRoles(supporter.discord_user_id)
+        { userId, discordUserId: resolvedDiscordUserId },
+        () => removeAllTierRoles(resolvedDiscordUserId)
+      );
+      await safeDiscordCall(
+        'remove supporter role (subscription updated)',
+        { userId, discordUserId: resolvedDiscordUserId },
+        () => removeSupporterRole(resolvedDiscordUserId)
       );
     }
   }
@@ -351,11 +513,12 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
     throw new Error(`Failed to expire subscription for ${supporter.user_id}: ${error.message}`);
   }
 
-  if (supporter.discord_user_id) {
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (discordUserId) {
     await safeDiscordCall(
       'remove tier roles (subscription deleted)',
-      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-      () => removeAllTierRoles(supporter.discord_user_id)
+      { userId: supporter.user_id, discordUserId },
+      () => removeAllTierRoles(discordUserId)
     );
   }
 
@@ -364,30 +527,16 @@ async function handleSubscriptionDeleted(subscription: any): Promise<void> {
 
 // deno-lint-ignore no-explicit-any
 async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
-  const subscriptionId = invoice.subscription;
+  const subscriptionId = getInvoiceSubscriptionId(invoice);
   if (!subscriptionId) return;
+  await reconcileSubscription(await fetchLatestSubscription(subscriptionId));
+}
 
-  const supporter = await findSupporterBy('stripe_subscription_id', subscriptionId);
-  if (!supporter) return;
-
-  const grace = new Date();
-  grace.setDate(grace.getDate() + GRACE_PERIOD_DAYS);
-
-  const { error } = await supabase
-    .from('supporters')
-    .update({
-      status: 'past_due',
-      expires_at: grace.toISOString(),
-    })
-    .eq('user_id', supporter.user_id);
-
-  if (error) {
-    throw new Error(`Failed to mark past_due for ${supporter.user_id}: ${error.message}`);
-  }
-
-  console.warn(
-    `[stripe-webhook] Payment failed for ${supporter.user_id}, grace until ${grace.toISOString()}`
-  );
+// deno-lint-ignore no-explicit-any
+async function handleInvoicePaid(invoice: any): Promise<void> {
+  const subscriptionId = getInvoiceSubscriptionId(invoice);
+  if (!subscriptionId) return;
+  await reconcileSubscription(await fetchLatestSubscription(subscriptionId), true);
 }
 
 /**
@@ -424,9 +573,7 @@ async function stripeGet<T>(path: string): Promise<T | null> {
  */
 async function getCustomerPaymentCount(stripeCustomerId: string): Promise<number | null> {
   if (!STRIPE_SECRET_KEY) {
-    console.warn(
-      '[stripe-webhook] STRIPE_SECRET_KEY missing; cannot determine charge history.'
-    );
+    console.warn('[stripe-webhook] STRIPE_SECRET_KEY missing; cannot determine charge history.');
     return null;
   }
 
@@ -466,12 +613,10 @@ async function resolveChargeSubscription(charge: any): Promise<string | null | u
   const invoiceId = typeof charge?.invoice === 'string' ? charge.invoice : null;
   // No invoice means this is a direct charge (one-time), not subscription-related.
   if (!invoiceId) return null;
-  const invoice = await stripeGet<{ subscription?: string | null }>(
-    `/invoices/${encodeURIComponent(invoiceId)}`
-  );
+  const invoice = await stripeGet<unknown>(`/invoices/${encodeURIComponent(invoiceId)}`);
   // API failure: return undefined so caller knows lookup was indeterminate.
   if (invoice === null) return undefined;
-  return typeof invoice.subscription === 'string' ? invoice.subscription : null;
+  return getInvoiceSubscriptionId(invoice);
 }
 
 // deno-lint-ignore no-explicit-any
@@ -504,9 +649,9 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
   );
   const matchesOneTime = Boolean(
     !sessionSubscriptionId &&
-      supporter.type === 'one_time' &&
-      sessionCustomerId &&
-      supporter.stripe_customer_id === sessionCustomerId
+    supporter.type === 'one_time' &&
+    sessionCustomerId &&
+    supporter.stripe_customer_id === sessionCustomerId
   );
 
   if (!matchesSubscription && !matchesOneTime) {
@@ -524,11 +669,12 @@ async function handleAsyncPaymentFailed(session: any): Promise<void> {
     throw new Error(`Failed to expire async-failed supporter for ${userId}: ${error.message}`);
   }
 
-  if (supporter.discord_user_id) {
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (discordUserId) {
     await safeDiscordCall(
       'remove tier roles (async payment failed)',
-      { userId, discordUserId: supporter.discord_user_id },
-      () => removeAllTierRoles(supporter.discord_user_id)
+      { userId, discordUserId },
+      () => removeAllTierRoles(discordUserId)
     );
   }
 }
@@ -578,36 +724,33 @@ async function revokeSupporter(
   if (!data) {
     // Row was modified between our read and write — re-read and let Stripe
     // retry if state still warrants revocation. Treat as transient.
-    throw new Error(
-      `Supporter row for ${supporter.user_id} changed during ${reason}; will retry`
-    );
+    throw new Error(`Supporter row for ${supporter.user_id} changed during ${reason}; will retry`);
   }
 
-  if (!supporter.discord_user_id) return;
+  const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
+  if (!discordUserId) return;
 
   await safeDiscordCall(
     `remove tier roles (${reason})`,
-    { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-    () => removeAllTierRoles(supporter.discord_user_id)
+    { userId: supporter.user_id, discordUserId },
+    () => removeAllTierRoles(discordUserId)
   );
 
   if (fullRevoke) {
-    const config = getDiscordRoleConfig();
     await safeDiscordCall(
       `remove supporter role (${reason})`,
-      { userId: supporter.user_id, discordUserId: supporter.discord_user_id },
-      () =>
-        removeRole({
-          guildId: config.guildId,
-          userId: supporter.discord_user_id,
-          roleId: config.supporterRoleId,
-        })
+      { userId: supporter.user_id, discordUserId },
+      () => removeSupporterRole(discordUserId)
     );
   }
 }
 
 // deno-lint-ignore no-explicit-any
 async function handleChargeRefunded(charge: any): Promise<void> {
+  if (!isFullRefund(charge)) {
+    console.info(`[stripe-webhook] Partial refund for charge ${charge?.id}; keeping entitlement`);
+    return;
+  }
   const customerId = typeof charge?.customer === 'string' ? charge.customer : null;
   if (!customerId) return;
 
@@ -701,7 +844,7 @@ async function handleChargeDisputeCreated(dispute: any): Promise<void> {
 
 type StripeEvent = { id: string; type: string; data: { object: unknown } };
 
-async function dispatchEvent(event: StripeEvent): Promise<void> {
+function dispatchEvent(event: StripeEvent): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed':
       return handleCheckoutCompleted(event.data.object);
@@ -709,18 +852,22 @@ async function dispatchEvent(event: StripeEvent): Promise<void> {
       return handleAsyncPaymentSucceeded(event.data.object);
     case 'checkout.session.async_payment_failed':
       return handleAsyncPaymentFailed(event.data.object);
+    case 'customer.subscription.created':
     case 'customer.subscription.updated':
       return handleSubscriptionUpdated(event.data.object);
     case 'customer.subscription.deleted':
       return handleSubscriptionDeleted(event.data.object);
     case 'invoice.payment_failed':
       return handleInvoicePaymentFailed(event.data.object);
+    case 'invoice.paid':
+      return handleInvoicePaid(event.data.object);
     case 'charge.refunded':
       return handleChargeRefunded(event.data.object);
     case 'charge.dispute.created':
       return handleChargeDisputeCreated(event.data.object);
     default:
       console.info(`[stripe-webhook] Unhandled event: ${event.type}`);
+      return Promise.resolve();
   }
 }
 

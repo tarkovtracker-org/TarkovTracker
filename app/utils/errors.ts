@@ -18,7 +18,7 @@ export const getErrorStatus = (error: unknown): number | null => {
   return null;
 };
 const TRANSIENT_STATUS_CODES = new Set([0, 408, 502, 503, 504]);
-export const TRANSIENT_ERROR_CODES = new Set([
+const TRANSIENT_ERROR_CODES = new Set([
   'ABORT_ERR',
   'ABORT_ERROR',
   'ECONNREFUSED',
@@ -33,7 +33,7 @@ export const TRANSIENT_ERROR_CODES = new Set([
   'UND_ERR_CONNECT',
   'UND_ERR_SOCKET',
 ]);
-export const TRANSIENT_ERROR_PATTERNS = [
+const TRANSIENT_ERROR_PATTERNS = [
   /connection refused/i,
   /failed to fetch/i,
   /fetch failed/i,

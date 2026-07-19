@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { OBJECTIVE_TYPE_PREFIXES, inferObjectiveType } from '@/server/utils/objectiveTypeInferrer';
+import { inferObjectiveType } from '@/server/utils/objectiveTypeInferrer';
 describe('objectiveTypeInferrer', () => {
-  it('orders composite prefixes before their constituents', () => {
-    const compositeIndex = OBJECTIVE_TYPE_PREFIXES.findIndex(
-      ({ prefix }) => prefix === 'find and hand over'
-    );
-    const findIndex = OBJECTIVE_TYPE_PREFIXES.findIndex(({ prefix }) => prefix === 'find');
-    expect(compositeIndex).toBeGreaterThan(-1);
-    expect(findIndex).toBeGreaterThan(-1);
-    expect(compositeIndex).toBeLessThan(findIndex);
-  });
   it('prefers composite prefix matches over shorter prefixes', () => {
     expect(inferObjectiveType({ description: 'Find and hand over the item' })).toBe('giveItem');
     expect(inferObjectiveType({ description: 'Find the item' })).toBe('findItem');

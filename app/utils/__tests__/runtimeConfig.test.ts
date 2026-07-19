@@ -3,6 +3,7 @@ import {
   GITHUB_IMAGE_DOMAINS,
   isPrimaryAppHostname,
   isPagesPreviewHostname,
+  resolveClientLogSinkUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   shouldEnableAnalyticsIntegrations,
@@ -55,6 +56,15 @@ describe('resolveSupabaseRuntimeConfig', () => {
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
     expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
       expect.arrayContaining(['assets.tarkov.dev', 'avatars.githubusercontent.com', 'github.com'])
+    );
+  });
+});
+describe('resolveClientLogSinkUrl', () => {
+  it('disables browser log forwarding unless a sink is explicitly configured', () => {
+    expect(resolveClientLogSinkUrl({})).toBe('');
+    expect(resolveClientLogSinkUrl({ NUXT_PUBLIC_CLIENT_LOG_SINK_URL: '  ' })).toBe('');
+    expect(resolveClientLogSinkUrl({ NUXT_PUBLIC_CLIENT_LOG_SINK_URL: ' /api/logs/client ' })).toBe(
+      '/api/logs/client'
     );
   });
 });

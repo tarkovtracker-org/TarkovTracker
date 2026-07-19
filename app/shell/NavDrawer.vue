@@ -66,39 +66,14 @@
       <div class="bg-surface-800 mx-3 my-2 h-px shrink-0" />
       <DrawerLinks :is-collapsed="isCollapsed" />
       <div class="bg-surface-800 mx-3 my-2 h-px shrink-0" />
-      <div class="flex flex-col gap-0.5">
-        <div v-if="!isCollapsed" class="px-4 py-2">
-          <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-            {{ t('navigation_drawer.section_external') }}
-          </h3>
-        </div>
-        <ul class="flex flex-col gap-0.5 px-1">
-          <DrawerItem
-            avatar="/img/logos/tarkovdevlogo.webp"
-            locale-key="tarkovdev"
-            href="https://tarkov.dev/"
-            :is-collapsed="isCollapsed"
-          />
-          <DrawerItem
-            avatar="/img/logos/tarkovmonitorlogo.avif"
-            locale-key="tarkovmonitor"
-            href="https://tarkov.dev/tarkov-monitor"
-            :is-collapsed="isCollapsed"
-          />
-          <DrawerItem
-            avatar="/img/logos/ratscannerlogo.webp"
-            locale-key="ratscanner"
-            href="https://github.com/RatScanner/RatScanner"
-            :is-collapsed="isCollapsed"
-          />
-          <DrawerItem
-            avatar="/img/logos/tarkovchangeslogo.svg"
-            locale-key="tarkovchanges"
-            href="https://tarkov-changes.com/"
-            :is-collapsed="isCollapsed"
-          />
-        </ul>
-      </div>
+      <ul class="flex flex-col gap-0.5 px-1">
+        <DrawerItem
+          icon="i-mdi-compass-outline"
+          locale-key="resources"
+          to="/resources"
+          :is-collapsed="isCollapsed"
+        />
+      </ul>
     </div>
   </nav>
 </template>

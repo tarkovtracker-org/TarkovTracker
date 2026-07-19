@@ -431,6 +431,7 @@
   import { HOT_WHEELS_TASK_ID } from '@/utils/constants';
   import { getExclusiveEditionsForTask } from '@/utils/editionHelpers';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
+  import { isFailedOnlyRequirement } from '@/utils/taskProgress';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { ActionButtonState } from '@/features/tasks/types';
   import type { GameEdition, Task } from '@/types/tarkov';
@@ -841,12 +842,7 @@
     (props.task.taskRequirements ?? []).forEach((requirement) => {
       const sourceTaskId = requirement?.task?.id;
       if (!sourceTaskId) return;
-      const expectedStatuses = getRequiredTaskStatuses(requirement.status);
-      const isFailedOnlyRequirement =
-        expectedStatuses.includes('failed') &&
-        !expectedStatuses.includes('completed') &&
-        !expectedStatuses.includes('active');
-      if (!isFailedOnlyRequirement) return;
+      if (!isFailedOnlyRequirement(requirement.status)) return;
       if (!isTaskSuccessful(sourceTaskId)) return;
       const sourceTask = metadataStore.getTaskById(sourceTaskId);
       sources.set(sourceTaskId, {

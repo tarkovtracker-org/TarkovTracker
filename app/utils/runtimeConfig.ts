@@ -59,6 +59,9 @@ export const resolvePublicAppUrl = (env: NodeJS.ProcessEnv): string => {
   }
   return normalizePublicAppUrl(configuredUrl);
 };
+export const resolveClientLogSinkUrl = (env: NodeJS.ProcessEnv): string => {
+  return resolveEnvValue(env.NUXT_PUBLIC_CLIENT_LOG_SINK_URL);
+};
 export const isPagesPreviewHostname = (hostname?: string): boolean => {
   const normalizedHostname = resolveHostname(hostname);
   return normalizedHostname.endsWith('.pages.dev');

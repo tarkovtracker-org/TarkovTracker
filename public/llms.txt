@@ -17,6 +17,11 @@ Authentication-required areas include `/account`, `/team`, `/settings`, and auth
 - [Hideout](https://tarkovtracker.org/hideout): Hideout modules, upgrades, and requirements.
 - [Needed Items](https://tarkovtracker.org/needed-items): Consolidated item requirements.
 - [Storyline](https://tarkovtracker.org/storyline): Storyline quest view.
+- [Resources](https://tarkovtracker.org/resources): Community tools hub and setup guides.
+- [Tarkov.dev Guide](https://tarkovtracker.org/resources/tarkovdev): Using Tarkov.dev data and GraphQL API.
+- [TarkovMonitor Guide](https://tarkovtracker.org/resources/tarkovmonitor): Install and link TarkovMonitor to TarkovTracker.
+- [RatScanner Guide](https://tarkovtracker.org/resources/ratscanner): Install and use RatScanner overlays.
+- [CultistCircle Guide](https://tarkovtracker.org/resources/cultistcircle): Cultist Circle recipe calculator reference.
 - [Profile](https://tarkovtracker.org/profile): Signed-in profile and progression management.
 - [Changelog](https://tarkovtracker.org/changelog): Product and feature updates.
 

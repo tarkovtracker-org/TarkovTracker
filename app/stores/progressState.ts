@@ -393,14 +393,6 @@ export const actions = {
       timestamp: Date.now(),
     });
   },
-  toggleStoryChapterComplete(this: UserState, chapterId: string) {
-    const isComplete = getters.isStoryChapterComplete(this)(chapterId);
-    if (isComplete) {
-      actions.setStoryChapterUncomplete.call(this, chapterId);
-    } else {
-      actions.setStoryChapterComplete.call(this, chapterId);
-    }
-  },
   setStoryObjectiveComplete(this: UserState, chapterId: string, objectiveId: string) {
     const data = getCurrentData(this);
     if (!data.storyChapters[chapterId]) {

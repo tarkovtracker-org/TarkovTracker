@@ -57,11 +57,15 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 ├── docs/                     # Documentation
 ├── supabase/                 # Supabase config and functions
 ├── workers/                  # Cloudflare Workers
-│   └── api-gateway/         # Rate limiting gateway
+│   └── api-gateway/         # External API gateway + Durable Object rate limiter
 ├── nuxt.config.ts           # Nuxt configuration
 ├── package.json             # Dependencies
 └── vitest.config.ts         # Test configuration
 ```
+
+Rate limiting is multi-plane (Worker DO, Edge mutation counters, Pages shared limits, Auth
+platform limits). See [`RATE_LIMITING.md`](./RATE_LIMITING.md) for ownership, flows, and when to
+use which enforcer.
 
 ## Architecture Diagram
 
@@ -311,7 +315,7 @@ All game data is fetched through Nuxt server routes that proxy to `json.tarkov.d
 | `/api/tarkov/items`            | Items (full)         | 24h       |
 | `/api/tarkov/prestige`         | Prestige levels      | 24h       |
 | `/api/tarkov/map-spawns`       | Map spawn points     | 12h       |
-| `/api/tarkov/cache-meta`       | Cache purge status   | no-store  |
+| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   |
 
 ### Team API
 
@@ -409,6 +413,8 @@ Build command: pnpm run build
 Build output: dist
 Root directory: /
 Node.js version: 24.x
+# Pages Functions only handle /api/* and /overlay/*; the build promotes Nuxt's
+# 200.html SPA fallback to index.html so Pages serves all app routes statically.
 # Optional build-tool pin (Pages build image). Detection also works from
 # pnpm-lock.yaml + packageManager without this env var.
 # PNPM_VERSION: 10.34.5
@@ -424,11 +430,12 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
 **Client-side (browser) — Nuxt public runtime config:**
 
-| Variable                        | Description                            | Required   |
-| ------------------------------- | -------------------------------------- | ---------- |
-| `NUXT_PUBLIC_SUPABASE_URL`      | Supabase project URL for auth and sync | Yes¹       |
-| `NUXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key for auth and sync    | Yes¹       |
-| `NUXT_PUBLIC_APP_URL`           | Application URL                        | Yes (prod) |
+| Variable                          | Description                                              | Required   |
+| --------------------------------- | -------------------------------------------------------- | ---------- |
+| `NUXT_PUBLIC_SUPABASE_URL`        | Supabase project URL for auth and sync                   | Yes¹       |
+| `NUXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anon key for auth and sync                      | Yes¹       |
+| `NUXT_PUBLIC_APP_URL`             | Application URL                                          | Yes (prod) |
+| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` | Optional browser log collector URL (disabled by default) | No         |
 
 > **¹ Required in production.** `SUPABASE_URL` and `SUPABASE_ANON_KEY` work as cross-platform
 > build-time fallbacks. Without Supabase configuration, auth, sync, realtime, and team features
@@ -460,6 +467,7 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 | `STRIPE_PRICE_CHAD_MONTHLY`        | Stripe price ID for Chad monthly plan             | Yes (prod) |
 | `STRIPE_PRICE_CHAD_6MONTH`         | Stripe price ID for Chad 6-month plan             | Yes (prod) |
 | `STRIPE_PRICE_CHAD_YEARLY`         | Stripe price ID for Chad yearly plan              | Yes (prod) |
+| `NUXT_ACCOUNT_IP_HASH_SECRET`      | HMAC secret for account-level IP audit records    | Yes (prod) |
 
 **Build-time / platform:**
 
@@ -477,8 +485,8 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 Functions. (`SUPABASE_SERVICE_ROLE_KEY` is deprecated only as a Nuxt app fallback; use
 `NUXT_SUPABASE_SERVICE_KEY` for Nuxt.) `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared
 canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`,
-`DISCORD_SUPPORTER_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` are Edge-only.
-See `supabase/functions/.env.example`.
+`DISCORD_SUPPORTER_ROLE_ID`, `DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`,
+`CLOUDFLARE_API_TOKEN` are Edge-only. See `supabase/functions/.env.example`.
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
 

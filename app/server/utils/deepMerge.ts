@@ -18,9 +18,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
  * Type guard to check if a value is an array of objects with ID properties.
  * Returns true for non-empty arrays where every element is a plain object containing an 'id'.
  */
-export function isIdKeyedArray(
-  value: unknown
-): value is Array<Record<string, unknown> & { id: unknown }> {
+function isIdKeyedArray(value: unknown): value is Array<Record<string, unknown> & { id: unknown }> {
   return (
     Array.isArray(value) &&
     value.length > 0 &&
@@ -38,7 +36,7 @@ export function isIdKeyedArray(
  * @param targetArray - Array of entities to apply patches to
  * @returns New array with patches applied
  */
-export function mergeArrayByIdPatches(
+function mergeArrayByIdPatches(
   sourcePatches: Record<string, unknown>,
   targetArray: unknown[]
 ): unknown[] {

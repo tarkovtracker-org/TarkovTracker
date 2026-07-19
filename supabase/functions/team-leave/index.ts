@@ -7,13 +7,12 @@ import {
   createErrorResponse,
   createSuccessResponse,
   type AuthSuccess
-} from "../_shared/auth.ts"
+} from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const LEAVE_COOLDOWN_MINUTES = 5
 const VALID_GAME_MODES = ["pvp", "pve"] as const
 type GameMode = typeof VALID_GAME_MODES[number]
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   const corsResponse = handleCorsPreflight(req)
   if (corsResponse) return corsResponse

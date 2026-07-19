@@ -23,10 +23,10 @@ Please be respectful and constructive in all interactions. We're building a tool
 
 ## Getting Started
 
-**Prerequisites:** Node.js >= 24.12.0, pnpm 10.34.5 (via Corepack; matches `packageManager`), Git.
+**Prerequisites:** Node.js >= 24.12.0, pnpm 11.14.0 (via Corepack; matches `packageManager`), Git.
 
 1. **Fork the repository** and clone your fork locally
-2. **Install dependencies**: `corepack enable && corepack prepare pnpm@10.34.5 --activate && pnpm install`
+2. **Install dependencies**: `corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm install`
 3. **Set up environment**: Copy `.env.example` to `.env` and add your Supabase credentials.
    Full env-var reference: [`docs/runbook.md`](../docs/runbook.md) and [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 4. **Start dev server**: `pnpm run dev`

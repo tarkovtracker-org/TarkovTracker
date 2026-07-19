@@ -56,6 +56,29 @@ describe('getSupporterStripeCustomerId', () => {
     expect(url).toContain('user_id=eq.user-1');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer service-key');
   });
+  it('returns the subscription state needed to prevent duplicate subscriptions', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          status: 'active',
+          stripe_customer_id: 'cus_123',
+          stripe_subscription_id: 'sub_123',
+          type: 'subscription',
+        },
+      ],
+    } as Response);
+    const { getSupporterBillingState } = await import('@/server/utils/supporterCustomerLookup');
+    await expect(getSupporterBillingState(event, 'user-1')).resolves.toEqual({
+      status: 'active',
+      stripeCustomerId: 'cus_123',
+      stripeSubscriptionId: 'sub_123',
+      type: 'subscription',
+    });
+    expect(mockFetch.mock.calls[0]?.[0]).toContain(
+      'select=stripe_customer_id,stripe_subscription_id,status,type'
+    );
+  });
   it('returns null when no row exists', async () => {
     mockFetch.mockResolvedValue({
       ok: true,

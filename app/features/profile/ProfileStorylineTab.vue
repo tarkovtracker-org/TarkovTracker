@@ -12,7 +12,7 @@
         <ChapterCard
           :chapter="chapter"
           :read-only="props.readOnly"
-          :show-chapter-actions="false"
+          @toggle-chapter="handleChapterToggle"
           @toggle-objective="handleObjectiveToggle"
         />
         <div class="bg-surface-800/60 h-1.5 overflow-hidden rounded-full">
@@ -52,6 +52,7 @@
   }
   const props = defineProps<Props>();
   const emit = defineEmits<{
+    toggleChapter: [chapterId: string];
     toggleObjective: [chapterId: string, objectiveId: string];
   }>();
   const { t } = useI18n({ useScope: 'global' });
@@ -78,5 +79,11 @@
       return;
     }
     emit('toggleObjective', chapterId, objectiveId);
+  };
+  const handleChapterToggle = (chapterId: string) => {
+    if (props.readOnly) {
+      return;
+    }
+    emit('toggleChapter', chapterId);
   };
 </script>

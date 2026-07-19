@@ -1,17 +1,18 @@
 import { writeToClipboard } from '@/composables/useCopyToClipboard';
 import { useWikiLink } from '@/composables/useWikiLink';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { openExternalUrl } from '@/utils/redirect';
 import type { Task, TaskObjective } from '@/types/tarkov';
-export interface UseTaskCardLinksOptions {
+interface UseTaskCardLinksOptions {
   task: () => Task;
   objectives: () => TaskObjective[];
 }
-export type SelectedTaskItem = {
+type SelectedTaskItem = {
   id: string;
   name?: string;
   wikiLink?: string;
 };
-export interface UseTaskCardLinksReturn {
+interface UseTaskCardLinksReturn {
   selectedItem: Ref<SelectedTaskItem | null>;
   tarkovDevTaskUrl: ComputedRef<string>;
   copyTextToClipboard: (text: string) => Promise<boolean>;
@@ -41,11 +42,11 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
   const openTaskWiki = () => {
     const wikiLink = toWikiUrl(task().wikiLink);
     if (wikiLink) {
-      window.open(wikiLink, '_blank', 'noopener,noreferrer');
+      openExternalUrl(wikiLink);
     }
   };
   const openTaskOnTarkovDev = () => {
-    window.open(tarkovDevTaskUrl.value, '_blank', 'noopener,noreferrer');
+    openExternalUrl(tarkovDevTaskUrl.value);
   };
   const getTaskDataIssueUrl = (): string => {
     const currentTask = task();
@@ -76,25 +77,21 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
     return `https://trackerbot.nivmizz7.dev/data?${params.toString()}`;
   };
   const openTaskDataIssue = () => {
-    window.open(getTaskDataIssueUrl(), '_blank', 'noopener,noreferrer');
+    openExternalUrl(getTaskDataIssueUrl());
   };
   const setSelectedItem = (item: SelectedTaskItem | null) => {
     selectedItem.value = item;
   };
   const openItemOnTarkovDev = () => {
     if (!selectedItem.value) return;
-    window.open(
-      `https://tarkov.dev/item/${selectedItem.value.id}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
+    openExternalUrl(`https://tarkov.dev/item/${selectedItem.value.id}`);
   };
   const openItemOnWiki = () => {
     if (!selectedItem.value) return;
     if (selectedItem.value.wikiLink) {
       const wikiLink = toWikiUrl(selectedItem.value.wikiLink);
       if (wikiLink) {
-        window.open(wikiLink, '_blank', 'noopener,noreferrer');
+        openExternalUrl(wikiLink);
       }
       return;
     }
@@ -103,7 +100,7 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
       `https://escapefromtarkov.fandom.com/wiki/Special:Search?query=${encodeURIComponent(fallbackQuery)}`
     );
     if (fallbackUrl) {
-      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+      openExternalUrl(fallbackUrl);
     }
   };
   return {

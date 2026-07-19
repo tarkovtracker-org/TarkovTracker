@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-h-[calc(100vh-250px)] overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-[1400px]">
+      <div class="mx-auto max-w-[1400px] xl:max-w-[1600px] 2xl:max-w-[1800px]">
         <h1 class="sr-only">Tarkov Tracker - Escape from Tarkov Progress Tracker</h1>
         <DashboardNextActions />
         <DashboardChangelog />
@@ -150,10 +150,51 @@
           </div>
           <div
             v-show="!tradersSectionCollapsed"
-            class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
           >
             <div
-              v-for="trader in traderStats"
+              v-for="trader in unlockedTraderStats"
+              :id="`dashboard-trader-${trader.id}`"
+              :key="trader.id"
+              class="content-visibility-auto-220 h-full"
+              :class="
+                highlightedTraderId === trader.id
+                  ? 'ring-primary-500 ring-offset-surface-950 rounded-lg ring-2 ring-offset-2'
+                  : ''
+              "
+            >
+              <DashboardTraderCard
+                :trader="trader"
+                :completed-tasks="trader.completedTasks"
+                :total-tasks="trader.totalTasks"
+                :percentage="trader.percentage"
+              />
+            </div>
+          </div>
+          <button
+            v-if="lockedTraderStats.length && !tradersSectionCollapsed"
+            type="button"
+            class="bg-surface-900/60 border-surface-700/40 hover:bg-surface-900 hover:border-surface-600 group mt-5 flex w-full cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors"
+            :aria-expanded="showLockedTraders"
+            :aria-controls="'dashboard-locked-traders'"
+            @click="showLockedTraders = !showLockedTraders"
+          >
+            <UIcon name="i-mdi-lock" class="text-warning-400/80 h-5 w-5 shrink-0" />
+            <span class="text-sm font-semibold text-white">
+              {{ $t('page.dashboard.traders.locked_summary', { count: lockedTraderStats.length }) }}
+            </span>
+            <UIcon
+              :name="showLockedTraders ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
+              class="text-surface-300 group-hover:text-surface-100 ml-auto h-5 w-5 shrink-0 transition-colors"
+            />
+          </button>
+          <div
+            v-if="lockedTraderStats.length && showLockedTraders && !tradersSectionCollapsed"
+            id="dashboard-locked-traders"
+            class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+          >
+            <div
+              v-for="trader in lockedTraderStats"
               :id="`dashboard-trader-${trader.id}`"
               :key="trader.id"
               class="content-visibility-auto-220 h-full"
@@ -262,9 +303,11 @@
 </template>
 <script setup lang="ts">
   import { useDashboardFilters } from '@/composables/useDashboardFilters';
+  import { isTraderLocked } from '@/features/dashboard/traderLockStatus';
+  import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { sortTraderStats } from '@/utils/constants';
+  import { GAME_MODES, sortTraderStats } from '@/utils/constants';
   import { calculatePercentageNum } from '@/utils/formatters';
   import { getQueryString } from '@/utils/routeHelpers';
   import type { TraderSortMode, TraderSortDirection } from '@/utils/constants';
@@ -276,6 +319,7 @@
   const progressSectionCollapsed = ref(false);
   const tradersSectionCollapsed = ref(false);
   const milestonesSectionCollapsed = ref(false);
+  const showLockedTraders = ref(false);
   const highlightedTraderId = ref<string | null>(null);
   const traderHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   // Page metadata
@@ -294,6 +338,7 @@
   const { hasDashboardFiltersActive } = useDashboardFilters();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
+  const metadataStore = useMetadataStore();
   const { t } = useI18n({ useScope: 'global' });
   const traderSortMode = computed({
     get: () => preferencesStore.getTraderSortMode,
@@ -321,6 +366,18 @@
       tarkovStore.getTraderReputation
     );
   });
+  const traderLockDeps = computed(() => ({
+    tasks: metadataStore.tasks,
+    isTaskComplete: (id: string) => tarkovStore.isTaskComplete(id),
+    gameMode: tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP,
+  }));
+  const metadataTasksLoaded = computed(() => metadataStore.tasks.length > 0);
+  const unlockedTraderStats = computed(() =>
+    traderStats.value.filter((trader) => !isTraderLocked(trader, traderLockDeps.value))
+  );
+  const lockedTraderStats = computed(() =>
+    traderStats.value.filter((trader) => isTraderLocked(trader, traderLockDeps.value))
+  );
   const clearTraderHighlight = () => {
     if (traderHighlightTimeout.value) {
       clearTimeout(traderHighlightTimeout.value);
@@ -331,8 +388,13 @@
   const focusTraderFromRoute = async () => {
     const traderId = getQueryString(route.query.trader);
     if (!traderId || traderStats.value.length === 0) return;
-    if (!traderStats.value.some((trader) => trader.id === traderId)) return;
+    if (!metadataTasksLoaded.value) return;
+    const targetTrader = traderStats.value.find((trader) => trader.id === traderId);
+    if (!targetTrader) return;
     tradersSectionCollapsed.value = false;
+    if (isTraderLocked(targetTrader, traderLockDeps.value)) {
+      showLockedTraders.value = true;
+    }
     await nextTick();
     const traderElement = document.getElementById(`dashboard-trader-${traderId}`);
     if (!traderElement) return;
@@ -352,7 +414,7 @@
     });
   };
   watch(
-    [() => route.query.trader, traderStats],
+    [() => route.query.trader, traderStats, metadataTasksLoaded],
     async () => {
       await focusTraderFromRoute();
     },

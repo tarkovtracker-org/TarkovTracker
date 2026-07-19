@@ -1,20 +1,13 @@
 {
-  "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "app/i18n.config.ts",
-    "app/server/api/**/*.{js,ts}",
-    "app/server/routes/**/*.{js,ts}",
-    "vitest.config.ts"
-  ],
+  "$schema": "./node_modules/knip/schema.json",
   "ignore": [
     "supabase/functions/**",
-    "app/components/PromotedTwitchEmbed.vue",
-    "app/i18n.config.ts",
     "app/server/api/changelog.get.ts",
     "app/server/api/contributors.get.ts",
-    "scripts/stripe-import-test.mjs"
+    "scripts/precompute/nuxt-imports.ts"
   ],
   "ignoreDependencies": [
+    "@codecov/nuxt-plugin",
     "@iconify-json/mdi",
     "@semantic-release/npm",
     "@tailwindcss/postcss",
@@ -23,19 +16,20 @@
     "lru-cache",
     "postcss",
     "vitest-environment-nuxt",
-    "vue-tsc",
-    "@nuxt/kit"
+    "vue-tsc"
   ],
   "ignoreExportsUsedInFile": true,
   "workspaces": {
-    "workers/api-gateway": {
+    ".": {
       "entry": [
-        "scripts/validate-openapi.ts",
-        "src/**/__tests__/**/*.test.ts",
-        "src/index.ts",
-        "vitest.config.ts"
-      ],
-      "project": ["scripts/**/*.ts", "src/**/*.ts", "vitest.config.ts"]
+        "app/i18n.config.ts",
+        "scripts/measure-pageload.mjs",
+        "scripts/stripe-import-test.mjs"
+      ]
+    },
+    "workers/api-gateway": {
+      "entry": ["src/**/__tests__/**/*.test.ts"],
+      "project": ["scripts/**/*.ts", "src/**/*.ts"]
     }
   }
 }
