@@ -276,22 +276,22 @@ describe('Shared Profile API', () => {
         new Response(
           JSON.stringify({
             data: {
-              tasks: [
-                {
+              tasks: {
+                '597a0f5686f774273b74f676': {
                   id: '597a0f5686f774273b74f676',
                   failConditions: [
                     {
-                      __typename: 'TaskObjectiveTaskStatus',
+                      type: 'taskStatus',
                       status: ['complete'],
-                      task: { id: '597a160786f77477531d39d2' },
+                      task: '597a160786f77477531d39d2',
                     },
                   ],
                 },
-                {
+                '597a160786f77477531d39d2': {
                   id: '597a160786f77477531d39d2',
                   failConditions: [],
                 },
-              ],
+              },
             },
           }),
           {
@@ -302,6 +302,7 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
+    expect(mockFetch.mock.calls[2]?.[0]).toBe('https://json.tarkov.dev/pve/tasks');
     expect(result.mode).toBe('pve');
     expect(result.data?.taskCompletions).toMatchObject({
       '597a0f5686f774273b74f676': { complete: true, failed: true },

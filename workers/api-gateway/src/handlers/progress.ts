@@ -324,7 +324,10 @@ export async function handleGetProgress(
   const fallbackDisplayName =
     progressData?.displayName?.trim() || (await getUserDisplayName(env, token.user_id));
   // Fetch task and hideout data (cached)
-  const [tasks, hideoutStations] = await Promise.all([getTasks(), getHideoutStations()]);
+  const [tasks, hideoutStations] = await Promise.all([
+    getTasks(gameMode),
+    getHideoutStations(gameMode),
+  ]);
   // Transform to API response format
   const data = transformProgress(
     progressData,
@@ -430,7 +433,7 @@ export async function handleUpdateTask(
     updateTime,
     updateMap
   );
-  const tasks = await getTasks();
+  const tasks = await getTasks(gameMode);
   if (tasks.length > 0) {
     updateDependentTasks(taskId, state, tasks, taskCompletions, updateTime, updateMap);
     const changedTask = tasks.find((task) => task.id === taskId);
@@ -483,7 +486,7 @@ export async function handleUpdateTasks(
   const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
   const explicitTaskIds = new Set(updates.map((update) => update.id));
-  const tasks = await getTasks();
+  const tasks = await getTasks(gameMode);
   for (const update of updates) {
     setTaskCompletion(
       taskCompletions,

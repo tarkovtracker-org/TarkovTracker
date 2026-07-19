@@ -28,6 +28,11 @@ describe('deepMerge id-keyed arrays', () => {
       ],
     });
   });
+  it('preserves empty projection arrays when an overlay contains ID-keyed patches', () => {
+    expect(deepMerge({ objectives: [] }, { objectives: { objective1: { count: 2 } } })).toEqual({
+      objectives: [],
+    });
+  });
 });
 describe('mergeModeCorrections (via applyOverlay integration)', () => {
   it('returns shared when no mode-specific corrections exist', () => {

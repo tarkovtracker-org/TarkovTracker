@@ -15,7 +15,7 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
-import { createTarkovFetcher } from '@/server/utils/tarkovFetcher';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { API_GAME_MODES, GAME_MODES, type GameMode } from '@/utils/constants';
 import {
   isRecord,
@@ -39,34 +39,19 @@ const DEFAULT_SHARED_PROFILE_CACHE_TTL_MS = 5000;
 const SHARED_PROFILE_CACHE_PREFIX = 'shared-profile';
 const SHARED_PROFILE_RATE_LIMIT_PREFIX = 'shared-profile-rate';
 const TASK_FAILURE_METADATA_CACHE_TTL_MS = 60 * 60 * 1000;
-const TASK_FAILURE_METADATA_QUERY = `
-  query SharedProfileTaskFailureMetadata($gameMode: GameMode) {
-    tasks(gameMode: $gameMode) {
-      id
-      failConditions {
-        __typename
-        ... on TaskObjectiveTaskStatus {
-          status
-          task {
-            id
-          }
-        }
-      }
-    }
-  }
-`;
+const TARKOV_JSON_BASE_URL = 'https://json.tarkov.dev';
 const isTestEnvironment = process.env.NODE_ENV === 'test';
-type TaskFailureObjective = {
-  __typename?: string | null;
+type JsonFailCondition = {
+  type?: string | null;
+  task?: string | null;
   status?: string[] | null;
-  task?: { id?: string | null } | null;
 };
-type TaskFailureMetadataTask = {
+type JsonTaskFailureMetadata = {
   id?: string | null;
-  failConditions?: TaskFailureObjective[] | null;
+  failConditions?: JsonFailCondition[] | null;
 };
-type TaskFailureMetadataQueryResult = {
-  tasks?: TaskFailureMetadataTask[] | null;
+type JsonTasksPayload = {
+  tasks?: Record<string, JsonTaskFailureMetadata> | null;
 };
 type PreferencesRow = {
   streamer_mode?: boolean | null;
@@ -273,7 +258,7 @@ const hasCompleteStatus = (statuses: unknown): boolean => {
   const normalizedStatuses = normalizeStatusList(statuses);
   return normalizedStatuses.includes('complete') || normalizedStatuses.includes('completed');
 };
-const buildTaskFailureSourcesMap = (tasks: TaskFailureMetadataTask[]): TaskFailureSourcesMap => {
+const buildTaskFailureSourcesMap = (tasks: JsonTaskFailureMetadata[]): TaskFailureSourcesMap => {
   const sourcesByTarget: TaskFailureSourcesMap = {};
   for (const task of tasks) {
     const targetTaskId = toCleanString(task?.id, 128);
@@ -282,10 +267,10 @@ const buildTaskFailureSourcesMap = (tasks: TaskFailureMetadataTask[]): TaskFailu
     }
     const failConditions = Array.isArray(task?.failConditions) ? task.failConditions : [];
     for (const objective of failConditions) {
-      if (objective?.__typename !== 'TaskObjectiveTaskStatus') {
+      if (objective?.type !== 'taskStatus') {
         continue;
       }
-      const sourceTaskId = toCleanString(objective.task?.id, 128);
+      const sourceTaskId = toCleanString(objective.task, 128);
       if (!sourceTaskId || !hasCompleteStatus(objective.status)) {
         continue;
       }
@@ -311,17 +296,19 @@ const getTaskFailureSources = async (mode: GameMode): Promise<TaskFailureSources
   }
   const requestPromise = (async () => {
     try {
-      const fetchFailureMetadata = createTarkovFetcher<{ data?: TaskFailureMetadataQueryResult }>(
-        TASK_FAILURE_METADATA_QUERY,
-        {
-          gameMode: API_GAME_MODES[mode],
-        }
-      );
-      const response = await fetchFailureMetadata();
-      const tasks = response?.data?.tasks;
-      if (!Array.isArray(tasks)) {
+      const response = await fetch(`${TARKOV_JSON_BASE_URL}/${API_GAME_MODES[mode]}/tasks`, {
+        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as { data?: JsonTasksPayload };
+      const tasksMap = payload?.data?.tasks;
+      if (!tasksMap || typeof tasksMap !== 'object') {
         return null;
       }
+      const tasks = Object.values(tasksMap);
       const sourcesByTarget = buildTaskFailureSourcesMap(tasks);
       taskFailureSourcesCache[mode] = {
         expiresAt: now + TASK_FAILURE_METADATA_CACHE_TTL_MS,

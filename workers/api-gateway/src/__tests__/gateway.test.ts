@@ -80,6 +80,7 @@ type BaseFetchMockOptions = {
   tasks?: Array<Record<string, unknown>>;
   userProgress?: Record<string, unknown>;
   permissions?: string[];
+  gameMode?: 'pvp' | 'pve';
 };
 const createBaseFetchMock = ({
   onMerge,
@@ -93,6 +94,7 @@ const createBaseFetchMock = ({
     pve_data: null,
   },
   permissions = ['WP'],
+  gameMode = 'pvp',
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
@@ -104,7 +106,7 @@ const createBaseFetchMock = ({
           user_id: 'user-1',
           token_hash: 'hash',
           permissions,
-          game_mode: 'pvp',
+          game_mode: gameMode,
           note: 'test',
           is_active: true,
           usage_count: 0,
@@ -127,19 +129,24 @@ const createBaseFetchMock = ({
     if (url.includes('/rest/v1/user_progress')) {
       return jsonResponse([userProgress]);
     }
-    if (url === 'https://api.tarkov.dev/graphql') {
+    const apiGameMode = gameMode === 'pve' ? 'pve' : 'regular';
+    if (url === `https://json.tarkov.dev/${apiGameMode}/tasks`) {
       return jsonResponse({
         data: {
-          tasks,
-          hideoutStations: [],
+          tasks: Object.fromEntries(tasks.map((task) => [String(task.id), task])),
         },
       });
+    }
+    if (url === `https://json.tarkov.dev/${apiGameMode}/hideout`) {
+      return jsonResponse({ data: {} });
     }
     return new Response('Not Found', { status: 404 });
   });
 beforeEach(() => {
-  deleteMemoryCache('tarkov:tasks');
-  deleteMemoryCache('tarkov:hideout');
+  deleteMemoryCache('tarkov:tasks:regular');
+  deleteMemoryCache('tarkov:tasks:pve');
+  deleteMemoryCache('tarkov:hideout:regular');
+  deleteMemoryCache('tarkov:hideout:pve');
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('Unmocked fetch: missing test handler', { status: 500 }))
@@ -294,7 +301,7 @@ describe('api-gateway', () => {
     expect(retryAfter).toBeGreaterThan(0);
     expect(retryAfter).toBeLessThanOrEqual(31);
   });
-  it('updates dependent and alternative tasks for single update', async () => {
+  it('updates dependent tasks for single update', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
       onMerge: (payload) => {
@@ -305,7 +312,6 @@ describe('api-gateway', () => {
           id: 'task-main',
           name: 'Main Task',
           factionName: 'Any',
-          alternatives: [{ id: 'task-alt' }],
           objectives: [],
           taskRequirements: [],
         },
@@ -315,7 +321,7 @@ describe('api-gateway', () => {
           factionName: 'Any',
           alternatives: [],
           objectives: [],
-          taskRequirements: [{ task: { id: 'task-main' }, status: ['complete'] }],
+          taskRequirements: [{ task: 'task-main', status: ['complete'] }],
         },
       ],
     });
@@ -338,8 +344,6 @@ describe('api-gateway', () => {
     > | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
-    expect(taskCompletions?.['task-alt']?.complete).toBe(true);
-    expect(taskCompletions?.['task-alt']?.failed).toBe(true);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
     expect(payload.p_set?.lastApiUpdate).toBeDefined();
@@ -404,7 +408,7 @@ describe('api-gateway', () => {
           factionName: 'Any',
           alternatives: [],
           objectives: [],
-          taskRequirements: [{ task: { id: 'task-main' }, status: ['complete'] }],
+          taskRequirements: [{ task: 'task-main', status: ['complete'] }],
         },
       ],
     });
@@ -593,20 +597,25 @@ describe('api-gateway', () => {
           },
         ]);
       }
-      if (url === 'https://api.tarkov.dev/graphql') {
-        const data = {
-          tasks: [
-            {
-              id: 'task-1',
-              name: 'Task One',
-              factionName: 'Any',
-              alternatives: [],
-              objectives: [{ id: 'obj-1', type: 'find', count: 2 }],
-              taskRequirements: [],
+      if (url === 'https://json.tarkov.dev/regular/tasks') {
+        return jsonResponse({
+          data: {
+            tasks: {
+              'task-1': {
+                id: 'task-1',
+                name: 'Task One',
+                factionName: 'Any',
+                objectives: [{ id: 'obj-1', type: 'find', count: 2 }],
+                taskRequirements: [],
+              },
             },
-          ],
-          hideoutStations: [
-            {
+          },
+        });
+      }
+      if (url === 'https://json.tarkov.dev/regular/hideout') {
+        return jsonResponse({
+          data: {
+            'station-1': {
               id: 'station-1',
               levels: [
                 {
@@ -616,9 +625,8 @@ describe('api-gateway', () => {
                 },
               ],
             },
-          ],
-        };
-        return jsonResponse({ data });
+          },
+        });
       }
       return new Response('Not Found', { status: 404 });
     });

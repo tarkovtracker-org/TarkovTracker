@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildTasksCorePrecomputedKey, isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
+import {
+  buildTasksCorePrecomputedKey,
+  isPrecomputedEnvelope,
+} from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { PRECOMPUTED_TTL_SECONDS, runPrecompute, validatePrecomputeFilter } from '../precompute';
@@ -47,10 +50,7 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([]);
     expect(result.successes).toHaveLength(2);
     expect(result.successes).toEqual(
-      expect.arrayContaining([
-        'tasks-core-json-v2-en-regular',
-        'tasks-core-json-v2-en-pve',
-      ])
+      expect.arrayContaining(['tasks-core-json-v2-en-regular', 'tasks-core-json-v2-en-pve'])
     );
     expect(kv.put).toHaveBeenCalledTimes(2);
     const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v2-en-regular');
@@ -110,6 +110,24 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([
       {
         error: 'Sanity check failed: payload has no tasks; refusing to write to KV',
+        key: 'tasks-core-json-v2-en-regular',
+      },
+    ]);
+    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
+    expect(kv.put).toHaveBeenCalledTimes(1);
+  });
+  it('refuses to publish overlay objective patches as objects', async () => {
+    applyOverlayMock
+      .mockResolvedValueOnce({
+        data: { tasks: [{ id: 'task-bad', objectives: { objective: { count: 2 } } }] },
+      })
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] } });
+    const kv = createKvMock();
+    const result = await runPrecompute(kv, { lang: 'en' });
+    expect(result.failures).toEqual([
+      {
+        error:
+          'Sanity check failed: task "task-bad" has malformed objective arrays; refusing to write to KV',
         key: 'tasks-core-json-v2-en-regular',
       },
     ]);

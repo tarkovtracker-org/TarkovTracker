@@ -125,7 +125,10 @@ export async function handleGetTeamProgress(
   }
   const progressRows = (await progressRes.json()) as UserProgressRow[];
   // Step 4: Fetch task and hideout data (cached)
-  const [tasks, hideoutStations] = await Promise.all([getTasks(), getHideoutStations()]);
+  const [tasks, hideoutStations] = await Promise.all([
+    getTasks(gameMode),
+    getHideoutStations(gameMode),
+  ]);
   // Step 5: Transform progress for each team member
   const teamProgress: ProgressResponseData[] = await Promise.all(
     memberIds.map(async (memberId) => {
@@ -177,7 +180,10 @@ async function getSoloProgress(
   const progressData = extractGameModeData(row, gameMode);
   const fallbackDisplayName =
     progressData?.displayName?.trim() || (await getUserDisplayName(env, token.user_id));
-  const [tasks, hideoutStations] = await Promise.all([getTasks(), getHideoutStations()]);
+  const [tasks, hideoutStations] = await Promise.all([
+    getTasks(gameMode),
+    getHideoutStations(gameMode),
+  ]);
   const data = transformProgress(
     progressData,
     token.user_id,

@@ -811,6 +811,8 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     taskRequirements: Array.isArray(raw.taskRequirements)
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))
       : undefined,
+    objectives: [],
+    failConditions: [],
     traderRequirements: Array.isArray(raw.traderRequirements)
       ? raw.traderRequirements.map((requirement) => adaptTraderRequirement(requirement, context))
       : undefined,

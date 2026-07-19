@@ -114,4 +114,16 @@ function assertLooksLikeTasksCore(payload: unknown): void {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error('Sanity check failed: payload has no tasks; refusing to write to KV');
   }
+  for (const task of tasks) {
+    if (!task || typeof task !== 'object' || Array.isArray(task)) continue;
+    const candidate = task as { failConditions?: unknown; id?: unknown; objectives?: unknown };
+    if (
+      (candidate.objectives !== undefined && !Array.isArray(candidate.objectives)) ||
+      (candidate.failConditions !== undefined && !Array.isArray(candidate.failConditions))
+    ) {
+      throw new Error(
+        `Sanity check failed: task "${String(candidate.id ?? 'unknown')}" has malformed objective arrays; refusing to write to KV`
+      );
+    }
+  }
 }

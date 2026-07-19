@@ -88,6 +88,7 @@ When asked to "review for production readiness", "deep review", "is this safe to
 - **Keep secrets out of the repo.** Use `useRuntimeConfig()` for env-driven values.
 - **No destructive git commands** (`git restore`, `git checkout --`, `git reset`, `git clean`, force-push) without explicit user approval in the current conversation.
 - **No runtime dependency additions** without explaining why existing deps are insufficient.
+- **Do not add new runtime dependencies on Tarkov task `alternatives`.** Upstream removed the field; branch relationships must be compiled from task-status failure conditions. Existing uses remain until the shared progress engine replaces them.
 - **Keep changes scoped** to the requested task. Prefer small, reviewable diffs.
 
 ## Coding Conventions

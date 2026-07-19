@@ -54,6 +54,34 @@ describe('fetchTarkovJsonEndpoint', () => {
     );
     expect(result.items.item1?.name).toBe('Bandage');
   });
+  it('keeps regular and PVE source data distinct', async () => {
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/tasks': {
+        data: { tasks: { regular: { id: 'regular' } } },
+        translations: [],
+      },
+      'https://json.tarkov.dev/pve/tasks': {
+        data: { tasks: { pve: { id: 'pve' } } },
+        translations: [],
+      },
+    });
+    const regular = await fetchTarkovJsonEndpoint<{ tasks: Record<string, { id: string }> }>(
+      'tasks',
+      { deps: { fetcher }, gameMode: 'regular', lang: 'en' }
+    );
+    const pve = await fetchTarkovJsonEndpoint<{ tasks: Record<string, { id: string }> }>('tasks', {
+      deps: { fetcher },
+      gameMode: 'pve',
+      lang: 'en',
+    });
+    expect(regular.tasks).toEqual({ regular: { id: 'regular' } });
+    expect(pve.tasks).toEqual({ pve: { id: 'pve' } });
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://json.tarkov.dev/regular/tasks',
+      expect.any(Object)
+    );
+    expect(fetcher).toHaveBeenCalledWith('https://json.tarkov.dev/pve/tasks', expect.any(Object));
+  });
   it('supports an overridden JSON base URL', async () => {
     const fetcher = createFetcher({
       'https://json-mirror.example/regular/items': {
@@ -419,6 +447,8 @@ describe('tarkov JSON adapters', () => {
       map: { id: 'map1', name: 'Customs' },
       trader: { id: 'trader1', name: 'Prapor' },
       requiredPrestige: { id: 'prestige1' },
+      objectives: [],
+      failConditions: [],
     });
     expect(result.maps[0]?.spawns).toHaveLength(1);
     expect(result.traders[0]?.levels).toHaveLength(1);
