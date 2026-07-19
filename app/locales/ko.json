@@ -71,7 +71,13 @@
     "user_label": "User",
     "user_avatar_alt": "User avatar",
     "supporter_badge_label": "Supporter",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})"
+    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
+    "help_community_aria": "Help & community",
+    "community_section": "Community",
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "report_problem": "Report a problem",
+    "more_aria": "More",
+    "login_aria": "Log in to your account"
   },
   "omnibar": {
     "title": "Search",
@@ -233,7 +239,8 @@
       "page_guide": "Guide this page",
       "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
       "onboarding": "New user onboarding",
-      "onboarding_description": "Start with imports, finish the basics, then verify tasks."
+      "onboarding_description": "Start with imports, finish the basics, then verify tasks.",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "Getting set up",
@@ -1648,7 +1655,7 @@
       "discord": "Discord",
       "github": "GitHub"
     },
-    "support_button": "Support Development",
+    "support_button": "Support",
     "support_tagline": "Help keep TarkovTracker free & updated",
     "terms_of_service": "Terms of Service",
     "privacy_policy": "Privacy Policy",
