@@ -71,7 +71,13 @@
     "user_label": "Uživatel",
     "user_avatar_alt": "Avatar uživatele",
     "supporter_badge_label": "Supporter",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})"
+    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
+    "help_community_aria": "Help & community",
+    "community_section": "Community",
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "report_problem": "Report a problem",
+    "more_aria": "Více",
+    "login_aria": "Log in to your account"
   },
   "omnibar": {
     "title": "Search",
@@ -233,7 +239,8 @@
       "page_guide": "Průvodce touto stránkou",
       "page_guide_unavailable": "Zatím zde není žádný průvodce stránkami. Použij místo toho zapojení",
       "onboarding": "Zapojení nového uživatele",
-      "onboarding_description": "Začněte importem, dokončete základy, pak ověřte úkoly."
+      "onboarding_description": "Začněte importem, dokončete základy, pak ověřte úkoly.",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "Načítání nastavení",
