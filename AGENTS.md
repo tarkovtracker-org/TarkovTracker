@@ -132,6 +132,7 @@ Naming:
 - `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
 - Locale keys must be snake_case. Provide fallback strings in `t('key', 'Fallback')` calls.
 - When adding user-facing copy: add key to `en.json` only, run `pnpm run i18n:check`. Crowdin handles propagation.
+- Crowdin-only PRs that change only non-English exports are excluded from repository-owned CI, PR metadata, security, and Dependabot workflows via their `paths-ignore` filters. Changes to source code or `en.json` still run normal checks.
 - Add keys consistently with existing namespace patterns. Keep locale keys stable to avoid churn.
 - Avoid hard-coded user-facing strings in components.
 - The sole exception to not editing non-English locale files is fixing a broken Crowdin export PR; even then, only touch the file(s) Crowdin produced.
@@ -155,6 +156,7 @@ Naming:
 - When investigating user issues, correlate across GA4, Clarity, and Cloudflare when possible.
 - Always state date range, property/project/zone, and source used in analytics conclusions.
 - When using Tarkov API or MCP tools, state only what the API returned. Missing API data is not proof the content doesn't exist in-game.
+- The root `socket.yml` limits Socket PR alerts to dependency manifest changes; CodeAnt locale filters live in `.codeant/configuration.json`. Kilo, Snyk, and Supabase PR integrations remain vendor-dashboard settings.
 - Use browser-based dashboard inspection only as a fallback when MCP/API access is missing or insufficient.
 
 ## Git Workflow

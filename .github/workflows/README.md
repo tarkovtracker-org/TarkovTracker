@@ -19,6 +19,13 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 All jobs run in parallel; the `Workers` job no longer waits for `Validate` to finish.
 
+### Crowdin locale PRs
+
+PRs whose changes are limited to the non-English locale exports in `app/locales/` do not trigger
+`CI`, `PR Checks`, `Security`, or `Dependabot Auto Merge`. This prevents each burst of Crowdin
+synchronization commits from starting redundant repository-owned jobs. Changes to source code,
+workflow files, or `app/locales/en.json` still run the normal checks.
+
 ### Security (`security.yml`)
 
 **Trigger:** Push to main/develop, PRs, weekly schedule
@@ -72,7 +79,16 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-CodeRabbit automatic reviews are disabled in `.coderabbit.yaml`; invoke it on demand with `@coderabbitai review`. CodeAnt and Kilo Code PR reviews are controlled by their GitHub App dashboards, not GitHub Actions in this repo. Keep those apps disabled or remove this repository from their automatic review selections, then invoke them manually from their PR comments or dashboards when needed.
+CodeRabbit skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`; normal automatic reviews
+remain enabled. CodeAnt excludes the non-English locale exports via `.codeant/configuration.json`,
+but its GitHub App can still post PR metadata. Kilo Code reviews are controlled by its GitHub App
+dashboard and have no repository workflow switch. GitHub-managed Copilot review and the duplicate
+CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also controlled outside this repository;
+the checked-in `Security` workflow already runs CodeQL for normal code PRs. To stop those apps and
+workflows from consuming usage on the automated `locales` PR, remove this repository from their
+automatic review selection or disable the duplicate integration in each vendor/GitHub dashboard.
+Socket PR alerts are limited to dependency manifest changes by the root `socket.yml`; Snyk and
+Supabase preview behavior is controlled by their integration settings.
 
 ## Commands
 

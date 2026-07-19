@@ -3,6 +3,18 @@ name: PR Checks
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - 'app/locales/cs.json'
+      - 'app/locales/de.json'
+      - 'app/locales/es.json'
+      - 'app/locales/fr.json'
+      - 'app/locales/it.json'
+      - 'app/locales/ko.json'
+      - 'app/locales/pl.json'
+      - 'app/locales/pt.json'
+      - 'app/locales/ru.json'
+      - 'app/locales/uk.json'
+      - 'app/locales/zh.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}

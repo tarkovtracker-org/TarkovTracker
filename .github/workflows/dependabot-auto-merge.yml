@@ -3,6 +3,18 @@ name: Dependabot Auto Merge
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'app/locales/cs.json'
+      - 'app/locales/de.json'
+      - 'app/locales/es.json'
+      - 'app/locales/fr.json'
+      - 'app/locales/it.json'
+      - 'app/locales/ko.json'
+      - 'app/locales/pl.json'
+      - 'app/locales/pt.json'
+      - 'app/locales/ru.json'
+      - 'app/locales/uk.json'
+      - 'app/locales/zh.json'
 
 permissions:
   checks: read
