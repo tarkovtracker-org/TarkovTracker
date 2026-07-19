@@ -1632,7 +1632,7 @@
           "faq_2_q": "RatScanner funziona con il flea market?",
           "faq_2_a": "Sì. Mostra i prezzi correnti del flea market e può aiutare a confrontare il prezzo flea e quello dei trader.",
           "faq_3_q": "RatScanner può mostrare gli oggetti necessari per TarkovTracker?",
-          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page."
+          "faq_3_a": "Può mostrare le informazioni generali ricevuti dal fornitore di dati. Per i requisiti in base ai progressi personali di TarkovTracker, utilizzare la pagina Oggetti."
         },
         "cultistcircle": {
           "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
