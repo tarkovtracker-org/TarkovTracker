@@ -71,7 +71,13 @@
     "user_label": "Пользователь",
     "user_avatar_alt": "Аватар пользователя",
     "supporter_badge_label": "Supporter",
-    "supporter_badge_aria": "Manage your supporter subscription ({tier})"
+    "supporter_badge_aria": "Manage your supporter subscription ({tier})",
+    "help_community_aria": "Help & community",
+    "community_section": "Community",
+    "keyboard_shortcuts": "Keyboard shortcuts",
+    "report_problem": "Report a problem",
+    "more_aria": "Показать больше",
+    "login_aria": "Log in to your account"
   },
   "omnibar": {
     "title": "Search",
@@ -233,7 +239,8 @@
       "page_guide": "Объяснить эту страницу",
       "page_guide_unavailable": "Для этой страницы гид пока недоступен. Используйте онбординг.",
       "onboarding": "Онбординг для новых пользователей",
-      "onboarding_description": "Начните с импортов, затем завершите базовую настройку и проверьте задания."
+      "onboarding_description": "Начните с импортов, затем завершите базовую настройку и проверьте задания.",
+      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
     },
     "onboarding": {
       "title": "Начало настройки",
