@@ -348,8 +348,8 @@ Release ID should be content-derived or otherwise immutable and include a manife
 4. Validate canonical models and all output projections.
 5. Write every immutable release artifact.
 6. Read back and verify required artifacts.
-7. Serialize promotion with a single-writer publish lock, or an equivalent compare-and-set that verifies `active-release` is still the expected prior release `A` before changing either pointer. If that check fails, abort and re-evaluate instead of overwriting a newer promotion.
-8. While holding that guarantee, set `previous-release` to `A`, then set `active-release` to the newly verified release `B` last. The two pointers must not both be advanced to `B`, or rollback would be ineffective.
+7. Acquire a single-writer promotion lock with a unique owner token and lease. Before changing either pointer, read `active-release` and verify it is the expected prior release `A`; if not, release the lock and abort because another publisher has won. A future compare-and-set implementation is acceptable only if it atomically claims the transition from `A` before either pointer write.
+8. While the lock/claim remains valid, write `previous-release = A`, verify it, then write `active-release = B` last and verify it. If the first write fails, leave `active-release` at `A` and abort. If the final write fails, keep or restore `active-release = A`, repair `previous-release` to its pre-promotion value when known, and report the release as not promoted. Never retry by blindly overwriting pointers after the lock/claim is lost; re-read state and start a new promotion attempt. The two pointers must not both be advanced to `B`, or rollback would be ineffective.
 9. Run production canaries.
 10. Retain active and previous releases without expiration.
 11. Optionally archive older releases in R2.
