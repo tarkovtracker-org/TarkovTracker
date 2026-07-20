@@ -17,8 +17,6 @@ export interface UsageRecord {
  * record_api_usage RPC. Best-effort: failures are logged, never surfaced.
  */
 export async function recordUsage(env: Env, record: UsageRecord): Promise<void> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), USAGE_RPC_TIMEOUT_MS);
   const rpcUrl = `${env.SUPABASE_URL}/rest/v1/rpc/record_api_usage`;
   const headers = {
     Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -33,25 +31,29 @@ export async function recordUsage(env: Env, record: UsageRecord): Promise<void> 
     p_writes: record.kind === 'write' && !record.throttled ? 1 : 0,
     p_throttled: record.throttled ? 1 : 0,
   };
+  const postUsage = async (payload: Record<string, unknown>): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), USAGE_RPC_TIMEOUT_MS);
+    try {
+      return await fetch(rpcUrl, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify(payload),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
   try {
-    let response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers,
-      signal: controller.signal,
-      body: JSON.stringify({ ...basePayload, p_user_agent: record.userAgent }),
-    });
+    let response = await postUsage({ ...basePayload, p_user_agent: record.userAgent });
     // During a staggered deploy, PostgREST can still expose the previous
     // six-argument RPC signature. Retry that exact signature so accounting is
     // preserved until the database migration reaches the environment.
     if (!response.ok && (response.status === 404 || response.status === 400)) {
       const error = (await response.clone().json().catch(() => null)) as { code?: unknown } | null;
       if (error?.code === 'PGRST202') {
-        response = await fetch(rpcUrl, {
-          method: 'POST',
-          headers,
-          signal: controller.signal,
-          body: JSON.stringify(basePayload),
-        });
+        response = await postUsage(basePayload);
       }
     }
     if (!response.ok) {
@@ -59,7 +61,5 @@ export async function recordUsage(env: Env, record: UsageRecord): Promise<void> 
     }
   } catch (error) {
     console.warn('recordUsage error', { error });
-  } finally {
-    clearTimeout(timeout);
   }
 }

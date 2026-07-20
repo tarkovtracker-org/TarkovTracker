@@ -348,8 +348,8 @@ Release ID should be content-derived or otherwise immutable and include a manife
 4. Validate canonical models and all output projections.
 5. Write every immutable release artifact.
 6. Read back and verify required artifacts.
-7. Let `A` be the prior active release and `B` the newly verified release; set `previous-release` to `A`.
-8. Set `active-release` to `B` last. The two pointers must not both be advanced to `B`, or rollback would be ineffective.
+7. Serialize promotion with a single-writer publish lock, or an equivalent compare-and-set that verifies `active-release` is still the expected prior release `A` before changing either pointer. If that check fails, abort and re-evaluate instead of overwriting a newer promotion.
+8. While holding that guarantee, set `previous-release` to `A`, then set `active-release` to the newly verified release `B` last. The two pointers must not both be advanced to `B`, or rollback would be ineffective.
 9. Run production canaries.
 10. Retain active and previous releases without expiration.
 11. Optionally archive older releases in R2.

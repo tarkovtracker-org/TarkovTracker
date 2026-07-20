@@ -62,6 +62,25 @@ describe('recordUsage', () => {
     expect(retryBody).toMatchObject({ p_user_id: 'user-1', p_reads: 1 });
   });
 
+  it('gives the legacy retry a fresh timeout signal', async () => {
+    const signals: AbortSignal[] = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      signals.push(init?.signal as AbortSignal);
+      if (signals.length === 1) {
+        return Response.json({ code: 'PGRST202' }, { status: 404 });
+      }
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await recordUsage(env, record);
+
+    expect(signals).toHaveLength(2);
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).not.toBe(signals[0]);
+  });
+
   it('does not retry unrelated RPC failures', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
