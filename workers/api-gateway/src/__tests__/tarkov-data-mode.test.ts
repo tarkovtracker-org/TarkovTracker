@@ -42,4 +42,41 @@ describe('Tarkov data modes', () => {
     await getTasks('pve');
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
+  it('maps hideout requirement rows to item template IDs', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/hideout')) {
+        return jsonResponse({
+          data: {
+            stash: {
+              id: 'stash',
+              levels: [
+                {
+                  id: 'stash-1',
+                  level: 1,
+                  itemRequirements: [
+                    { id: 'requirement-row-1', item: 'item-template-1', count: 2 },
+                  ],
+                },
+              ],
+            },
+          },
+        });
+      }
+      return jsonResponse({ data: { tasks: {} } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getHideoutStations('pvp')).resolves.toEqual([
+      {
+        id: 'stash',
+        levels: [
+          {
+            id: 'stash-1',
+            level: 1,
+            itemRequirements: [{ id: 'item-template-1', count: 2 }],
+          },
+        ],
+      },
+    ]);
+  });
 });

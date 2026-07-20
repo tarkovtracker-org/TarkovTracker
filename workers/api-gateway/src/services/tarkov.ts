@@ -34,7 +34,7 @@ type JsonTasksPayload = { tasks: Record<string, JsonTask> };
 type JsonHideoutLevel = {
   id: string;
   level: number;
-  itemRequirements?: { id: string; count: number }[];
+  itemRequirements?: { id: string; item?: string; count: number }[];
 };
 type JsonHideoutStation = {
   id: string;
@@ -74,7 +74,9 @@ export async function getHideoutStations(gameMode: GameMode): Promise<TarkovHide
       id: level.id,
       level: level.level,
       itemRequirements: level.itemRequirements?.map((item) => ({
-        id: item.id,
+        // json.tarkov.dev identifies a requirement row separately from the
+        // actual item. Progress responses must expose the item template ID.
+        id: item.item ?? item.id,
         count: item.count,
       })),
     })),
