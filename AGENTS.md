@@ -162,6 +162,17 @@ Naming:
 
 ## Git Workflow
 
+### PR Review Gate
+
+- Do not merge a PR until all available automated and human reviews have finished and every in-scope comment/thread has an explicit disposition.
+- For valid in-scope feedback, fix it on the same PR branch, push the change, wait for the updated review/check cycle, reply with evidence, and resolve the thread before merging. Do not open a chain of follow-up PRs for feedback that belongs to the current PR's scope.
+- For invalid, already-addressed, or superseded feedback, reply with the technical rationale and evidence, then resolve the thread before merging.
+- For genuinely out-of-scope valid feedback, open a tracked GitHub issue before merge, link it in the review reply, explain why it is outside the PR scope, and resolve the thread. Do not silently defer it.
+- Before merge, query both inline review threads and review-summary/top-level comments; summary-only findings still require a reply or reconciliation comment even when GitHub provides no resolvable thread.
+- If a review integration cannot complete because of exhausted credits, rate limits, vendor failure, or an equivalent external blocker, document that failure on the PR, perform and report a direct self-review of the diff, and only then decide whether to merge.
+- Treat new comments created by the latest pushed commit as part of the same review cycle. Repeat until checks pass, reviews are complete, and unresolved thread count is zero.
+- After merge, run one fresh review-thread query to verify zero unresolved threads. Post-merge follow-ups are exceptional recovery, not the normal review workflow.
+
 - Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks).
 - Before edits, run `git status --short --branch`.
 - Never mix unrelated changes in one commit or PR.
