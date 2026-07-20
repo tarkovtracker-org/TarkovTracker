@@ -144,7 +144,6 @@ export interface TarkovTask {
   id: string;
   name: string;
   factionName?: string;
-  alternatives?: string[];
   objectives?: TarkovObjective[];
   taskRequirements?: TarkovTaskRequirement[];
 }

@@ -104,8 +104,9 @@ The live Supabase MCP is authenticated.
 ```text
 json.tarkov.dev
   → app/server/utils/tarkov-json.ts
-  → reduced endpoint adapter
+  → complete canonical model
   → app/server/utils/overlay.ts
+  → reduced endpoint projections
   → edgeCache / precomputed TARKOV_DATA value
   → browser metadata store
 ```
@@ -188,11 +189,11 @@ Examples:
 
 Adding a third SQL implementation would increase drift. Extract one shared pure TypeScript engine.
 
-### P0: current Worker JSON migration is mode-insensitive
+### Resolved: interim Worker JSON migration was mode-insensitive
 
-The interim Worker service fetches `regular/tasks` and `regular/hideout` without accepting game mode. PVE requests would evaluate against regular data.
+The Worker service, callers, and caches now select distinct `regular` and `pve` JSON data. Shared-profile failure metadata also uses the requested mode and the runtime-configurable Tarkov JSON base URL.
 
-The shared-profile failure metadata fetch also hardcodes regular tasks after previously requesting a mode-specific GraphQL result.
+The remaining limitation is architectural rather than mode correctness: the Worker still fetches directly from the upstream JSON service instead of consuming an immutable validated release. Phase 4 removes that runtime upstream dependency.
 
 ### P0: branch semantics depend on removed `alternatives`
 
@@ -347,8 +348,8 @@ Release ID should be content-derived or otherwise immutable and include a manife
 4. Validate canonical models and all output projections.
 5. Write every immutable release artifact.
 6. Read back and verify required artifacts.
-7. Update `previous-release`.
-8. Update `active-release` last.
+7. Let `A` be the prior active release and `B` the newly verified release; set `previous-release` to `A`.
+8. Set `active-release` to `B` last. The two pointers must not both be advanced to `B`, or rollback would be ineffective.
 9. Run production canaries.
 10. Retain active and previous releases without expiration.
 11. Optionally archive older releases in R2.

@@ -19,25 +19,41 @@ export interface UsageRecord {
 export async function recordUsage(env: Env, record: UsageRecord): Promise<void> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), USAGE_RPC_TIMEOUT_MS);
+  const rpcUrl = `${env.SUPABASE_URL}/rest/v1/rpc/record_api_usage`;
+  const headers = {
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    'content-type': 'application/json',
+  };
+  const basePayload = {
+    p_user_id: record.userId,
+    p_token_id: record.tokenId,
+    p_tier: record.tier,
+    p_reads: record.kind === 'read' && !record.throttled ? 1 : 0,
+    p_writes: record.kind === 'write' && !record.throttled ? 1 : 0,
+    p_throttled: record.throttled ? 1 : 0,
+  };
   try {
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/record_api_usage`, {
+    let response = await fetch(rpcUrl, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        'content-type': 'application/json',
-      },
+      headers,
       signal: controller.signal,
-      body: JSON.stringify({
-        p_user_id: record.userId,
-        p_token_id: record.tokenId,
-        p_tier: record.tier,
-        p_reads: record.kind === 'read' && !record.throttled ? 1 : 0,
-        p_writes: record.kind === 'write' && !record.throttled ? 1 : 0,
-        p_throttled: record.throttled ? 1 : 0,
-        p_user_agent: record.userAgent,
-      }),
+      body: JSON.stringify({ ...basePayload, p_user_agent: record.userAgent }),
     });
+    // During a staggered deploy, PostgREST can still expose the previous
+    // six-argument RPC signature. Retry that exact signature so accounting is
+    // preserved until the database migration reaches the environment.
+    if (!response.ok && (response.status === 404 || response.status === 400)) {
+      const error = (await response.clone().json().catch(() => null)) as { code?: unknown } | null;
+      if (error?.code === 'PGRST202') {
+        response = await fetch(rpcUrl, {
+          method: 'POST',
+          headers,
+          signal: controller.signal,
+          body: JSON.stringify(basePayload),
+        });
+      }
+    }
     if (!response.ok) {
       console.warn('recordUsage failed', { status: response.status });
     }

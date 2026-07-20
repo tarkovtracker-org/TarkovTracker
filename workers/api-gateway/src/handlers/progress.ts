@@ -277,26 +277,6 @@ const updateDependentTasks = (
     }
   }
 };
-const updateAlternativeTasks = (
-  changedTask: TarkovTask,
-  newState: TaskState,
-  taskCompletions: Record<string, TaskCompletion>,
-  updateTime: number,
-  updates?: Map<string, TaskState>,
-  protectedTaskIds?: Set<string>
-): void => {
-  const alternatives = changedTask.alternatives ?? [];
-  if (!alternatives.length) return;
-  for (const altTaskId of alternatives) {
-    if (!altTaskId) continue;
-    if (protectedTaskIds?.has(altTaskId)) continue;
-    if (newState === 'completed') {
-      setTaskCompletion(taskCompletions, altTaskId, true, true, updateTime, updates);
-    } else if (newState !== 'failed') {
-      setTaskCompletion(taskCompletions, altTaskId, false, false, updateTime, updates);
-    }
-  }
-};
 /**
  * Handle GET /api/progress - Return player progress
  */
@@ -436,10 +416,6 @@ export async function handleUpdateTask(
   const tasks = await getTasks(gameMode);
   if (tasks.length > 0) {
     updateDependentTasks(taskId, state, tasks, taskCompletions, updateTime, updateMap);
-    const changedTask = tasks.find((task) => task.id === taskId);
-    if (changedTask) {
-      updateAlternativeTasks(changedTask, state, taskCompletions, updateTime, updateMap);
-    }
   }
   const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
   const set: Record<string, unknown> = {};
@@ -506,17 +482,6 @@ export async function handleUpdateTasks(
         updateMap,
         explicitTaskIds
       );
-      const changedTask = tasks.find((task) => task.id === update.id);
-      if (changedTask) {
-        updateAlternativeTasks(
-          changedTask,
-          update.state,
-          taskCompletions,
-          updateTime,
-          updateMap,
-          explicitTaskIds
-        );
-      }
     }
   }
   const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);

@@ -1,10 +1,6 @@
 ALTER TABLE public.api_usage_daily
   ADD COLUMN IF NOT EXISTS user_agent TEXT;
 
-CREATE INDEX IF NOT EXISTS idx_api_usage_daily_user_agent
-  ON public.api_usage_daily(user_agent)
-  WHERE user_agent IS NOT NULL;
-
 DROP FUNCTION public.record_api_usage(UUID, TEXT, TEXT, INTEGER, INTEGER, INTEGER);
 
 CREATE FUNCTION public.record_api_usage(

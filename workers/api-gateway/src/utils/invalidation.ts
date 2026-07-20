@@ -47,12 +47,12 @@ export const computeInvalidProgress = ({
     });
   });
   const visited = new Set<string>();
-  const invalidateTaskRecursive = (taskId: string, childOnly = false) => {
+  const invalidateTaskRecursive = (taskId: string) => {
     const task = tasksById.get(taskId);
     if (!task) return;
     const completion = taskCompletions[taskId];
     const isCompleted = completion?.complete === true && completion?.failed !== true;
-    if (!childOnly && !invalidTasks[taskId] && !isCompleted) {
+    if (!invalidTasks[taskId] && !isCompleted) {
       invalidTasks[taskId] = true;
       task.objectives?.forEach((objective) => {
         if (objective?.id) {
@@ -65,7 +65,7 @@ export const computeInvalidProgress = ({
     const dependents = requiredBy.get(taskId);
     if (!dependents) return;
     if (isCompleted) return;
-    dependents.forEach((dependentId) => invalidateTaskRecursive(dependentId, false));
+    dependents.forEach((dependentId) => invalidateTaskRecursive(dependentId));
   };
   // Invalidate faction-specific tasks (no cascade)
   tasks.forEach((task) => {
@@ -101,17 +101,6 @@ export const computeInvalidProgress = ({
     });
     if (hasFailedPrerequisite) {
       invalidateTaskRecursive(task.id);
-    }
-  });
-  // Invalidate successors when alternative task is completed
-  tasks.forEach((task) => {
-    if (!task.alternatives?.length) return;
-    const alternativeCompleted = task.alternatives.some((alternativeId) => {
-      const completion = taskCompletions[alternativeId];
-      return completion?.complete === true && completion?.failed !== true;
-    });
-    if (alternativeCompleted) {
-      invalidateTaskRecursive(task.id, true);
     }
   });
   return { invalidTasks, invalidObjectives };
