@@ -94,7 +94,7 @@ type JsonItemsPayload = {
   playerLevels?: unknown;
   skills?: unknown;
 };
-type JsonTasksPayload = {
+export type JsonTasksPayload = {
   questItems?: unknown;
   tasks?: unknown;
   prestige?: unknown;

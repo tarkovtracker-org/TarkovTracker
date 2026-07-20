@@ -42,6 +42,36 @@ describe('Tarkov data modes', () => {
     await getTasks('pve');
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
+  it('skips malformed task metadata entries instead of throwing', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/tasks')) {
+        return jsonResponse({
+          data: {
+            tasks: {
+              valid: {
+                id: 'valid',
+                name: 'Valid',
+                objectives: [null, { id: 'objective-1', type: 'find', count: 2 }],
+                taskRequirements: [null, { task: 'required-task', status: ['complete'] }],
+              },
+              invalid: null,
+            },
+          },
+        });
+      }
+      return jsonResponse({ data: {} });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getTasks('pvp')).resolves.toEqual([
+      {
+        id: 'valid',
+        name: 'Valid',
+        objectives: [{ id: 'objective-1', type: 'find', count: 2 }],
+        taskRequirements: [{ task: { id: 'required-task' }, status: ['complete'] }],
+      },
+    ]);
+  });
   it('maps hideout requirement rows to item template IDs', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -57,6 +87,42 @@ describe('Tarkov data modes', () => {
                   itemRequirements: [
                     { id: 'requirement-row-1', item: 'item-template-1', count: 2 },
                   ],
+                },
+              ],
+            },
+          },
+        });
+      }
+      return jsonResponse({ data: { tasks: {} } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getHideoutStations('pvp')).resolves.toEqual([
+      {
+        id: 'stash',
+        levels: [
+          {
+            id: 'stash-1',
+            level: 1,
+            itemRequirements: [{ id: 'item-template-1', count: 2 }],
+          },
+        ],
+      },
+    ]);
+  });
+  it('skips malformed hideout levels and requirement entries', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/hideout')) {
+        return jsonResponse({
+          data: {
+            stash: {
+              id: 'stash',
+              levels: [
+                null,
+                {
+                  id: 'stash-1',
+                  level: 1,
+                  itemRequirements: [null, { item: 'item-template-1', count: 2 }],
                 },
               ],
             },

@@ -17,6 +17,7 @@ const runtimeConfig = {
   supabaseAnonKey: 'anon-key',
   supabaseServiceKey: 'service-key',
   supabaseUrl: 'https://test.supabase.co',
+  tarkovJsonBaseUrl: undefined as string | undefined,
 };
 const createAbortError = (): Error => {
   const error = new Error('aborted');
@@ -60,6 +61,7 @@ describe('Shared Profile API', () => {
     runtimeConfig.supabaseAnonKey = 'anon-key';
     runtimeConfig.supabaseServiceKey = 'service-key';
     runtimeConfig.supabaseUrl = 'https://test.supabase.co';
+    runtimeConfig.tarkovJsonBaseUrl = undefined;
     mockEvent = {
       node: {
         req: {} as H3Event['node']['req'],
@@ -308,6 +310,43 @@ describe('Shared Profile API', () => {
       '597a0f5686f774273b74f676': { complete: true, failed: true },
       '597a160786f77477531d39d2': { complete: true, failed: false },
     });
+  });
+  it('uses the configured Tarkov JSON base for failure metadata', async () => {
+    runtimeConfig.tarkovJsonBaseUrl = 'https://json-mirror.example';
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            game_edition: 4,
+            pve_data: { level: 1 },
+            pvp_data: {
+              level: 24,
+              taskCompletions: { target: { complete: false, failed: false } },
+            },
+            user_id: '11111111-1111-4111-8111-111111111111',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            profile_share_pvp_public: true,
+            profile_share_pve_public: false,
+            streamer_mode: false,
+          },
+        ],
+      })
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { tasks: {} } }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200,
+        })
+      );
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await handler(mockEvent as H3Event);
+    expect(mockFetch.mock.calls[2]?.[0]).toBe('https://json-mirror.example/regular/tasks');
   });
   it('removes non-progress fields from shared profile payload', async () => {
     mockFetch

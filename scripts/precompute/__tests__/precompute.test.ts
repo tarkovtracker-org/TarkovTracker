@@ -116,6 +116,21 @@ describe('runPrecompute', () => {
     expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
     expect(kv.put).toHaveBeenCalledTimes(1);
   });
+  it('refuses to publish malformed task entries', async () => {
+    applyOverlayMock
+      .mockResolvedValueOnce({ data: { tasks: [null, { id: 'task-good', objectives: [] }] } })
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] } });
+    const kv = createKvMock();
+    const result = await runPrecompute(kv, { lang: 'en' });
+    expect(result.failures).toEqual([
+      {
+        error: 'Sanity check failed: payload contains a malformed task; refusing to write to KV',
+        key: 'tasks-core-json-v2-en-regular',
+      },
+    ]);
+    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
+    expect(kv.put).toHaveBeenCalledTimes(1);
+  });
   it('refuses to publish overlay objective patches as objects', async () => {
     applyOverlayMock
       .mockResolvedValueOnce({

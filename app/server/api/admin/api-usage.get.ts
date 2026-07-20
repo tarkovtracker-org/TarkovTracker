@@ -60,7 +60,7 @@ export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
     reads: Number(row.reads) || 0,
     writes: Number(row.writes) || 0,
     throttled: Number(row.throttled) || 0,
-    userAgent: row.user_agent,
+    userAgent: typeof row.user_agent === 'string' ? row.user_agent : null,
   }));
   return { since: sinceDay, consumers };
 });

@@ -15,8 +15,8 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
-import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
-import { API_GAME_MODES, GAME_MODES, type GameMode } from '@/utils/constants';
+import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
+import { GAME_MODES, type GameMode } from '@/utils/constants';
 import {
   isRecord,
   sanitizeDisplayName,
@@ -39,7 +39,6 @@ const DEFAULT_SHARED_PROFILE_CACHE_TTL_MS = 5000;
 const SHARED_PROFILE_CACHE_PREFIX = 'shared-profile';
 const SHARED_PROFILE_RATE_LIMIT_PREFIX = 'shared-profile-rate';
 const TASK_FAILURE_METADATA_CACHE_TTL_MS = 60 * 60 * 1000;
-const TARKOV_JSON_BASE_URL = 'https://json.tarkov.dev';
 const isTestEnvironment = process.env.NODE_ENV === 'test';
 type JsonFailCondition = {
   type?: string | null;
@@ -49,9 +48,6 @@ type JsonFailCondition = {
 type JsonTaskFailureMetadata = {
   id?: string | null;
   failConditions?: JsonFailCondition[] | null;
-};
-type JsonTasksPayload = {
-  tasks?: Record<string, JsonTaskFailureMetadata> | null;
 };
 type PreferencesRow = {
   streamer_mode?: boolean | null;
@@ -296,19 +292,17 @@ const getTaskFailureSources = async (mode: GameMode): Promise<TaskFailureSources
   }
   const requestPromise = (async () => {
     try {
-      const response = await fetch(`${TARKOV_JSON_BASE_URL}/${API_GAME_MODES[mode]}/tasks`, {
-        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
-        signal: AbortSignal.timeout(30_000),
+      const payload = await fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', {
+        gameMode: mode === GAME_MODES.PVE ? 'pve' : 'regular',
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = (await response.json()) as { data?: JsonTasksPayload };
-      const tasksMap = payload?.data?.tasks;
-      if (!tasksMap || typeof tasksMap !== 'object') {
+      const tasksMap = payload.tasks;
+      if (!tasksMap || typeof tasksMap !== 'object' || Array.isArray(tasksMap)) {
         return null;
       }
-      const tasks = Object.values(tasksMap);
+      const tasks = Object.values(tasksMap).filter(
+        (task): task is JsonTaskFailureMetadata =>
+          task !== null && typeof task === 'object' && !Array.isArray(task)
+      );
       const sourcesByTarget = buildTaskFailureSourcesMap(tasks);
       taskFailureSourcesCache[mode] = {
         expiresAt: now + TASK_FAILURE_METADATA_CACHE_TTL_MS,
