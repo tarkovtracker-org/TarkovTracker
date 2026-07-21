@@ -53,3 +53,12 @@
 # Agent contract + source locale (drift / instruction integrity)
 /AGENTS.md                @DysektAI
 /app/locales/en.json      @DysektAI
+
+# Public-facing docs and community health files (voice / policy integrity)
+/README.md                @DysektAI
+/docs/                    @DysektAI
+/.github/CONTRIBUTING.md  @DysektAI
+/.github/ISSUE_TEMPLATE/  @DysektAI
+/SECURITY.md              @DysektAI
+/SUPPORT.md               @DysektAI
+/CODE_OF_CONDUCT.md       @DysektAI

@@ -72,6 +72,9 @@ The short version: this README gets you running; the `docs/` folder explains how
 | You want to…                                      | Read                                                                    |
 | ------------------------------------------------- | ----------------------------------------------------------------------- |
 | Get started                                       | This README                                                             |
+| Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                            |
+| Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                              |
+| Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                              |
 | Understand the systems (caching, data, overlay)   | [`docs/SYSTEMS.md`](docs/SYSTEMS.md)                                    |
 | Understand the full architecture & data flow      | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                          |
 | Use or extend the HTTP/API surface                | [`docs/API.md`](docs/API.md)                                            |

@@ -238,6 +238,19 @@ pnpm run setup
 2. Run `pnpm run dev`
 3. Visit <http://localhost:3000>
 
+> **`.env` vs `.env.local` — both work, they serve different setup paths.**
+>
+> - The automated `pnpm run setup` script writes `.env.local` (Nuxt's
+>   git-ignored, machine-local override file). Use this path if you are new to
+>   the project.
+> - Manual setup documented in [`README.md`](../README.md) and
+>   [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) copies `.env.example`
+>   to `.env`. Use this path if you prefer the explicit copy step.
+>
+> Nuxt loads both files; `.env.local` takes precedence over `.env`. Do not commit
+> either file — both are in `.gitignore`. The canonical env-var reference lives
+> in [`ARCHITECTURE.md`](./ARCHITECTURE.md) and [`runbook.md`](./runbook.md).
+
 ## Deployment Process
 
 ### Automatic Deployment

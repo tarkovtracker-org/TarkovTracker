@@ -16,6 +16,8 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - deprecated patterns that agents must avoid
 - behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
   pipeline, multi-layer caching, overlay corrections, precompute workflow)
+- community health policy: security reporting (`SECURITY.md`), support routing
+  (`SUPPORT.md`), or code of conduct (`CODE_OF_CONDUCT.md`)
 
 If this file conflicts with executable config (eslint, prettier, tsconfig, package.json), trust the executable config, then update this file before finishing.
 
@@ -239,6 +241,9 @@ Naming:
 - System specs (caching, data fetching, overlay, precompute): `docs/SYSTEMS.md`
 - Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
 - Contributing: `.github/CONTRIBUTING.md`
+- Security policy: `SECURITY.md`
+- Support routing: `SUPPORT.md`
+- Code of conduct: `CODE_OF_CONDUCT.md`
 - Runbook: `docs/runbook.md`
 - API docs: `docs/API.md`
 - Workflow automation: `docs/WORKFLOW_AUTOMATION.md`

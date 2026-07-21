@@ -19,7 +19,10 @@ Thank you for your interest in contributing to TarkovTracker! This document prov
 
 ## Code of Conduct
 
-Please be respectful and constructive in all interactions. We're building a tool for the Tarkov community together.
+Participation in this project is governed by the [`Code of Conduct`](../CODE_OF_CONDUCT.md).
+Please read it before contributing. In short: be respectful and constructive —
+we are building a tool for the Tarkov community together. Report conduct issues
+to <mailto:support@tarkovtracker.org> or via Discord DM to a maintainer.
 
 ## Getting Started
 
@@ -27,7 +30,11 @@ Please be respectful and constructive in all interactions. We're building a tool
 
 1. **Fork the repository** and clone your fork locally
 2. **Install dependencies**: `corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm install`
-3. **Set up environment**: Copy `.env.example` to `.env` and add your Supabase credentials.
+3. **Set up environment**: either run `pnpm run setup` (writes `.env.local` with
+   local defaults) or copy `.env.example` to `.env` manually, then add your
+   Supabase credentials. Both paths work; `.env.local` takes precedence over
+   `.env`. See [`docs/WORKFLOW_AUTOMATION.md`](../docs/WORKFLOW_AUTOMATION.md)
+   for the distinction.
    Full env-var reference: [`docs/runbook.md`](../docs/runbook.md) and [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 4. **Start dev server**: `pnpm run dev`
 5. **Read [`AGENTS.md`](../AGENTS.md)** for detailed development guidelines

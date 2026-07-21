@@ -8,6 +8,9 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 | I want to…                                                                        | Read                                                               |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | Understand the project and get it running                                         | [`/README.md`](../README.md)                                       |
+| Report a security vulnerability                                                   | [`/SECURITY.md`](../SECURITY.md)                                   |
+| Find where to ask for help or report something                                    | [`/SUPPORT.md`](../SUPPORT.md)                                     |
+| Read the code of conduct                                                          | [`/CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)                     |
 | Contribute (issues, branches, PRs, labels)                                        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)            |
 | Understand how a specific system works (caching, data fetch, overlay, precompute) | [`SYSTEMS.md`](./SYSTEMS.md)                                       |
 | Understand the deeper architecture, state model, and data flows                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                             |
@@ -23,6 +26,9 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 ### Human-facing
 
 - [`/README.md`](../README.md) — public overview, features, quick start.
+- [`/SECURITY.md`](../SECURITY.md) — vulnerability reporting policy and scope.
+- [`/SUPPORT.md`](../SUPPORT.md) — routing table for questions, bugs, features, and account support.
+- [`/CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) — Contributor Covenant 2.1 with enforcement contacts.
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow, issues, labels, project board.
 - [`SYSTEMS.md`](./SYSTEMS.md) — plain-language spec of the non-obvious systems (Tarkov.dev integration, data fetching, multi-layer caching, overlay, precompute) with diagrams and invariants. Covers **what systems exist, what they own, and how they interact**. Point at this when asking "why does the app do X?".
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — deeper technical structure: state model, sync, data flows, implementation decisions, tradeoffs, and the canonical environment-variable map. `SYSTEMS.md` is the entry point for system behavior; `ARCHITECTURE.md` is the deeper reference for how the app is built.
