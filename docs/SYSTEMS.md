@@ -212,7 +212,9 @@ data correction.
 
 ```mermaid
 flowchart TD
-    Req["Request to /api/tarkov/*"] --> Bypass{Bypass requested?}
+    Req["Request to /api/tarkov/*"] --> CacheAvail{Cache API available?}
+    CacheAvail -->|no| Dev["Fetch fresh, return DEV<br/>(local dev, no edge cache)"]
+    CacheAvail -->|yes| Bypass{Bypass requested?}
     Bypass -->|yes| FetchFresh["Fetch fresh, return BYPASS"]
     Bypass -->|no| Pre{precomputed option?}
     Pre -->|yes| KV["Read TARKOV_DATA KV"]
@@ -226,6 +228,7 @@ flowchart TD
     Stale -->|yes| ReturnStale["Return STALE + background refresh"]
     Hit -->|no| Miss["Fetch fresh, write edge cache"]
     Miss --> ReturnMiss["Return MISS"]
+    Dev --> End
     FetchFresh --> End
     ReturnPre --> End
     ReturnHit --> End
