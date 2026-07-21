@@ -29,10 +29,11 @@ to <mailto:support@tarkovtracker.org> or via Discord DM to a maintainer.
 **Prerequisites:** Node.js >= 24.12.0, pnpm 11.14.0 (via Corepack; matches `packageManager`), Git.
 
 1. **Fork the repository** and clone your fork locally
-2. **Install dependencies**: `corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm install`
+2. **Install dependencies**: `corepack enable && pnpm install` (Corepack resolves the pnpm version from `packageManager` in `package.json`)
 3. **Set up environment**: run `pnpm run setup` (creates `.env` from
-   `.env.example`) or copy `.env.example` to `.env` manually, then add your
-   Supabase credentials. Nuxt auto-loads `.env` on `pnpm run dev`.
+   `.env.example` if it does not already exist) or copy `.env.example` to `.env`
+   manually (only if `.env` does not exist), then add your Supabase credentials.
+   Nuxt auto-loads `.env` on `pnpm run dev`.
    Full env-var reference: [`docs/runbook.md`](../docs/runbook.md) and [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 4. **Start dev server**: `pnpm run dev`
 5. **Read [`AGENTS.md`](../AGENTS.md)** for detailed development guidelines

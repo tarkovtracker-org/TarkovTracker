@@ -31,8 +31,14 @@ check_prerequisites() {
     required_pnpm="$(
         node -e "
             const packageJson = require('./package.json');
-            const match = packageJson.packageManager.match(/^pnpm@([^+]+)/);
+            const pm = packageJson.packageManager;
+            if (typeof pm !== 'string') {
+                console.error('ERROR: packageManager field is missing or not a string in package.json');
+                process.exit(1);
+            }
+            const match = pm.match(/^pnpm@([^+]+)/);
             if (!match) {
+                console.error('ERROR: packageManager field does not match pnpm@<version>');
                 process.exit(1);
             }
             process.stdout.write(match[1]);
@@ -43,6 +49,7 @@ check_prerequisites() {
 
     if [ "$actual_pnpm" != "$required_pnpm" ]; then
         echo "ERROR: Expected pnpm $required_pnpm, but found $actual_pnpm"
+        echo "  Run: corepack prepare pnpm@$required_pnpm --activate"
         exit 1
     fi
 
@@ -64,6 +71,14 @@ setup_environment() {
     local env_file=".env"
     local legacy_env_file=".env.local"
     local env_example=".env.example"
+
+    # Reject paths that exist but are not regular files (e.g. directories).
+    for f in "$env_file" "$legacy_env_file" "$env_example"; do
+        if [ -e "$f" ] && [ ! -f "$f" ]; then
+            echo "ERROR: $f exists but is not a regular file"
+            exit 1
+        fi
+    done
 
     # Never overwrite a contributor's existing configuration.
     if [ -f "$env_file" ]; then
