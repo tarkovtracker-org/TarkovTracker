@@ -2,11 +2,11 @@
 
 > TarkovTracker is a Nuxt 4 single-page app for tracking Escape from Tarkov progression (tasks, hideout, storyline, needed items), with optional account sync, shared profiles, and team collaboration.
 
-This site is primarily a client app plus JSON APIs. Public game data is available under `/api/tarkov/*` and is proxied from tarkov.dev with overlay fixes and edge caching. API endpoints are intended for direct programmatic access, not crawling; `/api` is disallowed in `robots.txt`.
+This site is primarily a client app plus JSON APIs. Public game data is available under `/api/tarkov/*` and is proxied from tarkov.dev with overlay fixes and edge caching. API endpoints are intended for direct programmatic access, not crawling.
 
-For API requests, use `lang` and `gameMode` where supported. Common `gameMode` values are `regular` (PvP) and `pve`. Supported `lang` values match the UI locales below.
+For API requests, use `lang` and `gameMode` where supported. Common `gameMode` values are `regular` (PvP) and `pve`. Supported `lang` values: `cs`, `de`, `en`, `es`, `fr`, `hu`, `it`, `ja`, `ko`, `pl`, `pt`, `ro`, `ru`, `sk`, `tr`, `zh`. Unsupported values fall back to `en`.
 
-UI locales: `en`, `de`, `es`, `fr`, `ru`, `uk`, `zh`, `ko`.
+UI locales (separate from the API `lang` set): `en`, `de`, `es`, `fr`, `ru`, `uk`, `zh`, `ko`.
 
 Authentication-required areas include `/account`, `/profile`, `/team`, `/settings`, and authenticated team APIs.
 
@@ -39,7 +39,7 @@ Crawl and discovery directives live at `/robots.txt` and `/sitemap.xml`; see tho
 - [Prestige](https://tarkovtracker.org/api/tarkov/prestige): Prestige requirement data. Accepts `lang`.
 - [Cache Metadata](https://tarkovtracker.org/api/tarkov/cache-meta): Cache purge timestamp metadata.
 - [Contributors](https://tarkovtracker.org/api/contributors): Contributor listing.
-- [Changelog API](https://tarkovtracker.org/api/changelog): Changelog data feed. Accepts `limit` (entries) and `releases` (1-10).
+- [Changelog API](https://tarkovtracker.org/api/changelog): Changelog data feed. Accepts `limit` (1-50, default 10) and `releases` (1-10, default 3).
 
 ## Markdown Docs
 

@@ -1,9 +1,11 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { SUPPORTED_LOCALES } from '@/utils/locales';
 const LLMS_TXT_PATH = join(process.cwd(), 'public', 'llms.txt');
 const TARKOV_API_DIR = join(process.cwd(), 'app', 'server', 'api', 'tarkov');
+const TOP_LEVEL_API_DIR = join(process.cwd(), 'app', 'server', 'api');
 const llmsTxt = readFileSync(LLMS_TXT_PATH, 'utf8');
 const HYPERLINK_RE = /^- \[([^\]]+)\]\(([^)]+)\)(?::\s*(.*))?$/;
 const H1_RE = /^# (.+)$/;
@@ -26,12 +28,16 @@ const splitSections = (src: string): Section[] => {
 };
 const nonEmptyLines = (src: string): string[] => src.split('\n').filter((l) => l.trim().length > 0);
 const listItems = (section: Section): string[] =>
-  section.lines.filter((l) => HYPERLINK_RE.test(l.trim()));
+  section.lines.filter((l) => l.trim().startsWith('- '));
 const parseLink = (line: string): { name: string; url: string; notes?: string } | null => {
   const match = line.trim().match(HYPERLINK_RE);
   if (!match) return null;
   return { name: match[1], url: match[2], notes: match[3] };
 };
+const getHandlers = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isFile() && d.name.endsWith('.get.ts'))
+    .map((d) => d.name.replace(/\.get\.ts$/, ''));
 describe('public/llms.txt', () => {
   it('starts with an H1 project name', () => {
     const lines = nonEmptyLines(llmsTxt);
@@ -66,16 +72,23 @@ describe('public/llms.txt', () => {
     for (const section of sections) {
       for (const item of listItems(section)) {
         const parsed = parseLink(item);
-        if (!parsed) continue;
-        expect(parsed.url, `non-https url: ${parsed.url}`).toMatch(/^https:\/\//);
+        expect(parsed, `unparseable list item: ${item}`).not.toBeNull();
+        expect(parsed?.url, `non-https url: ${parsed?.url}`).toMatch(/^https:\/\//);
       }
     }
   });
   it('declares every supported UI locale', () => {
-    const localeLine = nonEmptyLines(llmsTxt).find((l) => l.startsWith('UI locales:'));
+    const localeLine = nonEmptyLines(llmsTxt).find((l) => l.startsWith('UI locales'));
     expect(localeLine, 'missing UI locales line').toBeDefined();
     for (const locale of SUPPORTED_LOCALES) {
       expect(localeLine, `locale "${locale}" missing from llms.txt`).toContain(`\`${locale}\``);
+    }
+  });
+  it('declares every API-supported language', () => {
+    const langLine = nonEmptyLines(llmsTxt).find((l) => l.includes('Supported `lang` values:'));
+    expect(langLine, 'missing API lang line').toBeDefined();
+    for (const lang of API_SUPPORTED_LANGUAGES) {
+      expect(langLine, `API lang "${lang}" missing from llms.txt`).toContain(`\`${lang}\``);
     }
   });
   it('lists /profile among auth-required areas', () => {
@@ -94,23 +107,26 @@ describe('public/llms.txt', () => {
     expect(optional, 'missing Optional section').toBeDefined();
     for (const item of listItems(optional!)) {
       const parsed = parseLink(item);
+      expect(parsed, `unparseable list item: ${item}`).not.toBeNull();
       expect(parsed?.url, `infrastructure url in Optional: ${parsed?.url}`).not.toMatch(
         /robots\.txt$|sitemap\.xml$/
       );
     }
   });
-  it('advertises every tarkov API handler that exists on disk', () => {
-    const handlers = readdirSync(TARKOV_API_DIR)
-      .filter((f) => f.endsWith('.get.ts'))
-      .map((f) => f.replace(/\.get\.ts$/, ''));
+  it('advertises every public API handler that exists on disk', () => {
+    const tarkovHandlers = getHandlers(TARKOV_API_DIR);
+    const topLevelHandlers = getHandlers(TOP_LEVEL_API_DIR);
     const sections = splitSections(llmsTxt);
     const apiSection = sections.find((s) => s.heading === 'Public JSON APIs');
     expect(apiSection, 'missing Public JSON APIs section').toBeDefined();
     const advertised = new Set(
       listItems(apiSection!).map((l) => parseLink(l)?.url.split('/').at(-1))
     );
-    for (const handler of handlers) {
-      expect(advertised.has(handler), `handler "${handler}" not advertised in llms.txt`).toBe(true);
+    for (const handler of tarkovHandlers) {
+      expect(advertised.has(handler), `tarkov handler "${handler}" not advertised`).toBe(true);
+    }
+    for (const handler of topLevelHandlers) {
+      expect(advertised.has(handler), `top-level handler "${handler}" not advertised`).toBe(true);
     }
   });
 });
