@@ -238,18 +238,26 @@ pnpm run setup
 2. Run `pnpm run dev`
 3. Visit <http://localhost:3000>
 
-> **`.env` vs `.env.local` — both work, they serve different setup paths.**
+> **`.env` vs `.env.local` — important difference.**
 >
-> - The automated `pnpm run setup` script writes `.env.local` (Nuxt's
->   git-ignored, machine-local override file). Use this path if you are new to
->   the project.
+> - **Nuxt auto-loads `.env` only.** `pnpm run dev` runs `nuxt dev` without a
+>   `--dotenv` flag, so Nuxt's default dotenv loader (c12 `setupDotenv`) reads
+>   `.env` and ignores `.env.local`.
+> - The automated `pnpm run setup` script writes `.env.local`. For Nuxt to load
+>   it, either rename it to `.env` or run `nuxt dev --dotenv .env.local`.
 > - Manual setup documented in [`README.md`](../README.md) and
 >   [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) copies `.env.example`
->   to `.env`. Use this path if you prefer the explicit copy step.
+>   to `.env`, which Nuxt loads automatically — this is the recommended path.
 >
-> Nuxt loads both files; `.env.local` takes precedence over `.env`. Do not commit
-> either file — both are in `.gitignore`. The canonical env-var reference lives
-> in [`ARCHITECTURE.md`](./ARCHITECTURE.md) and [`runbook.md`](./runbook.md).
+> Do not commit either file — both are in `.gitignore`. The canonical env-var
+> reference lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md) and
+> [`runbook.md`](./runbook.md).
+>
+> **Known issue:** the setup script writes `.env.local` but `pnpm run dev` does
+> not pass `--dotenv .env.local`, so the generated file is not loaded
+> automatically. This is a pre-existing script bug tracked separately from this
+> documentation; until it is fixed, use the manual `.env` path or rename the
+> generated `.env.local` to `.env`.
 
 ## Deployment Process
 

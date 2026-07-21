@@ -18,7 +18,7 @@ Report vulnerabilities through either of these private channels:
 2. **Email** — <mailto:security@tarkovtracker.org>
 
 > If GitHub private vulnerability reporting is not enabled when you try it, fall
-> back to email and let us know the in-app route was unavailable so we can re-enable it.
+> back to email and let us know the GitHub reporting route was unavailable so we can re-enable it.
 
 Please include as much of the following as you can:
 
