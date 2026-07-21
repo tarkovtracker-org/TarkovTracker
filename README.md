@@ -8,6 +8,10 @@ A friendly, comprehensive progress tracker for **Escape from Tarkov**. Track tas
 progress, collaborate with your team in real time, and switch between PvP and PvE modes without
 losing your place. Built with Nuxt 4, Vue 3, Supabase, and Tailwind CSS.
 
+**Try it live at <https://tarkovtracker.org>.**
+
+![TarkovTracker dashboard showing task progress, hideout modules, and team overview](.github/assets/dashboard.png)
+
 > New here? Issues labeled [`good-first-issue`](https://github.com/tarkovtracker-org/TarkovTracker/labels/good-first-issue)
 > are the easiest way to get familiar with the codebase and the contribution process.
 
