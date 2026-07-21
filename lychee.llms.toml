@@ -1,0 +1,16 @@
+# Dedicated lychee config for public/llms.txt link verification.
+# The shared lychee.toml excludes tarkovtracker.org (production origin is
+# checked by deploy, not docs CI), which would skip every internal link in
+# llms.txt. This config drops that exclude so the llms.txt internal links are
+# actually verified, while keeping the same runtime settings and dev-host
+# exclusions as lychee.toml.
+#############################  Runtime  #############################
+no_progress = true
+max_concurrency = 4
+max_retries = 3
+retry_wait_time = 2
+accept = ["200", "204", "206", "301", "302", "308"]
+#############################  Exclusions  ##########################
+# Local/dev hosts only. Production origin (tarkovtracker.org) is intentionally
+# NOT excluded here so llms.txt internal links are checked.
+exclude = ['localhost', '127\.0\.0\.1', 'gnu\.org']
