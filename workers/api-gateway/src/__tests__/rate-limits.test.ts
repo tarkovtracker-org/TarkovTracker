@@ -100,8 +100,13 @@ const makeFetchMock = ({
     }
     return new Response('Not Found', { status: 404 });
   });
-const buildRequest = (path: string, init?: RequestInit) =>
-  new Request(`https://api.tarkovtracker.org${path}`, init);
+const buildRequest = (path: string, init?: RequestInit) => {
+  const headers = new Headers(init?.headers);
+  if (!headers.has('User-Agent')) {
+    headers.set('User-Agent', 'TestClient/1.0 (+https://example.com)');
+  }
+  return new Request(`https://api.tarkovtracker.org${path}`, { ...init, headers });
+};
 const flushAsync = () => new Promise((resolve) => setTimeout(resolve, 0));
 describe('ApiGatewayRateLimiter durable object', () => {
   afterEach(() => {

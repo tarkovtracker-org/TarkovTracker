@@ -14,7 +14,7 @@ import {
 } from '@/server/utils/tarkov-json';
 type TestJsonFetcher = <T = unknown>(
   url: string,
-  request: { headers: { Accept: string }; retry: number; timeout: number }
+  request: { headers: Record<string, string>; retry: number; timeout: number }
 ) => Promise<T>;
 const createFetcher = (responses: Record<string, unknown>) =>
   vi.fn(async (url: string) => {

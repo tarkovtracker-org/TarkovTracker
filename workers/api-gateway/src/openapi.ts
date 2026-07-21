@@ -2,7 +2,7 @@ export const OPENAPI_SPEC = {
   openapi: '3.1.0',
   info: {
     title: 'TarkovTracker API Gateway',
-    version: '2.2.0',
+    version: '2.3.0',
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
@@ -18,6 +18,9 @@ export const OPENAPI_SPEC = {
       'Token cap: each account may have at most 3 active API tokens. Revoke an existing ' +
       'token before creating a new one if the cap is reached. Token creation is only ' +
       'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
+      'User-Agent: a 5-200 character User-Agent header identifying the client application ' +
+      'is required on all API endpoints. Requests outside that range are rejected with 400. ' +
+      'Use a descriptive string like "AppName/1.0 (+https://your-app.com)".\n\n' +
       'Docs: https://api.tarkovtracker.org/docs (or / on the api subdomain).',
     contact: {
       name: 'TarkovTracker',
@@ -54,6 +57,19 @@ export const OPENAPI_SPEC = {
         description: 'Authorization: Bearer <token>',
       },
     },
+    parameters: {
+      UserAgentHeader: {
+        name: 'User-Agent',
+        in: 'header',
+        required: true,
+        description:
+          'A 5-200 character User-Agent identifying the client application, ' +
+          'e.g. "RatScanner/2.1 (+https://ratscanner.io)". ' +
+          'Requests outside that range are rejected with 400.',
+        schema: { type: 'string', minLength: 5, maxLength: 200 },
+        example: 'RatScanner/2.1 (+https://ratscanner.io)',
+      },
+    },
     responses: {
       Unauthorized: {
         description: 'Unauthorized',
@@ -87,6 +103,14 @@ export const OPENAPI_SPEC = {
             schema: { $ref: '#/components/schemas/ErrorResponse' },
             examples: {
               invalidState: { value: { success: false, error: 'Invalid state' } },
+              invalidUserAgent: {
+                summary: 'Missing or invalid User-Agent header',
+                value: {
+                  success: false,
+                  error:
+                    'User-Agent must be 5-200 characters (e.g. "AppName/1.0 (+https://your-app.com)")',
+                },
+              },
             },
           },
         },

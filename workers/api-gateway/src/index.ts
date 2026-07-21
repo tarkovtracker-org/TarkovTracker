@@ -20,7 +20,11 @@ import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
 import { logger } from './utils/logger';
-import { normalizeInboundUserAgent } from './utils/userAgent';
+import {
+  INBOUND_USER_AGENT_MAX_LENGTH,
+  INBOUND_USER_AGENT_MIN_LENGTH,
+  normalizeInboundUserAgent,
+} from './utils/userAgent';
 import type {
   ApiToken,
   Env,
@@ -660,7 +664,8 @@ async function authenticateAndRateLimit(
   action: Action,
   envOrigin?: string,
   requestOrigin?: string,
-  ctx?: ExecutionContext
+  ctx?: ExecutionContext,
+  userAgent?: string | null
 ): Promise<AuthSuccess | Response> {
   const validation = await validateToken(env, rawToken, permission);
   if (!validation.valid) {
@@ -679,7 +684,7 @@ async function authenticateAndRateLimit(
       tier,
       kind,
       throttled,
-      userAgent: normalizeInboundUserAgent(request.headers.get('User-Agent')),
+      userAgent: userAgent ?? null,
     });
     if (ctx) {
       ctx.waitUntil(promise);
@@ -949,6 +954,20 @@ export default {
     if (!apiPath) {
       return new Response('Not Found', { status: 404, headers });
     }
+    const rawUserAgent = request.headers.get('User-Agent');
+    const inboundUserAgent = normalizeInboundUserAgent(rawUserAgent);
+    if (
+      !inboundUserAgent ||
+      inboundUserAgent.length < INBOUND_USER_AGENT_MIN_LENGTH ||
+      (rawUserAgent?.trim().length ?? 0) > INBOUND_USER_AGENT_MAX_LENGTH
+    ) {
+      return errorResponse(
+        'User-Agent must be 5-200 characters (e.g. "AppName/1.0 (+https://your-app.com)")',
+        400,
+        origin,
+        reqOrigin
+      );
+    }
     // Extract and validate token
     const authHeader = request.headers.get('Authorization');
     const rawToken = extractBearerToken(authHeader);
@@ -966,7 +985,8 @@ export default {
           'token-info',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -983,7 +1003,8 @@ export default {
           'progress-read',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1001,7 +1022,8 @@ export default {
           'progress-read',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1020,7 +1042,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1051,7 +1074,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1111,7 +1135,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1151,7 +1176,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;

@@ -2,6 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { $fetch } from 'ofetch';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
@@ -55,9 +56,7 @@ type TarkovJsonEnvelope<T = unknown> = {
   translations?: string[];
 };
 type TarkovJsonRequest = {
-  headers: {
-    Accept: string;
-  };
+  headers: Record<string, string>;
   timeout: number;
   retry: number;
 };
@@ -235,7 +234,7 @@ async function fetchEnvelopePayload(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fetcher<unknown>(url, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
         timeout: timeoutMs,
         retry: 0,
       });
