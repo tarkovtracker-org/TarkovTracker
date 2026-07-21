@@ -14,8 +14,27 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - localization workflow, Crowdin behavior, or locale file ownership
 - analytics tooling, MCP access, or external data integrations
 - deprecated patterns that agents must avoid
+- behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
+  pipeline, multi-layer caching, overlay corrections, precompute workflow)
 
 If this file conflicts with executable config (eslint, prettier, tsconfig, package.json), trust the executable config, then update this file before finishing.
+
+### System spec sync (`docs/SYSTEMS.md`)
+
+`docs/SYSTEMS.md` is the plain-language spec for the non-obvious systems. It is written so a human
+can read it and an agent can verify any claim against the code. Each system section lists
+**invariants** the code must hold.
+
+- When you change a system documented there, update the matching section in the same PR. Do not let
+  the spec and the code drift.
+- If a claim in `SYSTEMS.md` is wrong, fix the doc. If an invariant is violated by the code, fix the
+  code. The code is the source of truth; the doc is the explanation of it.
+- Do not duplicate system behavior in code comments. Put the explanation in `SYSTEMS.md` and keep
+  code comments reserved for genuinely non-obvious local decisions, per the "No comments" rule
+  below. This is the balance between "no comments in files" (drift/stale-comment risk) and
+  "document how it works" (context for humans and agents).
+- When adding a new non-obvious system, add a section to `SYSTEMS.md` with a summary, a diagram, a
+  step-by-step flow, the implementing files, and the invariants.
 
 ## Source-of-Truth Priority
 
@@ -217,6 +236,7 @@ Naming:
 - Generated codebase knowledge base (start at the index): `docs/agent-context/summary/index.md`
 - Style, testing, and validation details: `docs/agent-context/style-and-validation.md`
 - Architecture: `docs/ARCHITECTURE.md`
+- System specs (caching, data fetching, overlay, precompute): `docs/SYSTEMS.md`
 - Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
 - Contributing: `.github/CONTRIBUTING.md`
 - Runbook: `docs/runbook.md`

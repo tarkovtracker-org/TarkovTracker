@@ -2,151 +2,102 @@
 
 [![Crowdin](https://badges.crowdin.net/tarkovtrackerorg/localized.svg)](https://crowdin.com/project/tarkovtrackerorg)
 [![codecov](https://codecov.io/gh/tarkovtracker-org/TarkovTracker/graph/badge.svg)](https://codecov.io/gh/tarkovtracker-org/TarkovTracker)
+[![Greptile: The War on Bugs](https://www.greptile.com/badge.svg)](https://www.greptile.com/?utm_source=oss_badge&utm_medium=readme&utm_campaign=greptile_for_open_source)
 
-A comprehensive Escape from Tarkov progress tracker built with Nuxt 4, featuring team collaboration, dual game mode support (PvP/PvE), and real-time synchronization via Supabase.
+A friendly, comprehensive progress tracker for **Escape from Tarkov**. Track tasks and hideout
+progress, collaborate with your team in real time, and switch between PvP and PvE modes without
+losing your place. Built with Nuxt 4, Vue 3, Supabase, and Tailwind CSS.
+
+> New here? Issues labeled [`good-first-issue`](https://github.com/tarkovtracker-org/TarkovTracker/labels/good-first-issue)
+> are the easiest way to get familiar with the codebase and the contribution process.
 
 ## Features
 
-- **Dual Game Mode Support**: Track progress separately for PvP and PvE modes
-- **Team Collaboration**: Share progress with teammates in real-time
-- **Task Tracking**: Monitor quest completions and objectives
-- **Hideout Progress**: Track module upgrades and parts
-- **Player Level Progress**: Monitor leveling across different factions
-- **Real-time Sync**: Automatic synchronization via Supabase
-- **Multi-language Support**: Available in English, German, Spanish, French, Russian, Ukrainian, and Chinese. API data can be fetched in additional tarkov.dev-supported languages. Community translations are available through [translate.tarkovtracker.org](https://translate.tarkovtracker.org).
+- **Dual game modes** — track PvP and PvE progress separately.
+- **Team collaboration** — share progress with teammates in real time via Supabase.
+- **Task & objective tracking** — see what is available, what is locked, and what is next.
+- **Hideout progress** — track module upgrades and the parts you still need.
+- **Player level & faction progress** — monitor leveling across factions.
+- **Interactive maps** — explore maps with spawn points and objectives.
+- **Streamer tools** — overlays for content creators.
+- **Multi-language** — English, German, Spanish, French, Russian, Ukrainian, and Chinese, with
+  community translations at [translate.tarkovtracker.org](https://translate.tarkovtracker.org).
+  API data can be fetched in any tarkov.dev-supported language.
 
-## Tech Stack
-
-- **Framework**: Nuxt 4 (SPA mode)
-- **UI**: Nuxt UI component library
-- **Styling**: Tailwind CSS v4
-- **State Management**: Pinia with three-store architecture
-- **Backend**: Supabase (authentication, database, real-time)
-- **API**: Nuxt server-side proxy to json.tarkov.dev static data
-- **Deployment**: Cloudflare Pages
-
-## Setup
-
-Install dependencies (Node >=24.12.0, enables pnpm via Corepack):
+## Quick start
 
 ```bash
-corepack enable
+corepack enable        # enables pnpm via Corepack (Node >=24.12.0)
 pnpm install
+pnpm run dev           # http://localhost:3000
 ```
 
-## Environment Variables
+Copy `.env.example` to `.env` and fill in your Supabase values. Without Supabase configured, the
+app runs in offline mode with localStorage only — auth, sync, realtime, and team features are
+unavailable.
 
-Copy `.env.example` to `.env` and fill in your values:
+> Only `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_ANON_KEY` are required for login/sync.
+> Everything else is optional and documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-```env
-# Required for login/sync features
-NUXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NUXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anonymous_key
+## Common commands
 
-# Optional: App configuration
-# NUXT_PUBLIC_APP_URL=http://localhost:3000
-# NUXT_TARKOV_JSON_BASE_URL=https://json.tarkov.dev
-# NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=false
-# NUXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
-# NUXT_PUBLIC_CLARITY_PROJECT_ID=xxxxxxxxxx
-```
+| Task          | Command               |
+| ------------- | --------------------- |
+| Dev server    | `pnpm run dev`        |
+| Build         | `pnpm run build`      |
+| Preview build | `pnpm run preview`    |
+| Lint          | `pnpm run lint`       |
+| Typecheck     | `pnpm run typecheck`  |
+| Tests         | `pnpm run test`       |
+| Test watch    | `pnpm run test:watch` |
 
-`NUXT_PUBLIC_APP_URL` only sets the public app/canonical URL. `NUXT_PUBLIC_GA_MEASUREMENT_ID`
-and `NUXT_PUBLIC_CLARITY_PROJECT_ID` only enable the Google Analytics and Microsoft Clarity
-integration codepaths; they do not start tracking by themselves. Tracking stays disabled until the
-user explicitly opts in through the analytics consent banner or footer "Analytics Preferences"
-control. That opt-in state is managed in `app/composables/useAnalyticsConsent.ts`, and
-`app/plugins/04.analytics-consent-mode.client.ts` keeps analytics consent mode denied until the
-user accepts.
+Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` before pushing. The full command
+list (including i18n, Supabase types, OpenAPI validation, and the API gateway tests) is in
+[`AGENTS.md`](AGENTS.md) and [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md).
 
-`NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK` is disabled by default and should stay off in
-production. It exists only for controlled local/self-hosted or staggered rollout cases where the
-`token-create` Edge Function is temporarily unavailable and you intentionally accept bypassing
-function-level rate limiting for token creation.
+## Contributing
 
-## Cloudflare Workers
+Each pull request must address **one change only** — a single fix, update, doc improvement, or
+feature. PRs that bundle unrelated changes may be asked to split or be closed.
 
-The project uses one Cloudflare Worker for the public API surface:
-
-- `workers/api-gateway` — API request gateway
-  - `API_GATEWAY_LIMITER` (Durable Object)
-
-## Server API Runtime Notes
-
-- `app/server/api/team/members.ts` uses in-memory Maps for response caching and rate limiting.
-- `app/server/api/profile/[userId]/[mode].get.ts` uses in-memory Maps `sharedProfileRateLimiter` and `sharedProfileCache`.
-- Team and token mutations are rate-limited inside Supabase Edge Functions on a per-user basis.
-- In-memory Maps are local to each running instance and are not shared across serverless/horizontal deployments.
-- For production-wide consistency across both endpoints, use a distributed backend (for example Redis or Cloudflare KV)
-  for rate limiting and caching.
-
-## Development
-
-Start the development server:
-
-```bash
-pnpm run dev
-```
-
-The application will be available at `http://localhost:3000`.
-
-## Code Quality
-
-Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm test` before pushing. See
-[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) and
-[`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md) for the full command list, pre-commit
-hooks, and CI details.
-
-## Tarkov.dev Profile Cleanup
-
-The app now persists only the linked `tarkovUid` for tarkov.dev profiles. Legacy manual backups
-created before this cleanup may still contain imported profile snapshots. New imports ignore those
-legacy blobs, but regenerate backups after upgrading if you want future exports to be fully scrubbed.
-
-## Production
-
-Build for production:
-
-```bash
-pnpm run build
-```
-
-Preview production build locally:
-
-```bash
-pnpm run preview
-```
-
-## Project Structure
-
-- `app/` — Nuxt application (features, stores, composables, server routes, shell, locales)
-- `workers/` — Cloudflare Workers (public API gateway)
-- `supabase/` — database migrations and edge functions
-- `docs/` — project documentation
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`AGENTS.md`](AGENTS.md) for the full map.
+- **[How to contribute](.github/CONTRIBUTING.md)** — issues, branches, PR process, and the PR
+  template.
+- **[Label system](.github/LABELS.md)** — issue types, scope, priority, ownership, and status.
+- **[Project board](.github/PROJECT_BOARD.md)** — how issues move from backlog to done.
 
 ## Documentation
 
-For detailed development guidelines and architecture references, see the [`docs/`](docs/) directory (start at [`docs/README.md`](docs/README.md)).
+The short version: this README gets you running; the `docs/` folder explains how things work.
 
-This repository includes both **contribution workflow guidance** and **technical documentation**.
+| You want to…                                      | Read                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| Get started                                       | This README                                                             |
+| Understand the systems (caching, data, overlay)   | [`docs/SYSTEMS.md`](docs/SYSTEMS.md)                                    |
+| Understand the full architecture & data flow      | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                          |
+| Use or extend the HTTP/API surface                | [`docs/API.md`](docs/API.md)                                            |
+| Understand rate limits / abuse controls           | [`docs/RATE_LIMITING.md`](docs/RATE_LIMITING.md)                        |
+| Deploy, configure env vars, or handle an incident | [`docs/runbook.md`](docs/runbook.md)                                    |
+| Understand CI/CD, hooks, and releases             | [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md)            |
+| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)                    |
+| Work as (or configure) an AI agent                | [`AGENTS.md`](AGENTS.md) + [`docs/agent-context/`](docs/agent-context/) |
 
-[**How to Contribute (Issues, Branches, PR Process):**](.github/CONTRIBUTING.md) Open or pick an issue, get assigned, create a focused branch, Use the PR template, and link the issue.
+Start at [`docs/README.md`](docs/README.md) if you are not sure which doc you need.
 
-> [!IMPORTANT]
-> Each pull request must address **one change only** — a single fix, update, documentation improvement, or new feature.  
-> Pull requests that bundle unrelated changes may be asked to split or be closed.
+## Project structure
 
-[**Label System:**](.github/LABELS.md) Issue Types define the kind of work being done, while labels communicate scope, priority, ownership, and status throughout the lifecycle of the issue.
+```text
+app/         Nuxt 4 source (features, stores, server routes, shell, locales)
+supabase/    Database migrations and edge functions
+workers/     Cloudflare Workers (public API gateway)
+scripts/     Precompute and other tooling
+docs/        Project documentation
+public/      Static assets
+```
 
-[**GitHub Project Board:**](.github/PROJECT_BOARD.md) Issues progress through the board from backlog to completion, with transitions driven by issue and pull request activity.
-
-### Where to start (new contributors)
-
-> [!NOTE]
-> If you’re new to the project, look for issues labeled **`good-first-issue`**. These are intentionally scoped to be approachable and are the best way to get familiar with the codebase, contribution process, and review expectations.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full module map and
+[`docs/SYSTEMS.md`](docs/SYSTEMS.md) for how the non-obvious systems (Tarkov.dev integration,
+multi-layer caching, overlay corrections, precompute) actually work.
 
 ## License
 
-This project remains licensed under the GNU General Public License v3.0. See [LICENSE.md](LICENSE.md) for the full license text.
+GNU General Public License v3.0 — see [`LICENSE.md`](LICENSE.md).

@@ -5,17 +5,18 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 ## Which doc do I need?
 
-| I want to…                                        | Read                                                               |
-| ------------------------------------------------- | ------------------------------------------------------------------ |
-| Understand the project and get it running         | [`/README.md`](../README.md)                                       |
-| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)            |
-| Understand the architecture and data flow         | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                             |
-| Use or extend the HTTP/API surface                | [`API.md`](./API.md)                                               |
-| Understand rate limits / abuse controls by layer  | [`RATE_LIMITING.md`](./RATE_LIMITING.md)                           |
-| Deploy, configure env vars, or handle an incident | [`runbook.md`](./runbook.md)                                       |
-| Understand CI/CD, hooks, and releases             | [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md)               |
-| Follow the visual/design system                   | [`/DESIGN.md`](../DESIGN.md)                                       |
-| Work as (or configure) an AI agent                | [`AGENTS.md`](../AGENTS.md) + [`agent-context/`](./agent-context/) |
+| I want to…                                                                        | Read                                                               |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Understand the project and get it running                                         | [`/README.md`](../README.md)                                       |
+| Contribute (issues, branches, PRs, labels)                                        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)            |
+| Understand how a specific system works (caching, data fetch, overlay, precompute) | [`SYSTEMS.md`](./SYSTEMS.md)                                       |
+| Understand the deeper architecture, state model, and data flows                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                             |
+| Use or extend the HTTP/API surface                                                | [`API.md`](./API.md)                                               |
+| Understand rate limits / abuse controls by layer                                  | [`RATE_LIMITING.md`](./RATE_LIMITING.md)                           |
+| Deploy, configure env vars, or handle an incident                                 | [`runbook.md`](./runbook.md)                                       |
+| Understand CI/CD, hooks, and releases                                             | [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md)               |
+| Follow the visual/design system                                                   | [`/DESIGN.md`](../DESIGN.md)                                       |
+| Work as (or configure) an AI agent                                                | [`AGENTS.md`](../AGENTS.md) + [`agent-context/`](./agent-context/) |
 
 ## Document map
 
@@ -23,7 +24,8 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 - [`/README.md`](../README.md) — public overview, features, quick start.
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow, issues, labels, project board.
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system architecture, state model, sync, caching, and the canonical environment-variable map.
+- [`SYSTEMS.md`](./SYSTEMS.md) — plain-language spec of the non-obvious systems (Tarkov.dev integration, data fetching, multi-layer caching, overlay, precompute) with diagrams and invariants. Covers **what systems exist, what they own, and how they interact**. Point at this when asking "why does the app do X?".
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — deeper technical structure: state model, sync, data flows, implementation decisions, tradeoffs, and the canonical environment-variable map. `SYSTEMS.md` is the entry point for system behavior; `ARCHITECTURE.md` is the deeper reference for how the app is built.
 - [`API.md`](./API.md) — endpoint reference, caching, supported languages, game modes.
 - [`RATE_LIMITING.md`](./RATE_LIMITING.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
@@ -38,7 +40,8 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 > To avoid drift, each fact has a single owner: code style and commit scopes live in `AGENTS.md`;
 > the environment-variable map lives in `ARCHITECTURE.md` and `runbook.md`; API details live in
-> `API.md`; rate-limit ownership lives in `RATE_LIMITING.md`. Other documents link to those owners
+> `API.md`; rate-limit ownership lives in `RATE_LIMITING.md`; plain-language system specs (caching,
+> data fetching, overlay, precompute) live in `SYSTEMS.md`. Other documents link to those owners
 > instead of restating them.
 
 ## Maintainer notes
