@@ -234,9 +234,12 @@ pnpm run setup
 
 **Manual steps after setup:**
 
-1. Update `.env.local` with Supabase credentials
-2. Run `pnpm run dev`
-3. Visit <http://localhost:3000>
+1. Rename the generated `.env.local` to `.env` (or run
+   `nuxt dev --dotenv .env.local` instead of `pnpm run dev`) — see the note
+   below for why this is required.
+2. Update `.env` with your Supabase credentials
+3. Run `pnpm run dev`
+4. Visit <http://localhost:3000>
 
 > **`.env` vs `.env.local` — important difference.**
 >
