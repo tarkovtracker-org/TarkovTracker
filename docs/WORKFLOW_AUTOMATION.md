@@ -229,48 +229,18 @@ pnpm run setup
 1. Prerequisites check (Node.js, pnpm via Corepack, git)
 2. Install dependencies
 3. Setup git hooks (Husky)
-4. Create `.env.local` with local development defaults
+4. Create `.env` from `.env.example` (migrates a legacy `.env.local` if present;
+   never overwrites an existing `.env`)
 5. Install worker dependencies
 
 **Manual steps after setup:**
 
-The setup script writes `.env.local`, but `pnpm run dev` does not load it (see
-the note below). Pick **one** of the two paths:
-
-**Option A — rename to `.env` (recommended):**
-
-1. Rename the generated `.env.local` to `.env`
-2. Update `.env` with your Supabase credentials
-3. Run `pnpm run dev`
-4. Visit <http://localhost:3000>
-
-**Option B — keep `.env.local`, pass `--dotenv` explicitly:**
-
-1. Update `.env.local` with your Supabase credentials
-2. Run `pnpm exec nuxt dev --dotenv .env.local` (the `pnpm exec` prefix is
-   required because `nuxt` is not on the interactive shell PATH)
+1. Update `.env` with your Supabase credentials if you need login or sync
+2. Run `pnpm run dev`
 3. Visit <http://localhost:3000>
 
-> **`.env` vs `.env.local` — important difference.**
->
-> - **Nuxt auto-loads `.env` only.** `pnpm run dev` runs `nuxt dev` without a
->   `--dotenv` flag, so Nuxt's default dotenv loader (c12 `setupDotenv`) reads
->   `.env` and ignores `.env.local`.
-> - The automated `pnpm run setup` script writes `.env.local`. For Nuxt to load
->   it, either rename it to `.env` (Option A) or run
->   `pnpm exec nuxt dev --dotenv .env.local` (Option B).
-> - Manual setup documented in [`README.md`](../README.md) and
->   [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) copies `.env.example`
->   to `.env`, which Nuxt loads automatically — this is the recommended path.
->
-> Do not commit either file — both are in `.gitignore`. The canonical env-var
-> reference lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md) and
-> [`runbook.md`](./runbook.md).
->
-> **Known issue:** the setup script writes `.env.local` but `pnpm run dev` does
-> not pass `--dotenv .env.local`, so the generated file is not loaded
-> automatically. This is a pre-existing script bug tracked separately from this
-> documentation; until it is fixed, use Option A or Option B above.
+> Do not commit `.env` — it is in `.gitignore`. The canonical env-var reference
+> lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md) and [`runbook.md`](./runbook.md).
 
 ## Deployment Process
 
