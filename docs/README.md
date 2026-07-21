@@ -5,21 +5,22 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 ## Which doc do I need?
 
-| I want to…                                                                        | Read                                                               |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Understand the project and get it running                                         | [`/README.md`](../README.md)                                       |
-| Report a security vulnerability                                                   | [`/SECURITY.md`](../SECURITY.md)                                   |
-| Find where to ask for help or report something                                    | [`/SUPPORT.md`](../SUPPORT.md)                                     |
-| Read the code of conduct                                                          | [`/CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)                     |
-| Contribute (issues, branches, PRs, labels)                                        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)            |
-| Understand how a specific system works (caching, data fetch, overlay, precompute) | [`SYSTEMS.md`](./SYSTEMS.md)                                       |
-| Understand the deeper architecture, state model, and data flows                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                             |
-| Use or extend the HTTP/API surface                                                | [`API.md`](./API.md)                                               |
-| Understand rate limits / abuse controls by layer                                  | [`RATE_LIMITING.md`](./RATE_LIMITING.md)                           |
-| Deploy, configure env vars, or handle an incident                                 | [`runbook.md`](./runbook.md)                                       |
-| Understand CI/CD, hooks, and releases                                             | [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md)               |
-| Follow the visual/design system                                                   | [`/DESIGN.md`](../DESIGN.md)                                       |
-| Work as (or configure) an AI agent                                                | [`AGENTS.md`](../AGENTS.md) + [`agent-context/`](./agent-context/) |
+| I want to…                                                                        | Read                                                                               |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Understand the project and get it running                                         | [`/README.md`](../README.md)                                                       |
+| Report a security vulnerability                                                   | [`/SECURITY.md`](../SECURITY.md)                                                   |
+| Find where to ask for help or report something                                    | [`/SUPPORT.md`](../SUPPORT.md)                                                     |
+| Read the code of conduct                                                          | [`/CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)                                     |
+| Contribute (issues, branches, PRs, labels)                                        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)                            |
+| Understand how a specific system works (caching, data fetch, overlay, precompute) | [`SYSTEMS.md`](./SYSTEMS.md)                                                       |
+| Understand the deeper architecture, state model, and data flows                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                                             |
+| Read the Tarkov data architecture decision and implementation plan                | [`decisions/tarkov-data-architecture.md`](./decisions/tarkov-data-architecture.md) |
+| Use or extend the HTTP/API surface                                                | [`API.md`](./API.md)                                                               |
+| Understand rate limits / abuse controls by layer                                  | [`RATE_LIMITING.md`](./RATE_LIMITING.md)                                           |
+| Deploy, configure env vars, or handle an incident                                 | [`runbook.md`](./runbook.md)                                                       |
+| Understand CI/CD, hooks, and releases                                             | [`WORKFLOW_AUTOMATION.md`](./WORKFLOW_AUTOMATION.md)                               |
+| Follow the visual/design system                                                   | [`/DESIGN.md`](../DESIGN.md)                                                       |
+| Work as (or configure) an AI agent                                                | [`AGENTS.md`](../AGENTS.md) + [`agent-context/`](./agent-context/)                 |
 
 ## Document map
 
@@ -32,6 +33,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow, issues, labels, project board.
 - [`SYSTEMS.md`](./SYSTEMS.md) — plain-language spec of the non-obvious systems (Tarkov.dev integration, data fetching, multi-layer caching, overlay, precompute) with diagrams and invariants. Covers **what systems exist, what they own, and how they interact**. Point at this when asking "why does the app do X?".
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — deeper technical structure: state model, sync, data flows, implementation decisions, tradeoffs, and the canonical environment-variable map. `SYSTEMS.md` is the entry point for system behavior; `ARCHITECTURE.md` is the deeper reference for how the app is built.
+- [`decisions/tarkov-data-architecture.md`](./decisions/tarkov-data-architecture.md) — durable architecture decision and resumable implementation plan for the Tarkov data and progress system (KV releases, shared rules engine, Supabase write consolidation).
 - [`API.md`](./API.md) — endpoint reference, caching, supported languages, game modes.
 - [`RATE_LIMITING.md`](./RATE_LIMITING.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.

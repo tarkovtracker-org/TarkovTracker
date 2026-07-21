@@ -2,11 +2,9 @@
 
 ## Document status
 
-- **Purpose:** durable architecture record and resumable implementation plan
-- **Decision status:** target architecture agreed; Phase 0 local safeguards implemented
-- **Last verified:** 2026-07-18
-- **Repository:** `tarkovtracker-org/TarkovTracker`, branch `tarkov-data-architecture`
-- **Do not treat the current branch as the final data architecture.** Direct Worker JSON fetching remains an interim compatibility path, not the intended end state.
+- **Purpose:** durable architecture record and resumable implementation plan for the Tarkov data and progress system.
+- **Decision status:** target architecture agreed; Phase 0 local safeguards implemented.
+- **Interim state:** direct Worker JSON fetching remains an interim compatibility path, not the intended end state.
 
 ## Executive decision
 
@@ -24,76 +22,6 @@ Platform responsibilities:
 | Shared TypeScript domain module | All progression, branch, invalidation, and edition semantics                 |
 
 Do not make Supabase the primary runtime store for globally static game definitions. A release audit table is reasonable, but full static payloads should not be a required Postgres read on every request.
-
----
-
-## Verified production inventory
-
-### GitHub Actions
-
-Workflow: `.github/workflows/precompute-tarkov-data.yml`
-
-- Triggered at `0 */12 * * *` and by manual dispatch.
-- Runs `pnpm run precompute:tarkov` on GitHub-hosted Ubuntu.
-- Installs the repository dependencies and writes through the Cloudflare KV REST API.
-- Has a 30-minute timeout and serialized concurrency group.
-- Opens or updates a GitHub issue when a scheduled run fails.
-- Repository variables are configured:
-  - `CLOUDFLARE_ACCOUNT_ID=fe638e80cee39a738275d92348d02bd4`
-  - `TARKOV_DATA_KV_NAMESPACE_ID=6034d8d7b7534946bf04110c33ac3b88`
-- The latest 15 scheduled runs inspected all succeeded.
-- Latest inspected run: `29645388404`, commit `4045861902cab7fd3b397ff0f403b7272b7a4bfb`, 2026-07-18 13:01–13:02 UTC.
-- The latest job successfully completed the `Precompute and write to KV` step.
-
-The workflow currently precomputes only `tasks-core` payloads. It does not create a release manifest, compact Worker rules, hideout rules, rollback pointer, or permanent release history.
-
-### Cloudflare
-
-Account: `DysektAI` (`fe638e80cee39a738275d92348d02bd4`)
-
-KV namespace:
-
-- Title: `TARKOV_DATA`
-- ID: `6034d8d7b7534946bf04110c33ac3b88`
-- 32 keys currently exist: 16 languages × `regular`/`pve`.
-- Keys use `tasks-core-json-v2-{lang}-{mode}`.
-- Every key has an approximately seven-day expiration.
-- No active-release or previous-release pointer exists.
-
-Pages project:
-
-- Project: `tarkovtracker`
-- Production and preview both bind `TARKOV_DATA` to the namespace above.
-- Production and preview both bind `API_GATEWAY_LIMITER` to the API Worker's Durable Object.
-
-API Worker:
-
-- Script: `api-gateway`
-- Smart Placement enabled.
-- Observability and invocation logs enabled at 100% sampling.
-- Bound to `API_GATEWAY_LIMITER` and Supabase credentials.
-- **Not bound to `TARKOV_DATA`.**
-
-Production Worker CPU, 2026-07-18 20:00–23:19 UTC:
-
-| Scope                   | Requests | Average |   p95 |   p99 |   Max |
-| ----------------------- | -------: | ------: | ----: | ----: | ----: |
-| All API Worker requests |   16,567 | 4.10 ms |  9 ms | 13 ms | 20 ms |
-| GET `/api/v2/progress`  |    8,551 | 5.34 ms | 10 ms | 14 ms | 20 ms |
-| Task-write paths        |    1,886 | 5.63 ms | 10 ms | 12 ms | 16 ms |
-
-These values require a canary rollout. The production Worker likely still benefits from the old broken task query returning empty data, so populated metadata must be measured before full deployment.
-
-### Supabase
-
-The live Supabase MCP is authenticated.
-
-- `user_progress` had approximately 15,833 rows when Phase 0 verification ran.
-- No Tarkov game-data tables currently exist.
-- `user_progress` stores PVP and PVE progress as JSONB.
-- `merge_progress_data` already performs row locking and partial atomic merges.
-- Browser code still performs direct full-row `user_progress` upserts.
-- The live `record_api_usage` RPC still has its old six-parameter signature. The local Worker now sends `p_user_agent`, so the pending migration must be applied before that Worker code reaches production.
 
 ---
 
@@ -278,14 +206,6 @@ type ProgressRuleset = {
   >;
 };
 ```
-
-Measured against current upstream data:
-
-- Raw tasks response: approximately 2,084 KB.
-- Raw hideout response: approximately 83 KB.
-- Basic task rules projection: approximately 136 KB.
-- Relevant stash/cultist hideout projection: approximately 1.5 KB.
-- Existing 510-task invalidation function benchmark: approximately 0.17 ms per evaluation in local Node.
 
 Compile graph indexes during precompute to reduce request CPU further.
 
