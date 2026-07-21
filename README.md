@@ -37,8 +37,9 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 - **Back up your data** — server-side storage protects against browser data loss
 
 > **Signing in:** If you have local progress and create a new account, that progress uploads to
-> your account on first login. If you sign into an existing account that already has cloud
-> progress, the cloud data takes precedence — your local guest progress is not merged.
+> your account on first login. Returning users (same browser, same account) get a merge of local
+> and cloud progress. If you sign into an existing account from a new browser that already has
+> cloud progress, the cloud data takes precedence — your local guest progress is not merged.
 
 ### Getting help
 
@@ -60,7 +61,7 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 The rest of this README covers local development and contributing. If you only want to use
 TarkovTracker, visit **<https://tarkovtracker.org>** — no setup required.
 
-## Local development
+### Local development
 
 ```bash
 corepack enable        # enables pnpm via Corepack (Node >=24.12.0)
@@ -78,7 +79,7 @@ unavailable.
 **Tech stack:** Nuxt 4 (SPA, `ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia,
 Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 
-## Common commands
+### Common commands
 
 | Task          | Command               |
 | ------------- | --------------------- |
@@ -94,7 +95,7 @@ Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` before pushing. T
 list (including i18n, Supabase types, OpenAPI validation, and the API gateway tests) is in
 [`AGENTS.md`](AGENTS.md) and [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md).
 
-## Contributing
+### Contributing
 
 Each pull request must address **one change only** — a single fix, update, doc improvement, or
 feature. PRs that bundle unrelated changes may be asked to split or be closed.
@@ -108,7 +109,7 @@ feature. PRs that bundle unrelated changes may be asked to split or be closed.
 > [`good-first-issue`](https://github.com/tarkovtracker-org/TarkovTracker/labels/good-first-issue)
 > are the easiest way to get started.
 
-## Documentation
+### Documentation
 
 The short version: this README gets you running; the `docs/` folder explains how things work.
 
@@ -130,7 +131,7 @@ The short version: this README gets you running; the `docs/` folder explains how
 
 Start at [`docs/README.md`](docs/README.md) if you are not sure which doc you need.
 
-## Project structure
+### Project structure
 
 ```text
 app/         Nuxt 4 source (features, stores, server routes, shell, locales)
@@ -145,6 +146,6 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full module map and
 [`docs/SYSTEMS.md`](docs/SYSTEMS.md) for how the non-obvious systems (Tarkov.dev integration,
 multi-layer caching, overlay corrections, precompute) actually work.
 
-## License
+### License
 
 GNU General Public License v3.0 — see [`LICENSE.md`](LICENSE.md).
