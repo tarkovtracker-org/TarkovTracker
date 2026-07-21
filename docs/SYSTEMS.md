@@ -29,29 +29,34 @@ and have an agent verify the answer against the code.
 from the community-maintained `json.tarkov.dev` static JSON API. The browser never calls
 `json.tarkov.dev` directly — every request goes through our own Nitro server routes under
 `/api/tarkov/*`. The server route fetches from upstream, adapts the raw JSON into the shape our
-client expects, applies corrections (see [Overlay](#4-overlay-corrections)), and returns it.
+client expects, and (for most endpoints) applies corrections (see [Overlay](#4-overlay-corrections))
+before returning it.
 
 **Why a proxy instead of calling upstream from the browser?**
 
 - We control caching headers and can serve stale-while-revalidate from the Cloudflare edge.
 - We can apply the overlay and adapt the payload once on the server instead of in every client.
-- We can keep the upstream retry/timeout budget server-side (see [Data fetching](#2)).
+- We can keep the upstream retry/timeout budget server-side (see [Data fetching](#2-data-fetching-pipeline)).
 - We avoid leaking the user's IP to a third party and avoid CORS quirks.
 
 ### Endpoints
 
-| Endpoint                       | Purpose              | Cache TTL | Precomputed? |
-| ------------------------------ | -------------------- | --------- | ------------ |
-| `/api/tarkov/bootstrap`        | Player levels        | 12h       | no           |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 12h       | **yes**      |
-| `/api/tarkov/tasks-objectives` | Task objectives      | 12h       | no           |
-| `/api/tarkov/tasks-rewards`    | Task rewards         | 12h       | no           |
-| `/api/tarkov/hideout`          | Hideout stations     | 12h       | no           |
-| `/api/tarkov/items-lite`       | Items (minimal)      | 24h       | no           |
-| `/api/tarkov/items`            | Items (full)         | 24h       | no           |
-| `/api/tarkov/prestige`         | Prestige levels      | 24h       | no           |
-| `/api/tarkov/map-spawns`       | Map spawn points     | 12h       | no           |
-| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   | no           |
+| Endpoint                       | Purpose              | Cache TTL | Precomputed? | Overlay? |
+| ------------------------------ | -------------------- | --------- | ------------ | -------- |
+| `/api/tarkov/bootstrap`        | Player levels        | 12h       | no           | no       |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 12h       | **yes**      | yes      |
+| `/api/tarkov/tasks-objectives` | Task objectives      | 12h       | no           | yes      |
+| `/api/tarkov/tasks-rewards`    | Task rewards         | 12h       | no           | yes      |
+| `/api/tarkov/hideout`          | Hideout stations     | 12h       | no           | yes      |
+| `/api/tarkov/items-lite`       | Items (minimal)      | 24h       | no           | yes      |
+| `/api/tarkov/items`            | Items (full)         | 24h       | no           | yes      |
+| `/api/tarkov/prestige`         | Prestige levels      | 24h       | no           | no       |
+| `/api/tarkov/map-spawns`       | Map spawn points     | 12h       | no           | no       |
+| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   | no           | no       |
+
+Overlay is applied by the six task/hideout/item endpoints. `bootstrap`, `prestige`,
+`map-spawns`, and `cache-meta` fetch directly into `edgeCache` without the overlay step —
+their upstream data does not currently need corrections.
 
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](#5-precompute-workflow).
@@ -64,8 +69,10 @@ flowchart LR
     Route --> Cache["edgeCache()<br/>app/server/utils/edgeCache.ts"]
     Cache -->|miss| Fetch["tarkov-json.ts<br/>fetch + adapt"]
     Fetch -->|HTTPS| Upstream["json.tarkov.dev"]
-    Fetch --> Overlay["applyOverlay()<br/>app/server/utils/overlay.ts"]
-    Overlay --> Cache
+    Fetch --> Overlay{"Overlay?<br/>(6 of 10 endpoints)"}
+    Overlay -->|yes| ApplyOverlay["applyOverlay()<br/>app/server/utils/overlay.ts"]
+    Overlay -->|no| Cache
+    ApplyOverlay --> Cache
     Cache --> Browser
 ```
 
@@ -82,6 +89,8 @@ flowchart LR
   `/api/tarkov/*`.
 - Every endpoint handler returns its payload through `edgeCache()`; no handler fetches upstream
   outside the cache wrapper.
+- Overlay is applied only by endpoints that call `applyOverlay()` in their handler. Adding a new
+  endpoint does not imply adding overlay — only add it when the upstream data needs corrections.
 - Game mode is validated with `validateGameMode()` and defaults to `regular` on any invalid input.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
@@ -153,7 +162,8 @@ replaces the key with the translated string.
 - Only `tarkov-json.ts` imports a fetcher for `json.tarkov.dev`. No other module hits upstream.
 - Every upstream call uses `fetchEnvelope` (which enforces timeout + retry + dedup). No raw `$fetch`
   to upstream anywhere else.
-- A missing translation falls back to English, never to the raw translation key.
+- A missing translation falls back to English when available; otherwise, the original
+  translation key is preserved.
 - The upstream budget must stay under Cloudflare's 100s origin limit. If you add a new leg, budget
   it here.
 
@@ -250,7 +260,9 @@ flowchart TD
   layer or reorder them.
 - A `STALE` response must always trigger exactly one background refresh (guarded by
   `inFlightRevalidations`).
-- `X-Cache-Status` must be set on every response, including errors from the dev fallback path.
+- `X-Cache-Status` must be set on every successful response. Error responses from the
+  catch block (502 on upstream failure) do not set it — the invariant covers the success
+  paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
 - The precomputed envelope is only trusted if `isPrecomputedEnvelope()` returns true; a corrupt
   write falls through to the edge cache instead of serving `null`.
