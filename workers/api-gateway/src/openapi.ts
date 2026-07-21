@@ -19,8 +19,9 @@ export const OPENAPI_SPEC = {
       'token before creating a new one if the cap is reached. Token creation is only ' +
       'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
       'User-Agent: a 5-200 character User-Agent header identifying the client application ' +
-      'is required on all API endpoints. Requests outside that range are rejected with 400. ' +
-      'Use a descriptive string like "AppName/1.0 (+https://your-app.com)".\n\n' +
+      'is required on protected API endpoints (token, progress, team). Infrastructure routes ' +
+      '(/health, /openapi.json, /docs, /robots.txt) are exempt. Requests outside that range ' +
+      'are rejected with 400. Use a descriptive string like "AppName/1.0 (+https://your-app.com)".\n\n' +
       'Docs: https://api.tarkovtracker.org/docs (or / on the api subdomain).',
     contact: {
       name: 'TarkovTracker',
@@ -575,6 +576,7 @@ export const OPENAPI_SPEC = {
           'Requires GP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
         operationId: 'getTokenInfo',
         security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
         responses: {
           '200': {
             description: 'Token info',
@@ -584,6 +586,7 @@ export const OPENAPI_SPEC = {
               },
             },
           },
+          '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
@@ -599,6 +602,7 @@ export const OPENAPI_SPEC = {
           'Requires GP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
         operationId: 'getProgress',
         security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
         responses: {
           '200': {
             description: 'Progress data',
@@ -608,6 +612,7 @@ export const OPENAPI_SPEC = {
               },
             },
           },
+          '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
@@ -623,6 +628,7 @@ export const OPENAPI_SPEC = {
           'Requires TP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
         operationId: 'getTeamProgress',
         security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
         responses: {
           '200': {
             description: 'Team progress data',
@@ -632,6 +638,7 @@ export const OPENAPI_SPEC = {
               },
             },
           },
+          '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
@@ -648,6 +655,7 @@ export const OPENAPI_SPEC = {
         operationId: 'updatePlayerLevel',
         security: [{ bearerAuth: [] }],
         parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
           {
             name: 'level',
             in: 'path',
@@ -683,6 +691,7 @@ export const OPENAPI_SPEC = {
         operationId: 'updateTask',
         security: [{ bearerAuth: [] }],
         parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
           {
             name: 'taskId',
             in: 'path',
@@ -730,6 +739,7 @@ export const OPENAPI_SPEC = {
         operationId: 'updateTaskObjective',
         security: [{ bearerAuth: [] }],
         parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
           {
             name: 'objectiveId',
             in: 'path',
@@ -776,6 +786,7 @@ export const OPENAPI_SPEC = {
           'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
         operationId: 'updateTasksBatch',
         security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
         requestBody: {
           required: true,
           content: {

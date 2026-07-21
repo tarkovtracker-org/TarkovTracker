@@ -237,12 +237,39 @@ describe('api-gateway', () => {
     expect(body.success).toBe(false);
     expect(body.error).toContain('User-Agent must be 5-200 characters');
   });
+  it('rejects requests with an oversized User-Agent header', async () => {
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'User-Agent': 'x'.repeat(201) },
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('User-Agent must be 5-200 characters');
+  });
+  it('validates User-Agent before issuing a legacy /api/v2 308 redirect', async () => {
+    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
+        method: 'POST',
+        headers: { ...AUTH_HEADERS, 'User-Agent': 'ab' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      env
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toContain('User-Agent must be 5-200 characters');
+  });
   it('redirects legacy /api/v2 routes with 308 when LEGACY_API_REDIRECT is true', async () => {
     const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
     const res = await worker.fetch(
       new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: { ...AUTH_HEADERS, 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
         body: JSON.stringify({ state: 'completed' }),
       }),
       env
@@ -262,7 +289,10 @@ describe('api-gateway', () => {
     const res = await worker.fetch(
       new Request('https://tarkovtracker.org/api/progress', {
         method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123' },
+        headers: {
+          Authorization: 'Bearer PVP_abc123',
+          'User-Agent': 'TestClient/1.0 (+https://example.com)',
+        },
       }),
       env
     );
@@ -536,7 +566,7 @@ describe('api-gateway', () => {
             id: 'task-main',
             name: 'Main Task',
             factionName: 'Any',
-              objectives: [],
+            objectives: [],
             taskRequirements: [],
           },
         ],

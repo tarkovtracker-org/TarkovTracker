@@ -10,8 +10,8 @@ describe('normalizeInboundUserAgent', () => {
     expect(normalizeInboundUserAgent('  Client/1.0  ')).toBe('Client/1.0');
   });
 
-  it('caps oversized values', () => {
+  it('rejects oversized values', () => {
     const value = 'x'.repeat(INBOUND_USER_AGENT_MAX_LENGTH + 1);
-    expect(normalizeInboundUserAgent(value)).toBe('x'.repeat(INBOUND_USER_AGENT_MAX_LENGTH));
+    expect(normalizeInboundUserAgent(value)).toBeNull();
   });
 });

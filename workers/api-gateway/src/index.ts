@@ -20,11 +20,7 @@ import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
 import { logger } from './utils/logger';
-import {
-  INBOUND_USER_AGENT_MAX_LENGTH,
-  INBOUND_USER_AGENT_MIN_LENGTH,
-  normalizeInboundUserAgent,
-} from './utils/userAgent';
+import { INBOUND_USER_AGENT_MIN_LENGTH, normalizeInboundUserAgent } from './utils/userAgent';
 import type {
   ApiToken,
   Env,
@@ -932,41 +928,38 @@ export default {
       const apiMatch = path.match(/^\/api(?:\/v2)?(.*)$/);
       if (apiMatch) {
         apiPath = apiMatch[1] || '/';
-        // Host migration: once LEGACY_API_REDIRECT is flipped to "true",
-        // legacy /api and /api/v2 routes permanently redirect to the api
-        // subdomain. Clients should migrate proactively: some HTTP stacks
-        // (e.g. .NET HttpClient) drop Authorization on cross-host redirects.
-        if ((env.LEGACY_API_REDIRECT || '').trim().toLowerCase() === 'true') {
-          const target = `https://${apiHost}${apiPath}${url.search}`;
-          return new Response(null, {
-            status: 308,
-            headers: {
-              ...headers,
-              Location: target,
-              Deprecation: LEGACY_API_DEPRECATION_DATE,
-              Link: `<${target}>; rel="successor-version"`,
-              'Cache-Control': 'no-store',
-            },
-          });
-        }
       }
     }
     if (!apiPath) {
       return new Response('Not Found', { status: 404, headers });
     }
-    const rawUserAgent = request.headers.get('User-Agent');
-    const inboundUserAgent = normalizeInboundUserAgent(rawUserAgent);
-    if (
-      !inboundUserAgent ||
-      inboundUserAgent.length < INBOUND_USER_AGENT_MIN_LENGTH ||
-      (rawUserAgent?.trim().length ?? 0) > INBOUND_USER_AGENT_MAX_LENGTH
-    ) {
+    // Validate inbound User-Agent before any routing/redirect so legacy
+    // /api and /api/v2 entrypoints cannot bypass enforcement via 308.
+    const inboundUserAgent = normalizeInboundUserAgent(request.headers.get('User-Agent'));
+    if (!inboundUserAgent || inboundUserAgent.length < INBOUND_USER_AGENT_MIN_LENGTH) {
       return errorResponse(
         'User-Agent must be 5-200 characters (e.g. "AppName/1.0 (+https://your-app.com)")',
         400,
         origin,
         reqOrigin
       );
+    }
+    // Host migration: once LEGACY_API_REDIRECT is flipped to "true",
+    // legacy /api and /api/v2 routes permanently redirect to the api
+    // subdomain. Clients should migrate proactively: some HTTP stacks
+    // (e.g. .NET HttpClient) drop Authorization on cross-host redirects.
+    if (!isApiHost && (env.LEGACY_API_REDIRECT || '').trim().toLowerCase() === 'true') {
+      const target = `https://${apiHost}${apiPath}${url.search}`;
+      return new Response(null, {
+        status: 308,
+        headers: {
+          ...headers,
+          Location: target,
+          Deprecation: LEGACY_API_DEPRECATION_DATE,
+          Link: `<${target}>; rel="successor-version"`,
+          'Cache-Control': 'no-store',
+        },
+      });
     }
     // Extract and validate token
     const authHeader = request.headers.get('Authorization');
