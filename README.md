@@ -36,8 +36,9 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 - **Use API tokens** — programmatically read your progress via the public API
 - **Back up your data** — server-side storage protects against browser data loss
 
-> Your local progress is preserved when you sign in. Existing local data merges into your account
-> on first login.
+> **Signing in:** If you have local progress and create a new account, that progress uploads to
+> your account on first login. If you sign into an existing account that already has cloud
+> progress, the cloud data takes precedence — your local guest progress is not merged.
 
 ### Getting help
 
@@ -54,7 +55,7 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 <!-- Everything below this line is for developers and contributors. -->
 <!-- If you just want to use TarkovTracker, visit https://tarkovtracker.org. -->
 
-# For Developers and Contributors
+## For Developers and Contributors
 
 The rest of this README covers local development and contributing. If you only want to use
 TarkovTracker, visit **<https://tarkovtracker.org>** — no setup required.
