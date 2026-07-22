@@ -105,9 +105,11 @@ feature. PRs that bundle unrelated changes may be asked to split or be closed.
 - **[Label system](.github/LABELS.md)** — issue types, scope, priority, ownership, and status.
 - **[Project board](.github/PROJECT_BOARD.md)** — how issues move from backlog to done.
 
-> New to the codebase? Issues labeled
+> New to the codebase? Start with
+> [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) for the development workflow and PR process.
+> When available, issues labeled
 > [`good-first-issue`](https://github.com/tarkovtracker-org/TarkovTracker/labels/good-first-issue)
-> are the easiest way to get started.
+> are scoped for newcomers.
 
 ### Documentation
 
