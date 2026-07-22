@@ -241,7 +241,9 @@ Naming:
 - Architecture: `docs/ARCHITECTURE.md`
 - System specs (caching, data fetching, overlay, precompute): `docs/SYSTEMS.md`
 - Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
-- Contributing: `.github/CONTRIBUTING.md`
+- Contributing (human workflow entry point): `.github/CONTRIBUTING.md`
+- Local development setup and coding standards: `docs/contributing/development.md`
+- Pull-request requirements: `docs/contributing/pull-requests.md`
 - Security policy: `SECURITY.md`
 - Support routing: `SUPPORT.md`
 - Code of conduct: `CODE_OF_CONDUCT.md`

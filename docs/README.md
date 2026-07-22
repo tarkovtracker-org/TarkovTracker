@@ -12,6 +12,8 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 | Find where to ask for help or report something                                    | [`/SUPPORT.md`](../SUPPORT.md)                                                     |
 | Read the code of conduct                                                          | [`/CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)                                     |
 | Contribute (issues, branches, PRs, labels)                                        | [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md)                            |
+| Set up your development environment                                               | [`contributing/development.md`](./contributing/development.md)                     |
+| Understand the PR process and requirements                                        | [`contributing/pull-requests.md`](./contributing/pull-requests.md)                 |
 | Understand how a specific system works (caching, data fetch, overlay, precompute) | [`SYSTEMS.md`](./SYSTEMS.md)                                                       |
 | Understand the deeper architecture, state model, and data flows                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                                             |
 | Read the Tarkov data architecture decision and implementation plan                | [`decisions/tarkov-data-architecture.md`](./decisions/tarkov-data-architecture.md) |
@@ -30,7 +32,9 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 - [`/SECURITY.md`](../SECURITY.md) — vulnerability reporting policy and scope.
 - [`/SUPPORT.md`](../SUPPORT.md) — routing table for questions, bugs, features, and account support.
 - [`/CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) — Contributor Covenant 2.1 with enforcement contacts.
-- [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow, issues, labels, project board.
+- [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contribution workflow entry point (issues, branches, PRs, labels, project board).
+- [`contributing/development.md`](./contributing/development.md) — local development setup, coding standards, common tasks, debugging, and commit conventions.
+- [`contributing/pull-requests.md`](./contributing/pull-requests.md) — branching strategy, PR requirements, template fields, review process, and pre-submit checklist.
 - [`SYSTEMS.md`](./SYSTEMS.md) — plain-language spec of the non-obvious systems (Tarkov.dev integration, data fetching, multi-layer caching, overlay, precompute) with diagrams and invariants. Covers **what systems exist, what they own, and how they interact**. Point at this when asking "why does the app do X?".
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — deeper technical structure: state model, sync, data flows, implementation decisions, tradeoffs, and the canonical environment-variable map. `SYSTEMS.md` is the entry point for system behavior; `ARCHITECTURE.md` is the deeper reference for how the app is built.
 - [`decisions/tarkov-data-architecture.md`](./decisions/tarkov-data-architecture.md) — durable architecture decision and resumable implementation plan for the Tarkov data and progress system (KV releases, shared rules engine, Supabase write consolidation).
