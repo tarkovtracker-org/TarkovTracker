@@ -65,6 +65,7 @@ body:
     id: product-area
     attributes:
       label: Which area of TarkovTracker is affected?
+      multiple: true
       options:
         - Dashboard
         - Tasks
