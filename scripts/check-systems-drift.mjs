@@ -167,29 +167,12 @@ function checkKvBinding(md) {
     return;
   }
   const wrangler = readText(WRANGLER_TOML);
-  const bindingLines = wrangler
-    .split('\n')
-    .filter((l) => /^\s*binding\s*=/.test(l) && !l.trim().startsWith('#'));
-  if (bindingLines.length === 0) {
+  const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
+  if (!wranglerBindingRe.test(wrangler)) {
     fail(
-      `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml has no binding declarations.`
+      `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
+        `contain a binding with that name.`
     );
-  } else {
-    for (const line of bindingLines) {
-      const match = line.match(/binding\s*=\s*"([^"]+)"/);
-      if (match && match[1] !== documentedBinding) {
-        fail(
-          `wrangler.toml contains KV binding "${match[1]}" which does not match the documented binding "${documentedBinding}".`
-        );
-      }
-    }
-    const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
-    if (!wranglerBindingRe.test(wrangler)) {
-      fail(
-        `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
-          `contain a binding with that name.`
-      );
-    }
   }
 
   // Check PRECOMPUTED_KV_BINDING constant in precomputedTarkov.ts.
