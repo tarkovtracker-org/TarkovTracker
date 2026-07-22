@@ -167,11 +167,29 @@ function checkKvBinding(md) {
     return;
   }
   const wrangler = readText(WRANGLER_TOML);
+  // Scope the binding search to [[kv_namespaces]] / [[env.*.kv_namespaces]] blocks so
+  // a binding name in a non-KV resource (Durable Objects, R2, etc.) cannot satisfy the check.
+  // Only active (non-commented) binding lines are considered.
+  const kvBlocks = [];
+  const blockRe = /^\s*\[\[(env\.\w+\.)?kv_namespaces\]\]/;
+  const lines = wrangler.split('\n');
+  let inKvBlock = false;
+  for (const line of lines) {
+    if (blockRe.test(line)) {
+      inKvBlock = true;
+      continue;
+    }
+    if (/^\s*\[\[/.test(line) && inKvBlock) {
+      inKvBlock = false;
+    }
+    if (inKvBlock) kvBlocks.push(line);
+  }
+  const kvText = kvBlocks.filter((l) => !l.trim().startsWith('#')).join('\n');
   const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
-  if (!wranglerBindingRe.test(wrangler)) {
+  if (!wranglerBindingRe.test(kvText)) {
     fail(
       `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
-        `contain a binding with that name.`
+        `declare it inside a [[kv_namespaces]] block.`
     );
   }
 
