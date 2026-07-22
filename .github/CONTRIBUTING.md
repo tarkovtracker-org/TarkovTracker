@@ -36,9 +36,8 @@ automation, see [`PROJECT_BOARD.md`](PROJECT_BOARD.md).
 **Prerequisites:** Node.js >= 24.12.0, pnpm 11.14.0 (via Corepack), Git.
 
 ```bash
-corepack enable && pnpm install
-pnpm run setup   # creates .env from .env.example
-pnpm run dev     # localhost:3000
+corepack enable && pnpm run setup   # installs deps + creates .env
+pnpm run dev                        # localhost:3000
 ```
 
 > Most features work without Supabase configured; auth and sync are simply disabled.
@@ -51,7 +50,8 @@ For the full setup guide, coding standards, common tasks, debugging, and commit 
 1. Create a branch: `git checkout -b type/short-description`
    (`fix/`, `feat/`, `enhance/`, `refactor/`, `docs/`, `chore/`)
 2. Make your changes following the coding standards
-3. Self-review, test (`pnpm run lint`, `pnpm run typecheck`, `pnpm test`), and update docs
+3. Self-review, run the smallest relevant validation (`pnpm run lint` for code, `pnpm run typecheck`
+   for TS, `pnpm test` for executable code), and update docs
 4. Open a PR using the template, link related issues, and ensure all CI checks pass
 5. Address review feedback; a maintainer merges once approved
 

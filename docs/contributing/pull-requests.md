@@ -32,12 +32,13 @@ changes may be requested to be split or closed.
    - Check for typos and formatting
    - Ensure no secrets or credentials
 
-2. **Test thoroughly**
-   - Test manually in browser
-   - Run `pnpm run lint` (must pass with zero warnings)
-   - Run `pnpm run typecheck`
-   - Run `pnpm test` if your change touches executable code
-   - Test in both PvP and PvE modes if relevant
+2. **Run the smallest relevant validation**
+   - `pnpm run lint` (must pass with zero warnings) — for any code change
+   - `pnpm run typecheck` — for TypeScript changes
+   - `pnpm test` — only if your change touches executable code that could break tests
+   - Test manually in browser — for UI changes
+   - Test in both PvP and PvE modes — if the change is mode-specific
+   - Docs-only PRs do not need lint, typecheck, or tests
 
 3. **Update documentation**
    - Update README if adding features
@@ -45,8 +46,8 @@ changes may be requested to be split or closed.
 
 ## PR Requirements
 
-- Title and commits follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g.
-  `feat(tasks): add objective filter`) — enforced by commitlint
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g.
+  `feat(tasks): add objective filter`) — enforced by commitlint on commit messages
 - All template sections completed
 - Linked to related issue(s)
 - Passes all CI checks
@@ -75,17 +76,15 @@ asks for the following sections. Complete every section:
 
 ## Review Process
 
-1. Maintainers will review your PR
-2. Address any feedback or requested changes
-3. Once approved, maintainers will merge
-4. Your contribution will be in the next release!
+1. Maintainers and automated review tools review your PR
+2. Address all feedback on the same PR branch — do not open follow-up PRs for in-scope feedback
+3. Every review thread must have an explicit disposition (fixed, rejected with rationale, or
+   deferred to a tracked issue) before merge
+4. Once all threads are resolved and CI is green, a maintainer merges
+5. Your contribution will be in the next release!
 
-## Finding Work
+> The full review gate (including rate-limit handling and out-of-scope deferrals) is in
+> [`../../AGENTS.md`](../../AGENTS.md) under "PR Review Gate".
 
-- Check existing issues before creating new ones
-- Use appropriate issue templates (Bug Report, Feature Request, Enhancement, Data Issue)
-- Comment on an issue to express interest and wait for maintainer assignment to avoid duplicate work
-- Issues labeled `good-first-issue` are great for newcomers
-- See [`../../.github/LABELS.md`](../../.github/LABELS.md) for the complete label reference and
-  [`../../.github/PROJECT_BOARD.md`](../../.github/PROJECT_BOARD.md) for project-board workflow
-  states
+For finding and claiming work, see
+[`../../.github/CONTRIBUTING.md`](../../.github/CONTRIBUTING.md) ("How to Find and Claim Work").
