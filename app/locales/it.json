@@ -747,7 +747,7 @@
       "tier_cta": "Abbonati",
       "tier_login_cta": "Accedi per sottoscrivere",
       "tier_current_cta": "Livello attuale",
-      "tier_change_cta": "Passa a questo livello",
+      "tier_change_cta": "Cambia piano nel portale di fatturazione",
       "current_tier_badge": "Livello attuale",
       "tier_scav_name": "Scav",
       "tier_scav_tagline": "Si sta solo cercando di cavarsela",
@@ -1540,71 +1540,71 @@
         "setup": "Primi passi",
         "troubleshooting": "Risoluzione problemi",
         "tips": "Tips & Tricks",
-        "faq": "Common Questions"
+        "faq": "Domande frequenti"
       },
       "items": {
         "tarkovdev": {
           "name": "Tarkov.dev",
-          "description": "Community-maintained item, quest, trader, and market data for players and developers."
+          "description": "Database collaborativo di oggetti, missioni, mercanti e mercato, curato dalla community per giocatori e sviluppatori."
         },
         "tarkovmonitor": {
           "name": "TarkovMonitor",
-          "description": "Read live raid data and automatically sync supported progress to TarkovTracker."
+          "description": "Leggi i dati dei raid live e sincronizza automaticamente i progressi su TarkovTracker."
         },
         "ratscanner": {
           "name": "RatScanner",
-          "description": "Scan in-game item tooltips to see market value, barter uses, and quest relevance."
+          "description": "Scansiona gli oggetti in gioco per vedere il valore di mercato, baratto e la pertinenza con le missioni."
         },
         "cultistcircle": {
-          "name": "CultistCircle",
-          "description": "Calculate possible Cultist Circle rewards from the items you contribute."
+          "name": "Cultist Circle",
+          "description": "Calcola le possibili ricompense dagli oggetti che inserisci nel Circolo Cultista."
         },
         "tarkovchanges": {
           "name": "Tarkov Changes",
-          "description": "Review item, quest, and gameplay changes between Tarkov updates."
+          "description": "Revisiona oggetti, missioni e modifiche di gioco tra gli aggiornamenti di Tarkov."
         }
       },
       "guides": {
         "tarkovdev": {
-          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through a free GraphQL API. TarkovTracker itself uses this API to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
-          "step_1_title": "Browse the website",
-          "step_1_desc": "Visit tarkov.dev to search items, check quest requirements, view trader inventories, and explore hideout station data in a clean, ad-free interface.",
-          "step_2_title": "Use the GraphQL API",
-          "step_2_desc": "If you are a developer, point your GraphQL client at api.tarkov.dev. The API is free, requires no authentication for read queries, and has full schema documentation available at the endpoint.",
-          "step_3_title": "Join the community",
-          "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
-          "tip_1": "The GraphQL API is rate-limited but generous. For production apps, cache responses client-side to avoid redundant queries.",
-          "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
-          "faq_1_q": "Is the Tarkov.dev API free to use?",
-          "faq_1_a": "Yes, the GraphQL API is completely free for read queries. No API key or authentication is required for standard usage.",
-          "faq_2_q": "How often is the data updated?",
-          "faq_2_a": "Data is maintained by community contributors and updated as changes are discovered in-game. During active wipe periods, updates can happen multiple times per day."
+          "overview": "Tarkov.dev è la spina dorsale dell'ecosistema di dati della comunità. Mantiene un set di dati open-source di oggetti, missioni, trader, stazioni del rifugio e altro ancora, tutti accessibili tramite un'API gratuita GraphQL. TarkovTracker stesso utilizza questa API per rimanere aggiornato con gli ultimi dati di gioco. Se crei strumenti, guide, o semplicemente desideri cercare statistiche, Tarkov.dev è la fonte autorevole.",
+          "step_1_title": "Sfoglia il sito web",
+          "step_1_desc": "Visita tarkov.dev per cercare oggetti, controllare i requisiti missione, visualizzare gli inventari dei commercianti ed esplorare i dati della stazione rifugio in un'interfaccia pulita e senza pubblicità.",
+          "step_2_title": "Usa l'API GraphQL",
+          "step_2_desc": "Se sei uno sviluppatore, punta il tuo client GraphQL su api.tarkov.dev. L'API è gratuita, non richiede autenticazione per le query di lettura e ha la documentazione completa disponibile alla visione.",
+          "step_3_title": "Unisciti alla comunità",
+          "step_3_desc": "Il canale Discord Hideout è l'hub per i contributori di dati, sviluppatori di strumenti e segnalazioni di bug. Se si individuano dati obsoleti o si desidera contribuire, questo è il posto giusto.",
+          "tip_1": "L'API di GraphQL è limitata, ma generosa. Per le app di produzione, metti in cache le risposte del client per evitare interrogazioni ridondanti.",
+          "tip_2": "Gli aggiornamenti dati su Tarkov.dev sono frequenti durante le stagioni. Se qualcosa sembra sbagliato, potrebbe essere già risolto nell'ultimo set di dati.",
+          "faq_1_q": "L'API Tarkov.dev è libera?",
+          "faq_1_a": "Sì, l'API di GraphQL è completamente gratuita. Non è richiesta alcuna chiave API o autenticazione per l'uso standard.",
+          "faq_2_q": "Quanto spesso vengono aggiornati i dati?",
+          "faq_2_a": "I dati vengono mantenuti dai collaboratori della comunità e aggiornati quando i cambiamenti vengono scoperti in-game. Durante i periodi di wipe, gli aggiornamenti possono avvenire più volte al giorno."
         },
         "tarkovmonitor": {
-          "overview": "TarkovMonitor is a desktop application by The Hideout team that watches Escape from Tarkov log files and can automatically mark completed quests in TarkovTracker. It also provides audio notifications, local statistics, and optional Tarkov.dev website integration.",
-          "compatibility": "Keep TarkovMonitor running while you play so it can watch new game log entries. It does not read game memory.",
-          "step_1_title": "Download TarkovMonitor",
-          "step_1_desc": "Download the latest Windows release ZIP from the official GitHub Releases page.",
-          "step_2_title": "Extract and launch",
-          "step_2_desc": "Extract the archive to a permanent folder, then run TarkovMonitor.exe. Do not run it directly from inside the ZIP file.",
-          "step_3_title": "Connect your TarkovTracker account",
-          "step_3_desc": "In TarkovMonitor settings, open the TarkovTracker integration section. Create a read-write API token in TarkovTracker Settings, then paste it into TarkovMonitor.",
-          "step_4_title": "Play with TarkovMonitor open",
-          "step_4_desc": "Play normally while TarkovMonitor stays open. When the game writes a supported quest-completion event to its logs, TarkovMonitor can mark that quest complete in TarkovTracker.",
-          "troubleshooting_1_title": "Progress is not syncing",
-          "troubleshooting_1_desc": "Confirm the API token is read-write, has not expired, and that TarkovMonitor is running the latest release.",
-          "troubleshooting_2_title": "Earlier progress is missing",
-          "troubleshooting_2_desc": "Use Read Past Logs in Initial Setup, then choose the correct wipe and profile breakpoint.",
-          "troubleshooting_3_title": "Game mode looks wrong",
-          "troubleshooting_3_desc": "Match your TarkovTracker game mode setting to the mode you are playing, either PvP or PvE.",
-          "tip_1": "Generate a read-write API token in TarkovTracker settings. A read-only token cannot update progress.",
-          "tip_2": "Normal monitoring only processes new logs written while TarkovMonitor is running.",
-          "faq_1_q": "Is TarkovMonitor safe to use?",
-          "faq_1_a": "TarkovMonitor watches the log files that Escape from Tarkov writes locally. It does not read game memory, and the logs are not updated while a raid is in progress. Any third-party tool carries some risk, so use it at your own discretion.",
-          "faq_2_q": "Does TarkovMonitor work with PvE mode?",
-          "faq_2_a": "Yes. It supports both PvP and PvE. Match your TarkovTracker game mode setting to the mode you are playing.",
-          "faq_3_q": "Do I need TarkovMonitor to use TarkovTracker?",
-          "faq_3_a": "No. TarkovTracker funziona completamente con input manuale. TarkovMonitor automatizza solo gli aggiornamenti di avanzamento supportati."
+          "overview": "Tarkov Monitor è un'applicazione desktop del team Hideout che, tramite i file log di Escape from Tarkov, può contrassegnare automaticamente le missioni completate in TarkovTracker. Fornisce anche notifiche audio, statistiche locali e l'integrazione opzionale del sito web Tarkov.dev.",
+          "compatibility": "Mantieni Tarkov Monitor in esecuzione mentre giochi in modo che possa leggere i log di gioco.",
+          "step_1_title": "Scarica Tarkov Monitor",
+          "step_1_desc": "Scarica l'ultima ZIP di rilascio di Windows dalla pagina ufficiale di GitHub.",
+          "step_2_title": "Estrai e avvia",
+          "step_2_desc": "Estrai l'archivio in una cartella, quindi avvia TarkovMonitor.exe. Non avviarlo direttamente dall'interno dell'archivio.",
+          "step_3_title": "Collega il tuo account TarkovTracker",
+          "step_3_desc": "Nelle impostazioni di Tarkov Monitor, apri la sezione integrazione Tarkov Tracker. Crea un token API di lettura-scrittura nelle impostazioni di TarkovTracker, quindi incollalo in Tarkov Monitor.",
+          "step_4_title": "Gioca con Tarkov Monitor aperto",
+          "step_4_desc": "Gioca normalmente mentre Tarkov Monitor rimane aperto. Quando il gioco scrive un evento nei log (es. completamento missione), Tarkov Monitor può segnalare a TarkovTracker che la missione è stata completata.",
+          "troubleshooting_1_title": "Progressi non sincronizzati",
+          "troubleshooting_1_desc": "Conferma che il token API è lettura-scrittura, non è scaduto e che Tarkov Monitor è aggiornato all'ultima versione.",
+          "troubleshooting_2_title": "Mancanza di progressi precedenti",
+          "troubleshooting_2_desc": "Utilizza la funzione di lettura dei vecchi log nella configurazione iniziale, quindi scegli il corretto wipe e il punto di interruzione del profilo.",
+          "troubleshooting_3_title": "La modalità di gioco sembra sbagliata",
+          "troubleshooting_3_desc": "Abbina la tua modalità di gioco TarkovTracker alla modalità che stai giocando, PvP o PvE.",
+          "tip_1": "Genera un token API di lettura-scrittura nelle impostazioni di TarkovTracker. Un token di sola lettura non permetterà di aggiornare i progressi.",
+          "tip_2": "Il monitoraggio elabora solo nuovi log scritti mentre Tarkov Monitor è in esecuzione.",
+          "faq_1_q": "Tarkov Monitor è sicuro da usare?",
+          "faq_1_a": "Tarkov Monitor guarda i file di registro che Escape da Tarkov scrive localmente. Non legge la memoria di gioco, e i log non vengono aggiornati mentre un raid è in corso. Qualsiasi strumento di terze parti comporta qualche rischio, quindi usalo a tua discrezione.",
+          "faq_2_q": "Tarkov Monitor funziona con la modalità PvE?",
+          "faq_2_a": "Sì. Supporta sia PvP che PvE. Abbina la tua modalità di gioco TarkovTracker alla modalità che stai giocando.",
+          "faq_3_q": "Ho bisogno di Tarkov Monitor per usare TarkovTracker?",
+          "faq_3_a": "No. TarkovTracker funziona completamente con input manuale. Tarkov Monitor automatizza solo gli aggiornamenti supportati."
         },
         "ratscanner": {
           "overview": "RatScanner è uno strumento desktop open-source che identifica oggetti da screenshot in Escape da Tarkov e visualizza i dati in una sovrapposizione. Funziona esternamente e non accede alla memoria del gioco.",
@@ -1635,17 +1635,17 @@
           "faq_3_a": "Può mostrare le informazioni generali ricevuti dal fornitore di dati. Per i requisiti in base ai progressi personali di TarkovTracker, utilizzare la pagina Oggetti."
         },
         "cultistcircle": {
-          "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
-          "step_1_title": "Visit the website",
-          "step_1_desc": "Go to cultistcircle.com to access the calculator. No account or download is required — it works entirely in your browser.",
-          "step_2_title": "Search for recipes",
-          "step_2_desc": "Use the search or browse functionality to find recipes by input item or output result. The calculator shows the trade ratios and possible outcomes for each combination.",
-          "tip_1": "Check the calculator before sacrificing rare items — some trades have much better value ratios than others.",
-          "tip_2": "Recipe data may lag behind game patches. If a recipe seems missing or incorrect, check back after the site has been updated.",
-          "faq_1_q": "Is CultistCircle free to use?",
-          "faq_1_a": "Yes, CultistCircle is completely free and runs in your browser with no account required.",
-          "faq_2_q": "Is CultistCircle affiliated with TarkovTracker?",
-          "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
+          "overview": "CultistCircle è un sito web sviluppato gratuitamente dalla community da utilizzare per il Circolo Cultista in Escape from Tarkov. Ti permette di cercare ricette — quali oggetti sacrificare e quello che ottieni in cambio — senza dover sperimentare in gioco. Costruito da uno sviluppatore solista, è un riferimento utile per pianificare i tuoi scambi nel Circolo Cultista in modo efficiente.",
+          "step_1_title": "Visita il sito web",
+          "step_1_desc": "Vai su cultistcircle.com per accedere al calcolatore. Non è richiesto alcun account o download — funziona interamente all'interno del browser.",
+          "step_2_title": "Cerca ricette",
+          "step_2_desc": "Usa la funzione di ricerca per trovare ricette per elemento di input o risultato di output. Il sito mostrerà i rapporti trader e i possibili risultati per ogni combinazione.",
+          "tip_1": "Controllare il calcolatore prima di sacrificare oggetti rari — alcuni scambi hanno rapporti di valore molto migliori rispetto ad altri.",
+          "tip_2": "I dati delle ricette possono ritardare al rilascio di nuove patch del gioco. Se una ricetta sembra mancante o non corretta, controlla di nuovo dopo che il sito è stato aggiornato.",
+          "faq_1_q": "CultistCircle è libero da utilizzare?",
+          "faq_1_a": "Sì, CultistCircle è completamente gratuito e funziona nel tuo browser senza richiedere un account.",
+          "faq_2_q": "CultistCircle è affiliato a TarkovTracker?",
+          "faq_2_a": "No, CultistCircle è un progetto indipendente di uno sviluppatore solista. È elencato qui come una risorsa utile per la comunità."
         }
       }
     }
@@ -1685,7 +1685,7 @@
     "tarkovchanges": "Tarkov Changes",
     "tarkovmonitor": "Tarkov Monitor",
     "credits": "Riconoscimenti",
-    "resources": "Resources",
+    "resources": "Risorse",
     "settings": "Impostazioni",
     "profile": "Profilo",
     "kappa": "Kappa & Lightkeeper",
@@ -2134,21 +2134,21 @@
       "go_to_dashboard": "Vai alla Dashboard"
     },
     "discord_link": {
-      "title": "Discord Account",
-      "description": "Link your Discord account to receive the Linked role and keep supporter perks synchronized.",
-      "link_account": "Link Discord account",
-      "login_to_link": "Log in to link Discord",
-      "linked_as": "Linked as {username}",
-      "sync_roles": "Sync Discord roles",
-      "error_title": "Discord link unavailable",
-      "not_in_guild_title": "Join the Discord server",
-      "not_in_guild": "Your account is linked, but you must join the TarkovTracker Discord server before roles can be synchronized.",
-      "load_error": "We could not load your Discord account link.",
-      "link_error": "We could not start Discord account linking. Please try again.",
-      "unlink_account": "Unlink Discord account",
-      "unlink_requires_login": "Add another login method before unlinking your only sign-in identity.",
-      "unlink_error": "We could not unlink your Discord account. Your link remains active.",
-      "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
+      "title": "Account Discord",
+      "description": "Collega il tuo account Discord per ricevere il ruolo Connesso e mantenere i perk supporter sincronizzati.",
+      "link_account": "Connetti account Discord",
+      "login_to_link": "Accedi per collegare l'account Discord",
+      "linked_as": "Collegato come {username}",
+      "sync_roles": "Sincronizza i ruoli Discord",
+      "error_title": "Link Discord non disponibile",
+      "not_in_guild_title": "Unisciti al server Discord",
+      "not_in_guild": "Il tuo account è collegato, ma devi unirti al nostro server TarkovTracker prima che i ruoli possano essere sincronizzati.",
+      "load_error": "Non è stato possibile caricare il link del tuo account Discord.",
+      "link_error": "Non è stato possibile avviare il collegamento dell'account Discord. Per favore riprova.",
+      "unlink_account": "Scollega l'account Discord",
+      "unlink_requires_login": "Aggiungi un altro metodo di login prima di scollegare la tua unica identità di accesso.",
+      "unlink_error": "Non è stato possibile scollegare il tuo account Discord. Il tuo link rimane attivo.",
+      "sync_error": "Il tuo account è collegato, ma non è stato possibile sincronizzare i ruoli di Discord. Riprova più tardi."
     },
     "prestige": {
       "title": "Prestigio",
