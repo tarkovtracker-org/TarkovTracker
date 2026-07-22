@@ -20,7 +20,7 @@
  * Uses only Node.js built-in modules so it runs without installing deps.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, dirname, basename, extname } from 'path';
+import { join, dirname, basename } from 'path';
 
 const ROOT = process.cwd();
 const SYSTEMS_MD = join(ROOT, 'docs', 'SYSTEMS.md');
@@ -94,7 +94,9 @@ function pathExists(relativePath) {
     // Glob: check that the directory exists and at least one file matches.
     const dir = dirname(absolute);
     if (!existsSync(dir)) return false;
-    const pattern = basename(absolute).replace(/\./g, '\\.').replace(/\*/g, '.*');
+    const pattern = basename(absolute)
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\*/g, '.*');
     const re = new RegExp(`^${pattern}$`);
     try {
       return readdirSync(dir).some((f) => re.test(f));
@@ -102,13 +104,16 @@ function pathExists(relativePath) {
       return false;
     }
   }
-  return existsSync(absolute);
+  if (!existsSync(absolute)) return false;
+  return statSync(absolute).isFile();
 }
 
 function checkEndpoints(md) {
   const documented = extractDocumentedEndpoints(md);
   if (documented.length === 0) {
-    warnings.push('No /api/tarkov/* endpoints found in SYSTEMS.md endpoint table.');
+    fail(
+      'No /api/tarkov/* endpoints found in SYSTEMS.md endpoint table. The endpoint section is required.'
+    );
     return;
   }
   const handlers = new Set(listTarkovHandlers());
@@ -133,7 +138,9 @@ function checkEndpoints(md) {
 function checkDocumentedPaths(md) {
   const paths = extractDocumentedPaths(md);
   if (paths.length === 0) {
-    warnings.push('No implementation file paths found in SYSTEMS.md.');
+    fail(
+      'No implementation file paths found in SYSTEMS.md. The implementation paths section is required.'
+    );
     return;
   }
   for (const p of paths) {
@@ -148,18 +155,41 @@ function checkKvBinding(md) {
   const bindingMatch = md.match(/KV binding name is `([A-Z_]+)`/);
   const documentedBinding = bindingMatch ? bindingMatch[1] : null;
   if (!documentedBinding) {
-    warnings.push('Could not find a KV binding name declaration in SYSTEMS.md.');
+    fail(
+      'Could not find a KV binding name declaration in SYSTEMS.md. The KV binding section is required.'
+    );
     return;
   }
 
   // Check wrangler.toml binding.
+  if (!existsSync(WRANGLER_TOML)) {
+    fail(`Cannot verify KV binding: ${WRANGLER_TOML} does not exist.`);
+    return;
+  }
   const wrangler = readText(WRANGLER_TOML);
-  const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
-  if (!wranglerBindingRe.test(wrangler)) {
+  const bindingLines = wrangler
+    .split('\n')
+    .filter((l) => /^\s*binding\s*=/.test(l) && !l.trim().startsWith('#'));
+  if (bindingLines.length === 0) {
     fail(
-      `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
-        `contain a binding with that name.`
+      `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml has no binding declarations.`
     );
+  } else {
+    for (const line of bindingLines) {
+      const match = line.match(/binding\s*=\s*"([^"]+)"/);
+      if (match && match[1] !== documentedBinding) {
+        fail(
+          `wrangler.toml contains KV binding "${match[1]}" which does not match the documented binding "${documentedBinding}".`
+        );
+      }
+    }
+    const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
+    if (!wranglerBindingRe.test(wrangler)) {
+      fail(
+        `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
+          `contain a binding with that name.`
+      );
+    }
   }
 
   // Check PRECOMPUTED_KV_BINDING constant in precomputedTarkov.ts.
@@ -181,15 +211,15 @@ function checkSupportedLanguages(md) {
   // SYSTEMS.md does not currently enumerate supported languages. When it does
   // (as a backtick-quoted, comma/space-separated list on a line containing
   // "supported languages" or similar), verify it against app/locales/.
-  const localeDirs = readdirSync(LOCALES_DIR)
+  const localeFiles = readdirSync(LOCALES_DIR)
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.replace(/\.json$/, ''));
-  const localeSet = new Set(localeDirs);
+  const localeSet = new Set(localeFiles);
 
-  // Look for an explicit language list in the doc, e.g. a line like:
-  //   Supported languages: `en`, `de`, `fr`, ...
-  const listRe = /[Ss]upported languages?[:\s]+(.+)/;
-  const match = md.match(listRe);
+  // Look for an explicit language list in the doc. Capture the full section
+  // after the "Supported languages" heading to handle multiline lists.
+  const sectionRe = /[Ss]upported languages?[:\s]+([\s\S]*?)(?:\n#|\n##|\n$|$)/;
+  const match = md.match(sectionRe);
   if (!match) {
     // No language list in the doc — nothing to verify yet.
     return;
@@ -206,10 +236,11 @@ function checkSupportedLanguages(md) {
       );
     }
   }
-  const undocumentedLocales = localeDirs.filter((c) => !langCodes.includes(c));
+  const undocumentedLocales = localeFiles.filter((c) => !langCodes.includes(c));
   if (undocumentedLocales.length > 0) {
-    warnings.push(
-      `Locale directories exist without a SYSTEMS.md language entry: ${undocumentedLocales.join(', ')}.`
+    fail(
+      `Locale files exist without a SYSTEMS.md language entry: ${undocumentedLocales.join(', ')}. ` +
+        `Add them to the supported languages list or remove them from app/locales/.`
     );
   }
 }
