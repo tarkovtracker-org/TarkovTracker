@@ -40,10 +40,10 @@
 
 Select one:
 
-- [ ] No user-visible, contributor-visible, or operational behavior changed
-- [ ] Existing documentation remains accurate
-- [ ] Documentation was updated in this PR
-- [ ] Follow-up documentation issue: #
+- [ ] No behavior changed — no documentation review needed
+- [ ] Behavior changed — existing documentation remains accurate
+- [ ] Behavior changed — documentation was updated in this PR
+- [ ] Behavior changed — follow-up documentation issue: #
 
 Documents reviewed when relevant:
 
