@@ -78,9 +78,9 @@ asks for the following sections. Complete every section:
 
 1. Maintainers and automated review tools review your PR
 2. Address all feedback on the same PR branch — do not open follow-up PRs for in-scope feedback
-3. Every review thread must have an explicit disposition (fixed, rejected with rationale, or
-   deferred to a tracked issue) before merge
-4. Once all threads are resolved and CI is green, a maintainer merges
+3. Every inline review thread and every top-level/review-summary comment must have an explicit
+   disposition (fixed, rejected with rationale, or deferred to a tracked issue) before merge
+4. Once all reviews complete, all threads are resolved, and CI is green, a maintainer merges
 5. Your contribution will be in the next release!
 
 > The full review gate (including rate-limit handling and out-of-scope deferrals) is in

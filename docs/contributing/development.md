@@ -27,7 +27,7 @@ conventions for TarkovTracker. For the contribution workflow overview, see
 ## Coding Standards
 
 Coding standards are documented in [`../../AGENTS.md`](../../AGENTS.md) (Coding Conventions,
-Nuxt/Vue Rules, TypeScript, Error Handling, Localization sections). That file is the canonical
+Nuxt / Vue Rules, TypeScript, Error Handling, Localization sections). That file is the canonical
 source — do not duplicate its rules here. Key reminders for new contributors:
 
 - `<script setup lang="ts">` with TypeScript strict
