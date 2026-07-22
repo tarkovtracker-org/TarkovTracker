@@ -179,7 +179,7 @@ function checkKvBinding(md) {
       inKvBlock = true;
       continue;
     }
-    if (/^\s*\[\[/.test(line) && inKvBlock) {
+    if (/^\s*\[/.test(line) && inKvBlock) {
       inKvBlock = false;
     }
     if (inKvBlock) kvBlocks.push(line);
