@@ -41,6 +41,10 @@ function readText(filePath) {
 }
 
 function listTarkovHandlers() {
+  if (!existsSync(TARKOV_API_DIR)) {
+    fail(`Cannot list Tarkov handlers: ${TARKOV_API_DIR} does not exist.`);
+    return [];
+  }
   return readdirSync(TARKOV_API_DIR)
     .filter((f) => f.endsWith('.get.ts'))
     .map((f) => f.replace(/\.get\.ts$/, ''));
@@ -212,6 +216,10 @@ function checkSupportedLanguages(md) {
   // SYSTEMS.md does not currently enumerate supported languages. When it does
   // (as a backtick-quoted, comma/space-separated list on a line containing
   // "supported languages" or similar), verify it against app/locales/.
+  if (!existsSync(LOCALES_DIR)) {
+    fail(`Cannot verify supported languages: ${LOCALES_DIR} does not exist.`);
+    return;
+  }
   const localeFiles = readdirSync(LOCALES_DIR)
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.replace(/\.json$/, ''));
