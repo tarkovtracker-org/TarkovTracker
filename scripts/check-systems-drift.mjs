@@ -41,7 +41,11 @@ function readText(filePath) {
 }
 
 function listTarkovHandlers() {
-  if (!existsSync(TARKOV_API_DIR) || !statSync(TARKOV_API_DIR).isDirectory()) {
+  if (!existsSync(TARKOV_API_DIR)) {
+    fail(`Cannot list Tarkov handlers: ${TARKOV_API_DIR} does not exist.`);
+    return [];
+  }
+  if (!statSync(TARKOV_API_DIR).isDirectory()) {
     fail(`Cannot list Tarkov handlers: ${TARKOV_API_DIR} is not a directory.`);
     return [];
   }
@@ -216,7 +220,11 @@ function checkSupportedLanguages(md) {
   // SYSTEMS.md does not currently enumerate supported languages. When it does
   // (as a backtick-quoted, comma/space-separated list on a line containing
   // "supported languages" or similar), verify it against app/locales/.
-  if (!existsSync(LOCALES_DIR) || !statSync(LOCALES_DIR).isDirectory()) {
+  if (!existsSync(LOCALES_DIR)) {
+    fail(`Cannot verify supported languages: ${LOCALES_DIR} does not exist.`);
+    return;
+  }
+  if (!statSync(LOCALES_DIR).isDirectory()) {
     fail(`Cannot verify supported languages: ${LOCALES_DIR} is not a directory.`);
     return;
   }
