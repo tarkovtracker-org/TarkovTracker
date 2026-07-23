@@ -1,3 +1,10 @@
+## [1.60.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.0...v1.60.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **api:** finish User-Agent rollout safeguards ([#581](https://github.com/tarkovtracker-org/TarkovTracker/issues/581)) ([123d641](https://github.com/tarkovtracker-org/TarkovTracker/commit/123d6414cde3f9cfdb15cebe08d0fdcabe5e1c71)), closes [#565](https://github.com/tarkovtracker-org/TarkovTracker/issues/565)
+
 # [1.60.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.4...v1.60.0) (2026-07-21)
 
 
