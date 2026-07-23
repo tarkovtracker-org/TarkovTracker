@@ -156,4 +156,77 @@ describe('useSkillCalculation', () => {
     const { allGameSkills } = useSkillCalculation();
     expect(allGameSkills.value).toEqual([]);
   });
+  it('backfills missing skill id and image link from later objectives', () => {
+    const metadataStore = useMetadataStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-vitality',
+        name: 'Vitality Task',
+        objectives: [
+          {
+            id: 'objective-vitality-no-meta',
+            type: 'skill',
+            skillLevel: {
+              id: 'req-1',
+              name: 'Vitality',
+              level: 3,
+            },
+          },
+          {
+            id: 'objective-vitality-with-meta',
+            type: 'skill',
+            skillLevel: {
+              id: 'req-2',
+              name: 'Vitality',
+              level: 5,
+              skill: {
+                id: 'Vitality',
+                name: 'Vitality',
+                imageLink: 'https://example.com/vitality.webp',
+              },
+            },
+          },
+        ],
+      },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    const vitality = allGameSkills.value.find((skill) => skill.key === 'Vitality');
+    expect(vitality).toMatchObject({
+      id: 'Vitality',
+      imageLink: 'https://example.com/vitality.webp',
+      name: 'Vitality',
+      requiredByTasks: ['Vitality Task', 'Vitality Task'],
+      requiredLevels: [3, 5],
+    });
+  });
+  it('deduplicates repeated required levels for the same skill', () => {
+    const metadataStore = useMetadataStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-a',
+        name: 'Task A',
+        objectives: [
+          {
+            id: 'objective-1',
+            type: 'skill',
+            skillLevel: { id: 'req-1', name: 'Strength', level: 5, skill: { id: 'Strength' } },
+          },
+        ],
+      },
+      {
+        id: 'task-b',
+        name: 'Task B',
+        objectives: [
+          {
+            id: 'objective-2',
+            type: 'skill',
+            skillLevel: { id: 'req-2', name: 'Strength', level: 5, skill: { id: 'Strength' } },
+          },
+        ],
+      },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    const strength = allGameSkills.value.find((skill) => skill.key === 'Strength');
+    expect(strength?.requiredLevels).toEqual([5]);
+  });
 });

@@ -5,6 +5,7 @@ import {
   getCanonicalSkillKey,
   normalizeSkillToken,
   readSkillObjective,
+  resolveSkillKey,
 } from '@/utils/skillHelpers';
 import type { Task, TaskObjective } from '@/types/tarkov';
 const skillObjective = (overrides: Partial<TaskObjective> = {}): TaskObjective => ({
@@ -190,6 +191,17 @@ describe('buildSkillKeyAliases', () => {
     ] as unknown as Task[];
     expect(buildSkillKeyAliases(tasks).size).toBe(0);
   });
+  it('ignores rewards with a whitespace-only name and no skill id', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [],
+        finishRewards: { skillLevelReward: [{ name: '   ', level: 1 }] },
+      },
+    ] as unknown as Task[];
+    expect(buildSkillKeyAliases(tasks).size).toBe(0);
+  });
   it('merges aliases across multiple tasks', () => {
     const tasks = [
       {
@@ -218,6 +230,21 @@ describe('buildSkillKeyAliases', () => {
     const aliases = buildSkillKeyAliases(tasks);
     expect(aliases.get('Vitality')).toBe('Vitality');
     expect(aliases.get('Endurance')).toBe('Endurance');
+  });
+});
+describe('resolveSkillKey', () => {
+  it('returns the original name when it is empty or whitespace-only', () => {
+    const aliases = new Map<string, string>([['Strength', 'Strength']]);
+    expect(resolveSkillKey('', aliases)).toBe('');
+    expect(resolveSkillKey('   ', aliases)).toBe('   ');
+  });
+  it('falls back to the normalized name when no alias exists', () => {
+    const aliases = new Map<string, string>();
+    expect(resolveSkillKey('Endurance', aliases)).toBe('Endurance');
+  });
+  it('returns an alias when present', () => {
+    const aliases = new Map<string, string>([['Starke', 'Strength']]);
+    expect(resolveSkillKey('Starke', aliases)).toBe('Strength');
   });
 });
 describe('collapseSkillOffsets', () => {
