@@ -119,16 +119,12 @@
   "promoted_stream": {
     "close": "Close stream",
     "expand": "Open stream",
-    "mute": "Mute stream",
     "open_channel": "Go to Twitch channel",
-    "pause": "Pause stream",
     "player_title": "{streamer} Twitch stream",
-    "play": "Play stream",
     "region_label": "Promoted Twitch stream for {streamer}",
     "reopen": "Reopen stream",
     "shrink": "Shrink stream",
-    "title": "{streamer} live",
-    "unmute": "Unmute stream"
+    "title": "{streamer} live"
   },
   "buttons": {
     "retry": "Opakovat"
@@ -231,8 +227,6 @@
   },
   "page_help": {
     "button": "Nápověda",
-    "hint_title": "Novinka?",
-    "dismiss": "Odmítnout",
     "launcher": {
       "title": "Pomoc a zapojení",
       "summary": "Vyberte rychlý průvodce pro tuto stránku nebo cestu úplného nastavení.",
@@ -506,7 +500,6 @@
         },
         "stat": {
           "why": "Proč zvítězila",
-          "progress": "Pokrok v tomto doplňku",
           "status": "Stav",
           "secondary": "Další dobré možnosti",
           "secondary_actionable": "Použijte je, pokud primární plán není vhodný.",
@@ -548,17 +541,6 @@
           "filters_one": "Žádné viditelné možnosti: ve vašich filtrech je skryt 1 dostupný úkol.",
           "filters_other": "Žádné viditelné možnosti: {count} dostupné úkoly jsou skryty vašimi filtry.",
           "complete": "V tomto rozsahu hlavního panelu nezůstává žádná viditelná díla."
-        },
-        "contribution": {
-          "unlock_trader": "Odemkne linii úkolu {trader}.",
-          "impact_one": "Vytvoří 1 nový úkol.",
-          "impact_other": "Vytvoří {count} nové následné úkoly.",
-          "kappa": "Počítadlo k vašemu Kappa řetězci.",
-          "lightkeeper": "Počítá se do tvého řetězce Lightkeeper.",
-          "trader": "Posune linku úkolu {trader} dopředu.",
-          "filters": "Zobrazí úkoly, které jsou již proveditelné.",
-          "complete": "Zbytek řídicího panelu nyní podporuje kontext.",
-          "default": "Udržuje váš viditelný dashboard v pohybu."
         },
         "status": {
           "ready_one": "Nyní je připraveno. Zbývá 1 cíl.",
@@ -696,10 +678,6 @@
         "lightkeeper": "Držák blesku"
       },
       "stats": {
-        "total": "Kappa úkoly",
-        "completed": "Kappa Done",
-        "lightkeeper_total": "Lightkeeper Tasks",
-        "lightkeeper_completed": "Lightkeeper Done",
         "available": "Dostupné",
         "locked": "Uzamčeno",
         "failed": "Selhalo"
@@ -720,8 +698,6 @@
         "action_reset_failed": "Reset failed",
         "locked_by": "Requires: {task}"
       },
-      "progress_label": "complete",
-      "all_complete": "All tasks complete! Well done, PMC.",
       "empty": "No tasks for this list yet.",
       "summary": {
         "progress": "Progress",
@@ -743,10 +719,8 @@
       "billing_6month": "6 Months",
       "billing_yearly": "Yearly",
       "most_popular": "Most Popular",
-      "fee_note": "Price shown includes Stripe fees.",
       "tier_cta": "Subscribe",
       "tier_login_cta": "Log in to subscribe",
-      "tier_current_cta": "Current tier",
       "tier_change_cta": "Change plan in billing portal",
       "current_tier_badge": "Current tier",
       "tier_scav_name": "Šcav",
@@ -818,7 +792,6 @@
     "tasks": {
       "title": "Úkoly",
       "primary_views": {
-        "all": "Seznam",
         "list": "Seznam",
         "maps": "Mapy",
         "traders": "Obchodníci",
@@ -877,17 +850,6 @@
       },
       "filters": {
         "close": "Zavřít"
-      },
-      "api_update_log": {
-        "title": "Nedávná historie synchronizace",
-        "subtitle": "Sledovat při automatické synchronizaci z externích zdrojů.",
-        "empty": "Zatím nejsou zaznamenány žádné synchronizace. Při synchronizaci se zde zobrazí váš průběh.",
-        "entry_count": "{count} úkoly",
-        "no_task_details": "Pokrok byl úspěšně synchronizován.",
-        "more_tasks": "+{count} další",
-        "unknown_time": "Neznámý čas",
-        "collapse": "Sbalit historii synchronizace",
-        "expand": "Rozbalit historii synchronizace"
       },
       "settings": {
         "title": "Nastavení úkolu",
@@ -976,7 +938,6 @@
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "Wiki stránka",
         "locked_before": "Opravit úkoly: {count}",
-        "locked_behind": "Úkoly uzamčené Behind: {count}",
         "requires": "Vyžaduje",
         "unlocks_next": "Odemkne další",
         "impact": "Dopad",
@@ -1018,7 +979,6 @@
         "undo_uncomplete": "Nedokončeno nedokončení {name}",
         "undo_failed": "Nedošlo k selhání {name}",
         "undo_reset_failed": "Obnovení stavu pro {name}",
-        "undo_unknown": "Akce pro {name} nelze vrátit zpět",
         "mark_failed_confirm": "Označit tento úkol jako neúspěšný? Toto je pouze pro datové problémy, není doporučeno a může blokovat řetězce úkolů.",
         "reset_item_counts_confirm": "Obnovit všechny počty položek pro tento úkol?",
         "failed_because": "Nezdařilo se, protože",
@@ -1029,11 +989,8 @@
         "blocked_because_was": "byl {status}",
         "blocked_because_status_tooltip": "Trvale blokováno — \"{name}\" bylo {status}",
         "blocked_because_unknown": "Zablokováno předpoklady",
-        "keys_header": "Požadované klíče",
         "keys_disclaimer_tooltip": "Na základě dat API a ne vždy vyžadovaných. Dveře již mohou být odemčeny. Před nákupem klíčů ověřte ve hře nebo na wiki.",
         "keys_disclaimer_aria": "Odmítnutí vyžadovaných kláves",
-        "keys_needed": "{keys} na {map} | Jedno z {keys} na {map}",
-        "keys_optional_badge": "Nepovinné",
         "keys_or": "nebo",
         "equipment_disclaimer_tooltip": "Zvláštní vybavení, které musí být zabrzděno, aby byl tento cíl naplněn.",
         "equipment_disclaimer_aria": "Odmítnutí požadovaného vybavení",
@@ -1056,9 +1013,6 @@
         "objective_optional_badge": "Nepovinné",
         "ready_to_hand_over": "Připraveno k předání",
         "objectives_hidden": "{count} cíle nejsou na této mapě ({uncompleted} nedokončeno)",
-        "alternatives": "Alternativní úkoly",
-        "alternative_failed": "Další úkoly budou také resetovány",
-        "different_faction": "Tento úkol není k dispozici vaší frakci",
         "needed_by": "Potřebuje: {names}",
         "unlocks_next_tooltip": "Počet úkolů, které budou dostupné po dokončení tohoto úkolu",
         "impact_tooltip": "Počet nedokončených úkolů, které závisejí na dokončení tohoto úkolu",
@@ -1079,12 +1033,10 @@
         "find_fir": "Najít v razii",
         "items_count": "{count} položky",
         "kappa_tooltip": "Tento úkol je vyžadován pro získání zabezpečené kontejneru Kappa",
-        "kappa_required": "POVOLENÁ KAPPA",
         "level_badge_tooltip": "Pro odemknutí tohoto úkolu je vyžadována minimální úroveň {level}",
         "lightkeeper_tooltip": "Tento úkol je vyžadován k odemčení obchodníka Lightkeeper",
         "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
         "alternatives_badge": "{count} alt",
-        "lightkeeper_required": "VYŽADUJE LIGHTKEEPER",
         "location_tooltip": "Cíle úkolu jsou na {map}",
         "next_tasks": "Další úkol(y):",
         "objective": "Cíl",
@@ -1103,7 +1055,6 @@
       "loading": "Načítání dat skrytí",
       "station_link_label": "Přejít na {name}",
       "no_stations_found": "Nebyly nalezeny žádné stanice. Zkuste změnit filtry.",
-      "load_more_stations": "Načíst více stanic",
       "collapse_completed": "Sbalit dokončené stanice",
       "sort": {
         "ready_first": "Řadit připraveno k první sestavení"
@@ -1166,26 +1117,17 @@
       "filters": {
         "all": "Vše",
         "label": "Filtry",
-        "sections": {
-          "items": "POLOŽKY",
-          "team": "TEAM"
-        },
         "fir": "FYR",
         "non_fir": "NON-FIR",
-        "show_owned": "ZOBRAZIT VLASTNÍ",
         "hide_owned": "ZOBRAZIT VLASTNÍK",
         "hide_non_fir_special_equipment_title": "Skrýt speciální zařízení jiné než FIR (např. značky MS2000, Wi-Fi kamery)",
-        "no_special": "NEZVLÁŠTNÍ",
-        "special": "ZVLÁŠTNÍ",
         "kappa_only": "KAPPA",
         "kappa_only_tooltip": "Zobrazit pouze položky potřebné pro úkoly Kappa",
         "kappa_only_disabled_tooltip": "Filtr Kappa se vztahuje pouze na úkoly.",
-        "hide_team_needs": "SKRÝT TEAM NEEDS",
-        "show_team_needs": "ZOBRAZIT TEAM NEEDS"
+        "hide_team_needs": "SKRÝT TEAM NEEDS"
       },
       "sort": {
         "label": "Seřadit",
-        "by": "SEŘADIT PODLE",
         "priority": "Priorita",
         "name": "Název",
         "category": "Kategorie",
@@ -1399,25 +1341,17 @@
       "achievement_mainline": "Průběh hlavního úkolu",
       "achievement_objectives": "Cíl dokončen",
       "no_storyline": "Pro tento profil nejsou k dispozici žádná data o úložišti.",
-      "storyline_chapter": "KAPITOLA 1 1 —",
       "storyline_auto_start": "Automatické spuštění",
       "storyline_discovered": "Objeveno",
       "storyline_requires": "Vyžaduje",
-      "storyline_unlocks_maps": "Odemkne mapy",
-      "storyline_unlocks_traders": "Odemkne obchodníky",
-      "storyline_wiki": "Wiki",
       "storyline_objectives_main": "Hlavní cíle",
       "storyline_objectives_optional": "Nepovinné cíle",
-      "storyline_description": "L 343, 22.12.2009, s. 1).",
-      "storyline_notes": "Poznámky",
-      "storyline_rewards": "Odměny",
       "view_tarkov_dev": "Zobrazit na Tarkov.dev",
       "no_hideout": "Pro tento profil nejsou k dispozici žádná data skrýt.",
       "hideout_level": "Úrovně",
       "hideout_fallback": "Hideout",
       "hideout_item_fallback": "Hideout item",
       "hideout_module_fallback": "Skrývat upgrade",
-      "unknown_trader": "Neznámý obchodník",
       "level_prefix": "Lv.",
       "no_tasks": "Pro tento profil nejsou k dispozici žádné úkoly.",
       "task_fallback": "Úkol",
@@ -1512,7 +1446,6 @@
         "open_tool": "Open tool",
         "download_release": "Download latest release"
       },
-      "view_guide": "Setup guide",
       "back_to_hub": "Back to Resources",
       "breadcrumb": "Breadcrumb",
       "guide_label": "Guide",
@@ -1656,7 +1589,6 @@
       "github": "GitHub"
     },
     "support_button": "Podpořit vývoj",
-    "support_tagline": "Pomozte zachovat TarkovTracker zdarma & aktualizován",
     "terms_of_service": "Podmínky služby",
     "privacy_policy": "Ochrana osobních údajů",
     "credits": "Kredity",
@@ -1833,13 +1765,10 @@
     "title": "Nastavení",
     "locale": "Jazyk",
     "tabs": {
-      "gameplay": "Hra",
-      "interface": "Rozhraní",
       "account": "Účet",
       "progression": "Pokrok",
       "prestige": "Prestige",
       "preferences": "Předvolby",
-      "data_management": "Správa dat",
       "imports": "Dovoz",
       "backup_restore": "Zálohování a obnovení",
       "api": "API",
@@ -1887,10 +1816,6 @@
       "compact": "Kompaktní",
       "comfortable": "Komfortní"
     },
-    "account_moved": {
-      "message": "Hledáte API tokeny nebo nastavení účtu?",
-      "link": "Přejít na účet"
-    },
     "account": {
       "begin_deletion": "Zahájit odstranění účtu"
     },
@@ -1905,7 +1830,6 @@
       "admin_panel": "Admin panel"
     },
     "interface": {
-      "title": "Přizpůsobení rozhraní",
       "tasks": {
         "title": "Karty úkolů",
         "show_required": "Zobrazit povinné štítky",
@@ -1914,9 +1838,6 @@
         "show_prev": "Zobrazit předchozí úkoly",
         "density": "Hustota karty",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
-      },
-      "defaults": {
-        "title": "Výchozí zobrazení"
       },
       "maps": {
         "title": "Mapy",
@@ -1942,9 +1863,6 @@
         "title": "Wiki Links",
         "antifandom": "Use antifandom.com",
         "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
-      },
-      "misc": {
-        "title": "Ostatní"
       }
     },
     "game_profile": {
@@ -1960,7 +1878,6 @@
       "mode_pve": "PvE",
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_link": "Kopírovat odkaz na profil",
       "copy_pvp_link": "Copy PvP profile link",
       "copy_pve_link": "Copy PvE profile link",
       "login_required": "Přihlaste se pro správu viditelnosti sdílení profilu."
@@ -1971,9 +1888,6 @@
       "pve": "PvE",
       "switch_mode_failed": "Přepnutí herního režimu se nezdařilo, zkuste to prosím znovu",
       "switch_mode_fetch_failed": "Herní režim byl přepnut, ale nepodařilo se aktualizovat data, zkuste to prosím znovu"
-    },
-    "data_management_card": {
-      "title": "Správa dat"
     },
     "data_management": {
       "reset_pvp_title": "Resetovat PvP data",
@@ -1988,20 +1902,14 @@
       "reset_all_data": "Resetovat všechna data",
       "reset_all_confirmation": "Jste si jisti, že chcete obnovit VŠECHNY váš pokrok?",
       "reset_all_warning": "Tímto trvale smažete VŠECHNY váš postup pro PvP a PvE režimy. Tuto akci nelze vrátit zpět!",
-      "prestige_pvp_title": "Prestige PvP Profile",
-      "prestige_pvp_data": "Prestige PvP",
-      "prestige_pvp_confirmation": "Jste si jisti, že chcete prestiž vašeho profilu PvP?",
       "prestige_pvp_warning": "Váš současný běh PvP bude archivován, pak se PvP postup resetuje pro další úroveň prestiže. Data PvE nejsou ovlivněna.",
       "reset_cancel": "Zrušit",
       "reset_confirm": "Resetovat data",
-      "export_title": "Exportovat & zálohování",
       "export_description": "Stáhněte si zálohu dat o průběhu jak pro PvP, tak pro PvE režimy.",
       "export_button": "Export zálohy průběhu exportu",
       "debug_export_button": "Exportovat ladící snímek",
       "debug_export_description": "Stáhněte si snímek účtu pro ladění podpisových úloh. To nezahrnuje autentizační tokeny, emaily a profilové obrázky.",
-      "import_title": "Importovat",
       "import_backup_button": "Importovat zálohu TarkovTrackeru",
-      "import_tarkovdev_button": "Importovat tarkov.dev profil",
       "import_eft_logs_folder_button": "Importovat složku protokolů EFT",
       "recommended_badge": "Doporučené",
       "active_flow_blocked_title": "Nejprve dokončete aktuální tok dat",
@@ -2016,7 +1924,6 @@
       "backup_restore_section_title": "Zálohování a obnovení",
       "backup_restore_section_description": "Exportovat zálohu nebo obnovit z dříve exportovaného souboru",
       "debug_section_title": "Debug Snapshot",
-      "debug_section_description": "Stáhnout sanitovaný snímek pro podporu a ladění",
       "import_backup_title": "Obnovit ze zálohy",
       "import_backup_description": "Obnovit postup ze záložního souboru TarkovTracker",
       "import_preview_exported_at": "Exportováno",
@@ -2038,7 +1945,6 @@
       "debug_export_error_title": "Export ladění se nezdařil",
       "reset_title": "Obnovit průběh",
       "prestige_history_title": "Prestige History",
-      "prestige_history_description": "Archivované běhy PvP jsou udržovány po každé prestiži, abyste mohli porovnat pokrok.",
       "prestige_history_loading": "Načítání historie prestiži...",
       "prestige_history_empty": "Zatím neběží žádná archivovaná prestiž.",
       "prestige_history_load_error": "Nepodařilo se načíst historii prestiže.",
@@ -2061,10 +1967,6 @@
       "success_title": "PvP Prestige Complete",
       "success_description": "Váš PvP profil byl prestiž na úrovni {level}.",
       "error_description": "Prestiž PvP profilu se nezdařila. Zkuste to prosím znovu."
-    },
-    "data_migration": {
-      "title": "Migrace lokálních dat",
-      "description": "Přeneste místní data o pokroku na váš cloudový účet. To se stane automaticky při přihlášení."
     },
     "reset": {
       "error_title": "Obnovení selhalo"
@@ -2094,7 +1996,6 @@
       "member_since_label": "Členem od",
       "account_id_label": "ID účtu",
       "unknown_label": "Neznámý",
-      "data_reset_title": "Resetování dat",
       "account_deletion_title": "Smazání účtu",
       "login_required_delete": "Pro smazání účtu se přihlaste",
       "action_show": "Zobrazit",
@@ -2208,9 +2109,7 @@
       "summary_description_manual": "Požadavky {count} stále vyžadují ruční ověření ve hře."
     },
     "display_name": {
-      "title": "Zobrazované jméno",
       "explanation": "Zobrazované jméno je zobrazeno týmovým přátelům a navigaci. Každý herní režim (PVP/PVE) má samostatné zobrazovací jméno.",
-      "mode_hint": "Upravujete název zobrazení pro režim {mode} . Přepněte herní režimy v navigační liště a upravte další zobrazovací jméno.",
       "label": "Zobrazované jméno",
       "placeholder": "Zadejte své zobrazovací jméno...",
       "save": "Uložit",
@@ -2272,7 +2171,6 @@
       "reset_offset": "Resetovat odsazení XP"
     },
     "danger_zone": {
-      "confirm_delete_instruction": "Napište {word} pro potvrzení:",
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {
@@ -2313,7 +2211,6 @@
       "unknown_mode_event_details": "Neznámé podrobnosti o události režimu",
       "unknown_completion_events": "Dokončené úkoly (neznámý režim)",
       "unknown_started_events": "Zahájené úkoly (neznámý režim)",
-      "import_to_mode": "Importovat do režimu",
       "import_unknown_to_mode": "Importovat neznámé události režimu do",
       "import_unknown_to_mode_hint": "Známé události PvP/PvE jsou automaticky směrovány. To platí pouze pro nevyřešené události.",
       "auto_mode_hint": "Směrování režimu bylo zjištěno z backendových protokolů a bude použito automaticky.",
@@ -2350,9 +2247,7 @@
       "profile_url_label": "URL profilu Tarkov.dev",
       "profile_url_placeholder": "https://tarkov.dev/players/regular/8560316",
       "profile_url_hint": "Najděte si svůj profil v {link}, otevřete odpovídající PvP nebo PvE profil a pak vložte URL této stránky.",
-      "profile_url_hint_before_link": "Najděte svůj profil na",
       "profile_url_hint_link": "tarkov.dev/hráči",
-      "profile_url_hint_after_link": ", otevřete odpovídající profil PvP nebo PvE a vložte tuto adresu URL zde.",
       "profile_url_refresh_hint": "Tarkov.dev obnoví profil JSON poté, co tam otevřete profilovou stránku.",
       "fetch_profile": "Načíst profil",
       "nickname": "Přezdívka",
