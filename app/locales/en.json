@@ -1573,7 +1573,7 @@
           "step_2_desc": "If you are a developer, point your HTTP client at json.tarkov.dev. The endpoint catalog is at json.tarkov.dev/endpoints. The API is free, requires no authentication for read queries, and returns static JSON files you can cache locally.",
           "step_3_title": "Join the community",
           "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
-          "tip_1": "The JSON endpoints are rate-limited but generous. For production apps, cache responses client-side to avoid redundant requests.",
+          "tip_1": "The JSON endpoints have no rate limit. For production apps, cache responses client-side to avoid redundant requests.",
           "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
           "faq_1_q": "Is the Tarkov.dev API free to use?",
           "faq_1_a": "Yes, the JSON endpoints are completely free for read queries. No API key or authentication is required for standard usage.",
