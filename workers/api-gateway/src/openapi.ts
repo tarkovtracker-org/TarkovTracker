@@ -186,17 +186,22 @@ export const OPENAPI_SPEC = {
             description: 'Always `private, max-age=15` for token-scoped reads.',
             schema: { type: 'string' },
           },
+          Vary: {
+            description:
+              'Cache variant dimensions. Always `Accept-Encoding, Authorization, Origin`.',
+            schema: { type: 'string' },
+          },
           'X-RateLimit-Limit': {
             description: 'Maximum requests permitted per UTC day for the account tier.',
-            schema: { type: 'integer' },
+            schema: { type: 'integer', minimum: 1 },
           },
           'X-RateLimit-Remaining': {
             description: 'Requests remaining in the daily quota.',
-            schema: { type: 'integer' },
+            schema: { type: 'integer', minimum: 0 },
           },
           'X-RateLimit-Reset': {
             description: 'Unix timestamp (seconds) when the daily quota resets (00:00 UTC).',
-            schema: { type: 'integer' },
+            schema: { type: 'integer', minimum: 0 },
           },
         },
       },
@@ -207,7 +212,7 @@ export const OPENAPI_SPEC = {
         headers: {
           'Retry-After': {
             description: 'Seconds to wait before retrying.',
-            schema: { type: 'integer' },
+            schema: { type: 'integer', minimum: 1 },
           },
         },
         content: {
