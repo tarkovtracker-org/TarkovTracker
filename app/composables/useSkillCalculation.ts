@@ -18,6 +18,7 @@ import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
   getCanonicalSkillKey,
+  readSkillObjective,
   resolveSkillKey as resolveSkillAliasKey,
 } from '@/utils/skillHelpers';
 export interface SkillMetadata {
@@ -42,15 +43,9 @@ export function useSkillCalculation() {
       const taskName = task.name;
       if (!taskName) return;
       task.objectives?.forEach((objective) => {
-        if (objective.type !== 'skill') return;
-        const skillLevel = objective.skillLevel;
-        const skillName = skillLevel?.name;
-        if (!skillName || !skillLevel) return;
-        const skillId = skillLevel.skill?.id;
-        const skillKey = getCanonicalSkillKey(skillName, skillId);
-        if (!skillKey) return;
-        const requiredLevel = skillLevel.level || 0;
-        const imageLink = skillLevel.skill?.imageLink;
+        const skill = readSkillObjective(objective);
+        if (!skill) return;
+        const { imageLink, requiredLevel, skillId, skillKey, skillName } = skill;
         if (!skillsMap.has(skillKey)) {
           skillsMap.set(skillKey, {
             key: skillKey,
