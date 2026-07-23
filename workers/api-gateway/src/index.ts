@@ -628,8 +628,8 @@ const READ_CACHE_CONTROL = 'private, max-age=15';
 // header is echoed per request. Accept-Encoding: bodies may be gzipped.
 const READ_VARY = 'Accept-Encoding, Authorization, Origin';
 const GZIP_MIN_BYTES = 1024;
-async function weakEtag(payload: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+async function weakEtag(payload: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', payload);
   const hex = Array.from(new Uint8Array(digest))
     .slice(0, 16)
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -641,6 +641,26 @@ function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
   if (ifNoneMatch.trim() === '*') return true;
   const opaque = (value: string) => value.trim().replace(/^W\//i, '');
   return ifNoneMatch.split(',').some((candidate) => opaque(candidate) === opaque(etag));
+}
+/**
+ * RFC 9110 Accept-Encoding negotiation for gzip. An explicit `gzip;q=0` is a
+ * rejection and must not be compressed; `*` only applies when gzip is not
+ * listed on its own. A malformed q-value falls back to "not acceptable",
+ * because an uncompressed body is always decodable.
+ */
+function acceptsGzip(header: string | null): boolean {
+  if (!header) return false;
+  let wildcard = false;
+  for (const part of header.split(',')) {
+    const [rawCoding, ...params] = part.split(';');
+    const coding = rawCoding.trim().toLowerCase();
+    if (coding !== 'gzip' && coding !== '*') continue;
+    const qParam = params.map((p) => p.trim().toLowerCase()).find((p) => p.startsWith('q='));
+    const acceptable = !qParam || Number(qParam.slice(2)) > 0;
+    if (coding === 'gzip') return acceptable;
+    wildcard = acceptable;
+  }
+  return wildcard;
 }
 /**
  * Success response for token-authenticated read endpoints: weak ETag derived
@@ -657,13 +677,16 @@ async function conditionalReadResponse(
 ): Promise<Response> {
   const body: Record<string, unknown> = { success: true };
   if (data && typeof data === 'object' && 'data' in data) {
-    body.data = (data as Record<string, unknown>).data;
-    body.meta = (data as Record<string, unknown>).meta;
+    const wrapped = data as Record<string, unknown>;
+    body.data = wrapped.data;
+    if (wrapped.meta !== undefined) body.meta = wrapped.meta;
   } else {
     body.data = data;
   }
-  const json = JSON.stringify(body);
-  const etag = await weakEtag(json);
+  // Encode once: the same bytes back the ETag digest, the size threshold, and
+  // the response body, so the validator and the payload can never disagree.
+  const payload = new TextEncoder().encode(JSON.stringify(body));
+  const etag = await weakEtag(payload);
   const headers: Record<string, string> = {
     ...corsHeaders(envOrigin, requestOrigin),
     'Cache-Control': READ_CACHE_CONTROL,
@@ -675,13 +698,15 @@ async function conditionalReadResponse(
     return new Response(null, { status: 304, headers });
   }
   headers['Content-Type'] = 'application/json';
-  const acceptEncoding = request.headers.get('Accept-Encoding') || '';
-  if (/(^|[\s,])gzip($|[\s,;])/i.test(acceptEncoding) && json.length >= GZIP_MIN_BYTES) {
+  if (
+    payload.byteLength >= GZIP_MIN_BYTES &&
+    acceptsGzip(request.headers.get('Accept-Encoding'))
+  ) {
     headers['Content-Encoding'] = 'gzip';
-    const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+    const stream = new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
     return new Response(stream, { status: 200, headers });
   }
-  return new Response(json, { status: 200, headers });
+  return new Response(payload, { status: 200, headers });
 }
 type AuthSuccess = {
   validation: { valid: true; token: ApiToken };

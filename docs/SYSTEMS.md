@@ -456,8 +456,8 @@ sequenceDiagram
    game-edition hideout auto-completes.
 6. **Response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts` serializes once,
    derives a weak `ETag` from the payload, answers `304` on a matching `If-None-Match`, sets
-   `Cache-Control: private, max-age=15` + `Vary: Accept-Encoding, Authorization`, and gzips bodies
-   ≥1 KiB when the client sent `Accept-Encoding: gzip`.
+   `Cache-Control: private, max-age=15` + `Vary: Accept-Encoding, Authorization, Origin`, and gzips
+   bodies ≥1 KiB when the client accepts gzip (an explicit `gzip;q=0` is honored as a rejection).
 7. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
    throttle flag) in `public.api_usage_daily` via `record_api_usage`, off the response path.
 

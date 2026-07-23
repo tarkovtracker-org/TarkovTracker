@@ -967,6 +967,35 @@ describe('api-gateway', () => {
     const body = (await res.json()) as { success: boolean };
     expect(body.success).toBe(true);
   });
+  it.each([
+    ['gzip;q=0', null],
+    ['gzip;q=0.0', null],
+    ['br, gzip;q=0', null],
+    ['*;q=0, gzip', 'gzip'],
+    ['gzip;q=0, *', null],
+    ['*', 'gzip'],
+    ['identity', null],
+    ['gzip;q=0.5', 'gzip'],
+  ])('honors Accept-Encoding %s', async (acceptEncoding, expected) => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        permissions: ['GP'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: { taskCompletions: manyCompletions },
+          pve_data: null,
+        },
+      })
+    );
+    const res = await worker.fetch(
+      progressRequest({ 'Accept-Encoding': acceptEncoding }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBe(expected);
+  });
   it('does not gzip small responses even when the client accepts gzip', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const res = await worker.fetch(progressRequest({ 'Accept-Encoding': 'gzip' }), BASE_ENV);
