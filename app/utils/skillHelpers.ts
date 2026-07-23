@@ -20,8 +20,8 @@ export type SkillObjectiveDetails = {
 };
 export const readSkillObjective = (objective: TaskObjective): SkillObjectiveDetails | null => {
   const { skillLevel } = objective;
-  if (objective.type !== 'skill' || !skillLevel?.name) return null;
-  const skillName = skillLevel.name;
+  const skillName = normalizeSkillToken(skillLevel?.name);
+  if (objective.type !== 'skill' || !skillLevel || !skillName) return null;
   const skillId = skillLevel.skill?.id;
   const skillKey = getCanonicalSkillKey(skillName, skillId);
   if (!skillKey) return null;

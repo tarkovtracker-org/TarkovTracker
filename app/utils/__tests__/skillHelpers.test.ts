@@ -94,6 +94,16 @@ describe('readSkillObjective', () => {
     objective.skillLevel = { id: 'req', name: '   ', level: 5 };
     expect(readSkillObjective(objective)).toBeNull();
   });
+  it('ignores a whitespace-only skill name even when a nested skill id exists', () => {
+    const objective = skillObjective();
+    objective.skillLevel = {
+      id: 'req',
+      name: '   ',
+      level: 5,
+      skill: { id: 'endurance', name: 'Endurance' },
+    };
+    expect(readSkillObjective(objective)).toBeNull();
+  });
   it('falls back to the skill name when the nested skill ref is absent', () => {
     const objective = skillObjective();
     objective.skillLevel = { id: 'req', name: 'Endurance', level: 3 };
