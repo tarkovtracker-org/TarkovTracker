@@ -3,7 +3,7 @@
 ## Document status
 
 - **Purpose:** durable architecture record and resumable implementation plan for the Tarkov data and progress system.
-- **Decision status:** target architecture agreed; Phase 0 local safeguards implemented.
+- **Decision status:** target architecture agreed; Phase 0 deployment safeguards completed.
 - **Interim state:** direct Worker JSON fetching remains an interim compatibility path, not the intended end state.
 
 ## Executive decision
@@ -127,9 +127,9 @@ The remaining limitation is architectural rather than mode correctness: the Work
 
 The upstream `alternatives` field no longer exists. Branch relationships are represented by `taskStatus` failure conditions. Compile explicit branch/failure edges from `failConditions` and remove runtime dependence on `alternatives`.
 
-### P0: active usage migration is not yet deployed
+### Resolved: API usage User-Agent migration deployed and constrained
 
-The local Worker sends `p_user_agent`; the live Supabase RPC does not accept it. Apply the migration before deploying the new Worker.
+Migration `20260718120000_add_user_agent_to_api_usage_daily.sql` is deployed in production. The live seven-argument `record_api_usage` RPC accepts `p_user_agent`, trims it to 200 characters, and stores the latest normalized value per token/day. Follow-up migration `20260723120000_constrain_api_usage_user_agent.sql` constrains the storage column to `VARCHAR(200)` so direct writes cannot bypass the RPC's length bound.
 
 ### P1: Worker has no durable source for patched metadata
 
@@ -401,7 +401,7 @@ Use a canary before full rollout because current GET progress p95 CPU is already
 
 ### Phase 0 — deployment safety
 
-- [ ] Apply `20260718120000_add_user_agent_to_api_usage_daily.sql` before Worker deployment. Production application is explicitly on hold; the corrected migration exists locally only.
+- [x] Deploy `20260718120000_add_user_agent_to_api_usage_daily.sql` before User-Agent-aware usage recording and constrain the storage column with `20260723120000_constrain_api_usage_user_agent.sql`.
 - [x] Do not ship mode-insensitive direct JSON fetching as the final solution. Interim callers and caches are mode-aware; Phase 4 removes runtime upstream fetching.
 - [x] Add tests proving regular and PVE use distinct data.
 - [x] Add a regression test for overlay objective array shape.
@@ -464,7 +464,7 @@ Use a canary before full rollout because current GET progress p95 CPU is already
 
 ### Resume point
 
-When work resumes, start with **Phase 0**, then design the canonical schema and release manifest before changing storage bindings. Do not begin by adding Supabase game tables or by merely increasing the Worker memory TTL; both bypass the root consistency problems.
+When work resumes, verify that the completed **Phase 0** safeguards still hold, then start active implementation with **Phase 1** by designing the canonical schema and release manifest before changing storage bindings. Do not begin by adding Supabase game tables or by merely increasing the Worker memory TTL; both bypass the root consistency problems.
 
 ---
 
@@ -489,6 +489,10 @@ Cloudflare API inspection confirmed overlay objective patches are published as o
 ### 2026-07-18 — GitHub Actions remains the release control plane
 
 The existing scheduled precompute workflow is healthy and appropriately keeps heavy work off the Free-plan Worker. It should be expanded into a validated release publisher rather than replaced by a scheduled Worker.
+
+### 2026-07-23 — User-Agent enforcement rollout accepted
+
+The 5–200 character `User-Agent` requirement shipped directly in API version 2.3.0 without the deprecation window proposed in issue #565. Enforcement is already live, documented in OpenAPI, and verified at the production boundary. The missed advance-warning period cannot be recreated retroactively, so the direct rollout is accepted as the final disposition rather than weakening enforcement after release. The database retains defense in depth through RPC normalization plus a `VARCHAR(200)` column constraint.
 
 ---
 
@@ -533,4 +537,5 @@ The existing scheduled precompute workflow is healthy and appropriately keeps he
 
 - `supabase/migrations/20260708140000_add_merge_progress_rpc.sql`
 - `supabase/migrations/20260718120000_add_user_agent_to_api_usage_daily.sql`
+- `supabase/migrations/20260723120000_constrain_api_usage_user_agent.sql`
 - `supabase/migrations/20260215160000_sanitize_user_progress_payload.sql`
