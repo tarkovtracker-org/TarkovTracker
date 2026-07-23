@@ -81,7 +81,7 @@ vi.mock('@/stores/useMetadata', () => ({
         prestigeLevel: 5,
         conditions: [
           {
-            __typename: 'TaskObjectivePlayerLevel',
+            type: 'playerLevel',
             id: 'player-level',
             playerLevel: 47,
           },

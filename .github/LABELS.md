@@ -24,14 +24,14 @@ GitHub's native **Issue Types** feature replaces type labels. Each issue must ha
 
 All area labels use `#c2e0c6` (light green) for visual grouping.
 
-| Label           | Description                                 | Examples                                                              |
-| --------------- | ------------------------------------------- | --------------------------------------------------------------------- |
-| `area:ui`       | Vue components, pages, styling              | Component bugs, layout issues, Tailwind CSS, responsive design        |
-| `area:api`      | Nitro server routes, workers, API endpoints | Server routes in `app/server/api/`, Cloudflare Workers, GraphQL proxy |
-| `area:database` | Supabase schema, migrations, queries        | Database schema, Postgres queries, migrations, RLS policies           |
-| `area:auth`     | Authentication and authorization            | Login/logout, Supabase Auth, permissions, session management          |
-| `area:realtime` | Team sync, Supabase broadcasts              | Team features, real-time sync, Supabase Realtime, broadcasts          |
-| `area:i18n`     | Translations and localization               | Language files, translation keys, i18n system, locale switching       |
+| Label           | Description                                 | Examples                                                               |
+| --------------- | ------------------------------------------- | ---------------------------------------------------------------------- |
+| `area:ui`       | Vue components, pages, styling              | Component bugs, layout issues, Tailwind CSS, responsive design         |
+| `area:api`      | Nitro server routes, workers, API endpoints | Server routes in `app/server/api/`, Cloudflare Workers, JSON API proxy |
+| `area:database` | Supabase schema, migrations, queries        | Database schema, Postgres queries, migrations, RLS policies            |
+| `area:auth`     | Authentication and authorization            | Login/logout, Supabase Auth, permissions, session management           |
+| `area:realtime` | Team sync, Supabase broadcasts              | Team features, real-time sync, Supabase Realtime, broadcasts           |
+| `area:i18n`     | Translations and localization               | Language files, translation keys, i18n system, locale switching        |
 
 **Note:** Issues can have multiple area labels if they affect multiple systems (e.g., `area:ui` + `area:realtime` for team page display issues).
 

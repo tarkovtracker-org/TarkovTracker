@@ -18,32 +18,9 @@ import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
   getCanonicalSkillKey,
+  readSkillObjective,
   resolveSkillKey as resolveSkillAliasKey,
 } from '@/utils/skillHelpers';
-import type { Skill, SkillRequirement, TaskObjective } from '@/types/tarkov';
-/**
- * Extended TaskObjective with GraphQL __typename discriminator
- */
-interface TaskObjectiveWithTypename extends TaskObjective {
-  __typename?: string;
-}
-/**
- * TaskObjectiveSkill - objective type that requires a skill level
- */
-interface TaskObjectiveSkill extends TaskObjectiveWithTypename {
-  __typename: 'TaskObjectiveSkill';
-  skillLevel?: SkillRequirement & {
-    skill?: Skill;
-  };
-}
-/**
- * Type guard to check if an objective is a TaskObjectiveSkill
- */
-function isTaskObjectiveSkill(
-  objective: TaskObjectiveWithTypename
-): objective is TaskObjectiveSkill {
-  return objective.__typename === 'TaskObjectiveSkill';
-}
 export interface SkillMetadata {
   key: string;
   id?: string;
@@ -66,14 +43,9 @@ export function useSkillCalculation() {
       const taskName = task.name;
       if (!taskName) return;
       task.objectives?.forEach((objective) => {
-        const objectiveWithType = objective as TaskObjectiveWithTypename;
-        if (!isTaskObjectiveSkill(objectiveWithType) || !objectiveWithType.skillLevel?.name) return;
-        const skillName = objectiveWithType.skillLevel.name;
-        const skillId = objectiveWithType.skillLevel.skill?.id;
-        const skillKey = getCanonicalSkillKey(skillName, skillId);
-        if (!skillKey) return;
-        const requiredLevel = objectiveWithType.skillLevel.level || 0;
-        const imageLink = objectiveWithType.skillLevel?.skill?.imageLink;
+        const skill = readSkillObjective(objective);
+        if (!skill) return;
+        const { imageLink, requiredLevel, skillId, skillKey, skillName } = skill;
         if (!skillsMap.has(skillKey)) {
           skillsMap.set(skillKey, {
             key: skillKey,

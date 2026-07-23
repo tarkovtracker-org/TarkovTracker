@@ -81,9 +81,9 @@ export const RESOURCES: Resource[] = [
     hasGuide: true,
     guide: { steps: 3, tips: 2, faq: 2 },
     primaryAction: 'api',
-    keywords: ['api', 'graphql', 'data', 'developer', 'items', 'quests', 'market', 'traders'],
+    keywords: ['api', 'json', 'data', 'developer', 'items', 'quests', 'market', 'traders'],
     links: [
-      { type: 'api', url: 'https://api.tarkov.dev/' },
+      { type: 'api', url: 'https://json.tarkov.dev/endpoints' },
       { type: 'website', url: 'https://tarkov.dev/' },
       { type: 'github', url: 'https://github.com/the-hideout' },
       { type: 'discord', url: 'https://discord.gg/bgpejCuFDf' },

@@ -33,6 +33,16 @@ const PRESTIGE_MANUAL_ITEM_RULES: Partial<Record<number, string[]>> = {
   4: ['Ticket from Tarkov'],
   5: ['Ticket from Tarkov'],
 };
+// Upstream currently only emits `haveItem` for prestige item conditions, but the objective schema
+// shares one item shape across these types. Matching all of them keeps a requirement row rendering
+// if upstream ever switches the condition type.
+const PRESTIGE_ITEM_CONDITION_TYPES = new Set([
+  'findItem',
+  'giveItem',
+  'haveItem',
+  'plantItem',
+  'sellItem',
+]);
 export type PrestigeRunSummary = {
   completedHideoutModules: number;
   completedHideoutParts: number;
@@ -364,7 +374,7 @@ export const buildPrestigeRequirementRows = (
     rows.push(row);
   };
   for (const condition of prestige?.conditions || []) {
-    if (condition.__typename === 'TaskObjectivePlayerLevel') {
+    if (condition.type === 'playerLevel') {
       const apiRequiredLevel = toSafeInteger(condition.playerLevel, 0);
       const requiredLevel =
         apiRequiredLevel > 0 ? apiRequiredLevel : PRESTIGE_PLAYER_LEVEL_REQUIREMENT;
@@ -391,7 +401,7 @@ export const buildPrestigeRequirementRows = (
       });
       continue;
     }
-    if (condition.__typename === 'TaskObjectiveTaskStatus' && condition.task?.id) {
+    if (condition.type === 'taskStatus' && condition.task?.id) {
       const taskName = condition.task.name || 'Task';
       const taskRole: PrestigeRequirementTaskRole =
         taskName === 'Collector'
@@ -422,7 +432,7 @@ export const buildPrestigeRequirementRows = (
       });
       continue;
     }
-    if (condition.__typename === 'TaskObjectiveSkill' && condition.skillLevel?.name) {
+    if (condition.type === 'skill' && condition.skillLevel?.name) {
       const skillName = condition.skillLevel.name;
       const requiredLevel = Math.max(0, condition.skillLevel.level || 0);
       const skillKey = getCanonicalSkillKey(skillName, condition.skillLevel.skill?.id) || skillName;
@@ -440,7 +450,7 @@ export const buildPrestigeRequirementRows = (
       });
       continue;
     }
-    if (condition.__typename === 'TaskObjectiveHideoutStation' && condition.hideoutStation?.id) {
+    if (condition.type === 'hideoutStation' && condition.hideoutStation?.id) {
       const stationId = condition.hideoutStation.id;
       const requiredLevel = Math.max(0, toSafeInteger(condition.stationLevel, 0));
       const currentLevel = stationLevels.get(stationId) ?? 0;
@@ -457,7 +467,7 @@ export const buildPrestigeRequirementRows = (
       });
       continue;
     }
-    if (condition.__typename === 'TaskObjectiveItem') {
+    if (condition.type && PRESTIGE_ITEM_CONDITION_TYPES.has(condition.type)) {
       const itemName = condition.items?.[0]?.name || 'Item';
       pushRow({
         currentValue: null,

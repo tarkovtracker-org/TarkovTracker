@@ -81,4 +81,152 @@ describe('useSkillCalculation', () => {
     expect(totalSkills.value.Perception).toBe(16);
     expect(getSkillOffset('Perception')).toBe(14.5);
   });
+  it('collects skills required by task objectives', () => {
+    const metadataStore = useMetadataStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-vitality',
+        name: 'Shootout Picnic',
+        objectives: [
+          {
+            id: 'objective-vitality',
+            type: 'skill',
+            skillLevel: {
+              id: 'req-vitality',
+              name: 'Vitality',
+              level: 5,
+              skill: {
+                id: 'Vitality',
+                name: 'Vitality',
+                imageLink: 'https://example.com/vitality.webp',
+              },
+            },
+          },
+          { id: 'objective-item', type: 'giveItem', items: [{ id: 'item-1', name: 'Salewa' }] },
+        ],
+      },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    const vitality = allGameSkills.value.find((skill) => skill.key === 'Vitality');
+    expect(vitality).toMatchObject({
+      id: 'Vitality',
+      imageLink: 'https://example.com/vitality.webp',
+      name: 'Vitality',
+      requiredByTasks: ['Shootout Picnic'],
+      requiredLevels: [5],
+    });
+    expect(allGameSkills.value.some((skill) => skill.key === 'Salewa')).toBe(false);
+  });
+  it('merges required levels for a skill demanded by several tasks', () => {
+    const metadataStore = useMetadataStore();
+    const objective = (id: string, level: number) => ({
+      id,
+      type: 'skill',
+      skillLevel: {
+        id: `req-${id}`,
+        name: 'Endurance',
+        level,
+        skill: { id: 'Endurance', name: 'Endurance' },
+      },
+    });
+    metadataStore.tasks = [
+      { id: 'task-a', name: 'Task A', objectives: [objective('a', 6)] },
+      { id: 'task-b', name: 'Task B', objectives: [objective('b', 2)] },
+      { id: 'task-c', name: 'Task C', objectives: [objective('c', 6)] },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    const endurance = allGameSkills.value.find((skill) => skill.key === 'Endurance');
+    expect(endurance?.requiredByTasks).toEqual(['Task A', 'Task B', 'Task C']);
+    expect(endurance?.requiredLevels).toEqual([2, 6]);
+  });
+  it('ignores tasks with no name when collecting objective skills', () => {
+    const metadataStore = useMetadataStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-unnamed',
+        objectives: [
+          {
+            id: 'objective-vitality',
+            type: 'skill',
+            skillLevel: { id: 'req', name: 'Vitality', level: 5 },
+          },
+        ],
+      },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    expect(allGameSkills.value).toEqual([]);
+  });
+  it('backfills missing skill id and image link from later objectives', () => {
+    const metadataStore = useMetadataStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-vitality',
+        name: 'Vitality Task',
+        objectives: [
+          {
+            id: 'objective-vitality-no-meta',
+            type: 'skill',
+            skillLevel: {
+              id: 'req-1',
+              name: 'Vitality',
+              level: 3,
+            },
+          },
+          {
+            id: 'objective-vitality-with-meta',
+            type: 'skill',
+            skillLevel: {
+              id: 'req-2',
+              name: 'Vitality',
+              level: 5,
+              skill: {
+                id: 'Vitality',
+                name: 'Vitality',
+                imageLink: 'https://example.com/vitality.webp',
+              },
+            },
+          },
+        ],
+      },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    const vitality = allGameSkills.value.find((skill) => skill.key === 'Vitality');
+    expect(vitality).toMatchObject({
+      id: 'Vitality',
+      imageLink: 'https://example.com/vitality.webp',
+      name: 'Vitality',
+      requiredByTasks: ['Vitality Task', 'Vitality Task'],
+      requiredLevels: [3, 5],
+    });
+  });
+  it('deduplicates repeated required levels for the same skill', () => {
+    const metadataStore = useMetadataStore();
+    metadataStore.tasks = [
+      {
+        id: 'task-a',
+        name: 'Task A',
+        objectives: [
+          {
+            id: 'objective-1',
+            type: 'skill',
+            skillLevel: { id: 'req-1', name: 'Strength', level: 5, skill: { id: 'Strength' } },
+          },
+        ],
+      },
+      {
+        id: 'task-b',
+        name: 'Task B',
+        objectives: [
+          {
+            id: 'objective-2',
+            type: 'skill',
+            skillLevel: { id: 'req-2', name: 'Strength', level: 5, skill: { id: 'Strength' } },
+          },
+        ],
+      },
+    ] as Task[];
+    const { allGameSkills } = useSkillCalculation();
+    const strength = allGameSkills.value.find((skill) => skill.key === 'Strength');
+    expect(strength?.requiredLevels).toEqual([5]);
+  });
 });

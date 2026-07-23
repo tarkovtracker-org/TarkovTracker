@@ -68,7 +68,7 @@ describe('ResourceCard', () => {
         primaryAction: 'api',
         keywords: ['api'],
         links: [
-          { type: 'api', url: 'https://api.tarkov.dev/' },
+          { type: 'api', url: 'https://json.tarkov.dev/endpoints' },
           { type: 'website', url: 'https://tarkov.dev/' },
           { type: 'github', url: 'https://github.com/the-hideout' },
         ],
@@ -76,7 +76,9 @@ describe('ResourceCard', () => {
       true
     );
     expect(wrapper.text()).toContain('Data Platform');
-    expect(wrapper.get('a[href="https://api.tarkov.dev/"]').text()).toBe('API documentation');
+    expect(wrapper.get('a[href="https://json.tarkov.dev/endpoints"]').text()).toBe(
+      'API documentation'
+    );
     expect(wrapper.get('a[href="/resources/tarkovdev"]').text()).toBe('Read guide');
     expect(wrapper.get('[data-testid="more-menu"]').text()).toContain('Open website');
     expect(wrapper.get('[data-testid="more-menu"]').text()).toContain('View source');

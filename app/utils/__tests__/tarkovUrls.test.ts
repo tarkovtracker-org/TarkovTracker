@@ -42,7 +42,7 @@ describe('buildSkillImageUrl', () => {
       'https://assets.tarkov.dev/skill-Vitality-icon.webp'
     );
   });
-  it('builds URLs for known skill ids from the tarkov.dev GraphQL API', () => {
+  it('builds URLs for known skill ids from the tarkov.dev dataset', () => {
     const knownSkillIds = [
       'Health',
       'Sniper',

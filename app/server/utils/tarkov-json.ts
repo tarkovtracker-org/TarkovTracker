@@ -661,35 +661,6 @@ function adaptHideoutRef(value: unknown, context: AdapterContext) {
     name: typeof raw.name === 'string' ? raw.name : undefined,
   });
 }
-function inferObjectiveTypename(type: unknown): string | undefined {
-  if (typeof type !== 'string') return undefined;
-  const typenameByType: Record<string, string> = {
-    buildItem: 'TaskObjectiveBuildItem',
-    buildWeapon: 'TaskObjectiveBuildItem',
-    experience: 'TaskObjectiveExperience',
-    extract: 'TaskObjectiveExtract',
-    findItem: 'TaskObjectiveItem',
-    findQuestItem: 'TaskObjectiveQuestItem',
-    giveItem: 'TaskObjectiveItem',
-    giveQuestItem: 'TaskObjectiveQuestItem',
-    haveItem: 'TaskObjectiveItem',
-    hideoutStation: 'TaskObjectiveHideoutStation',
-    mark: 'TaskObjectiveMark',
-    playerLevel: 'TaskObjectivePlayerLevel',
-    plantItem: 'TaskObjectiveItem',
-    plantQuestItem: 'TaskObjectiveQuestItem',
-    questItem: 'TaskObjectiveQuestItem',
-    sellItem: 'TaskObjectiveItem',
-    shoot: 'TaskObjectiveShoot',
-    skill: 'TaskObjectiveSkill',
-    taskStatus: 'TaskObjectiveTaskStatus',
-    traderLevel: 'TaskObjectiveTraderLevel',
-    traderStanding: 'TaskObjectiveTraderStanding',
-    useItem: 'TaskObjectiveUseItem',
-    visit: 'TaskObjectiveBasic',
-  };
-  return typenameByType[type];
-}
 function adaptRequiredKeys(value: unknown, context: AdapterContext): TarkovItem[][] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value
@@ -720,8 +691,6 @@ function adaptObjective(raw: JsonRecord, context: AdapterContext): TaskObjective
   return compactObject({
     ...raw,
     id: stringId(raw) ?? '',
-    __typename:
-      typeof raw.__typename === 'string' ? raw.__typename : inferObjectiveTypename(raw.type),
     maps: Array.isArray(raw.maps)
       ? raw.maps.map((map) => adaptMapRef(map, context)).filter(Boolean)
       : undefined,
@@ -787,8 +756,8 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
     trader: adaptTraderRef(raw.trader, context),
   });
 }
-// json.tarkov.dev serializes requiredPrestige as a bare Prestige id string, while
-// the GraphQL API returns an object ref. Accept both.
+// json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
+// Accept both shapes.
 function adaptRequiredPrestigeRef(value: unknown): { id: string } | undefined {
   if (typeof value === 'string' && value) return { id: value };
   if (isRecord(value) && value.id != null) return { id: String(value.id) };

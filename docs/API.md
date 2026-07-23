@@ -5,6 +5,10 @@
 TarkovTracker provides internal API routes for fetching game data and team information. Game data is proxied through Nuxt server routes to `json.tarkov.dev` with caching and overlay corrections applied.
 Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatible `json.tarkov.dev` mirror.
 
+> **Upstream data source.** TarkovTracker consumes the static JSON endpoints at `json.tarkov.dev`.
+> The endpoint catalog lives at `https://json.tarkov.dev/endpoints`. The older `api.tarkov.dev`
+> GraphQL playground is deprecated and unstable; do not use it for game data or external tooling.
+
 ## Base URL
 
 - **Development:** `http://localhost:3000/api`
@@ -29,13 +33,23 @@ Migration example:
 
 ## Authentication
 
-Most tarkov data endpoints are public. Team endpoints require Supabase authentication.
+Tarkov data endpoints (`/api/tarkov/*`) are unauthenticated. Team endpoints require Supabase authentication.
 
 ```http
 Authorization: Bearer <supabase_jwt_token>
 ```
 
 ## Tarkov Data Endpoints
+
+> **First-party routes, not a third-party API.** `/api/tarkov/*` exists to serve game data to the
+> TarkovTracker site itself. It is not a supported integration surface, carries no compatibility
+> guarantee, and its response shape can change in any release. Third-party clients should read game
+> data from `json.tarkov.dev` directly, or use the progress API at `https://api.tarkovtracker.org`
+> (see [Progress API Host Migration](#progress-api-host-migration-apitarkovtrackerorg)).
+>
+> These routes are public and pass through the API protection middleware; see
+> [`ARCHITECTURE.md#api-protection`](./ARCHITECTURE.md#api-protection) for access-control configuration and
+> [`RATE_LIMITING.md`](./RATE_LIMITING.md) for rate-limit ownership.
 
 ### GET /api/tarkov/bootstrap
 
@@ -428,23 +442,42 @@ Pass `cacheBust=1` query parameter to bypass cache.
 
 ## Supported Languages
 
-**Enabled UI locales** (from `SUPPORTED_LOCALES` in `app/utils/locales.ts`):
+The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/utils/constants.ts`); codes outside that allowlist fall back to `en` (`getValidatedLanguage` in `app/server/utils/language-helpers.ts`).
 
-| Code | Language  |
-| ---- | --------- |
-| `en` | English   |
-| `de` | German    |
-| `es` | Spanish   |
-| `fr` | French    |
-| `ru` | Russian   |
-| `uk` | Ukrainian |
-| `zh` | Chinese   |
+`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` JSONPath list. See [Data fetching pipeline](SYSTEMS.md#2-data-fetching-pipeline).
+
+**Language codes accepted by `/api/tarkov/*`:**
+
+| Code | Language   |
+| ---- | ---------- |
+| `cs` | Czech      |
+| `de` | German     |
+| `en` | English    |
+| `es` | Spanish    |
+| `fr` | French     |
+| `hu` | Hungarian  |
+| `it` | Italian    |
+| `ja` | Japanese   |
+| `ko` | Korean     |
+| `pl` | Polish     |
+| `pt` | Portuguese |
+| `ro` | Romanian   |
+| `ru` | Russian    |
+| `sk` | Slovak     |
+| `tr` | Turkish    |
+| `zh` | Chinese    |
+
+This allowlist is a subset of what upstream serves. `json.tarkov.dev` additionally supports `id`, `th`, and `vn`; add them to `API_SUPPORTED_LANGUAGES` when the API should accept those languages on `/api/tarkov/*` requests. Enabling a UI locale is a separate step (`SUPPORTED_LOCALES` below). The authoritative upstream list is the `languages` array at `https://json.tarkov.dev/endpoints`.
+
+**Enabled UI locales** (`SUPPORTED_LOCALES` in `app/utils/locales.ts`):
+
+`en` (English), `de` (German), `es` (Spanish), `fr` (French), `ko` (Korean), `ru` (Russian), `uk` (Ukrainian), `zh` (Chinese)
+
+**UI locale with upstream fallback.** `uk` (Ukrainian) is an enabled UI locale but is **not supported by `json.tarkov.dev`**. It is mapped to `en` via `LOCALE_TO_API_MAPPING` in `app/utils/constants.ts`, so Ukrainian users see English game data while the rest of the UI remains in Ukrainian.
 
 **Locale JSON files that exist but are not currently enabled** (may be enabled in the future; Crowdin may still sync translations for these):
 
-`cs` (Czech), `it` (Italian), `ko` (Korean), `pl` (Polish), `pt` (Portuguese)
-
-The API accepts any language code that `json.tarkov.dev` supports; unsupported codes fall back to English.
+`cs` (Czech), `it` (Italian), `pl` (Polish), `pt` (Portuguese)
 
 ---
 

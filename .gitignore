@@ -23,8 +23,6 @@ node_modules
 .env.*
 !.env.example
 .dev.vars
-graphql.config.js
-schema.graphql
 .lighthouseci*
 
 # Local EFT log archives (can contain sensitive data)
