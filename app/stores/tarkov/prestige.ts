@@ -33,6 +33,16 @@ const PRESTIGE_MANUAL_ITEM_RULES: Partial<Record<number, string[]>> = {
   4: ['Ticket from Tarkov'],
   5: ['Ticket from Tarkov'],
 };
+// Upstream currently only emits `haveItem` for prestige item conditions, but the objective schema
+// shares one item shape across these types. Matching all of them keeps a requirement row rendering
+// if upstream ever switches the condition type.
+const PRESTIGE_ITEM_CONDITION_TYPES = new Set([
+  'findItem',
+  'giveItem',
+  'haveItem',
+  'plantItem',
+  'sellItem',
+]);
 export type PrestigeRunSummary = {
   completedHideoutModules: number;
   completedHideoutParts: number;
@@ -457,7 +467,7 @@ export const buildPrestigeRequirementRows = (
       });
       continue;
     }
-    if (condition.type === 'haveItem') {
+    if (condition.type && PRESTIGE_ITEM_CONDITION_TYPES.has(condition.type)) {
       const itemName = condition.items?.[0]?.name || 'Item';
       pushRow({
         currentValue: null,

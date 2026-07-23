@@ -271,4 +271,33 @@ describe('buildPrestigeRequirementRows', () => {
       tracked: false,
     });
   });
+  it.each(['findItem', 'giveItem', 'haveItem', 'plantItem', 'sellItem'])(
+    'renders an item requirement row for the %s condition type',
+    (conditionType) => {
+      const rows = buildPrestigeRequirementRows({
+        currentPrestigeLevel: 0,
+        edition,
+        hideoutStations,
+        prestigeLevels: [
+          createPrestigeLevel(1, [
+            {
+              type: conditionType,
+              count: 2,
+              id: 'item-objective',
+              items: [{ id: 'bitcoin', name: 'Physical bitcoin' }],
+            },
+          ]),
+        ],
+        pvpProgress: createProgressData(),
+        storyChapters: [],
+        tasks: [],
+      });
+      expect(rows.find((row) => row.id === 'item:Physical bitcoin:2')).toMatchObject({
+        kind: 'item',
+        name: '2 Physical bitcoin',
+        requiredValue: 2,
+        source: 'tarkov.dev',
+      });
+    }
+  );
 });
