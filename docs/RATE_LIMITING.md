@@ -180,10 +180,13 @@ flowchart LR
   C[External client + API token] --> W[api-gateway Worker]
   W --> AUTH[Validate token hash]
   AUTH --> TIER[Resolve supporter tier]
-  TIER --> DAILY[DO daily quota<br/>utc-day window]
-  DAILY --> BURST[DO burst/min<br/>sliding]
-  BURST --> IP[DO IP backstop<br/>sliding hour]
-  IP --> HANDLER[Progress / team handlers]
+  TIER --> PAR{{Parallel DO checks<br/>5s timeout each}}
+  PAR --> DAILY[DO daily quota<br/>utc-day window]
+  PAR --> BURST[DO burst/min<br/>sliding]
+  PAR --> IP[DO IP backstop<br/>sliding hour]
+  DAILY --> HANDLER[Progress / team handlers]
+  BURST --> HANDLER
+  IP --> HANDLER
   HANDLER --> DB[(Supabase)]
   W --> USAGE[record_api_usage RPC<br/>api_usage_daily]
 ```
@@ -206,9 +209,24 @@ Implementation notes:
 
 - Enforcer class: `ApiGatewayRateLimiter` in `workers/api-gateway/src/index.ts`
 - Keys are namespaced (`daily-read:<userId>`, `burst-write:<userId>`, `ip-...`)
+- The three checks (daily, burst, IP) run **in parallel** with one 5-second timeout budget each.
+  Historically they ran sequentially with 3-second timeouts, so a slow Durable Object could cost up
+  to 9s of gateway time and produced ~10 intermittent 503s/day (issue #574). Parallel checks cap the
+  worst case at a single timeout.
+- Because all buckets are consulted concurrently, any bucket that consumed a slot is **refunded**
+  when another bucket denies the request. A denied or failed request never drains quota.
 - Burst uses sliding windows so a TarkovMonitor batch at a minute boundary is not spuriously blocked
-- Throttled requests can refund daily/burst slots when a later check fails
+- User-keyed buckets (`daily-*`, `burst-*`) opt into long retention (`retain: true`); IP-keyed
+  buckets are high-cardinality and are stored **without** retain, so the DO schedules an alarm and
+  wipes its own storage shortly after the window expires.
+- A limiter that cannot answer emits a structured `rate_limiter_unavailable` log line
+  (`action`, `reason` ∈ `http_status | bad_json | timeout | fetch_error`, `duration_ms`,
+  `timeout_ms`) — infrastructure failures are never logged or counted as throttles.
 - Usage observability goes to `public.api_usage_daily` (not a limiter itself)
+- `GET /progress` and `GET /team/progress` responses carry a payload-derived weak `ETag`, honor
+  `If-None-Match` with `304 Not Modified`, use `Cache-Control: private, max-age=15`, and gzip bodies
+  ≥1 KiB when the client sends `Accept-Encoding: gzip`. Polling clients should send the previous
+  `ETag` and poll at ≥60s intervals.
 
 ---
 
@@ -371,11 +389,11 @@ Checklist for every new limiter:
 
 ### Fail behavior
 
-| System                          | On limiter failure                                                                                                                                                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                                                                                                                                              |
-| Worker DO timeout / error       | Primary daily/burst DOs fail closed with limiter-unavailable **503**. Per-IP backstop DO: **503** fails open (request proceeds after daily/burst pass; no primary refund); genuine **429** rejects and refunds primary slots |
-| Pages shared limiter without DO | Falls back to in-memory best effort                                                                                                                                                                                          |
+| System                          | On limiter failure                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                                                                                                                                                                                                                                                     |
+| Worker DO timeout / error       | Primary daily/burst DOs fail closed with limiter-unavailable **503** (+ `Retry-After: 10`), refunding any slots other buckets consumed; not counted or logged as a throttle. Per-IP backstop DO: **503** fails open (request proceeds after daily/burst pass; no primary refund); genuine **429** rejects and refunds primary slots |
+| Pages shared limiter without DO | Falls back to in-memory best effort                                                                                                                                                                                                                                                                                                 |
 
 Treat these deliberately; do not “make everything fail open” without understanding abuse impact.
 

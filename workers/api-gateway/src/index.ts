@@ -64,6 +64,7 @@ type RateLimitMode = 'sliding';
 type RateLimitOptions = {
   anchor?: RateLimitAnchor;
   mode?: RateLimitMode;
+  retain?: boolean;
 };
 export type RateLimitState = {
   count: number;
@@ -89,8 +90,9 @@ type RateLimitResult = {
   resetAt?: number;
   consumedAt?: number;
 };
-const RATE_LIMIT_TIMEOUT_MS = 3000;
+const RATE_LIMIT_TIMEOUT_MS = 5000;
 const RATE_LIMIT_SLOW_MS = 200;
+const RATE_LIMIT_UNAVAILABLE_RETRY_AFTER_S = 10;
 const DAY_MS = 86400000;
 function nextUtcMidnight(now: number): number {
   return Math.floor(now / DAY_MS) * DAY_MS + DAY_MS;
@@ -284,15 +286,15 @@ export class ApiGatewayRateLimiter {
       resetAt: this.data!.resetAt,
     });
   }
-  // Schedule self-cleanup by default for high-cardinality keys (IP-derived,
-  // requester-target-mode combinations from Pages endpoints) so abandoned
-  // objects do not retain billable storage forever. The alarm fires shortly
-  // after the window resets and wipes all storage.
+  // Schedule self-cleanup by default for high-cardinality keys (IP-derived
+  // gateway backstop keys, requester-target-mode combinations from Pages
+  // endpoints) so abandoned objects do not retain billable storage forever.
+  // The alarm fires shortly after the window resets and wipes all storage.
   // Bounded authenticated keys (daily-*/burst-* keyed by user_id) pass
   // retain: true so they skip alarms; load() treats expired state as absent
   // for rate-limiting correctness.
-  // Alarms from previous deployments without the ephemeral flag in stored
-  // state are drained without rescheduling while the window is still active.
+  // Stored state written before the ephemeral flag existed is drained by
+  // alarm() without rescheduling while its window is still active.
   private async scheduleCleanup(resetAt: number): Promise<void> {
     const cleanupAt = resetAt + 1000;
     const existingAlarm = await this.state.storage.getAlarm();
@@ -338,6 +340,23 @@ export class ApiGatewayRateLimiter {
     }
   }
 }
+function logLimiterUnavailable(
+  action: string,
+  reason: 'http_status' | 'bad_json' | 'timeout' | 'fetch_error',
+  durationMs: number,
+  detail?: Record<string, unknown>
+): void {
+  console.error(
+    JSON.stringify({
+      event: 'rate_limiter_unavailable',
+      action,
+      reason,
+      duration_ms: durationMs,
+      timeout_ms: RATE_LIMIT_TIMEOUT_MS,
+      ...detail,
+    })
+  );
+}
 async function rateLimit(
   env: Env,
   key: string,
@@ -351,6 +370,11 @@ async function rateLimit(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), RATE_LIMIT_TIMEOUT_MS);
   const startedAt = Date.now();
+  const unavailable: RateLimitResult = {
+    allowed: false,
+    status: 503,
+    message: 'Rate limiter unavailable',
+  };
   try {
     const res = await stub.fetch('https://rate-limit', {
       method: 'POST',
@@ -360,7 +384,7 @@ async function rateLimit(
         windowSec,
         anchor: options?.anchor,
         mode: options?.mode,
-        retain: true,
+        retain: options?.retain === true ? true : undefined,
       }),
       signal: controller.signal,
     });
@@ -369,11 +393,8 @@ async function rateLimit(
       console.log('rateLimit slow', { action, durationMs, ok: res.ok });
     }
     if (!res.ok) {
-      return {
-        allowed: false,
-        status: 503,
-        message: 'Rate limiter unavailable',
-      };
+      logLimiterUnavailable(action, 'http_status', durationMs, { status: res.status });
+      return unavailable;
     }
     let data: { allowed?: boolean; remaining?: number; resetAt?: number; consumedAt?: number } = {};
     try {
@@ -384,11 +405,8 @@ async function rateLimit(
         consumedAt?: number;
       };
     } catch {
-      return {
-        allowed: false,
-        status: 503,
-        message: 'Rate limiter unavailable',
-      };
+      logLimiterUnavailable(action, 'bad_json', Date.now() - startedAt);
+      return unavailable;
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
@@ -407,15 +425,13 @@ async function rateLimit(
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('rateLimit timeout', { action, durationMs, timeoutMs: RATE_LIMIT_TIMEOUT_MS });
+      logLimiterUnavailable(action, 'timeout', durationMs);
     } else {
-      console.error('rateLimit error', { action, durationMs, error });
+      logLimiterUnavailable(action, 'fetch_error', durationMs, {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-    return {
-      allowed: false,
-      status: 503,
-      message: 'Rate limiter unavailable',
-    };
+    return unavailable;
   } finally {
     clearTimeout(timeout);
   }
@@ -469,7 +485,7 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
-      'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
+      'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, ETag',
   };
 }
 function retryAfterSeconds(resetAt: number): number {
@@ -607,6 +623,66 @@ function errorResponse(
     },
   });
 }
+const READ_CACHE_CONTROL = 'private, max-age=15';
+// Authorization: responses are token-scoped. Origin: the CORS allow-origin
+// header is echoed per request. Accept-Encoding: bodies may be gzipped.
+const READ_VARY = 'Accept-Encoding, Authorization, Origin';
+const GZIP_MIN_BYTES = 1024;
+async function weakEtag(payload: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+  const hex = Array.from(new Uint8Array(digest))
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `W/"${hex}"`;
+}
+function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch) return false;
+  if (ifNoneMatch.trim() === '*') return true;
+  const opaque = (value: string) => value.trim().replace(/^W\//i, '');
+  return ifNoneMatch.split(',').some((candidate) => opaque(candidate) === opaque(etag));
+}
+/**
+ * Success response for token-authenticated read endpoints: weak ETag derived
+ * from the response payload (always correct, even when only cached game
+ * metadata changed), If-None-Match → 304, short private caching, and gzip
+ * when the client opts in via Accept-Encoding.
+ */
+async function conditionalReadResponse(
+  request: Request,
+  data: unknown,
+  envOrigin?: string,
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
+): Promise<Response> {
+  const body: Record<string, unknown> = { success: true };
+  if (data && typeof data === 'object' && 'data' in data) {
+    body.data = (data as Record<string, unknown>).data;
+    body.meta = (data as Record<string, unknown>).meta;
+  } else {
+    body.data = data;
+  }
+  const json = JSON.stringify(body);
+  const etag = await weakEtag(json);
+  const headers: Record<string, string> = {
+    ...corsHeaders(envOrigin, requestOrigin),
+    'Cache-Control': READ_CACHE_CONTROL,
+    Vary: READ_VARY,
+    ETag: etag,
+    ...(extraHeaders ?? {}),
+  };
+  if (etagMatches(request.headers.get('If-None-Match'), etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  headers['Content-Type'] = 'application/json';
+  const acceptEncoding = request.headers.get('Accept-Encoding') || '';
+  if (/(^|[\s,])gzip($|[\s,;])/i.test(acceptEncoding) && json.length >= GZIP_MIN_BYTES) {
+    headers['Content-Encoding'] = 'gzip';
+    const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Response(stream, { status: 200, headers });
+  }
+  return new Response(json, { status: 200, headers });
+}
 type AuthSuccess = {
   validation: { valid: true; token: ApiToken };
   rlHeaders: Record<string, string>;
@@ -686,41 +762,71 @@ async function authenticateAndRateLimit(
       ctx.waitUntil(promise);
     }
   };
-  // Daily quota first, so a request rejected by the daily quota does not
-  // consume a burst slot. Both counters key on user_id so extra tokens do not
-  // multiply a user's quota.
+  // All three limiter checks run in parallel so a slow Durable Object only
+  // costs one timeout budget instead of three sequential ones (the dominant
+  // cause of intermittent 503s, see issue #574). Any bucket that consumed a
+  // slot is refunded when another bucket denies the request, preserving the
+  // "a denied request drains nothing" invariant of the old sequential flow.
+  // Both user counters key on user_id so extra tokens do not multiply quota;
+  // the IP backstop keys on CF-Connecting-IP and is stored without retain so
+  // the Durable Object self-cleans high-cardinality IP keys.
   const dailyKey = `daily-${kind}:${token.user_id}`;
-  const daily = await rateLimit(env, dailyKey, dailyLimit, DAILY_WINDOW_SEC, {
-    anchor: 'utc-day',
-  });
+  const burstKey = `burst-${kind}:${token.user_id}`;
+  const ipKey = clientIp ? `ip-${kind}:${clientIp}` : null;
+  const ipLimit =
+    kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
+  const [daily, burst, ipResult] = await Promise.all([
+    rateLimit(env, dailyKey, dailyLimit, DAILY_WINDOW_SEC, { anchor: 'utc-day', retain: true }),
+    rateLimit(env, burstKey, limits.burstPerMinute, BURST_WINDOW_SEC, {
+      mode: 'sliding',
+      retain: true,
+    }),
+    ipKey
+      ? rateLimit(env, ipKey, ipLimit, IP_BACKSTOP_WINDOW_SEC, { mode: 'sliding' })
+      : Promise.resolve(null),
+  ]);
   const dailyHeaders = rateLimitHeaders(daily);
+  // Refund every bucket that consumed a slot when the request is not served.
+  const refundConsumed = (deniedBucket: ThrottleBucket | 'unavailable') => {
+    const refunds: Promise<void>[] = [];
+    if (daily.allowed && deniedBucket !== 'daily') {
+      refunds.push(
+        refundRateLimit(
+          env,
+          dailyKey,
+          `daily-${kind}`,
+          typeof daily.resetAt === 'number' ? daily.resetAt : undefined
+        )
+      );
+    }
+    if (burst.allowed && deniedBucket !== 'burst') {
+      refunds.push(refundRateLimit(env, burstKey, `burst-${kind}`, undefined, burst.consumedAt));
+    }
+    if (ipKey && ipResult?.allowed && deniedBucket !== 'ip') {
+      refunds.push(refundRateLimit(env, ipKey, `ip-${kind}`, undefined, ipResult.consumedAt));
+    }
+    if (ctx) refunds.forEach((refund) => ctx.waitUntil(refund));
+  };
+  // Availability policy: daily and burst are the primary limiters and fail
+  // closed — with them unavailable there is no protection, so the request is
+  // rejected with an honest 503 (not counted or logged as a throttle). The IP
+  // backstop is a secondary signal and fails open below.
+  if (daily.status === 503 || burst.status === 503) {
+    refundConsumed('unavailable');
+    return errorResponse('Rate limiter unavailable', 503, envOrigin, requestOrigin, {
+      'Retry-After': String(RATE_LIMIT_UNAVAILABLE_RETRY_AFTER_S),
+    });
+  }
   if (!daily.allowed) {
+    refundConsumed('daily');
     track(true);
     const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
     logThrottle(action, 'daily', token.user_id, token.token_id, ipHash, retryAfterS(daily));
-    const message =
-      daily.status === 429 && tier === 'free'
-        ? upgradeMessage(kind)
-        : daily.message || 'Rate limit exceeded';
-    return errorResponse(message, daily.status || 429, envOrigin, requestOrigin, dailyHeaders);
+    const message = tier === 'free' ? upgradeMessage(kind) : daily.message || 'Rate limit exceeded';
+    return errorResponse(message, 429, envOrigin, requestOrigin, dailyHeaders);
   }
-  const burst = await rateLimit(
-    env,
-    `burst-${kind}:${token.user_id}`,
-    limits.burstPerMinute,
-    BURST_WINDOW_SEC,
-    { mode: 'sliding' }
-  );
   if (!burst.allowed) {
-    // Give back the daily slot consumed above so burst-throttled attempts do
-    // not drain the daily quota.
-    const refund = refundRateLimit(
-      env,
-      dailyKey,
-      `daily-${kind}`,
-      typeof daily.resetAt === 'number' ? daily.resetAt : undefined
-    );
-    if (ctx) ctx.waitUntil(refund);
+    refundConsumed('burst');
     track(true);
     const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
     logThrottle(action, 'burst', token.user_id, token.token_id, ipHash, retryAfterS(burst));
@@ -735,52 +841,33 @@ async function authenticateAndRateLimit(
     }
     return errorResponse(
       burst.message || 'Rate limit exceeded',
-      burst.status || 429,
+      429,
       envOrigin,
       requestOrigin,
       headers
     );
   }
-  // Per-IP backstop: catches "many accounts from one IP" abuse. Tuned
-  // generously (600 reads/hour, 200 writes/hour) so shared NAT users are not
-  // impacted. Uses a 1-hour sliding window. Only checked when CF-Connecting-IP
-  // is present (Cloudflare overwrites any inbound spoof).
-  //
-  // Availability policy: the daily and burst limiters are the primary rate
-  // limiting mechanism and remain fail-closed — if they are unavailable the
-  // request is rejected because there is no other protection. The IP backstop
-  // is a secondary abuse signal; when its Durable Object is unavailable
-  // (status 503) it fails open so a transient infrastructure issue does not
-  // take down the API for everyone behind a given IP. A genuine 429 from the
-  // IP backstop still rejects the request and refunds the primary slots.
-  if (clientIp) {
-    const ipLimit =
-      kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
-    const ipKey = `ip-${kind}:${clientIp}`;
-    const ipResult = await rateLimit(env, ipKey, ipLimit, IP_BACKSTOP_WINDOW_SEC, {
-      mode: 'sliding',
-    });
-    if (!ipResult.allowed && ipResult.status !== 503) {
-      // Genuine IP throttle (429): refund both the daily (fixed-window) and
-      // burst (sliding-window) slots so IP-throttled requests do not drain
-      // per-user quotas.
-      const refundBurst = refundRateLimit(
-        env,
-        `burst-${kind}:${token.user_id}`,
-        `burst-${kind}`,
-        undefined,
-        burst.consumedAt
+  if (clientIp && ipResult && !ipResult.allowed) {
+    if (ipResult.status === 503) {
+      // IP backstop limiter unavailable: fail open. The primary daily and
+      // burst checks passed, so the request proceeds and their slots stay
+      // consumed. Log a warning with the hashed IP (never the raw
+      // CF-Connecting-IP) so the infrastructure failure stays observable
+      // without being counted as a throttle.
+      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
+      console.warn(
+        JSON.stringify({
+          event: 'ip_backstop_unavailable',
+          action,
+          user_id: token.user_id,
+          token_id: token.token_id,
+          ip_hash: ipHash,
+        })
       );
-      const refundDaily = refundRateLimit(
-        env,
-        dailyKey,
-        `daily-${kind}`,
-        typeof daily.resetAt === 'number' ? daily.resetAt : undefined
-      );
-      if (ctx) {
-        ctx.waitUntil(refundBurst);
-        ctx.waitUntil(refundDaily);
-      }
+    } else {
+      // Genuine IP throttle (429): refund the daily and burst slots so
+      // IP-throttled requests do not drain per-user quotas.
+      refundConsumed('ip');
       track(true);
       const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
       logThrottle(action, 'ip', token.user_id, token.token_id, ipHash, retryAfterS(ipResult));
@@ -793,29 +880,10 @@ async function authenticateAndRateLimit(
       }
       return errorResponse(
         ipResult.message || 'Rate limit exceeded',
-        ipResult.status || 429,
+        429,
         envOrigin,
         requestOrigin,
         headers
-      );
-    }
-    if (!ipResult.allowed && ipResult.status === 503) {
-      // IP backstop limiter unavailable: fail open. The primary daily and
-      // burst checks already passed, so the request proceeds. Do not refund
-      // the primary slots (the request is being served) and do not surface
-      // the 503 to the client. Log a warning so the infrastructure failure
-      // remains observable and is not counted as a throttle. Log the hashed
-      // IP (never the raw CF-Connecting-IP) so the privacy control is
-      // consistent with the 429 path.
-      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
-      console.warn(
-        JSON.stringify({
-          event: 'ip_backstop_unavailable',
-          action,
-          user_id: token.user_id,
-          token_id: token.token_id,
-          ip_hash: ipHash,
-        })
       );
     }
   }
@@ -1003,7 +1071,7 @@ export default {
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const progress = await handleGetProgress(env, validation.token, effectiveGameMode);
-        return successResponse(progress, undefined, 200, origin, reqOrigin, rlHeaders);
+        return conditionalReadResponse(request, progress, origin, reqOrigin, rlHeaders);
       }
       // GET /team/progress - Team progress (requires TP permission)
       if (apiPath === '/team/progress' && request.method === 'GET') {
@@ -1022,7 +1090,7 @@ export default {
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const teamProgress = await handleGetTeamProgress(env, validation.token, effectiveGameMode);
-        return successResponse(teamProgress, undefined, 200, origin, reqOrigin, rlHeaders);
+        return conditionalReadResponse(request, teamProgress, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/level/:levelValue - Update player level
       const levelMatch = apiPath.match(/^\/progress\/level\/(\d+)$/);

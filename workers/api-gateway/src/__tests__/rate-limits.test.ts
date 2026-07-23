@@ -881,6 +881,154 @@ describe('tiered quotas in the worker', () => {
     const ipCall = calls.find((c) => c.key.startsWith('ip-read:'));
     expect(ipCall).toBeDefined();
     expect(ipCall?.body).toMatchObject({ mode: 'sliding', windowSec: 3600 });
+    // IP keys are high-cardinality: they must not opt into long retention, so
+    // the Durable Object schedules self-cleanup instead of storing forever.
+    expect(ipCall?.body.retain).toBeUndefined();
+  });
+  it('refunds burst and ip slots when the daily quota denies', async () => {
+    const calls: LimiterCall[] = [];
+    const consumedAt = Date.now();
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
+        if (call.body.refund === true) {
+          return { allowed: true, remaining: 0, resetAt: Date.now() + 1000 };
+        }
+        if (String(call.key).startsWith('daily-')) {
+          return { allowed: false, remaining: 0, resetAt: Date.now() + 1000 };
+        }
+        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000, consumedAt };
+      }),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(429);
+    await flushAsync();
+    const refunds = calls.filter((c) => c.body.refund === true);
+    expect(refunds.map((r) => r.key).sort()).toEqual([
+      'burst-read:user-free',
+      'ip-read:203.0.113.1',
+    ]);
+    expect(refunds.every((r) => r.body.consumedAt === consumedAt)).toBe(true);
+  });
+  it('fails closed with 503 and Retry-After when a primary limiter is unavailable', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const rpcCalls: Array<Record<string, unknown>> = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: {
+        idFromName: (name: string) => name,
+        get: (id: unknown) => ({
+          fetch: async (_url: string, init?: RequestInit) => {
+            const call: LimiterCall = {
+              key: String(id),
+              body: JSON.parse(String(init?.body || '{}')),
+            };
+            calls.push(call);
+            if (String(id).startsWith('daily-') && call.body.refund !== true) {
+              return new Response('Internal Error', { status: 500 });
+            }
+            return new Response(
+              JSON.stringify({ allowed: true, remaining: 5, resetAt: Date.now() + 1000 }),
+              { status: 200, headers: { 'content-type': 'application/json' } }
+            );
+          },
+        }),
+      } as unknown as Env['API_GATEWAY_LIMITER'],
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toBe('10');
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toBe('Rate limiter unavailable');
+    await flushAsync();
+    // Burst and ip consumed slots even though the request was rejected, so
+    // both are refunded; the failed daily bucket is not.
+    const refunds = calls.filter((c) => c.body.refund === true);
+    expect(refunds.map((r) => r.key).sort()).toEqual([
+      'burst-read:user-free',
+      'ip-read:203.0.113.1',
+    ]);
+    // Infrastructure failures are not throttles: no usage row, no 429 log.
+    expect(rpcCalls).toHaveLength(0);
+    const throttleLog = logSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('rate_limit_429'));
+    expect(throttleLog).toBeUndefined();
+    // Structured unavailability log is emitted for observability.
+    const unavailableLog = errorSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('rate_limiter_unavailable'));
+    expect(unavailableLog).toBeDefined();
+    const parsed = JSON.parse(unavailableLog!);
+    expect(parsed).toMatchObject({
+      event: 'rate_limiter_unavailable',
+      action: 'daily-read',
+      reason: 'http_status',
+      status: 500,
+    });
+    errorSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+  it('runs daily, burst, and ip limiter checks in parallel', async () => {
+    const starts: string[] = [];
+    let resolveGate: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      resolveGate = resolve;
+    });
+    const env: Env = {
+      API_GATEWAY_LIMITER: {
+        idFromName: (name: string) => name,
+        get: (id: unknown) => ({
+          fetch: async () => {
+            starts.push(String(id).split(':')[0]);
+            if (starts.length === 3) resolveGate();
+            // Hold every response until all three checks have started, which
+            // deadlocks if the gateway issues them sequentially.
+            await gate;
+            return new Response(
+              JSON.stringify({ allowed: true, remaining: 5, resetAt: Date.now() + 1000 }),
+              { status: 200, headers: { 'content-type': 'application/json' } }
+            );
+          },
+        }),
+      } as unknown as Env['API_GATEWAY_LIMITER'],
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    expect(starts.sort()).toEqual(['burst-read', 'daily-read', 'ip-read']);
   });
   it('returns 429 and refunds daily+burst when the per-IP backstop trips', async () => {
     const calls: LimiterCall[] = [];

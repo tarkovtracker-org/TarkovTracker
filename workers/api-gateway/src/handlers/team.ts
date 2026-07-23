@@ -112,8 +112,9 @@ export async function handleGetTeamProgress(
   if (memberIds.length === 0) {
     return await getSoloProgress(env, token, gameMode);
   }
-  // Step 3: Fetch progress for all team members
-  const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${memberIds.join(',')})&select=*`;
+  // Step 3: Fetch progress for all team members (only the active mode's blob)
+  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${memberIds.join(',')})&select=user_id,game_edition,${dataField}`;
   const progressRes = await fetch(progressUrl, {
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -163,8 +164,8 @@ async function getSoloProgress(
   token: ApiToken,
   gameMode: 'pvp' | 'pve'
 ): Promise<TeamProgressResponse> {
-  // Fetch user progress
-  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=*&limit=1`;
+  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=user_id,game_edition,${dataField}&limit=1`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,

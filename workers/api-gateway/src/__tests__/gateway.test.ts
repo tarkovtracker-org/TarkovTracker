@@ -871,6 +871,108 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
+  const manyCompletions = Object.fromEntries(
+    Array.from({ length: 80 }, (_, i) => [
+      `task-${i}`,
+      { complete: true, failed: false, timestamp: 1 },
+    ])
+  );
+  const progressRequest = (headers: Record<string, string> = {}) =>
+    buildRequest('/progress', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+    });
+  it('narrows the user_progress select to the token game mode', async () => {
+    const fetchMock = createBaseFetchMock({ permissions: ['GP'] });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(progressRequest(), BASE_ENV);
+    expect(res.status).toBe(200);
+    const progressUrl = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .find((url) => url.includes('/rest/v1/user_progress'));
+    expect(progressUrl).toContain('select=user_id,game_edition,pvp_data');
+    expect(progressUrl).not.toContain('select=*');
+  });
+  it('sets ETag, private Cache-Control, and Vary on GET /progress', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(progressRequest(), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('ETag')).toMatch(/^W\/"[0-9a-f]{32}"$/);
+    expect(res.headers.get('Cache-Control')).toBe('private, max-age=15');
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    expect(res.headers.get('Access-Control-Expose-Headers')).toContain('ETag');
+  });
+  it('returns 304 with rate-limit headers when If-None-Match matches', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const first = await worker.fetch(progressRequest(), BASE_ENV);
+    const etag = first.headers.get('ETag');
+    expect(etag).toBeTruthy();
+    const second = await worker.fetch(progressRequest({ 'If-None-Match': etag! }), BASE_ENV);
+    expect(second.status).toBe(304);
+    expect(await second.text()).toBe('');
+    expect(second.headers.get('ETag')).toBe(etag);
+    expect(second.headers.get('X-RateLimit-Limit')).toBe('1000');
+    expect(second.headers.get('Cache-Control')).toBe('private, max-age=15');
+  });
+  it('returns the full body when If-None-Match does not match', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest({ 'If-None-Match': 'W/"0000000000000000000000000000dead"' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { success: boolean };
+    expect(body.success).toBe(true);
+  });
+  it('gzips large /progress responses when the client accepts gzip', async () => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        permissions: ['GP'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: { taskCompletions: manyCompletions },
+          pve_data: null,
+        },
+      })
+    );
+    const res = await worker.fetch(progressRequest({ 'Accept-Encoding': 'gzip, br' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBe('gzip');
+    const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
+    const body = (await new Response(decompressed).json()) as {
+      success: boolean;
+      data: { tasksProgress: unknown[] };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.tasksProgress).toHaveLength(80);
+  });
+  it('does not gzip when the client does not accept gzip', async () => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        permissions: ['GP'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: { taskCompletions: manyCompletions },
+          pve_data: null,
+        },
+      })
+    );
+    const res = await worker.fetch(progressRequest(), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    const body = (await res.json()) as { success: boolean };
+    expect(body.success).toBe(true);
+  });
+  it('does not gzip small responses even when the client accepts gzip', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(progressRequest({ 'Accept-Encoding': 'gzip' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+  });
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {
   afterEach(() => {

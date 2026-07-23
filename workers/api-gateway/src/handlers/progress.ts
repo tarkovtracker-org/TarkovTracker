@@ -285,8 +285,10 @@ export async function handleGetProgress(
   token: ApiToken,
   gameMode: 'pvp' | 'pve'
 ): Promise<ProgressResponse> {
-  // Fetch user progress from Supabase
-  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=*&limit=1`;
+  // Select only the requested game mode's JSONB blob — fetching both pvp_data
+  // and pve_data doubles Supabase egress and Worker memory for no benefit.
+  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=user_id,game_edition,${dataField}&limit=1`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
