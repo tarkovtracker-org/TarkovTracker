@@ -32,6 +32,11 @@ from the community-maintained `json.tarkov.dev` static JSON API. The browser nev
 client expects, and (for most endpoints) applies corrections (see [Overlay](#4-overlay-corrections))
 before returning it.
 
+> **Note on upstream endpoints.** `json.tarkov.dev` is the canonical static JSON API for all
+> Tarkov.dev game data. The older `api.tarkov.dev` GraphQL playground is deprecated and unstable;
+> do not use it for new TarkovTracker functionality or external tooling. The current endpoint list
+> is available at `https://json.tarkov.dev/endpoints`.
+
 **Why a proxy instead of calling upstream from the browser?**
 
 - We control caching headers and can serve stale-while-revalidate from the Cloudflare edge.
@@ -89,6 +94,8 @@ flowchart LR
   `/api/tarkov/*`.
 - Every endpoint handler returns its payload through `edgeCache()`; no handler fetches upstream
   outside the cache wrapper.
+- Only `json.tarkov.dev` static endpoints are used for upstream game data. The `api.tarkov.dev`
+  GraphQL playground is deprecated and must not be called by TarkovTracker code.
 - Overlay is applied only by endpoints that call `applyOverlay()` in their handler. Adding a new
   endpoint does not imply adding overlay — only add it when the upstream data needs corrections.
 - Game mode is validated with `validateGameMode()` and defaults to `regular` on any invalid input.
