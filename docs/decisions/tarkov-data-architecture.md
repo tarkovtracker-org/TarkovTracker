@@ -464,7 +464,7 @@ Use a canary before full rollout because current GET progress p95 CPU is already
 
 ### Resume point
 
-When work resumes, start with **Phase 0**, then design the canonical schema and release manifest before changing storage bindings. Do not begin by adding Supabase game tables or by merely increasing the Worker memory TTL; both bypass the root consistency problems.
+When work resumes, verify that the completed **Phase 0** safeguards still hold, then start active implementation with **Phase 1** by designing the canonical schema and release manifest before changing storage bindings. Do not begin by adding Supabase game tables or by merely increasing the Worker memory TTL; both bypass the root consistency problems.
 
 ---
 
