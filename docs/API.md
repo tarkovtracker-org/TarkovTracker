@@ -47,14 +47,9 @@ Authorization: Bearer <supabase_jwt_token>
 > data from `json.tarkov.dev` directly, or use the progress API at `https://api.tarkovtracker.org`
 > (see [Progress API Host Migration](#progress-api-host-migration-apitarkovtrackerorg)).
 >
-> These routes skip auth (`defaultPublicRoutes` in `app/server/middleware/api-protection.ts`) but are
-> subject to `Host` header validation. When `API_ALLOWED_HOSTS` is unset, the production defaults are
-> `tarkovtracker.org` and `www.tarkovtracker.org`; setting `API_ALLOWED_HOSTS` replaces those
-> defaults, and the host derived from `NUXT_PUBLIC_APP_URL` is always allowed. If
-> `API_TRUSTED_IP_RANGES` is configured, its client-IP allowlist applies to these routes as well. The
-> CORS `Origin` allowlist stops cross-site browser JavaScript from reading responses; it does not
-> stop non-browser clients, which send no `Origin` and reach the route with a matching `Host`. There
-> is no route-specific rate limit today — see `docs/RATE_LIMITING.md`.
+> These routes are public and pass through the API protection middleware; see
+> `docs/ARCHITECTURE.md#api-protection` for access-control configuration and
+> `docs/RATE_LIMITING.md` for rate-limit ownership.
 
 ### GET /api/tarkov/bootstrap
 
