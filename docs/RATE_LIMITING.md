@@ -239,8 +239,10 @@ Important:
 - When the DO binding is present, enforcement is shared across isolates.
 - Without it, fallback is best-effort in-memory and can under-enforce under concurrency or restarts.
 - These limits protect **app endpoints**, not the external progress API.
-- Static game-data routes (`/api/tarkov/*`) are not enrolled in this limiter. They are served through
-  `edgeCache` with CDN/WAF abuse protection and have no route-specific rate limit.
+- Most static game-data routes (`/api/tarkov/*`) are not enrolled in this limiter. They are served
+  through `edgeCache` with CDN/WAF abuse protection and have no route-specific rate limit. The
+  `/api/tarkov/cache-meta` endpoint is an exception — it queries Supabase directly and relies on its
+  own `Cache-Control` headers.
 
 ---
 

@@ -48,8 +48,8 @@ Authorization: Bearer <supabase_jwt_token>
 > (see [Progress API Host Migration](#progress-api-host-migration-apitarkovtrackerorg)).
 >
 > These routes are public and pass through the API protection middleware; see
-> `docs/ARCHITECTURE.md#api-protection` for access-control configuration and
-> `docs/RATE_LIMITING.md` for rate-limit ownership.
+> [`ARCHITECTURE.md#api-protection`](./ARCHITECTURE.md#api-protection) for access-control configuration and
+> [`RATE_LIMITING.md`](./RATE_LIMITING.md) for rate-limit ownership.
 
 ### GET /api/tarkov/bootstrap
 
