@@ -119,16 +119,12 @@
   "promoted_stream": {
     "close": "Close stream",
     "expand": "Open stream",
-    "mute": "Mute stream",
     "open_channel": "Go to Twitch channel",
-    "pause": "Pause stream",
     "player_title": "{streamer} Twitch stream",
-    "play": "Play stream",
     "region_label": "Promoted Twitch stream for {streamer}",
     "reopen": "Reopen stream",
     "shrink": "Shrink stream",
-    "title": "{streamer} live",
-    "unmute": "Unmute stream"
+    "title": "{streamer} live"
   },
   "buttons": {
     "retry": "Erneut versuchen"
@@ -231,8 +227,6 @@
   },
   "page_help": {
     "button": "Hilfe",
-    "hint_title": "Neu hier?",
-    "dismiss": "Schließen",
     "launcher": {
       "title": "Hilfe und Onboarding",
       "summary": "Wähle eine kurze Anleitung für diese Seite oder den vollständigen Einrichtungsweg.",
@@ -506,7 +500,6 @@
         },
         "stat": {
           "why": "Warum es gewinnt",
-          "progress": "Welchen Fortschritt das bringt",
           "status": "Status",
           "secondary": "Weitere gute Optionen",
           "secondary_actionable": "Nutze diese, wenn der Hauptplan nicht passt.",
@@ -548,17 +541,6 @@
           "filters_one": "Keine sichtbaren Optionen: 1 verfügbare Aufgabe wird von deinen Filtern ausgeblendet.",
           "filters_other": "Keine sichtbaren Optionen: {count} verfügbare Aufgaben werden von deinen Filtern ausgeblendet.",
           "complete": "In diesem Dashboard-Bereich bleibt keine sichtbare Arbeit mehr übrig."
-        },
-        "contribution": {
-          "unlock_trader": "Schaltet die Aufgabenreihe von {trader} frei.",
-          "impact_one": "Erzeugt 1 neue Folgeaufgabe.",
-          "impact_other": "Erzeugt {count} neue Folgeaufgaben.",
-          "kappa": "Zählt für deine Kappa-Reihe.",
-          "lightkeeper": "Zählt für deine Leuchtturmwärter-Reihe.",
-          "trader": "Bringt die Aufgabenreihe von {trader} voran.",
-          "filters": "Zeigt Aufgaben an, die bereits machbar sind.",
-          "complete": "Der Rest des Dashboards ist jetzt nur noch unterstützender Kontext.",
-          "default": "Hält deinen sichtbaren Dashboard-Fortschritt in Bewegung."
         },
         "status": {
           "ready_one": "Jetzt bereit. Noch 1 Ziel offen.",
@@ -696,10 +678,6 @@
         "lightkeeper": "Leuchtturmwärter"
       },
       "stats": {
-        "total": "Kappa Aufgaben",
-        "completed": "Kappa Done",
-        "lightkeeper_total": "Lightkeeper Tasks",
-        "lightkeeper_completed": "Lightkeeper Done",
         "available": "Available",
         "locked": "Gesperrt",
         "failed": "Gescheitert"
@@ -720,8 +698,6 @@
         "action_reset_failed": "Reset failed",
         "locked_by": "Requires: {task}"
       },
-      "progress_label": "complete",
-      "all_complete": "All tasks complete! Well done, PMC.",
       "empty": "No tasks for this list yet.",
       "summary": {
         "progress": "Progress",
@@ -743,10 +719,8 @@
       "billing_6month": "6 Months",
       "billing_yearly": "Yearly",
       "most_popular": "Most Popular",
-      "fee_note": "Price shown includes Stripe fees.",
       "tier_cta": "Subscribe",
       "tier_login_cta": "Log in to subscribe",
-      "tier_current_cta": "Current tier",
       "tier_change_cta": "Change plan in billing portal",
       "current_tier_badge": "Current tier",
       "tier_scav_name": "Scav",
@@ -818,7 +792,6 @@
     "tasks": {
       "title": "Aufgaben",
       "primary_views": {
-        "all": "Liste",
         "list": "Liste",
         "maps": "Karten",
         "traders": "Händler",
@@ -877,17 +850,6 @@
       },
       "filters": {
         "close": "Schließen"
-      },
-      "api_update_log": {
-        "title": "Letzte Synchronisierungen",
-        "subtitle": "Verfolge, wann dein Fortschritt automatisch aus externen Quellen synchronisiert wurde.",
-        "empty": "Noch keine Synchronisierungen aufgezeichnet. Dein Fortschritt erscheint hier nach einer Synchronisierung.",
-        "entry_count": "{count} Aufgaben",
-        "no_task_details": "Fortschritt erfolgreich synchronisiert.",
-        "more_tasks": "+{count} weitere",
-        "unknown_time": "Unbekannte Zeit",
-        "collapse": "Synchronisationsverlauf einklappen",
-        "expand": "Synchronisationsverlauf ausklappen"
       },
       "settings": {
         "title": "Aufgabeneinstellungen",
@@ -976,7 +938,6 @@
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "Wikiseite",
         "locked_before": "Aufgaben davor: {count}",
-        "locked_behind": "Gesperrte Aufgaben danach: {count}",
         "requires": "Benötigt",
         "unlocks_next": "Schaltet frei",
         "impact": "Auswirkung",
@@ -1018,7 +979,6 @@
         "undo_uncomplete": "Unvollständigkeit von {name} rückgängig gemacht",
         "undo_failed": "Fehlschlagen von {name} rückgängig gemacht",
         "undo_reset_failed": "Fehlgeschlagen-Status für {name} wiederhergestellt",
-        "undo_unknown": "Aktion für {name} konnte nicht rückgängig gemacht werden",
         "mark_failed_confirm": "Diese Aufgabe als fehlgeschlagen markieren? Dies ist nur für Datenprobleme gedacht, wird nicht empfohlen und kann Aufgabenketten blockieren.",
         "reset_item_counts_confirm": "Alle Gegenstandszähler dieser Aufgabe zurücksetzen?",
         "failed_because": "Fehlgeschlagen wegen",
@@ -1029,11 +989,8 @@
         "blocked_because_was": "was {status}",
         "blocked_because_status_tooltip": "Permanently blocked — \"{name}\" was {status}",
         "blocked_because_unknown": "Blocked by prerequisites",
-        "keys_header": "Erforderliche Schlüssel",
         "keys_disclaimer_tooltip": "Basiert auf API-Daten und nicht immer zu 100 % erforderlich. Türen können bereits geöffnet sein. Vor dem Kauf von Schlüsseln im Spiel oder im Wiki prüfen.",
         "keys_disclaimer_aria": "Hinweis zu erforderlichen Schlüsseln",
-        "keys_needed": "{keys} auf {map} | Einer von {keys} auf {map}",
-        "keys_optional_badge": "Optional",
         "keys_or": "oder",
         "equipment_disclaimer_tooltip": "Spezialausrüstung, die für dieses Ziel in den Raid mitgenommen werden muss.",
         "equipment_disclaimer_aria": "Hinweis zur erforderlichen Ausrüstung",
@@ -1056,9 +1013,6 @@
         "objective_optional_badge": "Optional",
         "ready_to_hand_over": "Bereit zur Übergabe",
         "objectives_hidden": "{count} Ziele nicht auf dieser Karte ({uncompleted} unvollständig)",
-        "alternatives": "Alternative Aufgaben",
-        "alternative_failed": "Alternative Aufgaben werden auch zurückgesetzt",
-        "different_faction": "Diese Aufgabe ist für deine Fraktion nicht verfügbar",
         "needed_by": "Benötigt von: {names}",
         "unlocks_next_tooltip": "Anzahl der Aufgaben, die nach Abschluss dieser Aufgabe verfügbar werden",
         "impact_tooltip": "Anzahl der unvollständigen Aufgaben, die vom Abschluss dieser Aufgabe abhängen",
@@ -1079,12 +1033,10 @@
         "find_fir": "Im Raid finden",
         "items_count": "{count} Gegenstände",
         "kappa_tooltip": "Diese Aufgabe ist erforderlich, um den Kappa-Sicheren Container zu erhalten",
-        "kappa_required": "KAPPA ERFORDERLICH",
         "level_badge_tooltip": "Mindest-Spielerlevel {level} erforderlich, um diese Aufgabe freizuschalten",
         "lightkeeper_tooltip": "Diese Aufgabe ist erforderlich, um den Händler Lightkeeper freizuschalten",
         "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
         "alternatives_badge": "{count} alt",
-        "lightkeeper_required": "LIGHTKEEPER ERFORDERLICH",
         "location_tooltip": "Aufgabenziele sind auf {map}",
         "next_tasks": "Nächste Aufgabe(n):",
         "objective": "Ziel",
@@ -1103,7 +1055,6 @@
       "loading": "Lade Versteck-Daten",
       "station_link_label": "Zu {name} gehen",
       "no_stations_found": "Keine Stationen gefunden. Versuche deine Filter zu ändern.",
-      "load_more_stations": "Weitere Sender laden",
       "collapse_completed": "Fertige Stationen einklappen",
       "sort": {
         "ready_first": "Bereit zum Bauen zuerst sortieren"
@@ -1166,26 +1117,17 @@
       "filters": {
         "all": "Alle",
         "label": "Filter",
-        "sections": {
-          "items": "GEGENSTÄNDE",
-          "team": "TEAM"
-        },
         "fir": "FIR",
         "non_fir": "NICHT-FIR",
-        "show_owned": "IM BESITZ ANZEIGEN",
         "hide_owned": "IM BESITZ AUSBLENDEN",
         "hide_non_fir_special_equipment_title": "Nicht-FIR Spezialausrüstung ausblenden (z.B. MS2000 Marker, WLAN-Kameras)",
-        "no_special": "NORMAL",
-        "special": "SPEZIAL",
         "kappa_only": "KAPPA",
         "kappa_only_tooltip": "Nur Gegenstände anzeigen, die für Kappa-Aufgaben benötigt werden",
         "kappa_only_disabled_tooltip": "Der Kappa-Filter gilt nur für Aufgaben.",
-        "hide_team_needs": "TEAM-BEDARF AUSBLENDEN",
-        "show_team_needs": "TEAM-BEDARF ANZEIGEN"
+        "hide_team_needs": "TEAM-BEDARF AUSBLENDEN"
       },
       "sort": {
         "label": "Sortieren",
-        "by": "SORTIEREN NACH",
         "priority": "Priorität",
         "name": "Name",
         "category": "Kategorie",
@@ -1399,25 +1341,17 @@
       "achievement_mainline": "Mainline Task Progress",
       "achievement_objectives": "Objective Completion",
       "no_storyline": "Für dieses Profil sind keine Story-Daten verfügbar.",
-      "storyline_chapter": "Kapitel",
       "storyline_auto_start": "Automatischer Start",
       "storyline_discovered": "Entdeckt",
       "storyline_requires": "Benötigt",
-      "storyline_unlocks_maps": "Schaltet Karten frei",
-      "storyline_unlocks_traders": "Schaltet Händler frei",
-      "storyline_wiki": "Wiki",
       "storyline_objectives_main": "Hauptziele",
       "storyline_objectives_optional": "Optionale Ziele",
-      "storyline_description": "Beschreibung",
-      "storyline_notes": "Notizen",
-      "storyline_rewards": "Belohnungen",
       "view_tarkov_dev": "Auf Tarkov.dev ansehen",
       "no_hideout": "Für dieses Profil sind keine Versteckdaten verfügbar.",
       "hideout_level": "Stufe",
       "hideout_fallback": "Versteck",
       "hideout_item_fallback": "Hideout item",
       "hideout_module_fallback": "Hideout upgrade",
-      "unknown_trader": "Unbekannter Händler",
       "level_prefix": "Lvl.",
       "no_tasks": "Keine Aufgaben für dieses Profil verfügbar.",
       "task_fallback": "Aufgabe",
@@ -1512,7 +1446,6 @@
         "open_tool": "Open tool",
         "download_release": "Download latest release"
       },
-      "view_guide": "Setup guide",
       "back_to_hub": "Back to Resources",
       "breadcrumb": "Breadcrumb",
       "guide_label": "Guide",
@@ -1656,7 +1589,6 @@
       "github": "GitHub"
     },
     "support_button": "Entwicklung unterstützen",
-    "support_tagline": "Hilf TarkovTracker kostenlos und aktuell zu halten",
     "terms_of_service": "Nutzungsbedingungen",
     "privacy_policy": "Datenschutzrichtlinie",
     "credits": "Danksagungen",
@@ -1833,13 +1765,10 @@
     "title": "Einstellungen",
     "locale": "Sprache",
     "tabs": {
-      "gameplay": "Gameplay",
-      "interface": "Schnittstelle",
       "account": "Konto",
       "progression": "Fortschritt",
       "prestige": "Prestige",
       "preferences": "Präferenzen",
-      "data_management": "Datenverwaltung",
       "imports": "Importe",
       "backup_restore": "Backup & Wiederherstellung",
       "api": "API",
@@ -1887,10 +1816,6 @@
       "compact": "Kompakt",
       "comfortable": "Komfortabel"
     },
-    "account_moved": {
-      "message": "API-Token oder Kontoeinstellungen gesucht?",
-      "link": "Zum Konto"
-    },
     "account": {
       "begin_deletion": "Kontolöschung starten"
     },
@@ -1905,7 +1830,6 @@
       "admin_panel": "Admin-Panel"
     },
     "interface": {
-      "title": "Interface-Anpassung",
       "tasks": {
         "title": "Aufgabenkarten",
         "show_required": "Erforderlich-Labels anzeigen",
@@ -1914,9 +1838,6 @@
         "show_prev": "Vorherige Aufgaben anzeigen",
         "density": "Kartendichte",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
-      },
-      "defaults": {
-        "title": "Standardansichten"
       },
       "maps": {
         "title": "Karten",
@@ -1942,9 +1863,6 @@
         "title": "Wiki Links",
         "antifandom": "Use antifandom.com",
         "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
-      },
-      "misc": {
-        "title": "Verschiedenes"
       }
     },
     "game_profile": {
@@ -1960,7 +1878,6 @@
       "mode_pve": "PvE",
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_link": "Profillink kopieren",
       "copy_pvp_link": "Copy PvP profile link",
       "copy_pve_link": "Copy PvE profile link",
       "login_required": "Melde dich an, um die Profilfreigabe zu verwalten."
@@ -1971,9 +1888,6 @@
       "pve": "PvE",
       "switch_mode_failed": "Wechsel des Spielmodus fehlgeschlagen, bitte erneut versuchen",
       "switch_mode_fetch_failed": "Game mode switched but failed to refresh data, please retry"
-    },
-    "data_management_card": {
-      "title": "Datenverwaltung"
     },
     "data_management": {
       "reset_pvp_title": "PvP-Daten zurücksetzen",
@@ -1988,20 +1902,14 @@
       "reset_all_data": "Alle Daten zurücksetzen",
       "reset_all_confirmation": "Bist du sicher, dass du deinen GESAMTEN Fortschritt zurücksetzen möchtest?",
       "reset_all_warning": "Dies löscht dauerhaft deinen GESAMTEN Fortschritt für die Modi PvP und PvE. Diese Aktion kann nicht rückgängig gemacht werden!",
-      "prestige_pvp_title": "PvP-Profil prestigieren",
-      "prestige_pvp_data": "PvP prestige",
-      "prestige_pvp_confirmation": "Möchtest du dein PvP-Profil wirklich prestigieren?",
       "prestige_pvp_warning": "Dein aktueller PvP-Durchlauf wird archiviert und danach wird der PvP-Fortschritt für die nächste Prestige-Stufe zurückgesetzt. PvE-Daten bleiben unverändert.",
       "reset_cancel": "Abbrechen",
       "reset_confirm": "Daten zurücksetzen",
-      "export_title": "Export & Sicherung",
       "export_description": "Lade eine Sicherung deiner Fortschrittsdaten für die Modi PvP und PvE herunter.",
       "export_button": "Fortschrittssicherung exportieren",
       "debug_export_button": "Debug-Snapshot exportieren",
       "debug_export_description": "Lädt einen bereinigten Kontostand für die Fehlersuche bei angemeldeten Problemen herunter. Auth-Tokens, E-Mail und Profilbilder werden ausgeschlossen.",
-      "import_title": "Import",
       "import_backup_button": "TarkovTracker-Sicherung importieren",
-      "import_tarkovdev_button": "Tarkov.dev-Profil importieren",
       "import_eft_logs_folder_button": "EFT-Protokoll-Ordner importieren",
       "recommended_badge": "Empfohlen",
       "active_flow_blocked_title": "Schließe zuerst den aktuellen Datenvorgang ab",
@@ -2016,7 +1924,6 @@
       "backup_restore_section_title": "Sicherung & Wiederherstellung",
       "backup_restore_section_description": "Sicherung exportieren oder aus einer zuvor exportierten Datei wiederherstellen",
       "debug_section_title": "Debug-Snapshot",
-      "debug_section_description": "Bereinigten Snapshot für Support und Fehlersuche herunterladen",
       "import_backup_title": "Aus Sicherung wiederherstellen",
       "import_backup_description": "Fortschritt aus einer TarkovTracker-Sicherungsdatei wiederherstellen",
       "import_preview_exported_at": "Exportiert",
@@ -2038,7 +1945,6 @@
       "debug_export_error_title": "Debug-Export fehlgeschlagen",
       "reset_title": "Fortschritt zurücksetzen",
       "prestige_history_title": "Prestige-Verlauf",
-      "prestige_history_description": "Archivierte PvP-Durchläufe bleiben nach jedem Prestige erhalten, damit du Fortschritt vergleichen kannst.",
       "prestige_history_loading": "Prestige-Verlauf wird geladen...",
       "prestige_history_empty": "Noch keine archivierten Prestige-Durchläufe.",
       "prestige_history_load_error": "Prestige-Verlauf konnte nicht geladen werden.",
@@ -2061,10 +1967,6 @@
       "success_title": "PvP-Prestige abgeschlossen",
       "success_description": "Dein PvP-Profil wurde auf Prestige-Stufe {level} gesetzt.",
       "error_description": "PvP-Prestige fehlgeschlagen. Bitte versuche es erneut."
-    },
-    "data_migration": {
-      "title": "Lokale Datenmigration",
-      "description": "Migriere deine lokalen Fortschrittsdaten zu deinem Cloud-Konto. Dies geschieht automatisch beim Anmelden."
     },
     "reset": {
       "error_title": "Zurücksetzen fehlgeschlagen"
@@ -2094,7 +1996,6 @@
       "member_since_label": "Mitglied seit",
       "account_id_label": "Konto-ID",
       "unknown_label": "Unbekannt",
-      "data_reset_title": "Daten zurücksetzen",
       "account_deletion_title": "Konto löschen",
       "login_required_delete": "Melde dich an, um dein Konto zu löschen",
       "action_show": "Anzeigen",
@@ -2208,9 +2109,7 @@
       "summary_description_manual": "{count} Anforderung(en) müssen noch manuell im Spiel geprüft werden."
     },
     "display_name": {
-      "title": "Anzeigename",
       "explanation": "Dein Anzeigename wird Teammitgliedern und in der Navigation angezeigt. Jeder Spielmodus (PVP/PVE) hat einen separaten Anzeigenamen.",
-      "mode_hint": "Du bearbeitest den Anzeigenamen für den {mode}-Modus. Wechsle den Spielmodus im Navigationsmenü, um den anderen Anzeigenamen zu bearbeiten.",
       "label": "Anzeigename",
       "placeholder": "Gib deinen Anzeigenamen ein...",
       "save": "Speichern",
@@ -2272,7 +2171,6 @@
       "reset_offset": "XP-Offset zurücksetzen"
     },
     "danger_zone": {
-      "confirm_delete_instruction": "Geben Sie zur Bestätigung {word} ein:",
       "confirm_word": "DELETE"
     },
     "log_import": {
@@ -2313,7 +2211,6 @@
       "unknown_mode_event_details": "Ereignisdetails mit unbekanntem Modus",
       "unknown_completion_events": "Abgeschlossene Aufgaben (unbekannter Modus)",
       "unknown_started_events": "Gestartete Aufgaben (unbekannter Modus)",
-      "import_to_mode": "In Modus importieren",
       "import_unknown_to_mode": "Ereignisse mit unbekanntem Modus importieren nach",
       "import_unknown_to_mode_hint": "Bekannte PvP/PvE-Ereignisse werden automatisch zugeordnet. Dies gilt nur für nicht aufgelöste Ereignisse.",
       "auto_mode_hint": "Die Moduszuordnung wurde aus Backend-Protokollen erkannt und wird automatisch angewendet.",
@@ -2350,9 +2247,7 @@
       "profile_url_label": "Tarkov.dev-Profil-URL",
       "profile_url_placeholder": "https://tarkov.dev/players/regular/8560316",
       "profile_url_hint": "Finde dein Profil unter {link}, öffne das passende PvP- oder PvE-Profil und füge dann die URL dieser Seite hier ein.",
-      "profile_url_hint_before_link": "Finde dein Profil unter",
       "profile_url_hint_link": "tarkov.dev/players",
-      "profile_url_hint_after_link": ", öffne das passende PvP- oder PvE-Profil und füge dann die URL dieser Seite hier ein.",
       "profile_url_refresh_hint": "Tarkov.dev aktualisiert die Profil-JSON, nachdem du dort deine Profilseite geöffnet hast.",
       "fetch_profile": "Profil abrufen",
       "nickname": "Spielername",
