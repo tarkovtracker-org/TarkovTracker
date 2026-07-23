@@ -52,7 +52,7 @@ describe('buildPrestigeRequirementRows', () => {
       prestigeLevels: [
         createPrestigeLevel(1, [
           {
-            __typename: 'TaskObjectivePlayerLevel',
+            type: 'playerLevel',
             id: 'player-level',
           },
         ]),
@@ -113,12 +113,12 @@ describe('buildPrestigeRequirementRows', () => {
     const prestigeLevels = [
       createPrestigeLevel(5, [
         {
-          __typename: 'TaskObjectivePlayerLevel',
+          type: 'playerLevel',
           id: 'player-level',
           playerLevel: 47,
         },
         {
-          __typename: 'TaskObjectiveTaskStatus',
+          type: 'taskStatus',
           id: 'collector',
           task: {
             id: 'collector',
@@ -126,7 +126,7 @@ describe('buildPrestigeRequirementRows', () => {
           },
         },
         {
-          __typename: 'TaskObjectiveItem',
+          type: 'haveItem',
           count: 20000000,
           id: 'roubles',
           items: [
@@ -206,7 +206,7 @@ describe('buildPrestigeRequirementRows', () => {
     const prestigeLevels = [
       createPrestigeLevel(6, [
         {
-          __typename: 'TaskObjectivePlayerLevel',
+          type: 'playerLevel',
           id: 'player-level',
           playerLevel: 47,
         },
@@ -239,12 +239,12 @@ describe('buildPrestigeRequirementRows', () => {
       prestigeLevels: [
         createPrestigeLevel(1, [
           {
-            __typename: 'TaskObjectivePlayerLevel',
+            type: 'playerLevel',
             id: 'player-level',
             playerLevel: 47,
           },
           {
-            __typename: 'TaskObjectiveItem',
+            type: 'haveItem',
             count: 3,
             id: 'item-objective',
             items: [

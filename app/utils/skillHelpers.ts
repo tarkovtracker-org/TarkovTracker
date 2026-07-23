@@ -1,5 +1,5 @@
 import { logger } from '@/utils/logger';
-import type { SkillRequirement, Task, TaskObjective } from '@/types/tarkov';
+import type { Task } from '@/types/tarkov';
 export const normalizeSkillToken = (value: string | null | undefined): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -15,15 +15,11 @@ export const buildSkillKeyAliases = (tasks: Task[]): Map<string, string> => {
   const aliases = new Map<string, string>();
   tasks.forEach((task) => {
     task.objectives?.forEach((objective) => {
-      const objectiveData = objective as TaskObjective & {
-        __typename?: string;
-        skillLevel?: SkillRequirement & { skill?: { id?: string | null } };
-      };
-      if (objectiveData.__typename !== 'TaskObjectiveSkill' || !objectiveData.skillLevel?.name) {
-        return;
-      }
-      const skillName = objectiveData.skillLevel.name;
-      const skillId = objectiveData.skillLevel.skill?.id;
+      if (objective.type !== 'skill') return;
+      const skillLevel = objective.skillLevel;
+      const skillName = skillLevel?.name;
+      if (!skillName || !skillLevel) return;
+      const skillId = skillLevel.skill?.id;
       const skillKey = getCanonicalSkillKey(skillName, skillId);
       if (!skillKey) return;
       aliases.set(skillKey, skillKey);

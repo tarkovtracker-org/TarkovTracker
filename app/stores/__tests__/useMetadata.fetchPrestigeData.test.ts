@@ -47,7 +47,7 @@ describe('useMetadataStore fetchPrestigeData', () => {
           prestigeLevel: 1,
           conditions: [
             {
-              __typename: 'TaskObjectiveItem',
+              type: 'haveItem',
               id: 'objective1',
               items: [{ id: 'item1' }],
             },
