@@ -476,8 +476,12 @@ sequenceDiagram
 
 - The three limiter checks run in parallel; a request never waits on more than one limiter timeout
   budget (5s). Sequential checks are a regression (they caused the intermittent 503s in #574).
-- A request that is **not served** (429 or limiter-unavailable 503) must not leave any quota slot
-  consumed in any bucket — every bucket that allowed is refunded.
+- A request that is **not served** (429 or limiter-unavailable 503) must issue a refund for every
+  bucket that allowed. Refunds are best-effort: they are dispatched via `ctx.waitUntil` and a
+  refund that times out or errors leaves that slot debited. This is bounded and self-healing — a
+  daily slot is reclaimed at the 00:00 UTC reset, and burst/IP slots age out of their sliding
+  windows — so the code must attempt every refund, but callers must not treat quota accounting as
+  transactional.
 - Daily and burst buckets fail **closed** (503 + `Retry-After`); the IP backstop fails **open**.
   Infrastructure failures are logged as `rate_limiter_unavailable`, never as `rate_limit_429`, and
   are not recorded as throttles in `api_usage_daily`.

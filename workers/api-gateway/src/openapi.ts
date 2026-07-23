@@ -177,9 +177,39 @@ export const OPENAPI_SPEC = {
         description:
           'Payload unchanged since the ETag in If-None-Match. Empty body; rate-limit headers ' +
           'are still included and the request still counts against the daily quota.',
+        headers: {
+          ETag: {
+            description: 'Weak validator for the unchanged payload. Reuse it on the next poll.',
+            schema: { type: 'string' },
+          },
+          'Cache-Control': {
+            description: 'Always `private, max-age=15` for token-scoped reads.',
+            schema: { type: 'string' },
+          },
+          'X-RateLimit-Limit': {
+            description: 'Maximum requests permitted per UTC day for the account tier.',
+            schema: { type: 'integer' },
+          },
+          'X-RateLimit-Remaining': {
+            description: 'Requests remaining in the daily quota.',
+            schema: { type: 'integer' },
+          },
+          'X-RateLimit-Reset': {
+            description: 'Unix timestamp (seconds) when the daily quota resets (00:00 UTC).',
+            schema: { type: 'integer' },
+          },
+        },
       },
       ServiceUnavailable: {
-        description: 'Rate limiter unavailable',
+        description:
+          'Rate limiter unavailable. The primary per-user daily and burst limiters fail closed; ' +
+          'this is an infrastructure failure, not a quota violation. Retry after Retry-After.',
+        headers: {
+          'Retry-After': {
+            description: 'Seconds to wait before retrying.',
+            schema: { type: 'integer' },
+          },
+        },
         content: {
           'application/json': {
             schema: { $ref: '#/components/schemas/ErrorResponse' },

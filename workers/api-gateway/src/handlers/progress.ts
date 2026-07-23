@@ -5,7 +5,7 @@ import { extractGameModeData, transformProgress } from '../utils/transform';
 import type {
   Env,
   ApiToken,
-  UserProgressRow,
+  UserProgressModeRow,
   ProgressResponse,
   TaskState,
   BatchTaskUpdate,
@@ -298,7 +298,7 @@ export async function handleGetProgress(
   if (!response.ok) {
     throw new Error('Failed to fetch user progress');
   }
-  const rows = (await response.json()) as UserProgressRow[];
+  const rows = (await response.json()) as UserProgressModeRow[];
   const row = rows[0] || null;
   const gameEdition = row?.game_edition ?? 1;
   // Extract game mode specific data

@@ -976,6 +976,9 @@ describe('api-gateway', () => {
     ['*', 'gzip'],
     ['identity', null],
     ['gzip;q=0.5', 'gzip'],
+    ['gzip;q=2', null],
+    ['gzip;q=abc', null],
+    ['gzip;q=1.0', 'gzip'],
   ])('honors Accept-Encoding %s', async (acceptEncoding, expected) => {
     vi.stubGlobal(
       'fetch',

@@ -642,11 +642,14 @@ function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
   const opaque = (value: string) => value.trim().replace(/^W\//i, '');
   return ifNoneMatch.split(',').some((candidate) => opaque(candidate) === opaque(etag));
 }
+// RFC 9110 qvalue grammar: 0[.0-3 digits] or 1[.up to three zeros]. Anything
+// outside that range (q=2, q=abc) is malformed, not a stronger preference.
+const QVALUE_PATTERN = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
 /**
  * RFC 9110 Accept-Encoding negotiation for gzip. An explicit `gzip;q=0` is a
  * rejection and must not be compressed; `*` only applies when gzip is not
- * listed on its own. A malformed q-value falls back to "not acceptable",
- * because an uncompressed body is always decodable.
+ * listed on its own. A malformed or out-of-range q-value falls back to "not
+ * acceptable", because an uncompressed body is always decodable.
  */
 function acceptsGzip(header: string | null): boolean {
   if (!header) return false;
@@ -656,7 +659,8 @@ function acceptsGzip(header: string | null): boolean {
     const coding = rawCoding.trim().toLowerCase();
     if (coding !== 'gzip' && coding !== '*') continue;
     const qParam = params.map((p) => p.trim().toLowerCase()).find((p) => p.startsWith('q='));
-    const acceptable = !qParam || Number(qParam.slice(2)) > 0;
+    const qValue = qParam?.slice(2) ?? '';
+    const acceptable = !qParam || (QVALUE_PATTERN.test(qValue) && Number(qValue) > 0);
     if (coding === 'gzip') return acceptable;
     wildcard = acceptable;
   }

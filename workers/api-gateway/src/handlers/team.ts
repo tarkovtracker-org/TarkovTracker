@@ -1,7 +1,7 @@
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
-import type { Env, ApiToken, UserProgressRow, ProgressResponseData } from '../types';
+import type { Env, ApiToken, UserProgressModeRow, ProgressResponseData } from '../types';
 // Team member from database
 interface TeamMember {
   user_id: string;
@@ -124,7 +124,7 @@ export async function handleGetTeamProgress(
   if (!progressRes.ok) {
     throw new Error('Failed to fetch team progress');
   }
-  const progressRows = (await progressRes.json()) as UserProgressRow[];
+  const progressRows = (await progressRes.json()) as UserProgressModeRow[];
   // Step 4: Fetch task and hideout data (cached)
   const [tasks, hideoutStations] = await Promise.all([
     getTasks(gameMode),
@@ -175,7 +175,7 @@ async function getSoloProgress(
   if (!response.ok) {
     throw new Error('Failed to fetch user progress');
   }
-  const rows = (await response.json()) as UserProgressRow[];
+  const rows = (await response.json()) as UserProgressModeRow[];
   const row = rows[0] || null;
   const gameEdition = row?.game_edition ?? 1;
   const progressData = extractGameModeData(row, gameMode);

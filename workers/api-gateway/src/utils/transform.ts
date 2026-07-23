@@ -1,7 +1,7 @@
 import { computeInvalidProgress } from './invalidation';
 import type {
   UserProgressData,
-  UserProgressRow,
+  UserProgressModeRow,
   TarkovTask,
   TarkovHideoutStation,
   ProgressResponseData,
@@ -16,11 +16,11 @@ const CULTIST_CIRCLE_STATION_ID = '667298e75ea6b4493c08f266';
  * Extract game mode specific data from user progress row
  */
 export function extractGameModeData(
-  row: UserProgressRow | null,
+  row: UserProgressModeRow | null,
   gameMode: 'pvp' | 'pve'
 ): UserProgressData | null {
   if (!row) return null;
-  return gameMode === 'pve' ? row.pve_data : row.pvp_data;
+  return (gameMode === 'pve' ? row.pve_data : row.pvp_data) ?? null;
 }
 /**
  * Apply hideout auto-complete based on game edition
