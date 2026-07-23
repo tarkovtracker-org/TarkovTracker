@@ -47,12 +47,14 @@ Authorization: Bearer <supabase_jwt_token>
 > data from `json.tarkov.dev` directly, or use the progress API at `https://api.tarkovtracker.org`
 > (see [Progress API Host Migration](#progress-api-host-migration-apitarkovtrackerorg)).
 >
-> These routes skip auth (`defaultPublicRoutes` in `app/server/middleware/api-protection.ts`) and are
-> gated only by a `Host` header allowlist (`tarkovtracker.org`, `www.tarkovtracker.org`, plus
-> `NUXT_PUBLIC_APP_URL`) and a CORS `Origin` allowlist. The CORS allowlist stops cross-site browser
-> JavaScript from reading responses; it does not stop non-browser clients, which send no `Origin` and
-> reach the route with a matching `Host`. There is no rate limit on these routes today — see
-> `docs/RATE_LIMITING.md`.
+> These routes skip auth (`defaultPublicRoutes` in `app/server/middleware/api-protection.ts`) but are
+> subject to `Host` header validation. When `API_ALLOWED_HOSTS` is unset, the production defaults are
+> `tarkovtracker.org` and `www.tarkovtracker.org`; setting `API_ALLOWED_HOSTS` replaces those
+> defaults, and the host derived from `NUXT_PUBLIC_APP_URL` is always allowed. If
+> `API_TRUSTED_IP_RANGES` is configured, its client-IP allowlist applies to these routes as well. The
+> CORS `Origin` allowlist stops cross-site browser JavaScript from reading responses; it does not
+> stop non-browser clients, which send no `Origin` and reach the route with a matching `Host`. There
+> is no route-specific rate limit today — see `docs/RATE_LIMITING.md`.
 
 ### GET /api/tarkov/bootstrap
 
@@ -470,7 +472,7 @@ The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/
 | `tr` | Turkish    |
 | `zh` | Chinese    |
 
-This allowlist is a subset of what upstream serves. `json.tarkov.dev` additionally supports `id`, `th`, and `vn`; add them to `API_SUPPORTED_LANGUAGES` if a UI locale ever needs them. The authoritative upstream list is the `languages` array at `https://json.tarkov.dev/endpoints`.
+This allowlist is a subset of what upstream serves. `json.tarkov.dev` additionally supports `id`, `th`, and `vn`; add them to `API_SUPPORTED_LANGUAGES` when the API should accept those languages on `/api/tarkov/*` requests. Enabling a UI locale is a separate step (`SUPPORTED_LOCALES` below). The authoritative upstream list is the `languages` array at `https://json.tarkov.dev/endpoints`.
 
 **Enabled UI locales** (`SUPPORTED_LOCALES` in `app/utils/locales.ts`):
 

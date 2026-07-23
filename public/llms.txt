@@ -20,7 +20,7 @@ Crawl and discovery directives live at `/robots.txt` and `/sitemap.xml`; see tho
 - [Needed Items](https://tarkovtracker.org/needed-items): Consolidated item requirements.
 - [Storyline](https://tarkovtracker.org/storyline): Storyline quest view.
 - [Resources](https://tarkovtracker.org/resources): Community tools hub and setup guides.
-- [Tarkov.dev Guide](https://tarkovtracker.org/resources/tarkovdev): Using Tarkov.dev data and JSON API.
+- [Tarkov.dev Guide](https://tarkovtracker.org/resources/tarkovdev): Using Tarkov.dev data via the json.tarkov.dev JSON API.
 - [TarkovMonitor Guide](https://tarkovtracker.org/resources/tarkovmonitor): Install and link TarkovMonitor to TarkovTracker.
 - [RatScanner Guide](https://tarkovtracker.org/resources/ratscanner): Install and use RatScanner overlays.
 - [CultistCircle Guide](https://tarkovtracker.org/resources/cultistcircle): Cultist Circle recipe calculator reference.

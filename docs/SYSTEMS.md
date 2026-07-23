@@ -32,10 +32,10 @@ from the community-maintained `json.tarkov.dev` static JSON API. The browser nev
 client expects, and (for most endpoints) applies corrections (see [Overlay](#4-overlay-corrections))
 before returning it.
 
-> **Note on upstream endpoints.** `json.tarkov.dev` is the canonical static JSON API for all
-> Tarkov.dev game data. The older `api.tarkov.dev` GraphQL playground is deprecated and unstable;
-> do not use it for new TarkovTracker functionality or external tooling. The current endpoint list
-> is available at `https://json.tarkov.dev/endpoints`.
+> **Note on upstream endpoints.** `json.tarkov.dev` is the static JSON API TarkovTracker uses for
+> all Tarkov.dev game data. TarkovTracker no longer uses the older `api.tarkov.dev` GraphQL API;
+> do not use it for new TarkovTracker functionality. The current static endpoint list is available
+> at `https://json.tarkov.dev/endpoints`.
 
 **Why a proxy instead of calling upstream from the browser?**
 
