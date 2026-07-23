@@ -871,6 +871,28 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
+  const progressRequest = (headers: Record<string, string> = {}) =>
+    buildRequest('/progress', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+    });
+  it.each([
+    ['pvp', 'select=user_id,game_edition,pvp_data'],
+    ['pve', 'select=user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: mode });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(progressRequest(), BASE_ENV);
+      expect(res.status).toBe(200);
+      const progressUrl = fetchMock.mock.calls
+        .map((call) => String(call[0]))
+        .find((url) => url.includes('/rest/v1/user_progress'));
+      expect(progressUrl).toContain(expected);
+      expect(progressUrl).not.toContain('select=*');
+    }
+  );
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {
   afterEach(() => {

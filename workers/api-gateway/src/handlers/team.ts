@@ -1,7 +1,7 @@
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
-import type { Env, ApiToken, UserProgressRow, ProgressResponseData } from '../types';
+import type { Env, ApiToken, UserProgressModeRow, ProgressResponseData } from '../types';
 // Team member from database
 interface TeamMember {
   user_id: string;
@@ -112,8 +112,9 @@ export async function handleGetTeamProgress(
   if (memberIds.length === 0) {
     return await getSoloProgress(env, token, gameMode);
   }
-  // Step 3: Fetch progress for all team members
-  const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${memberIds.join(',')})&select=*`;
+  // Step 3: Fetch progress for all team members (only the active mode's blob)
+  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${memberIds.join(',')})&select=user_id,game_edition,${dataField}`;
   const progressRes = await fetch(progressUrl, {
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -123,7 +124,7 @@ export async function handleGetTeamProgress(
   if (!progressRes.ok) {
     throw new Error('Failed to fetch team progress');
   }
-  const progressRows = (await progressRes.json()) as UserProgressRow[];
+  const progressRows = (await progressRes.json()) as UserProgressModeRow[];
   // Step 4: Fetch task and hideout data (cached)
   const [tasks, hideoutStations] = await Promise.all([
     getTasks(gameMode),
@@ -163,8 +164,8 @@ async function getSoloProgress(
   token: ApiToken,
   gameMode: 'pvp' | 'pve'
 ): Promise<TeamProgressResponse> {
-  // Fetch user progress
-  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=*&limit=1`;
+  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=user_id,game_edition,${dataField}&limit=1`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -174,7 +175,7 @@ async function getSoloProgress(
   if (!response.ok) {
     throw new Error('Failed to fetch user progress');
   }
-  const rows = (await response.json()) as UserProgressRow[];
+  const rows = (await response.json()) as UserProgressModeRow[];
   const row = rows[0] || null;
   const gameEdition = row?.game_edition ?? 1;
   const progressData = extractGameModeData(row, gameMode);
