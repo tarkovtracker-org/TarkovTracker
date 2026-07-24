@@ -490,12 +490,12 @@ canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISC
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
 
-| Variable                    | Description                                             | Required   |
-| --------------------------- | ------------------------------------------------------- | ---------- |
-| `SUPABASE_URL`              | Supabase project URL                                    | Yes        |
-| `SUPABASE_ANON_KEY`         | Supabase anon key                                       | Yes        |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                               | Yes        |
-| `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in 429 log lines | Yes (prod) |
+| Variable                    | Description                                                    | Required   |
+| --------------------------- | -------------------------------------------------------------- | ---------- |
+| `SUPABASE_URL`              | Supabase project URL                                           | Yes        |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                              | Yes        |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                                      | Yes        |
+| `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in abuse-gate log lines | Yes (prod) |
 
 ## Code Conventions
 

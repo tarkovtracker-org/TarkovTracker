@@ -391,6 +391,7 @@ describe('daily quota and abuse gate', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
   it('applies free-tier daily limit keyed by user id (single DO call)', async () => {
     const calls: LimiterCall[] = [];
@@ -488,7 +489,6 @@ describe('daily quota and abuse gate', () => {
       user_id: 'user-free',
       token_id: 'token-1',
     });
-    warnSpy.mockRestore();
   });
   it('records successful usage through the record_api_usage rpc', async () => {
     const calls: LimiterCall[] = [];
@@ -569,7 +569,6 @@ describe('daily quota and abuse gate', () => {
       action: 'token-info',
       ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
     });
-    warnSpy.mockRestore();
   });
   it('skips the abuse gate when the binding is absent', async () => {
     const calls: LimiterCall[] = [];
@@ -642,48 +641,55 @@ describe('daily quota and abuse gate', () => {
       error_message: 'limiter binding failed for api:[redacted]',
     });
     expect(warnLog).not.toContain('203.0.113.1');
-    warnSpy.mockRestore();
   });
-  const malformedQuotaCases: Array<{ name: string; payload: Record<string, unknown> }> = [
+  const malformedQuotaCases: Array<{
+    name: string;
+    payload: () => Record<string, unknown>;
+  }> = [
     {
       name: 'missing allowed',
-      payload: { remaining: 5, resetAt: Date.now() + 1000 },
+      payload: () => ({ remaining: 5, resetAt: Date.now() + 60_000 }),
     },
     {
       name: 'missing resetAt',
-      payload: { allowed: true, remaining: 5 },
+      payload: () => ({ allowed: true, remaining: 5 }),
     },
     {
       name: 'expired resetAt',
-      payload: { allowed: false, remaining: 0, resetAt: Date.now() - 1000 },
+      payload: () => ({ allowed: false, remaining: 0, resetAt: Date.now() - 1000 }),
     },
     {
       name: 'out-of-range remaining',
-      payload: { allowed: true, remaining: Number.MAX_SAFE_INTEGER, resetAt: Date.now() + 1000 },
+      payload: () => ({
+        allowed: true,
+        remaining: Number.MAX_SAFE_INTEGER,
+        resetAt: Date.now() + 60_000,
+      }),
     },
     {
       name: 'fractional remaining',
-      payload: { allowed: true, remaining: 0.5, resetAt: Date.now() + 1000 },
+      payload: () => ({ allowed: true, remaining: 0.5, resetAt: Date.now() + 60_000 }),
     },
     {
       name: 'contradictory allowed state',
-      payload: { allowed: false, remaining: 3, resetAt: Date.now() + 1000 },
+      payload: () => ({ allowed: false, remaining: 3, resetAt: Date.now() + 60_000 }),
     },
     {
       name: 'far-future resetAt',
-      payload: { allowed: false, remaining: 0, resetAt: Date.now() + 86400000 * 2 },
+      payload: () => ({ allowed: false, remaining: 0, resetAt: Date.now() + 86_400_000 * 2 }),
     },
   ];
   for (const { name, payload } of malformedQuotaCases) {
     it(`treats a malformed daily quota DO payload (${name}) as unavailable and fails open`, async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const malformedPayload = payload();
       const rpcCalls: Array<Record<string, unknown>> = [];
       const env: Env = {
         API_GATEWAY_LIMITER: {
           idFromName: (key: string) => key,
           get: () => ({
             fetch: async () =>
-              new Response(JSON.stringify(payload), {
+              new Response(JSON.stringify(malformedPayload), {
                 status: 200,
                 headers: { 'content-type': 'application/json' },
               }),
@@ -717,7 +723,6 @@ describe('daily quota and abuse gate', () => {
         token_id: 'token-1',
         reason: 'bad_json',
       });
-      warnSpy.mockRestore();
     });
   }
   it('fails open and logs when the daily quota DO is unavailable', async () => {
@@ -759,6 +764,5 @@ describe('daily quota and abuse gate', () => {
       token_id: 'token-1',
       reason: 'http_status',
     });
-    warnSpy.mockRestore();
   });
 });

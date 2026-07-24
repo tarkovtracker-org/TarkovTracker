@@ -112,8 +112,8 @@ product.
    production **before** merging the worker change; adding a function ahead of its caller is safe.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
-   `IP_HASH_SECRET` (e.g. any change to abuse-gate IP logging), confirm the secret is already
-   provisioned on the production `api-gateway` Worker:
+   `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
+   already provisioned on the production `api-gateway` Worker:
 
    ```bash
    wrangler secret list --config workers/api-gateway/wrangler.toml   # confirm IP_HASH_SECRET is listed
