@@ -394,13 +394,13 @@ Treat these deliberately; do not “make everything fail open” without underst
 
 ### Cleanup / retention
 
-| Store                       | Retention guidance                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `mutation_rate_limits`      | Delete rows with `reset_at` older than 1 day periodically                                                                      |
-| `api_usage_daily`           | Keep finite retention (e.g. 90–180 days) for observability                                                                     |
-| Worker DO state             | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic                                       |
-| Legacy burst/IP DO keys     | Removed in the single daily-quota refactor; already-written objects drain via their existing alarms and are never re-addressed |
-| `account_deletion_attempts` | Existing cleanup function / retention policy                                                                                   |
+| Store                       | Retention guidance                                                                                                                                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mutation_rate_limits`      | Delete rows with `reset_at` older than 1 day periodically                                                                                                                                                                                            |
+| `api_usage_daily`           | Keep finite retention (e.g. 90–180 days) for observability                                                                                                                                                                                           |
+| Worker DO state             | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic                                                                                                                                                             |
+| Legacy burst/IP DO keys     | Removed in the single daily-quota refactor and never re-addressed; expired objects with pending alarms are deleted, but objects whose legacy alarm fired while the window was still active can linger (their alarm was drained without rescheduling) |
+| `account_deletion_attempts` | Existing cleanup function / retention policy                                                                                                                                                                                                         |
 
 ---
 

@@ -270,7 +270,11 @@ async function rateLimit(
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
-    if (data.allowed !== true && data.allowed !== false) {
+    if (
+      (data.allowed !== true && data.allowed !== false) ||
+      !Number.isFinite(remaining) ||
+      !Number.isFinite(resetAt)
+    ) {
       return {
         allowed: false,
         unavailable: true,
@@ -508,7 +512,15 @@ async function authenticateAndRateLimit(
     // 500 outage for valid requests — the daily quota still enforces the
     // customer entitlement downstream. Log the HMAC-hashed IP only: raw IPs
     // must never reach Worker logs (see docs/RATE_LIMITING.md).
-    const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
+    const getIpHash = (() => {
+      let cached: Promise<string | null> | null = null;
+      return () => {
+        if (!cached) {
+          cached = hashIp(clientIp, env.IP_HASH_SECRET).catch(() => null);
+        }
+        return cached;
+      };
+    })();
     let abuseResult: { success: boolean } | null = null;
     try {
       abuseResult = await env.API_ABUSE_LIMITER.limit({ key: `api:${clientIp}` });
@@ -517,7 +529,7 @@ async function authenticateAndRateLimit(
         JSON.stringify({
           event: 'abuse_gate_unavailable',
           action,
-          ip_hash: ipHash,
+          ip_hash: await getIpHash(),
           reason: 'binding_error',
           ...errorInfo(error),
         })
@@ -528,7 +540,7 @@ async function authenticateAndRateLimit(
         JSON.stringify({
           event: 'abuse_gate_429',
           action,
-          ip_hash: ipHash,
+          ip_hash: await getIpHash(),
         })
       );
       return errorResponse('Too many requests', 429, envOrigin, requestOrigin, {

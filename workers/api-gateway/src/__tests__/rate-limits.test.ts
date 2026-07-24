@@ -642,7 +642,7 @@ describe('daily quota and abuse gate', () => {
     expect(warnLog).not.toContain('203.0.113.1');
     warnSpy.mockRestore();
   });
-  it('treats a malformed daily quota DO payload as unavailable and fails open', async () => {
+  it('treats a malformed daily quota DO payload (missing allowed) as unavailable and fails open', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const rpcCalls: Array<Record<string, unknown>> = [];
     const env: Env = {
@@ -650,7 +650,7 @@ describe('daily quota and abuse gate', () => {
         idFromName: (name: string) => name,
         get: () => ({
           fetch: async () =>
-            new Response(JSON.stringify({ remaining: 5, resetAt: Date.now() + 1000 }), {
+            new Response(JSON.stringify({ allowed: true, remaining: 5 }), {
               status: 200,
               headers: { 'content-type': 'application/json' },
             }),
