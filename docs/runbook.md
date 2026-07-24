@@ -121,9 +121,9 @@ product.
    ```
 
    The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
-   deploy time, `abuse_gate_429`, `abuse_gate_unavailable`, and `daily_quota_429` log lines emit
-   `ip_hash: null`, defeating the IP-level abuse observability the change introduced. Provision the
-   secret **before** merging so the first post-merge request already has a non-null HMAC identifier.
+   deploy time, `abuse_gate_429` and `abuse_gate_unavailable` log lines emit `ip_hash: null`,
+   defeating the IP-level abuse observability the change introduced. Provision the secret **before**
+   merging so the first post-merge request already has a non-null HMAC identifier.
    Do not commit the value.
 
 5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
