@@ -642,50 +642,70 @@ describe('daily quota and abuse gate', () => {
     expect(warnLog).not.toContain('203.0.113.1');
     warnSpy.mockRestore();
   });
-  it('treats a malformed daily quota DO payload (missing allowed) as unavailable and fails open', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const rpcCalls: Array<Record<string, unknown>> = [];
-    const env: Env = {
-      API_GATEWAY_LIMITER: {
-        idFromName: (name: string) => name,
-        get: () => ({
-          fetch: async () =>
-            new Response(JSON.stringify({ allowed: true, remaining: 5 }), {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }),
+  const malformedQuotaCases: Array<{ name: string; payload: Record<string, unknown> }> = [
+    {
+      name: 'missing allowed',
+      payload: { remaining: 5, resetAt: Date.now() + 1000 },
+    },
+    {
+      name: 'missing resetAt',
+      payload: { allowed: true, remaining: 5 },
+    },
+    {
+      name: 'expired resetAt',
+      payload: { allowed: false, remaining: 0, resetAt: Date.now() - 1000 },
+    },
+    {
+      name: 'out-of-range remaining',
+      payload: { allowed: true, remaining: Number.MAX_SAFE_INTEGER, resetAt: Date.now() + 1000 },
+    },
+  ];
+  for (const { name, payload } of malformedQuotaCases) {
+    it(`treats a malformed daily quota DO payload (${name}) as unavailable and fails open`, async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const rpcCalls: Array<Record<string, unknown>> = [];
+      const env: Env = {
+        API_GATEWAY_LIMITER: {
+          idFromName: (key: string) => key,
+          get: () => ({
+            fetch: async () =>
+              new Response(JSON.stringify(payload), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              }),
+          }),
+        } as unknown as Env['API_GATEWAY_LIMITER'],
+        SUPABASE_URL: 'https://supabase.example',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+        ALLOWED_ORIGIN: '*',
+      };
+      vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
+      const res = await worker.fetch(
+        buildRequest('/token', {
+          method: 'GET',
+          headers: { Authorization: 'Bearer PVP_abc123' },
         }),
-      } as unknown as Env['API_GATEWAY_LIMITER'],
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
-    const res = await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123' },
-      }),
-      env
-    );
-    expect(res.status).toBe(200);
-    await flushAsync();
-    expect(rpcCalls).toHaveLength(1);
-    expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 0, p_reads: 1 });
-    const warnLog = warnSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('daily_quota_unavailable'));
-    expect(warnLog).toBeDefined();
-    expect(JSON.parse(warnLog!)).toMatchObject({
-      event: 'daily_quota_unavailable',
-      action: 'token-info',
-      user_id: 'user-free',
-      token_id: 'token-1',
-      reason: 'bad_json',
+        env
+      );
+      expect(res.status).toBe(200);
+      await flushAsync();
+      expect(rpcCalls).toHaveLength(1);
+      expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 0, p_reads: 1 });
+      const warnLog = warnSpy.mock.calls
+        .map((c) => String(c[0]))
+        .find((s) => s.includes('daily_quota_unavailable'));
+      expect(warnLog).toBeDefined();
+      expect(JSON.parse(warnLog!)).toMatchObject({
+        event: 'daily_quota_unavailable',
+        action: 'token-info',
+        user_id: 'user-free',
+        token_id: 'token-1',
+        reason: 'bad_json',
+      });
+      warnSpy.mockRestore();
     });
-    warnSpy.mockRestore();
-  });
+  }
   it('fails open and logs when the daily quota DO is unavailable', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const rpcCalls: Array<Record<string, unknown>> = [];

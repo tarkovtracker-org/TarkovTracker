@@ -272,8 +272,13 @@ async function rateLimit(
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
     if (
       (data.allowed !== true && data.allowed !== false) ||
+      remaining === undefined ||
       !Number.isFinite(remaining) ||
-      !Number.isFinite(resetAt)
+      remaining < 0 ||
+      remaining > limit ||
+      resetAt === undefined ||
+      !Number.isFinite(resetAt) ||
+      resetAt <= Date.now()
     ) {
       return {
         allowed: false,
