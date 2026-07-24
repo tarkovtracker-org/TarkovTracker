@@ -8,13 +8,15 @@ export const OPENAPI_SPEC = {
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
       'Tokens use prefixes `PVP_` or `PVE_`.\n\n' +
       'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
-      '100 writes/day; supporter tiers scale up), resetting at 00:00 UTC, plus a per-minute ' +
-      'burst limit using a 60-second sliding window. A per-IP backstop (600 reads/hour, ' +
-      '200 writes/hour) catches abuse from many accounts sharing one IP. ' +
-      'Every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` ' +
-      '(unix seconds) describing the daily quota. On `429` responses a `Retry-After` header (seconds) ' +
-      'is also returned, so clients should queue and retry after that delay rather than busy-looping. ' +
-      'Burst-throttled and IP-throttled requests do not consume the daily quota.\n\n' +
+      '100 writes/day; supporter tiers scale up), resetting at 00:00 UTC. A pre-authentication ' +
+      'IP abuse gate (Cloudflare Workers Rate Limiting binding) shields token validation from ' +
+      'floods and returns its own `429` with only `Retry-After`. ' +
+      'Authenticated responses that reach the daily quota include `X-RateLimit-Limit`, ' +
+      '`X-RateLimit-Remaining`, and `X-RateLimit-Reset` (unix seconds); daily-quota `429` ' +
+      'responses add `Retry-After` (seconds), so clients should queue and retry after that ' +
+      'delay rather than busy-looping. Throttled requests do not consume the daily quota. ' +
+      'If the daily-quota service is temporarily unavailable the gateway fails open and ' +
+      'serves the request without rate-limit headers.\n\n' +
       'Token cap: each account may have at most 3 active API tokens. Revoke an existing ' +
       'token before creating a new one if the cap is reached. Token creation is only ' +
       'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
@@ -118,11 +120,13 @@ export const OPENAPI_SPEC = {
       },
       RateLimited: {
         description:
-          'Rate limit exceeded (daily quota, per-minute burst limit, or per-IP backstop)',
+          'Rate limit exceeded (tiered daily quota, or the pre-authentication IP abuse gate). ' +
+          'Daily-quota `429` responses include the `X-RateLimit-*` headers below; abuse-gate ' +
+          '`429` responses are pre-authentication and include only `Retry-After`.',
         headers: {
           'Retry-After': {
             description:
-              'Seconds the client should wait before retrying (daily reset, or when burst capacity frees).',
+              'Seconds the client should wait before retrying (until the daily quota resets at 00:00 UTC, or the abuse-gate period elapses).',
             schema: { type: 'integer', minimum: 1 },
           },
           'X-RateLimit-Limit': {
@@ -573,7 +577,7 @@ export const OPENAPI_SPEC = {
         tags: ['tokens'],
         summary: 'Get token info',
         description:
-          'Requires GP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
+          'Requires GP permission. Counts against the tiered daily read quota (keyed by user).',
         operationId: 'getTokenInfo',
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
@@ -599,7 +603,7 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Get user progress',
         description:
-          'Requires GP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
+          'Requires GP permission. Counts against the tiered daily read quota (keyed by user).',
         operationId: 'getProgress',
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
@@ -625,7 +629,7 @@ export const OPENAPI_SPEC = {
         tags: ['team'],
         summary: 'Get team progress',
         description:
-          'Requires TP permission. Counts against the tiered daily read quota (keyed by user) and the per-minute burst limit.',
+          'Requires TP permission. Counts against the tiered daily read quota (keyed by user).',
         operationId: 'getTeamProgress',
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
@@ -651,7 +655,7 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Update player level',
         description:
-          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user).',
         operationId: 'updatePlayerLevel',
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -687,7 +691,7 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Update single task state',
         description:
-          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user).',
         operationId: 'updateTask',
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -735,7 +739,7 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Update a task objective',
         description:
-          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user).',
         operationId: 'updateTaskObjective',
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -783,7 +787,7 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Batch update tasks',
         description:
-          'Requires WP permission. Counts against the tiered daily write quota (keyed by user) and the per-minute burst limit.',
+          'Requires WP permission. Counts against the tiered daily write quota (keyed by user).',
         operationId: 'updateTasksBatch',
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
