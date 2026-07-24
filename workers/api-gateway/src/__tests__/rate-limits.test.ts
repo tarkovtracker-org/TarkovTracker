@@ -503,6 +503,7 @@ describe('daily quota and abuse gate', () => {
     expect(isKnownTier('chad')).toBe(true);
   });
   it('returns 429 when the IP abuse gate limit is exceeded', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
     const abuseLimit = vi.fn().mockResolvedValue({ success: false });
     const env: Env = {
@@ -529,6 +530,16 @@ describe('daily quota and abuse gate', () => {
     expect(abuseLimit).toHaveBeenCalledWith({ key: 'api:203.0.113.1' });
     // No DO calls — abuse gate rejects before token validation.
     expect(calls).toHaveLength(0);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_429'));
+    expect(warnLog).toBeDefined();
+    expect(JSON.parse(warnLog!)).toMatchObject({
+      event: 'abuse_gate_429',
+      action: 'token-info',
+      client_ip: '203.0.113.1',
+    });
+    warnSpy.mockRestore();
   });
   it('skips the abuse gate when the binding is absent', async () => {
     const calls: LimiterCall[] = [];
@@ -554,6 +565,48 @@ describe('daily quota and abuse gate', () => {
     expect(res.status).toBe(200);
     expect(calls).toHaveLength(1);
     expect(calls[0].key).toBe('daily-read:user-free');
+  });
+  it('fails open and logs when the abuse gate binding throws', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const abuseLimit = vi.fn().mockRejectedValue(new Error('limiter binding failed'));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    // Fail open: request proceeds to token validation and daily quota.
+    expect(res.status).toBe(200);
+    expect(abuseLimit).toHaveBeenCalledWith({ key: 'api:203.0.113.1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].key).toBe('daily-read:user-free');
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    const parsed = JSON.parse(warnLog!);
+    expect(parsed).toMatchObject({
+      event: 'abuse_gate_unavailable',
+      action: 'token-info',
+      client_ip: '203.0.113.1',
+      reason: 'binding_error',
+    });
+    warnSpy.mockRestore();
   });
   it('fails open and logs when the daily quota DO is unavailable', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

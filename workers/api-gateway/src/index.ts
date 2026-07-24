@@ -474,8 +474,31 @@ async function authenticateAndRateLimit(
   // infrastructure protection, not a customer quota.
   const clientIp = request.headers.get('CF-Connecting-IP')?.trim() || null;
   if (clientIp && env.API_ABUSE_LIMITER) {
-    const { success } = await env.API_ABUSE_LIMITER.limit({ key: `api:${clientIp}` });
-    if (!success) {
+    // Fail open: the abuse gate is infrastructure protection for Supabase,
+    // not a customer quota. A binding/runtime failure must not turn into a
+    // 500 outage for valid requests — the daily quota still enforces the
+    // customer entitlement downstream.
+    let abuseResult: { success: boolean } | null = null;
+    try {
+      abuseResult = await env.API_ABUSE_LIMITER.limit({ key: `api:${clientIp}` });
+    } catch {
+      console.warn(
+        JSON.stringify({
+          event: 'abuse_gate_unavailable',
+          action,
+          client_ip: clientIp,
+          reason: 'binding_error',
+        })
+      );
+    }
+    if (abuseResult && !abuseResult.success) {
+      console.warn(
+        JSON.stringify({
+          event: 'abuse_gate_429',
+          action,
+          client_ip: clientIp,
+        })
+      );
       return errorResponse('Too many requests', 429, envOrigin, requestOrigin, {
         'Retry-After': String(ABUSE_GATE_PERIOD_SEC),
       });
