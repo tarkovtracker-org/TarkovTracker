@@ -599,7 +599,9 @@ describe('daily quota and abuse gate', () => {
   it('fails open and logs when the abuse gate binding throws', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
-    const abuseLimit = vi.fn().mockRejectedValue(new Error('limiter binding failed'));
+    const abuseLimit = vi
+      .fn()
+      .mockRejectedValue(new Error('limiter binding failed for api:203.0.113.1'));
     const env: Env = {
       API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
         allowed: true,
@@ -637,7 +639,7 @@ describe('daily quota and abuse gate', () => {
       ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
       reason: 'binding_error',
       error_name: 'Error',
-      error_message: 'limiter binding failed',
+      error_message: 'limiter binding failed for api:[redacted]',
     });
     expect(warnLog).not.toContain('203.0.113.1');
     warnSpy.mockRestore();
