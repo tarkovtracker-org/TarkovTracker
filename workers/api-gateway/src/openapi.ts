@@ -160,19 +160,6 @@ export const OPENAPI_SPEC = {
           },
         },
       },
-      ServiceUnavailable: {
-        description: 'Rate limiter unavailable',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/ErrorResponse' },
-            examples: {
-              limiterUnavailable: {
-                value: { success: false, error: 'Rate limiter unavailable' },
-              },
-            },
-          },
-        },
-      },
     },
     schemas: {
       ErrorResponse: {
@@ -594,7 +581,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
@@ -620,7 +606,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
@@ -646,7 +631,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
@@ -682,7 +666,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
@@ -730,7 +713,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
@@ -778,7 +760,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
@@ -831,7 +812,6 @@ export const OPENAPI_SPEC = {
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
           '429': { $ref: '#/components/responses/RateLimited' },
-          '503': { $ref: '#/components/responses/ServiceUnavailable' },
         },
       },
     },
