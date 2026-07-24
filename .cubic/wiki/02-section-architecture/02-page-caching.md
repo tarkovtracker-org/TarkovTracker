@@ -1,5 +1,5 @@
 ---
-title: "Caching & Precompute System"
+title: "Data Pipeline & Caching"
 wiki_page_id: "page-caching"
 ---
 
@@ -8,164 +8,162 @@ wiki_page_id: "page-caching"
 
 The following files were used as context for generating this wiki page:
 
-- [scripts/precompute/precompute.ts](scripts/precompute/precompute.ts)
 - [app/server/utils/edgeCache.ts](app/server/utils/edgeCache.ts)
-- [app/server/api/tarkov/cache-meta.get.ts](app/server/api/tarkov/cache-meta.get.ts)
+- [app/server/utils/sharedEdgeStore.ts](app/server/utils/sharedEdgeStore.ts)
+- [app/utils/tarkovCache.ts](app/utils/tarkovCache.ts)
 - [AGENTS.md](AGENTS.md)
-- [wrangler.toml](wrangler.toml)
-- [code_review.md](code_review.md)
-- [app/stores/useMetadata.ts](app/stores/useMetadata.ts)
+- [docs/SYSTEMS.md](docs/SYSTEMS.md)
+- [README.md](README.md)
 </details>
 
-# Caching & Precompute System
+# Data Pipeline & Caching
 
-The Caching & Precompute System is a multi-layer data delivery architecture designed to optimize the performance of TarkovTracker, specifically for heavy game data payloads like `tasks-core`. Due to the CPU limits of the Cloudflare Workers Free tier, complex data processing is offloaded to a standalone precompute stage. This system ensures high availability and low latency by utilizing Cloudflare Key-Value (KV) storage as a globally replicated primary cache, falling back to the per-colo Cache API or origin fetches when necessary.
+The Data Pipeline and Caching system in TarkovTracker is a multi-layered architecture designed to provide high-performance access to game data while minimizing the load on upstream providers like `tarkov.dev`. It utilizes Cloudflare's edge infrastructure to serve data from the closest possible location to the user, employing a combination of precomputed data, edge-level caching, and client-side persistence.
 
-The system bridges external data from `tarkov.dev` with the client-side [Metadata Store](#app-stores-usemetadata-ts) through an efficient edge-side pipeline. It maintains data consistency across deployments by providing a centralized metadata endpoint for cache invalidation and ensuring schema compatibility between the precompute script and runtime request handlers.
+The pipeline ensures that heavy game data—including tasks, hideout requirements, and item metadata—is processed and cached efficiently. It handles language and game-mode (`regular` vs `pve`) variations through specialized cache keys and edge logic.
 
-Sources: [AGENTS.md](AGENTS.md), [app/server/utils/edgeCache.ts](app/server/utils/edgeCache.ts), [scripts/precompute/precompute.ts](scripts/precompute/precompute.ts)
+## Multi-Layer Caching Architecture
 
----
-
-## System Architecture
-
-The architecture consists of a decoupled producer-consumer model where the producer (GitHub Actions) populates global storage, and the consumer (Nitro server routes) serves the data to users.
+The system operates across three primary layers: the Cloudflare KV store for precomputed data, the Cloudflare Cache API for per-datacenter (colo) caching, and the browser's local storage for client-side persistence.
 
 ### High-Level Data Flow
 
-The following diagram illustrates how game data moves from the upstream source to the end user:
+The following diagram illustrates how a request for game data is resolved through the various caching layers.
 
 ```mermaid
 flowchart TD
-    subgraph CI_CD [CI/CD Pipeline - GitHub Actions]
-        A[Scheduled Trigger] --> B[scripts/precompute/precompute.ts]
-        B --> C{Fetch from tarkov.dev}
-        C --> D[Process & Normalize Data]
-        D --> E[Write to Cloudflare KV]
-    end
-
-    subgraph Edge [Cloudflare Edge]
-        E --> F[(KV Namespace: TARKOV_DATA)]
-        G[User Request] --> H[Nitro API Handler]
-        H --> I[edgeCache Utility]
-        I --> J{Check KV}
-        J -- Found --> K[Return Data]
-        J -- Missing --> L{Check Cache API}
-        L -- Found --> K
-        L -- Missing --> M[Fetch from Origin]
-        M --> N[Populate Cache API]
-        N --> K
-    end
+    Req[Client Request] --> ClientCache{Client Storage?}
+    ClientCache -- Yes --> Return[Return Data]
+    ClientCache -- No --> EdgeReq[Edge Server Request]
     
-    K --> O[Client Browser]
+    EdgeReq --> Precompute{KV Precomputed?}
+    Precompute -- Yes --> KVReturn[Serve from KV]
+    Precompute -- No --> ColoCache{Colo Cache?}
+    
+    ColoCache -- Yes --> CacheReturn[Serve from Cache API]
+    ColoCache -- No --> Upstream[Fetch tarkov.dev]
+    
+    Upstream --> Process[Apply Overlay Fixes]
+    Process --> StoreColo[Store in Colo Cache]
+    StoreColo --> KVReturn
+    KVReturn --> StoreClient[Store in Client Cache]
+    CacheReturn --> StoreClient
+    StoreClient --> Return
 ```
 
-The diagram shows the transition from the precompute script in CI/CD to the Cloudflare KV storage, and the fallback logic used by server handlers.
-Sources: [scripts/precompute/precompute.ts](scripts/precompute/precompute.ts), [app/server/utils/edgeCache.ts](app/server/utils/edgeCache.ts), [wrangler.toml](wrangler.toml)
+Sources: [AGENTS.md](AGENTS.md), [app/server/utils/edgeCache.ts:1-20](app/server/utils/edgeCache.ts#L1-L20)
 
----
-
-## Component Breakdown
-
-### 1. Precompute Script (`scripts/precompute/precompute.ts`)
-This script is responsible for generating optimized payloads for every supported language and game mode combinations. It prevents the web application from having to perform heavy computations (like building task graphs or normalizing large JSON objects) during a user request.
-
-- **Storage Target**: Cloudflare KV Namespace `TARKOV_DATA`.
-- **Concurrency**: It uses a configurable concurrency limit (defaulting to 10) to avoid overloading upstream APIs or storage write limits.
-- **Key Strategy**: Keys are structured as `route:lang:gameMode`. For example: `tasks-core:en:regular`.
-
-Sources: [scripts/precompute/precompute.ts:1-25](scripts/precompute/precompute.ts#L1-L25), [scripts/precompute/precompute.ts:98-105](scripts/precompute/precompute.ts#L98-L105)
-
-### 2. Edge Cache Utility (`app/server/utils/edgeCache.ts`)
-A server-side utility that abstracts the complexity of multi-layer caching. It handles the `Cache-Control` headers and orchestrates the retrieval of precomputed data.
+### Cache Layer Definitions
 
 | Layer | Component | Description |
 | :--- | :--- | :--- |
-| **L1** | Cloudflare KV | Replicated globally. Checked first if the `precomputed` flag is set. |
-| **L2** | Cache API | Per-datacenter (colo) cache. Used as a fallback or for non-precomputed routes. |
-| **L3** | Origin Fetch | Direct request to `json.tarkov.dev` if no cache hits occur. |
+| **Precompute** | Cloudflare KV (`TARKOV_DATA`) | Standalone precompute of heavy payloads run by GitHub Actions. Request handlers read these first. |
+| **Edge Cache** | Cloudflare Cache API | Per-colo (datacenter) cache that falls back to upstream if KV or Cache is missing. |
+| **Client Cache** | Browser `localStorage` | Persists game data locally in the browser to enable offline functionality and instant loads. |
 
-Sources: [app/server/utils/edgeCache.ts:40-65](app/server/utils/edgeCache.ts#L40-L65), [wrangler.toml:22-26](wrangler.toml#L22-L26)
+Sources: [AGENTS.md](AGENTS.md), [README.md](README.md)
 
-### 3. Cache Metadata API (`app/server/api/tarkov/cache-meta.get.ts`)
-This endpoint provides a way for the client to determine if local caches need to be purged. It reads the `lastPurgeAt` value from the `TARKOV_DATA` KV store.
+## Edge Caching Logic
 
-- **Endpoint**: `/api/tarkov/cache-meta`
-- **Function**: Returns a JSON object containing the timestamp of the last manual or automated cache purge.
+The edge caching logic is primarily implemented in `edgeCache.ts`. It provides a unified interface for checking precomputed data and managing the lifecycle of cached responses at the network edge.
 
-Sources: [app/server/api/tarkov/cache-meta.get.ts](app/server/api/tarkov/cache-meta.get.ts)
+### Core Caching Functions
 
----
+The `edgeCache` utility handles the complexity of environment-specific bindings and cache header management.
 
-## Implementation Details
-
-### The `edgeCache` Strategy
-The `edgeCache` function is the core of the runtime system. It accepts an `H3Event` and a fetch function. If the `precomputed` option is enabled, it attempts to read from the `TARKOV_DATA` KV binding before continuing to standard caching logic.
-
-```typescript
-// Conceptual logic from app/server/utils/edgeCache.ts
-export async function edgeCache<T>(event: H3Event, options: EdgeCacheOptions<T>) {
-  if (options.precomputed) {
-    const kv = event.context.cloudflare?.env?.TARKOV_DATA;
-    const kvKey = `${options.key}:${options.lang}:${options.gameMode}`;
-    const cached = await kv?.get(kvKey);
-    if (cached) return JSON.parse(cached);
-  }
-  // Fallback to Cache API...
-}
-```
-
-Sources: [app/server/utils/edgeCache.ts:68-80](app/server/utils/edgeCache.ts#L68-L80)
-
-### Key Configuration Values
-The system relies on specific environment variables and bindings defined in `wrangler.toml`:
-
-| Binding | Type | Description |
-| :--- | :--- | :--- |
-| `TARKOV_DATA` | KV Namespace | Stores precomputed JSON payloads (e.g., `tasks-core`). |
-| `API_GATEWAY_LIMITER` | Durable Object | While primarily for rate limiting, it ensures consistent access to edge resources. |
-
-Sources: [wrangler.toml:13-33](wrangler.toml#L13-L33)
-
----
-
-## Cache Invalidation & Consistency
-
-Data consistency is maintained through a "Purge Timestamp" mechanism. When an admin purges the cache, a timestamp is updated in KV. The client store (`useMetadata.ts`) periodically checks this metadata.
-
-### Client-Side Validation Sequence
+- **`getCachedResponse`**: Attempts to retrieve data from the `TARKOV_DATA` KV namespace. If the binding or entry is absent, it signals a fallback to the standard Cache API.
+- **`saveToEdgeCache`**: Stores a response in the Cloudflare Cache API with specific TTLs (Time-To-Live).
+- **`getPrecomputedKey`**: Generates standardized keys for KV lookups based on route, language, and game mode.
 
 ```mermaid
 sequenceDiagram
-    participant C as Metadata Store (Client)
-    participant A as cache-meta API
+    participant H as Request Handler
+    participant EC as edgeCache.ts
     participant KV as KV (TARKOV_DATA)
+    participant C as Cache API (Colo)
 
-    C->>A: GET /api/tarkov/cache-meta
-    A->>KV: Get "meta:lastPurgeAt"
-    KV-->>A: Timestamp
-    A-->>C: { lastPurgeAt: "2026-06-30..." }
-    Note over C: Compare with local localStorage value
-    alt Server Time > Local Time
-        C->>C: clearAllCache() (IndexedDB)
-        C->>C: Update localStorage with new timestamp
+    H->>EC: getCachedResponse(event, key)
+    EC->>KV: get(key)
+    alt Entry Found
+        KV-->>EC: data
+        EC-->>H: Response (KV_HIT)
+    else Binding/Entry Missing
+        EC->>C: match(request)
+        alt Cache Hit
+            C-->>EC: response
+            EC-->>H: Response (EDGE_HIT)
+        else Cache Miss
+            EC-->>H: null (MISS)
+        end
     end
 ```
 
-The sequence shows how the client validates its local IndexedDB cache against the server's global purge state.
-Sources: [app/stores/useMetadata.ts:607-635](app/stores/useMetadata.ts#L607-L635), [app/server/api/tarkov/cache-meta.get.ts](app/server/api/tarkov/cache-meta.get.ts)
+Sources: [app/server/utils/edgeCache.ts:31-75](app/server/utils/edgeCache.ts#L31-L75), [AGENTS.md](AGENTS.md)
 
----
+### Cache Configuration Constants
 
-## Operational Risk Areas
+The system uses specific durations to balance data freshness with performance.
 
-1.  **Entry Shape Compatibility**: The precompute script and runtime request handlers must agree on the JSON schema. If the schema changes in `precompute.ts`, the script must run and populate KV before the new server code is deployed to avoid parsing errors.
-2.  **KV Consistency**: KV storage is eventually consistent. While writes are usually visible globally within seconds, there can be a window where different colos see different data versions.
-3.  **Graceful Degradation**: If the `TARKOV_DATA` binding is missing (e.g., in local development without Miniflare), the `edgeCache` utility is designed to fall back to the Cache API and origin fetch automatically, ensuring the app remains functional.
+| Constant | Value | Description |
+| :--- | :--- | :--- |
+| `DEFAULT_CACHE_TTL` | 3600 (1 hour) | Standard duration for caching game data at the edge. |
+| `STALE_IF_ERROR_TTL` | 86400 (24 hours) | Allows serving stale data if the upstream fetch fails. |
 
-Sources: [code_review.md:55-62](code_review.md#L55-L62), [app/server/utils/edgeCache.ts:85-90](app/server/utils/edgeCache.ts#L85-L90)
+Sources: [app/server/utils/edgeCache.ts:11-15](app/server/utils/edgeCache.ts#L11-L15)
 
----
+## Client-Side Pipeline
+
+On the client side, the `tarkovCache.ts` utility manages data synchronization between the API and local storage. This ensures that users can track progress immediately—even without an account.
+
+### TarkovCache Management
+
+The client-side pipeline is responsible for:
+1.  **Hydration**: Loading initial data from `localStorage`.
+2.  **Validation**: Checking cache metadata (purge timestamps) to invalidate old data.
+3.  **Persistence**: Saving updated game data and user progress.
+
+```mermaid
+flowchart TD
+    Init[App Initialize] --> LoadMeta[Fetch Cache Metadata]
+    LoadMeta --> CheckTS{Local TS < Remote TS?}
+    CheckTS -- Yes --> Purge[Purge Local Storage]
+    Purge --> Fetch[Fetch Fresh API Data]
+    CheckTS -- No --> LoadLocal[Load from Local Storage]
+    LoadLocal --> AppReady[Application Ready]
+    Fetch --> Save[Save to Local Storage]
+    Save --> AppReady
+```
+
+Sources: [app/utils/tarkovCache.ts:5-40](app/utils/tarkovCache.ts#L5-L40), [README.md](README.md)
+
+## Public API Gateway
+
+The API Gateway (located in `workers/api-gateway/`) acts as the entry point for programmatic access. It enforces rate limits using Cloudflare Durable Objects to prevent abuse while ensuring high availability for game data.
+
+### Public API Endpoints
+The following endpoints serve processed and cached game data:
+- `/api/tarkov/bootstrap`: Level and XP metadata.
+- `/api/tarkov/tasks-core`: Tasks, maps, and traders.
+- `/api/tarkov/tasks-objectives`: Detailed task requirements.
+- `/api/tarkov/hideout`: Station and upgrade data.
+- `/api/tarkov/items`: Full item index.
+
+Sources: [AGENTS.md](AGENTS.md), [public/llms.txt](public/llms.txt)
+
+## Precompute Workflow
+
+Heavy payloads, specifically for `tasks-core`, are precomputed into the `TARKOV_DATA` KV namespace. This process is triggered by a scheduled GitHub Actions workflow rather than a scheduled Worker to stay within the Workers Free tier CPU limits.
+
+### Precompute Logic
+1.  **Trigger**: Scheduled GitHub Action runs.
+2.  **Fetch**: Queries `json.tarkov.dev` for all languages and game modes.
+3.  **Process**: Normalizes the data and applies TarkovTracker-specific corrections (overlays).
+4.  **Upload**: Writes the resulting JSON into Cloudflare KV.
+
+Sources: [AGENTS.md](AGENTS.md), [docs/SYSTEMS.md](docs/SYSTEMS.md)
 
 ## Summary
-The TarkovTracker Caching & Precompute System effectively bypasses platform limitations by utilizing external CI/CD for heavy processing. By layering Cloudflare KV, the Cache API, and origin fetches, it provides a robust and performant data delivery pipeline that maintains consistency via a shared metadata heartbeat. This ensures that the application remains responsive and accurate even during periods of heavy game data updates.
+
+The TarkovTracker Data Pipeline and Caching system utilizes a multi-layered approach to ensure reliability and speed. By combining GitHub-driven precomputation with Cloudflare Edge caching and browser-local persistence, the application achieves sub-second load times for complex game data while remaining resilient to upstream API outages. This architecture supports both guest users with local-only storage and authenticated users with cloud-synchronized progress.
+
+Sources: [README.md](README.md), [AGENTS.md](AGENTS.md), [docs/SYSTEMS.md](docs/SYSTEMS.md)
