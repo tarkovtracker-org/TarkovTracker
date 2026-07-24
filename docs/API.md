@@ -375,23 +375,25 @@ This section covers **external progress API quotas only** (Worker + Durable Obje
 limits, shared profile limits, Auth limits, and DB hard caps live in a separate ownership map:
 [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 
-Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC; burst limits use a 60-second sliding window so batch updates near a minute boundary are not spuriously throttled.
+Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered daily quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC and count authenticated requests admitted for processing.
 
-| Tier      | Reads/day | Writes/day | Burst/min |
-| --------- | --------- | ---------- | --------- |
-| Free      | 1,000     | 100        | 30        |
-| Supporter | 2,000     | 250        | 60        |
-| Scav      | 2,000     | 250        | 60        |
-| Timmy     | 3,000     | 400        | 90        |
-| Chad      | 5,000     | 600        | 120       |
+| Tier      | Reads/day | Writes/day |
+| --------- | --------- | ---------- |
+| Free      | 1,000     | 100        |
+| Supporter | 2,000     | 250        |
+| Scav      | 2,000     | 250        |
+| Timmy     | 3,000     | 400        |
+| Chad      | 5,000     | 600        |
 
 The gateway resolves the tier from `public.supporters` for the token owner and caches successful
 lookups for up to 60 seconds. Active subscriptions and past-due subscriptions within their recorded
 grace period keep paid limits; expired subscriptions return to Free limits.
 
-A per-IP backstop applies on top of the per-user quotas: 600 reads/hour and 200 writes/hour per IP address (1-hour sliding window). This catches abuse from many accounts sharing one IP while remaining generous enough for shared NAT users. IP-throttled requests do not consume the daily or burst quotas.
+A pre-authentication IP-based abuse gate (Cloudflare Workers Rate Limiting binding) shields
+the token validation step from floods. It is deliberately coarse — infrastructure protection,
+not a customer quota — and is not advertised as a per-IP entitlement.
 
-Every gateway response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (Unix seconds) for the daily quota, plus `Retry-After` on `429` responses. On burst or IP `429`s the `X-RateLimit-*` headers still describe the daily quota (throttled requests do not consume it) while `Retry-After` indicates when capacity frees. When a free-tier user exhausts a daily quota, the `429` body includes an upgrade link. Admins can inspect the top consumers via `GET /api/admin/api-usage`; usage is bucketed by UTC day, so the report covers the current and previous UTC day (the `since` field gives the exact starting day).
+Every gateway response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (Unix seconds) for the daily quota, plus `Retry-After` on `429` responses. When a free-tier user exhausts a daily quota, the `429` body includes an upgrade link. Admins can inspect the top consumers via `GET /api/admin/api-usage`; usage is bucketed by UTC day, so the report covers the current and previous UTC day (the `since` field gives the exact starting day).
 
 ### Active Token Cap
 

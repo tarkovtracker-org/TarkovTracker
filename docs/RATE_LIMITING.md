@@ -74,14 +74,14 @@ flowchart TB
 
 ### Ownership matrix
 
-| Traffic class               | Examples                                         | Primary enforcer                               | Secondary / hard stop                    | Storage / implementation                   |
-| --------------------------- | ------------------------------------------------ | ---------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`           | Worker DO quotas (daily + burst + IP backstop) | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
-| Authenticated app mutations | team create/join/leave/kick, token create/revoke | Edge Function mutation limiter                 | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
-| Public / shared app reads   | shared profile, team members, tarkov-dev profile | Pages/Nitro shared limiter                     | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
-| Destructive account ops     | account delete                                   | Edge Function (dedicated table for now)        | Deletion jobs queue                      | `account_deletion_attempts`                |
-| Auth platform               | signup, sign-in, refresh, OTP                    | Supabase Auth                                  | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
-| Outbound third parties      | Discord API, Stripe                              | Provider `Retry-After` / SDK rules             | Circuit breakers, job retries            | not user quotas                            |
+| Traffic class               | Examples                                         | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
+| --------------------------- | ------------------------------------------------ | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`           | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
+| Authenticated app mutations | team create/join/leave/kick, token create/revoke | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
+| Public / shared app reads   | shared profile, team members, tarkov-dev profile | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
+| Destructive account ops     | account delete                                   | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
+| Auth platform               | signup, sign-in, refresh, OTP                    | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
+| Outbound third parties      | Discord API, Stripe                              | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
 
 ---
 
@@ -178,36 +178,39 @@ This is the high-volume system used by token-authenticated progress clients. It 
 ```mermaid
 flowchart LR
   C[External client + API token] --> W[api-gateway Worker]
-  W --> AUTH[Validate token hash]
+  W --> ABUSE[IP abuse gate<br/>Cloudflare Rate Limiting binding]
+  ABUSE --> AUTH[Validate token hash]
   AUTH --> TIER[Resolve supporter tier]
   TIER --> DAILY[DO daily quota<br/>utc-day window]
-  DAILY --> BURST[DO burst/min<br/>sliding]
-  BURST --> IP[DO IP backstop<br/>sliding hour]
-  IP --> HANDLER[Progress / team handlers]
+  DAILY --> HANDLER[Progress / team handlers]
   HANDLER --> DB[(Supabase)]
   W --> USAGE[record_api_usage RPC<br/>api_usage_daily]
 ```
 
-**Primary limits** (from `workers/api-gateway/src/limits.ts`):
+**Daily limits** (from `workers/api-gateway/src/limits.ts`):
 
-| Tier      | Reads/day | Writes/day | Burst/min |
-| --------- | --------: | ---------: | --------: |
-| Free      |     1,000 |        100 |        30 |
-| Supporter |     2,000 |        250 |        60 |
-| Scav      |     2,000 |        250 |        60 |
-| Timmy     |     3,000 |        400 |        90 |
-| Chad      |     5,000 |        600 |       120 |
+| Tier      | Reads/day | Writes/day |
+| --------- | --------: | ---------: |
+| Free      |     1,000 |        100 |
+| Supporter |     2,000 |        250 |
+| Scav      |     2,000 |        250 |
+| Timmy     |     3,000 |        400 |
+| Chad      |     5,000 |        600 |
 
-Plus IP backstop: **600 reads/hour**, **200 writes/hour** per IP.
+**Abuse gate**: a pre-authentication IP-keyed Cloudflare Workers Rate Limiting binding that
+shields the `api_tokens` lookup from floods. Coarse by design (infrastructure protection, not a
+customer quota). Counter is per-Cloudflare-location and eventually consistent.
 
 Details and response headers: [`API.md`](./API.md#rate-limits-api-gateway)
 
 Implementation notes:
 
 - Enforcer class: `ApiGatewayRateLimiter` in `workers/api-gateway/src/index.ts`
-- Keys are namespaced (`daily-read:<userId>`, `burst-write:<userId>`, `ip-...`)
-- Burst uses sliding windows so a TarkovMonitor batch at a minute boundary is not spuriously blocked
-- Throttled requests can refund daily/burst slots when a later check fails
+- Keys are namespaced (`daily-read:<userId>`, `daily-write:<userId>`)
+- Daily quota uses a UTC-day fixed window; a quota unit is consumed when a valid authenticated
+  request is admitted for processing (downstream failures do not trigger refunds)
+- The daily quota DO fails open when unavailable — the abuse gate still protects Supabase,
+  and daily quotas are product entitlements, not database-integrity boundaries
 - Usage observability goes to `public.api_usage_daily` (not a limiter itself)
 
 ---
@@ -371,23 +374,23 @@ Checklist for every new limiter:
 
 ### Fail behavior
 
-| System                          | On limiter failure                                                                                                                                                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                                                                                                                                              |
-| Worker DO timeout / error       | Primary daily/burst DOs fail closed with limiter-unavailable **503**. Per-IP backstop DO: **503** fails open (request proceeds after daily/burst pass; no primary refund); genuine **429** rejects and refunds primary slots |
-| Pages shared limiter without DO | Falls back to in-memory best effort                                                                                                                                                                                          |
+| System                          | On limiter failure                                                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edge mutation RPC error         | Edge returns **503** “Rate limiter unavailable” (fail closed for that mutation)                                                                                         |
+| Worker DO timeout / error       | Daily quota DO fails open (product entitlement, not DB-integrity boundary). Abuse gate still protects Supabase. Structured `daily_quota_unavailable` warning is logged. |
+| Pages shared limiter without DO | Falls back to in-memory best effort                                                                                                                                     |
 
 Treat these deliberately; do not “make everything fail open” without understanding abuse impact.
 
 ### Observability
 
-| System                   | Where to look                                                               |
-| ------------------------ | --------------------------------------------------------------------------- |
-| External API throttles   | Worker logs (`rate_limit_429`), `api_usage_daily`, admin API usage endpoint |
-| Mutation throttles       | Edge Function logs (`[rate-limit] ...`), `mutation_rate_limits.updated_at`  |
-| Pages endpoint throttles | Pages/Nitro logs from sharedEdgeStore warnings                              |
-| Account delete throttles | `account_deletion_attempts`                                                 |
-| Auth storms              | Supabase Auth logs / dashboard                                              |
+| System                   | Where to look                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| External API throttles   | Worker logs (`daily_quota_unavailable`), `api_usage_daily`, admin API usage endpoint |
+| Mutation throttles       | Edge Function logs (`[rate-limit] ...`), `mutation_rate_limits.updated_at`           |
+| Pages endpoint throttles | Pages/Nitro logs from sharedEdgeStore warnings                                       |
+| Account delete throttles | `account_deletion_attempts`                                                          |
+| Auth storms              | Supabase Auth logs / dashboard                                                       |
 
 ### Cleanup / retention
 
@@ -427,7 +430,7 @@ Browser UI
   └─ auth             → Supabase Auth platform limits
 
 External clients (API tokens)
-  └─ api-gateway Worker → DO quotas (daily / burst / IP) → Supabase data
+  └─ api-gateway Worker → IP abuse gate → DO daily quota → Supabase data
 
 Hard rules always in DB:
   active token cap, RLS, uniqueness, deletion job integrity

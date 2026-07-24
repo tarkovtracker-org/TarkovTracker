@@ -1,6 +1,9 @@
 // Environment bindings
 export interface Env {
   API_GATEWAY_LIMITER: DurableObjectNamespace;
+  // Native Workers rate limiting binding used as the pre-auth abuse gate.
+  // Optional so local dev and tests without the binding simply skip the gate.
+  API_ABUSE_LIMITER?: RateLimit;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
