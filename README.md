@@ -45,8 +45,7 @@ Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
 
 - **Questions or bugs?** See [`SUPPORT.md`](SUPPORT.md) for where to ask.
 - **Found a security issue?** See [`SECURITY.md`](SECURITY.md) for how to report it privately.
-- **Community:** Join us on [Discord](https://discord.gg/M8nBgA2sT6) or
-  [GitHub Discussions](https://github.com/tarkovtracker-org/TarkovTracker/discussions).
+- **Community:** Join us on [Discord](https://discord.gg/M8nBgA2sT6).
 - **Translations:** Help translate at
   [translate.tarkovtracker.org](https://translate.tarkovtracker.org). Supported languages:
   English, German, Spanish, French, Russian, Ukrainian, and Chinese.
