@@ -500,19 +500,31 @@ function sanitizeLogValue(value: unknown, redactions: string[]): string {
     return 'Unknown';
   }
   for (const redaction of redactions) {
+    if (redaction.length === 0) continue;
     sanitized = sanitized.replaceAll(redaction, '[redacted]');
   }
   return sanitized.slice(0, 200);
+}
+function readErrorProperty(error: Error, property: 'name' | 'message'): unknown {
+  try {
+    return error[property];
+  } catch {
+    return 'Unknown';
+  }
 }
 function errorInfo(
   error: unknown,
   redactions: string[]
 ): { error_name: string; error_message: string } {
-  if (error instanceof Error) {
-    return {
-      error_name: sanitizeLogValue(error.name, redactions),
-      error_message: sanitizeLogValue(error.message, redactions),
-    };
+  try {
+    if (error instanceof Error) {
+      return {
+        error_name: sanitizeLogValue(readErrorProperty(error, 'name'), redactions),
+        error_message: sanitizeLogValue(readErrorProperty(error, 'message'), redactions),
+      };
+    }
+  } catch {
+    return { error_name: 'Unknown', error_message: 'Unknown' };
   }
   return {
     error_name: sanitizeLogValue(typeof error, redactions),

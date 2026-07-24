@@ -642,6 +642,51 @@ describe('daily quota and abuse gate', () => {
     });
     expect(warnLog).not.toContain('203.0.113.1');
   });
+  for (const property of ['name', 'message'] as const) {
+    it(`fails open when an abuse-gate error ${property} getter throws`, async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const limiterError = new Error('limiter binding failed');
+      Object.defineProperty(limiterError, property, {
+        get: () => {
+          throw new Error(`${property} getter failed`);
+        },
+      });
+      const calls: LimiterCall[] = [];
+      const env: Env = {
+        API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+          allowed: true,
+          remaining: 5,
+          resetAt: Date.now() + 1000,
+        })),
+        API_ABUSE_LIMITER: {
+          limit: vi.fn().mockRejectedValue(limiterError),
+        } as unknown as RateLimit,
+        SUPABASE_URL: 'https://supabase.example',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+        ALLOWED_ORIGIN: '*',
+      };
+      vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+      const res = await worker.fetch(
+        buildRequest('/token', {
+          method: 'GET',
+          headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+        }),
+        env
+      );
+      expect(res.status).toBe(200);
+      expect(calls).toHaveLength(1);
+      const warnLog = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((entry) => entry.includes('abuse_gate_unavailable'));
+      expect(warnLog).toBeDefined();
+      expect(JSON.parse(warnLog!)).toMatchObject({
+        event: 'abuse_gate_unavailable',
+        reason: 'binding_error',
+        [`error_${property}`]: 'Unknown',
+      });
+    });
+  }
   const malformedQuotaCases: Array<{
     name: string;
     payload: () => Record<string, unknown>;
