@@ -659,6 +659,18 @@ describe('daily quota and abuse gate', () => {
       name: 'out-of-range remaining',
       payload: { allowed: true, remaining: Number.MAX_SAFE_INTEGER, resetAt: Date.now() + 1000 },
     },
+    {
+      name: 'fractional remaining',
+      payload: { allowed: true, remaining: 0.5, resetAt: Date.now() + 1000 },
+    },
+    {
+      name: 'contradictory allowed state',
+      payload: { allowed: false, remaining: 3, resetAt: Date.now() + 1000 },
+    },
+    {
+      name: 'far-future resetAt',
+      payload: { allowed: false, remaining: 0, resetAt: Date.now() + 86400000 * 2 },
+    },
   ];
   for (const { name, payload } of malformedQuotaCases) {
     it(`treats a malformed daily quota DO payload (${name}) as unavailable and fails open`, async () => {

@@ -270,15 +270,18 @@ async function rateLimit(
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
+    const now = Date.now();
     if (
       (data.allowed !== true && data.allowed !== false) ||
       remaining === undefined ||
-      !Number.isFinite(remaining) ||
+      !Number.isInteger(remaining) ||
       remaining < 0 ||
       remaining > limit ||
+      (data.allowed === false ? remaining !== 0 : remaining >= limit) ||
       resetAt === undefined ||
       !Number.isFinite(resetAt) ||
-      resetAt <= Date.now()
+      resetAt <= now ||
+      resetAt > now + windowSec * 1000
     ) {
       return {
         allowed: false,
