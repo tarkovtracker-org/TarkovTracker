@@ -384,22 +384,23 @@ Treat these deliberately; do not “make everything fail open” without underst
 
 ### Observability
 
-| System                   | Where to look                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------ |
-| External API throttles   | Worker logs (`daily_quota_unavailable`), `api_usage_daily`, admin API usage endpoint |
-| Mutation throttles       | Edge Function logs (`[rate-limit] ...`), `mutation_rate_limits.updated_at`           |
-| Pages endpoint throttles | Pages/Nitro logs from sharedEdgeStore warnings                                       |
-| Account delete throttles | `account_deletion_attempts`                                                          |
-| Auth storms              | Supabase Auth logs / dashboard                                                       |
+| System                   | Where to look                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| External API throttles   | Worker logs (`daily_quota_429`, `abuse_gate_429`), `api_usage_daily`, admin API usage endpoint |
+| Mutation throttles       | Edge Function logs (`[rate-limit] ...`), `mutation_rate_limits.updated_at`                     |
+| Pages endpoint throttles | Pages/Nitro logs from sharedEdgeStore warnings                                                 |
+| Account delete throttles | `account_deletion_attempts`                                                                    |
+| Auth storms              | Supabase Auth logs / dashboard                                                                 |
 
 ### Cleanup / retention
 
-| Store                       | Retention guidance                                                                       |
-| --------------------------- | ---------------------------------------------------------------------------------------- |
-| `mutation_rate_limits`      | Delete rows with `reset_at` older than 1 day periodically                                |
-| `api_usage_daily`           | Keep finite retention (e.g. 90–180 days) for observability                               |
-| Worker DO state             | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic |
-| `account_deletion_attempts` | Existing cleanup function / retention policy                                             |
+| Store                       | Retention guidance                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `mutation_rate_limits`      | Delete rows with `reset_at` older than 1 day periodically                                                                      |
+| `api_usage_daily`           | Keep finite retention (e.g. 90–180 days) for observability                                                                     |
+| Worker DO state             | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic                                       |
+| Legacy burst/IP DO keys     | Removed in the single daily-quota refactor; already-written objects drain via their existing alarms and are never re-addressed |
+| `account_deletion_attempts` | Existing cleanup function / retention policy                                                                                   |
 
 ---
 

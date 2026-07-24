@@ -100,6 +100,21 @@ const makeFetchMock = ({
     }
     return new Response('Not Found', { status: 404 });
   });
+const TEST_IP_HASH_SECRET = 'test-ip-hash-secret';
+const expectedIpHash = async (ip: string, secret: string) => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(sig))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
 const buildRequest = (path: string, init?: RequestInit) => {
   const headers = new Headers(init?.headers);
   if (!headers.has('User-Agent')) {
@@ -434,6 +449,7 @@ describe('daily quota and abuse gate', () => {
     expect(calls[0].body).toMatchObject({ limit: TIER_LIMITS.chad.readsPerDay });
   });
   it('returns an upgrade message when a free user exhausts the daily quota', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
     const rpcCalls: Array<Record<string, unknown>> = [];
     const env: Env = {
@@ -461,6 +477,18 @@ describe('daily quota and abuse gate', () => {
     await flushAsync();
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
+    const throttleLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('daily_quota_429'));
+    expect(throttleLog).toBeDefined();
+    expect(JSON.parse(throttleLog!)).toMatchObject({
+      event: 'daily_quota_429',
+      action: 'token-info',
+      kind: 'read',
+      user_id: 'user-free',
+      token_id: 'token-1',
+    });
+    warnSpy.mockRestore();
   });
   it('records successful usage through the record_api_usage rpc', async () => {
     const calls: LimiterCall[] = [];
@@ -517,6 +545,7 @@ describe('daily quota and abuse gate', () => {
       SUPABASE_ANON_KEY: 'anon',
       SUPABASE_SERVICE_ROLE_KEY: 'service',
       ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
     const res = await worker.fetch(
@@ -534,10 +563,11 @@ describe('daily quota and abuse gate', () => {
       .map((c) => String(c[0]))
       .find((s) => s.includes('abuse_gate_429'));
     expect(warnLog).toBeDefined();
+    expect(warnLog).not.toContain('203.0.113.1');
     expect(JSON.parse(warnLog!)).toMatchObject({
       event: 'abuse_gate_429',
       action: 'token-info',
-      client_ip: '203.0.113.1',
+      ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
     });
     warnSpy.mockRestore();
   });
@@ -581,6 +611,7 @@ describe('daily quota and abuse gate', () => {
       SUPABASE_ANON_KEY: 'anon',
       SUPABASE_SERVICE_ROLE_KEY: 'service',
       ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
     const res = await worker.fetch(
@@ -603,8 +634,55 @@ describe('daily quota and abuse gate', () => {
     expect(parsed).toMatchObject({
       event: 'abuse_gate_unavailable',
       action: 'token-info',
-      client_ip: '203.0.113.1',
+      ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
       reason: 'binding_error',
+      error_name: 'Error',
+      error_message: 'limiter binding failed',
+    });
+    expect(warnLog).not.toContain('203.0.113.1');
+    warnSpy.mockRestore();
+  });
+  it('treats a malformed daily quota DO payload as unavailable and fails open', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rpcCalls: Array<Record<string, unknown>> = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: {
+        idFromName: (name: string) => name,
+        get: () => ({
+          fetch: async () =>
+            new Response(JSON.stringify({ remaining: 5, resetAt: Date.now() + 1000 }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }),
+        }),
+      } as unknown as Env['API_GATEWAY_LIMITER'],
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123' },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    await flushAsync();
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 0, p_reads: 1 });
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('daily_quota_unavailable'));
+    expect(warnLog).toBeDefined();
+    expect(JSON.parse(warnLog!)).toMatchObject({
+      event: 'daily_quota_unavailable',
+      action: 'token-info',
+      user_id: 'user-free',
+      token_id: 'token-1',
+      reason: 'bad_json',
     });
     warnSpy.mockRestore();
   });

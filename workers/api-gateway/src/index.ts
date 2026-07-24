@@ -270,6 +270,14 @@ async function rateLimit(
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
+    if (data.allowed !== true && data.allowed !== false) {
+      return {
+        allowed: false,
+        unavailable: true,
+        reason: 'bad_json',
+        message: 'Rate limiter unavailable',
+      };
+    }
     if (data.allowed === false) {
       return {
         allowed: false,
@@ -457,6 +465,27 @@ type AuthSuccess = {
   validation: { valid: true; token: ApiToken };
   rlHeaders: Record<string, string>;
 };
+async function hashIp(ip: string, secret?: string): Promise<string | null> {
+  if (!secret) return null;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(sig))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+function errorInfo(error: unknown): { error_name: string; error_message: string } {
+  if (error instanceof Error) {
+    return { error_name: error.name, error_message: error.message.slice(0, 200) };
+  }
+  return { error_name: typeof error, error_message: String(error).slice(0, 200) };
+}
 async function authenticateAndRateLimit(
   env: Env,
   request: Request,
@@ -477,17 +506,20 @@ async function authenticateAndRateLimit(
     // Fail open: the abuse gate is infrastructure protection for Supabase,
     // not a customer quota. A binding/runtime failure must not turn into a
     // 500 outage for valid requests — the daily quota still enforces the
-    // customer entitlement downstream.
+    // customer entitlement downstream. Log the HMAC-hashed IP only: raw IPs
+    // must never reach Worker logs (see docs/RATE_LIMITING.md).
+    const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
     let abuseResult: { success: boolean } | null = null;
     try {
       abuseResult = await env.API_ABUSE_LIMITER.limit({ key: `api:${clientIp}` });
-    } catch {
+    } catch (error) {
       console.warn(
         JSON.stringify({
           event: 'abuse_gate_unavailable',
           action,
-          client_ip: clientIp,
+          ip_hash: ipHash,
           reason: 'binding_error',
+          ...errorInfo(error),
         })
       );
     }
@@ -496,7 +528,7 @@ async function authenticateAndRateLimit(
         JSON.stringify({
           event: 'abuse_gate_429',
           action,
-          client_ip: clientIp,
+          ip_hash: ipHash,
         })
       );
       return errorResponse('Too many requests', 429, envOrigin, requestOrigin, {
@@ -552,6 +584,16 @@ async function authenticateAndRateLimit(
       return { validation, rlHeaders: {} };
     }
     track(true);
+    console.warn(
+      JSON.stringify({
+        event: 'daily_quota_429',
+        action,
+        kind,
+        user_id: token.user_id,
+        token_id: token.token_id,
+        retry_after_s: typeof daily.resetAt === 'number' ? retryAfterSeconds(daily.resetAt) : null,
+      })
+    );
     const message = tier === 'free' ? upgradeMessage(kind) : daily.message || 'Rate limit exceeded';
     return errorResponse(message, 429, envOrigin, requestOrigin, dailyHeaders);
   }

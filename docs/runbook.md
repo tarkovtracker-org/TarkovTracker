@@ -112,7 +112,7 @@ product.
    production **before** merging the worker change; adding a function ahead of its caller is safe.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
-   `IP_HASH_SECRET` (e.g. any change to IP-backstop logging), confirm the secret is already
+   `IP_HASH_SECRET` (e.g. any change to abuse-gate or throttle logging), confirm the secret is already
    provisioned on the production `api-gateway` Worker:
 
    ```bash
@@ -121,9 +121,10 @@ product.
    ```
 
    The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
-   deploy time, every 429 and `ip_backstop_unavailable` log line emits `ip_hash: null`, defeating
-   the IP-level abuse observability the change introduced. Provision the secret **before** merging
-   so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
+   deploy time, `abuse_gate_429`, `abuse_gate_unavailable`, and `daily_quota_429` log lines emit
+   `ip_hash: null`, defeating the IP-level abuse observability the change introduced. Provision the
+   secret **before** merging so the first post-merge request already has a non-null HMAC identifier.
+   Do not commit the value.
 
 5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
 6. Deploy Supabase Edge Functions after every change under `supabase/functions/`:
