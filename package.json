@@ -45,7 +45,7 @@
     "@semantic-release/npm": "^13.1.5",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^25.5.2",
+    "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
     "@vue/test-utils": "^2.4.6",
