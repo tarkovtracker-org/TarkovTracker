@@ -1,3 +1,10 @@
+## [1.60.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.1...v1.60.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **deps:** pin postcss >=8.5.18 to patch directory traversal (SNYK-JS-POSTCSS-18313038) ([#605](https://github.com/tarkovtracker-org/TarkovTracker/issues/605)) ([5a2808b](https://github.com/tarkovtracker-org/TarkovTracker/commit/5a2808bfaedc4d02761fdddf50dedd7e1c49d04d)), closes [#603](https://github.com/tarkovtracker-org/TarkovTracker/issues/603) [#600](https://github.com/tarkovtracker-org/TarkovTracker/issues/600)
+
 ## [1.60.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.0...v1.60.1) (2026-07-23)
 
 
