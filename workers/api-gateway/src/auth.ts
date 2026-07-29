@@ -1,11 +1,15 @@
+import { logger } from './utils/logger';
 import type { Env, ApiToken, Permission } from './types';
-// Valid token prefixes: tt_ (legacy), PVE_, PVP_ (game mode specific)
-const VALID_TOKEN_PREFIXES = ['tt_', 'PVE_', 'PVP_'];
+const TOKEN_PREFIX_GAME_MODES: ReadonlyArray<readonly [string, ApiToken['game_mode']]> = [
+  ['PVP_', 'pvp'],
+  ['PVE_', 'pve'],
+];
 /**
- * Check if token has a valid prefix format
+ * Resolve the game mode a token's prefix claims, or null for unsupported prefixes.
+ * The prefix is cosmetic; `api_tokens.game_mode` stays authoritative for behaviour.
  */
-export function isValidTokenFormat(token: string): boolean {
-  return VALID_TOKEN_PREFIXES.some((prefix) => token.startsWith(prefix));
+export function getTokenPrefixGameMode(token: string): ApiToken['game_mode'] | null {
+  return TOKEN_PREFIX_GAME_MODES.find(([prefix]) => token.startsWith(prefix))?.[1] ?? null;
 }
 /**
  * SHA-256 hash a string and return hex
@@ -36,7 +40,8 @@ export async function validateToken(
 ): Promise<{ valid: true; token: ApiToken } | { valid: false; error: string; status: number }> {
   try {
     // Validate token format (must have valid prefix)
-    if (!isValidTokenFormat(token)) {
+    const prefixGameMode = getTokenPrefixGameMode(token);
+    if (!prefixGameMode) {
       return { valid: false, error: 'Invalid token format', status: 401 };
     }
     // Hash the token for lookup
@@ -58,6 +63,14 @@ export async function validateToken(
       return { valid: false, error: 'Invalid token', status: 401 };
     }
     const row = tokens[0];
+    if (row.game_mode !== prefixGameMode) {
+      logger.error('token game mode mismatch', {
+        tokenId: row.token_id,
+        prefixGameMode,
+        storedGameMode: row.game_mode,
+      });
+      return { valid: false, error: 'Token game mode mismatch', status: 401 };
+    }
     // Check if token is active
     if (!row.is_active) {
       return { valid: false, error: 'Token is inactive', status: 401 };

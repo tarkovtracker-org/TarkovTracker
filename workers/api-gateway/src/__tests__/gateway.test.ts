@@ -256,6 +256,30 @@ describe('api-gateway', () => {
     const res = await worker.fetch(buildRequest('/token', { method: 'GET' }), BASE_ENV);
     await expectErrorResponse(res, 401, 'Unauthorized');
   });
+  it('rejects legacy tt_ prefixed tokens without a token lookup', async () => {
+    const fetchMock = createBaseFetchMock({ permissions: ['GP'] });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer tt_abc123' } }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Invalid token format');
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes('/rest/v1/api_tokens'))
+    ).toBe(false);
+  });
+  it('rejects a token whose prefix contradicts its stored game mode', async () => {
+    const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: 'pve' });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Token game mode mismatch');
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes('/rest/v1/user_progress'))
+    ).toBe(false);
+  });
   it('rejects requests with a missing User-Agent header', async () => {
     const res = await worker.fetch(
       new Request('https://api.tarkovtracker.org/token', {
@@ -913,10 +937,12 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
-  const progressRequest = (headers: Record<string, string> = {}) =>
+  const bearerForMode = (mode: 'pvp' | 'pve') =>
+    `Bearer ${mode === 'pve' ? 'PVE' : 'PVP'}_abc123`;
+  const progressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
     buildRequest('/progress', {
       method: 'GET',
-      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+      headers: { Authorization: bearerForMode(mode), ...headers },
     });
   const findProgressSelect = (fetchMock: ReturnType<typeof vi.fn>): string | undefined =>
     fetchMock.mock.calls
@@ -932,17 +958,20 @@ describe('api-gateway', () => {
     async (mode, expected) => {
       const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: mode });
       vi.stubGlobal('fetch', fetchMock);
-      const res = await worker.fetch(progressRequest(), BASE_ENV);
+      const res = await worker.fetch(progressRequest(mode), BASE_ENV);
       expect(res.status).toBe(200);
       const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
       expect(select).toBe(expected);
       expect(select).not.toContain('*');
     }
   );
-  const teamProgressRequest = (headers: Record<string, string> = {}) =>
+  const teamProgressRequest = (
+    mode: 'pvp' | 'pve' = 'pvp',
+    headers: Record<string, string> = {}
+  ) =>
     buildRequest('/team/progress', {
       method: 'GET',
-      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+      headers: { Authorization: bearerForMode(mode), ...headers },
     });
   it.each([
     ['pvp', 'user_id,game_edition,pvp_data'],
@@ -957,7 +986,7 @@ describe('api-gateway', () => {
         teamMembers: ['user-1', 'user-2'],
       });
       vi.stubGlobal('fetch', fetchMock);
-      const res = await worker.fetch(teamProgressRequest(), BASE_ENV);
+      const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
       expect(res.status).toBe(200);
       const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
       expect(select).toBe(expected);
@@ -983,7 +1012,7 @@ describe('api-gateway', () => {
         teamId: null,
       });
       vi.stubGlobal('fetch', fetchMock);
-      const res = await worker.fetch(teamProgressRequest(), BASE_ENV);
+      const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
       expect(res.status).toBe(200);
       const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
       expect(select).toBe(expected);

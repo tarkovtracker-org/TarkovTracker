@@ -7,13 +7,7 @@ import {
   type AuthSuccess,
 } from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
-
-const generateToken = (gameMode: string) => {
-  const bytes = crypto.getRandomValues(new Uint8Array(9))
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
-  const prefix = gameMode === "pve" ? "PVE" : "PVP"
-  return `${prefix}_${hex}`
-}
+import { generateToken, isTokenGameMode, isTokenValueForGameMode } from "./tokenValue.ts"
 
 const hashToken = async (token: string) => {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
@@ -53,6 +47,14 @@ Deno.serve(async (req) => {
 
     if (!permissions.length || !gameMode) {
       return createErrorResponse("gameMode and permissions are required", 400, req)
+    }
+
+    if (!isTokenGameMode(gameMode)) {
+      return createErrorResponse("gameMode must be 'pvp' or 'pve'", 400, req)
+    }
+
+    if (tokenValue && !isTokenValueForGameMode(tokenValue, gameMode)) {
+      return createErrorResponse("tokenValue prefix must match gameMode", 400, req)
     }
 
     if (!tokenValue) tokenValue = generateToken(gameMode)

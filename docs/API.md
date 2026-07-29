@@ -399,6 +399,22 @@ Responses for which the daily-quota service returns a quota decision include `X-
 
 Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account.
 
+### Token Prefixes
+
+Progress API tokens are prefixed `PVP_` or `PVE_`. The prefix is cosmetic: the token's stored
+`game_mode` decides which progress blob every read and write touches, never the game mode the owner
+is currently viewing on the site. The two are kept from diverging at three layers:
+
+- `token-create` rejects a `gameMode` outside `pvp`/`pve` with `400`, and rejects a supplied
+  `tokenValue` whose prefix contradicts `gameMode` with `400 tokenValue prefix must match gameMode`.
+- A `NOT VALID` check constraint on `api_tokens` requires `token_value` to carry the prefix matching
+  `game_mode`.
+- The gateway rejects a token whose prefix disagrees with its stored `game_mode` with
+  `401 Token game mode mismatch` instead of silently serving the stored mode.
+
+Legacy `tt_` tokens are no longer accepted; they fail with `401 Invalid token format`. Create a
+`PVP_`/`PVE_` token in Settings → API Tokens instead.
+
 ---
 
 ## Error Responses
