@@ -52,7 +52,7 @@
     />
   </div>
   <div v-else-if="systemStore.isAdmin" class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px] space-y-6">
+    <div class="mx-auto max-w-350 space-y-6">
       <UAlert
         icon="i-mdi-alert"
         color="warning"
