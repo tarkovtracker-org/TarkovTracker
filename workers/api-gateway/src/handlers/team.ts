@@ -112,7 +112,8 @@ export async function handleGetTeamProgress(
   if (memberIds.length === 0) {
     return await getSoloProgress(env, token, gameMode);
   }
-  // Step 3: Fetch progress for all team members (only the active mode's blob)
+  // Step 3: Fetch progress for all team members (only the active mode's blob,
+  // to reduce Supabase egress and Worker memory; the other mode is not needed).
   const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
   const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${memberIds.join(',')})&select=user_id,game_edition,${dataField}`;
   const progressRes = await fetch(progressUrl, {

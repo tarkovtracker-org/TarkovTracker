@@ -86,6 +86,8 @@ type BaseFetchMockOptions = {
   userProgress?: Record<string, unknown>;
   permissions?: string[];
   gameMode?: 'pvp' | 'pve';
+  teamId?: string | null;
+  teamMembers?: string[];
 };
 const createBaseFetchMock = ({
   onMerge,
@@ -100,6 +102,8 @@ const createBaseFetchMock = ({
   },
   permissions = ['WP'],
   gameMode = 'pvp',
+  teamId = null,
+  teamMembers = ['user-1', 'user-2'],
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
@@ -130,6 +134,12 @@ const createBaseFetchMock = ({
         mergeStore.data = applyMergeRpc(mergeStore.data, payload);
       }
       return new Response(result, { status: 200 });
+    }
+    if (url.includes('/rest/v1/user_system')) {
+      return jsonResponse([{ user_id: 'user-1', pvp_team_id: teamId, pve_team_id: teamId }]);
+    }
+    if (url.includes('/rest/v1/team_memberships')) {
+      return jsonResponse(teamMembers.map((id) => ({ user_id: id })));
     }
     if (url.includes('/rest/v1/user_progress')) {
       return jsonResponse([userProgress]);
@@ -876,9 +886,15 @@ describe('api-gateway', () => {
       method: 'GET',
       headers: { Authorization: 'Bearer PVP_abc123', ...headers },
     });
+  const findProgressSelect = (fetchMock: ReturnType<typeof vi.fn>): string | undefined =>
+    fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/rest/v1/user_progress'))
+      .map((url) => new URL(url).searchParams.get('select') ?? undefined)
+      .find((select) => select !== undefined);
   it.each([
-    ['pvp', 'select=user_id,game_edition,pvp_data'],
-    ['pve', 'select=user_id,game_edition,pve_data'],
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
   ] as const)(
     'narrows the user_progress select to the %s token game mode',
     async (mode, expected) => {
@@ -886,11 +902,53 @@ describe('api-gateway', () => {
       vi.stubGlobal('fetch', fetchMock);
       const res = await worker.fetch(progressRequest(), BASE_ENV);
       expect(res.status).toBe(200);
-      const progressUrl = fetchMock.mock.calls
-        .map((call) => String(call[0]))
-        .find((url) => url.includes('/rest/v1/user_progress'));
-      expect(progressUrl).toContain(expected);
-      expect(progressUrl).not.toContain('select=*');
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+    }
+  );
+  const teamProgressRequest = (headers: Record<string, string> = {}) =>
+    buildRequest('/team/progress', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+    });
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the team batch user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: 'team-1',
+        teamMembers: ['user-1', 'user-2'],
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+    }
+  );
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the solo-fallback user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: null,
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
     }
   );
 });

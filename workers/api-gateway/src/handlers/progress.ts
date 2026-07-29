@@ -285,8 +285,8 @@ export async function handleGetProgress(
   token: ApiToken,
   gameMode: 'pvp' | 'pve'
 ): Promise<ProgressResponse> {
-  // Select only the requested game mode's JSONB blob — fetching both pvp_data
-  // and pve_data doubles Supabase egress and Worker memory for no benefit.
+  // Select only the requested game mode's JSONB blob to reduce Supabase egress
+  // and Worker memory; the other mode's column is not needed for this response.
   const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
   const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=user_id,game_edition,${dataField}&limit=1`;
   const response = await fetch(url, {
