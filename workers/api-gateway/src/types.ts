@@ -93,6 +93,14 @@ export interface UserProgressRow {
   created_at?: string | null;
   updated_at?: string | null;
 }
+/**
+ * Read-path projection of `user_progress`. Reads select only the requested
+ * game mode's blob, so the other mode's column and every unselected field are
+ * genuinely absent. Typing the projection separately keeps the compiler from
+ * treating unselected columns as present.
+ */
+export type UserProgressModeRow = Pick<UserProgressRow, 'user_id' | 'game_edition'> &
+  Partial<Pick<UserProgressRow, 'pvp_data' | 'pve_data'>>;
 // Legacy token response format (matching old API)
 export interface LegacyTokenResponse {
   permissions: string[];

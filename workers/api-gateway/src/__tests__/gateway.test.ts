@@ -86,6 +86,8 @@ type BaseFetchMockOptions = {
   userProgress?: Record<string, unknown>;
   permissions?: string[];
   gameMode?: 'pvp' | 'pve';
+  teamId?: string | null;
+  teamMembers?: string[];
 };
 const createBaseFetchMock = ({
   onMerge,
@@ -100,6 +102,8 @@ const createBaseFetchMock = ({
   },
   permissions = ['WP'],
   gameMode = 'pvp',
+  teamId = null,
+  teamMembers = ['user-1', 'user-2'],
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
@@ -131,8 +135,46 @@ const createBaseFetchMock = ({
       }
       return new Response(result, { status: 200 });
     }
+    if (url.includes('/rest/v1/user_system')) {
+      return jsonResponse([{ user_id: 'user-1', pvp_team_id: teamId, pve_team_id: teamId }]);
+    }
+    if (url.includes('/rest/v1/team_memberships')) {
+      return jsonResponse(teamMembers.map((id) => ({ user_id: id })));
+    }
     if (url.includes('/rest/v1/user_progress')) {
-      return jsonResponse([userProgress]);
+      const parsedUrl = new URL(url);
+      const selectParam = parsedUrl.searchParams.get('select') ?? '*';
+      const selectedColumns = selectParam === '*' ? null : selectParam.split(',');
+      const userIdParam = parsedUrl.searchParams.get('user_id') ?? '';
+      let requestedUserIds: string[];
+      if (userIdParam.startsWith('eq.')) {
+        requestedUserIds = [userIdParam.slice(3)];
+      } else if (userIdParam.startsWith('in.(') && userIdParam.endsWith(')')) {
+        requestedUserIds = userIdParam
+          .slice(4, -1)
+          .split(',')
+          .map((s) => s.trim());
+      } else {
+        requestedUserIds = [String(userProgress.user_id)];
+      }
+      const activeModeField = selectedColumns?.includes('pve_data') ? 'pve_data' : 'pvp_data';
+      const buildRow = (userId: string): Record<string, unknown> => {
+        const base: Record<string, unknown> = { ...userProgress, user_id: userId };
+        // Give each member a distinct displayName in the active mode's data so
+        // per-member mapping regressions are detectable in team tests.
+        const modeData = base[activeModeField];
+        base[activeModeField] = {
+          ...(typeof modeData === 'object' && modeData !== null ? modeData : {}),
+          displayName: `Member-${userId}`,
+        };
+        if (!selectedColumns) return base;
+        const row: Record<string, unknown> = {};
+        for (const col of selectedColumns) {
+          if (col in base) row[col] = base[col];
+        }
+        return row;
+      };
+      return jsonResponse(requestedUserIds.map(buildRow));
     }
     const apiGameMode = gameMode === 'pve' ? 'pve' : 'regular';
     if (url === `https://json.tarkov.dev/${apiGameMode}/tasks`) {
@@ -871,6 +913,83 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
+  const progressRequest = (headers: Record<string, string> = {}) =>
+    buildRequest('/progress', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+    });
+  const findProgressSelect = (fetchMock: ReturnType<typeof vi.fn>): string | undefined =>
+    fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/rest/v1/user_progress'))
+      .map((url) => new URL(url).searchParams.get('select') ?? undefined)
+      .find((select) => select !== undefined);
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: mode });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(progressRequest(), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+    }
+  );
+  const teamProgressRequest = (headers: Record<string, string> = {}) =>
+    buildRequest('/team/progress', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer PVP_abc123', ...headers },
+    });
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the team batch user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: 'team-1',
+        teamMembers: ['user-1', 'user-2'],
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+      // Verify per-member mapping: each member gets their own row's displayName.
+      const body = (await res.json()) as {
+        data: Array<{ userId: string; displayName: string }>;
+      };
+      const byUser = new Map(body.data.map((d) => [d.userId, d.displayName]));
+      expect(byUser.get('user-1')).toBe('Member-user-1');
+      expect(byUser.get('user-2')).toBe('Member-user-2');
+    }
+  );
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the solo-fallback user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: null,
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+    }
+  );
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {
   afterEach(() => {
