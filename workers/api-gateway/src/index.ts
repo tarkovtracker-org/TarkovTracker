@@ -499,8 +499,11 @@ function sanitizeLogValue(value: unknown, redactions: string[]): string {
   } catch {
     return 'Unknown';
   }
+  // Cap early: this runs pre-auth on attacker-influenced inputs, so avoid
+  // unbounded string/regex work before the final truncation.
+  sanitized = sanitized.slice(0, 200);
   for (const redaction of redactions) {
-    if (redaction.length === 0) continue;
+    if (redaction.length === 0 || redaction.length > sanitized.length) continue;
     // Case-insensitive: a rate-limit binding may canonicalize an IPv6 address's
     // hex digits to a different case before echoing it in an exception, so an
     // exact match would leave the normalized form in the log.
