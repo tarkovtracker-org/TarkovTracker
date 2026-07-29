@@ -1,6 +1,6 @@
 <template>
   <div class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px] space-y-6">
+    <div class="mx-auto max-w-350 space-y-6">
       <div v-if="route?.query?.team && route?.query?.code" class="mx-auto max-w-6xl">
         <TeamInvite />
       </div>

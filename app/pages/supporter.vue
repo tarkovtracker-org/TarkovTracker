@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1100px] space-y-8">
+    <div class="mx-auto max-w-275 space-y-8">
       <header class="text-center">
         <h1 class="text-2xl font-bold text-white sm:text-3xl">
           {{ t('page.supporter.title') }}
