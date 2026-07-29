@@ -550,7 +550,9 @@ async function conditionalReadResponse(
   if (payload.byteLength >= GZIP_MIN_BYTES && acceptsGzip(request.headers.get('Accept-Encoding'))) {
     headers['Content-Encoding'] = 'gzip';
     const stream = new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
-    return new Response(stream, { status: 200, headers });
+    // encodeBody: 'manual' prevents the Workers runtime from double-compressing
+    // the already-gzipped stream (the default 'automatic' would re-encode it).
+    return new Response(stream, { status: 200, headers, encodeBody: 'manual' } as ResponseInit);
   }
   return new Response(payload, { status: 200, headers });
 }

@@ -427,7 +427,7 @@ sequenceDiagram
   W->>SB: supporters tier (60s cache)
   W->>DO: daily-read:{user_id} (utc-day anchor, retain)
   alt DO unavailable
-    W-->>C: 200 (fail open, no X-RateLimit-* headers)
+    W-->>C: 200 or 304 (fail open, no X-RateLimit-* headers)
   else daily quota denied
     W-->>C: 429 + Retry-After + X-RateLimit-*
   end
