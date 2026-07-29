@@ -1,3 +1,10 @@
+## [1.60.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.3...v1.60.4) (2026-07-29)
+
+
+### Performance Improvements
+
+* **api:** select only the active game mode blob on progress reads ([#590](https://github.com/tarkovtracker-org/TarkovTracker/issues/590)) ([6437bd0](https://github.com/tarkovtracker-org/TarkovTracker/commit/6437bd02b5eb407791f8b9717497f181319389b5)), closes [#589](https://github.com/tarkovtracker-org/TarkovTracker/issues/589)
+
 ## [1.60.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.2...v1.60.3) (2026-07-29)
 
 
