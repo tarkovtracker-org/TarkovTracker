@@ -181,8 +181,8 @@ export class ApiGatewayRateLimiter {
   // requester-target-mode combinations from Pages endpoints) so abandoned
   // objects do not retain billable storage forever. The alarm fires shortly
   // after the window resets and wipes all storage.
-  // Bounded authenticated keys (daily-*/burst-* keyed by user_id) pass
-  // retain: true so they skip alarms; load() treats expired state as absent
+  // Bounded authenticated keys (daily-* keyed by user_id) pass retain: true
+  // so they skip alarms; load() treats expired state as absent
   // for rate-limiting correctness.
   // Alarms from previous deployments without the ephemeral flag in stored
   // state are drained without rescheduling while the window is still active.
@@ -492,11 +492,52 @@ async function hashIp(ip: string, secret?: string): Promise<string | null> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
-function errorInfo(error: unknown): { error_name: string; error_message: string } {
-  if (error instanceof Error) {
-    return { error_name: error.name, error_message: error.message.slice(0, 200) };
+function sanitizeLogValue(value: unknown, redactions: string[]): string {
+  let sanitized: string;
+  try {
+    sanitized = String(value);
+  } catch {
+    return 'Unknown';
   }
-  return { error_name: typeof error, error_message: String(error).slice(0, 200) };
+  // Cap before redaction but leave headroom beyond the final 200-char limit so
+  // an IP straddling the boundary is fully present for replacement (a partial
+  // match would leak a fragment). 256 = 200 + max IPv6 length (45) with margin.
+  sanitized = sanitized.slice(0, 256);
+  for (const redaction of redactions) {
+    if (redaction.length === 0 || redaction.length > sanitized.length) continue;
+    // Case-insensitive: a rate-limit binding may canonicalize an IPv6 address's
+    // hex digits to a different case before echoing it in an exception, so an
+    // exact match would leave the normalized form in the log.
+    const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    sanitized = sanitized.replace(new RegExp(escaped, 'gi'), '[redacted]');
+  }
+  return sanitized.slice(0, 200);
+}
+function readErrorProperty(error: Error, property: 'name' | 'message'): unknown {
+  try {
+    return error[property];
+  } catch {
+    return 'Unknown';
+  }
+}
+function errorInfo(
+  error: unknown,
+  redactions: string[]
+): { error_name: string; error_message: string } {
+  try {
+    if (error instanceof Error) {
+      return {
+        error_name: sanitizeLogValue(readErrorProperty(error, 'name'), redactions),
+        error_message: sanitizeLogValue(readErrorProperty(error, 'message'), redactions),
+      };
+    }
+  } catch {
+    return { error_name: 'Unknown', error_message: 'Unknown' };
+  }
+  return {
+    error_name: sanitizeLogValue(typeof error, redactions),
+    error_message: sanitizeLogValue(error, redactions),
+  };
 }
 async function authenticateAndRateLimit(
   env: Env,
@@ -539,7 +580,7 @@ async function authenticateAndRateLimit(
           action,
           ip_hash: await getIpHash(),
           reason: 'binding_error',
-          ...errorInfo(error),
+          ...errorInfo(error, [clientIp]),
         })
       );
     }

@@ -391,6 +391,7 @@ describe('daily quota and abuse gate', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
   it('applies free-tier daily limit keyed by user id (single DO call)', async () => {
     const calls: LimiterCall[] = [];
@@ -488,7 +489,6 @@ describe('daily quota and abuse gate', () => {
       user_id: 'user-free',
       token_id: 'token-1',
     });
-    warnSpy.mockRestore();
   });
   it('records successful usage through the record_api_usage rpc', async () => {
     const calls: LimiterCall[] = [];
@@ -569,7 +569,6 @@ describe('daily quota and abuse gate', () => {
       action: 'token-info',
       ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
     });
-    warnSpy.mockRestore();
   });
   it('skips the abuse gate when the binding is absent', async () => {
     const calls: LimiterCall[] = [];
@@ -599,7 +598,9 @@ describe('daily quota and abuse gate', () => {
   it('fails open and logs when the abuse gate binding throws', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
-    const abuseLimit = vi.fn().mockRejectedValue(new Error('limiter binding failed'));
+    const abuseLimit = vi
+      .fn()
+      .mockRejectedValue(new Error('limiter binding failed for api:203.0.113.1'));
     const env: Env = {
       API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
         allowed: true,
@@ -637,51 +638,185 @@ describe('daily quota and abuse gate', () => {
       ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
       reason: 'binding_error',
       error_name: 'Error',
-      error_message: 'limiter binding failed',
+      error_message: 'limiter binding failed for api:[redacted]',
     });
     expect(warnLog).not.toContain('203.0.113.1');
-    warnSpy.mockRestore();
   });
-  const malformedQuotaCases: Array<{ name: string; payload: Record<string, unknown> }> = [
+  it('redacts a mixed-case IPv6 address even when the binding lowercases it', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const mixedCaseIp = '2001:DB8::1';
+    const abuseLimit = vi
+      .fn()
+      .mockRejectedValue(new Error('limiter binding failed for api:2001:db8::1'));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': mixedCaseIp },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    expect(JSON.parse(warnLog!)).toMatchObject({
+      event: 'abuse_gate_unavailable',
+      reason: 'binding_error',
+      error_message: 'limiter binding failed for api:[redacted]',
+    });
+    expect(warnLog).not.toContain('2001:db8::1');
+    expect(warnLog).not.toContain('2001:DB8::1');
+  });
+  it('redacts an IP that straddles the 200-char truncation boundary', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const ip = '203.0.113.99';
+    // Prefix is 24 chars; padding of 166 places the IP at char 190, so it
+    // straddles the 200-char boundary (ends at 202). After replacement,
+    // [redacted] (10 chars) lands at 190-199, fitting within the 200 cap.
+    const prefix = 'limiter binding failed: ';
+    const padding = 'x'.repeat(200 - prefix.length - ip.length + 2);
+    const errorMessage = `${prefix}${padding}${ip} trailing`;
+    const abuseLimit = vi.fn().mockRejectedValue(new Error(errorMessage));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': ip },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    expect(warnLog).toContain('[redacted]');
+    expect(warnLog).not.toContain(ip);
+    expect(warnLog).not.toContain('203.0.113.');
+  });
+  for (const property of ['name', 'message'] as const) {
+    it(`fails open when an abuse-gate error ${property} getter throws`, async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const limiterError = new Error('limiter binding failed');
+      Object.defineProperty(limiterError, property, {
+        get: () => {
+          throw new Error(`${property} getter failed`);
+        },
+      });
+      const calls: LimiterCall[] = [];
+      const env: Env = {
+        API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+          allowed: true,
+          remaining: 5,
+          resetAt: Date.now() + 1000,
+        })),
+        API_ABUSE_LIMITER: {
+          limit: vi.fn().mockRejectedValue(limiterError),
+        } as unknown as RateLimit,
+        SUPABASE_URL: 'https://supabase.example',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+        ALLOWED_ORIGIN: '*',
+      };
+      vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+      const res = await worker.fetch(
+        buildRequest('/token', {
+          method: 'GET',
+          headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+        }),
+        env
+      );
+      expect(res.status).toBe(200);
+      expect(calls).toHaveLength(1);
+      const warnLog = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((entry) => entry.includes('abuse_gate_unavailable'));
+      expect(warnLog).toBeDefined();
+      expect(JSON.parse(warnLog!)).toMatchObject({
+        event: 'abuse_gate_unavailable',
+        reason: 'binding_error',
+        [`error_${property}`]: 'Unknown',
+      });
+    });
+  }
+  const malformedQuotaCases: Array<{
+    name: string;
+    payload: () => Record<string, unknown>;
+  }> = [
     {
       name: 'missing allowed',
-      payload: { remaining: 5, resetAt: Date.now() + 1000 },
+      payload: () => ({ remaining: 5, resetAt: Date.now() + 60_000 }),
     },
     {
       name: 'missing resetAt',
-      payload: { allowed: true, remaining: 5 },
+      payload: () => ({ allowed: true, remaining: 5 }),
     },
     {
       name: 'expired resetAt',
-      payload: { allowed: false, remaining: 0, resetAt: Date.now() - 1000 },
+      payload: () => ({ allowed: false, remaining: 0, resetAt: Date.now() - 1000 }),
     },
     {
       name: 'out-of-range remaining',
-      payload: { allowed: true, remaining: Number.MAX_SAFE_INTEGER, resetAt: Date.now() + 1000 },
+      payload: () => ({
+        allowed: true,
+        remaining: Number.MAX_SAFE_INTEGER,
+        resetAt: Date.now() + 60_000,
+      }),
     },
     {
       name: 'fractional remaining',
-      payload: { allowed: true, remaining: 0.5, resetAt: Date.now() + 1000 },
+      payload: () => ({ allowed: true, remaining: 0.5, resetAt: Date.now() + 60_000 }),
     },
     {
       name: 'contradictory allowed state',
-      payload: { allowed: false, remaining: 3, resetAt: Date.now() + 1000 },
+      payload: () => ({ allowed: false, remaining: 3, resetAt: Date.now() + 60_000 }),
     },
     {
       name: 'far-future resetAt',
-      payload: { allowed: false, remaining: 0, resetAt: Date.now() + 86400000 * 2 },
+      payload: () => ({ allowed: false, remaining: 0, resetAt: Date.now() + 86_400_000 * 2 }),
     },
   ];
   for (const { name, payload } of malformedQuotaCases) {
     it(`treats a malformed daily quota DO payload (${name}) as unavailable and fails open`, async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const malformedPayload = payload();
       const rpcCalls: Array<Record<string, unknown>> = [];
       const env: Env = {
         API_GATEWAY_LIMITER: {
           idFromName: (key: string) => key,
           get: () => ({
             fetch: async () =>
-              new Response(JSON.stringify(payload), {
+              new Response(JSON.stringify(malformedPayload), {
                 status: 200,
                 headers: { 'content-type': 'application/json' },
               }),
@@ -715,7 +850,6 @@ describe('daily quota and abuse gate', () => {
         token_id: 'token-1',
         reason: 'bad_json',
       });
-      warnSpy.mockRestore();
     });
   }
   it('fails open and logs when the daily quota DO is unavailable', async () => {
@@ -757,6 +891,5 @@ describe('daily quota and abuse gate', () => {
       token_id: 'token-1',
       reason: 'http_status',
     });
-    warnSpy.mockRestore();
   });
 });
