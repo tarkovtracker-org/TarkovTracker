@@ -142,7 +142,39 @@ const createBaseFetchMock = ({
       return jsonResponse(teamMembers.map((id) => ({ user_id: id })));
     }
     if (url.includes('/rest/v1/user_progress')) {
-      return jsonResponse([userProgress]);
+      const parsedUrl = new URL(url);
+      const selectParam = parsedUrl.searchParams.get('select') ?? '*';
+      const selectedColumns = selectParam === '*' ? null : selectParam.split(',');
+      const userIdParam = parsedUrl.searchParams.get('user_id') ?? '';
+      let requestedUserIds: string[];
+      if (userIdParam.startsWith('eq.')) {
+        requestedUserIds = [userIdParam.slice(3)];
+      } else if (userIdParam.startsWith('in.(') && userIdParam.endsWith(')')) {
+        requestedUserIds = userIdParam
+          .slice(4, -1)
+          .split(',')
+          .map((s) => s.trim());
+      } else {
+        requestedUserIds = [String(userProgress.user_id)];
+      }
+      const activeModeField = selectedColumns?.includes('pve_data') ? 'pve_data' : 'pvp_data';
+      const buildRow = (userId: string): Record<string, unknown> => {
+        const base: Record<string, unknown> = { ...userProgress, user_id: userId };
+        // Give each member a distinct displayName in the active mode's data so
+        // per-member mapping regressions are detectable in team tests.
+        const modeData = base[activeModeField];
+        base[activeModeField] = {
+          ...(typeof modeData === 'object' && modeData !== null ? modeData : {}),
+          displayName: `Member-${userId}`,
+        };
+        if (!selectedColumns) return base;
+        const row: Record<string, unknown> = {};
+        for (const col of selectedColumns) {
+          if (col in base) row[col] = base[col];
+        }
+        return row;
+      };
+      return jsonResponse(requestedUserIds.map(buildRow));
     }
     const apiGameMode = gameMode === 'pve' ? 'pve' : 'regular';
     if (url === `https://json.tarkov.dev/${apiGameMode}/tasks`) {
@@ -930,6 +962,13 @@ describe('api-gateway', () => {
       const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
       expect(select).toBe(expected);
       expect(select).not.toContain('*');
+      // Verify per-member mapping: each member gets their own row's displayName.
+      const body = (await res.json()) as {
+        data: Array<{ userId: string; displayName: string }>;
+      };
+      const byUser = new Map(body.data.map((d) => [d.userId, d.displayName]));
+      expect(byUser.get('user-1')).toBe('Member-user-1');
+      expect(byUser.get('user-2')).toBe('Member-user-2');
     }
   );
   it.each([
