@@ -19,6 +19,12 @@ export const OPENAPI_SPEC = {
       'delay rather than busy-looping. Throttled requests do not consume the daily quota. ' +
       'If the daily-quota service is temporarily unavailable the gateway fails open and ' +
       'serves the request without rate-limit headers.\n\n' +
+      'Conditional requests & polling: `GET /progress` and `GET /team/progress` return a weak ' +
+      '`ETag` and honor `If-None-Match` with `304 Not Modified` (empty body, rate-limit headers ' +
+      'included). Responses are gzip-compressed when the request sends `Accept-Encoding: gzip` ' +
+      'and the body is at least 1 KiB; an explicit `gzip;q=0` is honored as a refusal. ' +
+      'Poll read endpoints at 60-second intervals or slower and always send the previous `ETag` ' +
+      'so unchanged progress costs almost no bandwidth. A `304` still counts against the daily quota.\n\n' +
       'Token cap: each account may have at most 3 active API tokens. Revoke an existing ' +
       'token before creating a new one if the cap is reached. Token creation is only ' +
       'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
@@ -73,6 +79,16 @@ export const OPENAPI_SPEC = {
           'Requests outside that range are rejected with 400.',
         schema: { type: 'string', minLength: 5, maxLength: 200 },
         example: 'RatScanner/2.1 (+https://ratscanner.io)',
+      },
+      IfNoneMatchHeader: {
+        name: 'If-None-Match',
+        in: 'header',
+        required: false,
+        description:
+          'The ETag from a previous response. When the payload is unchanged the gateway ' +
+          'answers 304 Not Modified with an empty body. Polling clients should always send this.',
+        schema: { type: 'string' },
+        example: 'W/"0b661a2f5c3d9e14a7b8c0d1e2f30456"',
       },
     },
     responses: {
@@ -159,6 +175,38 @@ export const OPENAPI_SPEC = {
                 },
               },
             },
+          },
+        },
+      },
+      NotModified: {
+        description:
+          'Payload unchanged since the ETag in If-None-Match. Empty body; rate-limit headers ' +
+          'are still included and the request still counts against the daily quota.',
+        headers: {
+          ETag: {
+            description: 'Weak validator for the unchanged payload. Reuse it on the next poll.',
+            schema: { type: 'string' },
+          },
+          'Cache-Control': {
+            description: 'Always `private, max-age=15` for token-scoped reads.',
+            schema: { type: 'string' },
+          },
+          Vary: {
+            description:
+              'Cache variant dimensions. Always `Accept-Encoding, Authorization, Origin`.',
+            schema: { type: 'string' },
+          },
+          'X-RateLimit-Limit': {
+            description: 'Maximum requests permitted per UTC day for the account tier.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+          'X-RateLimit-Remaining': {
+            description: 'Requests remaining in the daily quota.',
+            schema: { type: 'integer', minimum: 0 },
+          },
+          'X-RateLimit-Reset': {
+            description: 'Unix timestamp (seconds) when the daily quota resets (00:00 UTC).',
+            schema: { type: 'integer', minimum: 0 },
           },
         },
       },
@@ -591,10 +639,14 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Get user progress',
         description:
-          'Requires GP permission. Counts against the tiered daily read quota (keyed by user).',
+          'Requires GP permission. Counts against the tiered daily read quota (keyed by user). ' +
+          'Returns a weak ETag; send If-None-Match to receive 304 when unchanged. Poll at >=60s intervals.',
         operationId: 'getProgress',
         security: [{ bearerAuth: [] }],
-        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
+        parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
+          { $ref: '#/components/parameters/IfNoneMatchHeader' },
+        ],
         responses: {
           '200': {
             description: 'Progress data',
@@ -604,6 +656,7 @@ export const OPENAPI_SPEC = {
               },
             },
           },
+          '304': { $ref: '#/components/responses/NotModified' },
           '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
@@ -616,10 +669,14 @@ export const OPENAPI_SPEC = {
         tags: ['team'],
         summary: 'Get team progress',
         description:
-          'Requires TP permission. Counts against the tiered daily read quota (keyed by user).',
+          'Requires TP permission. Counts against the tiered daily read quota (keyed by user). ' +
+          'Returns a weak ETag; send If-None-Match to receive 304 when unchanged. Poll at >=60s intervals.',
         operationId: 'getTeamProgress',
         security: [{ bearerAuth: [] }],
-        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
+        parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
+          { $ref: '#/components/parameters/IfNoneMatchHeader' },
+        ],
         responses: {
           '200': {
             description: 'Team progress data',
@@ -629,6 +686,7 @@ export const OPENAPI_SPEC = {
               },
             },
           },
+          '304': { $ref: '#/components/responses/NotModified' },
           '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },

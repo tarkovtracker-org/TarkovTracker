@@ -395,6 +395,12 @@ not a customer quota — and is not advertised as a per-IP entitlement.
 
 Responses for which the daily-quota service returns a quota decision include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (Unix seconds). When that decision denies the request, the gateway responds with `429` and `Retry-After`. Pre-authentication abuse-gate `429` responses include only `Retry-After`, and fail-open responses (daily-quota service temporarily unavailable) omit the `X-RateLimit-*` headers. When a free-tier user exhausts a daily quota, the `429` body includes an upgrade link. Admins can inspect the top consumers via `GET /api/admin/api-usage`; usage is bucketed by UTC day, so the report covers the current and previous UTC day (the `since` field gives the exact starting day).
 
+### Conditional Requests & Polling
+
+`GET /progress` and `GET /team/progress` return a weak `ETag` derived from the response payload and use `Cache-Control: private, max-age=15`. Response bodies of **1 KiB or larger** are gzipped when the request includes `Accept-Encoding: gzip`; smaller payloads are sent uncompressed, so do not assume `Content-Encoding` is always present. An explicit `Accept-Encoding: gzip;q=0` is honored as a refusal. Send the previous response's `ETag` in `If-None-Match`; when nothing changed the gateway answers `304 Not Modified` with an empty body (rate-limit headers still included). A `304` still counts against the daily quota, so it saves bandwidth, not quota.
+
+Polling integrators (TarkovMonitor, tarkov.dev, RatScanner) should poll read endpoints at **≥60-second intervals** and always send `If-None-Match`. Idle accounts then cost a few hundred bytes per poll instead of a full progress payload.
+
 ### Active Token Cap
 
 Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account.

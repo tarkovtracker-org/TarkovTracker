@@ -19,6 +19,7 @@ and have an agent verify the answer against the code.
 3. [Multi-layer caching](#3-multi-layer-caching) — the four cache layers and how they fall through
 4. [Overlay corrections](#4-overlay-corrections) — fixing wrong upstream data
 5. [Precompute workflow](#5-precompute-workflow) — warming KV off the request path
+6. [Progress API data flow](#6-progress-api-data-flow) — how an external `GET /progress` is served
 
 ---
 
@@ -394,6 +395,107 @@ flowchart LR
 - A missing or corrupt KV entry must fall through to the edge cache path, never 5xx.
 - The precompute pipeline must reuse `app/server/utils` — it must not re-implement the adapt/overlay
   logic or the outputs will diverge from what the request handler would produce.
+
+---
+
+## 6. Progress API data flow
+
+**Summary.** External clients (TarkovMonitor, RatScanner, tarkov.dev) read and write user progress
+through the `api-gateway` Worker on `api.tarkovtracker.org`. A progress read touches several
+layers; this section is the canonical map of those layers so a failure can be located quickly
+instead of guessed at. Rate-limit ownership details live in
+[`RATE_LIMITING.md`](./RATE_LIMITING.md); client-facing quota docs live in
+[`API.md`](./API.md#rate-limits-api-gateway).
+
+### Diagram
+
+```mermaid
+sequenceDiagram
+  participant C as Client (Bearer token)
+  participant W as api-gateway Worker
+  participant AG as IP abuse gate (CF RateLimit binding)
+  participant DO as ApiGatewayRateLimiter DO (daily quota)
+  participant SB as Supabase
+  participant TD as json.tarkov.dev (1h memory cache)
+
+  C->>W: GET /progress (User-Agent + Authorization)
+  W->>AG: limit({ key: "api:{ip}" })
+  alt abuse gate denies
+    W-->>C: 429 + Retry-After (pre-auth, no X-RateLimit-*)
+  end
+  W->>SB: api_tokens lookup (token hash)
+  W->>SB: supporters tier (60s cache)
+  W->>DO: daily-read:{user_id} (utc-day anchor, retain)
+  alt DO unavailable
+    W-->>C: 200 (fail open, no X-RateLimit-* headers)
+  else daily quota denied
+    W-->>C: 429 + Retry-After + X-RateLimit-*
+  end
+  W->>SB: user_progress select (only the token's game-mode column)
+  W->>TD: tasks + hideout metadata (cached)
+  W->>W: transform + invalidation + hideout auto-complete
+  alt If-None-Match matches payload ETag
+    W-->>C: 304 Not Modified (empty body)
+  else
+    W-->>C: 200 JSON (weak ETag, private max-age=15, gzip if accepted)
+  end
+```
+
+### Flow
+
+1. **Routing + User-Agent gate.** `workers/api-gateway/src/index.ts` normalizes the path, rejects
+   requests without a 5–200 character `User-Agent`, and (when enabled) 308-redirects legacy
+   `/api/v2` hosts to the api subdomain.
+2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
+   on `CF-Connecting-IP` and shields the `api_tokens` lookup from token-rotation floods. It is
+   infrastructure protection, not a customer quota, and fails open on binding errors.
+3. **Token auth.** `workers/api-gateway/src/auth.ts` validates the bearer token against
+   `api_tokens` by hash and checks the permission (`GP`/`TP`/`WP`).
+4. **Tier + daily quota.** `resolveTier` reads `public.supporters` (cached 60s), then a single
+   `ApiGatewayRateLimiter` Durable Object call (`daily-{kind}:{user_id}`, UTC-day anchor, retained)
+   admits or denies the request. The quota counts admitted requests — downstream Supabase failures
+   do not trigger refunds. The daily quota fails open on DO unavailability.
+5. **Data fetch.** `workers/api-gateway/src/handlers/progress.ts` selects only
+   `user_id,game_edition,<mode>_data` from `user_progress` (never both game modes), resolves a
+   display-name fallback from Supabase Auth (24h cache), and loads tasks/hideout metadata from
+   `json.tarkov.dev` via `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
+6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
+   public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
+   game-edition hideout auto-completes.
+7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts`
+   serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
+   `If-None-Match`, sets `Cache-Control: private, max-age=15` + `Vary: Accept-Encoding,
+Authorization, Origin`, and gzips bodies ≥1 KiB when the client accepts gzip (an explicit
+   `gzip;q=0` is honored as a rejection).
+8. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
+   throttle flag) in `public.api_usage_daily` via `record_api_usage`, off the response path.
+
+### Files
+
+- `workers/api-gateway/src/index.ts` — routing, rate limiting, conditional response layer
+- `workers/api-gateway/src/auth.ts` — token validation
+- `workers/api-gateway/src/handlers/progress.ts`, `workers/api-gateway/src/handlers/team.ts` —
+  progress reads/writes
+- `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
+  `workers/api-gateway/src/services/tarkov.ts`
+- `workers/api-gateway/src/utils/transform.ts`, `workers/api-gateway/src/utils/invalidation.ts`
+- `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
+
+### Invariants
+
+- A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
+  IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
+- The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth
+  abuse gate fails open on binding errors (logs `abuse_gate_unavailable`). Neither is recorded as a
+  throttle in `api_usage_daily`.
+- The daily quota counts admitted requests, not successful responses. A Supabase 500 after
+  admission consumes one slot — no refund system exists or is needed.
+- Progress reads select only the requested game mode's JSONB column, never `select=*`.
+- Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
+  never hide a change that came from task metadata or invalidation rather than the user's row.
+- Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
+- The ETag digest, the gzip size threshold, and the response body all back the same UTF-8 bytes,
+  so the validator and the payload can never disagree.
 
 ---
 
