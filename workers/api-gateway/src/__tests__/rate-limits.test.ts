@@ -687,9 +687,12 @@ describe('daily quota and abuse gate', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
     const ip = '203.0.113.99';
-    // Place the IP so it starts before char 200 but extends past it.
-    const padding = 'x'.repeat(195);
-    const errorMessage = `limiter binding failed: ${padding}${ip} trailing`;
+    // Prefix is 24 chars; padding of 166 places the IP at char 190, so it
+    // straddles the 200-char boundary (ends at 202). After replacement,
+    // [redacted] (10 chars) lands at 190-199, fitting within the 200 cap.
+    const prefix = 'limiter binding failed: ';
+    const padding = 'x'.repeat(200 - prefix.length - ip.length + 2);
+    const errorMessage = `${prefix}${padding}${ip} trailing`;
     const abuseLimit = vi.fn().mockRejectedValue(new Error(errorMessage));
     const env: Env = {
       API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
@@ -717,6 +720,7 @@ describe('daily quota and abuse gate', () => {
       .map((c) => String(c[0]))
       .find((s) => s.includes('abuse_gate_unavailable'));
     expect(warnLog).toBeDefined();
+    expect(warnLog).toContain('[redacted]');
     expect(warnLog).not.toContain(ip);
     expect(warnLog).not.toContain('203.0.113.');
   });
