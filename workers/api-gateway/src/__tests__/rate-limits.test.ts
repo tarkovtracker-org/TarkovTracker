@@ -642,6 +642,47 @@ describe('daily quota and abuse gate', () => {
     });
     expect(warnLog).not.toContain('203.0.113.1');
   });
+  it('redacts a mixed-case IPv6 address even when the binding lowercases it', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const mixedCaseIp = '2001:DB8::1';
+    const abuseLimit = vi
+      .fn()
+      .mockRejectedValue(new Error('limiter binding failed for api:2001:db8::1'));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': mixedCaseIp },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    expect(JSON.parse(warnLog!)).toMatchObject({
+      event: 'abuse_gate_unavailable',
+      reason: 'binding_error',
+      error_message: 'limiter binding failed for api:[redacted]',
+    });
+    expect(warnLog).not.toContain('2001:db8::1');
+    expect(warnLog).not.toContain('2001:DB8::1');
+  });
   for (const property of ['name', 'message'] as const) {
     it(`fails open when an abuse-gate error ${property} getter throws`, async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

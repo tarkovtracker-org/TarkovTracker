@@ -501,7 +501,11 @@ function sanitizeLogValue(value: unknown, redactions: string[]): string {
   }
   for (const redaction of redactions) {
     if (redaction.length === 0) continue;
-    sanitized = sanitized.replaceAll(redaction, '[redacted]');
+    // Case-insensitive: a rate-limit binding may canonicalize an IPv6 address's
+    // hex digits to a different case before echoing it in an exception, so an
+    // exact match would leave the normalized form in the log.
+    const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    sanitized = sanitized.replace(new RegExp(escaped, 'gi'), '[redacted]');
   }
   return sanitized.slice(0, 200);
 }
