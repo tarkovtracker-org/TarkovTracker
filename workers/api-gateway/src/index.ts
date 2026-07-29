@@ -499,9 +499,10 @@ function sanitizeLogValue(value: unknown, redactions: string[]): string {
   } catch {
     return 'Unknown';
   }
-  // Cap early: this runs pre-auth on attacker-influenced inputs, so avoid
-  // unbounded string/regex work before the final truncation.
-  sanitized = sanitized.slice(0, 200);
+  // Cap before redaction but leave headroom beyond the final 200-char limit so
+  // an IP straddling the boundary is fully present for replacement (a partial
+  // match would leak a fragment). 256 = 200 + max IPv6 length (45) with margin.
+  sanitized = sanitized.slice(0, 256);
   for (const redaction of redactions) {
     if (redaction.length === 0 || redaction.length > sanitized.length) continue;
     // Case-insensitive: a rate-limit binding may canonicalize an IPv6 address's
