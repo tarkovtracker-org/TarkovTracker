@@ -81,7 +81,7 @@ case "$cmd" in
 
     target="$WT_DIR/$branch"
     echo "Creating worktree at $target on branch ${branch} (from ${base})..."
-    git worktree add "$target" -b "$branch" "$base"
+    git worktree add --no-track "$target" -b "$branch" "$base"
 
     echo "Bootstrapping (node_modules + husky)..."
     ( cd "$target" && bash scripts/setup-worktree.sh )
@@ -95,10 +95,10 @@ case "$cmd" in
   rm)
     [[ -n "$branch" ]] || { echo "ERROR: rm requires <branch>" >&2; usage; }
     validate_branch "$branch"
-    target="$WT_DIR/$branch"
 
-    if [[ ! -d "$target" ]]; then
-      echo "ERROR: no worktree at $target" >&2
+    target="$(find_branch_path "$branch")"
+    if [[ -z "$target" ]]; then
+      echo "ERROR: no worktree checked out for branch '$branch'" >&2
       echo "Existing worktrees:" >&2
       git worktree list --porcelain | grep "^worktree " >&2 || true
       exit 1
@@ -114,7 +114,13 @@ case "$cmd" in
     fi
 
     git worktree remove "$target"
-    echo "Removed worktree at $target."
+    removed_path="$target"
+    while [[ "$target" != "$WT_DIR" ]]; do
+      target="$(dirname "$target")"
+      [[ "$target" == "$WT_DIR" ]] && break
+      rmdir "$target" 2>/dev/null || break
+    done
+    echo "Removed worktree at $removed_path."
     echo "If branch '${branch}' is merged, delete it with:  git branch -d ${branch}"
     echo "  (use -D only if you have confirmed there are no unmerged commits to keep)"
     ;;
