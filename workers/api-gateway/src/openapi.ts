@@ -251,12 +251,33 @@ export const OPENAPI_SPEC = {
         description:
           'The client refused every encoding the gateway can produce (gzip and identity, ' +
           'e.g. `Accept-Encoding: gzip;q=0, identity;q=0`). No response body encoding is ' +
-          'acceptable. The rejection depends on `Accept-Encoding`, so `Vary` is included.',
+          'acceptable. The request was admitted and counts against the daily quota, so the ' +
+          '`X-RateLimit-*` headers are present when the daily-quota service is available ' +
+          '(omitted on the fail-open path). The rejection depends on `Accept-Encoding`, so ' +
+          '`Vary` is included.',
         headers: {
           Vary: {
             description:
               'Cache variant dimensions. Always `Accept-Encoding, Authorization, Origin`.',
             schema: { type: 'string' },
+          },
+          'X-RateLimit-Limit': {
+            description:
+              'Maximum requests permitted per UTC day for the account tier. Present only when ' +
+              'the daily-quota service is available.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+          'X-RateLimit-Remaining': {
+            description:
+              'Requests remaining in the daily quota. Present only when the daily-quota ' +
+              'service is available.',
+            schema: { type: 'integer', minimum: 0 },
+          },
+          'X-RateLimit-Reset': {
+            description:
+              'Unix timestamp (seconds) when the daily quota resets (00:00 UTC). Present only ' +
+              'when the daily-quota service is available.',
+            schema: { type: 'integer', minimum: 0 },
           },
         },
         content: {
