@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "autoImports": true,
+  "entry": [
+    "scripts/measure-pageload.mjs",
+    "scripts/stripe-import-test.mjs",
+    "scripts/precompute/__tests__/*.test.ts",
+    "supabase/functions/**/*.test.ts",
+    "tests/**/*.test.ts"
+  ],
+  "ignoreDependencies": [
+    "@nuxt/image",
+    "@nuxtjs/i18n",
+    "@nuxtjs/sitemap",
+    "@pinia/nuxt",
+    "@codecov/nuxt-plugin",
+    "@nuxt/eslint"
+  ],
+  "ignoreUnresolvedImports": ["@/data/maps.json", "./.nuxt/eslint.config.mjs"],
+  "overrides": [
+    {
+      "files": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "unprovided-injects": "off"
+      }
+    }
+  ],
+  "health": {
+    "ignore": ["**/*.test.ts", "**/__tests__/**", "**/*.spec.ts", ".nuxt/**"]
+  },
+  "audit": {
+    "gate": "new-only"
+  }
+}
