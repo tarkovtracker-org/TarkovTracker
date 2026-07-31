@@ -248,14 +248,6 @@ export const useMetadataStore = defineStore('metadata', {
       });
       return allObjectives;
     },
-    // Get edition name by value
-    getEditionName:
-      (state) =>
-      (edition: number | undefined): string => {
-        if (edition == null) return 'N/A';
-        const found = state.editions.find((e) => e.value === edition);
-        return found ? found.title : `Edition ${edition}`;
-      },
     // Get edition data by value
     getEditionByValue:
       (state) =>
@@ -340,34 +332,6 @@ export const useMetadataStore = defineStore('metadata', {
     },
     // Computed properties for traders (sorted by in-game order)
     sortedTraders: (state): Trader[] => sortTradersByGameOrder(state.traders),
-    // Computed properties for hideout
-    stationsByName: (state): { [name: string]: HideoutStation } => {
-      const stationMap: { [name: string]: HideoutStation } = {};
-      state.hideoutStations.forEach((station) => {
-        stationMap[station.name] = station;
-        if (station.normalizedName) {
-          stationMap[station.normalizedName] = station;
-        }
-      });
-      return stationMap;
-    },
-    modulesByStation: (state): { [stationId: string]: HideoutModule[] } => {
-      const moduleMap: { [stationId: string]: HideoutModule[] } = {};
-      state.hideoutModules.forEach((module) => {
-        if (!moduleMap[module.stationId]) {
-          moduleMap[module.stationId] = [];
-        }
-        moduleMap[module.stationId]!.push(module);
-      });
-      return moduleMap;
-    },
-    maxStationLevels: (state): { [stationId: string]: number } => {
-      const maxLevels: { [stationId: string]: number } = {};
-      state.hideoutStations.forEach((station) => {
-        maxLevels[station.id] = Math.max(...station.levels.map((level) => level.level));
-      });
-      return maxLevels;
-    },
     // Player level properties
     minPlayerLevel: (state): number => {
       if (!state.playerLevels.length) return 1;
@@ -378,31 +342,8 @@ export const useMetadataStore = defineStore('metadata', {
       return Math.max(...state.playerLevels.map((level) => level.level));
     },
     // Utility getters
-    isDataLoaded: (state): boolean => {
-      return (
-        !state.loading &&
-        !state.hideoutLoading &&
-        state.tasks.length > 0 &&
-        state.hideoutStations.length > 0
-      );
-    },
     hasInitialized: (state): boolean => state.initialized,
-    // Items getters
-    isItemsLoaded: (state): boolean => {
-      return !state.itemsLoading && state.items.length > 0;
-    },
-    isItemsFullLoaded: (state): boolean => state.itemsFullLoaded === true,
     // Prestige getters
-    isPrestigeLoaded: (state): boolean => {
-      return !state.prestigeLoading && state.prestigeLevels.length > 0;
-    },
-    getPrestigeByLevel:
-      (state) =>
-      (level: number): PrestigeLevel | undefined => {
-        return state.prestigeLevels.find(
-          (prestige: PrestigeLevel) => prestige.prestigeLevel === level
-        );
-      },
     /**
      * Build a mapping of task IDs to the user prestige level that should see them.
      * This is derived from prestige conditions - if prestige N requires completing task X,
@@ -2175,21 +2116,7 @@ export const useMetadataStore = defineStore('metadata', {
     getItemById(itemId: string): TarkovItem | undefined {
       return this.itemsById.get(itemId) ?? this.items.find((item) => item.id === itemId);
     },
-    getTasksByTrader(traderId: string): Task[] {
-      return this.tasks.filter((task) => task.trader?.id === traderId);
-    },
-    getTasksByMap(mapId: string): Task[] {
-      const taskIds = this.mapTasks[mapId] || [];
-      return this.tasks.filter((task) => taskIds.includes(task.id));
-    },
-    isPrerequisiteFor(taskId: string, targetTaskId: string): boolean {
-      const targetTask = this.getTaskById(targetTaskId);
-      return targetTask?.predecessors?.includes(taskId) ?? false;
-    },
     // Trader utility functions
-    getTraderById(traderId: string): Trader | undefined {
-      return this.traders.find((trader) => trader.id === traderId);
-    },
     getTraderByName(traderName: string): Trader | undefined {
       const lowerCaseName = traderName.toLowerCase();
       return this.traders.find(
@@ -2199,62 +2126,9 @@ export const useMetadataStore = defineStore('metadata', {
       );
     },
     // Map utility functions
-    getMapById(mapId: string): TarkovMap | undefined {
-      return this.maps.find((map) => map.id === mapId);
-    },
-    getMapByName(mapName: string): TarkovMap | undefined {
-      const lowerCaseName = mapName.toLowerCase();
-      return this.maps.find(
-        (map) =>
-          map.name.toLowerCase() === lowerCaseName ||
-          map.normalizedName?.toLowerCase() === lowerCaseName
-      );
-    },
-    getStaticMapKey(mapName: string, normalizedName?: string): string {
-      return deriveStaticMapKey(mapName, normalizedName);
-    },
-    hasMapSvg(mapId: string): boolean {
-      const map = this.getMapById(mapId);
-      return !!map?.svg;
-    },
     // Hideout utility functions
     getStationById(stationId: string): HideoutStation | undefined {
       return this.hideoutStations.find((station) => station.id === stationId);
-    },
-    getStationByName(name: string): HideoutStation | undefined {
-      return this.stationsByName[name];
-    },
-    getModuleById(moduleId: string): HideoutModule | undefined {
-      return this.hideoutModules.find((module) => module.id === moduleId);
-    },
-    getModulesByStation(stationId: string): HideoutModule[] {
-      return this.modulesByStation[stationId] || [];
-    },
-    getMaxStationLevel(stationId: string): number {
-      return this.maxStationLevels[stationId] || 0;
-    },
-    isPrerequisiteForModule(moduleId: string, targetModuleId: string): boolean {
-      const targetModule = this.getModuleById(targetModuleId);
-      return targetModule?.predecessors?.includes(moduleId) ?? false;
-    },
-    getItemsForModule(moduleId: string): NeededItemHideoutModule[] {
-      return this.neededItemHideoutModules.filter((item) => item.hideoutModule.id === moduleId);
-    },
-    getModulesRequiringItem(itemId: string): NeededItemHideoutModule[] {
-      return this.neededItemHideoutModules.filter((item) => item.item.id === itemId);
-    },
-    getTotalConstructionTime(moduleId: string): number {
-      const module = this.getModuleById(moduleId);
-      if (!module) return 0;
-      let totalTime = module.constructionTime;
-      // Add time for all prerequisite modules
-      module.predecessors.forEach((prerequisiteId) => {
-        const prerequisite = this.getModuleById(prerequisiteId);
-        if (prerequisite) {
-          totalTime += prerequisite.constructionTime;
-        }
-      });
-      return totalTime;
     },
     /**
      * Refresh all data

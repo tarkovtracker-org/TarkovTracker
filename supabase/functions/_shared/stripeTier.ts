@@ -3,7 +3,7 @@
  * Kept dependency-free so Vitest can cover the mapping without Deno edge runtime.
  */
 
-export const SUPPORTER_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
+const SUPPORTER_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
 export type SupporterTier = (typeof SUPPORTER_TIERS)[number];
 
 export const TIER_PRICE_ENV_NAMES = {

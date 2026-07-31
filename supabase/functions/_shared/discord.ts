@@ -12,7 +12,7 @@ const UNKNOWN_USER_CODE = 10013;
 
 export type DiscordRoleStatus = 'failed' | 'not_in_guild' | 'success';
 
-export class DiscordNotInGuildError extends Error {
+class DiscordNotInGuildError extends Error {
   constructor(userId: string) {
     super(`Discord user ${userId} is not in the configured guild`);
     this.name = 'DiscordNotInGuildError';
@@ -173,7 +173,7 @@ export function removeRole(action: RoleAction): Promise<boolean> {
   return applyRole('DELETE', action);
 }
 
-export interface DiscordRoleConfig {
+interface DiscordRoleConfig {
   guildId: string;
   supporterRoleId: string;
   linkedRoleId: string;
@@ -182,7 +182,7 @@ export interface DiscordRoleConfig {
   chadRoleId: string;
 }
 
-export function getDiscordRoleConfig(): DiscordRoleConfig {
+function getDiscordRoleConfig(): DiscordRoleConfig {
   const guildId = Deno.env.get('DISCORD_GUILD_ID');
   const supporterRoleId = Deno.env.get('DISCORD_SUPPORTER_ROLE_ID');
   const missing: string[] = [];
@@ -201,7 +201,7 @@ export function getDiscordRoleConfig(): DiscordRoleConfig {
   };
 }
 
-export function getTierRoleId(tier: string, config: DiscordRoleConfig): string | null {
+function getTierRoleId(tier: string, config: DiscordRoleConfig): string | null {
   switch (tier) {
     case 'scav':
       return config.scavRoleId || null;

@@ -519,7 +519,6 @@ export interface SystemGetters extends _GettersTree<SystemState> {
   userTokens: (state: SystemState) => string[];
   userTokenCount: (state: SystemState) => number;
   userTeam: (state: SystemState) => string | null;
-  userTeamIsOwn: (state: SystemState) => boolean;
   isAdmin: (state: SystemState) => boolean;
 }
 export interface TeamState extends StateTree {

@@ -44,11 +44,6 @@ export const useSystemStore = defineStore<string, SystemState, SystemGetters>('s
     userTeam(state): string | null {
       return getTeamIdFromState(state);
     },
-    userTeamIsOwn(state) {
-      const { $supabase } = useNuxtApp();
-      const teamId = getTeamIdFromState(state);
-      return teamId === $supabase.user?.id;
-    },
     isAdmin(state): boolean {
       return state.is_admin === true;
     },

@@ -18,7 +18,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  export type MilestoneColor = 'primary' | 'info' | 'success' | 'kappa' | 'lightkeeper';
+  type MilestoneColor = 'primary' | 'info' | 'success' | 'kappa' | 'lightkeeper';
   const props = withDefaults(
     defineProps<{
       title: string;

@@ -1,9 +1,8 @@
-/* eslint-disable import/no-mutable-exports */
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import { logger } from '@/utils/logger';
 import type { Pinia } from 'pinia';
-export let pinia: Pinia | undefined;
-export function installPiniaPlugins(target: Pinia): void {
+let pinia: Pinia | undefined;
+function installPiniaPlugins(target: Pinia): void {
   // Install persistedstate plugin for automatic localStorage persistence
   target.use(piniaPluginPersistedstate);
 }

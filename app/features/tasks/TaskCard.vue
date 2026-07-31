@@ -329,7 +329,6 @@
       <TaskCardRewards
         v-if="taskExpanded"
         :is-compact="isCompact"
-        :task-id="task.id"
         :trader-standing-rewards="traderStandingRewards"
         :skill-rewards="skillRewards"
         :trader-unlock-reward="traderUnlockReward"

@@ -144,7 +144,6 @@ const setup = async (
       setTraderSortMode,
       setTraderSortDirection,
       dashboardNoticeDismissed: false,
-      setDashboardNoticeDismissed: vi.fn(),
       setTaskPrimaryView: vi.fn(),
       setTaskTraderView: vi.fn(),
     }),
