@@ -436,6 +436,8 @@ sequenceDiagram
   W->>W: transform + invalidation + hideout auto-complete
   alt If-None-Match matches payload ETag
     W-->>C: 304 Not Modified (empty body)
+  else no acceptable Accept-Encoding
+    W-->>C: 406 no_acceptable_encoding
   else
     W-->>C: 200 JSON (weak ETag, private max-age=15, gzip if accepted)
   end
@@ -464,9 +466,10 @@ sequenceDiagram
    game-edition hideout auto-completes.
 7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
-   `If-None-Match`, sets `Cache-Control: private, max-age=15` + `Vary: Accept-Encoding,
-Authorization, Origin`, and gzips bodies ≥1 KiB when the client accepts gzip (an explicit
-   `gzip;q=0` is honored as a rejection).
+   `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
+   `Vary: Accept-Encoding, Authorization, Origin`. Bodies ≥1 KiB are gzipped when the client
+   accepts gzip; an explicit `gzip;q=0` is honored as a rejection, `identity;q=0` bypasses the
+   size threshold, and a client that refuses every available coding gets `406`.
 8. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
    throttle flag) in `public.api_usage_daily` via `record_api_usage`, off the response path.
 
