@@ -196,11 +196,16 @@ Naming:
 - Treat new comments created by the latest pushed commit as part of the same review cycle. Repeat until checks pass, reviews are complete, and unresolved thread count is zero.
 - After merge, run one fresh review-thread query to verify zero unresolved threads. Post-merge follow-ups are exceptional recovery, not the normal review workflow.
 
-- Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks).
+- Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks) for the first in-flight task.
 - Before edits, run `git status --short --branch`.
 - Never mix unrelated changes in one commit or PR.
 - Do not use `git stash` for normal context switching unless the user asks.
-- Do not create a worktree unless the user explicitly asks, the current checkout is unsafe, or an existing PR/branch must be tested separately. If a worktree is truly needed, explain why, name the exact path and branch, keep repeating that path in status updates, and run `bash scripts/setup-worktree.sh` before the first commit so husky + lint-staged actually run.
+- Worktree policy (parallel work isolation):
+  - Default to the main checkout for the first in-flight task. Do not create a worktree for solo work or for batched pre-PR edits the user is accumulating before opening a PR.
+  - Create a worktree only when starting a SECOND concurrent task while the first is still in flight (uncommitted edits in the main checkout, or an open PR waiting on CI/review). The first task stays in the main checkout; the new task gets a worktree. This is what enables parallel agents without one agent reverting another's uncommitted changes.
+  - Worktree convention: path `.wt/<branch>` (co-located, gitignored), created via `bash scripts/wt.sh add <branch>`. The script runs `scripts/setup-worktree.sh` so husky + lint-staged work on commit. State the worktree path in every status update so the user knows which checkout the agent is operating in.
+  - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. Never run `git restore`, `git checkout --`, `git clean`, or `git reset` on a working tree with changes you did not make — if the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
+  - After a worktree's PR merges, remove it with `bash scripts/wt.sh rm <branch>` so stale worktrees and branches don't accumulate.
 - Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `wip`.

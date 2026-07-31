@@ -1,3 +1,6 @@
+# Co-located git worktrees for parallel PR work (see AGENTS.md worktree policy)
+.wt/
+
 # Nuxt dev/build outputs
 .output
 .data
