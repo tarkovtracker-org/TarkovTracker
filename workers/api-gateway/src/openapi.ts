@@ -2,11 +2,13 @@ export const OPENAPI_SPEC = {
   openapi: '3.1.0',
   info: {
     title: 'TarkovTracker API Gateway',
-    version: '2.3.0',
+    version: '2.4.0',
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
-      'Tokens use prefixes `PVP_` or `PVE_`.\n\n' +
+      'Tokens use prefixes `PVP_` or `PVE_`, which must match the token\'s game mode; ' +
+      'a mismatched token is rejected with 401. The token game mode alone decides which ' +
+      'progress data is read or written. Legacy `tt_` tokens are no longer accepted.\n\n' +
       'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
       '100 writes/day; supporter tiers scale up), resetting at 00:00 UTC. A pre-authentication ' +
       'IP abuse gate (Cloudflare Workers Rate Limiting binding) shields token validation from ' +

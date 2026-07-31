@@ -98,7 +98,9 @@ product.
 2. Confirm the Pages project remains **fail open** so the static SPA shell still serves if the
    Functions daily quota is exhausted.
 3. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
-   intentionally disabled to avoid per-preview billing):
+   intentionally disabled to avoid per-preview billing). **Before running the commands below:** if
+   this release also changes an Edge Function that validates the same rule a new constraint
+   enforces, complete step 6 first — see _Constraint/validation ordering_ below.
 
    ```bash
    supabase migration list --linked   # any row with a blank REMOTE column is pending
@@ -110,6 +112,12 @@ product.
    a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
    for the gap between merge and `db push`. For such changes, apply the pending migration to
    production **before** merging the worker change; adding a function ahead of its caller is safe.
+   **Constraint/validation ordering:** when a migration adds a CHECK constraint that an Edge
+   Function also enforces in application code (e.g. `api_tokens_token_value_game_mode_match` and
+   the `tokenValue` guards in `token-create`), deploy the function (step 6) **before** `db push`.
+   Otherwise the still-unvalidated function can attempt a write the new constraint rejects, and the
+   resulting Postgres `23514` (`check_violation`) surfaces as whatever that function maps `23514`
+   to — `token-create` reports it as `409 Token limit reached (3 active)`, which is misleading.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
