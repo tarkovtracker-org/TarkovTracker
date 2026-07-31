@@ -53,6 +53,10 @@ Deno.serve(async (req) => {
       return createErrorResponse("gameMode must be 'pvp' or 'pve'", 400, req)
     }
 
+    if (body.tokenValue !== undefined && typeof body.tokenValue !== "string") {
+      return createErrorResponse("tokenValue must be a string", 400, req)
+    }
+
     if (tokenValue && !isTokenValueForGameMode(tokenValue, gameMode)) {
       return createErrorResponse("tokenValue prefix must match gameMode", 400, req)
     }
