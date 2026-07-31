@@ -18,6 +18,7 @@ import {
   TARKOV_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
+import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
@@ -62,11 +63,27 @@ if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
     throw new Error(`[Config] Missing required Stripe env vars: ${missingKeys.join(', ')}`);
   }
 }
+// Sitekeys are public identifiers; the secret stays in the Pages project env.
+// Preview builds default to no widget because *.pages.dev is not in the widget's
+// domain allowlist; non-production builds use Cloudflare's always-pass test keys.
+const TURNSTILE_PRODUCTION_SITE_KEY = '0x4AAAAAAEDQJTvapp0PUVaO';
+const TURNSTILE_SITE_KEY = (
+  process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ??
+  (!IS_PRODUCTION_BUILD
+    ? TURNSTILE_TEST_SITE_KEY
+    : IS_CF_PREVIEW
+      ? ''
+      : TURNSTILE_PRODUCTION_SITE_KEY)
+).trim();
+const TURNSTILE_SECRET_KEY = (
+  process.env.NUXT_TURNSTILE_SECRET_KEY ?? (IS_PRODUCTION_BUILD ? '' : TURNSTILE_TEST_SECRET_KEY)
+).trim();
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
   gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
+  turnstileSiteKey: TURNSTILE_SITE_KEY,
 });
 const webApplicationSchema = {
   '@context': 'https://schema.org',
@@ -184,6 +201,17 @@ export default defineNuxtConfig({
           process.env.SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
           '120'
       ) || 120,
+    tarkovDevProfileCacheTtlMs:
+      Number(process.env.NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS || '900000') || 900000,
+    tarkovDevProfileRateLimitPerMinute:
+      Number(process.env.NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE || '5') || 5,
+    tarkovDevProfileRateLimitPerHour:
+      Number(process.env.NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR || '20') || 20,
+    // 0 disables the freshness gate, so the raw value must survive without a truthiness fallback.
+    tarkovDevProfileMaxUpdatedAgeDays: Number(
+      process.env.NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS ?? '7'
+    ),
+    turnstileSecretKey: TURNSTILE_SECRET_KEY,
     // API protection configuration (server-only)
     apiProtection: {
       // Comma-separated list of allowed hosts (e.g., "tarkovtracker.org,www.tarkovtracker.org")
@@ -219,6 +247,9 @@ export default defineNuxtConfig({
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl,
+      turnstileSiteKey: TURNSTILE_SITE_KEY,
+      tarkovDevImportCooldownMinutes:
+        Number(process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES || '60') || 60,
       allowDirectTokenCreateFallback:
         process.env.NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK === 'true',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,

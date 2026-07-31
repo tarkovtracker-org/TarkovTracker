@@ -71,6 +71,20 @@ describe('parseTarkovDevProfile', () => {
     expect(result.data.prestigeLevel).toBe(0);
     expect(result.data).not.toHaveProperty('rawProfile');
   });
+  it('extracts the updated timestamp when present', () => {
+    const result = parseTarkovDevProfile(buildValidProfile({ updated: 1785524290902 }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.updatedAt).toBe(1785524290902);
+  });
+  it('returns a null updated timestamp when missing or invalid', () => {
+    const missing = parseTarkovDevProfile(buildValidProfile());
+    expect(missing.ok && missing.data.updatedAt).toBeNull();
+    const invalid = parseTarkovDevProfile(buildValidProfile({ updated: 'yesterday' }));
+    expect(invalid.ok && invalid.data.updatedAt).toBeNull();
+    const negative = parseTarkovDevProfile(buildValidProfile({ updated: -5 }));
+    expect(negative.ok && negative.data.updatedAt).toBeNull();
+  });
   it('computes skill levels from Progress / 100 floored', () => {
     const result = parseTarkovDevProfile(buildValidProfile());
     expect(result.ok).toBe(true);

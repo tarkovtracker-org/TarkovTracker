@@ -1,0 +1,55 @@
+import { createLogger } from '@/server/utils/logger';
+const logger = createLogger('Turnstile');
+const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+const SITEVERIFY_TIMEOUT_MS = 5000;
+export type TurnstileVerification =
+  { ok: true } | { ok: false; reason: 'missing-token' | 'invalid-token' | 'hostname-mismatch' };
+type SiteverifyResponse = {
+  success?: boolean;
+  hostname?: string;
+  'error-codes'?: string[];
+};
+const isAllowedHostname = (hostname: string | undefined, allowedHostnames: string[]): boolean => {
+  if (!hostname || allowedHostnames.length === 0) {
+    return true;
+  }
+  const normalized = hostname.toLowerCase();
+  return allowedHostnames.some(
+    (allowed) => normalized === allowed || normalized.endsWith(`.${allowed}`)
+  );
+};
+export const verifyTurnstileToken = async (options: {
+  secretKey: string;
+  token: string | null | undefined;
+  allowedHostnames?: string[];
+}): Promise<TurnstileVerification> => {
+  const token = options.token?.trim() ?? '';
+  if (!token) {
+    return { ok: false, reason: 'missing-token' };
+  }
+  let payload: SiteverifyResponse;
+  try {
+    const response = await fetch(SITEVERIFY_URL, {
+      method: 'POST',
+      body: new URLSearchParams({ secret: options.secretKey, response: token }),
+      signal: AbortSignal.timeout(SITEVERIFY_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`siteverify responded ${response.status}`);
+    }
+    payload = (await response.json()) as SiteverifyResponse;
+  } catch (error) {
+    // siteverify outages fail open: Turnstile is an abuse gate, not an integrity boundary.
+    logger.warn('Turnstile siteverify unavailable; allowing request', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { ok: true };
+  }
+  if (payload.success !== true) {
+    return { ok: false, reason: 'invalid-token' };
+  }
+  if (!isAllowedHostname(payload.hostname, options.allowedHostnames ?? [])) {
+    return { ok: false, reason: 'hostname-mismatch' };
+  }
+  return { ok: true };
+};
