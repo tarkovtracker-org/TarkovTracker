@@ -9,7 +9,7 @@ ALTER TABLE public.api_tokens
 
 ALTER TABLE public.api_tokens
   ADD CONSTRAINT api_tokens_token_value_game_mode_match
-  CHECK (token_value IS NULL OR token_value LIKE 'tt_%' OR left(token_value, 4) = upper(game_mode) || '_')
+  CHECK (token_value IS NULL OR left(token_value, 3) = 'tt_' OR left(token_value, 4) = upper(game_mode) || '_')
   NOT VALID;
 
 COMMENT ON CONSTRAINT api_tokens_token_value_game_mode_match ON public.api_tokens IS
