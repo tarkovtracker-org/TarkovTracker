@@ -1,3 +1,10 @@
+## [1.60.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.4...v1.60.5) (2026-07-31)
+
+
+### Bug Fixes
+
+* **api:** bind token prefix to stored game mode, drop tt_ tokens ([#608](https://github.com/tarkovtracker-org/TarkovTracker/issues/608)) ([0f65796](https://github.com/tarkovtracker-org/TarkovTracker/commit/0f6579653337f75eb586bc14a5cc8efbdb9411b0))
+
 ## [1.60.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.3...v1.60.4) (2026-07-29)
 
 
