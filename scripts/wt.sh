@@ -115,11 +115,13 @@ case "$cmd" in
 
     git worktree remove "$target"
     removed_path="$target"
-    while [[ "$target" != "$WT_DIR" ]]; do
-      target="$(dirname "$target")"
-      [[ "$target" == "$WT_DIR" ]] && break
-      rmdir "$target" 2>/dev/null || break
-    done
+    if [[ "$target" == "$WT_DIR"/* ]]; then
+      while [[ "$target" != "$WT_DIR" ]]; do
+        target="$(dirname "$target")"
+        [[ "$target" == "$WT_DIR" ]] && break
+        rmdir "$target" 2>/dev/null || break
+      done
+    fi
     echo "Removed worktree at $removed_path."
     echo "If branch '${branch}' is merged, delete it with:  git branch -d ${branch}"
     echo "  (use -D only if you have confirmed there are no unmerged commits to keep)"
