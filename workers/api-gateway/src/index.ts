@@ -336,10 +336,10 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
   return {
     'Access-Control-Allow-Origin': resolveOrigin(envOrigin, requestOrigin),
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,If-None-Match',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
-      'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
+      'ETag, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };
 }
 function retryAfterSeconds(resetAt: number): number {
@@ -472,6 +472,106 @@ function errorResponse(
       ...(extraHeaders ?? {}),
     },
   });
+}
+const READ_CACHE_CONTROL = 'private, max-age=15';
+// Authorization: responses are token-scoped. Origin: the CORS allow-origin
+// header is echoed per request. Accept-Encoding: bodies may be gzipped.
+const READ_VARY = 'Accept-Encoding, Authorization, Origin';
+const GZIP_MIN_BYTES = 1024;
+async function weakEtag(payload: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', payload);
+  const hex = Array.from(new Uint8Array(digest))
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `W/"${hex}"`;
+}
+function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch) return false;
+  if (ifNoneMatch.trim() === '*') return true;
+  const opaque = (value: string) => value.trim().replace(/^W\//i, '');
+  return ifNoneMatch.split(',').some((candidate) => opaque(candidate) === opaque(etag));
+}
+// RFC 9110 qvalue grammar: 0[.0-3 digits] or 1[.up to three zeros]. Anything
+// outside that range (q=2, q=abc) is malformed, not a stronger preference.
+const QVALUE_PATTERN = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
+// RFC 9110 Accept-Encoding negotiation. An explicit `gzip;q=0` is a rejection
+// and must not be compressed; `*` only applies when a coding is not listed on
+// its own. identity is always acceptable unless explicitly refused with
+// `identity;q=0`. A malformed or out-of-range q-value falls back to "not
+// acceptable" for that coding; gzip falls back to uncompressed (always
+// decodable), and an identity rejection is honored.
+function negotiateEncoding(header: string | null): { gzip: boolean; identity: boolean } {
+  if (!header) return { gzip: false, identity: true };
+  let gzipQ: number | null = null;
+  let identityQ: number | null = null;
+  let wildcardQ: number | null = null;
+  for (const part of header.split(',')) {
+    const [rawCoding, ...params] = part.split(';');
+    const coding = rawCoding.trim().toLowerCase();
+    if (coding !== 'gzip' && coding !== 'identity' && coding !== '*') continue;
+    const qParam = params.map((p) => p.trim().toLowerCase()).find((p) => p.startsWith('q='));
+    const qValue = qParam?.slice(2) ?? '';
+    const q = !qParam ? 1 : QVALUE_PATTERN.test(qValue) ? Number(qValue) : 0;
+    if (coding === 'gzip') gzipQ = q;
+    else if (coding === 'identity') identityQ = q;
+    else wildcardQ = q;
+  }
+  const gzip = gzipQ !== null ? gzipQ > 0 : wildcardQ !== null ? wildcardQ > 0 : false;
+  const identity = identityQ !== null ? identityQ > 0 : wildcardQ !== null ? wildcardQ > 0 : true;
+  return { gzip, identity };
+}
+// Conditional read response for GET /progress and GET /team/progress. The
+// payload is encoded once so the ETag digest, the gzip size threshold, and the
+// response body all back the same bytes — the validator and the body cannot
+// disagree. The ETag is derived from the serialized payload (not updated_at) so
+// a 304 can never hide a change originating in task metadata or invalidation.
+async function conditionalReadResponse(
+  request: Request,
+  data: unknown,
+  envOrigin?: string,
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
+): Promise<Response> {
+  const body: Record<string, unknown> = { success: true };
+  if (data && typeof data === 'object' && 'data' in data) {
+    const wrapped = data as Record<string, unknown>;
+    body.data = wrapped.data;
+    if (wrapped.meta !== undefined) body.meta = wrapped.meta;
+  } else {
+    body.data = data;
+  }
+  const payload = new TextEncoder().encode(JSON.stringify(body));
+  const etag = await weakEtag(payload);
+  const headers: Record<string, string> = {
+    ...corsHeaders(envOrigin, requestOrigin),
+    'Cache-Control': READ_CACHE_CONTROL,
+    Vary: READ_VARY,
+    ETag: etag,
+    ...(extraHeaders ?? {}),
+  };
+  if (etagMatches(request.headers.get('If-None-Match'), etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
+  if (!encoding.gzip && !encoding.identity) {
+    return errorResponse('no_acceptable_encoding', 406, envOrigin, requestOrigin, {
+      Vary: READ_VARY,
+      ...(extraHeaders ?? {}),
+    });
+  }
+  headers['Content-Type'] = 'application/json';
+  // Compress when gzip is acceptable and either the payload clears the size
+  // threshold or the client explicitly refused identity (identity;q=0), in
+  // which case uncompressed is not an acceptable response.
+  if (encoding.gzip && (payload.byteLength >= GZIP_MIN_BYTES || !encoding.identity)) {
+    headers['Content-Encoding'] = 'gzip';
+    const stream = new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
+    // encodeBody: 'manual' prevents the Workers runtime from double-compressing
+    // the already-gzipped stream (the default 'automatic' would re-encode it).
+    return new Response(stream, { status: 200, headers, encodeBody: 'manual' });
+  }
+  return new Response(payload, { status: 200, headers });
 }
 type AuthSuccess = {
   validation: { valid: true; token: ApiToken };
@@ -842,7 +942,7 @@ export default {
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const progress = await handleGetProgress(env, validation.token, effectiveGameMode);
-        return successResponse(progress, undefined, 200, origin, reqOrigin, rlHeaders);
+        return await conditionalReadResponse(request, progress, origin, reqOrigin, rlHeaders);
       }
       // GET /team/progress - Team progress (requires TP permission)
       if (apiPath === '/team/progress' && request.method === 'GET') {
@@ -861,7 +961,7 @@ export default {
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const teamProgress = await handleGetTeamProgress(env, validation.token, effectiveGameMode);
-        return successResponse(teamProgress, undefined, 200, origin, reqOrigin, rlHeaders);
+        return await conditionalReadResponse(request, teamProgress, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/level/:levelValue - Update player level
       const levelMatch = apiPath.match(/^\/progress\/level\/(\d+)$/);

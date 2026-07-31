@@ -6,7 +6,7 @@ export const OPENAPI_SPEC = {
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
-      'Tokens use prefixes `PVP_` or `PVE_`, which must match the token\'s game mode; ' +
+      "Tokens use prefixes `PVP_` or `PVE_`, which must match the token's game mode; " +
       'a mismatched token is rejected with 401. The token game mode alone decides which ' +
       'progress data is read or written. Legacy `tt_` tokens are no longer accepted.\n\n' +
       'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
@@ -19,6 +19,16 @@ export const OPENAPI_SPEC = {
       'delay rather than busy-looping. Throttled requests do not consume the daily quota. ' +
       'If the daily-quota service is temporarily unavailable the gateway fails open and ' +
       'serves the request without rate-limit headers.\n\n' +
+      'Conditional requests & polling: `GET /progress` and `GET /team/progress` return a weak ' +
+      '`ETag` and honor `If-None-Match` with `304 Not Modified` (empty body; rate-limit headers ' +
+      'included only when the daily-quota service is available — on the fail-open path they are ' +
+      'omitted). Responses are gzip-compressed when the request sends `Accept-Encoding: gzip` ' +
+      'and the body is at least 1 KiB; an explicit `gzip;q=0` is honored as a refusal. If the ' +
+      'client accepts gzip but refuses identity (`identity;q=0`), even sub-1 KiB bodies are ' +
+      'gzipped since uncompressed is not acceptable; if no acceptable encoding remains the ' +
+      'gateway returns `406`. Poll read endpoints at 60-second intervals or slower and always ' +
+      'send the previous `ETag` so unchanged progress costs almost no bandwidth. A `304` still ' +
+      'counts against the daily quota.\n\n' +
       'Token cap: each account may have at most 3 active API tokens. Revoke an existing ' +
       'token before creating a new one if the cap is reached. Token creation is only ' +
       'allowed through the token-create Edge Function and is rate-limited to 3/hour.\n\n' +
@@ -73,6 +83,59 @@ export const OPENAPI_SPEC = {
           'Requests outside that range are rejected with 400.',
         schema: { type: 'string', minLength: 5, maxLength: 200 },
         example: 'RatScanner/2.1 (+https://ratscanner.io)',
+      },
+      IfNoneMatchHeader: {
+        name: 'If-None-Match',
+        in: 'header',
+        required: false,
+        description:
+          'The ETag from a previous response. When the payload is unchanged the gateway ' +
+          'answers 304 Not Modified with an empty body. Polling clients should always send this.',
+        schema: { type: 'string' },
+        example: 'W/"0b661a2f5c3d9e14a7b8c0d1e2f30456"',
+      },
+    },
+    headers: {
+      ETag: {
+        description:
+          'Weak validator (SHA-256, first 16 bytes) for the response payload. ' +
+          'Send it back in `If-None-Match` to receive a `304` when nothing changed.',
+        schema: { type: 'string' },
+      },
+      ReadCacheControl: {
+        description:
+          'Always `private, max-age=15` for token-scoped reads. `private` prevents ' +
+          'shared/edge caches from storing authenticated progress.',
+        schema: { type: 'string' },
+      },
+      ReadVary: {
+        description: 'Cache variant dimensions. Always `Accept-Encoding, Authorization, Origin`.',
+        schema: { type: 'string' },
+      },
+      ContentEncoding: {
+        description:
+          'Present and set to `gzip` when the response body is gzip-compressed ' +
+          '(payload >= 1 KiB and the client accepts gzip, or any size when the client accepts ' +
+          'gzip but refused identity). Absent when the body is uncompressed.',
+        schema: { type: 'string', enum: ['gzip'] },
+      },
+      RateLimitLimit: {
+        description:
+          'Maximum requests permitted per UTC day for the account tier. Present only when ' +
+          'the daily-quota service is available.',
+        schema: { type: 'integer', minimum: 1 },
+      },
+      RateLimitRemaining: {
+        description:
+          'Requests remaining in the daily quota. Present only when the daily-quota ' +
+          'service is available.',
+        schema: { type: 'integer', minimum: 0 },
+      },
+      RateLimitReset: {
+        description:
+          'Unix timestamp (seconds) when the daily quota resets (00:00 UTC). Present only ' +
+          'when the daily-quota service is available.',
+        schema: { type: 'integer', minimum: 0 },
       },
     },
     responses: {
@@ -157,6 +220,52 @@ export const OPENAPI_SPEC = {
                     'Daily read quota exceeded for the free tier. Quotas reset at 00:00 UTC. ' +
                     'Upgrade your account for higher limits: https://tarkovtracker.org/supporter',
                 },
+              },
+            },
+          },
+        },
+      },
+      NotModified: {
+        description:
+          'Payload unchanged since the ETag in If-None-Match. Empty body. The request still ' +
+          'counts against the daily quota. `ETag`, `Cache-Control`, and `Vary` are always ' +
+          'present; the `X-RateLimit-*` headers are present only when the daily-quota service ' +
+          'is available (on the fail-open path they are omitted).',
+        headers: {
+          ETag: {
+            description: 'Weak validator for the unchanged payload. Reuse it on the next poll.',
+            schema: { type: 'string' },
+          },
+          'Cache-Control': {
+            description: 'Always `private, max-age=15` for token-scoped reads.',
+            schema: { type: 'string' },
+          },
+          Vary: { $ref: '#/components/headers/ReadVary' },
+          'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+          'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+          'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
+        },
+      },
+      NotAcceptable: {
+        description:
+          'The client refused every encoding the gateway can produce (gzip and identity, ' +
+          'e.g. `Accept-Encoding: gzip;q=0, identity;q=0`). No response body encoding is ' +
+          'acceptable. The request was admitted and counts against the daily quota, so the ' +
+          '`X-RateLimit-*` headers are present when the daily-quota service is available ' +
+          '(omitted on the fail-open path). The rejection depends on `Accept-Encoding`, so ' +
+          '`Vary` is included.',
+        headers: {
+          Vary: { $ref: '#/components/headers/ReadVary' },
+          'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+          'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+          'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
+        },
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+            examples: {
+              noAcceptableEncoding: {
+                value: { success: false, error: 'no_acceptable_encoding' },
               },
             },
           },
@@ -591,22 +700,37 @@ export const OPENAPI_SPEC = {
         tags: ['progress'],
         summary: 'Get user progress',
         description:
-          'Requires GP permission. Counts against the tiered daily read quota (keyed by user).',
+          'Requires GP permission. Counts against the tiered daily read quota (keyed by user). ' +
+          'Returns a weak ETag; send If-None-Match to receive 304 when unchanged. Poll at >=60s intervals.',
         operationId: 'getProgress',
         security: [{ bearerAuth: [] }],
-        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
+        parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
+          { $ref: '#/components/parameters/IfNoneMatchHeader' },
+        ],
         responses: {
           '200': {
             description: 'Progress data',
+            headers: {
+              ETag: { $ref: '#/components/headers/ETag' },
+              'Cache-Control': { $ref: '#/components/headers/ReadCacheControl' },
+              Vary: { $ref: '#/components/headers/ReadVary' },
+              'Content-Encoding': { $ref: '#/components/headers/ContentEncoding' },
+              'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+              'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+              'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
+            },
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ProgressResponse' },
               },
             },
           },
+          '304': { $ref: '#/components/responses/NotModified' },
           '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
+          '406': { $ref: '#/components/responses/NotAcceptable' },
           '429': { $ref: '#/components/responses/RateLimited' },
         },
       },
@@ -616,22 +740,37 @@ export const OPENAPI_SPEC = {
         tags: ['team'],
         summary: 'Get team progress',
         description:
-          'Requires TP permission. Counts against the tiered daily read quota (keyed by user).',
+          'Requires TP permission. Counts against the tiered daily read quota (keyed by user). ' +
+          'Returns a weak ETag; send If-None-Match to receive 304 when unchanged. Poll at >=60s intervals.',
         operationId: 'getTeamProgress',
         security: [{ bearerAuth: [] }],
-        parameters: [{ $ref: '#/components/parameters/UserAgentHeader' }],
+        parameters: [
+          { $ref: '#/components/parameters/UserAgentHeader' },
+          { $ref: '#/components/parameters/IfNoneMatchHeader' },
+        ],
         responses: {
           '200': {
             description: 'Team progress data',
+            headers: {
+              ETag: { $ref: '#/components/headers/ETag' },
+              'Cache-Control': { $ref: '#/components/headers/ReadCacheControl' },
+              Vary: { $ref: '#/components/headers/ReadVary' },
+              'Content-Encoding': { $ref: '#/components/headers/ContentEncoding' },
+              'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+              'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+              'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
+            },
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/TeamProgressResponse' },
               },
             },
           },
+          '304': { $ref: '#/components/responses/NotModified' },
           '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
+          '406': { $ref: '#/components/responses/NotAcceptable' },
           '429': { $ref: '#/components/responses/RateLimited' },
         },
       },
