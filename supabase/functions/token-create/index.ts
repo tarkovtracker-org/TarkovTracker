@@ -7,7 +7,7 @@ import {
   type AuthSuccess,
 } from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
-import { generateToken, isTokenGameMode, isTokenValueForGameMode } from "./tokenValue.ts"
+import { generateToken, isTokenGameMode, isTokenValueForGameMode } from './tokenValue.ts';
 
 const hashToken = async (token: string) => {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))

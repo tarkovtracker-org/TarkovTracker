@@ -6,7 +6,6 @@ const TOKEN_PREFIX_GAME_MODES: ReadonlyArray<readonly [string, ApiToken['game_mo
 ];
 /**
  * Resolve the game mode a token's prefix claims, or null for unsupported prefixes.
- * The prefix is cosmetic; `api_tokens.game_mode` stays authoritative for behaviour.
  */
 export function getTokenPrefixGameMode(token: string): ApiToken['game_mode'] | null {
   return TOKEN_PREFIX_GAME_MODES.find(([prefix]) => token.startsWith(prefix))?.[1] ?? null;
