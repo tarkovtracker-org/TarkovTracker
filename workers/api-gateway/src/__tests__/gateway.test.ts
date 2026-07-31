@@ -1157,6 +1157,81 @@ describe('api-gateway', () => {
     expect(body.success).toBe(false);
     expect(body.error).toBe('no_acceptable_encoding');
   });
+  it('declares Vary and rate-limit headers on the 406 response', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': '*;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(406);
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('1000');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBeTruthy();
+    expect(res.headers.get('X-RateLimit-Reset')).toBeTruthy();
+  });
+  it('returns 304 for a wildcard If-None-Match without encoding the body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'If-None-Match': '*', 'Accept-Encoding': 'gzip, identity;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(304);
+    expect(await res.text()).toBe('');
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    expect(res.headers.get('Content-Type')).toBeNull();
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    expect(res.headers.get('ETag')).toMatch(/^W\/"[0-9a-f]{32}"$/);
+  });
+  it('supports the ETag/304 round-trip on GET /team/progress', async () => {
+    const teamMock = () =>
+      createBaseFetchMock({
+        permissions: ['TP'],
+        teamId: 'team-1',
+        teamMembers: ['user-1', 'user-2'],
+      });
+    vi.stubGlobal('fetch', teamMock());
+    const first = await worker.fetch(teamProgressRequest(), BASE_ENV);
+    expect(first.status).toBe(200);
+    const etag = first.headers.get('ETag');
+    expect(etag).toMatch(/^W\/"[0-9a-f]{32}"$/);
+    expect(first.headers.get('Cache-Control')).toBe('private, max-age=15');
+    expect(first.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    vi.stubGlobal('fetch', teamMock());
+    const second = await worker.fetch(
+      teamProgressRequest('pvp', { 'If-None-Match': etag! }),
+      BASE_ENV
+    );
+    expect(second.status).toBe(304);
+    expect(await second.text()).toBe('');
+    expect(second.headers.get('ETag')).toBe(etag);
+  });
+  it('routes a conditional-read failure through the router error envelope', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const realDigest = crypto.subtle.digest.bind(crypto.subtle);
+    const digest = vi
+      .spyOn(crypto.subtle, 'digest')
+      .mockImplementation(
+        async (
+          algorithm: string | SubtleCryptoHashAlgorithm,
+          data: ArrayBuffer | ArrayBufferView
+        ) => {
+          if (new TextDecoder().decode(data).startsWith('{"success":')) {
+            throw new Error('digest unavailable');
+          }
+          return realDigest(algorithm, data);
+        }
+      );
+    try {
+      const res = await worker.fetch(progressRequest(), BASE_ENV);
+      expect(res.status).toBe(500);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeTruthy();
+      const body = (await res.json()) as { success: boolean; error: string };
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('digest unavailable');
+    } finally {
+      digest.mockRestore();
+    }
+  });
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {
   afterEach(() => {

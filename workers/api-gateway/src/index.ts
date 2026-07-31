@@ -569,7 +569,7 @@ async function conditionalReadResponse(
     const stream = new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
     // encodeBody: 'manual' prevents the Workers runtime from double-compressing
     // the already-gzipped stream (the default 'automatic' would re-encode it).
-    return new Response(stream, { status: 200, headers, encodeBody: 'manual' } as ResponseInit);
+    return new Response(stream, { status: 200, headers, encodeBody: 'manual' });
   }
   return new Response(payload, { status: 200, headers });
 }
@@ -942,7 +942,7 @@ export default {
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const progress = await handleGetProgress(env, validation.token, effectiveGameMode);
-        return conditionalReadResponse(request, progress, origin, reqOrigin, rlHeaders);
+        return await conditionalReadResponse(request, progress, origin, reqOrigin, rlHeaders);
       }
       // GET /team/progress - Team progress (requires TP permission)
       if (apiPath === '/team/progress' && request.method === 'GET') {
@@ -961,7 +961,7 @@ export default {
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const teamProgress = await handleGetTeamProgress(env, validation.token, effectiveGameMode);
-        return conditionalReadResponse(request, teamProgress, origin, reqOrigin, rlHeaders);
+        return await conditionalReadResponse(request, teamProgress, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/level/:levelValue - Update player level
       const levelMatch = apiPath.match(/^\/progress\/level\/(\d+)$/);
