@@ -98,7 +98,9 @@ product.
 2. Confirm the Pages project remains **fail open** so the static SPA shell still serves if the
    Functions daily quota is exhausted.
 3. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
-   intentionally disabled to avoid per-preview billing):
+   intentionally disabled to avoid per-preview billing). **Before running the commands below:** if
+   this release also changes an Edge Function that validates the same rule a new constraint
+   enforces, complete step 6 first — see _Constraint/validation ordering_ below.
 
    ```bash
    supabase migration list --linked   # any row with a blank REMOTE column is pending
