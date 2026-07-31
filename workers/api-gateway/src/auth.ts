@@ -7,13 +7,13 @@ const TOKEN_PREFIX_GAME_MODES: ReadonlyArray<readonly [string, ApiToken['game_mo
 /**
  * Resolve the game mode a token's prefix claims, or null for unsupported prefixes.
  */
-export function getTokenPrefixGameMode(token: string): ApiToken['game_mode'] | null {
+function getTokenPrefixGameMode(token: string): ApiToken['game_mode'] | null {
   return TOKEN_PREFIX_GAME_MODES.find(([prefix]) => token.startsWith(prefix))?.[1] ?? null;
 }
 /**
  * SHA-256 hash a string and return hex
  */
-export async function sha256(input: string): Promise<string> {
+async function sha256(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
