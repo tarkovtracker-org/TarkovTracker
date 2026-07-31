@@ -251,9 +251,18 @@ Push to `main` triggers:
 1. CI validation in GitHub Actions
 2. Cloudflare Pages deploy for the connected branch
 3. Cloudflare-managed worker deploys for the connected branch
-4. Smoke tests in production
+4. Supabase GitHub integration — applies pending DB migrations and deploys Edge Functions
+   (surfaces as the `Supabase Preview` check on the merge commit)
+5. Smoke tests in production
+
+GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. See the Deployment
+section of [`runbook.md`](./runbook.md) for what to verify after each merge.
 
 ### Manual Deployment
+
+Fallback only, for when an integration fails. Supabase fallbacks (`supabase db push --linked`,
+`supabase functions deploy --use-api`) are documented in [`runbook.md`](./runbook.md) rather than
+duplicated here:
 
 ```bash
 # Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)

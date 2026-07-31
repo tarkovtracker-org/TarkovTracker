@@ -49,8 +49,10 @@ can read it and an agent can verify any claim against the code. Each system sect
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 - **Runtime:** Node >=24.12.0, packageManager `pnpm@11.14.0` (engines allow `pnpm >=10.34.5 <12`).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
-- **Deployment:** Cloudflare Pages/Workers. The Pages build emits a static SPA shell and routes only
-  `/api/*` plus `/overlay/*` through Pages Functions.
+- **Deployment:** Cloudflare Pages/Workers for the frontend and `api-gateway`; the Supabase GitHub
+  integration applies DB migrations and deploys Edge Functions. All three run automatically on merge
+  to `main` — see the Deployment section of `docs/runbook.md`. The Pages build emits a static SPA
+  shell and routes only `/api/*` plus `/overlay/*` through Pages Functions.
 
 ## Project Map
 

@@ -94,30 +94,56 @@ product.
 
 ## Deployment
 
+Merging to `main` deploys everything automatically. Three integrations do the work — none of them
+GitHub Actions — and each surfaces as a check on the merge commit:
+
+| What                                 | Mechanism                    | Check on the merge commit     |
+| ------------------------------------ | ---------------------------- | ----------------------------- |
+| Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
+| `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
+| DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+
+The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
+project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
+per-preview billing, which is why the same check reports `skipping` on pull requests.
+
+The steps below are therefore mostly verification. The manual commands are a fallback for when an
+integration fails or is unavailable, not the normal path.
+
 1. Merge to `main` and verify CI workflow `Validate`, `Supabase DB`, and `Workers` jobs are green.
 2. Confirm the Pages project remains **fail open** so the static SPA shell still serves if the
    Functions daily quota is exhausted.
-3. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
-   intentionally disabled to avoid per-preview billing). **Before running the commands below:** if
-   this release also changes an Edge Function that validates the same rule a new constraint
-   enforces, complete step 6 first — see _Constraint/validation ordering_ below.
+3. **Verify DB migrations applied.** The Supabase integration applies pending migrations on merge.
+   Confirm rather than assume:
 
    ```bash
-   supabase migration list --linked   # any row with a blank REMOTE column is pending
-   supabase db push --linked          # apply pending migrations to production
+   supabase migration list --linked   # any row with a blank REMOTE column is still pending
    ```
 
-   Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
-   **Ordering caveat:** workers auto-deploy from `main` (step 1) while migrations are manual, so
-   a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
-   for the gap between merge and `db push`. For such changes, apply the pending migration to
-   production **before** merging the worker change; adding a function ahead of its caller is safe.
-   **Constraint/validation ordering:** when a migration adds a CHECK constraint that an Edge
-   Function also enforces in application code (e.g. `api_tokens_token_value_game_mode_match` and
-   the `tokenValue` guards in `token-create`), deploy the function (step 6) **before** `db push`.
-   Otherwise the still-unvalidated function can attempt a write the new constraint rejects, and the
-   resulting Postgres `23514` (`check_violation`) surfaces as whatever that function maps `23514`
-   to — `token-create` reports it as `409 Token limit reached (3 active)`, which is misleading.
+   If a migration is still pending, apply it manually:
+
+   ```bash
+   supabase db push --linked
+   ```
+
+   `db push` is safe to run when nothing is pending — it reports `Remote database is up to date`.
+   Verify the object itself landed, not just the version row; for a constraint, check
+   `pg_constraint` (`convalidated = false` is expected for `NOT VALID`).
+
+   **Ordering caveat:** migrations, Workers and Edge Functions all deploy from the same merge and
+   you cannot control the order between them. Code that depends on a new DB object (e.g. a worker
+   calling the `merge_progress_data` RPC) can briefly run against a database that does not have it
+   yet. When the dependency matters, land the migration in an **earlier release** than the code
+   that uses it; adding a DB object ahead of its caller is safe, the reverse is not.
+
+   **Constraint/validation ordering:** the same applies when a migration adds a CHECK constraint
+   that an Edge Function also enforces in application code (e.g.
+   `api_tokens_token_value_game_mode_match` and the `tokenValue` guards in `token-create`). If the
+   constraint lands first, the still-unvalidated function can attempt a write the constraint
+   rejects, and the resulting Postgres `23514` (`check_violation`) surfaces as whatever that
+   function maps `23514` to — `token-create` reports it as `409 Token limit reached (3 active)`,
+   which sends debugging the wrong way. Ship the function validation in an earlier release than the
+   constraint when that distinction matters.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
    `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
@@ -134,15 +160,21 @@ product.
    merging so the first post-merge request already has a non-null HMAC identifier.
    Do not commit the value.
 
-5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
-6. Deploy Supabase Edge Functions after every change under `supabase/functions/`:
+5. Confirm the `Cloudflare Pages`, `Workers Builds: api-gateway` and `Supabase Preview` checks all
+   succeeded on the merge commit.
+6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
+   `supabase/functions/` on merge; confirm each changed function reports a new version in the
+   Supabase dashboard. Manual fallback:
 
    ```bash
    supabase functions deploy --use-api
    ```
 
-   This deploys all functions using the per-function JWT settings in `supabase/config.toml`. Confirm
-   every changed function reports the expected version in the Supabase dashboard.
+   Deploy **all** functions, not one. A scoped `supabase functions deploy <name>` omits
+   `supabase/functions/deno.json`, so the bare specifiers it maps (`shared/auth`) fail to resolve
+   and the deploy is rejected with a `Relative import path ... not prefixed with / or ./ or ../`
+   bundling error. `--use-api` applies the per-function `verify_jwt` settings from
+   `supabase/config.toml`.
 
 7. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
@@ -197,14 +229,17 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   Supabase dashboard / SQL editor. Direct edits cause drift: a fresh environment built from
   migrations no longer matches production, and the next `db push` can fail or apply destructive
   changes. Always write a migration.
-- **CI does NOT apply migrations to production.** The `Supabase DB` job only validates
-  (`supabase:check` = local reset + lint); no workflow runs `db push`. Supabase branch/preview
-  auto-deploy is intentionally **disabled** (it bills per ephemeral preview DB). Applying to prod
-  is a **manual step** after merge to `main` (see Deployment checklist):
+- **GitHub Actions does not apply migrations — the Supabase integration does.** The `Supabase DB`
+  job only validates (`supabase:check` = local reset + lint) and no workflow runs `db push`.
+  Application to production happens automatically on merge to `main` via the Supabase GitHub
+  integration, which surfaces as the `Supabase Preview` check on the merge commit. Per-PR preview
+  databases are intentionally **disabled** (they bill per ephemeral preview DB), so that same check
+  reports `skipping` on pull requests. Confirm the result after every merge and apply manually only
+  if something is still pending:
 
   ```bash
-  supabase migration list --linked   # confirm the new migration is pending (blank REMOTE column)
-  supabase db push --linked          # applies pending migrations to production
+  supabase migration list --linked   # blank REMOTE column = still pending
+  supabase db push --linked          # fallback if the integration did not apply it
   ```
 
   Then verify the change landed (e.g. catalog query / `has_column_privilege`).
