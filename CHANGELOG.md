@@ -1,3 +1,10 @@
+# [1.61.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.5...v1.61.0) (2026-07-31)
+
+
+### Features
+
+* **api:** add ETag/304 conditional reads and gzip to progress endpoints ([9d2ec7e](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d2ec7edb87e9a8f67ce38b73cee64ccc3662232))
+
 ## [1.60.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.4...v1.60.5) (2026-07-31)
 
 
