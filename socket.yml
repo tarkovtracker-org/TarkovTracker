@@ -1,5 +1,4 @@
 version: 2
-
 triggerPaths:
   - 'package.json'
   - 'pnpm-lock.yaml'

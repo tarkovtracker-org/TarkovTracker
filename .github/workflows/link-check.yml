@@ -1,5 +1,4 @@
 name: Link Check
-
 on:
   pull_request:
     paths:
@@ -21,20 +20,16 @@ on:
   schedule:
     - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   link-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
       - name: Link Checker
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411
         with:
@@ -48,7 +43,6 @@ jobs:
             './*.md'
           output: lychee/out-docs.md
           fail: true
-
       - name: llms.txt Link Checker
         if: ${{ success() || failure() }}
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411
@@ -64,7 +58,6 @@ jobs:
             './public/llms.txt'
           output: lychee/out-llms.md
           fail: true
-
       - name: Upload Link Check Report
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

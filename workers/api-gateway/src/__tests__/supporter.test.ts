@@ -61,7 +61,6 @@ describe('resolveTier', () => {
     vi.stubGlobal('fetch', fetchMock);
     expect(await resolveTier(baseEnv, 'user-1')).toBe('free');
   });
-
   it('keeps paid limits during the configured past-due grace period', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -79,7 +78,6 @@ describe('resolveTier', () => {
     vi.stubGlobal('fetch', fetchMock);
     expect(await resolveTier(baseEnv, 'user-1')).toBe('timmy');
   });
-
   it('drops paid limits when the past-due grace period expires', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();

@@ -1,5 +1,4 @@
 name: Security
-
 on:
   push:
     branches: [main, develop]
@@ -18,11 +17,9 @@ on:
       - 'app/locales/zh.json'
   schedule:
     - cron: '0 0 * * 0'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   security-scan:
     name: Security Scan
@@ -33,26 +30,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Prepare pnpm audit workspace
         id: prepare-audit
         run: |
@@ -60,18 +52,14 @@ jobs:
           mkdir -p "$audit_dir"
           cp pnpm-lock.yaml package.json "$audit_dir/"
           echo "audit_dir=$audit_dir" >> "$GITHUB_OUTPUT"
-
       - name: Audit production dependencies
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
         run: pnpm audit --prod --audit-level=critical
-
       - name: Audit all dependencies (informational)
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
         run: pnpm audit --audit-level=high || true
-
       - name: Check for outdated dependencies
         run: pnpm outdated || true
-
       - name: Install Gitleaks CLI
         shell: bash
         run: |
@@ -81,7 +69,6 @@ jobs:
           checksums_path="$RUNNER_TEMP/gitleaks_checksums.txt"
           checksum_entry_path="$RUNNER_TEMP/gitleaks_checksum.txt"
           install_dir="$RUNNER_TEMP/gitleaks"
-
           mkdir -p "$install_dir"
           curl -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}" \
@@ -99,7 +86,6 @@ jobs:
           echo "$install_dir" >> "$GITHUB_PATH"
         env:
           GITLEAKS_VERSION: 8.30.1
-
       - name: Gitleaks scan
         id: gitleaks
         continue-on-error: true
@@ -110,7 +96,6 @@ jobs:
             --redact \
             --report-format sarif \
             --report-path gitleaks.sarif
-
       - name: Upload Gitleaks report
         if: steps.gitleaks.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -119,13 +104,11 @@ jobs:
           path: gitleaks.sarif
           if-no-files-found: ignore
           retention-days: 7
-
       - name: Fail on Gitleaks findings
         if: steps.gitleaks.outcome == 'failure'
         run: |
           echo "::error::Gitleaks detected secrets. Review the gitleaks-report artifact."
           exit 1
-
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
@@ -135,12 +118,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
         with:
           languages: javascript-typescript
           queries: security-extended
-
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e

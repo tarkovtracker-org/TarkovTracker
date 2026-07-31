@@ -672,7 +672,6 @@ html.no-smooth-scroll {
     background-color: var(--color-surface-900);
   }
 }
-
 @layer utilities {
   .scrollbar-none {
     scrollbar-width: none;
@@ -710,7 +709,6 @@ html.no-smooth-scroll {
   }
 }
 /* Text colors now use warm surface tokens (see @theme --color-surface-*) */
-
 /* Restore pointer cursor on interactive elements (reset by Tailwind preflight) */
 button:not(:disabled),
 [role='button']:not([disabled]):not([aria-disabled='true']),
@@ -721,7 +719,6 @@ select:not(:disabled),
 summary {
   cursor: pointer;
 }
-
 @layer base {
   :where(
     a[href],
@@ -737,7 +734,6 @@ summary {
     outline-offset: 2px;
   }
 }
-
 @layer utilities {
   .fade-enter-active,
   .fade-leave-active {

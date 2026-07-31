@@ -140,7 +140,8 @@ bash scripts/setup-worktree.sh
 
 That runs `pnpm install --frozen-lockfile` and `pnpm exec husky`. If install is
 impossible, format staged paths yourself before committing (for example
-`prettier --write` on touched markdown, `eslint --fix` on touched app files).
+`prettier --write` on touched markdown, `eslint --fix` on touched app files, and
+`node scripts/lint-blank-lines.mjs --fix` on supported source/config files).
 
 ### Hooks
 
@@ -315,8 +316,9 @@ pnpm exec vitest --ui        # UI dashboard
 ### Format & Lint
 
 ```bash
-pnpm run format         # Prettier + ESLint fix
-pnpm run lint           # Lint check
+pnpm run format         # Prettier + ESLint + blank-line fix
+pnpm run lint           # Lint and blank-line check
+pnpm run lint:blank-lines # Blank-line check only
 pnpm run lint:fix       # Auto-fix issues
 ```
 
