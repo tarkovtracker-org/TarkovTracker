@@ -494,8 +494,14 @@ Authorization, Origin`, and gzips bodies ≥1 KiB when the client accepts gzip (
 - Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
   never hide a change that came from task metadata or invalidation rather than the user's row.
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
-- The ETag digest, the gzip size threshold, and the response body all back the same UTF-8 bytes,
-  so the validator and the payload can never disagree.
+- The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
+  so the validator and the payload can never disagree. The wire body is those bytes uncompressed,
+  or a `CompressionStream('gzip')` over them when gzip is negotiated — the ETag always represents
+  the uncompressed entity, keyed by `Vary: Accept-Encoding`.
+- gzip is applied when the client accepts it and the payload clears the 1 KiB size threshold, or
+  when the client accepts gzip but explicitly refused identity (`identity;q=0`), in which case
+  uncompressed is not an acceptable response and the threshold is bypassed. If no acceptable
+  encoding exists the gateway returns `406 no_acceptable_encoding`.
 
 ---
 

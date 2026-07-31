@@ -336,7 +336,7 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
   return {
     'Access-Control-Allow-Origin': resolveOrigin(envOrigin, requestOrigin),
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,If-None-Match',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
       'ETag, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
@@ -495,24 +495,31 @@ function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
 // RFC 9110 qvalue grammar: 0[.0-3 digits] or 1[.up to three zeros]. Anything
 // outside that range (q=2, q=abc) is malformed, not a stronger preference.
 const QVALUE_PATTERN = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
-// RFC 9110 Accept-Encoding negotiation for gzip. An explicit `gzip;q=0` is a
-// rejection and must not be compressed; `*` only applies when gzip is not
-// listed on its own. A malformed or out-of-range q-value falls back to "not
-// acceptable", because an uncompressed body is always decodable.
-function acceptsGzip(header: string | null): boolean {
-  if (!header) return false;
-  let wildcard = false;
+// RFC 9110 Accept-Encoding negotiation. An explicit `gzip;q=0` is a rejection
+// and must not be compressed; `*` only applies when a coding is not listed on
+// its own. identity is always acceptable unless explicitly refused with
+// `identity;q=0`. A malformed or out-of-range q-value falls back to "not
+// acceptable" for that coding; gzip falls back to uncompressed (always
+// decodable), and an identity rejection is honored.
+function negotiateEncoding(header: string | null): { gzip: boolean; identity: boolean } {
+  if (!header) return { gzip: false, identity: true };
+  let gzipQ: number | null = null;
+  let identityQ: number | null = null;
+  let wildcardQ: number | null = null;
   for (const part of header.split(',')) {
     const [rawCoding, ...params] = part.split(';');
     const coding = rawCoding.trim().toLowerCase();
-    if (coding !== 'gzip' && coding !== '*') continue;
+    if (coding !== 'gzip' && coding !== 'identity' && coding !== '*') continue;
     const qParam = params.map((p) => p.trim().toLowerCase()).find((p) => p.startsWith('q='));
     const qValue = qParam?.slice(2) ?? '';
-    const acceptable = !qParam || (QVALUE_PATTERN.test(qValue) && Number(qValue) > 0);
-    if (coding === 'gzip') return acceptable;
-    wildcard = acceptable;
+    const q = !qParam ? 1 : QVALUE_PATTERN.test(qValue) ? Number(qValue) : 0;
+    if (coding === 'gzip') gzipQ = q;
+    else if (coding === 'identity') identityQ = q;
+    else wildcardQ = q;
   }
-  return wildcard;
+  const gzip = gzipQ !== null ? gzipQ > 0 : wildcardQ !== null ? wildcardQ > 0 : false;
+  const identity = identityQ !== null ? identityQ > 0 : wildcardQ !== null ? wildcardQ > 0 : true;
+  return { gzip, identity };
 }
 // Conditional read response for GET /progress and GET /team/progress. The
 // payload is encoded once so the ETag digest, the gzip size threshold, and the
@@ -546,8 +553,18 @@ async function conditionalReadResponse(
   if (etagMatches(request.headers.get('If-None-Match'), etag)) {
     return new Response(null, { status: 304, headers });
   }
+  const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
+  if (!encoding.gzip && !encoding.identity) {
+    return errorResponse('no_acceptable_encoding', 406, envOrigin, requestOrigin, {
+      Vary: READ_VARY,
+      ...(extraHeaders ?? {}),
+    });
+  }
   headers['Content-Type'] = 'application/json';
-  if (payload.byteLength >= GZIP_MIN_BYTES && acceptsGzip(request.headers.get('Accept-Encoding'))) {
+  // Compress when gzip is acceptable and either the payload clears the size
+  // threshold or the client explicitly refused identity (identity;q=0), in
+  // which case uncompressed is not an acceptable response.
+  if (encoding.gzip && (payload.byteLength >= GZIP_MIN_BYTES || !encoding.identity)) {
     headers['Content-Encoding'] = 'gzip';
     const stream = new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
     // encodeBody: 'manual' prevents the Workers runtime from double-compressing

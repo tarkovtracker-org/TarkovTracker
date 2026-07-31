@@ -6,7 +6,7 @@ export const OPENAPI_SPEC = {
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
-      'Tokens use prefixes `PVP_` or `PVE_`, which must match the token\'s game mode; ' +
+      "Tokens use prefixes `PVP_` or `PVE_`, which must match the token's game mode; " +
       'a mismatched token is rejected with 401. The token game mode alone decides which ' +
       'progress data is read or written. Legacy `tt_` tokens are no longer accepted.\n\n' +
       'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
@@ -207,6 +207,21 @@ export const OPENAPI_SPEC = {
           'X-RateLimit-Reset': {
             description: 'Unix timestamp (seconds) when the daily quota resets (00:00 UTC).',
             schema: { type: 'integer', minimum: 0 },
+          },
+        },
+      },
+      NotAcceptable: {
+        description:
+          'The client refused every encoding the gateway can produce (gzip and identity, ' +
+          'e.g. `Accept-Encoding: gzip;q=0, identity;q=0`). No response body encoding is acceptable.',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+            examples: {
+              noAcceptableEncoding: {
+                value: { success: false, error: 'no_acceptable_encoding' },
+              },
+            },
           },
         },
       },
@@ -660,6 +675,7 @@ export const OPENAPI_SPEC = {
           '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
+          '406': { $ref: '#/components/responses/NotAcceptable' },
           '429': { $ref: '#/components/responses/RateLimited' },
         },
       },
@@ -690,6 +706,7 @@ export const OPENAPI_SPEC = {
           '400': { $ref: '#/components/responses/BadRequest' },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
+          '406': { $ref: '#/components/responses/NotAcceptable' },
           '429': { $ref: '#/components/responses/RateLimited' },
         },
       },

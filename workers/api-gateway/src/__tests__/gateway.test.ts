@@ -937,8 +937,7 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
-  const bearerForMode = (mode: 'pvp' | 'pve') =>
-    `Bearer ${mode === 'pve' ? 'PVE' : 'PVP'}_abc123`;
+  const bearerForMode = (mode: 'pvp' | 'pve') => `Bearer ${mode === 'pve' ? 'PVE' : 'PVP'}_abc123`;
   const progressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
     buildRequest('/progress', {
       method: 'GET',
@@ -965,10 +964,7 @@ describe('api-gateway', () => {
       expect(select).not.toContain('*');
     }
   );
-  const teamProgressRequest = (
-    mode: 'pvp' | 'pve' = 'pvp',
-    headers: Record<string, string> = {}
-  ) =>
+  const teamProgressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
     buildRequest('/team/progress', {
       method: 'GET',
       headers: { Authorization: bearerForMode(mode), ...headers },
@@ -1033,13 +1029,14 @@ describe('api-gateway', () => {
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=15');
     expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
     expect(res.headers.get('Access-Control-Expose-Headers')).toContain('ETag');
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('If-None-Match');
   });
   it('returns 304 with rate-limit headers when If-None-Match matches', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const first = await worker.fetch(progressRequest(), BASE_ENV);
     const etag = first.headers.get('ETag');
     expect(etag).toBeTruthy();
-    const second = await worker.fetch(progressRequest({ 'If-None-Match': etag! }), BASE_ENV);
+    const second = await worker.fetch(progressRequest('pvp', { 'If-None-Match': etag! }), BASE_ENV);
     expect(second.status).toBe(304);
     expect(await second.text()).toBe('');
     expect(second.headers.get('ETag')).toBe(etag);
@@ -1049,7 +1046,7 @@ describe('api-gateway', () => {
   it('returns the full body when If-None-Match does not match', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
     const res = await worker.fetch(
-      progressRequest({ 'If-None-Match': 'W/"0000000000000000000000000000dead"' }),
+      progressRequest('pvp', { 'If-None-Match': 'W/"0000000000000000000000000000dead"' }),
       BASE_ENV
     );
     expect(res.status).toBe(200);
@@ -1069,7 +1066,10 @@ describe('api-gateway', () => {
         },
       })
     );
-    const res = await worker.fetch(progressRequest({ 'Accept-Encoding': 'gzip, br' }), BASE_ENV);
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': 'gzip, br' }),
+      BASE_ENV
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Encoding')).toBe('gzip');
     const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
@@ -1125,7 +1125,7 @@ describe('api-gateway', () => {
       })
     );
     const res = await worker.fetch(
-      progressRequest({ 'Accept-Encoding': acceptEncoding }),
+      progressRequest('pvp', { 'Accept-Encoding': acceptEncoding }),
       BASE_ENV
     );
     expect(res.status).toBe(200);
@@ -1133,9 +1133,29 @@ describe('api-gateway', () => {
   });
   it('does not gzip small responses even when the client accepts gzip', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
-    const res = await worker.fetch(progressRequest({ 'Accept-Encoding': 'gzip' }), BASE_ENV);
+    const res = await worker.fetch(progressRequest('pvp', { 'Accept-Encoding': 'gzip' }), BASE_ENV);
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Encoding')).toBeNull();
+  });
+  it('gzips small responses when the client accepts gzip but refuses identity', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': 'gzip, identity;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBe('gzip');
+  });
+  it('returns 406 when no acceptable encoding exists', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': 'gzip;q=0, identity;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(406);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('no_acceptable_encoding');
   });
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {
