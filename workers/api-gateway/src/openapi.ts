@@ -119,6 +119,24 @@ export const OPENAPI_SPEC = {
           'gzip but refused identity). Absent when the body is uncompressed.',
         schema: { type: 'string', enum: ['gzip'] },
       },
+      RateLimitLimit: {
+        description:
+          'Maximum requests permitted per UTC day for the account tier. Present only when ' +
+          'the daily-quota service is available.',
+        schema: { type: 'integer', minimum: 1 },
+      },
+      RateLimitRemaining: {
+        description:
+          'Requests remaining in the daily quota. Present only when the daily-quota ' +
+          'service is available.',
+        schema: { type: 'integer', minimum: 0 },
+      },
+      RateLimitReset: {
+        description:
+          'Unix timestamp (seconds) when the daily quota resets (00:00 UTC). Present only ' +
+          'when the daily-quota service is available.',
+        schema: { type: 'integer', minimum: 0 },
+      },
     },
     responses: {
       Unauthorized: {
@@ -222,29 +240,10 @@ export const OPENAPI_SPEC = {
             description: 'Always `private, max-age=15` for token-scoped reads.',
             schema: { type: 'string' },
           },
-          Vary: {
-            description:
-              'Cache variant dimensions. Always `Accept-Encoding, Authorization, Origin`.',
-            schema: { type: 'string' },
-          },
-          'X-RateLimit-Limit': {
-            description:
-              'Maximum requests permitted per UTC day for the account tier. Present only when ' +
-              'the daily-quota service is available.',
-            schema: { type: 'integer', minimum: 1 },
-          },
-          'X-RateLimit-Remaining': {
-            description:
-              'Requests remaining in the daily quota. Present only when the daily-quota ' +
-              'service is available.',
-            schema: { type: 'integer', minimum: 0 },
-          },
-          'X-RateLimit-Reset': {
-            description:
-              'Unix timestamp (seconds) when the daily quota resets (00:00 UTC). Present only ' +
-              'when the daily-quota service is available.',
-            schema: { type: 'integer', minimum: 0 },
-          },
+          Vary: { $ref: '#/components/headers/ReadVary' },
+          'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+          'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+          'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
         },
       },
       NotAcceptable: {
@@ -256,29 +255,10 @@ export const OPENAPI_SPEC = {
           '(omitted on the fail-open path). The rejection depends on `Accept-Encoding`, so ' +
           '`Vary` is included.',
         headers: {
-          Vary: {
-            description:
-              'Cache variant dimensions. Always `Accept-Encoding, Authorization, Origin`.',
-            schema: { type: 'string' },
-          },
-          'X-RateLimit-Limit': {
-            description:
-              'Maximum requests permitted per UTC day for the account tier. Present only when ' +
-              'the daily-quota service is available.',
-            schema: { type: 'integer', minimum: 1 },
-          },
-          'X-RateLimit-Remaining': {
-            description:
-              'Requests remaining in the daily quota. Present only when the daily-quota ' +
-              'service is available.',
-            schema: { type: 'integer', minimum: 0 },
-          },
-          'X-RateLimit-Reset': {
-            description:
-              'Unix timestamp (seconds) when the daily quota resets (00:00 UTC). Present only ' +
-              'when the daily-quota service is available.',
-            schema: { type: 'integer', minimum: 0 },
-          },
+          Vary: { $ref: '#/components/headers/ReadVary' },
+          'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+          'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+          'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
         },
         content: {
           'application/json': {
@@ -736,6 +716,9 @@ export const OPENAPI_SPEC = {
               'Cache-Control': { $ref: '#/components/headers/ReadCacheControl' },
               Vary: { $ref: '#/components/headers/ReadVary' },
               'Content-Encoding': { $ref: '#/components/headers/ContentEncoding' },
+              'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+              'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+              'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
             },
             content: {
               'application/json': {
@@ -773,6 +756,9 @@ export const OPENAPI_SPEC = {
               'Cache-Control': { $ref: '#/components/headers/ReadCacheControl' },
               Vary: { $ref: '#/components/headers/ReadVary' },
               'Content-Encoding': { $ref: '#/components/headers/ContentEncoding' },
+              'X-RateLimit-Limit': { $ref: '#/components/headers/RateLimitLimit' },
+              'X-RateLimit-Remaining': { $ref: '#/components/headers/RateLimitRemaining' },
+              'X-RateLimit-Reset': { $ref: '#/components/headers/RateLimitReset' },
             },
             content: {
               'application/json': {
