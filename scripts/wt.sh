@@ -31,7 +31,7 @@ EOF
 
 validate_branch() {
   local b="$1"
-  if ! git check-ref-format --branch "$b" 2>/dev/null; then
+  if ! git check-ref-format --branch "$b" >/dev/null 2>&1; then
     echo "ERROR: invalid branch name '$b'" >&2
     exit 1
   fi
