@@ -52,7 +52,7 @@ find_branch_path() {
         ;;
     esac
   done < <(git worktree list --porcelain -z)
-  return 1
+  return 0
 }
 
 [[ -n "$cmd" ]] || usage
