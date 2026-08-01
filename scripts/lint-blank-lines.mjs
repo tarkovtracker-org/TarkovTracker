@@ -2,7 +2,12 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
-import ts from 'typescript';
+let typescript;
+try {
+  typescript = (await import('typescript')).default;
+} catch {
+  typescript = null;
+}
 const FIX = process.argv.includes('--fix');
 const requestedFiles = process.argv.slice(2).filter((argument) => argument !== '--fix');
 const root = process.cwd();
@@ -56,39 +61,76 @@ const getProtectedRanges = (source, filePath) => {
   }));
   const extension = extname(filePath).toLowerCase();
   if (!['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(extension)) return ranges;
+  if (!typescript) {
+    for (const match of source.matchAll(/`(?:\\[\s\S]|[^`])*`/g)) {
+      ranges.push({ end: match.index + match[0].length, start: match.index });
+    }
+    return ranges;
+  }
   const scriptKind =
     extension === '.tsx'
-      ? ts.ScriptKind.TSX
+      ? typescript.ScriptKind.TSX
       : extension === '.ts'
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS;
-  const sourceFile = ts.createSourceFile(
+        ? typescript.ScriptKind.TS
+        : typescript.ScriptKind.JS;
+  const sourceFile = typescript.createSourceFile(
     filePath,
     source,
-    ts.ScriptTarget.Latest,
+    typescript.ScriptTarget.Latest,
     true,
     scriptKind
   );
   const visit = (node) => {
     if (
-      node.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral ||
-      node.kind === ts.SyntaxKind.TemplateExpression ||
-      node.kind === ts.SyntaxKind.TemplateHead ||
-      node.kind === ts.SyntaxKind.TemplateMiddle ||
-      node.kind === ts.SyntaxKind.TemplateTail
+      node.kind === typescript.SyntaxKind.NoSubstitutionTemplateLiteral ||
+      node.kind === typescript.SyntaxKind.TemplateExpression ||
+      node.kind === typescript.SyntaxKind.TemplateHead ||
+      node.kind === typescript.SyntaxKind.TemplateMiddle ||
+      node.kind === typescript.SyntaxKind.TemplateTail
     ) {
-      ranges.push({ end: node.getEnd(), start: node.getFullStart() });
+      ranges.push({ end: node.getEnd(), start: node.getStart(sourceFile) });
     }
-    ts.forEachChild(node, visit);
+    typescript.forEachChild(node, visit);
   };
   visit(sourceFile);
   return ranges;
 };
+const getYamlScalarLines = (lines, filePath) => {
+  const extension = extname(filePath).toLowerCase();
+  if (!['.yaml', '.yml'].includes(extension)) return new Set();
+  const protectedLines = new Set();
+  for (let index = 0; index < lines.length; index += 1) {
+    const header = lines[index];
+    const headerMatch = header.match(/^(\s*).*:\s*[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/);
+    if (!headerMatch) continue;
+    const headerIndent = headerMatch[1].length;
+    let contentIndent = null;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const candidate = lines[next];
+      if (/^[\t ]*$/.test(candidate)) {
+        if (contentIndent !== null) protectedLines.add(next);
+        continue;
+      }
+      const indent = candidate.match(/^\s*/)[0].length;
+      if (indent <= headerIndent) break;
+      if (contentIndent === null) {
+        contentIndent = indent;
+        for (let blank = index + 1; blank < next; blank += 1) {
+          protectedLines.add(blank);
+        }
+      }
+      protectedLines.add(next);
+    }
+  }
+  return protectedLines;
+};
 const stripBlankLines = (source, filePath) => {
+  if (/^[\t \r\n]*$/.test(source)) return { removed: 0, source };
   const lines = source.split('\n');
   const hasFinalNewline = source.endsWith('\n');
   const lastLine = hasFinalNewline ? lines.length - 1 : lines.length;
   const protectedRanges = getProtectedRanges(source, filePath);
+  const yamlScalarLines = getYamlScalarLines(lines, filePath);
   const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(
     extname(filePath).toLowerCase()
   );
@@ -101,13 +143,14 @@ const stripBlankLines = (source, filePath) => {
   for (let index = 0; index < lastLine; index += 1) {
     const line = lines[index];
     const isBlank = /^[\t \r]*$/.test(line);
-    const isProtected = protectedRanges.some(
-      ({ end, start }) => start <= offset && offset + line.length <= end
-    );
+    const isProtected =
+      yamlScalarLines.has(index) ||
+      protectedRanges.some(({ end, start }) => start <= offset && offset + line.length <= end);
     if (heredoc) {
       output.push(line);
       offset += line.length + 1;
-      if (line.trim() === heredoc) heredoc = null;
+      const terminator = heredoc.stripTabs ? line.replace(/^\t+/, '') : line;
+      if (terminator.replace(/\r$/, '') === heredoc.delimiter) heredoc = null;
       continue;
     }
     if (isBlank && !blockComment && !quote && !isProtected) {
@@ -138,18 +181,24 @@ const stripBlankLines = (source, filePath) => {
         }
         continue;
       }
+      if (
+        (character === '#' && (position === 0 || /\s/.test(line[position - 1]))) ||
+        (character === '/' && nextCharacter === '/')
+      ) {
+        break;
+      }
       if (character === '/' && nextCharacter === '*') {
         blockComment = true;
         position += 1;
-      } else if (character === '/' && nextCharacter === '/') {
-        break;
       } else if (character === '`' || character === '"' || character === "'") {
         quote = character;
       }
     }
     if (!blockComment && !quote) {
-      const heredocMatch = line.match(/<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/);
-      if (heredocMatch) heredoc = heredocMatch[1];
+      const heredocMatch = line.match(/<<(\-?)\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/);
+      if (heredocMatch) {
+        heredoc = { delimiter: heredocMatch[2], stripTabs: heredocMatch[1] === '-' };
+      }
     }
     offset += line.length + 1;
   }
@@ -162,7 +211,13 @@ let changedFiles = 0;
 let removedLines = 0;
 for (const filePath of files) {
   const absolutePath = resolve(root, filePath);
-  const original = readFileSync(absolutePath, 'utf8');
+  let original;
+  try {
+    original = readFileSync(absolutePath, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') continue;
+    throw error;
+  }
   const result = stripBlankLines(original, filePath);
   if (result.removed === 0) continue;
   changedFiles += 1;

@@ -317,7 +317,7 @@ pnpm exec vitest --ui        # UI dashboard
 
 ```bash
 pnpm run format         # Prettier + ESLint + blank-line fix
-pnpm run lint           # Lint and blank-line check
+pnpm run lint           # Lint
 pnpm run lint:blank-lines # Blank-line check only
 pnpm run lint:fix       # Auto-fix issues
 ```

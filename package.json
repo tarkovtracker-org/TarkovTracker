@@ -90,7 +90,7 @@
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",
-    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0 && pnpm run lint:blank-lines",
+    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
     "lint:blank-lines": "node scripts/lint-blank-lines.mjs",
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
@@ -113,10 +113,12 @@
   "lint-staged": {
     "app/**/*.{js,ts,tsx,vue}": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "app/**/*.{json,css,md}": [
-      "prettier --write"
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "app/locales/*.json": [
       "node scripts/lint-i18n.mjs"
@@ -135,24 +137,41 @@
       "design.md lint"
     ],
     "tests/test-setup.ts": [
-      "prettier --write"
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "nuxt.config.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "app/app.config.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "vitest*.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "*.json": [
-      "prettier --write"
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "**/*.{cjs,css,js,json,mjs,sh,ts,tsx,yaml,yml}": [
+    "scripts/**/*.{cjs,js,mjs,sh,ts,tsx}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "supabase/**/*.{cjs,js,mjs,sh,ts,tsx}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "workers/**/*.{cjs,js,mjs,sh,ts,tsx}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    ".github/**/*.{yaml,yml}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "*.{yaml,yml}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ]
   }
