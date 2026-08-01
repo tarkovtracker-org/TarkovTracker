@@ -252,6 +252,25 @@ const runFixtures = () => {
   if (explicitKey !== '? |\n  first\n\n  second\n: value\n') {
     throw new Error(`YAML explicit-key protection failed:\n${explicitKey}`);
   }
+  const nestedVue = runFix(
+    'nested-component',
+    '<template>\n  <template v-if="true">\n    <span>first</span>\n\n    <span>second</span>\n  </template>\n  <pre>first\n\nsecond</pre>\n</template>\n\n<i18n lang="yaml">\nkey: first\n\n  second\n</i18n>\n\nnext: value\n',
+    'vue'
+  );
+  if (!nestedVue.includes('<pre>first\n\nsecond</pre>')) {
+    throw new Error(`Vue nested template handling failed:\n${nestedVue}`);
+  }
+  if (!nestedVue.includes('key: first\n\n  second')) {
+    throw new Error(`Vue custom block handling failed:\n${nestedVue}`);
+  }
+  const shellSlashArgument = runFix(
+    'shell-slash-argument',
+    'printf // "first\n\nsecond"\n\nnext\n',
+    'sh'
+  );
+  if (shellSlashArgument !== 'printf // "first\n\nsecond"\nnext\n') {
+    throw new Error(`Shell slash-argument handling failed:\n${shellSlashArgument}`);
+  }
   const mixedQuotedHeredoc = runFix(
     'mixed-quoted-heredoc',
     'cat <<E"OF"\nbody\n\nEOF\n\nnext\n',

@@ -54,20 +54,54 @@ const trackedSymlinks = new Set(
 const files = (requestedFiles.length ? requestedFiles : trackedFiles())
   .map((filePath) => relative(root, resolve(root, filePath)))
   .filter(isCandidate);
+const findTagEnd = (source, start) => {
+  let quote = null;
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '>') {
+      return index;
+    }
+  }
+  return -1;
+};
 const getProtectedRanges = (source, filePath) => {
   const ranges = [];
   const extension = extname(filePath).toLowerCase();
   if (extension === '.vue') {
-    for (const match of source.matchAll(
-      /<template\b[^>]*>[\s\S]*?<\/template(?:[\t\n\r ]+[^>]*)?>/gi
-    )) {
-      ranges.push({ end: match.index + match[0].length, start: match.index });
+    const getNestedBlockRanges = (tagName) => {
+      const blocks = [];
+      const tags = new RegExp(`<\\/?${tagName}\\b[^>]*>`, 'gi');
+      let depth = 0;
+      let start = -1;
+      for (const match of source.matchAll(tags)) {
+        if (match[0].startsWith('</')) {
+          if (depth === 0) continue;
+          depth -= 1;
+          if (depth === 0) blocks.push({ end: match.index + match[0].length, start });
+        } else {
+          if (depth === 0) start = match.index;
+          depth += 1;
+        }
+      }
+      return blocks;
+    };
+    ranges.push(...getNestedBlockRanges('template'));
+    for (const tagName of ['i18n', 'docs', 'route', 'config']) {
+      ranges.push(...getNestedBlockRanges(tagName));
     }
-    for (const match of source.matchAll(
-      /<script\b[^>]*>([\s\S]*?)<\/script(?:[\t\n\r ]+[^>]*)?>/gi
-    )) {
-      const contentStart = match.index + match[0].indexOf('>') + 1;
-      for (const range of getProtectedRanges(match[1], 'component.ts')) {
+    for (const opening of source.matchAll(/<script\b/gi)) {
+      const openingEnd = findTagEnd(source, opening.index);
+      if (openingEnd === -1) continue;
+      const closing = source.slice(openingEnd + 1).match(/<\/script(?:[\t\n\r ]+[^>]*)?>/i);
+      if (!closing) continue;
+      const contentStart = openingEnd + 1;
+      const content = source.slice(contentStart, contentStart + closing.index);
+      for (const range of getProtectedRanges(content, 'component.ts')) {
         ranges.push({ end: contentStart + range.end, start: contentStart + range.start });
       }
     }
@@ -526,10 +560,7 @@ const stripBlankLines = (source, filePath) => {
         }
         continue;
       }
-      if (
-        (character === '#' && (position === 0 || /\s/.test(line[position - 1]))) ||
-        (character === '/' && nextCharacter === '/')
-      ) {
+      if (isShellFile && character === '#' && (position === 0 || /\s/.test(line[position - 1]))) {
         break;
       }
       if (!isShellFile && character === '/' && nextCharacter === '*') {
