@@ -11,10 +11,14 @@ const directory = mkdtempSync(join(tmpdir(), 'lint-blank-lines-'));
 const cleanup = () => rmSync(directory, { force: true, recursive: true });
 if (process.env.VITEST) afterAll(cleanup);
 else process.on('exit', cleanup);
-const runFix = (name, source, extension) => {
+const runFix = (name, source, extension, forceFallback = false) => {
   const file = join(directory, `${name}.${extension}`);
   writeFileSync(file, source);
-  execFileSync(process.execPath, [script, '--fix', file], { cwd: root, stdio: 'pipe' });
+  execFileSync(process.execPath, [script, '--fix', file], {
+    cwd: root,
+    env: { ...process.env, LINT_BLANK_LINES_FORCE_FALLBACK: forceFallback ? '1' : undefined },
+    stdio: 'pipe',
+  });
   return readFileSync(file, 'utf8');
 };
 const runFixtures = () => {
@@ -135,6 +139,18 @@ const runFixtures = () => {
   );
   if (template !== 'const value = 1;\nconst text = `first\n\nsecond`;\n') {
     throw new Error(`Template protection failed:\n${template}`);
+  }
+  const fallbackTemplate = runFix(
+    'fallback-template',
+    'const regex = /`[^`]+`/;\n\nconst value = `${{ text: "}" }.text}\n\nnext`;\n',
+    'mjs',
+    true
+  );
+  if (
+    fallbackTemplate !==
+    'const regex = /`[^`]+`/;\nconst value = `${{ text: "}" }.text}\n\nnext`;\n'
+  ) {
+    throw new Error(`Fallback template protection failed:\n${fallbackTemplate}`);
   }
   const blockCommentMarker = runFix(
     'block-comment-marker',

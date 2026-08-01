@@ -4,7 +4,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 let typescript;
 try {
-  typescript = (await import('typescript')).default;
+  typescript = process.env.LINT_BLANK_LINES_FORCE_FALLBACK
+    ? null
+    : (await import('typescript')).default;
 } catch {
   typescript = null;
 }
@@ -153,6 +155,54 @@ const getProtectedRanges = (source, filePath) => {
   }
   if (!['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(extension)) return ranges;
   if (!typescript) {
+    const findTemplateEnd = (start) => {
+      let interpolationDepth = 0;
+      let interpolationQuote = null;
+      let interpolationBlockComment = false;
+      let interpolationLineComment = false;
+      for (let index = start + 1; index < source.length; index += 1) {
+        const character = source[index];
+        const nextCharacter = source[index + 1];
+        if (interpolationLineComment) {
+          if (character === '\n') interpolationLineComment = false;
+          continue;
+        }
+        if (interpolationBlockComment) {
+          if (character === '*' && nextCharacter === '/') {
+            interpolationBlockComment = false;
+            index += 1;
+          }
+          continue;
+        }
+        if (interpolationQuote) {
+          if (character === '\\') index += 1;
+          else if (character === interpolationQuote) interpolationQuote = null;
+          continue;
+        }
+        if (interpolationDepth === 0) {
+          if (character === '`') return index;
+          if (character === '$' && nextCharacter === '{') {
+            interpolationDepth = 1;
+            index += 1;
+          }
+          continue;
+        }
+        if (character === '/' && nextCharacter === '/') {
+          interpolationLineComment = true;
+          index += 1;
+        } else if (character === '/' && nextCharacter === '*') {
+          interpolationBlockComment = true;
+          index += 1;
+        } else if (character === '"' || character === "'") {
+          interpolationQuote = character;
+        } else if (character === '{') {
+          interpolationDepth += 1;
+        } else if (character === '}') {
+          interpolationDepth -= 1;
+        }
+      }
+      return source.length - 1;
+    };
     let quote = null;
     for (let index = 0; index < source.length; index += 1) {
       const character = source[index];
@@ -186,47 +236,7 @@ const getProtectedRanges = (source, filePath) => {
           else if (source[index] === '/' && !inClass) break;
         }
       } else if (character === '`') {
-        let interpolationDepth = 0;
-        let templateEnd = -1;
-        for (let end = index + 1; end < source.length; end += 1) {
-          const templateCharacter = source[end];
-          if (templateCharacter === '\\') {
-            end += 1;
-            continue;
-          }
-          if (interpolationDepth === 0) {
-            if (templateCharacter === '`') {
-              templateEnd = end;
-              break;
-            }
-            if (templateCharacter === '$' && source[end + 1] === '{') {
-              interpolationDepth = 1;
-              end += 1;
-            }
-            continue;
-          }
-          if (templateCharacter === '/' && source[end + 1] === '/') {
-            const lineEnd = source.indexOf('\n', end + 2);
-            end = lineEnd === -1 ? source.length : lineEnd;
-            continue;
-          }
-          if (templateCharacter === '/' && source[end + 1] === '*') {
-            const commentEnd = source.indexOf('*/', end + 2);
-            end = commentEnd === -1 ? source.length : commentEnd + 1;
-            continue;
-          }
-          if (templateCharacter === '"' || templateCharacter === "'") {
-            const stringQuote = templateCharacter;
-            for (end += 1; end < source.length; end += 1) {
-              if (source[end] === '\\') end += 1;
-              else if (source[end] === stringQuote) break;
-            }
-            continue;
-          }
-          if (templateCharacter === '{') interpolationDepth += 1;
-          else if (templateCharacter === '}') interpolationDepth -= 1;
-        }
-        if (templateEnd === -1) templateEnd = source.length - 1;
+        const templateEnd = findTemplateEnd(index);
         ranges.push({ end: templateEnd + 1, start: index });
         index = templateEnd;
       } else if (character === '"' || character === "'") {
