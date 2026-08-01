@@ -152,6 +152,15 @@ const runFixtures = () => {
   ) {
     throw new Error(`Fallback template protection failed:\n${fallbackTemplate}`);
   }
+  const fallbackComment = runFix(
+    'fallback-comment-after-division',
+    'const ratio = width / height;\n\n/* first\n\nsecond */\n\nnext();\n',
+    'mjs',
+    true
+  );
+  if (fallbackComment !== 'const ratio = width / height;\n/* first\n\nsecond */\nnext();\n') {
+    throw new Error(`Fallback comment protection failed:\n${fallbackComment}`);
+  }
   const blockCommentMarker = runFix(
     'block-comment-marker',
     "const marker = '/*';\n\n/* actual\n\n */\nconst end = true;\n\n",
@@ -217,6 +226,22 @@ const runFixtures = () => {
     plainYaml !== 'message: first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n'
   ) {
     throw new Error(`Plain YAML scalar protection failed:\n${plainYaml}`);
+  }
+  const rootPlainYaml = runFix(
+    'root-plain-yaml',
+    'first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n\n',
+    'yml'
+  );
+  if (rootPlainYaml !== 'first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n') {
+    throw new Error(`Root YAML scalar protection failed:\n${rootPlainYaml}`);
+  }
+  const flowPlainYaml = runFix(
+    'flow-plain-yaml',
+    'values: [first paragraph,\n\n  second paragraph]\nnext: value\n\n',
+    'yml'
+  );
+  if (flowPlainYaml !== 'values: [first paragraph,\n\n  second paragraph]\nnext: value\n') {
+    throw new Error(`Flow YAML scalar protection failed:\n${flowPlainYaml}`);
   }
   const hashKeyPlainYaml = runFix(
     'hash-key-plain-yaml',

@@ -233,7 +233,10 @@ const getProtectedRanges = (source, filePath) => {
           if (source[index] === '\\') index += 1;
           else if (source[index] === '[') inClass = true;
           else if (source[index] === ']') inClass = false;
-          else if (source[index] === '/' && !inClass) break;
+          else if (source[index] === '/' && !inClass) {
+            if (source[index + 1] === '/' || source[index + 1] === '*') index -= 1;
+            break;
+          }
         }
       } else if (character === '`') {
         const templateEnd = findTemplateEnd(index);
@@ -351,11 +354,52 @@ const getYamlScalarLines = (lines, filePath) => {
 const getYamlPlainScalarLines = (lines, filePath) => {
   if (!['.yaml', '.yml'].includes(extname(filePath).toLowerCase())) return new Set();
   const protectedLines = new Set();
+  let flowDepth = 0;
+  let flowQuote = null;
+  let rootContinuationIndent = null;
+  let previousRootPlain = false;
+  const updateFlowContext = (line) => {
+    for (let position = 0; position < line.length; position += 1) {
+      const character = line[position];
+      if (flowQuote) {
+        if (character === '\\' && flowQuote === '"') position += 1;
+        else if (character === flowQuote) flowQuote = null;
+      } else if (character === '"' || character === "'") {
+        flowQuote = character;
+      } else if (character === '[' || character === '{') {
+        flowDepth += 1;
+      } else if ((character === ']' || character === '}') && flowDepth > 0) {
+        flowDepth -= 1;
+      }
+    }
+  };
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    if (/^[\t ]*$/.test(line)) {
+      if (flowDepth > 0 || rootContinuationIndent !== null) protectedLines.add(index);
+      continue;
+    }
+    const indent = line.match(/^\s*/)[0].length;
+    const rootPlain =
+      indent === 0 &&
+      !/^(?:---|\.\.\.|[&*!?{}\[\],>-])/.test(line.trim()) &&
+      !/^\s*#/.test(line) &&
+      !/^[^"']*:\s/.test(line);
+    if (rootPlain) rootContinuationIndent = null;
+    if (rootContinuationIndent !== null && indent < rootContinuationIndent) {
+      rootContinuationIndent = null;
+    }
+    if (rootContinuationIndent === null && indent > 0 && previousRootPlain) {
+      rootContinuationIndent = indent;
+    }
+    previousRootPlain = rootPlain;
+    if (rootContinuationIndent !== null) protectedLines.add(index);
     if (/^\s*#/.test(line)) continue;
     const match = line.match(/^(\s*)(?:[^\n:]+:\s*|[-]\s+)(.*)$/);
-    if (!match || !match[2]) continue;
+    if (!match || !match[2]) {
+      updateFlowContext(line);
+      continue;
+    }
     let scalarValue = match[2].trim();
     while (scalarValue.startsWith('&') || scalarValue.startsWith('!')) {
       const separator = scalarValue.search(/[\t ]/);
@@ -365,7 +409,10 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       }
       scalarValue = scalarValue.slice(separator).trimStart();
     }
-    if (!scalarValue || /^[|>'"\[\]{]/.test(scalarValue)) continue;
+    if (!scalarValue || /^[|>'"\[\]{]/.test(scalarValue)) {
+      updateFlowContext(line);
+      continue;
+    }
     const headerIndent = match[1].length;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
@@ -380,6 +427,7 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       if (indent <= headerIndent) break;
       protectedLines.add(next);
     }
+    updateFlowContext(line);
   }
   return protectedLines;
 };

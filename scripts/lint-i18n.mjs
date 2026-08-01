@@ -39,7 +39,9 @@ function main() {
   const files = readdirSync(LOCALES_DIR).filter((f) => f.endsWith(LOCALE_EXTENSION));
   const localeCodes = files.map((f) => f.replace(LOCALE_EXTENSION, ''));
   if (!localeCodes.includes(SOURCE_LOCALE)) {
-    console.error(`Source locale "${SOURCE_LOCALE}${LOCALE_EXTENSION}" not found in ${LOCALES_DIR}`);
+    console.error(
+      `Source locale "${SOURCE_LOCALE}${LOCALE_EXTENSION}" not found in ${LOCALES_DIR}`
+    );
     process.exit(1);
   }
   const locales = {};

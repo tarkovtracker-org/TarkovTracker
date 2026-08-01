@@ -14,6 +14,7 @@ const patterns = [
   'tests/test-setup.ts',
   'tests/**/*.{ts,tsx}',
   'scripts/**/*.json',
+  'scripts/**/*.mjs',
   'supabase/**/*.json',
   'workers/**/*.json',
 ];
