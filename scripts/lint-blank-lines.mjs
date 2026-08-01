@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 let typescript;
 try {
@@ -41,6 +41,13 @@ const isCandidate = (filePath) => {
 };
 const trackedFiles = () =>
   execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+const trackedSymlinks = new Set(
+  execFileSync('git', ['ls-files', '--stage', '-z'], { encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean)
+    .filter((entry) => entry.startsWith('120000 '))
+    .map((entry) => entry.slice(entry.indexOf('\t') + 1))
+);
 const files = (requestedFiles.length ? requestedFiles : trackedFiles())
   .map((filePath) => relative(root, resolve(root, filePath)))
   .filter(isCandidate);
@@ -162,10 +169,10 @@ const getYamlScalarLines = (lines, filePath) => {
   const protectedLines = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const header = lines[index];
-    const headerMatch = header.match(
-      /^(\s*)(?:(?:.*?:\s*)|(?:-\s*)|)(?:(?:[&!][^\s]+)\s*)*[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/
-    );
+    const headerMatch = header.match(/^(\s*)(.*)$/);
     if (!headerMatch) continue;
+    const headerContent = headerMatch[2].replace(/\s+#.*$/, '').trim();
+    if (!/(^|[\s:])[|>](?:[+-]?\d?[+-]?)?$/.test(headerContent)) continue;
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
     for (let next = index + 1; next < lines.length; next += 1) {
@@ -346,7 +353,7 @@ for (const filePath of files) {
   const absolutePath = resolve(root, filePath);
   let original;
   try {
-    if (lstatSync(absolutePath).isSymbolicLink()) continue;
+    if (trackedSymlinks.has(filePath)) continue;
     original = readFileSync(absolutePath, 'utf8');
   } catch (error) {
     if (error.code === 'ENOENT') continue;
