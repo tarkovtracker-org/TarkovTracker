@@ -180,6 +180,18 @@
     "workers/**/*.{cjs,js,mjs,sh,ts,tsx}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
+    "scripts/**/*.json": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "supabase/**/*.json": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "workers/**/*.json": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    ".cubic/**/*.json": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
     ".github/**/*.{yaml,yml}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],

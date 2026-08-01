@@ -28,6 +28,7 @@ const excludedFiles = new Set([
   'pnpm-lock.yaml',
   'supabase/functions/_shared/database.types.ts',
 ]);
+const excludedLocalePattern = /^app\/locales\/(?!en\.json$)[^/]+\.json$/;
 const excludedDirectories = ['.git/', '.nuxt/', 'coverage/', 'dist/', 'node_modules/'];
 const normalizePath = (filePath) => filePath.replaceAll('\\', '/');
 const isCandidate = (filePath) => {
@@ -35,6 +36,7 @@ const isCandidate = (filePath) => {
   const extension = extname(normalizedPath).toLowerCase();
   return (
     !excludedFiles.has(normalizedPath) &&
+    !excludedLocalePattern.test(normalizedPath) &&
     !excludedDirectories.some((directory) => normalizedPath.includes(directory)) &&
     supportedExtensions.has(extension)
   );
@@ -177,8 +179,24 @@ const getYamlScalarLines = (lines, filePath) => {
     const header = lines[index];
     const headerMatch = header.match(/^(\s*)(.*)$/);
     if (!headerMatch) continue;
-    const headerContent = headerMatch[2].replace(/\s+#.*$/, '').trim();
-    if (!/(^|[\s:])[|>](?:[+-]?\d?[+-]?)?$/.test(headerContent)) continue;
+    let quote = null;
+    let commentIndex = headerMatch[2].length;
+    for (let position = 0; position < headerMatch[2].length; position += 1) {
+      const character = headerMatch[2][position];
+      if (quote) {
+        if (character === '\\' && quote === '"') position += 1;
+        else if (character === quote) quote = null;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '#' && (position === 0 || /\s/.test(headerMatch[2][position - 1]))) {
+        commentIndex = position;
+        break;
+      }
+    }
+    const headerContent = headerMatch[2].slice(0, commentIndex).trim();
+    const valueMatch = headerContent.match(/^(?:.*?:\s*|-\s*)(.*)$/);
+    const scalarValue = valueMatch ? valueMatch[1] : headerContent;
+    if (!/^(?:[&!][^\s]+\s*)*[|>](?:[+-]?\d?[+-]?)?$/.test(scalarValue)) continue;
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
     for (let next = index + 1; next < lines.length; next += 1) {
@@ -372,7 +390,7 @@ const stripBlankLines = (source, filePath) => {
       ) {
         break;
       }
-      if (character === '/' && nextCharacter === '*') {
+      if (!isShellFile && character === '/' && nextCharacter === '*') {
         blockComment = true;
         position += 1;
       } else if (character === '`' || character === '"' || character === "'") {
