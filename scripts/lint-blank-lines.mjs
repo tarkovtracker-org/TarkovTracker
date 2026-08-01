@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 let typescript;
 try {
@@ -108,14 +108,8 @@ const getProtectedRanges = (source, filePath) => {
         }
       } else if (character === '`') {
         const start = index;
-        index += 1;
-        while (index < source.length) {
-          if (source[index] === '\\') index += 2;
-          else if (source[index] === '`') {
-            ranges.push({ end: index + 1, start });
-            break;
-          } else index += 1;
-        }
+        ranges.push({ end: source.length, start });
+        break;
       } else if (character === '"' || character === "'") {
         quote = character;
       }
@@ -168,7 +162,9 @@ const getYamlScalarLines = (lines, filePath) => {
   const protectedLines = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const header = lines[index];
-    const headerMatch = header.match(/^(\s*)(?:.*?:\s*|-\s*)[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/);
+    const headerMatch = header.match(
+      /^(\s*)(?:(?:.*?:\s*)|(?:-\s*)|)[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/
+    );
     if (!headerMatch) continue;
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
@@ -234,7 +230,15 @@ const getShellHeredocs = (line) => {
       if (line[index] === delimiterQuote) index += 1;
     } else {
       if (line[index] === '\\') index += 1;
-      while (index < line.length && !/[\s;|&<>]/.test(line[index])) delimiter += line[index++];
+      while (index < line.length && !/[;|&<>]/.test(line[index])) {
+        if (/\s/.test(line[index]) && line[index - 1] !== '\\') break;
+        if (line[index] === '\\' && index + 1 < line.length) {
+          delimiter += line[index + 1];
+          index += 2;
+        } else {
+          delimiter += line[index++];
+        }
+      }
     }
     if (delimiter) heredocs.push({ delimiter, stripTabs });
   }
@@ -331,6 +335,7 @@ for (const filePath of files) {
   const absolutePath = resolve(root, filePath);
   let original;
   try {
+    if (lstatSync(absolutePath).isSymbolicLink()) continue;
     original = readFileSync(absolutePath, 'utf8');
   } catch (error) {
     if (error.code === 'ENOENT') continue;

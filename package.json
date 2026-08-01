@@ -159,7 +159,19 @@
       "eslint --fix",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
+    "*.{js,mjs,cjs}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "tests/**/*.{ts,tsx}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
     "*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "*/*.json": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],

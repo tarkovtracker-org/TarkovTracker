@@ -55,6 +55,10 @@ const escapedHeredoc = runFix('escaped-heredoc', 'cat <<\\EOF\nbody\n\nEOF\n\nne
 if (escapedHeredoc !== 'cat <<\\EOF\nbody\n\nEOF\nnext\n') {
   throw new Error(`Escaped heredoc protection failed:\n${escapedHeredoc}`);
 }
+const escapedDelimiter = runFix('escaped-delimiter', 'cat <<E\\ OF\nbody\n\nE OF\n\nnext\n', 'sh');
+if (escapedDelimiter !== 'cat <<E\\ OF\nbody\n\nE OF\nnext\n') {
+  throw new Error(`Escaped delimiter protection failed:\n${escapedDelimiter}`);
+}
 const heredocText = runFix('heredoc-text', 'printf "a <<EOF"\n\nnext\n\n', 'sh');
 if (heredocText !== 'printf "a <<EOF"\nnext\n') {
   throw new Error(`Quoted heredoc text handling failed:\n${heredocText}`);
@@ -126,6 +130,10 @@ if (yamlHeredocText !== 'message: <<TOKEN\nnext: value\n') {
 const emptyScalar = runFix('empty-scalar', 'description: |\n\nnext: value\n\n', 'yml');
 if (emptyScalar !== 'description: |\n\nnext: value\n') {
   throw new Error(`Empty YAML scalar protection failed:\n${emptyScalar}`);
+}
+const rootScalar = runFix('root-scalar', '|\n  first\n\n  second\n', 'yml');
+if (rootScalar !== '|\n  first\n\n  second\n') {
+  throw new Error(`Root YAML scalar protection failed:\n${rootScalar}`);
 }
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {
