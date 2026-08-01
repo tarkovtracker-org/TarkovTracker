@@ -1,7 +1,7 @@
 name: Bug Report
 description: Report a bug or unexpected behavior
-title: "[Bug]: "
-labels: ["bug"]
+title: '[Bug]: '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -62,21 +62,25 @@ body:
       required: true
 
   - type: dropdown
-    id: area
+    id: product-area
     attributes:
-      label: Technical Area
-      description: Which technical system is affected? (Maintainers will add area labels during triage)
+      label: Which area of TarkovTracker is affected?
       multiple: true
       options:
-        - UI/Frontend (Vue components, pages, styling)
-        - API (Server routes, workers, endpoints)
-        - Database (Supabase, queries, schema)
-        - Auth (Login, permissions, sessions)
-        - Realtime (Team sync, broadcasts)
-        - i18n (Translations)
-        - Not Sure
+        - Dashboard
+        - Tasks
+        - Hideout
+        - Needed items
+        - Maps
+        - Team
+        - Profile or account
+        - Login
+        - Settings
+        - API or integrations
+        - Translations
+        - Other / not sure
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: screenshots

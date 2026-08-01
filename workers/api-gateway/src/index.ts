@@ -8,19 +8,12 @@ import {
 } from './handlers/progress';
 import { handleGetTeamProgress } from './handlers/team';
 import { handleGetToken } from './handlers/token';
-import {
-  BURST_WINDOW_SEC,
-  DAILY_WINDOW_SEC,
-  IP_BACKSTOP_LIMITS,
-  IP_BACKSTOP_WINDOW_SEC,
-  TIER_LIMITS,
-  upgradeMessage,
-} from './limits';
+import { ABUSE_GATE_PERIOD_SEC, DAILY_WINDOW_SEC, TIER_LIMITS, upgradeMessage } from './limits';
 import { OPENAPI_JSON } from './openapi';
 import { resolveTier } from './services/supporter';
 import { recordUsage } from './services/usage';
 import { logger } from './utils/logger';
-import { normalizeInboundUserAgent } from './utils/userAgent';
+import { INBOUND_USER_AGENT_MIN_LENGTH, normalizeInboundUserAgent } from './utils/userAgent';
 import type {
   ApiToken,
   Env,
@@ -60,34 +53,33 @@ function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
 type Action = 'progress-read' | 'progress-write' | 'token-info';
 type UsageKind = 'read' | 'write';
 type RateLimitAnchor = 'utc-day';
-type RateLimitMode = 'sliding';
 type RateLimitOptions = {
   anchor?: RateLimitAnchor;
-  mode?: RateLimitMode;
 };
 export type RateLimitState = {
   count: number;
   resetAt: number;
   windowSec: number;
   anchor?: RateLimitAnchor;
-  mode?: RateLimitMode;
-  timestamps?: number[];
   ephemeral?: boolean;
 };
 type RateLimitResponse = {
   allowed: boolean;
   remaining: number;
   resetAt: number;
-  consumedAt?: number;
 };
+type LimiterUnavailableReason = 'http_status' | 'bad_json' | 'timeout' | 'fetch_error';
 type RateLimitResult = {
   allowed: boolean;
-  status?: number;
+  // Set when the limiter could not answer. Callers treat this as fail-open:
+  // the quota is a product entitlement, not a database-integrity boundary, and
+  // the pre-auth abuse gate still protects Supabase.
+  unavailable?: boolean;
+  reason?: LimiterUnavailableReason;
   message?: string;
   limit?: number;
   remaining?: number;
   resetAt?: number;
-  consumedAt?: number;
 };
 const RATE_LIMIT_TIMEOUT_MS = 3000;
 const RATE_LIMIT_SLOW_MS = 200;
@@ -113,19 +105,7 @@ export class ApiGatewayRateLimiter {
     try {
       const stored = await this.state.storage.get<RateLimitState>('state');
       this.loaded = true;
-      // Sliding-window resetAt is oldestTimestamp + windowMs, so it can elapse
-      // while younger timestamps are still inside the window. Keep sliding
-      // state for the fetch path to prune; only fixed windows may discard by
-      // resetAt alone.
-      if (stored) {
-        if (stored.mode === 'sliding' || Date.now() < stored.resetAt) {
-          this.data = stored;
-        } else {
-          this.data = undefined;
-        }
-      } else {
-        this.data = undefined;
-      }
+      this.data = stored && Date.now() < stored.resetAt ? stored : undefined;
     } catch (error) {
       logger.error('rate limiter storage load failed', { id: this.state.id.toString(), error });
       throw error;
@@ -139,10 +119,6 @@ export class ApiGatewayRateLimiter {
       limit?: number;
       windowSec?: number;
       anchor?: string;
-      mode?: string;
-      refund?: boolean;
-      resetAt?: number;
-      consumedAt?: number;
       retain?: boolean;
     };
     try {
@@ -150,55 +126,10 @@ export class ApiGatewayRateLimiter {
         limit?: number;
         windowSec?: number;
         anchor?: string;
-        mode?: string;
-        refund?: boolean;
-        resetAt?: number;
-        consumedAt?: number;
         retain?: boolean;
       };
     } catch {
       return new Response('Bad Request', { status: 400 });
-    }
-    if (payload.refund === true) {
-      // Return one previously consumed slot. For fixed-window buckets the
-      // caller passes the resetAt of the window it consumed from so a refund
-      // delayed past a UTC-day rollover cannot decrement the new day. For
-      // sliding-window buckets the caller passes the consumedAt timestamp so
-      // the exact entry can be removed from the log.
-      await this.load();
-      const now = Date.now();
-      if (
-        this.data &&
-        this.data.mode === 'sliding' &&
-        typeof payload.consumedAt === 'number' &&
-        Array.isArray(this.data.timestamps)
-      ) {
-        const idx = this.data.timestamps.indexOf(payload.consumedAt);
-        if (idx >= 0) {
-          this.data.timestamps.splice(idx, 1);
-          this.data.count = this.data.timestamps.length;
-          if (this.data.timestamps.length > 0) {
-            this.data.resetAt = this.data.timestamps[0] + this.data.windowSec * 1000;
-          } else {
-            this.data.resetAt = now + this.data.windowSec * 1000;
-          }
-          await this.state.storage.put('state', this.data);
-          await this.scheduleCleanup(this.data.resetAt);
-        }
-        return this.json({ allowed: true, remaining: 0, resetAt: this.data.resetAt });
-      }
-      const expectedResetAt = payload.resetAt;
-      if (
-        this.data &&
-        !this.data.mode &&
-        now < this.data.resetAt &&
-        this.data.count > 0 &&
-        (typeof expectedResetAt !== 'number' || this.data.resetAt === expectedResetAt)
-      ) {
-        this.data.count -= 1;
-        await this.state.storage.put('state', this.data);
-      }
-      return this.json({ allowed: true, remaining: 0, resetAt: this.data?.resetAt ?? now });
     }
     const limit = Number(payload.limit);
     const windowSec = Number(payload.windowSec);
@@ -207,7 +138,6 @@ export class ApiGatewayRateLimiter {
     }
     const anchor: RateLimitAnchor | undefined =
       payload.anchor === 'utc-day' ? 'utc-day' : undefined;
-    const mode: RateLimitMode | undefined = payload.mode === 'sliding' ? 'sliding' : undefined;
     // Cleanup is the default for high-cardinality callers (Pages, legacy, unknown).
     // Authenticated gateway quotas opt in to long retention via retain: true so a
     // Worker-first deploy never drops cleanup for keys that omit the flag.
@@ -215,51 +145,14 @@ export class ApiGatewayRateLimiter {
     await this.load();
     const now = Date.now();
     const windowMs = windowSec * 1000;
-    if (mode === 'sliding') {
-      // Sliding-window log: bounded by `limit` entries, so short bursts across
-      // a fixed-window boundary are not spuriously throttled.
-      const cutoff = now - windowMs;
-      const timestamps = (this.data?.timestamps ?? []).filter((ts) => ts > cutoff);
-      const resetAt = timestamps.length ? timestamps[0] + windowMs : now + windowMs;
-      if (timestamps.length >= limit) {
-        // Deny path: refresh in-memory state but skip the storage write. The
-        // pruned timestamps/resetAt are recomputed from storage on the next
-        // load, so persisting on every throttled hit would only add Durable
-        // Object write amplification under sustained bursts.
-        this.data = {
-          count: timestamps.length,
-          resetAt,
-          windowSec,
-          mode,
-          timestamps,
-          ...(ephemeral && { ephemeral: true }),
-        };
-        if (ephemeral) await this.scheduleCleanup(resetAt);
-        return this.json({ allowed: false, remaining: 0, resetAt });
-      }
-      timestamps.push(now);
-      this.data = {
-        count: timestamps.length,
-        resetAt: timestamps[0] + windowMs,
-        windowSec,
-        mode,
-        timestamps,
-        ...(ephemeral && { ephemeral: true }),
-      };
-      await this.state.storage.put('state', this.data);
-      if (ephemeral) await this.scheduleCleanup(this.data.resetAt);
-      return this.json({
-        allowed: true,
-        remaining: Math.max(limit - timestamps.length, 0),
-        resetAt: this.data.resetAt,
-        consumedAt: now,
-      });
-    }
+    // Sliding-window state written by earlier deployments carries `mode` and
+    // `timestamps`. It is treated as a config change and replaced with a fresh
+    // fixed window rather than migrated.
     const configChanged =
       !this.data ||
       this.data.windowSec !== windowSec ||
       this.data.anchor !== anchor ||
-      this.data.mode !== undefined;
+      'timestamps' in this.data;
     if (configChanged || now >= this.data!.resetAt) {
       const resetAt = anchor === 'utc-day' ? nextUtcMidnight(now) : now + windowMs;
       this.data = { count: 0, resetAt, windowSec, anchor, ...(ephemeral && { ephemeral: true }) };
@@ -288,8 +181,8 @@ export class ApiGatewayRateLimiter {
   // requester-target-mode combinations from Pages endpoints) so abandoned
   // objects do not retain billable storage forever. The alarm fires shortly
   // after the window resets and wipes all storage.
-  // Bounded authenticated keys (daily-*/burst-* keyed by user_id) pass
-  // retain: true so they skip alarms; load() treats expired state as absent
+  // Bounded authenticated keys (daily-* keyed by user_id) pass retain: true
+  // so they skip alarms; load() treats expired state as absent
   // for rate-limiting correctness.
   // Alarms from previous deployments without the ephemeral flag in stored
   // state are drained without rescheduling while the window is still active.
@@ -300,33 +193,18 @@ export class ApiGatewayRateLimiter {
       await this.state.storage.setAlarm(cleanupAt);
     }
   }
-  private isStateActive(stored: RateLimitState, now: number): { active: boolean; resetAt: number } {
-    if (stored.mode === 'sliding') {
-      const windowMs = (stored.windowSec || 0) * 1000;
-      const cutoff = now - windowMs;
-      const timestamps = (stored.timestamps ?? []).filter((ts) => ts > cutoff);
-      if (!timestamps.length) {
-        return { active: false, resetAt: stored.resetAt };
-      }
-      return { active: true, resetAt: timestamps[0] + windowMs };
-    }
-    return { active: now < stored.resetAt, resetAt: stored.resetAt };
-  }
   async alarm(): Promise<void> {
     try {
       const stored = await this.state.storage.get<RateLimitState>('state');
       const now = Date.now();
-      if (stored) {
-        const { active, resetAt } = this.isStateActive(stored, now);
-        if (active) {
-          if (stored.ephemeral === true) {
-            await this.state.storage.setAlarm(resetAt + 1000);
-            return;
-          }
-          this.data = undefined;
-          this.loaded = false;
+      if (stored && now < stored.resetAt) {
+        if (stored.ephemeral === true) {
+          await this.state.storage.setAlarm(stored.resetAt + 1000);
           return;
         }
+        this.data = undefined;
+        this.loaded = false;
+        return;
       }
       this.data = undefined;
       this.loaded = false;
@@ -359,7 +237,6 @@ async function rateLimit(
         limit,
         windowSec,
         anchor: options?.anchor,
-        mode: options?.mode,
         retain: true,
       }),
       signal: controller.signal,
@@ -371,83 +248,76 @@ async function rateLimit(
     if (!res.ok) {
       return {
         allowed: false,
-        status: 503,
+        unavailable: true,
+        reason: 'http_status',
         message: 'Rate limiter unavailable',
       };
     }
-    let data: { allowed?: boolean; remaining?: number; resetAt?: number; consumedAt?: number } = {};
+    let data: { allowed?: boolean; remaining?: number; resetAt?: number } = {};
     try {
       data = (await res.json()) as {
         allowed?: boolean;
         remaining?: number;
         resetAt?: number;
-        consumedAt?: number;
       };
     } catch {
       return {
         allowed: false,
-        status: 503,
+        unavailable: true,
+        reason: 'bad_json',
         message: 'Rate limiter unavailable',
       };
     }
     const remaining = typeof data.remaining === 'number' ? data.remaining : undefined;
     const resetAt = typeof data.resetAt === 'number' ? data.resetAt : undefined;
-    const consumedAt = typeof data.consumedAt === 'number' ? data.consumedAt : undefined;
+    const now = Date.now();
+    if (
+      (data.allowed !== true && data.allowed !== false) ||
+      remaining === undefined ||
+      !Number.isInteger(remaining) ||
+      remaining < 0 ||
+      remaining > limit ||
+      (data.allowed === false ? remaining !== 0 : remaining >= limit) ||
+      resetAt === undefined ||
+      !Number.isFinite(resetAt) ||
+      resetAt <= now ||
+      resetAt > now + windowSec * 1000
+    ) {
+      return {
+        allowed: false,
+        unavailable: true,
+        reason: 'bad_json',
+        message: 'Rate limiter unavailable',
+      };
+    }
     if (data.allowed === false) {
       return {
         allowed: false,
-        status: 429,
         message: 'Rate limit exceeded',
         limit,
         remaining: remaining ?? 0,
         resetAt,
       };
     }
-    return { allowed: true, limit, remaining, resetAt, consumedAt };
+    return { allowed: true, limit, remaining, resetAt };
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     if (error instanceof Error && error.name === 'AbortError') {
       console.warn('rateLimit timeout', { action, durationMs, timeoutMs: RATE_LIMIT_TIMEOUT_MS });
-    } else {
-      console.error('rateLimit error', { action, durationMs, error });
+      return {
+        allowed: false,
+        unavailable: true,
+        reason: 'timeout',
+        message: 'Rate limiter unavailable',
+      };
     }
+    console.error('rateLimit error', { action, durationMs, error });
     return {
       allowed: false,
-      status: 503,
+      unavailable: true,
+      reason: 'fetch_error',
       message: 'Rate limiter unavailable',
     };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-/**
- * Best-effort refund of one previously consumed slot. For fixed-window buckets
- * `consumedResetAt` is the resetAt of the window the slot was taken from; the
- * Durable Object only decrements when its current window still matches, so a
- * refund delayed past a UTC-day rollover cannot steal a slot from the new day.
- * For sliding-window buckets `consumedAt` is the timestamp of the entry to
- * remove from the log.
- */
-async function refundRateLimit(
-  env: Env,
-  key: string,
-  action: string,
-  consumedResetAt?: number,
-  consumedAt?: number
-): Promise<void> {
-  const id = env.API_GATEWAY_LIMITER.idFromName(key);
-  const stub = env.API_GATEWAY_LIMITER.get(id);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), RATE_LIMIT_TIMEOUT_MS);
-  try {
-    await stub.fetch('https://rate-limit', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ refund: true, resetAt: consumedResetAt, consumedAt }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    console.warn('rateLimit refund failed', { action, error });
   } finally {
     clearTimeout(timeout);
   }
@@ -466,10 +336,10 @@ function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<string,
   return {
     'Access-Control-Allow-Origin': resolveOrigin(envOrigin, requestOrigin),
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,If-None-Match',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
-      'Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
+      'ETag, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
   };
 }
 function retryAfterSeconds(resetAt: number): number {
@@ -490,10 +360,6 @@ function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
     }
   }
   return headers;
-}
-function retryAfterS(rl: RateLimitResult): number | undefined {
-  if (typeof rl.resetAt !== 'number') return undefined;
-  return retryAfterSeconds(rl.resetAt);
 }
 function docsResponse(envOrigin?: string, requestOrigin?: string): Response {
   const html = `<!doctype html>
@@ -607,16 +473,110 @@ function errorResponse(
     },
   });
 }
+const READ_CACHE_CONTROL = 'private, max-age=15';
+// Authorization: responses are token-scoped. Origin: the CORS allow-origin
+// header is echoed per request. Accept-Encoding: bodies may be gzipped.
+const READ_VARY = 'Accept-Encoding, Authorization, Origin';
+const GZIP_MIN_BYTES = 1024;
+async function weakEtag(payload: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', payload);
+  const hex = Array.from(new Uint8Array(digest))
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `W/"${hex}"`;
+}
+function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch) return false;
+  if (ifNoneMatch.trim() === '*') return true;
+  const opaque = (value: string) => value.trim().replace(/^W\//i, '');
+  return ifNoneMatch.split(',').some((candidate) => opaque(candidate) === opaque(etag));
+}
+// RFC 9110 qvalue grammar: 0[.0-3 digits] or 1[.up to three zeros]. Anything
+// outside that range (q=2, q=abc) is malformed, not a stronger preference.
+const QVALUE_PATTERN = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
+// RFC 9110 Accept-Encoding negotiation. An explicit `gzip;q=0` is a rejection
+// and must not be compressed; `*` only applies when a coding is not listed on
+// its own. identity is always acceptable unless explicitly refused with
+// `identity;q=0`. A malformed or out-of-range q-value falls back to "not
+// acceptable" for that coding; gzip falls back to uncompressed (always
+// decodable), and an identity rejection is honored.
+function negotiateEncoding(header: string | null): { gzip: boolean; identity: boolean } {
+  if (!header) return { gzip: false, identity: true };
+  let gzipQ: number | null = null;
+  let identityQ: number | null = null;
+  let wildcardQ: number | null = null;
+  for (const part of header.split(',')) {
+    const [rawCoding, ...params] = part.split(';');
+    const coding = rawCoding.trim().toLowerCase();
+    if (coding !== 'gzip' && coding !== 'identity' && coding !== '*') continue;
+    const qParam = params.map((p) => p.trim().toLowerCase()).find((p) => p.startsWith('q='));
+    const qValue = qParam?.slice(2) ?? '';
+    const q = !qParam ? 1 : QVALUE_PATTERN.test(qValue) ? Number(qValue) : 0;
+    if (coding === 'gzip') gzipQ = q;
+    else if (coding === 'identity') identityQ = q;
+    else wildcardQ = q;
+  }
+  const gzip = gzipQ !== null ? gzipQ > 0 : wildcardQ !== null ? wildcardQ > 0 : false;
+  const identity = identityQ !== null ? identityQ > 0 : wildcardQ !== null ? wildcardQ > 0 : true;
+  return { gzip, identity };
+}
+// Conditional read response for GET /progress and GET /team/progress. The
+// payload is encoded once so the ETag digest, the gzip size threshold, and the
+// response body all back the same bytes — the validator and the body cannot
+// disagree. The ETag is derived from the serialized payload (not updated_at) so
+// a 304 can never hide a change originating in task metadata or invalidation.
+async function conditionalReadResponse(
+  request: Request,
+  data: unknown,
+  envOrigin?: string,
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
+): Promise<Response> {
+  const body: Record<string, unknown> = { success: true };
+  if (data && typeof data === 'object' && 'data' in data) {
+    const wrapped = data as Record<string, unknown>;
+    body.data = wrapped.data;
+    if (wrapped.meta !== undefined) body.meta = wrapped.meta;
+  } else {
+    body.data = data;
+  }
+  const payload = new TextEncoder().encode(JSON.stringify(body));
+  const etag = await weakEtag(payload);
+  const headers: Record<string, string> = {
+    ...corsHeaders(envOrigin, requestOrigin),
+    'Cache-Control': READ_CACHE_CONTROL,
+    Vary: READ_VARY,
+    ETag: etag,
+    ...(extraHeaders ?? {}),
+  };
+  if (etagMatches(request.headers.get('If-None-Match'), etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
+  if (!encoding.gzip && !encoding.identity) {
+    return errorResponse('no_acceptable_encoding', 406, envOrigin, requestOrigin, {
+      Vary: READ_VARY,
+      ...(extraHeaders ?? {}),
+    });
+  }
+  headers['Content-Type'] = 'application/json';
+  // Compress when gzip is acceptable and either the payload clears the size
+  // threshold or the client explicitly refused identity (identity;q=0), in
+  // which case uncompressed is not an acceptable response.
+  if (encoding.gzip && (payload.byteLength >= GZIP_MIN_BYTES || !encoding.identity)) {
+    headers['Content-Encoding'] = 'gzip';
+    const stream = new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'));
+    // encodeBody: 'manual' prevents the Workers runtime from double-compressing
+    // the already-gzipped stream (the default 'automatic' would re-encode it).
+    return new Response(stream, { status: 200, headers, encodeBody: 'manual' });
+  }
+  return new Response(payload, { status: 200, headers });
+}
 type AuthSuccess = {
   validation: { valid: true; token: ApiToken };
   rlHeaders: Record<string, string>;
 };
-type ThrottleBucket = 'daily' | 'burst' | 'ip';
-function resolveClientIp(request: Request): string | null {
-  const cfIp = request.headers.get('CF-Connecting-IP');
-  if (cfIp && cfIp.trim()) return cfIp.trim();
-  return null;
-}
 async function hashIp(ip: string, secret?: string): Promise<string | null> {
   if (!secret) return null;
   const key = await crypto.subtle.importKey(
@@ -632,25 +592,52 @@ async function hashIp(ip: string, secret?: string): Promise<string | null> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
-function logThrottle(
-  action: Action,
-  bucket: ThrottleBucket,
-  userId: string,
-  tokenId: string,
-  ipHash: string | null,
-  retryAfterS: number | undefined
-): void {
-  console.log(
-    JSON.stringify({
-      event: 'rate_limit_429',
-      action,
-      bucket,
-      user_id: userId,
-      token_id: tokenId,
-      ip_hash: ipHash,
-      retry_after_s: retryAfterS ?? null,
-    })
-  );
+function sanitizeLogValue(value: unknown, redactions: string[]): string {
+  let sanitized: string;
+  try {
+    sanitized = String(value);
+  } catch {
+    return 'Unknown';
+  }
+  // Cap before redaction but leave headroom beyond the final 200-char limit so
+  // an IP straddling the boundary is fully present for replacement (a partial
+  // match would leak a fragment). 256 = 200 + max IPv6 length (45) with margin.
+  sanitized = sanitized.slice(0, 256);
+  for (const redaction of redactions) {
+    if (redaction.length === 0 || redaction.length > sanitized.length) continue;
+    // Case-insensitive: a rate-limit binding may canonicalize an IPv6 address's
+    // hex digits to a different case before echoing it in an exception, so an
+    // exact match would leave the normalized form in the log.
+    const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    sanitized = sanitized.replace(new RegExp(escaped, 'gi'), '[redacted]');
+  }
+  return sanitized.slice(0, 200);
+}
+function readErrorProperty(error: Error, property: 'name' | 'message'): unknown {
+  try {
+    return error[property];
+  } catch {
+    return 'Unknown';
+  }
+}
+function errorInfo(
+  error: unknown,
+  redactions: string[]
+): { error_name: string; error_message: string } {
+  try {
+    if (error instanceof Error) {
+      return {
+        error_name: sanitizeLogValue(readErrorProperty(error, 'name'), redactions),
+        error_message: sanitizeLogValue(readErrorProperty(error, 'message'), redactions),
+      };
+    }
+  } catch {
+    return { error_name: 'Unknown', error_message: 'Unknown' };
+  }
+  return {
+    error_name: sanitizeLogValue(typeof error, redactions),
+    error_message: sanitizeLogValue(error, redactions),
+  };
 }
 async function authenticateAndRateLimit(
   env: Env,
@@ -660,8 +647,56 @@ async function authenticateAndRateLimit(
   action: Action,
   envOrigin?: string,
   requestOrigin?: string,
-  ctx?: ExecutionContext
+  ctx?: ExecutionContext,
+  userAgent?: string | null
 ): Promise<AuthSuccess | Response> {
+  // Pre-authentication abuse gate: keyed on CF-Connecting-IP to shield
+  // the api_tokens lookup (and therefore Supabase) from token-rotation floods.
+  // Counters are per-Cloudflare-location and eventually consistent — this is
+  // infrastructure protection, not a customer quota.
+  const clientIp = request.headers.get('CF-Connecting-IP')?.trim() || null;
+  if (clientIp && env.API_ABUSE_LIMITER) {
+    // Fail open: the abuse gate is infrastructure protection for Supabase,
+    // not a customer quota. A binding/runtime failure must not turn into a
+    // 500 outage for valid requests — the daily quota still enforces the
+    // customer entitlement downstream. Log the HMAC-hashed IP only: raw IPs
+    // must never reach Worker logs (see docs/RATE_LIMITING.md).
+    const getIpHash = (() => {
+      let cached: Promise<string | null> | null = null;
+      return () => {
+        if (!cached) {
+          cached = hashIp(clientIp, env.IP_HASH_SECRET).catch(() => null);
+        }
+        return cached;
+      };
+    })();
+    let abuseResult: { success: boolean } | null = null;
+    try {
+      abuseResult = await env.API_ABUSE_LIMITER.limit({ key: `api:${clientIp}` });
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: 'abuse_gate_unavailable',
+          action,
+          ip_hash: await getIpHash(),
+          reason: 'binding_error',
+          ...errorInfo(error, [clientIp]),
+        })
+      );
+    }
+    if (abuseResult && !abuseResult.success) {
+      console.warn(
+        JSON.stringify({
+          event: 'abuse_gate_429',
+          action,
+          ip_hash: await getIpHash(),
+        })
+      );
+      return errorResponse('Too many requests', 429, envOrigin, requestOrigin, {
+        'Retry-After': String(ABUSE_GATE_PERIOD_SEC),
+      });
+    }
+  }
   const validation = await validateToken(env, rawToken, permission);
   if (!validation.valid) {
     return errorResponse(validation.error, validation.status, envOrigin, requestOrigin);
@@ -671,7 +706,6 @@ async function authenticateAndRateLimit(
   const tier = await resolveTier(env, token.user_id);
   const limits = TIER_LIMITS[tier];
   const dailyLimit = kind === 'write' ? limits.writesPerDay : limits.readsPerDay;
-  const clientIp = resolveClientIp(request);
   const track = (throttled: boolean) => {
     const promise = recordUsage(env, {
       userId: token.user_id,
@@ -679,144 +713,50 @@ async function authenticateAndRateLimit(
       tier,
       kind,
       throttled,
-      userAgent: normalizeInboundUserAgent(request.headers.get('User-Agent')),
+      userAgent: userAgent ?? null,
     });
     if (ctx) {
       ctx.waitUntil(promise);
     }
   };
-  // Daily quota first, so a request rejected by the daily quota does not
-  // consume a burst slot. Both counters key on user_id so extra tokens do not
-  // multiply a user's quota.
+  // Daily quota: a single fixed-window DO call keyed by user_id so extra
+  // tokens do not multiply a user's quota. The quota counts authenticated
+  // requests admitted for processing — downstream Supabase failures do not
+  // trigger refunds (see docs/RATE_LIMITING.md).
   const dailyKey = `daily-${kind}:${token.user_id}`;
   const daily = await rateLimit(env, dailyKey, dailyLimit, DAILY_WINDOW_SEC, {
     anchor: 'utc-day',
   });
   const dailyHeaders = rateLimitHeaders(daily);
   if (!daily.allowed) {
-    track(true);
-    const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
-    logThrottle(action, 'daily', token.user_id, token.token_id, ipHash, retryAfterS(daily));
-    const message =
-      daily.status === 429 && tier === 'free'
-        ? upgradeMessage(kind)
-        : daily.message || 'Rate limit exceeded';
-    return errorResponse(message, daily.status || 429, envOrigin, requestOrigin, dailyHeaders);
-  }
-  const burst = await rateLimit(
-    env,
-    `burst-${kind}:${token.user_id}`,
-    limits.burstPerMinute,
-    BURST_WINDOW_SEC,
-    { mode: 'sliding' }
-  );
-  if (!burst.allowed) {
-    // Give back the daily slot consumed above so burst-throttled attempts do
-    // not drain the daily quota.
-    const refund = refundRateLimit(
-      env,
-      dailyKey,
-      `daily-${kind}`,
-      typeof daily.resetAt === 'number' ? daily.resetAt : undefined
-    );
-    if (ctx) ctx.waitUntil(refund);
-    track(true);
-    const ipHash = clientIp ? await hashIp(clientIp, env.IP_HASH_SECRET) : null;
-    logThrottle(action, 'burst', token.user_id, token.token_id, ipHash, retryAfterS(burst));
-    // X-RateLimit-* always describes the daily quota (see docs/API.md); adjust
-    // remaining for the refund. Retry-After reflects when burst capacity frees.
-    const headers = rateLimitHeaders({
-      ...daily,
-      remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
-    });
-    if (typeof burst.resetAt === 'number') {
-      headers['Retry-After'] = String(retryAfterSeconds(burst.resetAt));
-    }
-    return errorResponse(
-      burst.message || 'Rate limit exceeded',
-      burst.status || 429,
-      envOrigin,
-      requestOrigin,
-      headers
-    );
-  }
-  // Per-IP backstop: catches "many accounts from one IP" abuse. Tuned
-  // generously (600 reads/hour, 200 writes/hour) so shared NAT users are not
-  // impacted. Uses a 1-hour sliding window. Only checked when CF-Connecting-IP
-  // is present (Cloudflare overwrites any inbound spoof).
-  //
-  // Availability policy: the daily and burst limiters are the primary rate
-  // limiting mechanism and remain fail-closed — if they are unavailable the
-  // request is rejected because there is no other protection. The IP backstop
-  // is a secondary abuse signal; when its Durable Object is unavailable
-  // (status 503) it fails open so a transient infrastructure issue does not
-  // take down the API for everyone behind a given IP. A genuine 429 from the
-  // IP backstop still rejects the request and refunds the primary slots.
-  if (clientIp) {
-    const ipLimit =
-      kind === 'write' ? IP_BACKSTOP_LIMITS.writesPerHour : IP_BACKSTOP_LIMITS.readsPerHour;
-    const ipKey = `ip-${kind}:${clientIp}`;
-    const ipResult = await rateLimit(env, ipKey, ipLimit, IP_BACKSTOP_WINDOW_SEC, {
-      mode: 'sliding',
-    });
-    if (!ipResult.allowed && ipResult.status !== 503) {
-      // Genuine IP throttle (429): refund both the daily (fixed-window) and
-      // burst (sliding-window) slots so IP-throttled requests do not drain
-      // per-user quotas.
-      const refundBurst = refundRateLimit(
-        env,
-        `burst-${kind}:${token.user_id}`,
-        `burst-${kind}`,
-        undefined,
-        burst.consumedAt
-      );
-      const refundDaily = refundRateLimit(
-        env,
-        dailyKey,
-        `daily-${kind}`,
-        typeof daily.resetAt === 'number' ? daily.resetAt : undefined
-      );
-      if (ctx) {
-        ctx.waitUntil(refundBurst);
-        ctx.waitUntil(refundDaily);
-      }
-      track(true);
-      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
-      logThrottle(action, 'ip', token.user_id, token.token_id, ipHash, retryAfterS(ipResult));
-      const headers = rateLimitHeaders({
-        ...daily,
-        remaining: typeof daily.remaining === 'number' ? daily.remaining + 1 : undefined,
-      });
-      if (typeof ipResult.resetAt === 'number') {
-        headers['Retry-After'] = String(retryAfterSeconds(ipResult.resetAt));
-      }
-      return errorResponse(
-        ipResult.message || 'Rate limit exceeded',
-        ipResult.status || 429,
-        envOrigin,
-        requestOrigin,
-        headers
-      );
-    }
-    if (!ipResult.allowed && ipResult.status === 503) {
-      // IP backstop limiter unavailable: fail open. The primary daily and
-      // burst checks already passed, so the request proceeds. Do not refund
-      // the primary slots (the request is being served) and do not surface
-      // the 503 to the client. Log a warning so the infrastructure failure
-      // remains observable and is not counted as a throttle. Log the hashed
-      // IP (never the raw CF-Connecting-IP) so the privacy control is
-      // consistent with the 429 path.
-      const ipHash = await hashIp(clientIp, env.IP_HASH_SECRET);
+    if (daily.unavailable) {
       console.warn(
         JSON.stringify({
-          event: 'ip_backstop_unavailable',
+          event: 'daily_quota_unavailable',
           action,
           user_id: token.user_id,
           token_id: token.token_id,
-          ip_hash: ipHash,
+          reason: daily.reason,
         })
       );
+      // Fail open: the daily quota is a product entitlement, not a
+      // database-integrity boundary. The abuse gate still protects Supabase.
+      track(false);
+      return { validation, rlHeaders: {} };
     }
+    track(true);
+    console.warn(
+      JSON.stringify({
+        event: 'daily_quota_429',
+        action,
+        kind,
+        user_id: token.user_id,
+        token_id: token.token_id,
+        retry_after_s: typeof daily.resetAt === 'number' ? retryAfterSeconds(daily.resetAt) : null,
+      })
+    );
+    const message = tier === 'free' ? upgradeMessage(kind) : daily.message || 'Rate limit exceeded';
+    return errorResponse(message, 429, envOrigin, requestOrigin, dailyHeaders);
   }
   track(false);
   return { validation, rlHeaders: dailyHeaders };
@@ -927,27 +867,38 @@ export default {
       const apiMatch = path.match(/^\/api(?:\/v2)?(.*)$/);
       if (apiMatch) {
         apiPath = apiMatch[1] || '/';
-        // Host migration: once LEGACY_API_REDIRECT is flipped to "true",
-        // legacy /api and /api/v2 routes permanently redirect to the api
-        // subdomain. Clients should migrate proactively: some HTTP stacks
-        // (e.g. .NET HttpClient) drop Authorization on cross-host redirects.
-        if ((env.LEGACY_API_REDIRECT || '').trim().toLowerCase() === 'true') {
-          const target = `https://${apiHost}${apiPath}${url.search}`;
-          return new Response(null, {
-            status: 308,
-            headers: {
-              ...headers,
-              Location: target,
-              Deprecation: LEGACY_API_DEPRECATION_DATE,
-              Link: `<${target}>; rel="successor-version"`,
-              'Cache-Control': 'no-store',
-            },
-          });
-        }
       }
     }
     if (!apiPath) {
       return new Response('Not Found', { status: 404, headers });
+    }
+    // Validate inbound User-Agent before any routing/redirect so legacy
+    // /api and /api/v2 entrypoints cannot bypass enforcement via 308.
+    const inboundUserAgent = normalizeInboundUserAgent(request.headers.get('User-Agent'));
+    if (!inboundUserAgent || inboundUserAgent.length < INBOUND_USER_AGENT_MIN_LENGTH) {
+      return errorResponse(
+        'User-Agent must be 5-200 characters (e.g. "AppName/1.0 (+https://your-app.com)")',
+        400,
+        origin,
+        reqOrigin
+      );
+    }
+    // Host migration: once LEGACY_API_REDIRECT is flipped to "true",
+    // legacy /api and /api/v2 routes permanently redirect to the api
+    // subdomain. Clients should migrate proactively: some HTTP stacks
+    // (e.g. .NET HttpClient) drop Authorization on cross-host redirects.
+    if (!isApiHost && (env.LEGACY_API_REDIRECT || '').trim().toLowerCase() === 'true') {
+      const target = `https://${apiHost}${apiPath}${url.search}`;
+      return new Response(null, {
+        status: 308,
+        headers: {
+          ...headers,
+          Location: target,
+          Deprecation: LEGACY_API_DEPRECATION_DATE,
+          Link: `<${target}>; rel="successor-version"`,
+          'Cache-Control': 'no-store',
+        },
+      });
     }
     // Extract and validate token
     const authHeader = request.headers.get('Authorization');
@@ -966,7 +917,8 @@ export default {
           'token-info',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -983,13 +935,14 @@ export default {
           'progress-read',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const progress = await handleGetProgress(env, validation.token, effectiveGameMode);
-        return successResponse(progress, undefined, 200, origin, reqOrigin, rlHeaders);
+        return await conditionalReadResponse(request, progress, origin, reqOrigin, rlHeaders);
       }
       // GET /team/progress - Team progress (requires TP permission)
       if (apiPath === '/team/progress' && request.method === 'GET') {
@@ -1001,13 +954,14 @@ export default {
           'progress-read',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
         const effectiveGameMode = validation.token.game_mode;
         const teamProgress = await handleGetTeamProgress(env, validation.token, effectiveGameMode);
-        return successResponse(teamProgress, undefined, 200, origin, reqOrigin, rlHeaders);
+        return await conditionalReadResponse(request, teamProgress, origin, reqOrigin, rlHeaders);
       }
       // POST /progress/level/:levelValue - Update player level
       const levelMatch = apiPath.match(/^\/progress\/level\/(\d+)$/);
@@ -1020,7 +974,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1051,7 +1006,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1111,7 +1067,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;
@@ -1151,7 +1108,8 @@ export default {
           'progress-write',
           origin,
           reqOrigin,
-          ctx
+          ctx,
+          inboundUserAgent
         );
         if (auth instanceof Response) return auth;
         const { validation, rlHeaders } = auth;

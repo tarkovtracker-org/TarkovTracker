@@ -7,11 +7,11 @@ import {
   createSharedCacheHandle,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { resolveTarkovDevProfileSource } from '@/utils/tarkovDevProfileSource';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('TarkovDevProfileApi');
 const PROFILE_FETCH_TIMEOUT_MS = 10_000;
-const PROFILE_FETCH_USER_AGENT = 'TarkovTracker/1.x (+https://tarkovtracker.org)';
 const PROFILE_RATE_LIMIT_PER_MINUTE = 30;
 const PROFILE_RATE_LIMIT_PREFIX = 'tarkov-dev-profile-rate';
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -75,7 +75,7 @@ export default defineEventHandler(async (event) => {
     response = await fetch(source.data.profileJsonUrl, {
       headers: {
         accept: 'application/json',
-        'user-agent': PROFILE_FETCH_USER_AGENT,
+        'user-agent': TARKOVTRACKER_USER_AGENT,
       },
       signal: AbortSignal.timeout(PROFILE_FETCH_TIMEOUT_MS),
     });

@@ -52,7 +52,7 @@ describe('buildPrestigeRequirementRows', () => {
       prestigeLevels: [
         createPrestigeLevel(1, [
           {
-            __typename: 'TaskObjectivePlayerLevel',
+            type: 'playerLevel',
             id: 'player-level',
           },
         ]),
@@ -113,12 +113,12 @@ describe('buildPrestigeRequirementRows', () => {
     const prestigeLevels = [
       createPrestigeLevel(5, [
         {
-          __typename: 'TaskObjectivePlayerLevel',
+          type: 'playerLevel',
           id: 'player-level',
           playerLevel: 47,
         },
         {
-          __typename: 'TaskObjectiveTaskStatus',
+          type: 'taskStatus',
           id: 'collector',
           task: {
             id: 'collector',
@@ -126,7 +126,7 @@ describe('buildPrestigeRequirementRows', () => {
           },
         },
         {
-          __typename: 'TaskObjectiveItem',
+          type: 'haveItem',
           count: 20000000,
           id: 'roubles',
           items: [
@@ -206,7 +206,7 @@ describe('buildPrestigeRequirementRows', () => {
     const prestigeLevels = [
       createPrestigeLevel(6, [
         {
-          __typename: 'TaskObjectivePlayerLevel',
+          type: 'playerLevel',
           id: 'player-level',
           playerLevel: 47,
         },
@@ -239,12 +239,12 @@ describe('buildPrestigeRequirementRows', () => {
       prestigeLevels: [
         createPrestigeLevel(1, [
           {
-            __typename: 'TaskObjectivePlayerLevel',
+            type: 'playerLevel',
             id: 'player-level',
             playerLevel: 47,
           },
           {
-            __typename: 'TaskObjectiveItem',
+            type: 'haveItem',
             count: 3,
             id: 'item-objective',
             items: [
@@ -271,4 +271,136 @@ describe('buildPrestigeRequirementRows', () => {
       tracked: false,
     });
   });
+  it('renders skill and hideout station requirement rows when configured', () => {
+    const pvpProgress = createProgressData();
+    pvpProgress.skillOffsets = { Vitality: 3 };
+    const stations: HideoutStation[] = [
+      {
+        id: 'station1',
+        name: 'Test Station',
+        levels: [
+          {
+            id: 'station1-1',
+            level: 1,
+            constructionTime: 0,
+            itemRequirements: [],
+            stationLevelRequirements: [],
+            skillRequirements: [],
+            traderRequirements: [],
+            crafts: [],
+          },
+        ],
+      },
+    ];
+    pvpProgress.hideoutModules = { 'station1-1': { complete: true } };
+    const rows = buildPrestigeRequirementRows({
+      currentPrestigeLevel: 0,
+      edition,
+      hideoutStations: stations,
+      prestigeLevels: [
+        createPrestigeLevel(1, [
+          {
+            type: 'skill',
+            id: 'skill-condition',
+            skillLevel: {
+              id: 'skill-1',
+              name: 'Vitality',
+              level: 5,
+              skill: { id: 'Vitality', name: 'Vitality' },
+            },
+          },
+          {
+            type: 'hideoutStation',
+            id: 'hideout-condition',
+            hideoutStation: { id: 'station1', name: 'Test Station' },
+            stationLevel: 2,
+          },
+        ]),
+      ],
+      pvpProgress,
+      storyChapters: [],
+      tasks: [],
+    });
+    expect(rows.find((row) => row.kind === 'skill')).toMatchObject({
+      currentValue: 3,
+      id: 'skill:Vitality:5',
+      kind: 'skill',
+      name: 'Vitality',
+      requiredValue: 5,
+      source: 'tarkov.dev',
+      status: 'unmet',
+    });
+    expect(rows.find((row) => row.kind === 'hideoutStation')).toMatchObject({
+      currentValue: 1,
+      id: 'hideout:station1:2',
+      kind: 'hideoutStation',
+      name: 'Test Station',
+      requiredValue: 2,
+      source: 'tarkov.dev',
+      status: 'unmet',
+    });
+  });
+  it('skips taskStatus, skill, and hideout conditions when required references are missing', () => {
+    const rows = buildPrestigeRequirementRows({
+      currentPrestigeLevel: 0,
+      edition,
+      hideoutStations,
+      prestigeLevels: [
+        createPrestigeLevel(1, [
+          {
+            type: 'taskStatus',
+            id: 'no-task-id',
+            task: { name: 'Missing id' },
+          } as TaskObjective,
+          {
+            type: 'skill',
+            id: 'no-skill-name',
+            skillLevel: { id: 'skill-1', level: 5 },
+          } as TaskObjective,
+          {
+            type: 'hideoutStation',
+            id: 'no-station-id',
+            hideoutStation: { name: 'Missing id' },
+            stationLevel: 1,
+          } as TaskObjective,
+        ]),
+      ],
+      pvpProgress: createProgressData(),
+      storyChapters: [],
+      tasks: [],
+    });
+    expect(rows.some((row) => row.kind === 'task')).toBe(false);
+    expect(rows.some((row) => row.kind === 'skill')).toBe(false);
+    expect(rows.some((row) => row.kind === 'hideoutStation')).toBe(false);
+    expect(rows.find((row) => row.kind === 'playerLevel')).toBeTruthy();
+  });
+  it.each(['findItem', 'giveItem', 'haveItem', 'plantItem', 'sellItem'])(
+    'renders an item requirement row for the %s condition type',
+    (conditionType) => {
+      const rows = buildPrestigeRequirementRows({
+        currentPrestigeLevel: 0,
+        edition,
+        hideoutStations,
+        prestigeLevels: [
+          createPrestigeLevel(1, [
+            {
+              type: conditionType,
+              count: 2,
+              id: 'item-objective',
+              items: [{ id: 'bitcoin', name: 'Physical bitcoin' }],
+            },
+          ]),
+        ],
+        pvpProgress: createProgressData(),
+        storyChapters: [],
+        tasks: [],
+      });
+      expect(rows.find((row) => row.id === 'item:Physical bitcoin:2')).toMatchObject({
+        kind: 'item',
+        name: '2 Physical bitcoin',
+        requiredValue: 2,
+        source: 'tarkov.dev',
+      });
+    }
+  );
 });

@@ -1,3 +1,59 @@
+# [1.61.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.5...v1.61.0) (2026-07-31)
+
+
+### Features
+
+* **api:** add ETag/304 conditional reads and gzip to progress endpoints ([9d2ec7e](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d2ec7edb87e9a8f67ce38b73cee64ccc3662232))
+
+## [1.60.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.4...v1.60.5) (2026-07-31)
+
+
+### Bug Fixes
+
+* **api:** bind token prefix to stored game mode, drop tt_ tokens ([#608](https://github.com/tarkovtracker-org/TarkovTracker/issues/608)) ([0f65796](https://github.com/tarkovtracker-org/TarkovTracker/commit/0f6579653337f75eb586bc14a5cc8efbdb9411b0))
+
+## [1.60.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.3...v1.60.4) (2026-07-29)
+
+
+### Performance Improvements
+
+* **api:** select only the active game mode blob on progress reads ([#590](https://github.com/tarkovtracker-org/TarkovTracker/issues/590)) ([6437bd0](https://github.com/tarkovtracker-org/TarkovTracker/commit/6437bd02b5eb407791f8b9717497f181319389b5)), closes [#589](https://github.com/tarkovtracker-org/TarkovTracker/issues/589)
+
+## [1.60.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.2...v1.60.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* **api:** harden abuse-gate error logging ([#596](https://github.com/tarkovtracker-org/TarkovTracker/issues/596)) ([1b46103](https://github.com/tarkovtracker-org/TarkovTracker/commit/1b461036cd8561e4927893f7563c277a62d78f11))
+
+## [1.60.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.1...v1.60.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **deps:** pin postcss >=8.5.18 to patch directory traversal (SNYK-JS-POSTCSS-18313038) ([#605](https://github.com/tarkovtracker-org/TarkovTracker/issues/605)) ([5a2808b](https://github.com/tarkovtracker-org/TarkovTracker/commit/5a2808bfaedc4d02761fdddf50dedd7e1c49d04d)), closes [#603](https://github.com/tarkovtracker-org/TarkovTracker/issues/603) [#600](https://github.com/tarkovtracker-org/TarkovTracker/issues/600)
+
+## [1.60.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.0...v1.60.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **api:** finish User-Agent rollout safeguards ([#581](https://github.com/tarkovtracker-org/TarkovTracker/issues/581)) ([123d641](https://github.com/tarkovtracker-org/TarkovTracker/commit/123d6414cde3f9cfdb15cebe08d0fdcabe5e1c71)), closes [#565](https://github.com/tarkovtracker-org/TarkovTracker/issues/565)
+
+# [1.60.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.4...v1.60.0) (2026-07-21)
+
+
+### Features
+
+* **api:** enforce inbound User-Agent and propagate shared UA to upstream fetches ([#572](https://github.com/tarkovtracker-org/TarkovTracker/issues/572)) ([90657a8](https://github.com/tarkovtracker-org/TarkovTracker/commit/90657a814fe78e3747b6bccbc81cfb484823883d))
+
+## [1.59.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.3...v1.59.4) (2026-07-21)
+
+
+### Bug Fixes
+
+* setup script writes .env, reads pnpm version from package.json ([#570](https://github.com/tarkovtracker-org/TarkovTracker/issues/570)) ([4460f03](https://github.com/tarkovtracker-org/TarkovTracker/commit/4460f03f79d8fbd4d7378eed8b13d5f712876050))
+
 ## [1.59.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.2...v1.59.3) (2026-07-20)
 
 

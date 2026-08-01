@@ -5,14 +5,18 @@ on:
     paths:
       - 'docs/**/*.md'
       - '*.md'
+      - 'public/llms.txt'
       - 'lychee.toml'
+      - 'lychee.llms.toml'
       - '.github/workflows/link-check.yml'
   push:
     branches: [main]
     paths:
       - 'docs/**/*.md'
       - '*.md'
+      - 'public/llms.txt'
       - 'lychee.toml'
+      - 'lychee.llms.toml'
       - '.github/workflows/link-check.yml'
   schedule:
     - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
@@ -42,6 +46,23 @@ jobs:
             --verbose
             './docs/**/*.md'
             './*.md'
+          output: lychee/out-docs.md
+          fail: true
+
+      - name: llms.txt Link Checker
+        if: ${{ success() || failure() }}
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411
+        with:
+          # Dedicated config (lychee.llms.toml) drops the tarkovtracker.org
+          # exclude that lychee.toml uses for docs, so internal links in
+          # llms.txt are actually verified. Runs even if the docs link check
+          # above failed, since the two checks are independent. Separate output
+          # path so it does not overwrite the docs report.
+          args: >-
+            --config lychee.llms.toml
+            --verbose
+            './public/llms.txt'
+          output: lychee/out-llms.md
           fail: true
 
       - name: Upload Link Check Report
@@ -49,5 +70,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: link-check-report
-          path: ./lychee/out.md
+          path: ./lychee/
           retention-days: 7

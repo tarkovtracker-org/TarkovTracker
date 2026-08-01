@@ -11,33 +11,6 @@
 -
 -
 
-## Type of Change
-
-<!-- Mark the relevant option(s) with an 'x' -->
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Enhancement (improvement to existing feature)
-- [ ] Refactoring (code restructuring without changing functionality)
-- [ ] Documentation update
-- [ ] Dependency update
-- [ ] Other (please describe):
-
-## Area(s) Affected
-
-<!-- Mark all that apply with an 'x' -->
-
-- [ ] Frontend (UI/UX)
-- [ ] Backend (Supabase/Nitro/Workers)
-- [ ] Tasks/Quests
-- [ ] Team Features
-- [ ] Hideout
-- [ ] Maps
-- [ ] Traders
-- [ ] API
-- [ ] i18n/Translations
-- [ ] Other:
-
 ## Related Issues
 
 <!-- Link related issues using keywords: Fixes #123, Closes #456, Related to #789 -->
@@ -63,6 +36,24 @@
 
 <!-- If applicable, add screenshots or videos demonstrating the changes -->
 
+## Documentation impact
+
+Select one:
+
+- [ ] No behavior changed — no documentation review needed
+- [ ] Behavior changed — existing documentation remains accurate
+- [ ] Behavior changed — documentation was updated in this PR
+- [ ] Behavior changed — follow-up documentation issue: #
+
+Documents reviewed when relevant:
+
+- [ ] README or user guidance
+- [ ] Contributor documentation
+- [ ] SYSTEMS or architecture
+- [ ] API or rate-limit reference
+- [ ] Runbook or environment variables
+- [ ] Screenshots or diagrams
+
 ## Checklist
 
 <!-- Mark completed items with an 'x' -->
@@ -70,7 +61,6 @@
 - [ ] My code follows the project's coding conventions (see AGENTS.md)
 - [ ] I have performed a self-review of my code
 - [ ] I have commented my code where necessary
-- [ ] I have updated relevant documentation
 - [ ] My changes generate no new warnings or errors
 - [ ] I have tested my changes thoroughly
 - [ ] All existing tests still pass

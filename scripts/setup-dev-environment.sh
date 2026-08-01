@@ -27,12 +27,30 @@ check_prerequisites() {
     fi
 
     corepack enable
-    corepack prepare pnpm@10.34.5 --activate
 
-    pnpm_version=$(pnpm -v)
-    required_pnpm="10.34.5"
-    if ! printf '%s\n' "$required_pnpm" "$pnpm_version" | sort -V -C; then
-        echo "WARNING: pnpm version $pnpm_version found, but $required_pnpm or higher is recommended"
+    required_pnpm="$(
+        node -e "
+            const packageJson = require('./package.json');
+            const pm = packageJson.packageManager;
+            if (typeof pm !== 'string') {
+                console.error('ERROR: packageManager field is missing or not a string in package.json');
+                process.exit(1);
+            }
+            const match = pm.match(/^pnpm@([^+]+)/);
+            if (!match) {
+                console.error('ERROR: packageManager field does not match pnpm@<version>');
+                process.exit(1);
+            }
+            process.stdout.write(match[1]);
+        "
+    )"
+
+    actual_pnpm="$(pnpm --version)"
+
+    if [ "$actual_pnpm" != "$required_pnpm" ]; then
+        echo "ERROR: Expected pnpm $required_pnpm, but found $actual_pnpm"
+        echo "  Run: corepack prepare pnpm@$required_pnpm --activate"
+        exit 1
     fi
 
     echo "All prerequisites installed"
@@ -50,28 +68,44 @@ install_dependencies() {
 setup_environment() {
     echo "Setting up environment variables..."
 
-    if [ ! -f .env.local ]; then
-        cat > .env.local << 'EOF'
-# Supabase Configuration
-NUXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NUXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+    local env_file=".env"
+    local legacy_env_file=".env.local"
+    local env_example=".env.example"
 
-# App Configuration
-NUXT_PUBLIC_APP_URL=http://localhost:3000
+    # Reject paths that exist but are not regular files (e.g. directories).
+    for f in "$env_file" "$legacy_env_file" "$env_example"; do
+        if [ -e "$f" ] && [ ! -f "$f" ]; then
+            echo "ERROR: $f exists but is not a regular file"
+            exit 1
+        fi
+    done
 
-# Cloudflare Workers (for local development)
-CLOUDFLARE_ACCOUNT_ID=your_account_id_here
-CLOUDFLARE_API_TOKEN=your_api_token_here
-
-# Development
-NUXT_PUBLIC_LOG_LEVEL=debug
-NODE_ENV=development
-EOF
-        echo "Created .env.local"
-        echo "WARNING: Please update .env.local with your Supabase credentials"
-    else
-        echo "INFO: .env.local already exists"
+    # Never overwrite a contributor's existing configuration.
+    if [ -f "$env_file" ]; then
+        if [ -f "$legacy_env_file" ]; then
+            echo "INFO: Both $env_file and $legacy_env_file exist; Nuxt will use $env_file for pnpm run dev"
+        else
+            echo "INFO: $env_file already exists; leaving it unchanged"
+        fi
+        return
     fi
+
+    # Migrate files created by older versions of this setup script.
+    if [ -f "$legacy_env_file" ]; then
+        mv "$legacy_env_file" "$env_file"
+        echo "Migrated legacy $legacy_env_file to $env_file"
+        echo "WARNING: Review $env_file and add your Supabase credentials"
+        return
+    fi
+
+    if [ ! -f "$env_example" ]; then
+        echo "ERROR: $env_example was not found"
+        exit 1
+    fi
+
+    cp "$env_example" "$env_file"
+    echo "Created $env_file from $env_example"
+    echo "WARNING: Review $env_file and add your Supabase credentials"
 }
 
 main() {
@@ -83,7 +117,7 @@ main() {
     echo "Development environment setup complete!"
     echo ""
     echo "Next steps:"
-    echo "1. Update .env.local with your Supabase credentials"
+    echo "1. Update .env with your Supabase credentials if you need login or sync"
     echo "2. Run 'pnpm run dev' to start the development server"
     echo "3. Visit http://localhost:3000"
     echo ""

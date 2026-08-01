@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-h-[calc(100vh-250px)] overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-[1400px] xl:max-w-[1600px] 2xl:max-w-[1800px]">
+      <div class="mx-auto max-w-350 xl:max-w-400 2xl:max-w-450">
         <h1 class="sr-only">Tarkov Tracker - Escape from Tarkov Progress Tracker</h1>
         <DashboardNextActions />
         <DashboardChangelog />

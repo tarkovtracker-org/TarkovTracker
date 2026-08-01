@@ -91,7 +91,7 @@ describe('/api/tarkov-dev/profile', () => {
       expect.objectContaining({
         headers: {
           accept: 'application/json',
-          'user-agent': 'TarkovTracker/1.x (+https://tarkovtracker.org)',
+          'user-agent': 'TarkovTracker/1.0 (+https://tarkovtracker.org)',
         },
         signal: expect.any(AbortSignal),
       })
@@ -112,7 +112,7 @@ describe('/api/tarkov-dev/profile', () => {
       expect.objectContaining({
         headers: {
           accept: 'application/json',
-          'user-agent': 'TarkovTracker/1.x (+https://tarkovtracker.org)',
+          'user-agent': 'TarkovTracker/1.0 (+https://tarkovtracker.org)',
         },
         signal: expect.any(AbortSignal),
       })

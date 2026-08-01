@@ -53,3 +53,13 @@
 # Agent contract + source locale (drift / instruction integrity)
 /AGENTS.md                @DysektAI
 /app/locales/en.json      @DysektAI
+
+# Public-facing docs and community health files (voice / policy integrity).
+# Paths under /.github/ (CONTRIBUTING.md, ISSUE_TEMPLATE/) are already covered
+# by the /.github/ catch-all above and are intentionally not restated here —
+# restating them would silently override a future team expansion of that rule.
+/README.md                @DysektAI
+/docs/                    @DysektAI
+/SECURITY.md              @DysektAI
+/SUPPORT.md               @DysektAI
+/CODE_OF_CONDUCT.md       @DysektAI

@@ -14,8 +14,29 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - localization workflow, Crowdin behavior, or locale file ownership
 - analytics tooling, MCP access, or external data integrations
 - deprecated patterns that agents must avoid
+- behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
+  pipeline, multi-layer caching, overlay corrections, precompute workflow)
+- community health policy: security reporting (`SECURITY.md`), support routing
+  (`SUPPORT.md`), or code of conduct (`CODE_OF_CONDUCT.md`)
 
 If this file conflicts with executable config (eslint, prettier, tsconfig, package.json), trust the executable config, then update this file before finishing.
+
+### System spec sync (`docs/SYSTEMS.md`)
+
+`docs/SYSTEMS.md` is the plain-language spec for the non-obvious systems. It is written so a human
+can read it and an agent can verify any claim against the code. Each system section lists
+**invariants** the code must hold.
+
+- When you change a system documented there, update the matching section in the same PR. Do not let
+  the spec and the code drift.
+- If a claim in `SYSTEMS.md` is wrong, fix the doc. If an invariant is violated by the code, fix the
+  code. The code is the source of truth; the doc is the explanation of it.
+- Do not duplicate system behavior in code comments. Put the explanation in `SYSTEMS.md` and keep
+  code comments reserved for genuinely non-obvious local decisions, per the "No comments" rule
+  below. This is the balance between "no comments in files" (drift/stale-comment risk) and
+  "document how it works" (context for humans and agents).
+- When adding a new non-obvious system, add a section to `SYSTEMS.md` with a summary, a diagram, a
+  step-by-step flow, the implementing files, and the invariants.
 
 ## Source-of-Truth Priority
 
@@ -28,8 +49,10 @@ If this file conflicts with executable config (eslint, prettier, tsconfig, packa
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 - **Runtime:** Node >=24.12.0, packageManager `pnpm@11.14.0` (engines allow `pnpm >=10.34.5 <12`).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
-- **Deployment:** Cloudflare Pages/Workers. The Pages build emits a static SPA shell and routes only
-  `/api/*` plus `/overlay/*` through Pages Functions.
+- **Deployment:** Cloudflare Pages/Workers for the frontend and `api-gateway`; the Supabase GitHub
+  integration applies DB migrations and deploys Edge Functions. All three run automatically on merge
+  to `main` — see the Deployment section of `docs/runbook.md`. The Pages build emits a static SPA
+  shell and routes only `/api/*` plus `/overlay/*` through Pages Functions.
 
 ## Project Map
 
@@ -88,6 +111,7 @@ When asked to "review for production readiness", "deep review", "is this safe to
 - **Keep secrets out of the repo.** Use `useRuntimeConfig()` for env-driven values.
 - **No destructive git commands** (`git restore`, `git checkout --`, `git reset`, `git clean`, force-push) without explicit user approval in the current conversation.
 - **No runtime dependency additions** without explaining why existing deps are insufficient.
+- **Game data comes from `json.tarkov.dev` via the `/api/tarkov/*` server proxy.** Do not add usage of the `api.tarkov.dev` GraphQL API. Task objectives and prestige conditions are discriminated by the upstream `type` field; the synthetic `__typename` discriminator was removed — do not reintroduce it.
 - **Do not add new runtime dependencies on Tarkov task `alternatives`.** Upstream removed the field; branch relationships must be compiled from task-status failure conditions. Existing uses remain until the shared progress engine replaces them.
 - **Keep changes scoped** to the requested task. Prefer small, reviewable diffs.
 
@@ -143,6 +167,7 @@ Naming:
 - Pinia stores in `app/stores/`, auto-registered by Nuxt. Use `pinia-plugin-persistedstate` where applicable.
 - Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
+- Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling
@@ -173,11 +198,16 @@ Naming:
 - Treat new comments created by the latest pushed commit as part of the same review cycle. Repeat until checks pass, reviews are complete, and unresolved thread count is zero.
 - After merge, run one fresh review-thread query to verify zero unresolved threads. Post-merge follow-ups are exceptional recovery, not the normal review workflow.
 
-- Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks).
+- Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks) for the first in-flight task.
 - Before edits, run `git status --short --branch`.
 - Never mix unrelated changes in one commit or PR.
 - Do not use `git stash` for normal context switching unless the user asks.
-- Do not create a worktree unless the user explicitly asks, the current checkout is unsafe, or an existing PR/branch must be tested separately. If a worktree is truly needed, explain why, name the exact path and branch, keep repeating that path in status updates, and run `bash scripts/setup-worktree.sh` before the first commit so husky + lint-staged actually run.
+- Worktree policy (parallel work isolation):
+  - Default to the main checkout for the first in-flight task. Do not create a worktree for solo work or for batched pre-PR edits the user is accumulating before opening a PR.
+  - Create a worktree only when starting a SECOND concurrent task while the first is still in flight (uncommitted edits in the main checkout, or an open PR waiting on CI/review). The first task stays in the main checkout; the new task gets a worktree. This is what enables parallel agents without one agent reverting another's uncommitted changes.
+  - Worktree convention: path `.wt/<branch>` (co-located, gitignored), created via `bash scripts/wt.sh add <branch>`. The script runs `scripts/setup-worktree.sh` so husky + lint-staged work on commit. State the worktree path in every status update so the user knows which checkout the agent is operating in.
+  - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. Never run `git restore`, `git checkout --`, `git clean`, or `git reset` on a working tree with changes you did not make — if the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
+  - After a worktree's PR merges, remove it with `bash scripts/wt.sh rm <branch>` so stale worktrees and branches don't accumulate.
 - Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `wip`.
@@ -217,8 +247,14 @@ Naming:
 - Generated codebase knowledge base (start at the index): `docs/agent-context/summary/index.md`
 - Style, testing, and validation details: `docs/agent-context/style-and-validation.md`
 - Architecture: `docs/ARCHITECTURE.md`
+- System specs (caching, data fetching, overlay, precompute): `docs/SYSTEMS.md`
 - Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
-- Contributing: `.github/CONTRIBUTING.md`
+- Contributing (human workflow entry point): `.github/CONTRIBUTING.md`
+- Local development setup and coding standards: `docs/contributing/development.md`
+- Pull-request requirements: `docs/contributing/pull-requests.md`
+- Security policy: `SECURITY.md`
+- Support routing: `SUPPORT.md`
+- Code of conduct: `CODE_OF_CONDUCT.md`
 - Runbook: `docs/runbook.md`
 - API docs: `docs/API.md`
 - Workflow automation: `docs/WORKFLOW_AUTOMATION.md`

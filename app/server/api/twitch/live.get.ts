@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery, setResponseHeaders } from 'h3';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 const logger = createLogger('twitch-live');
 const TWITCH_GQL_URL = 'https://gql.twitch.tv/gql';
 const CACHE_TTL_MS = 60_000;
@@ -26,7 +27,11 @@ export default defineEventHandler(async (event) => {
   try {
     const response = await fetch(TWITCH_GQL_URL, {
       method: 'POST',
-      headers: { 'Client-ID': twitchClientId as string, 'Content-Type': 'application/json' },
+      headers: {
+        'Client-ID': twitchClientId as string,
+        'Content-Type': 'application/json',
+        'User-Agent': TARKOVTRACKER_USER_AGENT,
+      },
       body: JSON.stringify({
         query: 'query($login:String!){user(login:$login){stream{id}}}',
         variables: { login: channel },

@@ -14,7 +14,7 @@ import {
 } from '@/server/utils/tarkov-json';
 type TestJsonFetcher = <T = unknown>(
   url: string,
-  request: { headers: { Accept: string }; retry: number; timeout: number }
+  request: { headers: Record<string, string>; retry: number; timeout: number }
 ) => Promise<T>;
 const createFetcher = (responses: Record<string, unknown>) =>
   vi.fn(async (url: string) => {
@@ -469,12 +469,12 @@ describe('tarkov JSON adapters', () => {
       [{ id: 'item1' }],
       [{ id: 'item2' }, { id: 'missing-item' }],
     ]);
-    expect(objectives?.objectives?.[0]?.__typename).toBe('TaskObjectiveItem');
+    expect(objectives?.objectives?.[0]?.type).toBe('giveItem');
     expect(objectives?.objectives?.[0]?.items?.[0]).toEqual({ id: 'item1' });
     expect(objectives?.objectives?.[0]?.items?.[24]).toEqual({ id: 'bulk-item-23' });
     expect(objectives?.objectives?.[0]?.items?.[25]).toEqual({ id: 'bulk-item-24' });
     expect(objectives?.objectives?.[1]).toMatchObject({
-      __typename: 'TaskObjectiveQuestItem',
+      type: 'findQuestItem',
       questItem: { id: 'questItem1', name: 'Bronze pocket watch' },
     });
     const rewards = adaptTaskRewardsResponse(tasksPayload, { tradersPayload }).data.tasks[0];
@@ -489,7 +489,7 @@ describe('tarkov JSON adapters', () => {
       tradersPayload,
     }).data.tasks[0];
     expect(objectives?.objectives?.[2]).toMatchObject({
-      __typename: 'TaskObjectiveSkill',
+      type: 'skill',
       skillLevel: {
         name: 'Vitality',
         level: 5,
@@ -515,7 +515,7 @@ describe('tarkov JSON adapters', () => {
       tradersPayload,
     }).data.tasks[0];
     expect(objectives?.objectives?.[0]).toMatchObject({
-      __typename: 'TaskObjectiveItem',
+      type: 'giveItem',
       maps: [{ id: 'map1', name: 'Customs' }],
       items: expect.arrayContaining([expect.objectContaining({ id: 'item1', name: 'Salewa' })]),
     });
@@ -543,11 +543,11 @@ describe('tarkov JSON adapters', () => {
       hideoutPayload,
       tradersPayload,
     }).data.prestige[0];
-    expect(prestige?.conditions?.map((condition) => condition.__typename)).toEqual([
-      'TaskObjectivePlayerLevel',
-      'TaskObjectiveTaskStatus',
-      'TaskObjectiveHideoutStation',
-      'TaskObjectiveItem',
+    expect(prestige?.conditions?.map((condition) => condition.type)).toEqual([
+      'playerLevel',
+      'taskStatus',
+      'hideoutStation',
+      'haveItem',
     ]);
     expect(prestige?.conditions?.[1]?.task).toMatchObject({ id: 'task1', name: 'Debut' });
   });

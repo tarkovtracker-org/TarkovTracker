@@ -100,8 +100,28 @@ const makeFetchMock = ({
     }
     return new Response('Not Found', { status: 404 });
   });
-const buildRequest = (path: string, init?: RequestInit) =>
-  new Request(`https://api.tarkovtracker.org${path}`, init);
+const TEST_IP_HASH_SECRET = 'test-ip-hash-secret';
+const expectedIpHash = async (ip: string, secret: string) => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(sig))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+const buildRequest = (path: string, init?: RequestInit) => {
+  const headers = new Headers(init?.headers);
+  if (!headers.has('User-Agent')) {
+    headers.set('User-Agent', 'TestClient/1.0 (+https://example.com)');
+  }
+  return new Request(`https://api.tarkovtracker.org${path}`, { ...init, headers });
+};
 const flushAsync = () => new Promise((resolve) => setTimeout(resolve, 0));
 describe('ApiGatewayRateLimiter durable object', () => {
   afterEach(() => {
@@ -145,93 +165,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(afterMidnight.allowed).toBe(true);
     expect(afterMidnight.resetAt).toBe(Date.parse('2026-07-07T00:00:00Z'));
   });
-  it('sliding mode frees capacity as old requests age out', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-    const limiter = new ApiGatewayRateLimiter(makeState());
-    const payload = { limit: 3, windowSec: 60, mode: 'sliding' };
-    for (let i = 0; i < 3; i++) {
-      const res = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-      };
-      expect(res.allowed).toBe(true);
-    }
-    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(blocked.allowed).toBe(false);
-    vi.setSystemTime(new Date('2026-07-05T12:00:30Z'));
-    const stillBlocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(stillBlocked.allowed).toBe(false);
-    vi.setSystemTime(new Date('2026-07-05T12:01:01Z'));
-    const allowedAgain = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      remaining: number;
-    };
-    expect(allowedAgain.allowed).toBe(true);
-  });
-  it('refunds a consumed fixed-window slot on demand', async () => {
-    const limiter = new ApiGatewayRateLimiter(makeState());
-    const payload = { limit: 2, windowSec: 86400, anchor: 'utc-day' };
-    await limiter.fetch(limiterRequest(payload));
-    await limiter.fetch(limiterRequest(payload));
-    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(blocked.allowed).toBe(false);
-    await limiter.fetch(limiterRequest({ refund: true }));
-    const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      remaining: number;
-    };
-    expect(afterRefund.allowed).toBe(true);
-    expect(afterRefund.remaining).toBe(0);
-  });
-  it('does not refund across a UTC-day rollover when resetAt no longer matches', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-05T23:59:58Z'));
-    const limiter = new ApiGatewayRateLimiter(makeState());
-    const payload = { limit: 1, windowSec: 86400, anchor: 'utc-day' };
-    const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      resetAt: number;
-    };
-    expect(consumed.allowed).toBe(true);
-    expect(consumed.resetAt).toBe(Date.parse('2026-07-06T00:00:00Z'));
-    // Roll into the next UTC day and consume the new window's only slot.
-    vi.setSystemTime(new Date('2026-07-06T00:00:02Z'));
-    const newDay = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      resetAt: number;
-    };
-    expect(newDay.allowed).toBe(true);
-    expect(newDay.resetAt).toBe(Date.parse('2026-07-07T00:00:00Z'));
-    // A delayed refund for the previous day must not steal the new day's slot.
-    await limiter.fetch(limiterRequest({ refund: true, resetAt: consumed.resetAt }));
-    const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-    };
-    expect(blocked.allowed).toBe(false);
-    vi.useRealTimers();
-  });
-  it('still refunds when resetAt matches the current window', async () => {
-    const limiter = new ApiGatewayRateLimiter(makeState());
-    const payload = { limit: 1, windowSec: 86400, anchor: 'utc-day' };
-    const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      resetAt: number;
-    };
-    expect(consumed.allowed).toBe(true);
-    await limiter.fetch(limiterRequest({ refund: true, resetAt: consumed.resetAt }));
-    const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-      allowed: boolean;
-      remaining: number;
-    };
-    expect(afterRefund.allowed).toBe(true);
-    expect(afterRefund.remaining).toBe(0);
-  });
   it('keeps legacy fixed-window behavior for payloads without mode or anchor', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const payload = { limit: 2, windowSec: 60 };
@@ -246,65 +179,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       allowed: boolean;
     };
     expect(blocked.allowed).toBe(false);
-  });
-  it('refunds a sliding-window slot by removing the consumedAt timestamp', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-      const limiter = new ApiGatewayRateLimiter(makeState());
-      const payload = { limit: 2, windowSec: 60, mode: 'sliding' };
-      const first = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-        remaining: number;
-        consumedAt: number;
-      };
-      expect(first.allowed).toBe(true);
-      expect(first.consumedAt).toBeDefined();
-      const second = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-        remaining: number;
-        consumedAt: number;
-      };
-      expect(second.allowed).toBe(true);
-      const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-      };
-      expect(blocked.allowed).toBe(false);
-      // Refund the first slot using its consumedAt timestamp.
-      await limiter.fetch(limiterRequest({ refund: true, consumedAt: first.consumedAt }));
-      const afterRefund = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-        remaining: number;
-      };
-      expect(afterRefund.allowed).toBe(true);
-      expect(afterRefund.remaining).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('does not refund a sliding-window slot when consumedAt is missing', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-      const limiter = new ApiGatewayRateLimiter(makeState());
-      const payload = { limit: 1, windowSec: 60, mode: 'sliding' };
-      const consumed = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-      };
-      expect(consumed.allowed).toBe(true);
-      const blocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-      };
-      expect(blocked.allowed).toBe(false);
-      // Refund without consumedAt should be a no-op for sliding windows.
-      await limiter.fetch(limiterRequest({ refund: true }));
-      const stillBlocked = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
-        allowed: boolean;
-      };
-      expect(stillBlocked.allowed).toBe(false);
-    } finally {
-      vi.useRealTimers();
-    }
   });
   it('treats expired fixed-window persisted state as absent on load', async () => {
     vi.useFakeTimers();
@@ -327,81 +201,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.useRealTimers();
     }
   });
-  it('treats expired sliding-window persisted state as absent on load', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-      const state = makeState();
-      await state.storage.put('state', {
-        count: 3,
-        resetAt: Date.parse('2026-07-05T11:59:00Z'),
-        windowSec: 60,
-        mode: 'sliding',
-        timestamps: [Date.parse('2026-07-05T11:58:00Z')],
-      });
-      const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (
-        await limiter.fetch(limiterRequest({ limit: 3, windowSec: 60, mode: 'sliding' }))
-      ).json()) as { allowed: boolean; remaining: number };
-      expect(res.allowed).toBe(true);
-      expect(res.remaining).toBe(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('prunes expired timestamps from a sliding window with mixed entries', async () => {
-    vi.useFakeTimers();
-    try {
-      const baseTime = new Date('2026-07-05T12:00:00Z');
-      vi.setSystemTime(baseTime);
-      const state = makeState();
-      const expiredTs = Date.parse('2026-07-05T11:58:30Z');
-      const validTs = Date.parse('2026-07-05T11:59:30Z');
-      await state.storage.put('state', {
-        count: 2,
-        resetAt: validTs + 60_000,
-        windowSec: 60,
-        mode: 'sliding',
-        timestamps: [expiredTs, validTs],
-      });
-      const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (
-        await limiter.fetch(limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' }))
-      ).json()) as { allowed: boolean; remaining: number };
-      expect(res.allowed).toBe(true);
-      expect(res.remaining).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('keeps younger sliding hits when stored resetAt has already elapsed', async () => {
-    vi.useFakeTimers();
-    try {
-      // resetAt = oldest + window. At cold load the oldest is past cutoff but
-      // two younger hits remain; discarding whole state would under-enforce.
-      vi.setSystemTime(new Date('2026-07-05T12:00:00.100Z'));
-      const state = makeState();
-      const olderTs = Date.parse('2026-07-05T11:59:00Z');
-      const midTs = Date.parse('2026-07-05T11:59:20Z');
-      const youngerTs = Date.parse('2026-07-05T11:59:40Z');
-      await state.storage.put('state', {
-        count: 3,
-        resetAt: olderTs + 60_000,
-        windowSec: 60,
-        mode: 'sliding',
-        timestamps: [olderTs, midTs, youngerTs],
-      });
-      const limiter = new ApiGatewayRateLimiter(state);
-      const res = (await (
-        await limiter.fetch(limiterRequest({ limit: 2, windowSec: 60, mode: 'sliding' }))
-      ).json()) as { allowed: boolean; remaining: number };
-      expect(res.allowed).toBe(false);
-      expect(res.remaining).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('handles config change from sliding to fixed-window on expired state', async () => {
+  it('treats legacy sliding-window state as a config change and starts a fresh fixed window', async () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
@@ -436,17 +236,10 @@ describe('ApiGatewayRateLimiter durable object', () => {
     const state = makeState();
     const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
     const limiter = new ApiGatewayRateLimiter(state);
-    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding', retain: true }));
     await limiter.fetch(
       limiterRequest({ limit: 5, windowSec: 60, anchor: 'utc-day', retain: true })
     );
-    await limiter.fetch(limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true }));
-    const throttled = (await (
-      await limiter.fetch(
-        limiterRequest({ limit: 1, windowSec: 60, mode: 'sliding', retain: true })
-      )
-    ).json()) as { allowed: boolean };
-    expect(throttled.allowed).toBe(false);
+    await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, retain: true }));
     expect(setAlarmSpy).not.toHaveBeenCalled();
   });
   it('schedules cleanup alarm by default when retain is omitted', async () => {
@@ -463,59 +256,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       expect(setAlarmSpy).toHaveBeenCalledWith(body.resetAt + 1000);
       const stored = await state.storage.get<RateLimitState>('state');
       expect(stored?.ephemeral).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('schedules cleanup alarm for default sliding-window requests', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-      const state = makeState();
-      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-      const limiter = new ApiGatewayRateLimiter(state);
-      const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60, mode: 'sliding' }));
-      const body = (await res.json()) as { allowed: boolean; resetAt: number };
-      expect(body.allowed).toBe(true);
-      expect(setAlarmSpy).toHaveBeenCalledTimes(1);
-      expect(setAlarmSpy).toHaveBeenCalledWith(body.resetAt + 1000);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('schedules cleanup alarm for default fixed-window requests', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-      const state = makeState();
-      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-      const limiter = new ApiGatewayRateLimiter(state);
-      const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
-      const body = (await res.json()) as { allowed: boolean; resetAt: number };
-      expect(body.allowed).toBe(true);
-      expect(setAlarmSpy).toHaveBeenCalledTimes(1);
-      expect(setAlarmSpy).toHaveBeenCalledWith(body.resetAt + 1000);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('keeps cleanup alarm scheduled on throttled sliding-window deny path', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
-      const state = makeState();
-      const limiter = new ApiGatewayRateLimiter(state);
-      const payload = { limit: 1, windowSec: 60, mode: 'sliding' };
-      const first = await limiter.fetch(limiterRequest(payload));
-      const firstBody = (await first.json()) as { allowed: boolean; resetAt: number };
-      expect(firstBody.allowed).toBe(true);
-      const alarmAfterAllow = await state.storage.getAlarm();
-      expect(alarmAfterAllow).toBe(firstBody.resetAt + 1000);
-      const throttled = await limiter.fetch(limiterRequest(payload));
-      const body = (await throttled.json()) as { allowed: boolean; resetAt: number };
-      expect(body.allowed).toBe(false);
-      const alarmAfterDeny = await state.storage.getAlarm();
-      expect(alarmAfterDeny).toBe(body.resetAt + 1000);
     } finally {
       vi.useRealTimers();
     }
@@ -560,37 +300,6 @@ describe('ApiGatewayRateLimiter durable object', () => {
       const limiter = new ApiGatewayRateLimiter(state);
       await limiter.alarm();
       expect(setAlarmSpy).toHaveBeenCalledWith(resetAt + 1000);
-      const stored = await state.storage.get<RateLimitState>('state');
-      expect(stored).toBeDefined();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('alarm keeps younger sliding hits when stored resetAt has already elapsed', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-07-05T12:00:00.100Z'));
-      const state = makeState();
-      const olderTs = Date.parse('2026-07-05T11:59:00Z');
-      const midTs = Date.parse('2026-07-05T11:59:20Z');
-      const youngerTs = Date.parse('2026-07-05T11:59:40Z');
-      const staleResetAt = olderTs + 60_000;
-      await state.storage.put('state', {
-        count: 3,
-        resetAt: staleResetAt,
-        windowSec: 60,
-        mode: 'sliding',
-        timestamps: [olderTs, midTs, youngerTs],
-        ephemeral: true,
-      });
-      const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
-      const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
-      const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-      const limiter = new ApiGatewayRateLimiter(state);
-      await limiter.alarm();
-      expect(deleteAlarmSpy).not.toHaveBeenCalled();
-      expect(deleteAllSpy).not.toHaveBeenCalled();
-      expect(setAlarmSpy).toHaveBeenCalledWith(midTs + 60_000 + 1000);
       const stored = await state.storage.get<RateLimitState>('state');
       expect(stored).toBeDefined();
     } finally {
@@ -674,7 +383,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
     }
   });
 });
-describe('tiered quotas in the worker', () => {
+describe('daily quota and abuse gate', () => {
   beforeEach(() => {
     deleteMemoryCache('tier:user-free');
     deleteMemoryCache('tier:user-scav');
@@ -682,8 +391,9 @@ describe('tiered quotas in the worker', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
-  it('applies free-tier daily and burst limits keyed by user id', async () => {
+  it('applies free-tier daily limit keyed by user id (single DO call)', async () => {
     const calls: LimiterCall[] = [];
     const env: Env = {
       API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
@@ -702,19 +412,12 @@ describe('tiered quotas in the worker', () => {
       env
     );
     expect(res.status).toBe(200);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
     expect(calls[0].key).toBe('daily-read:user-free');
     expect(calls[0].body).toMatchObject({
       limit: TIER_LIMITS.free.readsPerDay,
       windowSec: 86400,
       anchor: 'utc-day',
-      retain: true,
-    });
-    expect(calls[1].key).toBe('burst-read:user-free');
-    expect(calls[1].body).toMatchObject({
-      limit: TIER_LIMITS.free.burstPerMinute,
-      windowSec: 60,
-      mode: 'sliding',
       retain: true,
     });
   });
@@ -745,14 +448,14 @@ describe('tiered quotas in the worker', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('X-RateLimit-Limit')).toBe(String(TIER_LIMITS.chad.readsPerDay));
     expect(calls[0].body).toMatchObject({ limit: TIER_LIMITS.chad.readsPerDay });
-    expect(calls[1].body).toMatchObject({ limit: TIER_LIMITS.chad.burstPerMinute });
   });
   it('returns an upgrade message when a free user exhausts the daily quota', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
     const rpcCalls: Array<Record<string, unknown>> = [];
     const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => ({
-        allowed: !String(call.key).startsWith('daily-'),
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: false,
         remaining: 0,
         resetAt: Date.now() + 1000,
       })),
@@ -775,46 +478,17 @@ describe('tiered quotas in the worker', () => {
     await flushAsync();
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
-  });
-  it('rejects inherited object keys as tiers', () => {
-    expect(isKnownTier('__proto__')).toBe(false);
-    expect(isKnownTier('constructor')).toBe(false);
-    expect(isKnownTier('chad')).toBe(true);
-  });
-  it('refunds the daily slot and returns daily headers when burst throttles', async () => {
-    const calls: LimiterCall[] = [];
-    const burstResetAt = Date.now() + 30_000;
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
-        if (call.body.refund === true) {
-          return { allowed: true, remaining: 0, resetAt: burstResetAt };
-        }
-        if (String(call.key).startsWith('burst-')) {
-          return { allowed: false, remaining: 0, resetAt: burstResetAt };
-        }
-        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000 };
-      }),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    const res = await worker.fetch(
-      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
-      env
-    );
-    expect(res.status).toBe(429);
-    // X-RateLimit-* reflects the daily quota; remaining includes the refunded slot.
-    expect(res.headers.get('X-RateLimit-Limit')).toBe(String(TIER_LIMITS.free.readsPerDay));
-    expect(res.headers.get('X-RateLimit-Remaining')).toBe('6');
-    const retryAfter = Number(res.headers.get('Retry-After'));
-    expect(retryAfter).toBeGreaterThan(0);
-    expect(retryAfter).toBeLessThanOrEqual(31);
-    await flushAsync();
-    const refunds = calls.filter((call) => call.body.refund === true);
-    expect(refunds).toHaveLength(1);
-    expect(refunds[0].key).toBe('daily-read:user-free');
+    const throttleLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('daily_quota_429'));
+    expect(throttleLog).toBeDefined();
+    expect(JSON.parse(throttleLog!)).toMatchObject({
+      event: 'daily_quota_429',
+      action: 'token-info',
+      kind: 'read',
+      user_id: 'user-free',
+      token_id: 'token-1',
+    });
   });
   it('records successful usage through the record_api_usage rpc', async () => {
     const calls: LimiterCall[] = [];
@@ -851,58 +525,29 @@ describe('tiered quotas in the worker', () => {
       p_user_agent: 'TestClient/1.0',
     });
   });
-  it('checks the per-IP backstop when CF-Connecting-IP is present', async () => {
+  it('rejects inherited object keys as tiers', () => {
+    expect(isKnownTier('__proto__')).toBe(false);
+    expect(isKnownTier('constructor')).toBe(false);
+    expect(isKnownTier('chad')).toBe(true);
+  });
+  it('returns 429 when the IP abuse gate limit is exceeded', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const calls: LimiterCall[] = [];
+    const abuseLimit = vi.fn().mockResolvedValue({ success: false });
     const env: Env = {
       API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
         allowed: true,
         remaining: 5,
         resetAt: Date.now() + 1000,
       })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
       SUPABASE_URL: 'https://supabase.example',
       SUPABASE_ANON_KEY: 'anon',
       SUPABASE_SERVICE_ROLE_KEY: 'service',
       ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    const res = await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
-      }),
-      env
-    );
-    expect(res.status).toBe(200);
-    const ipCall = calls.find((c) => c.key.startsWith('ip-read:'));
-    expect(ipCall).toBeDefined();
-    expect(ipCall?.body).toMatchObject({ mode: 'sliding', windowSec: 3600 });
-  });
-  it('returns 429 and refunds daily+burst when the per-IP backstop trips', async () => {
-    const calls: LimiterCall[] = [];
-    const rpcCalls: Array<Record<string, unknown>> = [];
-    const ipResetAt = Date.now() + 1800_000;
-    const burstConsumedAt = Date.now();
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
-        if (call.body.refund === true) {
-          return { allowed: true, remaining: 0, resetAt: ipResetAt };
-        }
-        if (String(call.key).startsWith('ip-')) {
-          return { allowed: false, remaining: 0, resetAt: ipResetAt };
-        }
-        return {
-          allowed: true,
-          remaining: 5,
-          resetAt: Date.now() + 1000,
-          consumedAt: burstConsumedAt,
-        };
-      }),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
     const res = await worker.fetch(
       buildRequest('/token', {
         method: 'GET',
@@ -911,43 +556,310 @@ describe('tiered quotas in the worker', () => {
       env
     );
     expect(res.status).toBe(429);
-    const retryAfter = Number(res.headers.get('Retry-After'));
-    expect(retryAfter).toBeGreaterThan(0);
-    await flushAsync();
-    const refunds = calls.filter((c) => c.body.refund === true);
-    expect(refunds).toHaveLength(2);
-    expect(refunds.some((r) => r.key === 'daily-read:user-free')).toBe(true);
-    const burstRefund = refunds.find((r) => r.key === 'burst-read:user-free');
-    expect(burstRefund).toBeDefined();
-    expect(burstRefund?.body.consumedAt).toBe(burstConsumedAt);
-    expect(rpcCalls).toHaveLength(1);
-    expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
+    expect(abuseLimit).toHaveBeenCalledWith({ key: 'api:203.0.113.1' });
+    // No DO calls — abuse gate rejects before token validation.
+    expect(calls).toHaveLength(0);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_429'));
+    expect(warnLog).toBeDefined();
+    expect(warnLog).not.toContain('203.0.113.1');
+    expect(JSON.parse(warnLog!)).toMatchObject({
+      event: 'abuse_gate_429',
+      action: 'token-info',
+      ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
+    });
   });
-  it('fails open when the per-IP backstop limiter is unavailable (503)', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('skips the abuse gate when the binding is absent', async () => {
     const calls: LimiterCall[] = [];
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].key).toBe('daily-read:user-free');
+  });
+  it('fails open and logs when the abuse gate binding throws', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const abuseLimit = vi
+      .fn()
+      .mockRejectedValue(new Error('limiter binding failed for api:203.0.113.1'));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+      }),
+      env
+    );
+    // Fail open: request proceeds to token validation and daily quota.
+    expect(res.status).toBe(200);
+    expect(abuseLimit).toHaveBeenCalledWith({ key: 'api:203.0.113.1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].key).toBe('daily-read:user-free');
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    const parsed = JSON.parse(warnLog!);
+    expect(parsed).toMatchObject({
+      event: 'abuse_gate_unavailable',
+      action: 'token-info',
+      ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
+      reason: 'binding_error',
+      error_name: 'Error',
+      error_message: 'limiter binding failed for api:[redacted]',
+    });
+    expect(warnLog).not.toContain('203.0.113.1');
+  });
+  it('redacts a mixed-case IPv6 address even when the binding lowercases it', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const mixedCaseIp = '2001:DB8::1';
+    const abuseLimit = vi
+      .fn()
+      .mockRejectedValue(new Error('limiter binding failed for api:2001:db8::1'));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': mixedCaseIp },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    expect(JSON.parse(warnLog!)).toMatchObject({
+      event: 'abuse_gate_unavailable',
+      reason: 'binding_error',
+      error_message: 'limiter binding failed for api:[redacted]',
+    });
+    expect(warnLog).not.toContain('2001:db8::1');
+    expect(warnLog).not.toContain('2001:DB8::1');
+  });
+  it('redacts an IP that straddles the 200-char truncation boundary', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const ip = '203.0.113.99';
+    // Prefix is 24 chars; padding of 166 places the IP at char 190, so it
+    // straddles the 200-char boundary (ends at 202). After replacement,
+    // [redacted] (10 chars) lands at 190-199, fitting within the 200 cap.
+    const prefix = 'limiter binding failed: ';
+    const padding = 'x'.repeat(200 - prefix.length - ip.length + 2);
+    const errorMessage = `${prefix}${padding}${ip} trailing`;
+    const abuseLimit = vi.fn().mockRejectedValue(new Error(errorMessage));
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+      IP_HASH_SECRET: TEST_IP_HASH_SECRET,
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': ip },
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const warnLog = warnSpy.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => s.includes('abuse_gate_unavailable'));
+    expect(warnLog).toBeDefined();
+    expect(warnLog).toContain('[redacted]');
+    expect(warnLog).not.toContain(ip);
+    expect(warnLog).not.toContain('203.0.113.');
+  });
+  for (const property of ['name', 'message'] as const) {
+    it(`fails open when an abuse-gate error ${property} getter throws`, async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const limiterError = new Error('limiter binding failed');
+      Object.defineProperty(limiterError, property, {
+        get: () => {
+          throw new Error(`${property} getter failed`);
+        },
+      });
+      const calls: LimiterCall[] = [];
+      const env: Env = {
+        API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+          allowed: true,
+          remaining: 5,
+          resetAt: Date.now() + 1000,
+        })),
+        API_ABUSE_LIMITER: {
+          limit: vi.fn().mockRejectedValue(limiterError),
+        } as unknown as RateLimit,
+        SUPABASE_URL: 'https://supabase.example',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+        ALLOWED_ORIGIN: '*',
+      };
+      vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+      const res = await worker.fetch(
+        buildRequest('/token', {
+          method: 'GET',
+          headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+        }),
+        env
+      );
+      expect(res.status).toBe(200);
+      expect(calls).toHaveLength(1);
+      const warnLog = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((entry) => entry.includes('abuse_gate_unavailable'));
+      expect(warnLog).toBeDefined();
+      expect(JSON.parse(warnLog!)).toMatchObject({
+        event: 'abuse_gate_unavailable',
+        reason: 'binding_error',
+        [`error_${property}`]: 'Unknown',
+      });
+    });
+  }
+  const malformedQuotaCases: Array<{
+    name: string;
+    payload: () => Record<string, unknown>;
+  }> = [
+    {
+      name: 'missing allowed',
+      payload: () => ({ remaining: 5, resetAt: Date.now() + 60_000 }),
+    },
+    {
+      name: 'missing resetAt',
+      payload: () => ({ allowed: true, remaining: 5 }),
+    },
+    {
+      name: 'expired resetAt',
+      payload: () => ({ allowed: false, remaining: 0, resetAt: Date.now() - 1000 }),
+    },
+    {
+      name: 'out-of-range remaining',
+      payload: () => ({
+        allowed: true,
+        remaining: Number.MAX_SAFE_INTEGER,
+        resetAt: Date.now() + 60_000,
+      }),
+    },
+    {
+      name: 'fractional remaining',
+      payload: () => ({ allowed: true, remaining: 0.5, resetAt: Date.now() + 60_000 }),
+    },
+    {
+      name: 'contradictory allowed state',
+      payload: () => ({ allowed: false, remaining: 3, resetAt: Date.now() + 60_000 }),
+    },
+    {
+      name: 'far-future resetAt',
+      payload: () => ({ allowed: false, remaining: 0, resetAt: Date.now() + 86_400_000 * 2 }),
+    },
+  ];
+  for (const { name, payload } of malformedQuotaCases) {
+    it(`treats a malformed daily quota DO payload (${name}) as unavailable and fails open`, async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const malformedPayload = payload();
+      const rpcCalls: Array<Record<string, unknown>> = [];
+      const env: Env = {
+        API_GATEWAY_LIMITER: {
+          idFromName: (key: string) => key,
+          get: () => ({
+            fetch: async () =>
+              new Response(JSON.stringify(malformedPayload), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              }),
+          }),
+        } as unknown as Env['API_GATEWAY_LIMITER'],
+        SUPABASE_URL: 'https://supabase.example',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+        ALLOWED_ORIGIN: '*',
+      };
+      vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
+      const res = await worker.fetch(
+        buildRequest('/token', {
+          method: 'GET',
+          headers: { Authorization: 'Bearer PVP_abc123' },
+        }),
+        env
+      );
+      expect(res.status).toBe(200);
+      await flushAsync();
+      expect(rpcCalls).toHaveLength(1);
+      expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 0, p_reads: 1 });
+      const warnLog = warnSpy.mock.calls
+        .map((c) => String(c[0]))
+        .find((s) => s.includes('daily_quota_unavailable'));
+      expect(warnLog).toBeDefined();
+      expect(JSON.parse(warnLog!)).toMatchObject({
+        event: 'daily_quota_unavailable',
+        action: 'token-info',
+        user_id: 'user-free',
+        token_id: 'token-1',
+        reason: 'bad_json',
+      });
+    });
+  }
+  it('fails open and logs when the daily quota DO is unavailable', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const rpcCalls: Array<Record<string, unknown>> = [];
-    // Custom limiter: IP-keyed DOs return HTTP 500 (non-OK) so rateLimit
-    // produces status 503; all other keys behave normally.
     const env: Env = {
       API_GATEWAY_LIMITER: {
         idFromName: (name: string) => name,
-        get: (id: unknown) => ({
-          fetch: async (_url: string, init?: RequestInit) => {
-            const call: LimiterCall = {
-              key: String(id),
-              body: JSON.parse(String(init?.body || '{}')),
-            };
-            calls.push(call);
-            if (String(id).startsWith('ip-')) {
-              return new Response('Internal Error', { status: 500 });
-            }
-            return new Response(
-              JSON.stringify({ allowed: true, remaining: 5, resetAt: Date.now() + 1000 }),
-              { status: 200, headers: { 'content-type': 'application/json' } }
-            );
-          },
+        get: () => ({
+          fetch: async () => new Response('Internal Error', { status: 500 }),
         }),
       } as unknown as Env['API_GATEWAY_LIMITER'],
       SUPABASE_URL: 'https://supabase.example',
@@ -959,250 +871,25 @@ describe('tiered quotas in the worker', () => {
     const res = await worker.fetch(
       buildRequest('/token', {
         method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
+        headers: { Authorization: 'Bearer PVP_abc123' },
       }),
       env
     );
-    // Request succeeds despite IP limiter being unavailable.
     expect(res.status).toBe(200);
     await flushAsync();
-    // No refund calls — the primary slots stay consumed because the request is served.
-    const refunds = calls.filter((c) => c.body.refund === true);
-    expect(refunds).toHaveLength(0);
-    // Primary daily and burst consumption remains in place (3 calls: daily, burst, ip).
-    expect(calls).toHaveLength(3);
-    expect(calls[0].key).toBe('daily-read:user-free');
-    expect(calls[1].key).toBe('burst-read:user-free');
-    expect(calls[2].key).toBe('ip-read:203.0.113.1');
-    // Usage tracked as non-throttled.
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 0, p_reads: 1 });
-    // No throttle log emitted for the infrastructure failure.
-    const throttleLog = logSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('rate_limit_429'));
-    expect(throttleLog).toBeUndefined();
-    // Availability warning emitted so the failure is observable.
     const warnLog = warnSpy.mock.calls
       .map((c) => String(c[0]))
-      .find((s) => s.includes('ip_backstop_unavailable'));
+      .find((s) => s.includes('daily_quota_unavailable'));
     expect(warnLog).toBeDefined();
     const parsed = JSON.parse(warnLog!);
     expect(parsed).toMatchObject({
-      event: 'ip_backstop_unavailable',
+      event: 'daily_quota_unavailable',
       action: 'token-info',
       user_id: 'user-free',
       token_id: 'token-1',
+      reason: 'http_status',
     });
-    // The warning must never leak the raw client IP or the ip_key (which
-    // embeds the raw IP). Only the HMAC-derived ip_hash is allowed.
-    expect(parsed.ip_key).toBeUndefined();
-    expect(parsed.ip_hash).toBeNull();
-    expect(warnLog).not.toContain('203.0.113.1');
-    warnSpy.mockRestore();
-    logSpy.mockRestore();
-  });
-  it('ip_backstop_unavailable warning uses hashed IP when secret is set', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const env: Env = {
-      API_GATEWAY_LIMITER: {
-        idFromName: (name: string) => name,
-        get: (id: unknown) => ({
-          fetch: async (_url: string, _init?: RequestInit) => {
-            const key = String(id);
-            if (key.startsWith('ip-')) {
-              return new Response('Internal Error', { status: 500 });
-            }
-            return new Response(
-              JSON.stringify({ allowed: true, remaining: 5, resetAt: Date.now() + 1000 }),
-              { status: 200, headers: { 'content-type': 'application/json' } }
-            );
-          },
-        }),
-      } as unknown as Env['API_GATEWAY_LIMITER'],
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-      IP_HASH_SECRET: 'test-secret',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    const res = await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
-      }),
-      env
-    );
-    expect(res.status).toBe(200);
-    const warnLog = warnSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('ip_backstop_unavailable'));
-    expect(warnLog).toBeDefined();
-    const parsed = JSON.parse(warnLog!);
-    expect(parsed.ip_key).toBeUndefined();
-    expect(parsed.ip_hash).toMatch(/^[0-9a-f]{16}$/);
-    expect(warnLog).not.toContain('203.0.113.1');
-    warnSpy.mockRestore();
-    logSpy.mockRestore();
-  });
-  it('emits a structured 429 log line with hashed IP on daily throttle', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const calls: LimiterCall[] = [];
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => ({
-        allowed: !String(call.key).startsWith('daily-'),
-        remaining: 0,
-        resetAt: Date.now() + 1000,
-      })),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-      IP_HASH_SECRET: 'test-secret',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
-      }),
-      env
-    );
-    const throttleLog = logSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('rate_limit_429'));
-    expect(throttleLog).toBeDefined();
-    const parsed = JSON.parse(throttleLog!);
-    expect(parsed).toMatchObject({
-      event: 'rate_limit_429',
-      action: 'token-info',
-      bucket: 'daily',
-      user_id: 'user-free',
-    });
-    expect(parsed.ip_hash).toMatch(/^[0-9a-f]{16}$/);
-    expect(parsed.token_id).toBe('token-1');
-    expect(parsed.token_suffix).toBeUndefined();
-    logSpy.mockRestore();
-  });
-  it('logs ip_hash as null when IP_HASH_SECRET is not set', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const calls: LimiterCall[] = [];
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => ({
-        allowed: !String(call.key).startsWith('daily-'),
-        remaining: 0,
-        resetAt: Date.now() + 1000,
-      })),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
-      }),
-      env
-    );
-    const throttleLog = logSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('rate_limit_429'));
-    expect(throttleLog).toBeDefined();
-    const parsed = JSON.parse(throttleLog!);
-    expect(parsed.ip_hash).toBeNull();
-    logSpy.mockRestore();
-  });
-  it('emits a structured 429 log line with bucket=ip on IP backstop throttle', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const calls: LimiterCall[] = [];
-    const ipResetAt = Date.now() + 1800_000;
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, (call) => {
-        if (call.body.refund === true) {
-          return { allowed: true, remaining: 0, resetAt: ipResetAt };
-        }
-        if (String(call.key).startsWith('ip-')) {
-          return { allowed: false, remaining: 0, resetAt: ipResetAt };
-        }
-        return { allowed: true, remaining: 5, resetAt: Date.now() + 1000 };
-      }),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-      IP_HASH_SECRET: 'test-secret',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.1' },
-      }),
-      env
-    );
-    const throttleLog = logSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('rate_limit_429'));
-    expect(throttleLog).toBeDefined();
-    const parsed = JSON.parse(throttleLog!);
-    expect(parsed).toMatchObject({
-      event: 'rate_limit_429',
-      action: 'token-info',
-      bucket: 'ip',
-      user_id: 'user-free',
-    });
-    expect(parsed.ip_hash).toMatch(/^[0-9a-f]{16}$/);
-    expect(parsed.token_id).toBe('token-1');
-    expect(parsed.token_suffix).toBeUndefined();
-    logSpy.mockRestore();
-  });
-  it('does not check the per-IP backstop when no IP header is present', async () => {
-    const calls: LimiterCall[] = [];
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
-        allowed: true,
-        remaining: 5,
-        resetAt: Date.now() + 1000,
-      })),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    const res = await worker.fetch(
-      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
-      env
-    );
-    expect(res.status).toBe(200);
-    expect(calls.filter((c) => c.key.startsWith('ip-'))).toHaveLength(0);
-  });
-  it('does not check the per-IP backstop when only X-Forwarded-For is present', async () => {
-    const calls: LimiterCall[] = [];
-    const env: Env = {
-      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
-        allowed: true,
-        remaining: 5,
-        resetAt: Date.now() + 1000,
-      })),
-      SUPABASE_URL: 'https://supabase.example',
-      SUPABASE_ANON_KEY: 'anon',
-      SUPABASE_SERVICE_ROLE_KEY: 'service',
-      ALLOWED_ORIGIN: '*',
-    };
-    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
-    const res = await worker.fetch(
-      buildRequest('/token', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123', 'X-Forwarded-For': '203.0.113.1' },
-      }),
-      env
-    );
-    expect(res.status).toBe(200);
-    expect(calls.filter((c) => c.key.startsWith('ip-'))).toHaveLength(0);
   });
 });

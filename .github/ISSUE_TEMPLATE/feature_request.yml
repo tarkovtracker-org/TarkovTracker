@@ -1,7 +1,7 @@
 name: Feature Request
 description: Suggest a new feature or major addition
-title: "[Feature]: "
-labels: ["feature"]
+title: '[Feature]: '
+labels: ['feature']
 body:
   - type: markdown
     attributes:
@@ -27,21 +27,25 @@ body:
       required: true
 
   - type: dropdown
-    id: area
+    id: product-area
     attributes:
-      label: Technical Area
-      description: Which technical system would this feature involve? (Maintainers will add area labels during triage)
+      label: Which area of TarkovTracker is affected?
       multiple: true
       options:
-        - UI/Frontend (Vue components, pages, styling)
-        - API (Server routes, workers, endpoints)
-        - Database (Supabase, queries, schema)
-        - Auth (Login, permissions, sessions)
-        - Realtime (Team sync, broadcasts)
-        - i18n (Translations)
-        - Not Sure
+        - Dashboard
+        - Tasks
+        - Hideout
+        - Needed items
+        - Maps
+        - Team
+        - Profile or account
+        - Login
+        - Settings
+        - API or integrations
+        - Translations
+        - Other / not sure
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: alternatives
@@ -61,15 +65,31 @@ body:
     validations:
       required: false
 
-  - type: dropdown
-    id: priority
+  - type: textarea
+    id: impact
     attributes:
-      label: Priority (Your Opinion)
-      description: How important is this feature to you?
+      label: What does this prevent you from doing?
+      description: Describe the problem or limitation this feature would solve.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this affect you?
       options:
-        - Low - Nice to have
-        - Medium - Would improve my experience
-        - High - Significantly impacts my workflow
+        - Always
+        - Frequently
+        - Occasionally
+        - Rarely
+    validations:
+      required: true
+
+  - type: textarea
+    id: beneficiaries
+    attributes:
+      label: Who would benefit from this change?
+      description: E.g., all users, team leaders, streamers, API consumers, etc.
     validations:
       required: false
 

@@ -3,150 +3,150 @@
 [![Crowdin](https://badges.crowdin.net/tarkovtrackerorg/localized.svg)](https://crowdin.com/project/tarkovtrackerorg)
 [![codecov](https://codecov.io/gh/tarkovtracker-org/TarkovTracker/graph/badge.svg)](https://codecov.io/gh/tarkovtracker-org/TarkovTracker)
 
-A comprehensive Escape from Tarkov progress tracker built with Nuxt 4, featuring team collaboration, dual game mode support (PvP/PvE), and real-time synchronization via Supabase.
+TarkovTracker tracks Escape from Tarkov tasks, hideout upgrades, required items, levels, and team
+progress separately for PvP and PvE.
 
-## Features
+[![TarkovTracker dashboard showing task progress, hideout modules, and team overview](.github/assets/dashboard.png)](https://tarkovtracker.org)
 
-- **Dual Game Mode Support**: Track progress separately for PvP and PvE modes
-- **Team Collaboration**: Share progress with teammates in real-time
-- **Task Tracking**: Monitor quest completions and objectives
-- **Hideout Progress**: Track module upgrades and parts
-- **Player Level Progress**: Monitor leveling across different factions
-- **Real-time Sync**: Automatic synchronization via Supabase
-- **Multi-language Support**: Available in English, German, Spanish, French, Russian, Ukrainian, and Chinese. API data can be fetched in additional tarkov.dev-supported languages. Community translations are available through [translate.tarkovtracker.org](https://translate.tarkovtracker.org).
+**Try it live at <https://tarkovtracker.org>.**
 
-## Tech Stack
+---
 
-- **Framework**: Nuxt 4 (SPA mode)
-- **UI**: Nuxt UI component library
-- **Styling**: Tailwind CSS v4
-- **State Management**: Pinia with three-store architecture
-- **Backend**: Supabase (authentication, database, real-time)
-- **API**: Nuxt server-side proxy to json.tarkov.dev static data
-- **Deployment**: Cloudflare Pages
+## Using TarkovTracker
 
-## Setup
+You can start tracking your progress immediately — **no account required**. Your progress is saved
+in your browser's local storage and stays there between visits.
 
-Install dependencies (Node >=24.12.0, enables pnpm via Corepack):
+### What works without an account
+
+- Track task and objective completion (PvP and PvE separately)
+- Track hideout module upgrades and the parts you still need
+- View player level, faction progress, and needed items
+- Browse interactive maps with spawn points and objectives
+- Customize display preferences and game mode
+- All data persists locally in your browser
+
+### What an account enables
+
+Sign in (via Discord, Twitch, Google, or GitHub) when you want to:
+
+- **Sync progress across devices** — your progress follows you to any browser
+- **Create or join a team** — share progress with teammates in real time
+- **Share your profile** — let others view your progress via a shareable link
+- **Use API tokens** — programmatically read your progress via the public API
+- **Back up your data** — server-side storage protects against browser data loss
+
+> **Signing in:** If you have local progress and create a new account, that progress uploads to
+> your account on first login. Returning users (same browser, same account) get a merge of local
+> and cloud progress. If you sign into an existing account from a new browser that already has
+> cloud progress, the cloud data takes precedence — your local guest progress is not merged.
+
+### Getting help
+
+- **Questions or bugs?** See [`SUPPORT.md`](SUPPORT.md) for where to ask.
+- **Found a security issue?** See [`SECURITY.md`](SECURITY.md) for how to report it privately.
+- **Community:** Join us on [Discord](https://discord.gg/M8nBgA2sT6).
+- **Translations:** Help translate at
+  [translate.tarkovtracker.org](https://translate.tarkovtracker.org). Supported languages:
+  English, German, Spanish, French, Russian, Ukrainian, and Chinese.
+
+---
+
+<!-- Everything below this line is for developers and contributors. -->
+<!-- If you just want to use TarkovTracker, visit https://tarkovtracker.org. -->
+
+## For Developers and Contributors
+
+The rest of this README covers local development and contributing. If you only want to use
+TarkovTracker, visit **<https://tarkovtracker.org>** — no setup required.
+
+### Local development
 
 ```bash
-corepack enable
+corepack enable        # enables pnpm via Corepack (Node >=24.12.0)
 pnpm install
+pnpm run dev           # http://localhost:3000
 ```
 
-## Environment Variables
+Copy `.env.example` to `.env` and fill in your Supabase values. Without Supabase configured, the
+app runs in offline mode with localStorage only — auth, sync, realtime, and team features are
+unavailable.
 
-Copy `.env.example` to `.env` and fill in your values:
+> Only `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_ANON_KEY` are required for login/sync.
+> Everything else is optional and documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-```env
-# Required for login/sync features
-NUXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NUXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anonymous_key
+**Tech stack:** Nuxt 4 (SPA, `ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia,
+Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 
-# Optional: App configuration
-# NUXT_PUBLIC_APP_URL=http://localhost:3000
-# NUXT_TARKOV_JSON_BASE_URL=https://json.tarkov.dev
-# NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=false
-# NUXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
-# NUXT_PUBLIC_CLARITY_PROJECT_ID=xxxxxxxxxx
+### Common commands
+
+| Task          | Command               |
+| ------------- | --------------------- |
+| Dev server    | `pnpm run dev`        |
+| Build         | `pnpm run build`      |
+| Preview build | `pnpm run preview`    |
+| Lint          | `pnpm run lint`       |
+| Typecheck     | `pnpm run typecheck`  |
+| Tests         | `pnpm run test`       |
+| Test watch    | `pnpm run test:watch` |
+
+Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` before pushing. The full command
+list (including i18n, Supabase types, OpenAPI validation, and the API gateway tests) is in
+[`AGENTS.md`](AGENTS.md) and [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md).
+
+### Contributing
+
+Each pull request must address **one change only** — a single fix, update, doc improvement, or
+feature. PRs that bundle unrelated changes may be asked to split or be closed.
+
+- **[How to contribute](.github/CONTRIBUTING.md)** — issues, branches, PR process, and the PR
+  template.
+- **[Label system](.github/LABELS.md)** — issue types, scope, priority, ownership, and status.
+- **[Project board](.github/PROJECT_BOARD.md)** — how issues move from backlog to done.
+
+> New to the codebase? Start with
+> [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) for the development workflow and PR process.
+> When available, issues labeled
+> [`good-first-issue`](https://github.com/tarkovtracker-org/TarkovTracker/labels/good-first-issue)
+> are scoped for newcomers.
+
+### Documentation
+
+The short version: this README gets you running; the `docs/` folder explains how things work.
+
+| You want to…                                      | Read                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Get started                                       | This README                                                                                |
+| Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                                               |
+| Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                                                 |
+| Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                                                 |
+| Understand the systems (caching, data, overlay)   | [`docs/SYSTEMS.md`](docs/SYSTEMS.md)                                                       |
+| Understand the full architecture & data flow      | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                                             |
+| Read the Tarkov data architecture decision        | [`docs/decisions/tarkov-data-architecture.md`](docs/decisions/tarkov-data-architecture.md) |
+| Use or extend the HTTP/API surface                | [`docs/API.md`](docs/API.md)                                                               |
+| Understand rate limits / abuse controls           | [`docs/RATE_LIMITING.md`](docs/RATE_LIMITING.md)                                           |
+| Deploy, configure env vars, or handle an incident | [`docs/runbook.md`](docs/runbook.md)                                                       |
+| Understand CI/CD, hooks, and releases             | [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md)                               |
+| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)                                       |
+| Work as (or configure) an AI agent                | [`AGENTS.md`](AGENTS.md) + [`docs/agent-context/`](docs/agent-context/)                    |
+
+Start at [`docs/README.md`](docs/README.md) if you are not sure which doc you need.
+
+### Project structure
+
+```text
+app/         Nuxt 4 source (features, stores, server routes, shell, locales)
+supabase/    Database migrations and edge functions
+workers/     Cloudflare Workers (public API gateway)
+scripts/     Precompute and other tooling
+docs/        Project documentation
+public/      Static assets
 ```
 
-`NUXT_PUBLIC_APP_URL` only sets the public app/canonical URL. `NUXT_PUBLIC_GA_MEASUREMENT_ID`
-and `NUXT_PUBLIC_CLARITY_PROJECT_ID` only enable the Google Analytics and Microsoft Clarity
-integration codepaths; they do not start tracking by themselves. Tracking stays disabled until the
-user explicitly opts in through the analytics consent banner or footer "Analytics Preferences"
-control. That opt-in state is managed in `app/composables/useAnalyticsConsent.ts`, and
-`app/plugins/04.analytics-consent-mode.client.ts` keeps analytics consent mode denied until the
-user accepts.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full module map and
+[`docs/SYSTEMS.md`](docs/SYSTEMS.md) for how the non-obvious systems (Tarkov.dev integration,
+multi-layer caching, overlay corrections, precompute) actually work.
 
-`NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK` is disabled by default and should stay off in
-production. It exists only for controlled local/self-hosted or staggered rollout cases where the
-`token-create` Edge Function is temporarily unavailable and you intentionally accept bypassing
-function-level rate limiting for token creation.
+### License
 
-## Cloudflare Workers
-
-The project uses one Cloudflare Worker for the public API surface:
-
-- `workers/api-gateway` — API request gateway
-  - `API_GATEWAY_LIMITER` (Durable Object)
-
-## Server API Runtime Notes
-
-- `app/server/api/team/members.ts` uses in-memory Maps for response caching and rate limiting.
-- `app/server/api/profile/[userId]/[mode].get.ts` uses in-memory Maps `sharedProfileRateLimiter` and `sharedProfileCache`.
-- Team and token mutations are rate-limited inside Supabase Edge Functions on a per-user basis.
-- In-memory Maps are local to each running instance and are not shared across serverless/horizontal deployments.
-- For production-wide consistency across both endpoints, use a distributed backend (for example Redis or Cloudflare KV)
-  for rate limiting and caching.
-
-## Development
-
-Start the development server:
-
-```bash
-pnpm run dev
-```
-
-The application will be available at `http://localhost:3000`.
-
-## Code Quality
-
-Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm test` before pushing. See
-[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) and
-[`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md) for the full command list, pre-commit
-hooks, and CI details.
-
-## Tarkov.dev Profile Cleanup
-
-The app now persists only the linked `tarkovUid` for tarkov.dev profiles. Legacy manual backups
-created before this cleanup may still contain imported profile snapshots. New imports ignore those
-legacy blobs, but regenerate backups after upgrading if you want future exports to be fully scrubbed.
-
-## Production
-
-Build for production:
-
-```bash
-pnpm run build
-```
-
-Preview production build locally:
-
-```bash
-pnpm run preview
-```
-
-## Project Structure
-
-- `app/` — Nuxt application (features, stores, composables, server routes, shell, locales)
-- `workers/` — Cloudflare Workers (public API gateway)
-- `supabase/` — database migrations and edge functions
-- `docs/` — project documentation
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`AGENTS.md`](AGENTS.md) for the full map.
-
-## Documentation
-
-For detailed development guidelines and architecture references, see the [`docs/`](docs/) directory (start at [`docs/README.md`](docs/README.md)).
-
-This repository includes both **contribution workflow guidance** and **technical documentation**.
-
-[**How to Contribute (Issues, Branches, PR Process):**](.github/CONTRIBUTING.md) Open or pick an issue, get assigned, create a focused branch, Use the PR template, and link the issue.
-
-> [!IMPORTANT]
-> Each pull request must address **one change only** — a single fix, update, documentation improvement, or new feature.  
-> Pull requests that bundle unrelated changes may be asked to split or be closed.
-
-[**Label System:**](.github/LABELS.md) Issue Types define the kind of work being done, while labels communicate scope, priority, ownership, and status throughout the lifecycle of the issue.
-
-[**GitHub Project Board:**](.github/PROJECT_BOARD.md) Issues progress through the board from backlog to completion, with transitions driven by issue and pull request activity.
-
-### Where to start (new contributors)
-
-> [!NOTE]
-> If you’re new to the project, look for issues labeled **`good-first-issue`**. These are intentionally scoped to be approachable and are the best way to get familiar with the codebase, contribution process, and review expectations.
-
-## License
-
-This project remains licensed under the GNU General Public License v3.0. See [LICENSE.md](LICENSE.md) for the full license text.
+GNU General Public License v3.0 — see [`LICENSE.md`](LICENSE.md).

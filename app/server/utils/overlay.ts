@@ -14,6 +14,7 @@ import {
   inferObjectiveType,
   normalizeObjectiveList,
 } from './objectiveTypeInferrer';
+import { TARKOVTRACKER_USER_AGENT } from './userAgent';
 const logger = createLogger('Overlay');
 // Overlay data structure
 interface ModeOverlayData {
@@ -153,7 +154,7 @@ async function fetchOverlay(
     try {
       const response = await fetch(OVERLAY_URL_WITH_BUSTER, {
         signal: controller.signal,
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
       });
       if (!response.ok) {
         logger.warn(`Failed to fetch overlay: ${response.status}`);

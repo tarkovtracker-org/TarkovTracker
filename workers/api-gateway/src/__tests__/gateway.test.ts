@@ -32,8 +32,13 @@ const BASE_ENV: Env = {
   SUPABASE_SERVICE_ROLE_KEY: 'service-key',
   ALLOWED_ORIGIN: '*',
 };
-const buildRequest = (path: string, init?: RequestInit) =>
-  new Request(`https://api.tarkovtracker.org${path}`, init);
+const buildRequest = (path: string, init?: RequestInit) => {
+  const headers = new Headers(init?.headers);
+  if (!headers.has('User-Agent')) {
+    headers.set('User-Agent', 'TestClient/1.0 (+https://example.com)');
+  }
+  return new Request(`https://api.tarkovtracker.org${path}`, { ...init, headers });
+};
 const jsonResponse = (payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
     status,
@@ -81,6 +86,8 @@ type BaseFetchMockOptions = {
   userProgress?: Record<string, unknown>;
   permissions?: string[];
   gameMode?: 'pvp' | 'pve';
+  teamId?: string | null;
+  teamMembers?: string[];
 };
 const createBaseFetchMock = ({
   onMerge,
@@ -95,6 +102,8 @@ const createBaseFetchMock = ({
   },
   permissions = ['WP'],
   gameMode = 'pvp',
+  teamId = null,
+  teamMembers = ['user-1', 'user-2'],
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
@@ -126,8 +135,46 @@ const createBaseFetchMock = ({
       }
       return new Response(result, { status: 200 });
     }
+    if (url.includes('/rest/v1/user_system')) {
+      return jsonResponse([{ user_id: 'user-1', pvp_team_id: teamId, pve_team_id: teamId }]);
+    }
+    if (url.includes('/rest/v1/team_memberships')) {
+      return jsonResponse(teamMembers.map((id) => ({ user_id: id })));
+    }
     if (url.includes('/rest/v1/user_progress')) {
-      return jsonResponse([userProgress]);
+      const parsedUrl = new URL(url);
+      const selectParam = parsedUrl.searchParams.get('select') ?? '*';
+      const selectedColumns = selectParam === '*' ? null : selectParam.split(',');
+      const userIdParam = parsedUrl.searchParams.get('user_id') ?? '';
+      let requestedUserIds: string[];
+      if (userIdParam.startsWith('eq.')) {
+        requestedUserIds = [userIdParam.slice(3)];
+      } else if (userIdParam.startsWith('in.(') && userIdParam.endsWith(')')) {
+        requestedUserIds = userIdParam
+          .slice(4, -1)
+          .split(',')
+          .map((s) => s.trim());
+      } else {
+        requestedUserIds = [String(userProgress.user_id)];
+      }
+      const activeModeField = selectedColumns?.includes('pve_data') ? 'pve_data' : 'pvp_data';
+      const buildRow = (userId: string): Record<string, unknown> => {
+        const base: Record<string, unknown> = { ...userProgress, user_id: userId };
+        // Give each member a distinct displayName in the active mode's data so
+        // per-member mapping regressions are detectable in team tests.
+        const modeData = base[activeModeField];
+        base[activeModeField] = {
+          ...(typeof modeData === 'object' && modeData !== null ? modeData : {}),
+          displayName: `Member-${userId}`,
+        };
+        if (!selectedColumns) return base;
+        const row: Record<string, unknown> = {};
+        for (const col of selectedColumns) {
+          if (col in base) row[col] = base[col];
+        }
+        return row;
+      };
+      return jsonResponse(requestedUserIds.map(buildRow));
     }
     const apiGameMode = gameMode === 'pve' ? 'pve' : 'regular';
     if (url === `https://json.tarkov.dev/${apiGameMode}/tasks`) {
@@ -209,12 +256,86 @@ describe('api-gateway', () => {
     const res = await worker.fetch(buildRequest('/token', { method: 'GET' }), BASE_ENV);
     await expectErrorResponse(res, 401, 'Unauthorized');
   });
+  it('rejects legacy tt_ prefixed tokens without a token lookup', async () => {
+    const fetchMock = createBaseFetchMock({ permissions: ['GP'] });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer tt_abc123' } }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Invalid token format');
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes('/rest/v1/api_tokens'))
+    ).toBe(false);
+  });
+  it('rejects a token whose prefix contradicts its stored game mode', async () => {
+    const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: 'pve' });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Token game mode mismatch');
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes('/rest/v1/user_progress'))
+    ).toBe(false);
+  });
+  it('rejects requests with a missing User-Agent header', async () => {
+    const res = await worker.fetch(
+      new Request('https://api.tarkovtracker.org/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123' },
+      }),
+      BASE_ENV
+    );
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(res.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('User-Agent must be 5-200 characters');
+  });
+  it('rejects requests with a too-short User-Agent header', async () => {
+    const res = await worker.fetch(
+      buildRequest('/token', { method: 'GET', headers: { 'User-Agent': 'ab' } }),
+      BASE_ENV
+    );
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(res.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('User-Agent must be 5-200 characters');
+  });
+  it('rejects requests with an oversized User-Agent header', async () => {
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'User-Agent': 'x'.repeat(201) },
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('User-Agent must be 5-200 characters');
+  });
+  it('validates User-Agent before issuing a legacy /api/v2 308 redirect', async () => {
+    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
+        method: 'POST',
+        headers: { ...AUTH_HEADERS, 'User-Agent': 'ab' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      env
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toContain('User-Agent must be 5-200 characters');
+  });
   it('redirects legacy /api/v2 routes with 308 when LEGACY_API_REDIRECT is true', async () => {
     const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
     const res = await worker.fetch(
       new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: { ...AUTH_HEADERS, 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
         body: JSON.stringify({ state: 'completed' }),
       }),
       env
@@ -234,7 +355,10 @@ describe('api-gateway', () => {
     const res = await worker.fetch(
       new Request('https://tarkovtracker.org/api/progress', {
         method: 'GET',
-        headers: { Authorization: 'Bearer PVP_abc123' },
+        headers: {
+          Authorization: 'Bearer PVP_abc123',
+          'User-Agent': 'TestClient/1.0 (+https://example.com)',
+        },
       }),
       env
     );
@@ -243,7 +367,10 @@ describe('api-gateway', () => {
   });
   it('serves legacy /api/v2 routes normally when LEGACY_API_REDIRECT is off', async () => {
     const res = await worker.fetch(
-      new Request('https://tarkovtracker.org/api/v2/progress', { method: 'GET' }),
+      new Request('https://tarkovtracker.org/api/v2/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
       BASE_ENV
     );
     await expectErrorResponse(res, 401, 'Unauthorized');
@@ -505,7 +632,7 @@ describe('api-gateway', () => {
             id: 'task-main',
             name: 'Main Task',
             factionName: 'Any',
-              objectives: [],
+            objectives: [],
             taskRequirements: [],
           },
         ],
@@ -809,6 +936,301 @@ describe('api-gateway', () => {
     > | null;
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
+  });
+  const bearerForMode = (mode: 'pvp' | 'pve') => `Bearer ${mode === 'pve' ? 'PVE' : 'PVP'}_abc123`;
+  const progressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
+    buildRequest('/progress', {
+      method: 'GET',
+      headers: { Authorization: bearerForMode(mode), ...headers },
+    });
+  const findProgressSelect = (fetchMock: ReturnType<typeof vi.fn>): string | undefined =>
+    fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/rest/v1/user_progress'))
+      .map((url) => new URL(url).searchParams.get('select') ?? undefined)
+      .find((select) => select !== undefined);
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: mode });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(progressRequest(mode), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+    }
+  );
+  const teamProgressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
+    buildRequest('/team/progress', {
+      method: 'GET',
+      headers: { Authorization: bearerForMode(mode), ...headers },
+    });
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the team batch user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: 'team-1',
+        teamMembers: ['user-1', 'user-2'],
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+      // Verify per-member mapping: each member gets their own row's displayName.
+      const body = (await res.json()) as {
+        data: Array<{ userId: string; displayName: string }>;
+      };
+      const byUser = new Map(body.data.map((d) => [d.userId, d.displayName]));
+      expect(byUser.get('user-1')).toBe('Member-user-1');
+      expect(byUser.get('user-2')).toBe('Member-user-2');
+    }
+  );
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
+  ] as const)(
+    'narrows the solo-fallback user_progress select to the %s token game mode',
+    async (mode, expected) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: null,
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
+      expect(res.status).toBe(200);
+      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(select).toBe(expected);
+      expect(select).not.toContain('*');
+    }
+  );
+  const manyCompletions = Object.fromEntries(
+    Array.from({ length: 80 }, (_, i) => [
+      `task-${i}`,
+      { complete: true, failed: false, timestamp: 1 },
+    ])
+  );
+  it('sets ETag, private Cache-Control, and Vary on GET /progress', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(progressRequest(), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('ETag')).toMatch(/^W\/"[0-9a-f]{32}"$/);
+    expect(res.headers.get('Cache-Control')).toBe('private, max-age=15');
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    expect(res.headers.get('Access-Control-Expose-Headers')).toContain('ETag');
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('If-None-Match');
+  });
+  it('returns 304 with rate-limit headers when If-None-Match matches', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const first = await worker.fetch(progressRequest(), BASE_ENV);
+    const etag = first.headers.get('ETag');
+    expect(etag).toBeTruthy();
+    const second = await worker.fetch(progressRequest('pvp', { 'If-None-Match': etag! }), BASE_ENV);
+    expect(second.status).toBe(304);
+    expect(await second.text()).toBe('');
+    expect(second.headers.get('ETag')).toBe(etag);
+    expect(second.headers.get('X-RateLimit-Limit')).toBe('1000');
+    expect(second.headers.get('Cache-Control')).toBe('private, max-age=15');
+  });
+  it('returns the full body when If-None-Match does not match', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'If-None-Match': 'W/"0000000000000000000000000000dead"' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { success: boolean };
+    expect(body.success).toBe(true);
+  });
+  it('gzips large /progress responses when the client accepts gzip', async () => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        permissions: ['GP'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: { taskCompletions: manyCompletions },
+          pve_data: null,
+        },
+      })
+    );
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': 'gzip, br' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBe('gzip');
+    const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
+    const body = (await new Response(decompressed).json()) as {
+      success: boolean;
+      data: { tasksProgress: unknown[] };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.tasksProgress).toHaveLength(80);
+  });
+  it('does not gzip when the client does not accept gzip', async () => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        permissions: ['GP'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: { taskCompletions: manyCompletions },
+          pve_data: null,
+        },
+      })
+    );
+    const res = await worker.fetch(progressRequest(), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    const body = (await res.json()) as { success: boolean };
+    expect(body.success).toBe(true);
+  });
+  it.each([
+    ['gzip;q=0', null],
+    ['gzip;q=0.0', null],
+    ['br, gzip;q=0', null],
+    ['*;q=0, gzip', 'gzip'],
+    ['gzip;q=0, *', null],
+    ['*', 'gzip'],
+    ['identity', null],
+    ['gzip;q=0.5', 'gzip'],
+    ['gzip;q=2', null],
+    ['gzip;q=abc', null],
+    ['gzip;q=1.0', 'gzip'],
+  ])('honors Accept-Encoding %s', async (acceptEncoding, expected) => {
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        permissions: ['GP'],
+        userProgress: {
+          user_id: 'user-1',
+          game_edition: 1,
+          pvp_data: { taskCompletions: manyCompletions },
+          pve_data: null,
+        },
+      })
+    );
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': acceptEncoding }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBe(expected);
+  });
+  it('does not gzip small responses even when the client accepts gzip', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(progressRequest('pvp', { 'Accept-Encoding': 'gzip' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+  });
+  it('gzips small responses when the client accepts gzip but refuses identity', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': 'gzip, identity;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Encoding')).toBe('gzip');
+  });
+  it('returns 406 when no acceptable encoding exists', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': 'gzip;q=0, identity;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(406);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('no_acceptable_encoding');
+  });
+  it('declares Vary and rate-limit headers on the 406 response', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'Accept-Encoding': '*;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(406);
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('1000');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBeTruthy();
+    expect(res.headers.get('X-RateLimit-Reset')).toBeTruthy();
+  });
+  it('returns 304 for a wildcard If-None-Match without encoding the body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const res = await worker.fetch(
+      progressRequest('pvp', { 'If-None-Match': '*', 'Accept-Encoding': 'gzip, identity;q=0' }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(304);
+    expect(await res.text()).toBe('');
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    expect(res.headers.get('Content-Type')).toBeNull();
+    expect(res.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    expect(res.headers.get('ETag')).toMatch(/^W\/"[0-9a-f]{32}"$/);
+  });
+  it('supports the ETag/304 round-trip on GET /team/progress', async () => {
+    const teamMock = () =>
+      createBaseFetchMock({
+        permissions: ['TP'],
+        teamId: 'team-1',
+        teamMembers: ['user-1', 'user-2'],
+      });
+    vi.stubGlobal('fetch', teamMock());
+    const first = await worker.fetch(teamProgressRequest(), BASE_ENV);
+    expect(first.status).toBe(200);
+    const etag = first.headers.get('ETag');
+    expect(etag).toMatch(/^W\/"[0-9a-f]{32}"$/);
+    expect(first.headers.get('Cache-Control')).toBe('private, max-age=15');
+    expect(first.headers.get('Vary')).toBe('Accept-Encoding, Authorization, Origin');
+    vi.stubGlobal('fetch', teamMock());
+    const second = await worker.fetch(
+      teamProgressRequest('pvp', { 'If-None-Match': etag! }),
+      BASE_ENV
+    );
+    expect(second.status).toBe(304);
+    expect(await second.text()).toBe('');
+    expect(second.headers.get('ETag')).toBe(etag);
+  });
+  it('routes a conditional-read failure through the router error envelope', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));
+    const realDigest = crypto.subtle.digest.bind(crypto.subtle);
+    const digest = vi
+      .spyOn(crypto.subtle, 'digest')
+      .mockImplementation(
+        async (
+          algorithm: string | SubtleCryptoHashAlgorithm,
+          data: ArrayBuffer | ArrayBufferView
+        ) => {
+          if (new TextDecoder().decode(data).startsWith('{"success":')) {
+            throw new Error('digest unavailable');
+          }
+          return realDigest(algorithm, data);
+        }
+      );
+    try {
+      const res = await worker.fetch(progressRequest(), BASE_ENV);
+      expect(res.status).toBe(500);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeTruthy();
+      const body = (await res.json()) as { success: boolean; error: string };
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('digest unavailable');
+    } finally {
+      digest.mockRestore();
+    }
   });
 });
 describe('ApiGatewayRateLimiter storage cleanup', () => {

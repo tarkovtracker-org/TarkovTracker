@@ -1,7 +1,7 @@
 name: Data Issue
 description: Report incorrect quest, item, or game data
-title: "[Data]: "
-labels: ["upstream"]
+title: '[Data]: '
+labels: ['upstream']
 body:
   - type: markdown
     attributes:
@@ -24,6 +24,26 @@ body:
         - Trader
         - Map
         - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: product-area
+    attributes:
+      label: Which area of TarkovTracker is affected?
+      options:
+        - Dashboard
+        - Tasks
+        - Hideout
+        - Needed items
+        - Maps
+        - Team
+        - Profile or account
+        - Login
+        - Settings
+        - API or integrations
+        - Translations
+        - Other / not sure
     validations:
       required: true
 

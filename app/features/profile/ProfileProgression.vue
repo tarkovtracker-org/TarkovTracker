@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px] space-y-4 sm:space-y-6">
+    <div class="mx-auto max-w-350 space-y-4 sm:space-y-6">
       <section
         class="bg-surface-900 relative overflow-hidden rounded-xl border border-white/10 p-4 shadow-md sm:p-6"
       >

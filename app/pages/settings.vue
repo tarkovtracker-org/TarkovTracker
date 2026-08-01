@@ -1,7 +1,7 @@
 <template>
   <div class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px]">
-      <div class="mx-auto max-w-[1160px] space-y-4 lg:space-y-0">
+    <div class="mx-auto max-w-350">
+      <div class="mx-auto max-w-290 space-y-4 lg:space-y-0">
         <UTabs
           :items="settingsTabItems"
           :model-value="activeTab"

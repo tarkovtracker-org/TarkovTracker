@@ -133,7 +133,6 @@ export interface HideoutModule extends HideoutLevel {
 }
 export interface TaskObjective {
   id: string;
-  __typename?: string;
   description?: string;
   location?: { id: string; name?: string };
   maps?: { id: string; name?: string }[];

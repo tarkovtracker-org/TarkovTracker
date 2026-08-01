@@ -1,6 +1,9 @@
 // Environment bindings
 export interface Env {
   API_GATEWAY_LIMITER: DurableObjectNamespace;
+  // Native Workers rate limiting binding used as the pre-auth abuse gate.
+  // Optional so local dev and tests without the binding simply skip the gate.
+  API_ABUSE_LIMITER?: RateLimit;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
@@ -90,6 +93,14 @@ export interface UserProgressRow {
   created_at?: string | null;
   updated_at?: string | null;
 }
+/**
+ * Read-path projection of `user_progress`. Reads select only the requested
+ * game mode's blob, so the other mode's column and every unselected field are
+ * genuinely absent. Typing the projection separately keeps the compiler from
+ * treating unselected columns as present.
+ */
+export type UserProgressModeRow = Pick<UserProgressRow, 'user_id' | 'game_edition'> &
+  Partial<Pick<UserProgressRow, 'pvp_data' | 'pve_data'>>;
 // Legacy token response format (matching old API)
 export interface LegacyTokenResponse {
   permissions: string[];
