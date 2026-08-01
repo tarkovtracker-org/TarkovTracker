@@ -163,7 +163,7 @@ const getYamlScalarLines = (lines, filePath) => {
   for (let index = 0; index < lines.length; index += 1) {
     const header = lines[index];
     const headerMatch = header.match(
-      /^(\s*)(?:(?:.*?:\s*)|(?:-\s*)|)[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/
+      /^(\s*)(?:(?:.*?:\s*)|(?:-\s*)|)(?:(?:[&!][^\s]+)\s*)*[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/
     );
     if (!headerMatch) continue;
     const headerIndent = headerMatch[1].length;
@@ -224,7 +224,10 @@ const getShellHeredocs = (line) => {
     if (stripTabs) index += 1;
     while (/\s/.test(line[index] ?? '')) index += 1;
     let delimiter = '';
-    if (line[index] === '"' || line[index] === "'") {
+    const hasAnsiQuote =
+      line[index] === '$' && (line[index + 1] === '"' || line[index + 1] === "'");
+    if (hasAnsiQuote || line[index] === '"' || line[index] === "'") {
+      if (hasAnsiQuote) index += 1;
       const delimiterQuote = line[index++];
       while (index < line.length && line[index] !== delimiterQuote) delimiter += line[index++];
       if (line[index] === delimiterQuote) index += 1;
@@ -243,6 +246,13 @@ const getShellHeredocs = (line) => {
     if (delimiter) heredocs.push({ delimiter, stripTabs });
   }
   return heredocs;
+};
+const endsWithContinuation = (line) => {
+  let backslashes = 0;
+  for (let index = line.length - 1; index >= 0 && line[index] === '\\'; index -= 1) {
+    backslashes += 1;
+  }
+  return backslashes % 2 === 1;
 };
 const stripBlankLines = (source, filePath) => {
   if (/^[\t \r\n]*$/.test(source)) return { removed: 0, source };
@@ -265,6 +275,7 @@ const stripBlankLines = (source, filePath) => {
   for (let index = 0; index < lastLine; index += 1) {
     const line = lines[index];
     const isBlank = /^[\t \r]*$/.test(line);
+    const followsContinuation = isShellFile && index > 0 && endsWithContinuation(lines[index - 1]);
     const isProtected =
       yamlScalarLines.has(index) ||
       protectedRanges.some(({ end, start }) => start <= offset && offset + line.length <= end);
@@ -276,7 +287,7 @@ const stripBlankLines = (source, filePath) => {
       if (terminator.replace(/\r$/, '') === heredoc.delimiter) heredocs.shift();
       continue;
     }
-    if (isBlank && !blockComment && !quote && !isProtected) {
+    if (isBlank && !followsContinuation && !blockComment && !quote && !isProtected) {
       removed += 1;
       offset += line.length + 1;
       continue;

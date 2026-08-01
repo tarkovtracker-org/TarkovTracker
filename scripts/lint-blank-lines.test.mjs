@@ -59,6 +59,10 @@ const escapedDelimiter = runFix('escaped-delimiter', 'cat <<E\\ OF\nbody\n\nE OF
 if (escapedDelimiter !== 'cat <<E\\ OF\nbody\n\nE OF\nnext\n') {
   throw new Error(`Escaped delimiter protection failed:\n${escapedDelimiter}`);
 }
+const ansiHeredoc = runFix('ansi-heredoc', "cat <<$'END JSON'\nbody\n\nEND JSON\n\nnext\n", 'sh');
+if (ansiHeredoc !== "cat <<$'END JSON'\nbody\n\nEND JSON\nnext\n") {
+  throw new Error(`ANSI heredoc protection failed:\n${ansiHeredoc}`);
+}
 const heredocText = runFix('heredoc-text', 'printf "a <<EOF"\n\nnext\n\n', 'sh');
 if (heredocText !== 'printf "a <<EOF"\nnext\n') {
   throw new Error(`Quoted heredoc text handling failed:\n${heredocText}`);
@@ -86,6 +90,10 @@ if (subshell !== '(\n  printf first\n\n  printf second\n)\nnext\n') {
 const arithmetic = runFix('arithmetic', 'value=$((1 << 2))\n\nnext\n\n', 'sh');
 if (arithmetic !== 'value=$((1 << 2))\nnext\n') {
   throw new Error(`Arithmetic shift handling failed:\n${arithmetic}`);
+}
+const continuation = runFix('continuation', 'printf first \\\n\n  printf second\n\nnext\n', 'sh');
+if (continuation !== 'printf first \\\n\n  printf second\nnext\n') {
+  throw new Error(`Shell continuation handling failed:\n${continuation}`);
 }
 const template = runFix(
   'template',
@@ -134,6 +142,14 @@ if (emptyScalar !== 'description: |\n\nnext: value\n') {
 const rootScalar = runFix('root-scalar', '|\n  first\n\n  second\n', 'yml');
 if (rootScalar !== '|\n  first\n\n  second\n') {
   throw new Error(`Root YAML scalar protection failed:\n${rootScalar}`);
+}
+const anchoredScalar = runFix(
+  'anchored-scalar',
+  'value: &anchor |\n  first\n\n  second\nnext: value\n\n',
+  'yml'
+);
+if (anchoredScalar !== 'value: &anchor |\n  first\n\n  second\nnext: value\n') {
+  throw new Error(`Anchored YAML scalar protection failed:\n${anchoredScalar}`);
 }
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {

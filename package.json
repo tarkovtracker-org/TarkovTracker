@@ -140,10 +140,6 @@
       "prettier --write",
       "design.md lint"
     ],
-    "tests/test-setup.ts": [
-      "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
-    ],
     "nuxt.config.ts": [
       "prettier --write",
       "eslint --fix",
