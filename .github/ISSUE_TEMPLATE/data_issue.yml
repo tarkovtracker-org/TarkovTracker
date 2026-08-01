@@ -26,7 +26,6 @@ body:
         - Other
     validations:
       required: true
-
   - type: dropdown
     id: product-area
     attributes:
@@ -46,7 +45,6 @@ body:
         - Other / not sure
     validations:
       required: true
-
   - type: input
     id: item-name
     attributes:
@@ -55,7 +53,6 @@ body:
       placeholder: e.g., "Chemical - Part 4", "Secure Flash Drive"
     validations:
       required: true
-
   - type: textarea
     id: incorrect
     attributes:
@@ -67,7 +64,6 @@ body:
         The item image is incorrect.
     validations:
       required: true
-
   - type: textarea
     id: correct
     attributes:
@@ -76,7 +72,6 @@ body:
       placeholder: The correct requirement is...
     validations:
       required: true
-
   - type: input
     id: source
     attributes:
@@ -85,7 +80,6 @@ body:
       placeholder: https://escapefromtarkov.fandom.com/wiki/...
     validations:
       required: false
-
   - type: dropdown
     id: game-mode
     attributes:
@@ -98,7 +92,6 @@ body:
         - Not Applicable
     validations:
       required: true
-
   - type: textarea
     id: screenshots
     attributes:
@@ -107,7 +100,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:

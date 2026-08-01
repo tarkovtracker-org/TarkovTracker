@@ -188,6 +188,39 @@ const getYamlScalarLines = (lines, filePath) => {
   }
   return protectedLines;
 };
+const getShellHeredocs = (line) => {
+  const heredocs = [];
+  let quote = null;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '#' && (index === 0 || /\s/.test(line[index - 1]))) break;
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character !== '<' || line[index + 1] !== '<') continue;
+    index += 2;
+    const stripTabs = line[index] === '-';
+    if (stripTabs) index += 1;
+    while (/\s/.test(line[index] ?? '')) index += 1;
+    let delimiter = '';
+    if (line[index] === '"' || line[index] === "'") {
+      const delimiterQuote = line[index++];
+      while (index < line.length && line[index] !== delimiterQuote) delimiter += line[index++];
+      if (line[index] === delimiterQuote) index += 1;
+    } else {
+      if (line[index] === '\\') index += 1;
+      while (index < line.length && !/[\s;|&<>]/.test(line[index])) delimiter += line[index++];
+    }
+    if (delimiter) heredocs.push({ delimiter, stripTabs });
+  }
+  return heredocs;
+};
 const stripBlankLines = (source, filePath) => {
   if (/^[\t \r\n]*$/.test(source)) return { removed: 0, source };
   const lines = source.split('\n');
@@ -198,6 +231,8 @@ const stripBlankLines = (source, filePath) => {
   const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(
     extname(filePath).toLowerCase()
   );
+  const isShellFile = extname(filePath).toLowerCase() === '.sh';
+  const isYamlFile = ['.yaml', '.yml'].includes(extname(filePath).toLowerCase());
   const output = [];
   let blockComment = false;
   let quote = null;
@@ -225,6 +260,10 @@ const stripBlankLines = (source, filePath) => {
     }
     output.push(line);
     if (isCodeFile) {
+      offset += line.length + 1;
+      continue;
+    }
+    if (isYamlFile) {
       offset += line.length + 1;
       continue;
     }
@@ -259,13 +298,7 @@ const stripBlankLines = (source, filePath) => {
         quote = character;
       }
     }
-    if (!blockComment && !quote) {
-      const heredocMatches = line.matchAll(/<<(\-?)\s*(?:(['"])([^'"\n]*)\2|([^\s;|&<>]+))/g);
-      heredocs = [...heredocMatches].map((match) => ({
-        delimiter: match[3] ?? match[4],
-        stripTabs: match[1] === '-',
-      }));
-    }
+    if (isShellFile && !blockComment && !quote) heredocs = getShellHeredocs(line);
     offset += line.length + 1;
   }
   return {

@@ -16,7 +16,6 @@ body:
       placeholder: I'm always frustrated when...
     validations:
       required: true
-
   - type: textarea
     id: solution
     attributes:
@@ -53,7 +52,6 @@ body:
       placeholder: I've also thought about...
     validations:
       required: false
-
   - type: textarea
     id: mockups
     attributes:
@@ -62,7 +60,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: textarea
     id: impact
     attributes:
@@ -70,7 +67,6 @@ body:
       description: Describe the problem or limitation this feature would solve.
     validations:
       required: true
-
   - type: dropdown
     id: frequency
     attributes:
@@ -82,7 +78,6 @@ body:
         - Rarely
     validations:
       required: true
-
   - type: textarea
     id: beneficiaries
     attributes:
@@ -90,7 +85,6 @@ body:
       description: E.g., all users, team leaders, streamers, API consumers, etc.
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:

@@ -51,6 +51,14 @@ const spacedHeredoc = runFix(
 if (spacedHeredoc !== "cat <<'END JSON'\nbody\n\nEND JSON\nnext\n") {
   throw new Error(`Spaced heredoc protection failed:\n${spacedHeredoc}`);
 }
+const escapedHeredoc = runFix('escaped-heredoc', 'cat <<\\EOF\nbody\n\nEOF\n\nnext\n', 'sh');
+if (escapedHeredoc !== 'cat <<\\EOF\nbody\n\nEOF\nnext\n') {
+  throw new Error(`Escaped heredoc protection failed:\n${escapedHeredoc}`);
+}
+const heredocText = runFix('heredoc-text', 'printf "a <<EOF"\n\nnext\n\n', 'sh');
+if (heredocText !== 'printf "a <<EOF"\nnext\n') {
+  throw new Error(`Quoted heredoc text handling failed:\n${heredocText}`);
+}
 const shellComment = runFix(
   'shell-comment',
   "# don't parse this\n\nvalue=$(\n  printf first\n\n  printf second\n)\n\nnext\n",
@@ -98,6 +106,14 @@ const quotedYamlKey = runFix(
 );
 if (quotedYamlKey !== '"run#section": |\n  first\n\n  second\nnext: value\n') {
   throw new Error(`Quoted YAML key protection failed:\n${quotedYamlKey}`);
+}
+const yamlApostrophe = runFix('yaml-apostrophe', "message: don't stop\n\nnext: value\n\n", 'yml');
+if (yamlApostrophe !== "message: don't stop\nnext: value\n") {
+  throw new Error(`YAML apostrophe scanning failed:\n${yamlApostrophe}`);
+}
+const yamlHeredocText = runFix('yaml-heredoc-text', 'message: <<TOKEN\n\nnext: value\n\n', 'yml');
+if (yamlHeredocText !== 'message: <<TOKEN\nnext: value\n') {
+  throw new Error(`YAML heredoc text handling failed:\n${yamlHeredocText}`);
 }
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {

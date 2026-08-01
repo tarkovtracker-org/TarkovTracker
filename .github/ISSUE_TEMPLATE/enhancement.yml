@@ -93,7 +93,6 @@ body:
       placeholder: username#1234
     validations:
       required: false
-
   - type: textarea
     id: additional
     attributes:
