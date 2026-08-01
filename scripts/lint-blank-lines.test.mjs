@@ -3,7 +3,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-const root = fileURLToPath(new URL('..', import.meta.url));
+import { it } from 'vitest';
+const rootUrl = new URL('..', import.meta.url);
+const root = rootUrl.protocol === 'file:' ? fileURLToPath(rootUrl) : process.cwd();
 const script = join(root, 'scripts/lint-blank-lines.mjs');
 const directory = mkdtempSync(join(tmpdir(), 'lint-blank-lines-'));
 process.on('exit', () => rmSync(directory, { force: true, recursive: true }));
@@ -83,3 +85,4 @@ execFileSync(process.execPath, [script, '--fix', join(directory, 'deleted.mjs')]
   cwd: root,
   stdio: 'pipe',
 });
+if (process.env.VITEST) it('passes formatter regression fixtures', () => {});
