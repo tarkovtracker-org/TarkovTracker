@@ -58,6 +58,10 @@ const getProtectedRanges = (source, filePath) => {
         else if (character === quote) quote = null;
         continue;
       }
+      if (character === '#' && (index === 0 || /\s/.test(source[index - 1]))) {
+        while (index < source.length && source[index] !== '\n') index += 1;
+        continue;
+      }
       if (character === '"' || character === "'") {
         quote = character;
         continue;
@@ -89,13 +93,27 @@ const getProtectedRanges = (source, filePath) => {
         else if (character === quote) quote = null;
         continue;
       }
+      if (character === '/' && nextCharacter === '/') {
+        while (index < source.length && source[index] !== '\n') index += 1;
+        continue;
+      }
       if (character === '/' && nextCharacter === '*') {
         const end = source.indexOf('*/', index + 2);
         if (end !== -1) {
           ranges.push({ end: end + 2, start: index });
           index = end + 1;
         }
-      } else if (character === '`' || character === '"' || character === "'") {
+      } else if (character === '`') {
+        const start = index;
+        index += 1;
+        while (index < source.length) {
+          if (source[index] === '\\') index += 2;
+          else if (source[index] === '`') {
+            ranges.push({ end: index + 1, start });
+            break;
+          } else index += 1;
+        }
+      } else if (character === '"' || character === "'") {
         quote = character;
       }
     }
@@ -147,9 +165,7 @@ const getYamlScalarLines = (lines, filePath) => {
   const protectedLines = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const header = lines[index];
-    const headerMatch = header.match(
-      /^(\s*)(?:[^#]*?:\s*|-\s*)[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/
-    );
+    const headerMatch = header.match(/^(\s*)(?:.*?:\s*|-\s*)[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/);
     if (!headerMatch) continue;
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
@@ -244,9 +260,7 @@ const stripBlankLines = (source, filePath) => {
       }
     }
     if (!blockComment && !quote) {
-      const heredocMatches = line.matchAll(
-        /<<(\-?)\s*(?:(['"])([A-Za-z_][A-Za-z0-9_.-]*)\2|([A-Za-z_][A-Za-z0-9_.-]*))/g
-      );
+      const heredocMatches = line.matchAll(/<<(\-?)\s*(?:(['"])([^'"\n]*)\2|([^\s;|&<>]+))/g);
       heredocs = [...heredocMatches].map((match) => ({
         delimiter: match[3] ?? match[4],
         stripTabs: match[1] === '-',

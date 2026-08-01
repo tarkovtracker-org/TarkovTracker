@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,6 +43,22 @@ const hyphenatedHeredoc = runFix(
 if (hyphenatedHeredoc !== "cat <<'END-JSON'\nbody\nEND-JSON\nnext\n") {
   throw new Error(`Hyphenated heredoc protection failed:\n${hyphenatedHeredoc}`);
 }
+const spacedHeredoc = runFix(
+  'spaced-heredoc',
+  "cat <<'END JSON'\nbody\n\nEND JSON\n\nnext\n",
+  'sh'
+);
+if (spacedHeredoc !== "cat <<'END JSON'\nbody\n\nEND JSON\nnext\n") {
+  throw new Error(`Spaced heredoc protection failed:\n${spacedHeredoc}`);
+}
+const shellComment = runFix(
+  'shell-comment',
+  "# don't parse this\n\nvalue=$(\n  printf first\n\n  printf second\n)\n\nnext\n",
+  'sh'
+);
+if (shellComment !== "# don't parse this\nvalue=$(\n  printf first\n\n  printf second\n)\nnext\n") {
+  throw new Error(`Shell comment scanning failed:\n${shellComment}`);
+}
 const substitution = runFix(
   'substitution',
   'value=$(\n  printf first\n\n  printf second\n)\n\nnext\n',
@@ -75,6 +91,14 @@ const sequenceScalar = runFix(
 if (sequenceScalar !== 'steps:\n  - |\n    first\n\n    second\nnext: value\n') {
   throw new Error(`YAML sequence scalar protection failed:\n${sequenceScalar}`);
 }
+const quotedYamlKey = runFix(
+  'quoted-yaml-key',
+  '"run#section": |\n  first\n\n  second\nnext: value\n\n',
+  'yml'
+);
+if (quotedYamlKey !== '"run#section": |\n  first\n\n  second\nnext: value\n') {
+  throw new Error(`Quoted YAML key protection failed:\n${quotedYamlKey}`);
+}
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {
   throw new Error(`Comment scanning failed:\n${comment}`);
@@ -85,4 +109,11 @@ execFileSync(process.execPath, [script, '--fix', join(directory, 'deleted.mjs')]
   cwd: root,
   stdio: 'pipe',
 });
+const checkFile = join(directory, 'check.mjs');
+writeFileSync(checkFile, 'const value = 1;\n\nconst next = 2;\n');
+const dirtyCheck = spawnSync(process.execPath, [script, checkFile], { cwd: root });
+if (dirtyCheck.status !== 1) throw new Error('Dirty check mode should fail');
+execFileSync(process.execPath, [script, '--fix', checkFile], { cwd: root, stdio: 'pipe' });
+const cleanCheck = spawnSync(process.execPath, [script, checkFile], { cwd: root });
+if (cleanCheck.status !== 0) throw new Error('Clean check mode should pass');
 if (process.env.VITEST) it('passes formatter regression fixtures', () => {});
