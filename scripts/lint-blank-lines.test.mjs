@@ -215,10 +215,10 @@ const runFixtures = () => {
   }
   const keepChompAtEof = runFix(
     'keep-chomp-at-eof',
-    'run: |+\n  first\n\nfolded: >+\n  second\n\n',
+    'run: |2+\n    first\n\nfolded: >2+\n    second\n\n',
     'yml'
   );
-  if (keepChompAtEof !== 'run: |+\n  first\n\nfolded: >+\n  second\n\n') {
+  if (keepChompAtEof !== 'run: |2+\n    first\n\nfolded: >2+\n    second\n\n') {
     throw new Error(`YAML keep-chomp EOF protection failed:\n${keepChompAtEof}`);
   }
   const flowQuotedYaml = runFix(
@@ -228,6 +228,25 @@ const runFixtures = () => {
   );
   if (flowQuotedYaml !== 'values: [ "first\n\nsecond" ]\nnext: value\n') {
     throw new Error(`YAML flow scalar protection failed:\n${flowQuotedYaml}`);
+  }
+  const clippedScalar = runFix(
+    'clipped-scalar',
+    'run: |\n  first\n\n  second\n\nnext: value\n\n',
+    'yml'
+  );
+  if (clippedScalar !== 'run: |\n  first\n\n  second\nnext: value\n') {
+    throw new Error(`YAML clip-chomp handling failed:\n${clippedScalar}`);
+  }
+  const vue = runFix(
+    'component',
+    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n\n<script setup lang="ts">\nconst first = 1;\n\nconst second = 2;\n</script>\n',
+    'vue'
+  );
+  if (
+    vue !==
+    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n<script setup lang="ts">\nconst first = 1;\nconst second = 2;\n</script>\n'
+  ) {
+    throw new Error(`Vue SFC handling failed:\n${vue}`);
   }
   const mixedQuotedHeredoc = runFix(
     'mixed-quoted-heredoc',

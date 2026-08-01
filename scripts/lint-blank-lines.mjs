@@ -20,6 +20,7 @@ const supportedExtensions = new Set([
   '.sh',
   '.ts',
   '.tsx',
+  '.vue',
   '.yaml',
   '.yml',
 ]);
@@ -56,6 +57,18 @@ const files = (requestedFiles.length ? requestedFiles : trackedFiles())
 const getProtectedRanges = (source, filePath) => {
   const ranges = [];
   const extension = extname(filePath).toLowerCase();
+  if (extension === '.vue') {
+    for (const match of source.matchAll(/<template\b[^>]*>[\s\S]*?<\/template\s*>/gi)) {
+      ranges.push({ end: match.index + match[0].length, start: match.index });
+    }
+    for (const match of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+      const contentStart = match.index + match[0].indexOf(match[1]);
+      for (const range of getProtectedRanges(match[1], '.ts')) {
+        ranges.push({ end: contentStart + range.end, start: contentStart + range.start });
+      }
+    }
+    return ranges;
+  }
   if (extension === '.sh') {
     let start = -1;
     let depth = 0;
@@ -116,8 +129,31 @@ const getProtectedRanges = (source, filePath) => {
           index = end + 1;
         }
       } else if (character === '`') {
-        ranges.push({ end: source.length, start: index });
-        break;
+        let interpolationDepth = 0;
+        let templateEnd = -1;
+        for (let end = index + 1; end < source.length; end += 1) {
+          const templateCharacter = source[end];
+          if (templateCharacter === '\\') {
+            end += 1;
+            continue;
+          }
+          if (interpolationDepth === 0) {
+            if (templateCharacter === '`') {
+              templateEnd = end;
+              break;
+            }
+            if (templateCharacter === '$' && source[end + 1] === '{') {
+              interpolationDepth = 1;
+              end += 1;
+            }
+            continue;
+          }
+          if (templateCharacter === '{') interpolationDepth += 1;
+          else if (templateCharacter === '}') interpolationDepth -= 1;
+        }
+        if (templateEnd === -1) templateEnd = source.length - 1;
+        ranges.push({ end: templateEnd + 1, start: index });
+        index = templateEnd;
       } else if (character === '"' || character === "'") {
         quote = character;
       }
@@ -198,7 +234,7 @@ const getYamlScalarLines = (lines, filePath) => {
       scalarValue = scalarValue.slice(separator).trimStart();
     }
     if (!/^[|>](?:[+-]?\d?[+-]?)?$/.test(scalarValue)) continue;
-    const keepChomping = /^[|>]\+/.test(scalarValue);
+    const keepChomping = scalarValue.includes('+');
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
     for (let next = index + 1; next < lines.length; next += 1) {
@@ -394,7 +430,7 @@ const stripBlankLines = (source, filePath) => {
   const yamlScalarLines = getYamlScalarLines(lines, filePath);
   const yamlPlainScalarLines = getYamlPlainScalarLines(lines, filePath);
   const yamlQuotedLines = getYamlQuotedLines(lines, filePath);
-  const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(
+  const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx', '.vue'].includes(
     extname(filePath).toLowerCase()
   );
   const isShellFile = extname(filePath).toLowerCase() === '.sh';
