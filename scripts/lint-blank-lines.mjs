@@ -201,6 +201,36 @@ const getYamlScalarLines = (lines, filePath) => {
   }
   return protectedLines;
 };
+const getYamlQuotedLines = (lines, filePath) => {
+  if (!['.yaml', '.yml'].includes(extname(filePath).toLowerCase())) return new Set();
+  const protectedLines = new Set();
+  let quote = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (quote && /^[\t ]*$/.test(line)) protectedLines.add(index);
+    for (let position = 0; position < line.length; position += 1) {
+      const character = line[position];
+      const previous = line[position - 1];
+      if (quote === '"') {
+        if (character === '\\') position += 1;
+        else if (character === '"') quote = null;
+        continue;
+      }
+      if (quote === "'") {
+        if (character === "'" && line[position + 1] === "'") position += 1;
+        else if (character === "'") quote = null;
+        continue;
+      }
+      if (
+        (character === '"' || character === "'") &&
+        (position === 0 || /[:\[,]/.test(previous) || /:\s*$/.test(line.slice(0, position)))
+      ) {
+        quote = character;
+      }
+    }
+  }
+  return protectedLines;
+};
 const getShellHeredocs = (line) => {
   const heredocs = [];
   let quote = null;
@@ -275,6 +305,7 @@ const stripBlankLines = (source, filePath) => {
   const lastLine = hasFinalNewline ? lines.length - 1 : lines.length;
   const protectedRanges = getProtectedRanges(source, filePath);
   const yamlScalarLines = getYamlScalarLines(lines, filePath);
+  const yamlQuotedLines = getYamlQuotedLines(lines, filePath);
   const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(
     extname(filePath).toLowerCase()
   );
@@ -284,6 +315,7 @@ const stripBlankLines = (source, filePath) => {
   let blockComment = false;
   let quote = null;
   let heredocs = [];
+  let continuedShellLine = null;
   let removed = 0;
   let offset = 0;
   for (let index = 0; index < lastLine; index += 1) {
@@ -292,6 +324,7 @@ const stripBlankLines = (source, filePath) => {
     const followsContinuation = isShellFile && index > 0 && endsWithContinuation(lines[index - 1]);
     const isProtected =
       yamlScalarLines.has(index) ||
+      yamlQuotedLines.has(index) ||
       protectedRanges.some(({ end, start }) => start <= offset && offset + line.length <= end);
     if (heredocs.length > 0) {
       output.push(line);
@@ -346,7 +379,15 @@ const stripBlankLines = (source, filePath) => {
         quote = character;
       }
     }
-    if (isShellFile && !blockComment && !quote) heredocs = getShellHeredocs(line);
+    if (isShellFile && !blockComment && !quote) {
+      const logicalLine = continuedShellLine === null ? line : continuedShellLine + line;
+      if (endsWithContinuation(line)) {
+        continuedShellLine = logicalLine.slice(0, -1);
+      } else {
+        continuedShellLine = null;
+        heredocs = getShellHeredocs(logicalLine);
+      }
+    }
     offset += line.length + 1;
   }
   return {

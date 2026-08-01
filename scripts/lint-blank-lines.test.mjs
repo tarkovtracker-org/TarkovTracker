@@ -63,6 +63,10 @@ const ansiHeredoc = runFix('ansi-heredoc', "cat <<$'END JSON'\nbody\n\nEND JSON\
 if (ansiHeredoc !== "cat <<$'END JSON'\nbody\n\nEND JSON\nnext\n") {
   throw new Error(`ANSI heredoc protection failed:\n${ansiHeredoc}`);
 }
+const continuedHeredoc = runFix('continued-heredoc', 'cat <<\\\nEOF\nbody\n\nEOF\n\nnext\n', 'sh');
+if (continuedHeredoc !== 'cat <<\\\nEOF\nbody\n\nEOF\nnext\n') {
+  throw new Error(`Continued heredoc protection failed:\n${continuedHeredoc}`);
+}
 const heredocText = runFix('heredoc-text', 'printf "a <<EOF"\n\nnext\n\n', 'sh');
 if (heredocText !== 'printf "a <<EOF"\nnext\n') {
   throw new Error(`Quoted heredoc text handling failed:\n${heredocText}`);
@@ -150,6 +154,14 @@ const anchoredScalar = runFix(
 );
 if (anchoredScalar !== 'value: &anchor |\n  first\n\n  second\nnext: value\n') {
   throw new Error(`Anchored YAML scalar protection failed:\n${anchoredScalar}`);
+}
+const quotedYamlValue = runFix(
+  'quoted-yaml-value',
+  'message: "first\n\nsecond"\nnext: value\n\n',
+  'yml'
+);
+if (quotedYamlValue !== 'message: "first\n\nsecond"\nnext: value\n') {
+  throw new Error(`Quoted YAML value protection failed:\n${quotedYamlValue}`);
 }
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {
