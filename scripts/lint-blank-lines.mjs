@@ -228,7 +228,17 @@ const getYamlPlainScalarLines = (lines, filePath) => {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const match = line.match(/^(\s*)(?:[^#\n:]+:\s*|[-]\s+)(.*)$/);
-    if (!match || !match[2] || /^[|>'"&!\[\]{]/.test(match[2])) continue;
+    if (!match || !match[2]) continue;
+    let scalarValue = match[2].trim();
+    while (scalarValue.startsWith('&') || scalarValue.startsWith('!')) {
+      const separator = scalarValue.search(/[\t ]/);
+      if (separator === -1) {
+        scalarValue = '';
+        break;
+      }
+      scalarValue = scalarValue.slice(separator).trimStart();
+    }
+    if (!scalarValue || /^[|>'"\[\]{]/.test(scalarValue)) continue;
     const headerIndent = match[1].length;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
@@ -319,6 +329,7 @@ const getShellHeredocs = (line) => {
     while (/\s/.test(line[index] ?? '')) index += 1;
     let delimiter = '';
     let delimiterQuote = null;
+    let delimiterParsed = false;
     while (index < line.length) {
       const character = line[index];
       if (delimiterQuote) {
@@ -333,22 +344,26 @@ const getShellHeredocs = (line) => {
           index += 1;
         }
       } else if (character === '"' || character === "'") {
+        delimiterParsed = true;
         delimiterQuote = character;
         index += 1;
       } else if (character === '$' && (line[index + 1] === '"' || line[index + 1] === "'")) {
+        delimiterParsed = true;
         delimiterQuote = line[index + 1];
         index += 2;
       } else if (/[;|&<>\s]/.test(character)) {
         break;
       } else if (character === '\\' && index + 1 < line.length) {
+        delimiterParsed = true;
         delimiter += line[index + 1];
         index += 2;
       } else {
+        delimiterParsed = true;
         delimiter += character;
         index += 1;
       }
     }
-    if (delimiter) heredocs.push({ delimiter, stripTabs });
+    if (delimiterParsed) heredocs.push({ delimiter, stripTabs });
   }
   return heredocs;
 };

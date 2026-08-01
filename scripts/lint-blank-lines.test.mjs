@@ -186,6 +186,17 @@ const runFixtures = () => {
   ) {
     throw new Error(`Plain YAML scalar protection failed:\n${plainYaml}`);
   }
+  const anchoredPlainYaml = runFix(
+    'anchored-plain-yaml',
+    'message: &anchor first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n\n',
+    'yml'
+  );
+  if (
+    anchoredPlainYaml !==
+    'message: &anchor first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n'
+  ) {
+    throw new Error(`Anchored plain YAML protection failed:\n${anchoredPlainYaml}`);
+  }
   const quotedYamlValue = runFix(
     'quoted-yaml-value',
     'message: "first\n\nsecond"\nnext: value\n\n',
@@ -209,6 +220,10 @@ const runFixtures = () => {
   );
   if (mixedQuotedHeredoc !== 'cat <<E"OF"\nbody\n\nEOF\nnext\n') {
     throw new Error(`Mixed heredoc delimiter handling failed:\n${mixedQuotedHeredoc}`);
+  }
+  const emptyQuotedHeredoc = runFix('empty-quoted-heredoc', "cat <<''\nbody\n\n\n\nnext\n", 'sh');
+  if (emptyQuotedHeredoc !== "cat <<''\nbody\n\nnext\n") {
+    throw new Error(`Empty heredoc delimiter handling failed:\n${emptyQuotedHeredoc}`);
   }
   const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
   if (comment !== "# don't stop\nkey: value\n") {

@@ -120,7 +120,7 @@
       "prettier --write",
       "eslint --fix"
     ],
-    "app/**/*.{json,css,md}": [
+    "app/**/*.{css,md}": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
@@ -163,11 +163,7 @@
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "*.json": [
-      "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
-    ],
-    "*/*.json": [
+    "**/*.json": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
