@@ -186,6 +186,17 @@ const runFixtures = () => {
   ) {
     throw new Error(`Plain YAML scalar protection failed:\n${plainYaml}`);
   }
+  const hashKeyPlainYaml = runFix(
+    'hash-key-plain-yaml',
+    'run#section: first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n\n',
+    'yml'
+  );
+  if (
+    hashKeyPlainYaml !==
+    'run#section: first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n'
+  ) {
+    throw new Error(`Hash-key plain YAML protection failed:\n${hashKeyPlainYaml}`);
+  }
   const anchoredPlainYaml = runFix(
     'anchored-plain-yaml',
     'message: &anchor first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n\n',

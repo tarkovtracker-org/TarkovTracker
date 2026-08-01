@@ -327,7 +327,8 @@ const getYamlPlainScalarLines = (lines, filePath) => {
   const protectedLines = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    const match = line.match(/^(\s*)(?:[^#\n:]+:\s*|[-]\s+)(.*)$/);
+    if (/^\s*#/.test(line)) continue;
+    const match = line.match(/^(\s*)(?:[^\n:]+:\s*|[-]\s+)(.*)$/);
     if (!match || !match[2]) continue;
     let scalarValue = match[2].trim();
     while (scalarValue.startsWith('&') || scalarValue.startsWith('!')) {
