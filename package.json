@@ -111,10 +111,14 @@
   },
   "type": "module",
   "lint-staged": {
-    "app/**/*.{js,ts,tsx,vue}": [
+    "app/**/*.{js,ts,tsx}": [
       "prettier --write",
       "eslint --fix",
       "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "app/**/*.vue": [
+      "prettier --write",
+      "eslint --fix"
     ],
     "app/**/*.{json,css,md}": [
       "prettier --write",

@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-const root = new URL('..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
 const script = join(root, 'scripts/lint-blank-lines.mjs');
 const directory = mkdtempSync(join(root, '.github/workflows/.lint-blank-lines-'));
 process.on('exit', () => rmSync(directory, { force: true, recursive: true }));
