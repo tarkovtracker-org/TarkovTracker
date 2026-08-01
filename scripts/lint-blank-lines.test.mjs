@@ -235,6 +235,14 @@ const runFixtures = () => {
   if (rootPlainYaml !== 'first paragraph\n  second paragraph\n\n  third paragraph\nnext: value\n') {
     throw new Error(`Root YAML scalar protection failed:\n${rootPlainYaml}`);
   }
+  const explicitValueYaml = runFix(
+    'explicit-value-yaml',
+    '? key\n: first paragraph\n\n  second paragraph\n\nnext: value\n',
+    'yml'
+  );
+  if (explicitValueYaml !== '? key\n: first paragraph\n\n  second paragraph\nnext: value\n') {
+    throw new Error(`Explicit YAML value protection failed:\n${explicitValueYaml}`);
+  }
   const flowPlainYaml = runFix(
     'flow-plain-yaml',
     'values: [first paragraph,\n\n  second paragraph]\nnext: value\n\n',
@@ -330,6 +338,14 @@ const runFixtures = () => {
   }
   if (!nestedVue.includes('key: first\n\n  second')) {
     throw new Error(`Vue custom block handling failed:\n${nestedVue}`);
+  }
+  const templateInScript = runFix(
+    'template-in-script',
+    '<template>\n  <pre>first\n\nsecond</pre>\n</template>\n\n<script setup>\nconst text = "<template>";\n\nconst value = 1;\n</script>\n',
+    'vue'
+  );
+  if (!templateInScript.includes('<pre>first\n\nsecond</pre>')) {
+    throw new Error(`Vue script template marker handling failed:\n${templateInScript}`);
   }
   const shellSlashArgument = runFix(
     'shell-slash-argument',

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 const patterns = [
   'app/**/*.{js,ts,tsx,vue,css,md}',
   'app/**/!(*locales)/*.json',
+  'app/locales/en.json',
   'docs/**/*.{md,markdown}',
   '*.md',
   '*.{js,mjs,cjs,json}',
@@ -10,7 +12,7 @@ const patterns = [
   'DESIGN.md',
   'nuxt.config.ts',
   'app/app.config.ts',
-  'vitest.config.ts',
+  'vitest*.ts',
   'tests/test-setup.ts',
   'tests/**/*.{ts,tsx}',
   'scripts/**/*.json',
@@ -23,4 +25,9 @@ if (!['--check', '--write'].includes(mode)) {
   console.error('Usage: format-files.mjs --check|--write');
   process.exit(1);
 }
-execFileSync('prettier', [mode, ...patterns], { stdio: 'inherit' });
+const localPrettier = resolve(
+  process.cwd(),
+  'node_modules/.bin',
+  process.platform === 'win32' ? 'prettier.cmd' : 'prettier'
+);
+execFileSync(localPrettier, [mode, ...patterns], { stdio: 'inherit' });

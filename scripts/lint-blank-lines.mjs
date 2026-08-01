@@ -75,12 +75,30 @@ const getProtectedRanges = (source, filePath) => {
   const ranges = [];
   const extension = extname(filePath).toLowerCase();
   if (extension === '.vue') {
+    const ignoredTagRanges = [];
+    for (const tagName of ['script', 'style']) {
+      for (const opening of source.matchAll(new RegExp(`<${tagName}\\b`, 'gi'))) {
+        const openingEnd = findTagEnd(source, opening.index);
+        if (openingEnd === -1) continue;
+        const closing = source
+          .slice(openingEnd + 1)
+          .match(new RegExp(`</${tagName}(?:[\\t\\n\\r ]+[^>]*)?>`, 'i'));
+        if (!closing) continue;
+        ignoredTagRanges.push({
+          end: openingEnd + 1 + closing.index + closing[0].length,
+          start: opening.index,
+        });
+      }
+    }
+    const isIgnoredTagContent = (index) =>
+      ignoredTagRanges.some((range) => range.start <= index && index < range.end);
     const getNestedBlockRanges = (tagName) => {
       const blocks = [];
       const tags = new RegExp(`<\\/?${tagName}\\b[^>]*>`, 'gi');
       let depth = 0;
       let start = -1;
       for (const match of source.matchAll(tags)) {
+        if (isIgnoredTagContent(match.index)) continue;
         if (match[0].startsWith('</')) {
           if (depth === 0) continue;
           depth -= 1;
@@ -395,7 +413,7 @@ const getYamlPlainScalarLines = (lines, filePath) => {
     previousRootPlain = rootPlain;
     if (rootContinuationIndent !== null) protectedLines.add(index);
     if (/^\s*#/.test(line)) continue;
-    const match = line.match(/^(\s*)(?:[^\n:]+:\s*|[-]\s+)(.*)$/);
+    const match = line.match(/^(\s*)(?:[^\n:]+:\s*|:\s*|[-]\s+)(.*)$/);
     if (!match || !match[2]) {
       updateFlowContext(line);
       continue;
