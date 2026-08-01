@@ -163,6 +163,10 @@ const quotedYamlValue = runFix(
 if (quotedYamlValue !== 'message: "first\n\nsecond"\nnext: value\n') {
   throw new Error(`Quoted YAML value protection failed:\n${quotedYamlValue}`);
 }
+const quotedYamlSequence = runFix('quoted-yaml-sequence', '- "first\n\nsecond"\n- next\n\n', 'yml');
+if (quotedYamlSequence !== '- "first\n\nsecond"\n- next\n') {
+  throw new Error(`Quoted YAML sequence protection failed:\n${quotedYamlSequence}`);
+}
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {
   throw new Error(`Comment scanning failed:\n${comment}`);

@@ -195,8 +195,16 @@ const getYamlScalarLines = (lines, filePath) => {
     }
     const headerContent = headerMatch[2].slice(0, commentIndex).trim();
     const valueMatch = headerContent.match(/^(?:.*?:\s*|-\s*)(.*)$/);
-    const scalarValue = valueMatch ? valueMatch[1] : headerContent;
-    if (!/^(?:[&!][^\s]+\s*)*[|>](?:[+-]?\d?[+-]?)?$/.test(scalarValue)) continue;
+    let scalarValue = (valueMatch ? valueMatch[1] : headerContent).trim();
+    while (scalarValue.startsWith('&') || scalarValue.startsWith('!')) {
+      const separator = scalarValue.search(/[\t ]/);
+      if (separator === -1) {
+        scalarValue = '';
+        break;
+      }
+      scalarValue = scalarValue.slice(separator).trimStart();
+    }
+    if (!/^[|>](?:[+-]?\d?[+-]?)?$/.test(scalarValue)) continue;
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
     for (let next = index + 1; next < lines.length; next += 1) {
@@ -241,7 +249,10 @@ const getYamlQuotedLines = (lines, filePath) => {
       }
       if (
         (character === '"' || character === "'") &&
-        (position === 0 || /[:\[,]/.test(previous) || /:\s*$/.test(line.slice(0, position)))
+        (position === 0 ||
+          /[:\[,]/.test(previous) ||
+          /:\s*$/.test(line.slice(0, position)) ||
+          /^\s*-\s*$/.test(line.slice(0, position)))
       ) {
         quote = character;
       }
