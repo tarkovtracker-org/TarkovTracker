@@ -213,6 +213,22 @@ const runFixtures = () => {
   if (quotedYamlSequence !== '- "first\n\nsecond"\n- next\n') {
     throw new Error(`Quoted YAML sequence protection failed:\n${quotedYamlSequence}`);
   }
+  const keepChompAtEof = runFix(
+    'keep-chomp-at-eof',
+    'run: |+\n  first\n\nfolded: >+\n  second\n\n',
+    'yml'
+  );
+  if (keepChompAtEof !== 'run: |+\n  first\n\nfolded: >+\n  second\n\n') {
+    throw new Error(`YAML keep-chomp EOF protection failed:\n${keepChompAtEof}`);
+  }
+  const flowQuotedYaml = runFix(
+    'flow-quoted-yaml',
+    'values: [ "first\n\nsecond" ]\nnext: value\n\n',
+    'yml'
+  );
+  if (flowQuotedYaml !== 'values: [ "first\n\nsecond" ]\nnext: value\n') {
+    throw new Error(`YAML flow scalar protection failed:\n${flowQuotedYaml}`);
+  }
   const mixedQuotedHeredoc = runFix(
     'mixed-quoted-heredoc',
     'cat <<E"OF"\nbody\n\nEOF\n\nnext\n',

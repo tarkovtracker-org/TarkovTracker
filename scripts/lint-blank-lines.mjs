@@ -198,11 +198,16 @@ const getYamlScalarLines = (lines, filePath) => {
       scalarValue = scalarValue.slice(separator).trimStart();
     }
     if (!/^[|>](?:[+-]?\d?[+-]?)?$/.test(scalarValue)) continue;
+    const keepChomping = /^[|>]\+/.test(scalarValue);
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
       if (/^[\t ]*$/.test(candidate)) {
+        if (keepChomping) {
+          protectedLines.add(next);
+          continue;
+        }
         const following = lines.slice(next + 1).find((line) => !/^[\t ]*$/.test(line));
         const followingIndent = following?.match(/^[\t ]*/)?.[0].length;
         if (contentIndent === null || followingIndent >= contentIndent) protectedLines.add(next);
@@ -260,6 +265,7 @@ const getYamlQuotedLines = (lines, filePath) => {
   if (!['.yaml', '.yml'].includes(extname(filePath).toLowerCase())) return new Set();
   const protectedLines = new Set();
   let quote = null;
+  let flowDepth = 0;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (quote && /^[\t ]*$/.test(line)) protectedLines.add(index);
@@ -283,9 +289,14 @@ const getYamlQuotedLines = (lines, filePath) => {
           /:\s*$/.test(line.slice(0, position)) ||
           /^\s*-\s*$/.test(line.slice(0, position)) ||
           /:\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)) ||
-          /^\s*-\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)))
+          /^\s*-\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)) ||
+          flowDepth > 0)
       ) {
         quote = character;
+      } else if (character === '[' || character === '{') {
+        flowDepth += 1;
+      } else if ((character === ']' || character === '}') && flowDepth > 0) {
+        flowDepth -= 1;
       }
     }
   }
