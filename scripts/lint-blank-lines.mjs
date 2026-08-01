@@ -171,6 +171,8 @@ const getProtectedRanges = (source, filePath) => {
         depth += 1;
       } else if (depth > 0 && character === '}' && parameterDepth > 0) {
         parameterDepth -= 1;
+      } else if (depth > 0 && parameterDepth > 0 && character === ')') {
+        continue;
       } else if (depth > 0 && (character === ')' || character === '}')) {
         depth -= 1;
         if (depth === 0) {

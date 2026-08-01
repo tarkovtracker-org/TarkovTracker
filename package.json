@@ -128,6 +128,7 @@
       "node scripts/lint-blank-lines.mjs --fix"
     ],
     "app/locales/*.json": [
+      "prettier --write",
       "node scripts/lint-i18n.mjs"
     ],
     "docs/**/*.{md,markdown}": [

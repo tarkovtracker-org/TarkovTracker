@@ -16,7 +16,7 @@ const patterns = [
   'tests/test-setup.ts',
   'tests/**/*.{ts,tsx}',
   'scripts/**/*.json',
-  'scripts/**/*.mjs',
+  'scripts/**/*.{cjs,js,mjs}',
   'supabase/**/*.json',
   'workers/**/*.json',
 ];
@@ -30,4 +30,7 @@ const localPrettier = resolve(
   'node_modules/.bin',
   process.platform === 'win32' ? 'prettier.cmd' : 'prettier'
 );
-execFileSync(localPrettier, [mode, ...patterns], { stdio: 'inherit' });
+execFileSync(localPrettier, [mode, ...patterns], {
+  shell: process.platform === 'win32',
+  stdio: 'inherit',
+});

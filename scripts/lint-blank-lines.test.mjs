@@ -383,6 +383,17 @@ const runFixtures = () => {
   ) {
     throw new Error(`Shell parameter expansion protection failed:\n${shellParameterExpansion}`);
   }
+  const shellParameterParenthesis = runFix(
+    'shell-parameter-parenthesis',
+    'value=$(\n  printf "%s" "${name:-value)}"\n\n  printf done\n)\n\nnext\n',
+    'sh'
+  );
+  if (
+    shellParameterParenthesis !==
+    'value=$(\n  printf "%s" "${name:-value)}"\n\n  printf done\n)\nnext\n'
+  ) {
+    throw new Error(`Shell parameter parenthesis protection failed:\n${shellParameterParenthesis}`);
+  }
   const escapedShellQuote = runFix(
     'escaped-shell-quote',
     'printf "escaped \\\" quote"\n\nnext\n',
