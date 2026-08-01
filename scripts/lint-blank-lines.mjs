@@ -115,8 +115,14 @@ const getProtectedRanges = (source, filePath) => {
         }
       } else if (character === '`') {
         const start = index;
-        ranges.push({ end: source.length, start });
-        break;
+        index += 1;
+        while (index < source.length) {
+          if (source[index] === '\\') index += 2;
+          else if (source[index] === '`') {
+            ranges.push({ end: index + 1, start });
+            break;
+          } else index += 1;
+        }
       } else if (character === '"' || character === "'") {
         quote = character;
       }
@@ -183,6 +189,7 @@ const getYamlScalarLines = (lines, filePath) => {
       }
       const indent = candidate.match(/^\s*/)[0].length;
       if (indent <= headerIndent) break;
+      if (contentIndent !== null && indent < contentIndent) break;
       if (contentIndent === null) {
         contentIndent = indent;
         for (let blank = index + 1; blank < next; blank += 1) {
@@ -353,7 +360,7 @@ for (const filePath of files) {
   const absolutePath = resolve(root, filePath);
   let original;
   try {
-    if (trackedSymlinks.has(filePath)) continue;
+    if (trackedSymlinks.has(normalizePath(filePath))) continue;
     original = readFileSync(absolutePath, 'utf8');
   } catch (error) {
     if (error.code === 'ENOENT') continue;
