@@ -213,7 +213,6 @@ const getProtectedRanges = (source, filePath) => {
   const visit = (node) => {
     if (
       node.kind === typescript.SyntaxKind.NoSubstitutionTemplateLiteral ||
-      node.kind === typescript.SyntaxKind.TemplateExpression ||
       node.kind === typescript.SyntaxKind.TemplateHead ||
       node.kind === typescript.SyntaxKind.TemplateMiddle ||
       node.kind === typescript.SyntaxKind.TemplateTail
