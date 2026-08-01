@@ -586,7 +586,7 @@
   const sortOptions = computed<SortOption[]>(() =>
     TASK_SORT_MODES.map((mode) => ({
       value: mode,
-      label: mode === 'impact' ? t('common.impact') : t(`page.tasks.sort.${mode}`),
+      label: t(`page.tasks.sort.${mode}`),
       icon: SORT_MODE_ICONS[mode],
     }))
   );

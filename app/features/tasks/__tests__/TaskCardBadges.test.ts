@@ -4,7 +4,7 @@ import TaskCardBadges from '@/features/tasks/TaskCardBadges.vue';
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
-    t: (key: string) => ({ 'common.failed': 'Failed', 'common.blocked': 'Blocked' })[key] ?? key,
+    t: (key: string) => key,
   }),
 }));
 const mountBadges = (props: Partial<InstanceType<typeof TaskCardBadges>['$props']> = {}) =>
@@ -34,8 +34,8 @@ const mountBadges = (props: Partial<InstanceType<typeof TaskCardBadges>['$props'
     },
   });
 describe('TaskCardBadges', () => {
-  it('renders title-cased common failed and blocked labels', () => {
-    expect(mountBadges({ isFailed: true }).text()).toContain('Failed');
-    expect(mountBadges({ isInvalid: true }).text()).toContain('Blocked');
+  it('renders failed and blocked labels from the common namespace', () => {
+    expect(mountBadges({ isFailed: true }).text()).toContain('common.failed');
+    expect(mountBadges({ isInvalid: true }).text()).toContain('common.blocked');
   });
 });

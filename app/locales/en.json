@@ -838,6 +838,7 @@
       },
       "sort": {
         "none": "Default order",
+        "impact": "Impact",
         "alphabetical": "Alphabetical",
         "level": "Level Required",
         "trader": "Trader Order",

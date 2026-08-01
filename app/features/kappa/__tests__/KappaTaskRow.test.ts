@@ -14,8 +14,10 @@ vi.mock('@/stores/useProgress', () => ({
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
-    t: (key: string, paramsOrFallback?: unknown, fallback?: string) =>
-      (typeof paramsOrFallback === 'string' ? paramsOrFallback : fallback) ?? key,
+    t: (key: string, paramsOrFallback?: unknown, fallback?: string) => {
+      if (key === 'common.failed') return key;
+      return (typeof paramsOrFallback === 'string' ? paramsOrFallback : fallback) ?? key;
+    },
   }),
 }));
 const row = (status: KappaRowEntry['status']): KappaRowEntry => ({
@@ -29,13 +31,16 @@ describe('KappaTaskRow', () => {
       props: { row: row('failed') },
       global: {
         stubs: {
-          AppTooltip: { template: '<div><slot /></div>' },
+          AppTooltip: {
+            props: ['text'],
+            template: '<div :data-tooltip="text"><slot /></div>',
+          },
           NuxtLink: { template: '<a><slot /></a>' },
           UIcon: true,
         },
       },
     });
     expect(wrapper.get('button').attributes('aria-label')).toBe('Reset failed: Test task');
-    expect(wrapper.html()).not.toContain('common.failed');
+    expect(wrapper.get('[data-tooltip]').attributes('data-tooltip')).toContain('common.failed');
   });
 });
