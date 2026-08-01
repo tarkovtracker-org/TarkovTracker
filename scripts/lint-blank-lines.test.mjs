@@ -104,6 +104,22 @@ const runFixtures = () => {
   if (subshell !== '(\n  printf first\n\n  printf second\n)\nnext\n') {
     throw new Error(`Subshell protection failed:\n${subshell}`);
   }
+  const shellFunction = runFix(
+    'shell-function',
+    'run() {\n  printf first\n\n  printf second\n}\n\nnext\n',
+    'sh'
+  );
+  if (shellFunction !== 'run() {\n  printf first\n\n  printf second\n}\nnext\n') {
+    throw new Error(`Shell function protection failed:\n${shellFunction}`);
+  }
+  const processSubstitution = runFix(
+    'process-substitution',
+    'diff <(\n  printf first\n\n  printf second\n)\n\nnext\n',
+    'sh'
+  );
+  if (processSubstitution !== 'diff <(\n  printf first\n\n  printf second\n)\nnext\n') {
+    throw new Error(`Process substitution protection failed:\n${processSubstitution}`);
+  }
   const arithmetic = runFix('arithmetic', 'value=$((1 << 2))\n\nnext\n\n', 'sh');
   if (arithmetic !== 'value=$((1 << 2))\nnext\n') {
     throw new Error(`Arithmetic shift handling failed:\n${arithmetic}`);

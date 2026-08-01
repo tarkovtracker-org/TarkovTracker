@@ -133,12 +133,15 @@ const getProtectedRanges = (source, filePath) => {
         start = start === -1 ? index : start;
         depth += 1;
         index += 1;
-      } else if (character === '(' && (index === 0 || /[\s;|&]/.test(source[index - 1]))) {
+      } else if (
+        (character === '(' || character === '{') &&
+        (index === 0 || /[\s;|&<>]/.test(source[index - 1]))
+      ) {
         start = start === -1 ? index : start;
         depth += 1;
       } else if (depth > 0 && character === '(') {
         depth += 1;
-      } else if (depth > 0 && character === ')') {
+      } else if (depth > 0 && (character === ')' || character === '}')) {
         depth -= 1;
         if (depth === 0) {
           ranges.push({ end: index + 1, start });
@@ -168,6 +171,19 @@ const getProtectedRanges = (source, filePath) => {
         if (end !== -1) {
           ranges.push({ end: end + 2, start: index });
           index = end + 1;
+        }
+      } else if (
+        character === '/' &&
+        nextCharacter !== '/' &&
+        nextCharacter !== '*' &&
+        (index === 0 || /[=(:,!&|?{;[\s]/.test(source[index - 1]))
+      ) {
+        let inClass = false;
+        for (index += 1; index < source.length; index += 1) {
+          if (source[index] === '\\') index += 1;
+          else if (source[index] === '[') inClass = true;
+          else if (source[index] === ']') inClass = false;
+          else if (source[index] === '/' && !inClass) break;
         }
       } else if (character === '`') {
         let interpolationDepth = 0;
