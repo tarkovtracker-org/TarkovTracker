@@ -11,7 +11,6 @@ body:
         Only use this template if the data source is correct but our tracker isn't displaying or handling it properly. Otherwise, please report at the data-overlay repo.
 
         Thanks for reporting a data issue! Please provide specific details about the incorrect data.
-
   - type: dropdown
     id: data-type
     attributes:

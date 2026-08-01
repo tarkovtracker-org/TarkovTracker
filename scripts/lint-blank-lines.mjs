@@ -116,15 +116,8 @@ const getProtectedRanges = (source, filePath) => {
           index = end + 1;
         }
       } else if (character === '`') {
-        const start = index;
-        index += 1;
-        while (index < source.length) {
-          if (source[index] === '\\') index += 2;
-          else if (source[index] === '`') {
-            ranges.push({ end: index + 1, start });
-            break;
-          } else index += 1;
-        }
+        ranges.push({ end: source.length, start: index });
+        break;
       } else if (character === '"' || character === "'") {
         quote = character;
       }
@@ -210,7 +203,9 @@ const getYamlScalarLines = (lines, filePath) => {
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
       if (/^[\t ]*$/.test(candidate)) {
-        protectedLines.add(next);
+        const following = lines.slice(next + 1).find((line) => !/^[\t ]*$/.test(line));
+        const followingIndent = following?.match(/^[\t ]*/)?.[0].length;
+        if (contentIndent === null || followingIndent >= contentIndent) protectedLines.add(next);
         continue;
       }
       const indent = candidate.match(/^\s*/)[0].length;
@@ -222,6 +217,32 @@ const getYamlScalarLines = (lines, filePath) => {
           protectedLines.add(blank);
         }
       }
+      protectedLines.add(next);
+    }
+  }
+  return protectedLines;
+};
+const getYamlPlainScalarLines = (lines, filePath) => {
+  if (!['.yaml', '.yml'].includes(extname(filePath).toLowerCase())) return new Set();
+  const protectedLines = new Set();
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const match = line.match(/^(\s*)(?:[^#\n:]+:\s*|[-]\s+)(.*)$/);
+    if (!match || !match[2] || /^[|>'"&!\[\]{]/.test(match[2])) continue;
+    const headerIndent = match[1].length;
+    let foundContinuation = false;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const candidate = lines[next];
+      if (/^[\t ]*$/.test(candidate)) {
+        const following = lines.slice(next + 1).find((entry) => !/^[\t ]*$/.test(entry));
+        if (following && following.match(/^[\t ]*/)[0].length > headerIndent) {
+          protectedLines.add(next);
+        }
+        continue;
+      }
+      const indent = candidate.match(/^\s*/)[0].length;
+      if (indent <= headerIndent) break;
+      foundContinuation = true;
       protectedLines.add(next);
     }
   }
@@ -252,7 +273,9 @@ const getYamlQuotedLines = (lines, filePath) => {
         (position === 0 ||
           /[:\[,]/.test(previous) ||
           /:\s*$/.test(line.slice(0, position)) ||
-          /^\s*-\s*$/.test(line.slice(0, position)))
+          /^\s*-\s*$/.test(line.slice(0, position)) ||
+          /:\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)) ||
+          /^\s*-\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)))
       ) {
         quote = character;
       }
@@ -297,23 +320,34 @@ const getShellHeredocs = (line) => {
     if (stripTabs) index += 1;
     while (/\s/.test(line[index] ?? '')) index += 1;
     let delimiter = '';
-    const hasAnsiQuote =
-      line[index] === '$' && (line[index + 1] === '"' || line[index + 1] === "'");
-    if (hasAnsiQuote || line[index] === '"' || line[index] === "'") {
-      if (hasAnsiQuote) index += 1;
-      const delimiterQuote = line[index++];
-      while (index < line.length && line[index] !== delimiterQuote) delimiter += line[index++];
-      if (line[index] === delimiterQuote) index += 1;
-    } else {
-      if (line[index] === '\\') index += 1;
-      while (index < line.length && !/[;|&<>]/.test(line[index])) {
-        if (/\s/.test(line[index]) && line[index - 1] !== '\\') break;
-        if (line[index] === '\\' && index + 1 < line.length) {
-          delimiter += line[index + 1];
+    let delimiterQuote = null;
+    while (index < line.length) {
+      const character = line[index];
+      if (delimiterQuote) {
+        if (character === '\\' && delimiterQuote === '"') {
+          delimiter += line[index + 1] ?? '';
           index += 2;
+        } else if (character === delimiterQuote) {
+          delimiterQuote = null;
+          index += 1;
         } else {
-          delimiter += line[index++];
+          delimiter += character;
+          index += 1;
         }
+      } else if (character === '"' || character === "'") {
+        delimiterQuote = character;
+        index += 1;
+      } else if (character === '$' && (line[index + 1] === '"' || line[index + 1] === "'")) {
+        delimiterQuote = line[index + 1];
+        index += 2;
+      } else if (/[;|&<>\s]/.test(character)) {
+        break;
+      } else if (character === '\\' && index + 1 < line.length) {
+        delimiter += line[index + 1];
+        index += 2;
+      } else {
+        delimiter += character;
+        index += 1;
       }
     }
     if (delimiter) heredocs.push({ delimiter, stripTabs });
@@ -334,6 +368,7 @@ const stripBlankLines = (source, filePath) => {
   const lastLine = hasFinalNewline ? lines.length - 1 : lines.length;
   const protectedRanges = getProtectedRanges(source, filePath);
   const yamlScalarLines = getYamlScalarLines(lines, filePath);
+  const yamlPlainScalarLines = getYamlPlainScalarLines(lines, filePath);
   const yamlQuotedLines = getYamlQuotedLines(lines, filePath);
   const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(
     extname(filePath).toLowerCase()
@@ -353,6 +388,7 @@ const stripBlankLines = (source, filePath) => {
     const followsContinuation = isShellFile && index > 0 && endsWithContinuation(lines[index - 1]);
     const isProtected =
       yamlScalarLines.has(index) ||
+      yamlPlainScalarLines.has(index) ||
       yamlQuotedLines.has(index) ||
       protectedRanges.some(({ end, start }) => start <= offset && offset + line.length <= end);
     if (heredocs.length > 0) {
