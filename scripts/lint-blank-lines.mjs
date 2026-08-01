@@ -230,7 +230,6 @@ const getYamlPlainScalarLines = (lines, filePath) => {
     const match = line.match(/^(\s*)(?:[^#\n:]+:\s*|[-]\s+)(.*)$/);
     if (!match || !match[2] || /^[|>'"&!\[\]{]/.test(match[2])) continue;
     const headerIndent = match[1].length;
-    let foundContinuation = false;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
       if (/^[\t ]*$/.test(candidate)) {
@@ -242,7 +241,6 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       }
       const indent = candidate.match(/^\s*/)[0].length;
       if (indent <= headerIndent) break;
-      foundContinuation = true;
       protectedLines.add(next);
     }
   }
