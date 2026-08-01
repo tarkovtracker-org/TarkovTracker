@@ -71,7 +71,7 @@
               class="mt-1 w-full justify-center"
               @click="closePreferences"
             >
-              {{ t('common.close') }}
+              {{ t('common.close', 'Close') }}
             </UButton>
           </div>
         </div>

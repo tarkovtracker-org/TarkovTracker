@@ -14,7 +14,7 @@
               size="sm"
               @click="handlePageRetry(clearError, error)"
             >
-              {{ t('common.retry') }}
+              {{ t('common.retry', 'Retry') }}
             </UButton>
           </div>
         </template>

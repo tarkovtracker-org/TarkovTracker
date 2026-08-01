@@ -212,9 +212,11 @@
     "locked": "Locked",
     "all": "All",
     "completed": "Completed",
+    "status_completed": "completed",
     "hideout": "Hideout",
     "unknown": "Unknown",
     "failed": "Failed",
+    "status_failed": "failed",
     "complete": "Complete",
     "pvp": "PvP",
     "pve": "PvE",
@@ -1807,6 +1809,7 @@
     "prestige_pvp": {
       "success_title": "PvP Prestige Complete",
       "success_description": "Your PvP profile has been prestiged to level {level}.",
+      "error_title": "Prestige Failed",
       "error_description": "Failed to prestige PvP profile. Please try again."
     },
     "reset_pvp": {
@@ -1914,9 +1917,11 @@
       "delete_history_selected_label": "Selected run",
       "delete_history_success_title": "Archived Run Deleted",
       "delete_history_success_description": "The selected prestige history entry was removed.",
+      "delete_history_error_title": "Delete Failed",
       "delete_history_error_description": "Failed to delete the archived prestige run. Please try again.",
       "sync_success_title": "Prestige Updated",
       "sync_success_description": "Tracker prestige is now set to {level}. Current progress was preserved.",
+      "sync_error_title": "Prestige Update Failed",
       "sync_error_description": "Failed to update tracker prestige. Please try again.",
       "requirement_source": {
         "tarkov_dev": "Tarkov.dev",

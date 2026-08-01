@@ -399,6 +399,21 @@ describe('AppBar page title', () => {
     expect(wrapper.text()).toContain('Alpha Profile PVE');
     wrapper.unmount();
   });
+  it.each([
+    ['tasks', 'common.tasks'],
+    ['hideout', 'common.hideout'],
+    ['team', 'common.team'],
+    ['settings', 'common.settings'],
+    ['storyline', 'common.storyline'],
+    ['credits', 'common.credits'],
+    ['needed-items', 'common.needed_items'],
+    ['kappa', 'common.kappa_lightkeeper'],
+  ])('uses the consolidated title for %s', async (routeName, expectedTitle) => {
+    routeState.name = routeName;
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain(expectedTitle);
+    wrapper.unmount();
+  });
   it('renders shared profile title from route user id instead of local progress data', async () => {
     routeState.name = 'profile-userId-mode';
     routeState.params = { mode: 'pve', userId: 'shared-user' };

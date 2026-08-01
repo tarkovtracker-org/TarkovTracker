@@ -96,11 +96,19 @@
       </span>
     </UBadge>
     <UBadge v-if="isFailed" size="xs" color="error" variant="soft" class="shrink-0 text-[11px]">
-      {{ t('common.failed') }}
+      {{ t('common.failed', 'Failed') }}
     </UBadge>
-    <AppTooltip v-if="isInvalid && !isFailed" :text="t('page.tasks.questcard.blocked_tooltip')">
+    <AppTooltip
+      v-if="isInvalid && !isFailed"
+      :text="
+        t(
+          'page.tasks.questcard.blocked_tooltip',
+          'This task is permanently blocked and can never be completed due to choices made in other tasks'
+        )
+      "
+    >
       <UBadge size="xs" color="neutral" variant="soft" class="shrink-0 cursor-help text-[11px]">
-        {{ t('common.blocked') }}
+        {{ t('common.blocked', 'Blocked') }}
       </UBadge>
     </AppTooltip>
     <AppTooltip
@@ -148,13 +156,13 @@
     </AppTooltip>
     <slot name="actions" />
     <div class="hidden sm:flex">
-      <AppTooltip v-if="isOurFaction" :text="t('common.more')">
+      <AppTooltip v-if="isOurFaction" :text="t('common.more', 'More')">
         <UButton
           size="xs"
           color="neutral"
           variant="ghost"
           class="shrink-0"
-          :aria-label="t('common.more')"
+          :aria-label="t('common.more', 'More')"
           @click.stop="emit('openMenu', $event)"
         >
           <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />

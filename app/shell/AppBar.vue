@@ -493,8 +493,22 @@
       }
       return t('page.resources.title', 'Resources & Guides');
     }
+    const commonTitles: Partial<Record<string, readonly [string, string]>> = {
+      credits: ['common.credits', 'Credits'],
+      hideout: ['common.hideout', 'Hideout'],
+      kappa: ['common.kappa_lightkeeper', 'Kappa & Lightkeeper'],
+      needed_items: ['common.needed_items', 'Needed Items'],
+      settings: ['common.settings', 'Settings'],
+      storyline: ['common.storyline', 'Storyline'],
+      tasks: ['common.tasks', 'Tasks'],
+      team: ['common.team', 'Team'],
+    };
+    const commonTitle = commonTitles[routeName];
+    if (commonTitle) {
+      return t(...commonTitle);
+    }
     const titleKeys = [
-      routeName === 'neededitems' ? 'common.needed_items' : `page.${routeName}.appbar_title`,
+      `page.${routeName}.appbar_title`,
       `page.${routeName}.title`,
       `page.${routeName}.meta.title`,
       routeName === 'admin' ? 'common.admin_panel' : '',

@@ -3,7 +3,7 @@
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-card-text" class="text-info-400 h-4 w-4" />
       <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
-        {{ t('common.appearance') }}
+        {{ t('common.appearance', 'Appearance') }}
       </h3>
     </div>
     <p class="text-surface-500 mb-2 text-xs">

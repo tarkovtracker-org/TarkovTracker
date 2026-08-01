@@ -46,7 +46,7 @@
               color="neutral"
               variant="ghost"
               class="shrink-0 sm:hidden"
-              :aria-label="t('common.more')"
+              :aria-label="t('common.more', 'More')"
               @click.stop="openOverflowMenu"
             >
               <UIcon name="i-mdi-dots-horizontal" aria-hidden="true" class="h-5 w-5" />
@@ -93,7 +93,7 @@
         </div>
         <!-- Extra Info Strips (padded area) -->
         <div v-if="lockedBefore > 0" class="text-surface-400 text-xs">
-          <span class="text-surface-500">{{ t('common.requires') }}:</span>
+          <span class="text-surface-500">{{ t('common.requires', 'Requires') }}:</span>
           <template v-if="useCompactRequires">
             <AppTooltip :text="compactRequiresTooltip">
               <span class="text-surface-300 ml-2">
@@ -259,7 +259,7 @@
             @keydown.space.prevent="toggleObjectivesVisibility"
           >
             <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-              {{ t('common.objectives') }}
+              {{ t('common.objectives', 'Objectives') }}
             </div>
             <div class="flex items-center gap-2">
               <AppTooltip
@@ -378,7 +378,7 @@
       <template #default="{ close }">
         <ContextMenuItem
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="t('common.view_on_tarkov_dev')"
+          :label="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
           @click="
             openItemOnTarkovDev();
             close();
@@ -386,7 +386,7 @@
         />
         <ContextMenuItem
           icon="/img/logos/wikilogo.webp"
-          :label="t('common.view_on_wiki')"
+          :label="t('common.view_on_wiki', 'View on Wiki')"
           @click="
             openItemOnWiki();
             close();
@@ -585,9 +585,9 @@
         return t('page.tasks.questcard.requirement_status_active', 'active/accepted');
       }
       if (status === 'failed') {
-        return t('common.failed', 'failed');
+        return t('common.status_failed', 'failed');
       }
-      return t('common.completed', 'completed');
+      return t('common.status_completed', 'completed');
     });
     return labels.join(` ${t('page.tasks.questcard.keys_or', 'or')} `);
   };
@@ -599,12 +599,12 @@
       return t('page.tasks.questcard.requirement_status_available', 'available');
     }
     if (status === 'failed') {
-      return t('common.failed', 'failed');
+      return t('common.status_failed', 'failed');
     }
     if (status === 'not_started') {
       return t('page.tasks.questcard.requirement_status_not_started', 'not started');
     }
-    return t('common.completed', 'completed');
+    return t('common.status_completed', 'completed');
   };
   const formatRequirementActionVerbs = (statuses: RequirementExpectedStatus[]): string => {
     const unique = Array.from(new Set(statuses));

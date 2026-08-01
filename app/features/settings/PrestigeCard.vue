@@ -860,7 +860,7 @@
     } catch (error) {
       logger.error('[PrestigeCard] Failed to sync PvP prestige level:', error);
       toast.add({
-        title: t('common.reset_failed'),
+        title: t('settings.prestige.sync_error_title', 'Prestige Update Failed'),
         description: t('settings.prestige.sync_error_description'),
         color: 'error',
       });
@@ -896,7 +896,7 @@
     } catch (error) {
       logger.error('[PrestigeCard] Failed to delete prestige history entry:', error);
       toast.add({
-        title: t('common.reset_failed'),
+        title: t('settings.prestige.delete_history_error_title', 'Delete Failed'),
         description: t('settings.prestige.delete_history_error_description'),
         color: 'error',
       });
@@ -931,7 +931,7 @@
     } catch (error) {
       logger.error('[PrestigeCard] Failed to prestige PvP data:', error);
       toast.add({
-        title: t('common.reset_failed'),
+        title: t('settings.prestige_pvp.error_title', 'Prestige Failed'),
         description: t('settings.prestige_pvp.error_description'),
         color: 'error',
       });

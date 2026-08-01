@@ -34,7 +34,7 @@
                   class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                 >
                   <UIcon name="i-mdi-open-in-new" class="h-3 w-3" />
-                  {{ t('common.view_on_tarkov_dev') }}
+                  {{ t('common.view_on_tarkov_dev', 'View on Tarkov.dev') }}
                 </NuxtLink>
               </div>
               <p class="text-surface-300 text-sm sm:text-base">
@@ -758,7 +758,7 @@
   const hideoutModuleLabelById = computed(() => {
     const lookup = new Map<string, string>();
     for (const station of metadataStore.hideoutStations ?? []) {
-      const stationName = station.name || t('common.hideout');
+      const stationName = station.name || t('common.hideout', 'Hideout');
       for (const level of station.levels ?? []) {
         if (!level?.id) {
           continue;
@@ -1498,21 +1498,21 @@
   const selectedTabIndex = ref(0);
   const profileTabItems = computed(() => [
     {
-      label: t('common.overview'),
+      label: t('common.overview', 'Overview'),
       icon: 'i-mdi-view-dashboard-outline',
     },
     {
-      label: t('common.tasks'),
+      label: t('common.tasks', 'Tasks'),
       icon: 'i-mdi-clipboard-check-outline',
       badge: `${formatNumber(completedTasks.value)}/${formatNumber(totalTasks.value)}`,
     },
     {
-      label: t('common.hideout'),
+      label: t('common.hideout', 'Hideout'),
       icon: 'i-mdi-home-city-outline',
       badge: `${formatNumber(completedHideoutModules.value)}/${formatNumber(totalHideoutModules.value)}`,
     },
     {
-      label: t('common.storyline'),
+      label: t('common.storyline', 'Storyline'),
       icon: 'i-mdi-book-open-variant',
       badge:
         totalStoryMainObjectives.value > 0

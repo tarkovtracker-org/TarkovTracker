@@ -53,7 +53,7 @@
                 :class="taskStatusColor(task.id)"
               />
               <span class="text-surface-200 min-w-0 flex-1 truncate text-sm">
-                {{ task.name || t('common.task') }}
+                {{ task.name || t('common.task', 'Task') }}
               </span>
               <span
                 v-if="task.trader?.name"
@@ -106,7 +106,7 @@
                     :class="objectiveColor(objective.id)"
                   />
                   <span class="text-surface-300 text-xs leading-relaxed">
-                    {{ objective.description || t('common.objective') }}
+                    {{ objective.description || t('common.objective', 'Objective') }}
                   </span>
                   <span
                     v-if="objective.count && objective.count > 1"
@@ -186,7 +186,7 @@
     return [
       {
         key: 'available',
-        label: t('common.available'),
+        label: t('common.available', 'Available'),
         icon: 'i-mdi-clipboard-check-outline',
         chipClass: 'bg-primary-700/25',
         iconClass: 'text-primary-300',
@@ -194,7 +194,7 @@
       },
       {
         key: 'locked',
-        label: t('common.locked'),
+        label: t('common.locked', 'Locked'),
         icon: 'i-mdi-lock-outline',
         chipClass: 'bg-warning-700/25',
         iconClass: 'text-warning-300',
@@ -202,7 +202,7 @@
       },
       {
         key: 'completed',
-        label: t('common.completed'),
+        label: t('common.completed', 'Completed'),
         icon: 'i-mdi-check-circle-outline',
         chipClass: 'bg-success-700/25',
         iconClass: 'text-success-300',

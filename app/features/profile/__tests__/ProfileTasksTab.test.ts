@@ -12,9 +12,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   useI18n: () => ({ t: (key: string) => messages[key] ?? key }),
 }));
 const tasks: Task[] = [
-  { id: 'available', name: 'Available task' },
-  { id: 'locked', name: 'Locked task' },
-  { id: 'completed', name: 'Completed task' },
+  { id: 'available', name: 'Alpha' },
+  { id: 'locked', name: 'Beta' },
+  { id: 'completed', name: 'Gamma' },
 ];
 describe('ProfileTasksTab', () => {
   it('renders title-cased common section labels', () => {

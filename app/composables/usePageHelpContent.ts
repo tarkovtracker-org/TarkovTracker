@@ -54,7 +54,7 @@ export const usePageHelpContent = () => {
       ],
       actions: [
         {
-          label: t('common.open_tasks'),
+          label: t('common.open_tasks', 'Open tasks'),
           to: '/tasks',
           icon: 'i-mdi-checkbox-multiple-marked',
         },
@@ -103,7 +103,7 @@ export const usePageHelpContent = () => {
           icon: 'i-mdi-package-variant',
         },
         {
-          label: t('common.open_hideout'),
+          label: t('common.open_hideout', 'Open hideout'),
           to: '/hideout',
           icon: 'i-mdi-home-city-outline',
           color: 'neutral',
@@ -142,12 +142,12 @@ export const usePageHelpContent = () => {
       ],
       actions: [
         {
-          label: t('common.open_tasks'),
+          label: t('common.open_tasks', 'Open tasks'),
           to: '/tasks',
           icon: 'i-mdi-checkbox-multiple-marked',
         },
         {
-          label: t('common.open_hideout'),
+          label: t('common.open_hideout', 'Open hideout'),
           to: '/hideout',
           icon: 'i-mdi-home-city-outline',
           color: 'neutral',
@@ -191,7 +191,7 @@ export const usePageHelpContent = () => {
           icon: 'i-mdi-package-variant',
         },
         {
-          label: t('common.open_tasks'),
+          label: t('common.open_tasks', 'Open tasks'),
           to: '/tasks',
           icon: 'i-mdi-checkbox-multiple-marked',
           color: 'neutral',
