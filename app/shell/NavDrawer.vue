@@ -69,7 +69,7 @@
       <ul class="flex flex-col gap-0.5 px-1">
         <DrawerItem
           icon="i-mdi-compass-outline"
-          locale-key="resources"
+          locale-key="navigation_drawer.resources"
           to="/resources"
           :is-collapsed="isCollapsed"
         />

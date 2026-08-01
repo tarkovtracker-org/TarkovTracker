@@ -157,6 +157,8 @@
         "plural": "Tasks updated"
       },
       "state": {
+        "completed": "completed",
+        "failed": "failed",
         "uncompleted": "uncompleted"
       },
       "more": ", +{count} more"
@@ -209,10 +211,10 @@
     "level": "Level",
     "locked": "Locked",
     "all": "All",
-    "completed": "completed",
+    "completed": "Completed",
     "hideout": "Hideout",
     "unknown": "Unknown",
-    "failed": "failed",
+    "failed": "Failed",
     "complete": "Complete",
     "pvp": "PvP",
     "pve": "PvE",

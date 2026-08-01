@@ -115,7 +115,8 @@
     [GAME_MODES.PVE]: '',
   });
   const getDisplayNameInputId = (mode: DisplayNameMode) => `settings-display-name-input-${mode}`;
-  const getModeLabel = (mode: DisplayNameMode) => t(`settings.game_settings.${mode}`);
+  const getModeLabel = (mode: DisplayNameMode) =>
+    mode === GAME_MODES.PVE ? t('common.pve') : t('common.pvp');
   const getStoredDisplayName = (mode: DisplayNameMode) =>
     tarkovStore.getModeDisplayName(mode) || '';
   const getDisplayNameValidationError = (mode: DisplayNameMode) => {
