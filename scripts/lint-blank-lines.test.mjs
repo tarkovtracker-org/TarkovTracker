@@ -75,6 +75,14 @@ const substitution = runFix(
 if (substitution !== 'value=$(\n  printf first\n\n  printf second\n)\nnext\n') {
   throw new Error(`Command substitution protection failed:\n${substitution}`);
 }
+const subshell = runFix('subshell', '(\n  printf first\n\n  printf second\n)\n\nnext\n', 'sh');
+if (subshell !== '(\n  printf first\n\n  printf second\n)\nnext\n') {
+  throw new Error(`Subshell protection failed:\n${subshell}`);
+}
+const arithmetic = runFix('arithmetic', 'value=$((1 << 2))\n\nnext\n\n', 'sh');
+if (arithmetic !== 'value=$((1 << 2))\nnext\n') {
+  throw new Error(`Arithmetic shift handling failed:\n${arithmetic}`);
+}
 const template = runFix(
   'template',
   'const value = 1;\n\nconst text = `first\n\nsecond`;\n\n',
@@ -114,6 +122,10 @@ if (yamlApostrophe !== "message: don't stop\nnext: value\n") {
 const yamlHeredocText = runFix('yaml-heredoc-text', 'message: <<TOKEN\n\nnext: value\n\n', 'yml');
 if (yamlHeredocText !== 'message: <<TOKEN\nnext: value\n') {
   throw new Error(`YAML heredoc text handling failed:\n${yamlHeredocText}`);
+}
+const emptyScalar = runFix('empty-scalar', 'description: |\n\nnext: value\n\n', 'yml');
+if (emptyScalar !== 'description: |\n\nnext: value\n') {
+  throw new Error(`Empty YAML scalar protection failed:\n${emptyScalar}`);
 }
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {

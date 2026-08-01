@@ -70,6 +70,9 @@ const getProtectedRanges = (source, filePath) => {
         start = start === -1 ? index : start;
         depth += 1;
         index += 1;
+      } else if (character === '(' && (index === 0 || /[\s;|&]/.test(source[index - 1]))) {
+        start = start === -1 ? index : start;
+        depth += 1;
       } else if (depth > 0 && character === '(') {
         depth += 1;
       } else if (depth > 0 && character === ')') {
@@ -172,7 +175,7 @@ const getYamlScalarLines = (lines, filePath) => {
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
       if (/^[\t ]*$/.test(candidate)) {
-        if (contentIndent !== null) protectedLines.add(next);
+        protectedLines.add(next);
         continue;
       }
       const indent = candidate.match(/^\s*/)[0].length;
@@ -191,8 +194,14 @@ const getYamlScalarLines = (lines, filePath) => {
 const getShellHeredocs = (line) => {
   const heredocs = [];
   let quote = null;
+  let arithmeticDepth = 0;
   for (let index = 0; index < line.length; index += 1) {
     const character = line[index];
+    if (arithmeticDepth > 0) {
+      if (character === '(') arithmeticDepth += 1;
+      else if (character === ')') arithmeticDepth -= 1;
+      continue;
+    }
     if (quote) {
       if (character === '\\') index += 1;
       else if (character === quote) quote = null;
@@ -201,6 +210,16 @@ const getShellHeredocs = (line) => {
     if (character === '#' && (index === 0 || /\s/.test(line[index - 1]))) break;
     if (character === '"' || character === "'") {
       quote = character;
+      continue;
+    }
+    if (
+      (character === '$' && line[index + 1] === '(' && line[index + 2] === '(') ||
+      (character === '(' &&
+        line[index + 1] === '(' &&
+        (index === 0 || /[\s;]/.test(line[index - 1])))
+    ) {
+      arithmeticDepth = 2;
+      index += 2;
       continue;
     }
     if (character !== '<' || line[index + 1] !== '<') continue;
