@@ -152,6 +152,15 @@ const runFixtures = () => {
   ) {
     throw new Error(`Fallback template protection failed:\n${fallbackTemplate}`);
   }
+  const escapedFallbackTemplate = runFix(
+    'escaped-fallback-template',
+    'const text = `first \\` marker\n\nsecond`;\n\nnext();\n',
+    'mjs',
+    true
+  );
+  if (escapedFallbackTemplate !== 'const text = `first \\` marker\n\nsecond`;\nnext();\n') {
+    throw new Error(`Escaped fallback template protection failed:\n${escapedFallbackTemplate}`);
+  }
   const fallbackComment = runFix(
     'fallback-comment-after-division',
     'const ratio = width / height;\n\n/* first\n\nsecond */\n\nnext();\n',
@@ -347,6 +356,14 @@ const runFixtures = () => {
   if (!templateInScript.includes('<pre>first\n\nsecond</pre>')) {
     throw new Error(`Vue script template marker handling failed:\n${templateInScript}`);
   }
+  const jsx = runFix(
+    'jsx-text',
+    'const view = <pre>first\n\nsecond</pre>;\n\nconst value = 1;\n',
+    'tsx'
+  );
+  if (!jsx.includes('<pre>first\n\nsecond</pre>')) {
+    throw new Error(`JSX text protection failed:\n${jsx}`);
+  }
   const shellSlashArgument = runFix(
     'shell-slash-argument',
     'printf // "first\n\nsecond"\n\nnext\n',
@@ -354,6 +371,25 @@ const runFixtures = () => {
   );
   if (shellSlashArgument !== 'printf // "first\n\nsecond"\nnext\n') {
     throw new Error(`Shell slash-argument handling failed:\n${shellSlashArgument}`);
+  }
+  const shellParameterExpansion = runFix(
+    'shell-parameter-expansion',
+    'value=$(\n  printf "%s" "${name:-default}"\n\n  printf done\n)\n\nnext\n',
+    'sh'
+  );
+  if (
+    shellParameterExpansion !==
+    'value=$(\n  printf "%s" "${name:-default}"\n\n  printf done\n)\nnext\n'
+  ) {
+    throw new Error(`Shell parameter expansion protection failed:\n${shellParameterExpansion}`);
+  }
+  const escapedShellQuote = runFix(
+    'escaped-shell-quote',
+    'printf "escaped \\\" quote"\n\nnext\n',
+    'sh'
+  );
+  if (escapedShellQuote !== 'printf "escaped \\\" quote"\nnext\n') {
+    throw new Error(`Escaped shell quote handling failed:\n${escapedShellQuote}`);
   }
   const mixedQuotedHeredoc = runFix(
     'mixed-quoted-heredoc',

@@ -133,6 +133,7 @@ const getProtectedRanges = (source, filePath) => {
   if (extension === '.sh') {
     let start = -1;
     let depth = 0;
+    let parameterDepth = 0;
     let quote = null;
     for (let index = 0; index < source.length; index += 1) {
       const character = source[index];
@@ -145,6 +146,10 @@ const getProtectedRanges = (source, filePath) => {
         while (index < source.length && source[index] !== '\n') index += 1;
         continue;
       }
+      if (character === '\\') {
+        index += 1;
+        continue;
+      }
       if (character === '"' || character === "'") {
         quote = character;
         continue;
@@ -152,6 +157,9 @@ const getProtectedRanges = (source, filePath) => {
       if (character === '$' && source[index + 1] === '(') {
         start = start === -1 ? index : start;
         depth += 1;
+        index += 1;
+      } else if (depth > 0 && character === '$' && source[index + 1] === '{') {
+        parameterDepth += 1;
         index += 1;
       } else if (
         (character === '(' || character === '{') &&
@@ -161,6 +169,8 @@ const getProtectedRanges = (source, filePath) => {
         depth += 1;
       } else if (depth > 0 && character === '(') {
         depth += 1;
+      } else if (depth > 0 && character === '}' && parameterDepth > 0) {
+        parameterDepth -= 1;
       } else if (depth > 0 && (character === ')' || character === '}')) {
         depth -= 1;
         if (depth === 0) {
@@ -198,7 +208,17 @@ const getProtectedRanges = (source, filePath) => {
           continue;
         }
         if (interpolationDepth === 0) {
-          if (character === '`') return index;
+          if (character === '`') {
+            let backslashes = 0;
+            for (
+              let previous = index - 1;
+              previous >= start && source[previous] === '\\';
+              previous -= 1
+            ) {
+              backslashes += 1;
+            }
+            if (backslashes % 2 === 0) return index;
+          }
           if (character === '$' && nextCharacter === '{') {
             interpolationDepth = 1;
             index += 1;
@@ -300,6 +320,9 @@ const getProtectedRanges = (source, filePath) => {
     ) {
       ranges.push({ end: node.getEnd(), start: node.getStart(sourceFile) });
     }
+    if (node.kind === typescript.SyntaxKind.JsxText) {
+      ranges.push({ end: node.getEnd(), start: node.getStart(sourceFile) });
+    }
     typescript.forEachChild(node, visit);
   };
   visit(sourceFile);
@@ -375,7 +398,7 @@ const getYamlPlainScalarLines = (lines, filePath) => {
   let flowDepth = 0;
   let flowQuote = null;
   let rootContinuationIndent = null;
-  let previousRootPlain = false;
+  const isStructural = (line) => /^\s*(?:[-?](?:\s|$)|[^#\n:]+:\s*|:\s*|---|\.\.\.)/.test(line);
   const updateFlowContext = (line) => {
     for (let position = 0; position < line.length; position += 1) {
       const character = line[position];
@@ -384,6 +407,8 @@ const getYamlPlainScalarLines = (lines, filePath) => {
         else if (character === flowQuote) flowQuote = null;
       } else if (character === '"' || character === "'") {
         flowQuote = character;
+      } else if (character === '#' && (position === 0 || /\s/.test(line[position - 1]))) {
+        break;
       } else if (character === '[' || character === '{') {
         flowDepth += 1;
       } else if ((character === ']' || character === '}') && flowDepth > 0) {
@@ -403,15 +428,17 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       !/^(?:---|\.\.\.|[&*!?{}\[\],>-])/.test(line.trim()) &&
       !/^\s*#/.test(line) &&
       !/^[^"']*:\s/.test(line);
-    if (rootPlain) rootContinuationIndent = null;
-    if (rootContinuationIndent !== null && indent < rootContinuationIndent) {
-      rootContinuationIndent = null;
+    if (rootContinuationIndent !== null) {
+      if (indent < rootContinuationIndent || isStructural(line)) rootContinuationIndent = null;
+      else protectedLines.add(index);
     }
-    if (rootContinuationIndent === null && indent > 0 && previousRootPlain) {
-      rootContinuationIndent = indent;
+    if (rootPlain && rootContinuationIndent === null) {
+      const following = lines.slice(index + 1).find((entry) => !/^[\t ]*$/.test(entry));
+      const followingIndent = following?.match(/^\s*/)[0].length;
+      if (following && followingIndent > 0 && !isStructural(following)) {
+        rootContinuationIndent = followingIndent;
+      }
     }
-    previousRootPlain = rootPlain;
-    if (rootContinuationIndent !== null) protectedLines.add(index);
     if (/^\s*#/.test(line)) continue;
     const match = line.match(/^(\s*)(?:[^\n:]+:\s*|:\s*|[-]\s+)(.*)$/);
     if (!match || !match[2]) {
@@ -436,13 +463,18 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       const candidate = lines[next];
       if (/^[\t ]*$/.test(candidate)) {
         const following = lines.slice(next + 1).find((entry) => !/^[\t ]*$/.test(entry));
-        if (following && following.match(/^[\t ]*/)[0].length > headerIndent) {
+        if (
+          following &&
+          following.match(/^[\t ]*/)[0].length > headerIndent &&
+          !isStructural(following)
+        ) {
           protectedLines.add(next);
         }
         continue;
       }
       const indent = candidate.match(/^\s*/)[0].length;
       if (indent <= headerIndent) break;
+      if (isStructural(candidate)) break;
       protectedLines.add(next);
     }
     updateFlowContext(line);
@@ -504,6 +536,10 @@ const getShellHeredocs = (line) => {
     if (quote) {
       if (character === '\\') index += 1;
       else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '\\') {
+      index += 1;
       continue;
     }
     if (character === '#' && (index === 0 || /\s/.test(line[index - 1]))) break;
@@ -655,6 +691,10 @@ const stripBlankLines = (source, filePath) => {
       }
       if (isShellFile && character === '#' && (position === 0 || /\s/.test(line[position - 1]))) {
         break;
+      }
+      if (isShellFile && character === '\\') {
+        position += 1;
+        continue;
       }
       if (!isShellFile && character === '/' && nextCharacter === '*') {
         blockComment = true;
