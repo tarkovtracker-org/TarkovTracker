@@ -321,7 +321,7 @@ describe('AppBar account menu', () => {
   it('does not include a duplicate account settings menu item', async () => {
     const wrapper = await mountAppBar();
     expect(wrapper.find('[data-menu-item="common.account"]').exists()).toBe(false);
-    expect(wrapper.find('[data-menu-item="common.settings"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-menu-item="common.settings"]')).toHaveLength(1);
     wrapper.unmount();
   });
   it('logs out when selecting the logout menu item', async () => {
