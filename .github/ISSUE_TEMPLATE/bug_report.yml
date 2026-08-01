@@ -16,7 +16,6 @@ body:
       placeholder: Tell us what you see!
     validations:
       required: true
-
   - type: textarea
     id: reproduction
     attributes:
@@ -29,7 +28,6 @@ body:
         4. See error
     validations:
       required: true
-
   - type: textarea
     id: expected
     attributes:
@@ -38,7 +36,6 @@ body:
       placeholder: Tell us what should have happened
     validations:
       required: true
-
   - type: textarea
     id: actual
     attributes:
@@ -47,7 +44,6 @@ body:
       placeholder: Tell us what actually happened
     validations:
       required: true
-
   - type: dropdown
     id: game-mode
     attributes:
@@ -60,7 +56,6 @@ body:
         - Not Applicable
     validations:
       required: true
-
   - type: dropdown
     id: product-area
     attributes:
@@ -81,7 +76,6 @@ body:
         - Other / not sure
     validations:
       required: true
-
   - type: textarea
     id: screenshots
     attributes:
@@ -90,7 +84,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: input
     id: browser
     attributes:
@@ -99,7 +92,6 @@ body:
       placeholder: e.g., Chrome 120, Firefox 121, Safari 17
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:

@@ -29,13 +29,6 @@ const excludedFiles = new Set([
   'supabase/functions/_shared/database.types.ts',
 ]);
 const excludedDirectories = ['.git/', '.nuxt/', 'coverage/', 'dist/', 'node_modules/'];
-const safeYamlFiles = new Set([
-  '.github/dependabot.yml',
-  '.github/labeler.yml',
-  'codecov.yml',
-  'pnpm-workspace.yaml',
-  'socket.yml',
-]);
 const normalizePath = (filePath) => filePath.replaceAll('\\', '/');
 const isCandidate = (filePath) => {
   const normalizedPath = normalizePath(filePath);
@@ -43,10 +36,7 @@ const isCandidate = (filePath) => {
   return (
     !excludedFiles.has(normalizedPath) &&
     !excludedDirectories.some((directory) => normalizedPath.includes(directory)) &&
-    supportedExtensions.has(extension) &&
-    ((extension !== '.yaml' && extension !== '.yml') ||
-      safeYamlFiles.has(normalizedPath) ||
-      normalizedPath.startsWith('.github/workflows/'))
+    supportedExtensions.has(extension)
   );
 };
 const trackedFiles = () =>
@@ -55,10 +45,7 @@ const files = (requestedFiles.length ? requestedFiles : trackedFiles())
   .map((filePath) => relative(root, resolve(root, filePath)))
   .filter(isCandidate);
 const getProtectedRanges = (source, filePath) => {
-  const ranges = [...source.matchAll(/\/\*[\s\S]*?\*\//g)].map((match) => ({
-    end: match.index + match[0].length,
-    start: match.index,
-  }));
+  const ranges = [];
   const extension = extname(filePath).toLowerCase();
   if (extension === '.sh') {
     let start = -1;
@@ -93,10 +80,38 @@ const getProtectedRanges = (source, filePath) => {
   }
   if (!['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(extension)) return ranges;
   if (!typescript) {
-    for (const match of source.matchAll(/`(?:\\[\s\S]|[^`])*`/g)) {
-      ranges.push({ end: match.index + match[0].length, start: match.index });
+    let quote = null;
+    for (let index = 0; index < source.length; index += 1) {
+      const character = source[index];
+      const nextCharacter = source[index + 1];
+      if (quote) {
+        if (character === '\\') index += 1;
+        else if (character === quote) quote = null;
+        continue;
+      }
+      if (character === '/' && nextCharacter === '*') {
+        const end = source.indexOf('*/', index + 2);
+        if (end !== -1) {
+          ranges.push({ end: end + 2, start: index });
+          index = end + 1;
+        }
+      } else if (character === '`' || character === '"' || character === "'") {
+        quote = character;
+      }
     }
     return ranges;
+  }
+  const scanner = typescript.createScanner(
+    typescript.ScriptTarget.Latest,
+    false,
+    extension === '.tsx' ? typescript.LanguageVariant.JSX : typescript.LanguageVariant.Standard,
+    source
+  );
+  let token;
+  while ((token = scanner.scan()) !== typescript.SyntaxKind.EndOfFileToken) {
+    if (token === typescript.SyntaxKind.MultiLineCommentTrivia) {
+      ranges.push({ end: scanner.getTextPos(), start: scanner.getTokenPos() });
+    }
   }
   const scriptKind =
     extension === '.tsx'
@@ -132,7 +147,9 @@ const getYamlScalarLines = (lines, filePath) => {
   const protectedLines = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const header = lines[index];
-    const headerMatch = header.match(/^(\s*).*:\s*[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/);
+    const headerMatch = header.match(
+      /^(\s*)(?:[^#]*?:\s*|-\s*)[|>]\s*(?:[+-]?\d?[+-]?)?\s*(?:#.*)?$/
+    );
     if (!headerMatch) continue;
     const headerIndent = headerMatch[1].length;
     let contentIndent = null;
@@ -168,7 +185,7 @@ const stripBlankLines = (source, filePath) => {
   const output = [];
   let blockComment = false;
   let quote = null;
-  let heredoc = null;
+  let heredocs = [];
   let removed = 0;
   let offset = 0;
   for (let index = 0; index < lastLine; index += 1) {
@@ -177,11 +194,12 @@ const stripBlankLines = (source, filePath) => {
     const isProtected =
       yamlScalarLines.has(index) ||
       protectedRanges.some(({ end, start }) => start <= offset && offset + line.length <= end);
-    if (heredoc) {
+    if (heredocs.length > 0) {
       output.push(line);
       offset += line.length + 1;
+      const heredoc = heredocs[0];
       const terminator = heredoc.stripTabs ? line.replace(/^\t+/, '') : line;
-      if (terminator.replace(/\r$/, '') === heredoc.delimiter) heredoc = null;
+      if (terminator.replace(/\r$/, '') === heredoc.delimiter) heredocs.shift();
       continue;
     }
     if (isBlank && !blockComment && !quote && !isProtected) {
@@ -226,10 +244,13 @@ const stripBlankLines = (source, filePath) => {
       }
     }
     if (!blockComment && !quote) {
-      const heredocMatch = line.match(/<<(\-?)\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/);
-      if (heredocMatch) {
-        heredoc = { delimiter: heredocMatch[2], stripTabs: heredocMatch[1] === '-' };
-      }
+      const heredocMatches = line.matchAll(
+        /<<(\-?)\s*(?:(['"])([A-Za-z_][A-Za-z0-9_.-]*)\2|([A-Za-z_][A-Za-z0-9_.-]*))/g
+      );
+      heredocs = [...heredocMatches].map((match) => ({
+        delimiter: match[3] ?? match[4],
+        stripTabs: match[1] === '-',
+      }));
     }
     offset += line.length + 1;
   }

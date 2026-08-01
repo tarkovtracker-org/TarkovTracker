@@ -28,7 +28,6 @@ body:
         - Other / not sure
     validations:
       required: true
-
   - type: textarea
     id: current
     attributes:
@@ -37,7 +36,6 @@ body:
       placeholder: Currently, when I...
     validations:
       required: true
-
   - type: textarea
     id: proposed
     attributes:
@@ -46,7 +44,6 @@ body:
       placeholder: It would be better if...
     validations:
       required: true
-
   - type: textarea
     id: benefits
     attributes:
@@ -55,7 +52,6 @@ body:
       placeholder: This would improve...
     validations:
       required: true
-
   - type: textarea
     id: impact
     attributes:
@@ -63,7 +59,6 @@ body:
       description: Describe the problem or limitation this enhancement would solve.
     validations:
       required: true
-
   - type: dropdown
     id: frequency
     attributes:
@@ -75,7 +70,6 @@ body:
         - Rarely
     validations:
       required: true
-
   - type: textarea
     id: beneficiaries
     attributes:
@@ -83,7 +77,6 @@ body:
       description: E.g., all users, team leaders, streamers, API consumers, etc.
     validations:
       required: false
-
   - type: textarea
     id: screenshots
     attributes:
@@ -92,7 +85,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:

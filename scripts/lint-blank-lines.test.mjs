@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = join(root, 'scripts/lint-blank-lines.mjs');
-const directory = mkdtempSync(join(root, '.github/workflows/.lint-blank-lines-'));
+const directory = mkdtempSync(join(tmpdir(), 'lint-blank-lines-'));
 process.on('exit', () => rmSync(directory, { force: true, recursive: true }));
 const runFix = (name, source, extension) => {
   const file = join(directory, `${name}.${extension}`);
@@ -24,6 +25,22 @@ const heredoc = runFix(
 if (heredoc !== 'cat <<EOF\nkeep\n\n EOF\n\nstill protected\nEOF\nnext\n') {
   throw new Error(`Heredoc protection failed:\n${heredoc}`);
 }
+const multipleHeredocs = runFix(
+  'multiple-heredocs',
+  "cat <<A <<'B'\nfirst\n\nA\nsecond\n\nB\n\nnext\n",
+  'sh'
+);
+if (multipleHeredocs !== "cat <<A <<'B'\nfirst\n\nA\nsecond\n\nB\nnext\n") {
+  throw new Error(`Multiple heredoc protection failed:\n${multipleHeredocs}`);
+}
+const hyphenatedHeredoc = runFix(
+  'hyphenated-heredoc',
+  "cat <<'END-JSON'\nbody\nEND-JSON\n\nnext\n",
+  'sh'
+);
+if (hyphenatedHeredoc !== "cat <<'END-JSON'\nbody\nEND-JSON\nnext\n") {
+  throw new Error(`Hyphenated heredoc protection failed:\n${hyphenatedHeredoc}`);
+}
 const substitution = runFix(
   'substitution',
   'value=$(\n  printf first\n\n  printf second\n)\n\nnext\n',
@@ -39,6 +56,22 @@ const template = runFix(
 );
 if (template !== 'const value = 1;\nconst text = `first\n\nsecond`;\n') {
   throw new Error(`Template protection failed:\n${template}`);
+}
+const blockCommentMarker = runFix(
+  'block-comment-marker',
+  "const marker = '/*';\n\n/* actual\n\n */\nconst end = true;\n\n",
+  'mjs'
+);
+if (blockCommentMarker !== "const marker = '/*';\n/* actual\n\n */\nconst end = true;\n") {
+  throw new Error(`Block comment scanning failed:\n${blockCommentMarker}`);
+}
+const sequenceScalar = runFix(
+  'sequence-scalar',
+  'steps:\n  - |\n    first\n\n    second\nnext: value\n\n',
+  'yml'
+);
+if (sequenceScalar !== 'steps:\n  - |\n    first\n\n    second\nnext: value\n') {
+  throw new Error(`YAML sequence scalar protection failed:\n${sequenceScalar}`);
 }
 const comment = runFix('comment', "# don't stop\n\nkey: value\n\n", 'yml');
 if (comment !== "# don't stop\nkey: value\n") {
