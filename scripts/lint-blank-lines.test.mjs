@@ -239,14 +239,18 @@ const runFixtures = () => {
   }
   const vue = runFix(
     'component',
-    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n\n<script setup lang="ts">\nconst first = 1;\n\nconst second = 2;\n</script\n data>\n',
+    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n\n<script setup lang="ts">\nconst text = `first\n\nsecond`;\n\nconst second = 2;\n</script\n data>\n\n<style>\n/* first\n\nsecond */\n</style>\n',
     'vue'
   );
   if (
     vue !==
-    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n<script setup lang="ts">\nconst first = 1;\nconst second = 2;\n</script\n data>\n'
+    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n<script setup lang="ts">\nconst text = `first\n\nsecond`;\nconst second = 2;\n</script\n data>\n<style>\n/* first\n\nsecond */\n</style>\n'
   ) {
     throw new Error(`Vue SFC handling failed:\n${vue}`);
+  }
+  const explicitKey = runFix('explicit-key', '? |\n  first\n\n  second\n: value\n\n', 'yml');
+  if (explicitKey !== '? |\n  first\n\n  second\n: value\n') {
+    throw new Error(`YAML explicit-key protection failed:\n${explicitKey}`);
   }
   const mixedQuotedHeredoc = runFix(
     'mixed-quoted-heredoc',

@@ -86,7 +86,7 @@
     "dev": "nuxt dev",
     "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"*.md\" \".github/**/*.md\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "format:blank-lines": "node scripts/lint-blank-lines.mjs --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"*.md\" \".github/**/*.md\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" && pnpm run lint:blank-lines",
+    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,css,md}\" \"app/**/!(*locales)/*.json\" \"docs/**/*.{md,markdown}\" \"*.md\" \"*.{js,mjs,cjs,json}\" \".github/**/*.md\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.json\" \"supabase/**/*.json\" \"workers/**/*.json\" && pnpm run lint:blank-lines",
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",

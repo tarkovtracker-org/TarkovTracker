@@ -66,10 +66,13 @@ const getProtectedRanges = (source, filePath) => {
     for (const match of source.matchAll(
       /<script\b[^>]*>([\s\S]*?)<\/script(?:[\t\n\r ]+[^>]*)?>/gi
     )) {
-      const contentStart = match.index + match[0].indexOf(match[1]);
-      for (const range of getProtectedRanges(match[1], '.ts')) {
+      const contentStart = match.index + match[0].indexOf('>') + 1;
+      for (const range of getProtectedRanges(match[1], 'component.ts')) {
         ranges.push({ end: contentStart + range.end, start: contentStart + range.start });
       }
+    }
+    for (const match of source.matchAll(/<style\b[^>]*>[\s\S]*?<\/style(?:[\t\n\r ]+[^>]*)?>/gi)) {
+      ranges.push({ end: match.index + match[0].length, start: match.index });
     }
     return ranges;
   }
@@ -152,6 +155,24 @@ const getProtectedRanges = (source, filePath) => {
             }
             continue;
           }
+          if (templateCharacter === '/' && source[end + 1] === '/') {
+            const lineEnd = source.indexOf('\n', end + 2);
+            end = lineEnd === -1 ? source.length : lineEnd;
+            continue;
+          }
+          if (templateCharacter === '/' && source[end + 1] === '*') {
+            const commentEnd = source.indexOf('*/', end + 2);
+            end = commentEnd === -1 ? source.length : commentEnd + 1;
+            continue;
+          }
+          if (templateCharacter === '"' || templateCharacter === "'") {
+            const stringQuote = templateCharacter;
+            for (end += 1; end < source.length; end += 1) {
+              if (source[end] === '\\') end += 1;
+              else if (source[end] === stringQuote) break;
+            }
+            continue;
+          }
           if (templateCharacter === '{') interpolationDepth += 1;
           else if (templateCharacter === '}') interpolationDepth -= 1;
         }
@@ -227,8 +248,9 @@ const getYamlScalarLines = (lines, filePath) => {
       }
     }
     const headerContent = headerMatch[2].slice(0, commentIndex).trim();
-    const valueMatch = headerContent.match(/^(?:.*?:\s*|-\s*)(.*)$/);
-    let scalarValue = (valueMatch ? valueMatch[1] : headerContent).trim();
+    const explicitKeyContent = headerContent.replace(/^\?\s*/, '');
+    const valueMatch = explicitKeyContent.match(/^(?:.*?:\s*|-\s*)(.*)$/);
+    let scalarValue = (valueMatch ? valueMatch[1] : explicitKeyContent).trim();
     while (scalarValue.startsWith('&') || scalarValue.startsWith('!')) {
       const separator = scalarValue.search(/[\t ]/);
       if (separator === -1) {
@@ -329,7 +351,7 @@ const getYamlQuotedLines = (lines, filePath) => {
           /:\s*$/.test(line.slice(0, position)) ||
           /^\s*-\s*$/.test(line.slice(0, position)) ||
           /:\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)) ||
-          /^\s*-\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)) ||
+          /^\s*(?:\?|-)\s*(?:[&!]\S+\s+)*$/.test(line.slice(0, position)) ||
           flowDepth > 0)
       ) {
         quote = character;
@@ -430,7 +452,9 @@ const stripBlankLines = (source, filePath) => {
   const lines = source.split('\n');
   const hasFinalNewline = source.endsWith('\n');
   const lastLine = hasFinalNewline ? lines.length - 1 : lines.length;
-  const protectedRanges = getProtectedRanges(source, filePath);
+  const protectedRanges = getProtectedRanges(source, filePath).sort(
+    (left, right) => left.start - right.start || left.end - right.end
+  );
   const yamlScalarLines = getYamlScalarLines(lines, filePath);
   const yamlPlainScalarLines = getYamlPlainScalarLines(lines, filePath);
   const yamlQuotedLines = getYamlQuotedLines(lines, filePath);
@@ -444,17 +468,25 @@ const stripBlankLines = (source, filePath) => {
   let quote = null;
   let heredocs = [];
   let continuedShellLine = null;
+  let protectedRangeIndex = 0;
   let removed = 0;
   let offset = 0;
   for (let index = 0; index < lastLine; index += 1) {
     const line = lines[index];
     const isBlank = /^[\t \r]*$/.test(line);
     const followsContinuation = isShellFile && index > 0 && endsWithContinuation(lines[index - 1]);
+    while (
+      protectedRangeIndex < protectedRanges.length &&
+      protectedRanges[protectedRangeIndex].end <= offset
+    ) {
+      protectedRangeIndex += 1;
+    }
+    const activeProtectedRange = protectedRanges[protectedRangeIndex];
     const isProtected =
       yamlScalarLines.has(index) ||
       yamlPlainScalarLines.has(index) ||
       yamlQuotedLines.has(index) ||
-      protectedRanges.some(({ end, start }) => start <= offset && offset + line.length <= end);
+      (activeProtectedRange?.start <= offset && offset + line.length <= activeProtectedRange.end);
     if (heredocs.length > 0) {
       output.push(line);
       offset += line.length + 1;
