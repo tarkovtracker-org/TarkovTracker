@@ -119,16 +119,12 @@
   "promoted_stream": {
     "close": "Cerrar transmisión",
     "expand": "Abrir transmisión",
-    "mute": "Silenciar transmisión",
     "open_channel": "Ir al canal de Twitch",
-    "pause": "Pausar la transmisión",
     "player_title": "Transmisión de Twitch {streamer}",
-    "play": "Reproducir transmisión",
     "region_label": "Transmisión de Twitch promocionado por {streamer}",
     "reopen": "Reopen stream",
     "shrink": "Contraer transmisión",
-    "title": "{streamer} en vivo",
-    "unmute": "Des silenciar transmisión"
+    "title": "{streamer} en vivo"
   },
   "buttons": {
     "retry": "Reintentar"
@@ -231,8 +227,6 @@
   },
   "page_help": {
     "button": "Ayuda",
-    "hint_title": "¿Nuevo por aquí?",
-    "dismiss": "Cerrar",
     "launcher": {
       "title": "Ayuda y onboarding",
       "summary": "Elige una guía rápida para esta página o el flujo completo de configuración.",
@@ -506,7 +500,6 @@
         },
         "stat": {
           "why": "Por qué gana",
-          "progress": "Progreso que añade",
           "status": "Estado",
           "secondary": "Otras buenas opciones",
           "secondary_actionable": "Úsalas si el plan principal no te encaja.",
@@ -548,17 +541,6 @@
           "filters_one": "Sin opciones visibles: 1 tarea disponible está oculta por tus filtros.",
           "filters_other": "Sin opciones visibles: {count} tareas disponibles están ocultas por tus filtros.",
           "complete": "No queda trabajo visible en este alcance del panel."
-        },
-        "contribution": {
-          "unlock_trader": "Desbloquea la línea de tareas de {trader}.",
-          "impact_one": "Crea 1 nueva tarea posterior.",
-          "impact_other": "Crea {count} nuevas tareas posteriores.",
-          "kappa": "Cuenta para tu cadena de Kappa.",
-          "lightkeeper": "Cuenta para tu cadena de Guardafaro.",
-          "trader": "Hace avanzar la línea de tareas de {trader}.",
-          "filters": "Muestra tareas que ya se pueden hacer.",
-          "complete": "El resto del panel ahora es solo contexto de apoyo.",
-          "default": "Mantiene avanzando tu progreso visible en el panel."
         },
         "status": {
           "ready_one": "Lista ahora. Queda 1 objetivo.",
@@ -696,10 +678,6 @@
         "lightkeeper": "Guardafaro"
       },
       "stats": {
-        "total": "Misiones Kappa",
-        "completed": "Kappa Done",
-        "lightkeeper_total": "Lightkeeper Tasks",
-        "lightkeeper_completed": "Lightkeeper Done",
         "available": "Disponible",
         "locked": "Bloqueada",
         "failed": "Fallidas"
@@ -720,8 +698,6 @@
         "action_reset_failed": "Reset failed",
         "locked_by": "Requires: {task}"
       },
-      "progress_label": "completado",
-      "all_complete": "¡Todas las tareas completadas! Bien hecho, PMC.",
       "empty": "No tasks for this list yet.",
       "summary": {
         "progress": "Progress",
@@ -743,10 +719,8 @@
       "billing_6month": "6 Months",
       "billing_yearly": "Yearly",
       "most_popular": "Most Popular",
-      "fee_note": "Price shown includes Stripe fees.",
       "tier_cta": "Subscribe",
       "tier_login_cta": "Log in to subscribe",
-      "tier_current_cta": "Current tier",
       "tier_change_cta": "Change plan in billing portal",
       "current_tier_badge": "Current tier",
       "tier_scav_name": "Scav",
@@ -818,7 +792,6 @@
     "tasks": {
       "title": "Misiones",
       "primary_views": {
-        "all": "Lista",
         "list": "Lista",
         "maps": "Mapas",
         "traders": "Comerciantes",
@@ -877,17 +850,6 @@
       },
       "filters": {
         "close": "Cerrar"
-      },
-      "api_update_log": {
-        "title": "Historial de sincronización reciente",
-        "subtitle": "Sigue cuándo se sincronizó automáticamente tu progreso desde fuentes externas.",
-        "empty": "Aún no hay sincronizaciones registradas. Tu progreso aparecerá aquí cuando se sincronice.",
-        "entry_count": "{count} misiones",
-        "no_task_details": "Progreso sincronizado correctamente.",
-        "more_tasks": "+{count} más",
-        "unknown_time": "Hora desconocida",
-        "collapse": "Contraer historial de sincronización",
-        "expand": "Expandir historial de sincronización"
       },
       "settings": {
         "title": "Configuración de tareas",
@@ -976,7 +938,6 @@
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "Wiki",
         "locked_before": "Misiones antes: {count}",
-        "locked_behind": "Misiones después: {count}",
         "requires": "Requiere",
         "unlocks_next": "Desbloquea el siguiente",
         "impact": "Impacto",
@@ -1018,7 +979,6 @@
         "undo_uncomplete": "Deshecha la marcación de no completado de {name}",
         "undo_failed": "Deshecho el fallo de {name}",
         "undo_reset_failed": "Restaurado el estado de fallo de {name}",
-        "undo_unknown": "No se pudo deshacer la acción de {name}",
         "mark_failed_confirm": "¿Marcar esta misión como fallida? Esto es solo para problemas de datos, no se recomienda y puede bloquear cadenas de misiones.",
         "reset_item_counts_confirm": "¿Restablecer todos los conteos de objetos de esta misión?",
         "failed_because": "Falló porque",
@@ -1029,11 +989,8 @@
         "blocked_because_was": "estaba {status}",
         "blocked_because_status_tooltip": "Bloqueada permanentemente — \"{name}\" estaba {status}",
         "blocked_because_unknown": "Bloqueada por requisitos previos",
-        "keys_header": "Llaves requeridas",
         "keys_disclaimer_tooltip": "Basado en datos de la API y no siempre es 100 % obligatorio. Es posible que las puertas ya estén abiertas. Verifícalo en el juego o en la wiki antes de comprar llaves.",
         "keys_disclaimer_aria": "Aviso sobre llaves requeridas",
-        "keys_needed": "{keys} necesaria en {map} | {keys} necesarias en {map}",
-        "keys_optional_badge": "Opcional",
         "keys_or": "o",
         "equipment_disclaimer_tooltip": "Equipo especial que se debe llevar a la raid para completar este objetivo.",
         "equipment_disclaimer_aria": "Aviso sobre equipo requerido",
@@ -1056,9 +1013,6 @@
         "objective_optional_badge": "Opcional",
         "ready_to_hand_over": "Listo para entregar",
         "objectives_hidden": "{count} objetivos no están en este mapa ({uncompleted} sin completar)",
-        "alternatives": "Misiones alternativas",
-        "alternative_failed": "Las misiones alternativas también se reiniciarán",
-        "different_faction": "Esta tarea no está disponible para tu facción.",
         "needed_by": "Necesitado por: {names}",
         "unlocks_next_tooltip": "Número de tareas que estarán disponibles después de completar esta tarea",
         "impact_tooltip": "Número de tareas incompletas que dependen de que esta tarea se complete",
@@ -1079,12 +1033,10 @@
         "find_fir": "Encontrar en incursión",
         "items_count": "{count} objetos",
         "kappa_tooltip": "Esta misión es necesaria para obtener el Contenedor Seguro Kappa",
-        "kappa_required": "KAPPA REQUERIDA",
         "level_badge_tooltip": "Nivel mínimo de jugador {level} requerido para desbloquear esta misión",
         "lightkeeper_tooltip": "Esta misión es necesaria para desbloquear al comerciante Lightkeeper",
         "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
         "alternatives_badge": "{count} alt",
-        "lightkeeper_required": "LIGHTKEEPER REQUERIDO",
         "location_tooltip": "Los objetivos de la misión están en {map}",
         "next_tasks": "Siguiente(s) misión(es):",
         "objective": "Objetivo",
@@ -1103,7 +1055,6 @@
       "loading": "Cargando datos del escondite",
       "station_link_label": "Ir a {name}",
       "no_stations_found": "No se encontraron estaciones. Intenta cambiar los filtros.",
-      "load_more_stations": "Cargar más estaciones",
       "collapse_completed": "Colapsar estaciones completadas",
       "sort": {
         "ready_first": "Ordenar las estaciones listas para construir primero"
@@ -1166,26 +1117,17 @@
       "filters": {
         "all": "Todas",
         "label": "Filtros",
-        "sections": {
-          "items": "ARTÍCULOS",
-          "team": "EQUIPO"
-        },
         "fir": "FIR",
         "non_fir": "NO-FIR",
-        "show_owned": "MOSTRAR POSEÍDOS",
         "hide_owned": "OCULTAR POSEÍDOS",
         "hide_non_fir_special_equipment_title": "Ocultar equipo especial no-FIR (p. ej., marcadores MS2000, cámaras Wi-Fi)",
-        "no_special": "SIN-ESPECIAL",
-        "special": "ESPECIAL",
         "kappa_only": "KAPPA",
         "kappa_only_tooltip": "Mostrar solo los objetos necesarios para misiones Kappa",
         "kappa_only_disabled_tooltip": "El filtro de Kappa solo aplica a las misiones.",
-        "hide_team_needs": "OCULTAR NECESIDADES DEL EQUIPO",
-        "show_team_needs": "MOSTRAR NECESIDADES DEL EQUIPO"
+        "hide_team_needs": "OCULTAR NECESIDADES DEL EQUIPO"
       },
       "sort": {
         "label": "Ordenar",
-        "by": "ORDENAR POR",
         "priority": "Prioridad",
         "name": "Nombre",
         "category": "Categoría",
@@ -1399,25 +1341,17 @@
       "achievement_mainline": "Mainline Task Progress",
       "achievement_objectives": "Objective Completion",
       "no_storyline": "No hay datos de historia disponibles para este perfil.",
-      "storyline_chapter": "Capítulo",
       "storyline_auto_start": "Inicio automático",
       "storyline_discovered": "Descubierto",
       "storyline_requires": "Requiere",
-      "storyline_unlocks_maps": "Desbloquea mapas",
-      "storyline_unlocks_traders": "Desbloquea comerciantes",
-      "storyline_wiki": "Wiki",
       "storyline_objectives_main": "Objetivos principales",
       "storyline_objectives_optional": "Objetivos opcionales",
-      "storyline_description": "Descripción",
-      "storyline_notes": "Notas",
-      "storyline_rewards": "Recompensas",
       "view_tarkov_dev": "Ver en Tarkov.dev",
       "no_hideout": "No hay datos del escondite disponibles para este perfil.",
       "hideout_level": "Nivel",
       "hideout_fallback": "Escondite",
       "hideout_item_fallback": "Hideout item",
       "hideout_module_fallback": "Hideout upgrade",
-      "unknown_trader": "Comerciante desconocido",
       "level_prefix": "Nv.",
       "no_tasks": "No hay tareas disponibles para este perfil.",
       "task_fallback": "Tarea",
@@ -1512,7 +1446,6 @@
         "open_tool": "Open tool",
         "download_release": "Download latest release"
       },
-      "view_guide": "Setup guide",
       "back_to_hub": "Back to Resources",
       "breadcrumb": "Breadcrumb",
       "guide_label": "Guide",
@@ -1566,17 +1499,17 @@
       },
       "guides": {
         "tarkovdev": {
-          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through a free GraphQL API. TarkovTracker itself uses this API to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
+          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through free static JSON endpoints at json.tarkov.dev. TarkovTracker itself uses these endpoints to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
           "step_1_title": "Browse the website",
           "step_1_desc": "Visit tarkov.dev to search items, check quest requirements, view trader inventories, and explore hideout station data in a clean, ad-free interface.",
-          "step_2_title": "Use the GraphQL API",
-          "step_2_desc": "If you are a developer, point your GraphQL client at api.tarkov.dev. The API is free, requires no authentication for read queries, and has full schema documentation available at the endpoint.",
+          "step_2_title": "Use the JSON API",
+          "step_2_desc": "If you are a developer, point your HTTP client at json.tarkov.dev. The endpoint catalog is at json.tarkov.dev/endpoints. The API is free, requires no authentication for read queries, and returns static JSON files you can cache locally.",
           "step_3_title": "Join the community",
           "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
-          "tip_1": "The GraphQL API is rate-limited but generous. For production apps, cache responses client-side to avoid redundant queries.",
+          "tip_1": "The JSON endpoints have no rate limit. For production apps, cache responses client-side to avoid redundant requests.",
           "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
           "faq_1_q": "Is the Tarkov.dev API free to use?",
-          "faq_1_a": "Yes, the GraphQL API is completely free for read queries. No API key or authentication is required for standard usage.",
+          "faq_1_a": "Yes, the JSON endpoints are completely free for read queries. No API key or authentication is required for standard usage.",
           "faq_2_q": "How often is the data updated?",
           "faq_2_a": "Data is maintained by community contributors and updated as changes are discovered in-game. During active wipe periods, updates can happen multiple times per day."
         },
@@ -1656,7 +1589,6 @@
       "github": "GitHub"
     },
     "support_button": "Apoyar el desarrollo",
-    "support_tagline": "Ayuda a mantener TarkovTracker gratis y actualizado",
     "terms_of_service": "Términos de servicio",
     "privacy_policy": "Política de privacidad",
     "credits": "Créditos",
@@ -1833,13 +1765,10 @@
     "title": "Configuración",
     "locale": "Idioma",
     "tabs": {
-      "gameplay": "Jugabilidad",
-      "interface": "Interfaz",
       "account": "Cuenta",
       "progression": "Progreso",
       "prestige": "Prestigio",
       "preferences": "Preferencias",
-      "data_management": "Gestión de datos",
       "imports": "Importaciones",
       "backup_restore": "Copia y restauración",
       "api": "API",
@@ -1887,10 +1816,6 @@
       "compact": "Compacta",
       "comfortable": "Cómoda"
     },
-    "account_moved": {
-      "message": "Buscas tokens de API o ajustes de cuenta?",
-      "link": "Ir a Cuenta"
-    },
     "account": {
       "begin_deletion": "Iniciar eliminación de cuenta"
     },
@@ -1905,7 +1830,6 @@
       "admin_panel": "Panel de administración"
     },
     "interface": {
-      "title": "Personalización de interfaz",
       "tasks": {
         "title": "Tarjetas de tareas",
         "show_required": "Mostrar etiquetas requeridas",
@@ -1914,9 +1838,6 @@
         "show_prev": "Mostrar misiones anteriores",
         "density": "Densidad de tarjetas",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
-      },
-      "defaults": {
-        "title": "Vistas predeterminadas"
       },
       "maps": {
         "title": "Mapas",
@@ -1942,9 +1863,6 @@
         "title": "Wiki Links",
         "antifandom": "Use antifandom.com",
         "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
-      },
-      "misc": {
-        "title": "Misceláneo"
       }
     },
     "game_profile": {
@@ -1960,7 +1878,6 @@
       "mode_pve": "PvE",
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_link": "Copiar enlace del perfil",
       "copy_pvp_link": "Copy PvP profile link",
       "copy_pve_link": "Copy PvE profile link",
       "login_required": "Inicia sesión para gestionar la visibilidad del perfil compartido."
@@ -1971,9 +1888,6 @@
       "pve": "PvE",
       "switch_mode_failed": "Error al cambiar el modo de juego, vuelve a intentarlo",
       "switch_mode_fetch_failed": "Se cambió el modo de juego, pero no se pudieron actualizar los datos. Vuelve a intentarlo."
-    },
-    "data_management_card": {
-      "title": "Gestión de datos"
     },
     "data_management": {
       "reset_pvp_title": "Restablecer datos PvP",
@@ -1988,20 +1902,14 @@
       "reset_all_data": "Restablecer todos los datos",
       "reset_all_confirmation": "¿Estás seguro de que quieres restablecer todo tu progreso?",
       "reset_all_warning": "¡Esto eliminará permanentemente todo tu progreso para los modos PvP y PvE. Esta acción no se puede deshacer!",
-      "prestige_pvp_title": "Prestigiar perfil PvP",
-      "prestige_pvp_data": "Prestigiar PvP",
-      "prestige_pvp_confirmation": "¿Seguro que quieres prestigiar tu perfil PvP?",
       "prestige_pvp_warning": "Tu run actual de PvP se archivará y luego se restablecerá la progresión PvP para el siguiente nivel de prestigio. Los datos de PvE no se ven afectados.",
       "reset_cancel": "Cancelar",
       "reset_confirm": "Restablecer",
-      "export_title": "Exportar y copia de seguridad",
       "export_description": "Descarga una copia de seguridad de tu progreso para los modos PvP y PvE.",
       "export_button": "Exportar copia de seguridad",
       "debug_export_button": "Exportar instantánea de depuración",
       "debug_export_description": "Descarga una instantánea saneada de la cuenta para depurar problemas al iniciar sesión. Excluye tokens de autenticación, correo electrónico e imágenes de perfil.",
-      "import_title": "Importar",
       "import_backup_button": "Importar copia de TarkovTracker",
-      "import_tarkovdev_button": "Importar perfil de Tarkov.dev",
       "import_eft_logs_folder_button": "Importar carpeta de registros de EFT",
       "recommended_badge": "Recomendado",
       "active_flow_blocked_title": "Termina primero el flujo de datos actual",
@@ -2016,7 +1924,6 @@
       "backup_restore_section_title": "Copia de seguridad y restauración",
       "backup_restore_section_description": "Exportar una copia de seguridad o restaurar desde un archivo exportado anteriormente",
       "debug_section_title": "Instantánea de depuración",
-      "debug_section_description": "Descargar una instantánea saneada para soporte y depuración",
       "import_backup_title": "Restaurar desde copia de seguridad",
       "import_backup_description": "Restaurar progreso desde un archivo de copia de seguridad de TarkovTracker",
       "import_preview_exported_at": "Exportado",
@@ -2038,7 +1945,6 @@
       "debug_export_error_title": "Error al exportar la depuración",
       "reset_title": "Restablecer progreso",
       "prestige_history_title": "Historial de prestigio",
-      "prestige_history_description": "Las runs PvP archivadas se conservan después de cada prestigio para comparar tu progreso.",
       "prestige_history_loading": "Cargando historial de prestigio...",
       "prestige_history_empty": "Aún no hay runs de prestigio archivadas.",
       "prestige_history_load_error": "No se pudo cargar el historial de prestigio.",
@@ -2061,10 +1967,6 @@
       "success_title": "Prestigio PvP completado",
       "success_description": "Tu perfil PvP ha sido prestigiado al nivel {level}.",
       "error_description": "No se pudo prestigiar el perfil PvP. Inténtalo de nuevo."
-    },
-    "data_migration": {
-      "title": "Migración de datos locales",
-      "description": "Migra tus datos de progreso local a tu cuenta en la nube. Esto ocurre automáticamente al iniciar sesión."
     },
     "reset": {
       "error_title": "Reinicio fallido"
@@ -2094,7 +1996,6 @@
       "member_since_label": "Miembro desde",
       "account_id_label": "ID de cuenta",
       "unknown_label": "Desconocido",
-      "data_reset_title": "Restablecer datos",
       "account_deletion_title": "Eliminación de cuenta",
       "login_required_delete": "Inicia sesión para eliminar tu cuenta",
       "action_show": "Mostrar",
@@ -2208,9 +2109,7 @@
       "summary_description_manual": "Todavía hay {count} requisito(s) que necesitan verificación manual en el juego."
     },
     "display_name": {
-      "title": "Nombre para mostrar",
       "explanation": "Su nombre para mostrar se muestra a los compañeros de equipo y en la navegación. Cada modo de juego (PVP/PVE) tiene un nombre para mostrar separado.",
-      "mode_hint": "Está editando el nombre para mostrar para el modo {mode}. Cambie de modo de juego en el cajón de navegación para editar el otro nombre para mostrar.",
       "label": "Nombre para mostrar",
       "placeholder": "Ingrese su nombre para mostrar...",
       "save": "Ahorrar",
@@ -2272,7 +2171,6 @@
       "reset_offset": "Restablecer compensación de XP"
     },
     "danger_zone": {
-      "confirm_delete_instruction": "Escriba {word} para confirmar:",
       "confirm_word": "ELIMINAR"
     },
     "log_import": {
@@ -2313,7 +2211,6 @@
       "unknown_mode_event_details": "Detalles de eventos de modo desconocido",
       "unknown_completion_events": "Misiones completadas (modo desconocido)",
       "unknown_started_events": "Misiones iniciadas (modo desconocido)",
-      "import_to_mode": "Importar al modo",
       "import_unknown_to_mode": "Importar eventos de modo desconocido a",
       "import_unknown_to_mode_hint": "Los eventos conocidos de PvP/PvE se enrutan automáticamente. Esto solo se aplica a eventos no resueltos.",
       "auto_mode_hint": "El enrutamiento de modo se detectó a partir de los registros del backend y se aplicará automáticamente.",
@@ -2350,9 +2247,7 @@
       "profile_url_label": "URL del perfil de Tarkov.dev",
       "profile_url_placeholder": "https://tarkov.dev/players/regular/8560316",
       "profile_url_hint": "Encuentra tu perfil en {link}, abre el perfil PvP o PvE correspondiente y pega aquí la URL de esa página.",
-      "profile_url_hint_before_link": "Encuentra tu perfil en",
       "profile_url_hint_link": "tarkov.dev/players",
-      "profile_url_hint_after_link": ", abre el perfil PvP o PvE correspondiente y pega aquí la URL de esa página.",
       "profile_url_refresh_hint": "Tarkov.dev actualiza el JSON del perfil después de que abras allí tu página de perfil.",
       "fetch_profile": "Obtener perfil",
       "nickname": "Apodo",

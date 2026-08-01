@@ -119,16 +119,12 @@
   "promoted_stream": {
     "close": "Close stream",
     "expand": "Open stream",
-    "mute": "Mute stream",
     "open_channel": "Go to Twitch channel",
-    "pause": "Pause stream",
     "player_title": "{streamer} Twitch stream",
-    "play": "Play stream",
     "region_label": "Promoted Twitch stream for {streamer}",
     "reopen": "Reopen stream",
     "shrink": "Shrink stream",
-    "title": "{streamer} live",
-    "unmute": "Unmute stream"
+    "title": "{streamer} live"
   },
   "buttons": {
     "retry": "重试"
@@ -231,8 +227,6 @@
   },
   "page_help": {
     "button": "帮助",
-    "hint_title": "第一次来这里？",
-    "dismiss": "关闭",
     "launcher": {
       "title": "帮助与新手引导",
       "summary": "为当前页面选择一份快速指南，或走完整的初始设置流程。",
@@ -506,7 +500,6 @@
         },
         "stat": {
           "why": "为什么它赢了",
-          "progress": "可带来的进度",
           "status": "状态",
           "secondary": "其他不错的选项",
           "secondary_actionable": "如果主要方案不合适，可以改做这些。",
@@ -548,17 +541,6 @@
           "filters_one": "当前没有可见选项：1 个可用任务被你的筛选隐藏了。",
           "filters_other": "当前没有可见选项：{count} 个可用任务被你的筛选隐藏了。",
           "complete": "在当前总览范围内，已经没有可见工作了。"
-        },
-        "contribution": {
-          "unlock_trader": "解锁 {trader} 的任务线。",
-          "impact_one": "新增 1 个后续任务。",
-          "impact_other": "新增 {count} 个后续任务。",
-          "kappa": "计入你的 Kappa 任务链。",
-          "lightkeeper": "计入你的灯塔守护者任务链。",
-          "trader": "推进 {trader} 的任务线。",
-          "filters": "显示已经可以执行的任务。",
-          "complete": "总览面板的其余部分现在只提供辅助信息。",
-          "default": "让你在可见面板中的进度继续推进。"
         },
         "status": {
           "ready_one": "现在可做。还剩 1 个目标。",
@@ -696,10 +678,6 @@
         "lightkeeper": "灯塔守护者任务"
       },
       "stats": {
-        "total": "Kappa保险箱任务",
-        "completed": "Kappa Done",
-        "lightkeeper_total": "Lightkeeper Tasks",
-        "lightkeeper_completed": "Lightkeeper Done",
         "available": "Available",
         "locked": "未解锁",
         "failed": "已失败"
@@ -720,8 +698,6 @@
         "action_reset_failed": "Reset failed",
         "locked_by": "Requires: {task}"
       },
-      "progress_label": "complete",
-      "all_complete": "All tasks complete! Well done, PMC.",
       "empty": "No tasks for this list yet.",
       "summary": {
         "progress": "Progress",
@@ -743,10 +719,8 @@
       "billing_6month": "6 Months",
       "billing_yearly": "Yearly",
       "most_popular": "Most Popular",
-      "fee_note": "Price shown includes Stripe fees.",
       "tier_cta": "Subscribe",
       "tier_login_cta": "Log in to subscribe",
-      "tier_current_cta": "Current tier",
       "tier_change_cta": "Change plan in billing portal",
       "current_tier_badge": "Current tier",
       "tier_scav_name": "Scav",
@@ -818,7 +792,6 @@
     "tasks": {
       "title": "任务",
       "primary_views": {
-        "all": "列表",
         "list": "列表",
         "maps": "按地图",
         "traders": "按商人",
@@ -877,17 +850,6 @@
       },
       "filters": {
         "close": "关闭"
-      },
-      "api_update_log": {
-        "title": "最近同步记录",
-        "subtitle": "查看你的进度何时从外部来源自动同步。",
-        "empty": "暂时还没有同步记录。发生同步后，你的进度会显示在这里。",
-        "entry_count": "{count} 个任务",
-        "no_task_details": "进度同步成功。",
-        "more_tasks": "+{count} 个更多",
-        "unknown_time": "未知时间",
-        "collapse": "收起同步历史记录",
-        "expand": "展开同步历史记录"
       },
       "settings": {
         "title": "任务设置",
@@ -976,7 +938,6 @@
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "维基百科",
         "locked_before": "前置任务：{count} 个",
-        "locked_behind": "后续锁定任务：{count} 个",
         "requires": "需要",
         "unlocks_next": "解锁后续任务",
         "impact": "影响关联",
@@ -1018,7 +979,6 @@
         "undo_uncomplete": "已撤销 {name} 的未完成标记",
         "undo_failed": "已撤销 {name} 的失败标记",
         "undo_reset_failed": "已恢复 {name} 的失败标记",
-        "undo_unknown": "无法撤销 {name} 的操作",
         "mark_failed_confirm": "是否要将此任务标记为失败? 此操作仅用于解决数据问题，不建议使用并可能会导致任务线阻塞",
         "reset_item_counts_confirm": "重置此任务的所有物品计数？",
         "failed_because": "失败原因",
@@ -1029,11 +989,8 @@
         "blocked_because_was": "为 {status}",
         "blocked_because_status_tooltip": "永久阻止 — \"{name}\" 为 {status}",
         "blocked_because_unknown": "被前置条件阻止",
-        "keys_header": "所需钥匙",
         "keys_disclaimer_tooltip": "基于 API 数据，并非始终 100% 必需。门可能已经被打开。购买钥匙前请在游戏内或 Wiki 核对。",
         "keys_disclaimer_aria": "所需钥匙说明",
-        "keys_needed": "{map} 地图需 {keys} | {map} 地图需 {keys} 其中一把",
-        "keys_optional_badge": "可选",
         "keys_or": "或",
         "equipment_disclaimer_tooltip": "完成此目标需要携带进入突袭的特殊装备。",
         "equipment_disclaimer_aria": "所需装备说明",
@@ -1056,9 +1013,6 @@
         "objective_optional_badge": "可选",
         "ready_to_hand_over": "可上交",
         "objectives_hidden": "其他地图中有 {count} 个任务目标({uncompleted} 个未完成)",
-        "alternatives": "替代任务",
-        "alternative_failed": "替代任务也将同步重置",
-        "different_faction": "该任务对你的阵营不可用",
         "needed_by": "被以下任务依赖：{names}",
         "unlocks_next_tooltip": "完成此任务后可解锁的任务数量",
         "impact_tooltip": "依赖此任务完成的未完成任务数量",
@@ -1079,12 +1033,10 @@
         "find_fir": "战局中找到",
         "items_count": "{count} 件物品",
         "kappa_tooltip": "该任务是获得 Kappa 安全箱的必需任务",
-        "kappa_required": "KAPPA 必需",
         "level_badge_tooltip": "需要玩家最低等级 {level} 才能解锁该任务",
         "lightkeeper_tooltip": "该任务是解锁商人 Lightkeeper 的必需任务",
         "alternatives_tooltip": "This quest has {count} alternative choice(s) — you only need to complete one",
         "alternatives_badge": "{count} alt",
-        "lightkeeper_required": "LIGHTKEEPER 必需",
         "location_tooltip": "任务目标位于 {map}",
         "next_tasks": "后续任务：",
         "objective": "目标",
@@ -1103,7 +1055,6 @@
       "loading": "加载藏身处数据中",
       "station_link_label": "前往 {name}",
       "no_stations_found": "未找到设施，可尝试修改筛选条件",
-      "load_more_stations": "加载更多电台",
       "collapse_completed": "折叠已完成的设施",
       "sort": {
         "ready_first": "优先显示可建造"
@@ -1166,26 +1117,17 @@
       "filters": {
         "all": "全部",
         "label": "筛选",
-        "sections": {
-          "items": "物品筛选",
-          "team": "队伍筛选"
-        },
         "fir": "战局拾取(FIR)",
         "non_fir": "非战局拾取",
-        "show_owned": "显示已拥有",
         "hide_owned": "隐藏已拥有",
         "hide_non_fir_special_equipment_title": "隐藏非战局拾取特殊装备(如MS2000信标、无线摄像头)",
-        "no_special": "无特殊装备",
-        "special": "特殊装备",
         "kappa_only": "Kappa前置",
         "kappa_only_tooltip": "只显示Kappa前置任务需要的物品",
         "kappa_only_disabled_tooltip": "\"只显示Kappa前置\"选项仅对任务界面生效",
-        "hide_team_needs": "隐藏队友所需",
-        "show_team_needs": "显示队友所需"
+        "hide_team_needs": "隐藏队友所需"
       },
       "sort": {
         "label": "排序",
-        "by": "排序方式",
         "priority": "优先级",
         "name": "名称",
         "category": "类别",
@@ -1399,25 +1341,17 @@
       "achievement_mainline": "Mainline Task Progress",
       "achievement_objectives": "Objective Completion",
       "no_storyline": "此档案暂无可用的剧情数据。",
-      "storyline_chapter": "章节",
       "storyline_auto_start": "自动开始",
       "storyline_discovered": "已发现",
       "storyline_requires": "需要",
-      "storyline_unlocks_maps": "解锁地图",
-      "storyline_unlocks_traders": "解锁商人",
-      "storyline_wiki": "维基",
       "storyline_objectives_main": "主要目标",
       "storyline_objectives_optional": "可选目标",
-      "storyline_description": "描述",
-      "storyline_notes": "备注",
-      "storyline_rewards": "奖励",
       "view_tarkov_dev": "在 Tarkov.dev 上查看",
       "no_hideout": "此档案没有可用的藏身处数据。",
       "hideout_level": "等级",
       "hideout_fallback": "藏身处",
       "hideout_item_fallback": "Hideout item",
       "hideout_module_fallback": "Hideout upgrade",
-      "unknown_trader": "未知商人",
       "level_prefix": "等级",
       "no_tasks": "此档案暂无可用任务。",
       "task_fallback": "任务",
@@ -1512,7 +1446,6 @@
         "open_tool": "Open tool",
         "download_release": "Download latest release"
       },
-      "view_guide": "Setup guide",
       "back_to_hub": "Back to Resources",
       "breadcrumb": "Breadcrumb",
       "guide_label": "Guide",
@@ -1566,17 +1499,17 @@
       },
       "guides": {
         "tarkovdev": {
-          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through a free GraphQL API. TarkovTracker itself uses this API to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
+          "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through free static JSON endpoints at json.tarkov.dev. TarkovTracker itself uses these endpoints to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
           "step_1_title": "Browse the website",
           "step_1_desc": "Visit tarkov.dev to search items, check quest requirements, view trader inventories, and explore hideout station data in a clean, ad-free interface.",
-          "step_2_title": "Use the GraphQL API",
-          "step_2_desc": "If you are a developer, point your GraphQL client at api.tarkov.dev. The API is free, requires no authentication for read queries, and has full schema documentation available at the endpoint.",
+          "step_2_title": "Use the JSON API",
+          "step_2_desc": "If you are a developer, point your HTTP client at json.tarkov.dev. The endpoint catalog is at json.tarkov.dev/endpoints. The API is free, requires no authentication for read queries, and returns static JSON files you can cache locally.",
           "step_3_title": "Join the community",
           "step_3_desc": "The Hideout Discord is the hub for data contributors, tool developers, and bug reports. If you spot outdated data or want to contribute, this is where it happens.",
-          "tip_1": "The GraphQL API is rate-limited but generous. For production apps, cache responses client-side to avoid redundant queries.",
+          "tip_1": "The JSON endpoints have no rate limit. For production apps, cache responses client-side to avoid redundant requests.",
           "tip_2": "Tarkov.dev data updates frequently during wipe seasons. If something looks wrong, it may already be fixed in the latest dataset.",
           "faq_1_q": "Is the Tarkov.dev API free to use?",
-          "faq_1_a": "Yes, the GraphQL API is completely free for read queries. No API key or authentication is required for standard usage.",
+          "faq_1_a": "Yes, the JSON endpoints are completely free for read queries. No API key or authentication is required for standard usage.",
           "faq_2_q": "How often is the data updated?",
           "faq_2_a": "Data is maintained by community contributors and updated as changes are discovered in-game. During active wipe periods, updates can happen multiple times per day."
         },
@@ -1656,7 +1589,6 @@
       "github": "GitHub 仓库"
     },
     "support_button": "支持开发",
-    "support_tagline": "助力 Tarkov Tracker 持续免费更新",
     "terms_of_service": "服务条款",
     "privacy_policy": "隐私政策",
     "credits": "鸣谢",
@@ -1833,13 +1765,10 @@
     "title": "设置",
     "locale": "语言",
     "tabs": {
-      "gameplay": "游戏玩法",
-      "interface": "界面",
       "account": "帐户",
       "progression": "进度",
       "prestige": "声望",
       "preferences": "偏好",
-      "data_management": "数据管理",
       "imports": "导入",
       "backup_restore": "备份和恢复",
       "api": "接口文档",
@@ -1887,10 +1816,6 @@
       "compact": "紧凑",
       "comfortable": "舒适"
     },
-    "account_moved": {
-      "message": "在找 API 令牌或账户设置？",
-      "link": "前往账户"
-    },
     "account": {
       "begin_deletion": "开始删除账户"
     },
@@ -1905,7 +1830,6 @@
       "admin_panel": "管理面板"
     },
     "interface": {
-      "title": "界面定制",
       "tasks": {
         "title": "任务卡片",
         "show_required": "显示必需标签",
@@ -1914,9 +1838,6 @@
         "show_prev": "显示前置任务",
         "density": "卡片密度",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
-      },
-      "defaults": {
-        "title": "默认视图"
       },
       "maps": {
         "title": "地图",
@@ -1942,9 +1863,6 @@
         "title": "Wiki Links",
         "antifandom": "Use antifandom.com",
         "antifandom_hint": "Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com."
-      },
-      "misc": {
-        "title": "杂项"
       }
     },
     "game_profile": {
@@ -1960,7 +1878,6 @@
       "mode_pve": "PvE",
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_link": "复制个人资料链接",
       "copy_pvp_link": "Copy PvP profile link",
       "copy_pve_link": "Copy PvE profile link",
       "login_required": "登录以管理个人资料分享的可见性。"
@@ -1971,9 +1888,6 @@
       "pve": "PvE",
       "switch_mode_failed": "切换游戏模式失败，请重试",
       "switch_mode_fetch_failed": "Game mode switched but failed to refresh data, please retry"
-    },
-    "data_management_card": {
-      "title": "数据管理"
     },
     "data_management": {
       "reset_pvp_title": "重置 PvP 数据",
@@ -1988,20 +1902,14 @@
       "reset_all_data": "重置所有数据",
       "reset_all_confirmation": "确定要重置你的全部进度吗？",
       "reset_all_warning": "这将永久删除 PvP 和 PvE 模式的全部进度。此操作无法撤销！",
-      "prestige_pvp_title": "PvP 声望重置",
-      "prestige_pvp_data": "PvP 声望",
-      "prestige_pvp_confirmation": "确定要进行 PvP 声望吗？",
       "prestige_pvp_warning": "当前 PvP 周目将先归档，然后重置 PvP 进度并进入下一声望等级。PvE 数据不受影响。",
       "reset_cancel": "取消",
       "reset_confirm": "重置数据",
-      "export_title": "导出与备份",
       "export_description": "下载 PvP 和 PvE 模式的进度备份。",
       "export_button": "导出进度备份",
       "debug_export_button": "导出调试快照",
       "debug_export_description": "下载用于排查登录问题的脱敏账户快照，不包含身份验证令牌、电子邮件和头像图片。",
-      "import_title": "导入",
       "import_backup_button": "导入 TarkovTracker 备份",
-      "import_tarkovdev_button": "导入 Tarkov.dev 档案",
       "import_eft_logs_folder_button": "导入 EFT 日志文件夹",
       "recommended_badge": "推荐",
       "active_flow_blocked_title": "请先完成当前数据流程",
@@ -2016,7 +1924,6 @@
       "backup_restore_section_title": "备份与恢复",
       "backup_restore_section_description": "导出备份或从之前导出的文件恢复",
       "debug_section_title": "调试快照",
-      "debug_section_description": "下载用于支持和调试的净化快照",
       "import_backup_title": "从备份恢复",
       "import_backup_description": "从 TarkovTracker 备份文件恢复进度",
       "import_preview_exported_at": "导出时间",
@@ -2038,7 +1945,6 @@
       "debug_export_error_title": "调试导出失败",
       "reset_title": "重置进度",
       "prestige_history_title": "声望历史",
-      "prestige_history_description": "每次声望后的 PvP 周目都会归档保存，方便你回看并比较进度。",
       "prestige_history_loading": "正在加载声望历史...",
       "prestige_history_empty": "暂无已归档的声望周目。",
       "prestige_history_load_error": "加载声望历史失败。",
@@ -2061,10 +1967,6 @@
       "success_title": "PvP 声望完成",
       "success_description": "你的 PvP 档案已提升到声望 {level}。",
       "error_description": "PvP 声望失败，请重试。"
-    },
-    "data_migration": {
-      "title": "本地数据迁移",
-      "description": "将本地进度数据迁移到云端账户。登录时自动进行。"
     },
     "reset": {
       "error_title": "重置失败"
@@ -2094,7 +1996,6 @@
       "member_since_label": "注册时间",
       "account_id_label": "账户 ID",
       "unknown_label": "未知",
-      "data_reset_title": "数据重置",
       "account_deletion_title": "账户删除",
       "login_required_delete": "登录后才能删除账户",
       "action_show": "显示",
@@ -2208,9 +2109,7 @@
       "summary_description_manual": "仍有 {count} 项要求需要在游戏内手动确认。"
     },
     "display_name": {
-      "title": "显示名称",
       "explanation": "显示名称将对队友及导航栏可见，PVP/PVE 模式拥有独立显示名称",
-      "mode_hint": "你正在编辑 {mode} 模式的显示名称，可在导航栏切换模式修改另一名称",
       "label": "显示名称",
       "placeholder": "输入你的显示名称...",
       "save": "保存",
@@ -2272,7 +2171,6 @@
       "reset_offset": "重置经验偏移量"
     },
     "danger_zone": {
-      "confirm_delete_instruction": "输入 {word} 确认操作:",
       "confirm_word": "删除账户"
     },
     "log_import": {
@@ -2313,7 +2211,6 @@
       "unknown_mode_event_details": "未知模式事件详情",
       "unknown_completion_events": "已完成任务（未知模式）",
       "unknown_started_events": "已开始任务（未知模式）",
-      "import_to_mode": "导入到模式",
       "import_unknown_to_mode": "将未知模式事件导入到",
       "import_unknown_to_mode_hint": "已知 PvP/PvE 事件会自动路由。此项仅适用于未解析事件。",
       "auto_mode_hint": "已从后端日志检测到模式路由，并将自动应用。",
@@ -2350,9 +2247,7 @@
       "profile_url_label": "Tarkov.dev 资料 URL",
       "profile_url_placeholder": "https://tarkov.dev/players/regular/8560316",
       "profile_url_hint": "在 {link} 找到你的资料，打开对应的 PvP 或 PvE 资料页，然后将该页面 URL 粘贴到这里。",
-      "profile_url_hint_before_link": "在以下位置找到你的资料",
       "profile_url_hint_link": "tarkov.dev/players",
-      "profile_url_hint_after_link": "，打开对应的 PvP 或 PvE 资料页，然后将该页面 URL 粘贴到这里。",
       "profile_url_refresh_hint": "Tarkov.dev 会在你打开资料页后刷新资料 JSON。",
       "fetch_profile": "获取资料",
       "nickname": "昵称",
