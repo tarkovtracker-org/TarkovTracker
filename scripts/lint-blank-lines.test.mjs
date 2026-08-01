@@ -24,6 +24,14 @@ const heredoc = runFix(
 if (heredoc !== 'cat <<EOF\nkeep\n\n EOF\n\nstill protected\nEOF\nnext\n') {
   throw new Error(`Heredoc protection failed:\n${heredoc}`);
 }
+const substitution = runFix(
+  'substitution',
+  'value=$(\n  printf first\n\n  printf second\n)\n\nnext\n',
+  'sh'
+);
+if (substitution !== 'value=$(\n  printf first\n\n  printf second\n)\nnext\n') {
+  throw new Error(`Command substitution protection failed:\n${substitution}`);
+}
 const template = runFix(
   'template',
   'const value = 1;\n\nconst text = `first\n\nsecond`;\n\n',

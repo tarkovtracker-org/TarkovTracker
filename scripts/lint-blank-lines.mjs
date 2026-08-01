@@ -60,6 +60,37 @@ const getProtectedRanges = (source, filePath) => {
     start: match.index,
   }));
   const extension = extname(filePath).toLowerCase();
+  if (extension === '.sh') {
+    let start = -1;
+    let depth = 0;
+    let quote = null;
+    for (let index = 0; index < source.length; index += 1) {
+      const character = source[index];
+      if (quote) {
+        if (character === '\\') index += 1;
+        else if (character === quote) quote = null;
+        continue;
+      }
+      if (character === '"' || character === "'") {
+        quote = character;
+        continue;
+      }
+      if (character === '$' && source[index + 1] === '(') {
+        start = start === -1 ? index : start;
+        depth += 1;
+        index += 1;
+      } else if (depth > 0 && character === '(') {
+        depth += 1;
+      } else if (depth > 0 && character === ')') {
+        depth -= 1;
+        if (depth === 0) {
+          ranges.push({ end: index + 1, start });
+          start = -1;
+        }
+      }
+    }
+    return ranges;
+  }
   if (!['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(extension)) return ranges;
   if (!typescript) {
     for (const match of source.matchAll(/`(?:\\[\s\S]|[^`])*`/g)) {
