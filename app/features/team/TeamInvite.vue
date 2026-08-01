@@ -19,7 +19,7 @@
             :loading="accepting"
             @click="acceptInvite"
           >
-            {{ $t('page.team.card.teaminvite.accept') }}
+            {{ $t('common.accept') }}
           </UButton>
           <UButton color="neutral" variant="outline" :disabled="accepting" @click="declined = true">
             {{ $t('page.team.card.teaminvite.decline') }}

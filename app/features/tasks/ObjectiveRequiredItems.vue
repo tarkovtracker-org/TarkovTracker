@@ -46,7 +46,7 @@
       >
         x{{ getItemCount(item.id) }}
       </span>
-      <AppTooltip :text="t('page.tasks.questcard.view_on_tarkov_dev')">
+      <AppTooltip :text="t('common.view_on_tarkov_dev')">
         <a
           :href="getKeyDevUrl(item)"
           target="_blank"
@@ -183,9 +183,7 @@
   const getItemCount = (itemId?: string) =>
     itemId && props.counts ? (props.counts[itemId] ?? 0) : 0;
   const getPrimaryTooltip = (item: TarkovItem) =>
-    item.wikiLink
-      ? t('page.tasks.questcard.view_on_wiki')
-      : t('page.tasks.questcard.view_on_tarkov_dev');
+    item.wikiLink ? t('common.view_on_wiki') : t('common.view_on_tarkov_dev');
   const openPrimaryLink = (item: TarkovItem) => {
     const url = toWikiUrl(getKeyPrimaryUrl(item));
     if (url) {

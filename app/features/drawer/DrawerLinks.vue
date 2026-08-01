@@ -8,56 +8,56 @@
     <ul class="flex flex-col gap-0.5 px-1">
       <DrawerItem
         icon="i-heroicons-squares-2x2"
-        locale-key="home"
+        locale-key="common.dashboard"
         to="/"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-mdi-book-open-variant"
-        locale-key="storyline"
+        locale-key="common.storyline"
         to="/storyline"
         :is-collapsed="props.isCollapsed"
         :badge="t('page.storyline.wip_badge')"
       ></DrawerItem>
       <DrawerItem
         icon="i-heroicons-clipboard-document-list"
-        locale-key="tasks"
+        locale-key="common.tasks"
         to="/tasks"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-heroicons-cube"
-        locale-key="needed_items"
+        locale-key="common.needed_items"
         to="/needed-items"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-heroicons-home"
-        locale-key="hideout"
+        locale-key="common.hideout"
         to="/hideout"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-heroicons-user-group"
-        locale-key="team"
+        locale-key="common.team"
         to="/team"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-mdi-cog-outline"
-        locale-key="settings"
+        locale-key="common.settings"
         to="/settings"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-mdi-trophy"
-        locale-key="kappa"
+        locale-key="common.kappa_lightkeeper"
         to="/kappa"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
         icon="i-mdi-heart-outline"
-        locale-key="supporter"
+        locale-key="common.support"
         to="/supporter"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>

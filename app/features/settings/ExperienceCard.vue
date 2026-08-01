@@ -82,10 +82,10 @@
               color="primary"
               class="min-w-24"
               :disabled="!isValidXPInput"
-              :aria-label="$t('settings.experience.apply')"
+              :aria-label="$t('common.apply')"
               @click="applyManualXP"
             >
-              {{ $t('settings.experience.apply') }}
+              {{ $t('common.apply') }}
             </UButton>
           </div>
         </div>

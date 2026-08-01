@@ -18,6 +18,6 @@ describe('account page', () => {
     expect(source).not.toContain('AccountDeletionCard');
     expect(source).not.toContain('ProfileSharingCard');
     expect(source).not.toContain('PrivacyCard');
-    expect(source).not.toContain('settings.general.admin_panel');
+    expect(source).not.toContain('common.admin_panel');
   });
 });

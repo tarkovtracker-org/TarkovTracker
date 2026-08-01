@@ -4,7 +4,7 @@
     icon-color="success"
     highlight-color="success"
     :fill-height="false"
-    :title="$t('settings.interface.maps.title')"
+    :title="$t('common.maps')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
@@ -79,7 +79,7 @@
               variant="ghost"
               @click="preferencesStore.resetMapMarkerColors()"
             >
-              {{ $t('settings.interface.maps.colors.reset') }}
+              {{ $t('common.reset') }}
             </UButton>
           </div>
           <div class="grid gap-2 md:grid-cols-2">

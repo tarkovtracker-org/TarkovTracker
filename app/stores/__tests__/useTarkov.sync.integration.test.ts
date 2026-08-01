@@ -121,8 +121,8 @@ const {
   const i18nTranslate = vi.fn((key: string, params?: Record<string, unknown>) => {
     if (key === 'toast.api_updated.label.single') return 'Task updated';
     if (key === 'toast.api_updated.label.plural') return 'Tasks updated';
-    if (key === 'toast.api_updated.state.completed') return 'completed';
-    if (key === 'toast.api_updated.state.failed') return 'failed';
+    if (key === 'common.completed') return 'completed';
+    if (key === 'common.failed') return 'failed';
     if (key === 'toast.api_updated.state.uncompleted') return 'uncompleted';
     if (key === 'toast.api_updated.description_fallback')
       return 'Your progress was updated via API.';

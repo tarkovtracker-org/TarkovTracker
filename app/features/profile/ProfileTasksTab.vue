@@ -53,7 +53,7 @@
                 :class="taskStatusColor(task.id)"
               />
               <span class="text-surface-200 min-w-0 flex-1 truncate text-sm">
-                {{ task.name || t('page.profile.task_fallback') }}
+                {{ task.name || t('common.task') }}
               </span>
               <span
                 v-if="task.trader?.name"
@@ -106,7 +106,7 @@
                     :class="objectiveColor(objective.id)"
                   />
                   <span class="text-surface-300 text-xs leading-relaxed">
-                    {{ objective.description || t('page.profile.objective_fallback') }}
+                    {{ objective.description || t('common.objective') }}
                   </span>
                   <span
                     v-if="objective.count && objective.count > 1"
@@ -186,7 +186,7 @@
     return [
       {
         key: 'available',
-        label: t('page.profile.section_available'),
+        label: t('common.available'),
         icon: 'i-mdi-clipboard-check-outline',
         chipClass: 'bg-primary-700/25',
         iconClass: 'text-primary-300',
@@ -194,7 +194,7 @@
       },
       {
         key: 'locked',
-        label: t('page.profile.section_locked'),
+        label: t('common.locked'),
         icon: 'i-mdi-lock-outline',
         chipClass: 'bg-warning-700/25',
         iconClass: 'text-warning-300',
@@ -202,7 +202,7 @@
       },
       {
         key: 'completed',
-        label: t('page.profile.section_completed'),
+        label: t('common.completed'),
         icon: 'i-mdi-check-circle-outline',
         chipClass: 'bg-success-700/25',
         iconClass: 'text-success-300',

@@ -83,10 +83,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const defaultTranslations: Record<string, string> = {
-    'needed_items.filters.all': 'All',
-    'needed_items.filters.tasks': 'Tasks',
-    'needed_items.filters.hideout': 'Hideout',
-    'needed_items.filters.completed': 'Completed',
+    'common.all': 'All',
+    'common.tasks': 'Tasks',
+    'common.hideout': 'Hideout',
+    'common.completed': 'Completed',
   };
   const translate = (key: string) => (t ? t(key) : defaultTranslations[key] || key);
   const perfDebug = computed(() => Boolean(toValue(perfDebugOption)));
@@ -359,25 +359,25 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
     return [
       {
-        label: translate('needed_items.filters.all'),
+        label: translate('common.all'),
         value: 'all' as NeededItemsFilterType,
         icon: 'i-mdi-clipboard-list',
         count: counts.incomplete,
       },
       {
-        label: translate('needed_items.filters.tasks'),
+        label: translate('common.tasks'),
         value: 'tasks' as NeededItemsFilterType,
         icon: 'i-mdi-checkbox-marked-circle-outline',
         count: counts.tasks,
       },
       {
-        label: translate('needed_items.filters.hideout'),
+        label: translate('common.hideout'),
         value: 'hideout' as NeededItemsFilterType,
         icon: 'i-mdi-home',
         count: counts.hideout,
       },
       {
-        label: translate('needed_items.filters.completed'),
+        label: translate('common.completed'),
         value: 'completed' as NeededItemsFilterType,
         icon: 'i-mdi-check-all',
         count: counts.completed,

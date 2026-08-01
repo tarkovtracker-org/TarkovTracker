@@ -79,7 +79,7 @@
         v-if="showActions && (props.devLink || props.wikiLink)"
         class="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/80 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
-        <AppTooltip v-if="props.devLink" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
+        <AppTooltip v-if="props.devLink" :text="t('common.view_on_tarkov_dev')">
           <a
             :href="props.devLink"
             target="_blank"
@@ -97,7 +97,7 @@
             />
           </a>
         </AppTooltip>
-        <AppTooltip v-if="props.wikiLink" :text="t('page.tasks.questcard.view_on_wiki')">
+        <AppTooltip v-if="props.wikiLink" :text="t('common.view_on_wiki')">
           <a
             :href="toWikiUrl(props.wikiLink)"
             target="_blank"
@@ -136,7 +136,7 @@
         <template v-if="props.taskWikiLink">
           <ContextMenuItem
             icon="/img/logos/wikilogo.webp"
-            :label="t('page.tasks.questcard.view_on_wiki')"
+            :label="t('common.view_on_wiki')"
             @click="
               openTaskWiki();
               close();
@@ -151,7 +151,7 @@
         <ContextMenuItem
           v-if="props.itemName && props.wikiLink"
           icon="/img/logos/wikilogo.webp"
-          :label="t('page.tasks.questcard.view_on_wiki')"
+          :label="t('common.view_on_wiki')"
           @click="
             openWikiLink();
             close();
@@ -160,7 +160,7 @@
         <ContextMenuItem
           v-if="props.itemName && props.devLink"
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="t('page.tasks.questcard.view_on_tarkov_dev')"
+          :label="t('common.view_on_tarkov_dev')"
           @click="
             openTarkovDevLink();
             close();
@@ -170,7 +170,7 @@
           <ContextMenuItem
             v-if="props.wikiLink"
             icon="/img/logos/wikilogo.webp"
-            :label="t('page.tasks.questcard.view_on_wiki')"
+            :label="t('common.view_on_wiki')"
             @click="
               openWikiLink();
               close();
@@ -179,7 +179,7 @@
           <ContextMenuItem
             v-if="props.devLink"
             icon="/img/logos/tarkovdevlogo.webp"
-            :label="t('page.tasks.questcard.view_on_tarkov_dev')"
+            :label="t('common.view_on_tarkov_dev')"
             @click="
               openTarkovDevLink();
               close();

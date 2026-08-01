@@ -461,7 +461,7 @@
         {
           color: 'primary',
           icon: 'i-mdi-checkbox-multiple-marked',
-          label: copy('page_help.onboarding.steps.tasks.actions.open', 'Open tasks'),
+          label: copy('common.open_tasks', 'Open tasks'),
           to: '/tasks',
         },
       ],

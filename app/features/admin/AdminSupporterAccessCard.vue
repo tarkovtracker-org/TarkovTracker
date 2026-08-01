@@ -12,10 +12,10 @@
   const enabled = ref(true);
   const isSaving = ref(false);
   const tierOptions = computed<Array<{ label: string; value: SupporterTier }>>(() => [
-    { label: t('admin.supporter_tier_supporter'), value: 'supporter' },
-    { label: t('admin.supporter_tier_scav'), value: 'scav' },
-    { label: t('admin.supporter_tier_timmy'), value: 'timmy' },
-    { label: t('admin.supporter_tier_chad'), value: 'chad' },
+    { label: t('common.supporter'), value: 'supporter' },
+    { label: t('common.scav'), value: 'scav' },
+    { label: t('common.timmy'), value: 'timmy' },
+    { label: t('common.chad'), value: 'chad' },
   ]);
   const canSave = computed(() => {
     return systemStore.isAdmin && targetUserId.value.trim().length > 0 && !isSaving.value;
@@ -108,7 +108,7 @@
             :loading="isSaving"
             @click="applySupporterOverride"
           >
-            {{ t('admin.supporter_override_save_button') }}
+            {{ t('common.apply') }}
           </UButton>
         </div>
       </div>

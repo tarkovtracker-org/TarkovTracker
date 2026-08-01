@@ -3,7 +3,7 @@
     icon="mdi-gamepad-variant"
     icon-color="accent"
     highlight-color="accent"
-    :title="$t('settings.game_settings.title')"
+    :title="$t('common.game_settings')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
@@ -73,7 +73,7 @@
             :for="gameEditionInputId"
             class="text-surface-200 block cursor-pointer text-sm font-semibold"
           >
-            {{ $t('settings.game_profile.game_edition') }}
+            {{ $t('common.game_edition') }}
           </label>
           <SelectMenuFixed
             :id="gameEditionInputId"
@@ -154,7 +154,7 @@
     const validationError = getDisplayNameValidationError(mode);
     if (validationError) {
       toast.add({
-        title: t('settings.display_name.validation_error'),
+        title: t('common.validation_error'),
         description: validationError,
         color: 'error',
       });

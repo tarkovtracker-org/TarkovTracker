@@ -24,7 +24,7 @@
     >
       <NuxtLink
         to="/"
-        :aria-label="t('navigation_drawer.home')"
+        :aria-label="t('common.dashboard')"
         class="group mt-1 flex shrink-0 flex-col items-center px-3 py-1.5 transition-opacity hover:opacity-90"
       >
         <div
@@ -55,7 +55,7 @@
         <DrawerLevel :is-collapsed="false" />
         <div class="px-4 py-1">
           <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-            {{ t('navigation_drawer.section_game_settings') }}
+            {{ t('common.game_settings') }}
           </h3>
         </div>
         <DrawerGameSettings />

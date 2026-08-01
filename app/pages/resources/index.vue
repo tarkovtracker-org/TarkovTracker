@@ -33,7 +33,7 @@
               variant="link"
               size="sm"
               icon="i-mdi-close-circle"
-              :aria-label="t('page.resources.clear_search', 'Clear search')"
+              :aria-label="t('common.clear_search', 'Clear search')"
               @click="searchQuery = ''"
             />
           </template>
@@ -171,7 +171,7 @@
   const categoryFilters = computed(() => [
     {
       id: 'all' as const,
-      label: t('page.resources.filters.all', 'All'),
+      label: t('common.all', 'All'),
     },
     ...RESOURCE_CATEGORIES.map((category) => ({
       id: category,

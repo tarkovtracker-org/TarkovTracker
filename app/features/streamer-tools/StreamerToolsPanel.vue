@@ -5,7 +5,7 @@
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div class="space-y-2">
             <h1 class="text-2xl font-bold text-white">
-              {{ t('streamer_tools.title', 'Streamer Tools') }}
+              {{ t('common.streamer_tools', 'Streamer Tools') }}
             </h1>
             <p class="text-surface-300 max-w-2xl text-sm sm:text-base">
               {{
@@ -101,7 +101,7 @@
                     "
                     @click="selectedMode = GAME_MODES.PVP"
                   >
-                    {{ t('streamer_tools.mode_pvp', 'PvP') }}
+                    {{ t('common.pvp', 'PvP') }}
                   </button>
                   <button
                     type="button"
@@ -115,7 +115,7 @@
                     "
                     @click="selectedMode = GAME_MODES.PVE"
                   >
-                    {{ t('streamer_tools.mode_pve', 'PvE') }}
+                    {{ t('common.pve', 'PvE') }}
                   </button>
                 </div>
               </article>
@@ -157,7 +157,7 @@
           icon="i-mdi-palette-outline"
           highlight-color="accent"
           :fill-height="false"
-          :title="t('streamer_tools.appearance_title', 'Appearance')"
+          :title="t('common.appearance', 'Appearance')"
           title-classes="text-lg font-semibold"
         >
           <template #content>
@@ -235,7 +235,7 @@
                 </article>
                 <article v-if="isSelfContained" class="space-y-2 sm:col-span-2 lg:col-span-3">
                   <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
-                    {{ t('streamer_tools.self_contained_hint_label', 'Self Contained') }}
+                    {{ t('common.self_contained', 'Self Contained') }}
                   </p>
                   <p class="text-surface-400 text-xs">
                     {{
@@ -383,7 +383,7 @@
                 </article>
                 <article v-if="isCustomResolution" class="space-y-2 sm:col-span-2 lg:col-span-3">
                   <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
-                    {{ t('streamer_tools.custom_scale', 'Custom Scale') }}
+                    {{ t('common.custom_scale', 'Custom Scale') }}
                   </p>
                   <div class="max-w-sm space-y-1">
                     <label
@@ -510,7 +510,7 @@
                   </div>
                   <div class="border-surface-700 space-y-4 rounded-lg border p-3">
                     <p class="text-surface-400 text-[11px] font-semibold tracking-wider uppercase">
-                      {{ t('streamer_tools.colors_progress', 'Progress Track') }}
+                      {{ t('common.progress_track', 'Progress Track') }}
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <div class="space-y-1">
@@ -518,7 +518,7 @@
                           :for="trackColorId"
                           class="text-surface-200 block text-xs font-medium"
                         >
-                          {{ t('streamer_tools.track_color', 'Progress Track') }}
+                          {{ t('common.progress_track', 'Progress Track') }}
                         </label>
                         <input
                           :id="trackColorId"

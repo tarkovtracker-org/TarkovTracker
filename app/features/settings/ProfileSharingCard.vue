@@ -26,7 +26,7 @@
                 <div class="min-w-0 space-y-1">
                   <div class="flex items-center gap-2">
                     <UBadge color="pvp" variant="soft" size="sm">
-                      {{ t('settings.profile_sharing.mode_pvp', 'PvP') }}
+                      {{ t('common.pvp', 'PvP') }}
                     </UBadge>
                     <span class="text-surface-300 text-xs">{{ pvpVisibilityLabel }}</span>
                   </div>
@@ -64,7 +64,7 @@
                 <div class="min-w-0 space-y-1">
                   <div class="flex items-center gap-2">
                     <UBadge color="pve" variant="soft" size="sm">
-                      {{ t('settings.profile_sharing.mode_pve', 'PvE') }}
+                      {{ t('common.pve', 'PvE') }}
                     </UBadge>
                     <span class="text-surface-300 text-xs">{{ pveVisibilityLabel }}</span>
                   </div>

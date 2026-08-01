@@ -51,7 +51,7 @@
               :class="firFilter === 'all' ? 'bg-white/10 text-white' : 'text-surface-300'"
               @click="firFilter = 'all'"
             >
-              {{ t('page.needed_items.filters.all') }}
+              {{ t('common.all') }}
             </UButton>
             <UButton
               variant="ghost"
@@ -62,7 +62,7 @@
               :class="firFilter === 'fir' ? 'bg-white/10 text-white' : 'text-surface-300'"
               @click="firFilter = 'fir'"
             >
-              {{ t('page.needed_items.filters.fir') }}
+              {{ t('common.fir') }}
             </UButton>
             <UButton
               variant="ghost"
@@ -105,15 +105,11 @@
       <div class="rounded-2xl border border-white/10 p-4">
         <div class="mb-3">
           <h3 class="text-surface-200 text-[11px] font-semibold tracking-[0.18em] uppercase">
-            {{ t('page.tasks.settings.tabs.appearance') }}
+            {{ t('common.appearance') }}
           </h3>
         </div>
         <div class="space-y-3">
-          <div
-            role="group"
-            :aria-label="t('page.tasks.settings.tabs.appearance')"
-            class="flex flex-wrap gap-2"
-          >
+          <div role="group" :aria-label="t('common.appearance')" class="flex flex-wrap gap-2">
             <UButton
               variant="ghost"
               color="neutral"

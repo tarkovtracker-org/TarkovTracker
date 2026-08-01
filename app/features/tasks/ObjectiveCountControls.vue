@@ -56,22 +56,12 @@
         </span>
       </AppTooltip>
     </div>
-    <AppTooltip
-      :text="
-        resolvedIsComplete
-          ? t('page.tasks.questcard.complete')
-          : t('page.tasks.questcard.mark_complete')
-      "
-    >
+    <AppTooltip :text="resolvedIsComplete ? t('common.complete') : t('common.mark_complete')">
       <button
         type="button"
         :disabled="disabled"
         class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-        :aria-label="
-          resolvedIsComplete
-            ? t('page.tasks.questcard.complete')
-            : t('page.tasks.questcard.mark_complete')
-        "
+        :aria-label="resolvedIsComplete ? t('common.complete') : t('common.mark_complete')"
         :aria-pressed="resolvedIsComplete"
         :class="
           resolvedIsComplete

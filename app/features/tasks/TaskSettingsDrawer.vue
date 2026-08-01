@@ -93,7 +93,7 @@
           </p>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="resolveRepairConfirm(false)">
-              {{ t('page.tasks.settings.advanced.repair_failed_cancel') }}
+              {{ t('common.cancel') }}
             </UButton>
             <UButton color="warning" variant="soft" @click="resolveRepairConfirm(true)">
               {{ t('page.tasks.settings.advanced.repair_failed_action') }}

@@ -114,7 +114,7 @@
         <article class="min-w-0 space-y-10">
           <ResourceGuideSection
             id="overview"
-            :title="t('page.resources.guide_sections.overview', 'Overview')"
+            :title="t('common.overview', 'Overview')"
             icon="i-mdi-information-outline"
           >
             <p class="text-surface-200 text-base leading-relaxed">{{ overviewText }}</p>
@@ -122,7 +122,7 @@
           <ResourceGuideSection
             v-if="resource.guide && resource.guide.steps > 0"
             id="setup"
-            :title="t('page.resources.guide_sections.setup', 'Getting Started')"
+            :title="t('common.getting_started', 'Getting Started')"
             icon="i-mdi-playlist-check"
           >
             <ol class="space-y-5">
@@ -301,13 +301,11 @@
     resource.value ? getGuideSecondaryLinks(resource.value) : []
   );
   const tocItems = computed(() => {
-    const items = [
-      { id: 'overview', label: t('page.resources.guide_sections.overview', 'Overview') },
-    ];
+    const items = [{ id: 'overview', label: t('common.overview', 'Overview') }];
     if (resource.value?.guide && resource.value.guide.steps > 0) {
       items.push({
         id: 'setup',
-        label: t('page.resources.guide_sections.setup', 'Getting Started'),
+        label: t('common.getting_started', 'Getting Started'),
       });
     }
     if (resource.value?.guide && (resource.value.guide.troubleshooting ?? 0) > 0) {

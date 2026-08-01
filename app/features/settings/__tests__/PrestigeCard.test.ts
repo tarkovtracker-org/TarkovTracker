@@ -322,7 +322,7 @@ describe('PrestigeCard', () => {
     await openDeleteButton!.trigger('click');
     const deleteButtons = wrapper
       .findAll('button')
-      .filter((button) => button.text().includes('settings.prestige.delete_history_confirm'));
+      .filter((button) => button.text().includes('common.delete_archived_run'));
     const confirmDeleteButton = deleteButtons[deleteButtons.length - 1];
     expect(confirmDeleteButton).toBeTruthy();
     await confirmDeleteButton!.trigger('click');

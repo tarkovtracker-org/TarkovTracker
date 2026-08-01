@@ -8,7 +8,7 @@ const routeQuery = { code: undefined as string | undefined, team: undefined as s
 mockNuxtImport('definePageMeta', () => () => {});
 mockNuxtImport('useSeoMeta', () => () => {});
 mockNuxtImport('useRoute', () => () => ({
-  meta: { titleKey: 'page.team.meta.title' },
+  meta: { titleKey: 'common.team' },
   query: routeQuery,
 }));
 vi.mock('@/stores/useSystemStore', () => ({

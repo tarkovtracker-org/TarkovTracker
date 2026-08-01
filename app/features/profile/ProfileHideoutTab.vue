@@ -31,7 +31,7 @@
               {{ station.name }}
             </div>
             <div class="text-surface-400 text-xs">
-              {{ t('page.profile.hideout_level') }} {{ station.completed }}/{{ station.total }}
+              {{ t('common.level') }} {{ station.completed }}/{{ station.total }}
             </div>
           </div>
           <UIcon
@@ -85,7 +85,7 @@
       }
       return {
         id: station.id,
-        name: station.name || t('page.profile.hideout_fallback'),
+        name: station.name || t('common.hideout'),
         imageLink: station.imageLink,
         completed,
         total,

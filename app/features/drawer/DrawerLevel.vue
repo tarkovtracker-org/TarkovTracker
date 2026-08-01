@@ -3,7 +3,7 @@
     <template v-if="isCollapsed">
       <div class="text-center">
         <div class="text-surface-400 mb-1 text-[0.7em]">
-          {{ t('navigation_drawer.level') }}
+          {{ t('common.level') }}
         </div>
         <span class="text-center text-2xl leading-tight font-bold">
           {{ displayedLevel }}
@@ -42,17 +42,13 @@
             <div
               class="text-surface-400 mb-0.5 flex items-center justify-center gap-1 text-[0.6rem]"
             >
-              <span>{{ t('navigation_drawer.level') }}</span>
+              <span>{{ t('common.level') }}</span>
               <span class="text-surface-500 text-[0.5rem]">·</span>
               <span
                 class="text-[0.55rem]"
                 :class="useAutomaticLevel ? 'text-accent-400' : 'text-surface-500'"
               >
-                {{
-                  useAutomaticLevel
-                    ? t('navigation_drawer.mode_auto')
-                    : t('navigation_drawer.mode_manual')
-                }}
+                {{ useAutomaticLevel ? t('navigation_drawer.mode_auto') : t('common.manual') }}
               </span>
             </div>
             <div class="flex h-8 items-center justify-center text-center">

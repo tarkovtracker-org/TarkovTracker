@@ -320,8 +320,8 @@ describe('AppBar account menu', () => {
   });
   it('does not include a duplicate account settings menu item', async () => {
     const wrapper = await mountAppBar();
-    expect(wrapper.find('[data-menu-item="settings.tabs.account"]').exists()).toBe(false);
-    expect(wrapper.find('[data-menu-item="navigation_drawer.settings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-menu-item="common.account"]').exists()).toBe(false);
+    expect(wrapper.find('[data-menu-item="common.settings"]').exists()).toBe(true);
     wrapper.unmount();
   });
   it('logs out when selecting the logout menu item', async () => {
@@ -341,7 +341,7 @@ describe('AppBar logged out actions', () => {
     const wrapper = await mountAppBar();
     expect(wrapper.find('[aria-label="app_bar.login_aria"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('navigation_drawer.login');
-    expect(wrapper.find('[aria-label="navigation_drawer.settings"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="common.settings"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });
@@ -351,7 +351,7 @@ describe('AppBar supporter badge', () => {
   });
   it('renders the green Support Development CTA when there is no active tier', async () => {
     const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('footer.support_button');
+    expect(wrapper.text()).toContain('common.support');
     expect(wrapper.text()).not.toContain('page.supporter.tier_chad_name');
     wrapper.unmount();
   });
@@ -364,7 +364,7 @@ describe('AppBar supporter badge', () => {
     // The More menu always contains the support label, so we check the CTA link specifically.
     const supportCtaLinks = wrapper.findAll('a').filter((a) => {
       const text = a.text();
-      return text.includes('footer.support_button') && !a.attributes('data-menu-item');
+      return text.includes('common.support') && !a.attributes('data-menu-item');
     });
     expect(supportCtaLinks.length).toBe(0);
     wrapper.unmount();
@@ -372,7 +372,7 @@ describe('AppBar supporter badge', () => {
   it('falls back to the generic Supporter label for past supporters', async () => {
     supporterTierRef.value = 'supporter';
     const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('app_bar.supporter_badge_label');
+    expect(wrapper.text()).toContain('common.supporter');
     wrapper.unmount();
   });
 });
@@ -448,7 +448,7 @@ describe('AppBar responsive layout', () => {
     const moreMenuItems = wrapper.findAll('[data-menu-item]');
     const labels = moreMenuItems.map((el) => el.attributes('data-menu-item'));
     expect(labels).toContain('settings.locale');
-    expect(labels).toContain('footer.support_button');
+    expect(labels).toContain('common.support');
     expect(labels).toContain('footer.call_to_action.discord');
     expect(labels).toContain('footer.call_to_action.github');
     wrapper.unmount();
@@ -473,7 +473,7 @@ describe('AppBar responsive layout', () => {
   });
   it('gives the bell a 36x36 hit target with aria-label and tooltip', async () => {
     const wrapper = await mountAppBar();
-    const bell = wrapper.find('button[aria-label="activity_log.aria_label"]');
+    const bell = wrapper.find('button[aria-label="common.activity_log"]');
     expect(bell.exists()).toBe(true);
     const classAttr = bell.attributes('class') || '';
     expect(classAttr).toContain('h-9');

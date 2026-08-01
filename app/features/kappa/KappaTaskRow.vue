@@ -31,7 +31,7 @@
         :aria-label="levelChipAriaLabel"
         :title="levelChipTitle"
       >
-        {{ t('page.kappa.row.level_prefix', 'Lv') }} {{ minLevel }}
+        {{ t('common.lv', 'Lv') }} {{ minLevel }}
       </span>
       <UIcon
         v-if="row.task.lightkeeperRequired && !row.task.kappaRequired"
@@ -105,13 +105,13 @@
   const statusLabel = computed(() => {
     switch (props.row.status) {
       case 'complete':
-        return t('page.kappa.row.status_complete', 'Complete');
+        return t('common.complete', 'Complete');
       case 'failed':
-        return t('page.kappa.row.status_failed', 'Failed');
+        return t('common.failed', 'Failed');
       case 'locked':
-        return t('page.kappa.row.status_locked', 'Locked');
+        return t('common.locked', 'Locked');
       default:
-        return t('page.kappa.row.status_available', 'Available');
+        return t('common.available', 'Available');
     }
   });
   const tooltipText = computed(() => {
@@ -167,9 +167,9 @@
       case 'failed':
         return t('page.kappa.row.action_reset_failed', 'Reset failed') + `: ${name}`;
       case 'locked':
-        return t('page.kappa.row.status_locked', 'Locked') + `: ${name}`;
+        return t('common.locked', 'Locked') + `: ${name}`;
       default:
-        return t('page.kappa.row.action_complete', 'Mark complete') + `: ${name}`;
+        return t('common.mark_complete', 'Mark complete') + `: ${name}`;
     }
   });
   function onToggle() {

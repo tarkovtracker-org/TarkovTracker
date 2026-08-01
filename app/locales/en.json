@@ -1,13 +1,11 @@
 {
   "admin": {
-    "title": "Admin Panel",
     "verifying_access": "Verifying admin access...",
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
-    "unknown_user": "Unknown",
     "cache_management_title": "Cache Management",
     "last_purge_description": "Last purge: {type} at {timestamp}",
     "tarkov_data_cache_label": "Tarkov Data Cache",
@@ -46,13 +44,8 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_tier_supporter": "Supporter",
-    "supporter_tier_scav": "Scav",
-    "supporter_tier_timmy": "Timmy",
-    "supporter_tier_chad": "Chad",
     "supporter_enabled_label": "Enabled",
     "supporter_disabled_label": "Disabled",
-    "supporter_override_save_button": "Apply",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
@@ -70,13 +63,11 @@
     "hidden_label": "Hidden",
     "user_label": "User",
     "user_avatar_alt": "User avatar",
-    "supporter_badge_label": "Supporter",
     "supporter_badge_aria": "Manage your supporter subscription ({tier})",
     "help_community_aria": "Help & community",
     "community_section": "Community",
     "keyboard_shortcuts": "Keyboard shortcuts",
     "report_problem": "Report a problem",
-    "more_aria": "More",
     "login_aria": "Log in to your account"
   },
   "omnibar": {
@@ -89,21 +80,16 @@
     "hint_min_chars": "Type at least 2 characters to search...",
     "no_results": "No results found for \"{query}\".",
     "group_tasks": "Tasks / Quests",
-    "group_items": "Needed Items",
     "group_hideout": "Hideout Stations"
   },
   "activity_log": {
-    "title": "Activity Log",
-    "aria_label": "Activity Log",
     "unread_indicator": "You have unread activity",
     "mark_read": "Mark read",
     "clear": "Clear",
     "empty": "No activity recorded yet.",
     "badge_api": "API Sync",
-    "badge_manual": "Manual",
     "api_synced": "API Progress Synced",
     "more_count": "+{count} more",
-    "unknown_time": "Unknown",
     "entry": {
       "completed": "Completed Task: {name}",
       "uncompleted": "Uncompleted Task: {name}",
@@ -126,9 +112,7 @@
     "shrink": "Shrink stream",
     "title": "{streamer} live"
   },
-  "buttons": {
-    "retry": "Retry"
-  },
+  "buttons": {},
   "errors": {
     "generic_fallback": "Unexpected error. Please try again.",
     "chunk_load_blocked": "A required app file could not load. Please retry. If this keeps happening, your ISP or region may be blocking access.",
@@ -142,7 +126,6 @@
     "copy_details": "Copy details",
     "copy_success": "Copied",
     "status_prefix": "Error",
-    "page_not_found": "Page Not Found",
     "page_not_found_description": "The page you are looking for does not exist.",
     "access_blocked": "Access Blocked",
     "service_unavailable": "Service Unavailable",
@@ -159,7 +142,6 @@
     "subtitle_error": "Some data failed to load",
     "first_load_info": "This may take a moment on first load. Data will be cached for future visits.",
     "partial_data_info": "The app can still work with partial data. You can retry or continue anyway.",
-    "retry": "Retry",
     "continue_anyway": "Continue Anyway"
   },
   "toast": {
@@ -175,8 +157,6 @@
         "plural": "Tasks updated"
       },
       "state": {
-        "completed": "completed",
-        "failed": "failed",
         "uncompleted": "uncompleted"
       },
       "more": ", +{count} more"
@@ -223,7 +203,111 @@
     "finish": "Finish",
     "back_to_top": "Back to top",
     "refresh_button": "Try again",
-    "opens_in_new_tab": "Opens in new tab"
+    "opens_in_new_tab": "Opens in new tab",
+    "available": "Available",
+    "tasks": "Tasks",
+    "level": "Level",
+    "locked": "Locked",
+    "all": "All",
+    "completed": "completed",
+    "hideout": "Hideout",
+    "unknown": "Unknown",
+    "failed": "failed",
+    "complete": "Complete",
+    "pvp": "PvP",
+    "pve": "PvE",
+    "retry": "Retry",
+    "open_tasks": "Open tasks",
+    "view_on_tarkov_dev": "View on Tarkov.dev",
+    "reset": "Reset",
+    "scav": "Scav",
+    "apply": "Apply",
+    "more": "More",
+    "needed_items": "Needed Items",
+    "task": "Task",
+    "lightkeeper": "Lightkeeper",
+    "kappa": "Kappa",
+    "storyline": "Storyline",
+    "mark_complete": "Mark complete",
+    "maps": "Maps",
+    "clear_search": "Clear search",
+    "settings": "Settings",
+    "credits": "Credits",
+    "support": "Support",
+    "privacy_policy": "Privacy Policy",
+    "terms_of_service": "Terms of Service",
+    "tarkov_dev": "Tarkov.dev",
+    "streamer_tools": "Streamer Tools",
+    "prestige": "Prestige",
+    "backup_restore": "Backup & Restore",
+    "confirm_import": "Confirm Import",
+    "admin_panel": "Admin Panel",
+    "supporter": "Supporter",
+    "timmy": "Timmy",
+    "chad": "Chad",
+    "activity_log": "Activity Log",
+    "manual": "Manual",
+    "page_not_found": "Page Not Found",
+    "open_hideout": "Open hideout",
+    "zoom_speed": "Zoom speed",
+    "pan_speed": "Pan speed",
+    "zone_opacity": "Zone opacity",
+    "default": "Default",
+    "compact": "Compact",
+    "pmc_spawn": "PMC Spawn",
+    "pmc_extract": "PMC Extract",
+    "scav_extract": "Scav Extract",
+    "dashboard": "Dashboard",
+    "meet_the_fence_reputation_requirement_required": "Meet the Fence reputation requirement ({required}).",
+    "objectives": "Objectives",
+    "kappa_tasks": "Kappa Tasks",
+    "getting_started": "Getting Started",
+    "progress": "Progress",
+    "blocked": "Blocked",
+    "optional": "Optional",
+    "lv": "Lv",
+    "kappa_lightkeeper": "Kappa & Lightkeeper",
+    "list": "List",
+    "traders": "Traders",
+    "clear_focus": "Clear focus",
+    "lvl_level": "Lvl {level}",
+    "impact": "Impact",
+    "appearance": "Appearance",
+    "requires": "Requires",
+    "view_on_wiki": "View on Wiki",
+    "item": "Item",
+    "reset_failed": "Reset Failed",
+    "was_status": "was {status}",
+    "fail": "Fail",
+    "accept": "Accept",
+    "ready_to_hand_over": "Ready to hand over",
+    "objective": "Objective",
+    "maxed": "Maxed",
+    "found_in_raid_required": "Found in Raid required",
+    "fir": "FIR",
+    "priority": "Priority",
+    "team": "Team",
+    "show": "Show",
+    "hide": "Hide",
+    "login": "Login",
+    "overview": "Overview",
+    "api_documentation": "API documentation",
+    "tarkov_changes": "Tarkov Changes",
+    "extract_and_launch": "Extract and launch",
+    "api": "API",
+    "game_settings": "Game Settings",
+    "custom_scale": "Custom Scale",
+    "self_contained": "Self Contained",
+    "progress_track": "Progress Track",
+    "account": "Account",
+    "preferences": "Preferences",
+    "game_edition": "Game Edition",
+    "reset_pvp_data": "Reset PvP Data",
+    "reset_pve_data": "Reset PvE Data",
+    "reset_all_data": "Reset All Data",
+    "import_failed": "Import Failed",
+    "delete_archived_run": "Delete Archived Run",
+    "validation_error": "Validation Error"
   },
   "page_help": {
     "button": "Help",
@@ -275,9 +359,6 @@
             "one": "On the tasks page, mark the quests you currently have available in-game for each trader. That backfills prerequisite chains much faster than manually completing old tasks one by one.",
             "two": "When something looks wrong, use the task card menu to report a data issue instead of forcing your tracker into a bad state.",
             "three": "After this pass, use the app-bar help button on any supported page to reopen the page guide or this onboarding flow."
-          },
-          "actions": {
-            "open": "Open tasks"
           }
         }
       }
@@ -307,7 +388,6 @@
         }
       },
       "actions": {
-        "tasks": "Open tasks",
         "needed_items": "Open needed items"
       }
     },
@@ -336,8 +416,7 @@
         }
       },
       "actions": {
-        "needed_items": "Task items",
-        "hideout": "Open hideout"
+        "needed_items": "Task items"
       }
     },
     "needed_items": {
@@ -363,10 +442,6 @@
           "bullet_one": "If an item disappears unexpectedly, a drawer filter is usually the reason.",
           "bullet_two": "Sorting by priority is best when you want the highest-impact items first."
         }
-      },
-      "actions": {
-        "tasks": "Open tasks",
-        "hideout": "Open hideout"
       }
     },
     "hideout": {
@@ -394,26 +469,19 @@
         }
       },
       "actions": {
-        "needed_items": "Hideout items",
-        "tasks": "Open tasks"
+        "needed_items": "Hideout items"
       }
     }
   },
   "maps": {
-    "zoom_speed": "Zoom speed",
-    "pan_speed": "Pan speed",
-    "zone_opacity": "Zone opacity",
     "tooltip_density": "Tooltips",
-    "tooltip_density_default": "Default",
-    "tooltip_density_compact": "Compact",
     "map_settings": "Map settings",
     "not_available_title": "Map Not Available",
     "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
     "placeholder": "this location",
     "floors": "Floors",
     "factions": {
-      "pmc": "PMC",
-      "scav": "Scav"
+      "pmc": "PMC"
     },
     "layers": {
       "pmc_spawns": "PMC Spawns"
@@ -421,9 +489,6 @@
     "legend": {
       "your_objectives": "Your Objectives",
       "team_objectives": "Team Objectives",
-      "pmc_spawn": "PMC Spawn",
-      "pmc_extract": "PMC Extract",
-      "scav_extract": "Scav Extract",
       "shared_extract": "Shared Extract (Either Faction)",
       "coop_extract": "Co-op Extract (PMC + Scav)"
     },
@@ -438,9 +503,6 @@
       }
     },
     "aria": {
-      "zoom_speed": "Zoom speed",
-      "pan_speed": "Pan speed",
-      "zone_opacity": "Zone opacity",
       "tooltip_density": "Tooltip density"
     },
     "tooltip": {
@@ -448,14 +510,10 @@
       "go_to_in_task_list": "Go to objective in task list",
       "complete": "Complete objective",
       "uncomplete": "Uncomplete objective",
-      "objective_unavailable": "Objective unavailable.",
-      "task_fallback": "Task"
+      "objective_unavailable": "Objective unavailable."
     }
   },
   "page": {
-    "index": {
-      "title": "Dashboard"
-    },
     "dashboard": {
       "changelog": {
         "title": "What's new",
@@ -463,7 +521,6 @@
         "hide": "Hide updates",
         "loading": "Loading updates...",
         "error": "Unable to load updates.",
-        "retry": "Retry",
         "empty": "No updates yet.",
         "view_all": "View all"
       },
@@ -550,8 +607,6 @@
           "level_one": "Reach level {required} (1 more level to go).",
           "level_other": "Reach level {required} ({count} more levels to go).",
           "prerequisite": "Complete {tasks}.",
-          "fence_positive": "Meet the Fence reputation requirement ({required}).",
-          "fence_negative": "Meet the Fence reputation requirement ({required}).",
           "trader_unlock": "Complete {task} to unlock {trader}.",
           "complete": "No blockers. Nothing visible is left undone."
         },
@@ -567,12 +622,8 @@
       },
       "progress": {
         "title": "Progress Breakdown",
-        "tasks": "Tasks",
-        "objectives": "Objectives",
         "items": "Task Items",
         "hideout_items": "Hideout Items",
-        "kappa": "Kappa Tasks",
-        "lightkeeper": "Lightkeeper",
         "filtered_status_active": "Filtered by task settings",
         "filtered_status_inactive": "Using all task types",
         "filtered_warning_tooltip": "These stats follow your task filter settings (Kappa, Lightkeeper, and non-special tasks)."
@@ -583,15 +634,12 @@
       },
       "milestones": {
         "title": "Milestones",
-        "starter": "Getting Started",
         "halfway": "Halfway There",
         "veteran": "Almost Done",
         "kappa": {
-          "title": "Kappa",
           "subtitle": "Container Earned"
         },
         "lightkeeper": {
-          "title": "Lightkeeper",
           "subtitle": "Trader Unlocked"
         }
       },
@@ -609,15 +657,7 @@
         "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
-          "direction_aria_label": "Toggle sort direction",
-          "default": "Default",
-          "progress": "Progress",
-          "level": "Level"
-        }
-      },
-      "stats": {
-        "failed": {
-          "stat": "Failed"
+          "direction_aria_label": "Toggle sort direction"
         }
       }
     },
@@ -627,7 +667,6 @@
       "back": "Back to Dashboard",
       "loading": "Loading changelog...",
       "error": "Unable to load changelog.",
-      "retry": "Try again",
       "empty": "No changelog entries yet.",
       "load_more": "Load more",
       "types": {
@@ -639,26 +678,20 @@
       }
     },
     "storyline": {
-      "title": "Storyline",
       "subtitle": "Track your progress through Tarkov story chapters.",
       "chapters_complete": "chapters complete",
       "wip_title": "Work in Progress",
       "wip_badge": "WIP",
       "wip_description": "This feature is still being built out. Content and functionality will be expanded and refined over time as we continue organizing the data. Thanks for your patience!",
       "no_data": "No storyline chapter data available.",
-      "mark_complete": "Mark complete",
       "mark_incomplete": "Mark incomplete",
-      "completed": "Completed",
       "endings": "Endings",
       "route_choice": "Route choice",
-      "route_available": "Available",
       "route_chosen": "Route selected",
-      "route_blocked": "Blocked",
       "route_blocks": "Blocks: {objectives}",
       "route_blocked_by": "Blocked by: {objectives}",
       "route_decision": "Decision {index}",
       "route_choose_one": "Choose one",
-      "route_optional": "Optional",
       "route_required_steps": "Required steps",
       "route_optional_steps": "Optional steps",
       "route_selected_hint": "This route is active.",
@@ -673,41 +706,24 @@
     "kappa": {
       "title": "Kappa & Lightkeeper Tracker",
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
-      "tabs": {
-        "kappa": "Kappa",
-        "lightkeeper": "Lightkeeper"
-      },
-      "stats": {
-        "available": "Available",
-        "locked": "Locked",
-        "failed": "Failed"
-      },
       "row": {
-        "level_prefix": "Lv",
         "level_met_aria": "Required level {required}, you are level {current}",
         "level_unmet_aria": "Requires level {required}, you are level {current}",
         "level_title": "Required level {required} (you are {current})",
         "level_summary": "Lv {required} (you {current})",
         "trader_level": "{trader} Lv{level}",
-        "status_complete": "Complete",
-        "status_failed": "Failed",
-        "status_locked": "Locked",
-        "status_available": "Available",
-        "action_complete": "Mark complete",
         "action_uncomplete": "Mark uncomplete",
         "action_reset_failed": "Reset failed",
         "locked_by": "Requires: {task}"
       },
       "empty": "No tasks for this list yet.",
       "summary": {
-        "progress": "Progress",
         "complete": "complete",
         "final_goal": "Final Kappa Goal"
       },
       "trader_selector": {
         "label": "Select Trader"
       },
-      "appbar_title": "Kappa & Lightkeeper",
       "trader": {
         "other": "Other"
       }
@@ -790,25 +806,15 @@
       "billing_yearly_interval": "year"
     },
     "tasks": {
-      "title": "Tasks",
       "primary_views": {
-        "list": "List",
-        "maps": "Maps",
-        "traders": "Traders",
         "graph": "Graph"
       },
       "graph": {
         "focus_mode_active": "Showing dependency chain for {taskName}",
         "isolate_chain": "Isolate chain",
         "show_context": "Show context",
-        "clear_focus": "Clear focus",
         "no_tasks": "No tasks found for this trader.",
         "mobile_unavailable": "Graph view is best experienced on a wider screen.",
-        "node_level": "Lvl {level}",
-        "completed": "Completed",
-        "available": "Available",
-        "locked": "Locked",
-        "failed": "Failed",
         "legend": "Legend",
         "flow_start": "Start (no prereqs)",
         "flow_end": "End (no follow-ups)",
@@ -820,25 +826,15 @@
         "alpha_notice": "Graph view is in alpha. Layout and features may change frequently as we improve it.",
         "resize_handle": "Resize graph height"
       },
-      "secondary_views": {
-        "all": "All",
-        "available": "Available",
-        "completed": "Completed",
-        "locked": "Locked",
-        "failed": "Failed"
-      },
       "user_views": {
-        "all": "All",
         "yourself": "Yourself"
       },
       "search": {
         "placeholder": "Search...",
-        "aria_label": "Search tasks",
-        "clear": "Clear search"
+        "aria_label": "Search tasks"
       },
       "sort": {
         "none": "Default order",
-        "impact": "Impact",
         "alphabetical": "Alphabetical",
         "level": "Level Required",
         "trader": "Trader Order",
@@ -848,14 +844,10 @@
         "descending": "Descending",
         "aria_label": "Sort tasks"
       },
-      "filters": {
-        "close": "Close"
-      },
       "settings": {
         "title": "Task Settings",
         "tabs": {
           "filters": "Task Filters",
-          "appearance": "Appearance",
           "filter_bar": "Filter Bar",
           "advanced": "Advanced"
         },
@@ -898,8 +890,7 @@
           "repair_failed_confirm": "Repair failed tasks by clearing failed flags that are not supported by current fail conditions?",
           "repair_failed_done": "Cleared failed status for {count} tasks.",
           "repair_failed_error": "Failed to repair tasks",
-          "repair_failed_action": "Repair",
-          "repair_failed_cancel": "Cancel"
+          "repair_failed_action": "Repair"
         }
       },
       "no_tasks_found": "No tasks found. Try changing your filters or updating your level.",
@@ -925,7 +916,6 @@
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",
       "focused_task_description": "Opened from a task link so you can see exactly where to continue.",
-      "clear_focused_task": "Clear focus",
       "global_tasks_section": "Global Tasks",
       "questcard": {
         "pin_task": "Pin task",
@@ -938,33 +928,22 @@
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "Wiki page",
         "locked_before": "Tasks Before: {count}",
-        "requires": "Requires",
         "unlocks_next": "Unlocks next",
-        "impact": "Impact",
-        "more": "More",
         "copy_task_link": "Copy Task Link",
         "copy_key_name": "Copy Key Name",
         "report_data_issue": "Report Data Issue",
         "tarkov_dev_logo": "Tarkov.dev logo",
-        "view_on_tarkov_dev": "View on Tarkov.dev",
-        "view_on_wiki": "View on Wiki",
         "view_task_on_wiki": "View {name} on Wiki",
         "hand_over": "Hand over",
         "hand_over_fir": "Hand over found in raid",
         "decrease": "Decrease",
         "increase": "Increase",
-        "complete": "Complete",
-        "mark_complete": "Mark complete",
         "uncomplete": "Uncomplete",
-        "completed": "Completed",
         "not_completed": "Not completed",
         "of": "of",
-        "item": "Item",
         "mark_failed": "Mark Failed",
-        "complete_button": "Complete",
         "available_button": "Mark Available",
         "uncomplete_button": "Mark Uncompleted",
-        "reset_failed": "Reset Failed",
         "reset_item_counts": "Reset item counts",
         "reset_item_counts_disabled_complete": "Uncomplete this task to reset item counts",
         "reset_item_counts_disabled_failed": "Mark this task as available to reset item counts",
@@ -982,11 +961,9 @@
         "mark_failed_confirm": "Mark this task as failed? This is only for data issues, isn't recommended, and may block task chains.",
         "reset_item_counts_confirm": "Reset all item counts for this task?",
         "failed_because": "Failed because",
-        "failed_because_was": "was {status}",
         "failed_because_status_tooltip": "Auto-failed when \"{name}\" was {status}",
         "failed_because_unknown": "Failed manually or data missing",
         "blocked_because": "Blocked because",
-        "blocked_because_was": "was {status}",
         "blocked_because_status_tooltip": "Permanently blocked — \"{name}\" was {status}",
         "blocked_because_unknown": "Blocked by prerequisites",
         "keys_disclaimer_tooltip": "Based on API data and not always 100% required. Doors may already be unlocked. Verify in-game or on the wiki before buying keys.",
@@ -997,28 +974,20 @@
         "copy_equipment_name": "Copy Equipment Name",
         "requirement_status_active": "active/accepted",
         "requirement_status_available": "available",
-        "requirement_status_completed": "completed",
-        "requirement_status_failed": "failed",
         "requirement_status_not_started": "not started",
         "requires_must_be": "must be {status}",
         "requires_currently": "currently {status}",
-        "requires_action_complete": "Complete",
-        "requires_action_fail": "Fail",
-        "requires_action_accept": "Accept",
         "requires_tooltip_action": "{action} \"{name}\" to unlock this task",
         "requires_tooltip_conflict": "\"{name}\" is {current} but needs {expected} — this task may be permanently locked",
         "requires_progress": "{completed} of {total} prerequisites completed",
         "requires_progress_tooltip": "Next: {tasks}",
         "requires_progress_tooltip_overflow": "Next: {tasks}, and {count} more",
-        "objective_optional_badge": "Optional",
-        "ready_to_hand_over": "Ready to hand over",
         "objectives_hidden": "{count} objectives not on this map ({uncompleted} uncompleted)",
         "needed_by": "Needed by: {names}",
         "unlocks_next_tooltip": "Number of tasks that become available after completing this task",
         "impact_tooltip": "Number of incomplete tasks that depend on this task being completed",
         "reward_items": "Items:",
         "unlocks_purchase": "Unlocks purchase:",
-        "blocked": "Blocked",
         "blocked_tooltip": "This task is permanently blocked and can never be completed due to choices made in other tasks",
         "edition_exclusive_tooltip": "This task is only available to players with {editions} edition",
         "any_map": "Any",
@@ -1026,7 +995,6 @@
         "jump_to_map": "Jump To Map",
         "any_location_tooltip": "Quest can be completed on any map",
         "click_to_edit": "Click to edit",
-        "fail_button": "Fail",
         "find": "Find",
         "find_and_hand_over": "Find and Hand over",
         "find_and_hand_over_fir": "Find and Hand over found in raid",
@@ -1039,18 +1007,14 @@
         "alternatives_badge": "{count} alt",
         "location_tooltip": "Quest objectives are on {map}",
         "next_tasks": "Next Task(s):",
-        "objective": "Objective",
-        "objectives": "Objectives",
         "open_item_on_tarkov_dev": "Open {name} on tarkov.dev",
         "previous_tasks": "Previous Task(s):",
         "progress": "Progress {completed}/{total}",
         "rewards": "Rewards",
-        "task": "Task",
         "unlocks_count": "{count} unlocks"
       }
     },
     "hideout": {
-      "title": "Hideout",
       "summary": "Track station upgrades, blockers, and what is ready to build next.",
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
@@ -1066,14 +1030,7 @@
         "trader_loyalty": "Require trader loyalty",
         "confirm_title": "Enable availability requirement?",
         "confirm_description": "Enabling {requirement} may remove hideout upgrades that no longer meet prerequisites.",
-        "confirm_cancel": "Cancel",
         "confirm_confirm": "Enable"
-      },
-      "primary_views": {
-        "all": "All",
-        "locked": "Locked",
-        "available": "Available",
-        "maxed": "Maxed"
       },
       "stationcard": {
         "level": "Available to build | Level {count} | Level {count}",
@@ -1094,30 +1051,21 @@
         "status_upgraded": "Upgraded {name} to level {level}",
         "status_downgraded": "Downgraded {name} from level {level}",
         "requirement": {
-          "found_in_raid": "Found in Raid required",
           "mark_complete": "Mark Complete ({count})",
           "mark_incomplete": "Mark Incomplete",
-          "set_custom_amount": "Set Custom Amount:",
-          "apply": "Apply",
-          "view_tarkov_dev": "View on Tarkov.dev",
-          "view_wiki": "View on Wiki"
+          "set_custom_amount": "Set Custom Amount:"
         }
       }
     },
     "needed_items": {
-      "title": "Needed Items",
       "meta_description": "View all items needed for your active quests and hideout upgrades. Filter by quest, craft, and find-in-raid requirements.",
       "loading": "Loading task and hideout data",
       "search_placeholder": "Search items, tasks, or hideout stations...",
-      "clear_search": "Clear search",
       "items": "items",
       "empty": "No items match your search.",
       "error": "Unable to load needed items.",
-      "retry": "Try again",
       "filters": {
-        "all": "All",
         "label": "Filters",
-        "fir": "FIR",
         "non_fir": "NON-FIR",
         "hide_owned": "HIDE OWNED",
         "hide_non_fir_special_equipment_title": "Hide non-FIR special equipment (e.g., MS2000 Markers, Wi-Fi Cameras)",
@@ -1128,7 +1076,6 @@
       },
       "sort": {
         "label": "Sort",
-        "priority": "Priority",
         "name": "Name",
         "category": "Category",
         "count": "Count"
@@ -1144,7 +1091,6 @@
       }
     },
     "settings": {
-      "title": "Settings",
       "card": {
         "apitokens": {
           "title": "API Tokens",
@@ -1190,15 +1136,13 @@
             "gamemode_title": "Game mode",
             "permissions_title": "Permissions",
             "note_label": "Label or note",
-            "note_placeholder": "e.g. streamer overlay, clan bot, personal app",
-            "cancel": "Cancel"
+            "note_placeholder": "e.g. streamer overlay, clan bot, personal app"
           }
         }
       }
     },
     "team": {
       "meta": {
-        "title": "Team",
         "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
       },
       "card": {
@@ -1215,9 +1159,7 @@
         },
         "teamoptions": {
           "title": "Team Integration Options",
-          "section_tasks": "Tasks",
           "section_items": "Items",
-          "section_maps": "Maps",
           "toggle_tasks": "Hide team members' tasks",
           "toggle_items": "Hide team members' needed items",
           "toggle_non_fir": "Hide non-FIR needed items",
@@ -1236,8 +1178,6 @@
           "leave_team_error": "Failed to leave your team.",
           "no_team": "You are not currently in a team.",
           "team_invite_url_label": "Team Invite URL",
-          "show_link": "Show",
-          "hide_link": "Hide",
           "copy_link": "Copy",
           "link_hidden_message": "Click 'Show' to reveal your team invite link",
           "user_not_authenticated": "User not authenticated.",
@@ -1245,13 +1185,11 @@
         },
         "teaminvite": {
           "description": "You have received an invite to a TarkovTracker team",
-          "accept": "Accept",
           "decline": "Decline"
         }
       }
     },
     "credits": {
-      "title": "Credits",
       "sections": {
         "original_creator": "Original creator of the project:",
         "staff": "TarkovTracker.org Staff:",
@@ -1262,7 +1200,6 @@
       "labels": {
         "creators": "Creators",
         "staff": "Core Team",
-        "support": "Support",
         "testers": "Beta Testers",
         "contributors": "Contributors"
       },
@@ -1273,20 +1210,16 @@
       "contributors": {
         "loading": "Loading contributors...",
         "error": "Unable to load contributors right now.",
-        "retry": "Retry",
         "empty": "No contributors found yet.",
         "contributions": "{count} contributions"
       }
     },
     "login": {
-      "title": "Login",
       "subtitle": "Sign in to access your account",
       "continue_twitch": "Continue with Twitch",
       "continue_discord": "Continue with Discord",
       "continue_google": "Continue with Google",
       "continue_github": "Continue with GitHub",
-      "privacy_policy": "Privacy Policy",
-      "terms_of_service": "Terms of Service",
       "popup_blocked_title": "Popup Blocked",
       "popup_blocked_description": "Your browser blocked the sign-in window. Redirecting you now...",
       "authenticating": "Authenticating...",
@@ -1296,7 +1229,6 @@
       "success_title": "Signed in",
       "success_description": "Signed in with {provider}.",
       "login_options": "Login options",
-      "meta_title": "Login",
       "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
@@ -1319,10 +1251,6 @@
       "mode_toggle_label": "Select profile mode",
       "copy_snapshot": "Copy Snapshot",
       "view_tasks": "Open Tasks",
-      "tab_overview": "Overview",
-      "tab_tasks": "Tasks",
-      "tab_hideout": "Hideout",
-      "tab_storyline": "Storyline",
       "story_no_tasks": "Waiting for task metadata to build your story.",
       "story_start": "{mode} profile is just getting started.",
       "story_complete": "Main task storyline completed.",
@@ -1343,22 +1271,13 @@
       "no_storyline": "No storyline data available for this profile.",
       "storyline_auto_start": "Auto-start",
       "storyline_discovered": "Discovered",
-      "storyline_requires": "Requires",
       "storyline_objectives_main": "Main Objectives",
       "storyline_objectives_optional": "Optional Objectives",
-      "view_tarkov_dev": "View on Tarkov.dev",
       "no_hideout": "No hideout data available for this profile.",
-      "hideout_level": "Level",
-      "hideout_fallback": "Hideout",
       "hideout_item_fallback": "Hideout item",
       "hideout_module_fallback": "Hideout upgrade",
       "level_prefix": "Lv.",
       "no_tasks": "No tasks available for this profile.",
-      "task_fallback": "Task",
-      "section_available": "Available",
-      "section_locked": "Locked",
-      "section_completed": "Completed",
-      "objective_fallback": "Objective",
       "no_objectives": "No objectives",
       "activity_timeline": "Activity Timeline",
       "timeline_subtitle": "Recent progress events from timestamps",
@@ -1398,35 +1317,25 @@
       "kappa_remaining": "{count} remaining"
     },
     "not_found": {
-      "title": "Page Not Found",
       "not_found_description": "Sorry, that page could not be found!"
     },
     "terms_of_service": {
-      "title": "Terms of Service",
       "table_of_contents": "Table of contents",
       "index_button": "Index"
-    },
-    "privacy": {
-      "title": "Privacy Policy"
     },
     "resources": {
       "title": "Resources & Guides",
       "subtitle": "Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.",
       "search_placeholder": "Search tools and guides...",
-      "clear_search": "Clear search",
       "clear_filters": "Clear filters",
       "no_results": "No resources match your search.",
       "results_count": "{count} resources found",
       "results_count_one": "1 resource found",
       "filter_label": "Filter resources by category",
-      "more": "More",
       "more_actions": "More actions",
       "suggest_title": "Know a useful Tarkov resource?",
       "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
       "suggest_cta": "Suggest a resource",
-      "filters": {
-        "all": "All"
-      },
       "categories": {
         "companion_apps": "Companion Apps",
         "data_and_apis": "Data & Developer Tools",
@@ -1440,7 +1349,6 @@
       "actions": {
         "setup_guide": "Setup guide",
         "read_guide": "Read guide",
-        "api_documentation": "API documentation",
         "open_calculator": "Open calculator",
         "view_changes": "View changes",
         "open_tool": "Open tool",
@@ -1465,12 +1373,9 @@
         "project_website": "Project website",
         "github": "View source",
         "discord": "Community support",
-        "api": "API documentation",
         "download": "Download"
       },
       "guide_sections": {
-        "overview": "Overview",
-        "setup": "Getting Started",
         "troubleshooting": "Troubleshooting",
         "tips": "Tips & Tricks",
         "faq": "Common Questions"
@@ -1518,7 +1423,6 @@
           "compatibility": "Keep TarkovMonitor running while you play so it can watch new game log entries. It does not read game memory.",
           "step_1_title": "Download TarkovMonitor",
           "step_1_desc": "Download the latest Windows release ZIP from the official GitHub Releases page.",
-          "step_2_title": "Extract and launch",
           "step_2_desc": "Extract the archive to a permanent folder, then run TarkovMonitor.exe. Do not run it directly from inside the ZIP file.",
           "step_3_title": "Connect your TarkovTracker account",
           "step_3_desc": "In TarkovMonitor settings, open the TarkovTracker integration section. Create a read-write API token in TarkovTracker Settings, then paste it into TarkovMonitor.",
@@ -1544,7 +1448,6 @@
           "compatibility": "Use borderless or windowed mode. Exclusive fullscreen may prevent the overlay from appearing.",
           "step_1_title": "Download the latest ZIP",
           "step_1_desc": "Download RatScanner.zip from the official GitHub Releases page. The project website may lag behind the latest release.",
-          "step_2_title": "Extract and launch",
           "step_2_desc": "Extract the ZIP to a permanent folder, then run RatScanner.exe. Do not launch it directly from inside the archive.",
           "step_3_title": "Configure the overlay",
           "step_3_desc": "Choose which item details appear in the overlay, set opacity, and confirm your scan hotkeys.",
@@ -1588,10 +1491,6 @@
       "discord": "Discord",
       "github": "GitHub"
     },
-    "support_button": "Support",
-    "terms_of_service": "Terms of Service",
-    "privacy_policy": "Privacy Policy",
-    "credits": "Credits",
     "analytics_preferences": "Analytics Preferences",
     "game_attribution": "Escape from Tarkov and related game content and materials are trademarks and copyrighted works of Battlestate Games Limited and its licensors. All rights reserved. TarkovTracker is an unofficial fan project and is not affiliated with or endorsed by Battlestate Games."
   },
@@ -1600,34 +1499,18 @@
     "close_menu": "Close menu",
     "toggle": "Toggle Menu Drawer",
     "brand_name": "TarkovTracker.org",
-    "home": "Dashboard",
-    "api": "API",
     "login": "Log In",
     "logout": "Log Out",
-    "level": "Level",
-    "team": "Team",
-    "storyline": "Storyline",
-    "tasks": "Tasks",
-    "hideout": "Hideout",
-    "needed_items": "Needed Items",
-    "supporter": "Support",
-    "tarkovdev": "Tarkov.dev",
     "ratscanner": "Rat Scanner",
     "tarkovguru": "Tarkov Guru",
-    "tarkovchanges": "Tarkov Changes",
     "tarkovmonitor": "Tarkov Monitor",
-    "credits": "Credits",
     "resources": "Resources",
-    "settings": "Settings",
     "profile": "Profile",
-    "kappa": "Kappa & Lightkeeper",
     "section_navigation": "Navigation",
-    "section_game_settings": "Game Settings",
     "section_external": "External Tools",
     "account_menu": "Account menu",
     "edition_label": "Edition",
     "mode_auto": "Auto",
-    "mode_manual": "Manual",
     "auto_level_enabled": "Automatic level calculation is enabled",
     "level_display_auto": "Level {level} (automatic calculation enabled)",
     "level_display_editable": "Level {level}, click or press Enter to edit",
@@ -1640,7 +1523,6 @@
     "title_with_mode": "{name} Profile {mode}"
   },
   "streamer_tools": {
-    "title": "Streamer Tools",
     "subtitle": "Generate browser-source links for OBS, Streamlabs Desktop, XSplit, and vMix to show live Kappa progress.",
     "manage_sharing": "Manage Sharing",
     "login_required": "Log in to generate personalized streamer overlay links.",
@@ -1649,11 +1531,8 @@
     "content_title": "Content",
     "mode_label": "Game Mode",
     "metric_label": "Widget",
-    "mode_pvp": "PvP",
-    "mode_pve": "PvE",
     "platform_obs": "OBS Studio / Streamlabs Desktop",
     "platform_xsplit": "XSplit / vMix",
-    "appearance_title": "Appearance",
     "customize_options": "Customize overlay options",
     "reset_defaults": "Reset Defaults",
     "layout_label": "Layout",
@@ -1706,7 +1585,6 @@
     "interval_300s": "Every 5 minutes",
     "interval_600s": "Every 10 minutes",
     "metric_tasks_desc": "Completed and remaining Kappa-required tasks.",
-    "metric_tasks": "Kappa Tasks",
     "metric_items_desc": "Collected and remaining Kappa task items.",
     "metric_items": "Kappa Items",
     "metric_summary_desc": "Tasks and items in one overlay widget.",
@@ -1738,13 +1616,9 @@
     "resolution_label": "Resolution",
     "resolution_1080": "1080p",
     "resolution_1440": "1440p",
-    "resolution_custom": "Custom Scale",
     "container_label": "Container",
     "container_canvas": "Scene Canvas",
-    "container_self_contained": "Self Contained",
-    "self_contained_hint_label": "Self Contained",
     "self_contained_hint": "Outputs only the widget bounds. Move the browser source in OBS/Streamlabs instead of changing overlay alignment.",
-    "custom_scale": "Custom Scale",
     "custom_scale_percent": "Scale",
     "font_label": "Font",
     "show_title": "Show title",
@@ -1752,27 +1626,18 @@
     "colors_text": "Text",
     "colors_card": "Card",
     "colors_border": "Border",
-    "colors_progress": "Progress Track",
     "text_color": "Text Color",
     "card_color": "Card Color",
     "card_opacity": "Card Opacity",
     "border_color": "Border Color",
     "border_opacity": "Border Opacity",
-    "track_color": "Progress Track",
     "track_opacity": "Track Opacity"
   },
   "settings": {
-    "title": "Settings",
     "locale": "Language",
     "tabs": {
-      "account": "Account",
       "progression": "Progression",
-      "prestige": "Prestige",
-      "preferences": "Preferences",
-      "imports": "Imports",
-      "backup_restore": "Backup & Restore",
-      "api": "API",
-      "streamer_tools": "Streamer Tools"
+      "imports": "Imports"
     },
     "tab_groups": {
       "game": "Game",
@@ -1813,7 +1678,6 @@
       }
     },
     "density": {
-      "compact": "Compact",
       "comfortable": "Comfortable"
     },
     "account": {
@@ -1826,8 +1690,7 @@
     },
     "general": {
       "privacy_mode": "Streamer Mode",
-      "privacy_mode_hint": "Hides sensitive information while you're streaming.",
-      "admin_panel": "Admin Panel"
+      "privacy_mode_hint": "Hides sensitive information while you're streaming."
     },
     "interface": {
       "tasks": {
@@ -1840,7 +1703,6 @@
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "maps": {
-        "title": "Maps",
         "show_extracts": "Show Extracts by Default",
         "zoom_speed": "Zoom Speed",
         "pan_speed": "Pan Speed",
@@ -1848,15 +1710,11 @@
         "colors": {
           "title": "Map Colors",
           "description": "Set marker colors for better readability and accessibility.",
-          "reset": "Reset",
           "self_objective": "Your Objective",
           "team_objective": "Team Objective",
           "selected": "Pinned Objective",
-          "pmc_extract": "PMC Extract",
-          "scav_extract": "Scav Extract",
           "shared_extract": "Shared Extract",
-          "coop_extract": "Co-op Extract",
-          "pmc_spawn": "PMC Spawn"
+          "coop_extract": "Co-op Extract"
         }
       },
       "links": {
@@ -1866,7 +1724,6 @@
       }
     },
     "game_profile": {
-      "game_edition": "Game Edition",
       "game_edition_with_value": "Edition {edition}"
     },
     "profile_sharing": {
@@ -1874,8 +1731,6 @@
       "description": "Control which game mode profiles can be viewed from a shared link.",
       "public": "Public",
       "private": "Private",
-      "mode_pvp": "PvP",
-      "mode_pve": "PvE",
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_pvp_link": "Copy PvP profile link",
@@ -1883,27 +1738,17 @@
       "login_required": "Log in to manage profile sharing visibility."
     },
     "game_settings": {
-      "title": "Game Settings",
-      "pvp": "PvP",
-      "pve": "PvE",
       "switch_mode_failed": "Failed to switch game mode, please retry",
       "switch_mode_fetch_failed": "Game mode switched but failed to refresh data, please retry"
     },
     "data_management": {
-      "reset_pvp_title": "Reset PvP Data",
-      "reset_pvp_data": "Reset PvP Data",
       "reset_pvp_confirmation": "Are you sure you want to reset your PvP progress?",
       "reset_pvp_warning": "This will permanently delete all your PvP progress, including tasks, hideout, and level. Your PvE data will not be affected.",
-      "reset_pve_title": "Reset PvE Data",
-      "reset_pve_data": "Reset PvE Data",
       "reset_pve_confirmation": "Are you sure you want to reset your PvE progress?",
       "reset_pve_warning": "This will permanently delete all your PvE progress, including tasks, hideout, and level. Your PvP data will not be affected.",
-      "reset_all_title": "Reset All Data",
-      "reset_all_data": "Reset All Data",
       "reset_all_confirmation": "Are you sure you want to reset ALL your progress?",
       "reset_all_warning": "This will permanently delete ALL your progress for PvP and PvE modes. This action cannot be undone!",
       "prestige_pvp_warning": "Your current PvP run will be archived, then PvP progression will reset for the next prestige level. PvE data is not affected.",
-      "reset_cancel": "Cancel",
       "reset_confirm": "Reset Data",
       "export_description": "Download a backup of your progress data for both PvP and PvE modes.",
       "export_button": "Export Progress Backup",
@@ -1921,13 +1766,11 @@
       "tarkov_dev_section_description": "Import profile metadata including level, faction, and skills",
       "eft_logs_section_title": "EFT Game Logs Import",
       "eft_logs_section_description": "Import quest progress detected from your game log files",
-      "backup_restore_section_title": "Backup & Restore",
       "backup_restore_section_description": "Export a backup or restore from a previously exported file",
       "debug_section_title": "Debug Snapshot",
       "import_backup_title": "Restore from Backup",
       "import_backup_description": "Restore progress from a TarkovTracker backup file",
       "import_preview_exported_at": "Exported",
-      "import_preview_game_edition": "Game Edition",
       "import_preview_pvp_level": "PvP Level",
       "import_preview_pvp_tasks": "PvP Tasks",
       "import_preview_pve_level": "PvE Level",
@@ -1936,11 +1779,8 @@
       "import_target_pvp": "PvP Only",
       "import_target_pve": "PvE Only",
       "import_target_both": "Both PvP & PvE",
-      "import_confirm": "Confirm Import",
-      "import_cancel": "Cancel",
       "import_success_title": "Backup Imported",
       "import_success_description": "Your progress data has been restored successfully.",
-      "import_error_title": "Import Failed",
       "export_error_title": "Export Failed",
       "debug_export_error_title": "Debug Export Failed",
       "reset_title": "Reset Progress",
@@ -1951,14 +1791,12 @@
       "prestige_history_select": "Select Run",
       "prestige_history_option": "P{from} → P{to} • {when}",
       "prestige_history_unknown_date": "Unknown date",
-      "prestige_history_level": "Level",
       "prestige_history_completed_tasks": "Completed Tasks",
       "prestige_history_failed_tasks": "Failed Tasks",
       "prestige_history_completed_objectives": "Completed Objectives",
       "prestige_history_completed_hideout_modules": "Hideout Modules",
       "prestige_history_completed_story_chapters": "Story Chapters",
       "prestige_history_duration": "Run Duration",
-      "prestige_history_unknown_duration": "Unknown",
       "prestige_history_days_value": "{days} days",
       "prestige_history_compare_title": "Comparison vs Previous Run",
       "prestige_history_compare_subtitle": "Current prestige {from} compared to prestige {to}"
@@ -1967,9 +1805,6 @@
       "success_title": "PvP Prestige Complete",
       "success_description": "Your PvP profile has been prestiged to level {level}.",
       "error_description": "Failed to prestige PvP profile. Please try again."
-    },
-    "reset": {
-      "error_title": "Reset Failed"
     },
     "reset_pvp": {
       "success_title": "PvP Data Reset",
@@ -1995,11 +1830,8 @@
       "auth_methods_label": "Auth Methods",
       "member_since_label": "Member since",
       "account_id_label": "Account ID",
-      "unknown_label": "Unknown",
       "account_deletion_title": "Account Deletion",
       "login_required_delete": "Log in to delete your account",
-      "action_show": "Show",
-      "action_hide": "Hide",
       "show_username": "Show username",
       "hide_username": "Hide username",
       "show_email": "Show email",
@@ -2052,7 +1884,6 @@
       "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
     },
     "prestige": {
-      "title": "Prestige",
       "pvp_only_title": "Prestige Is PvP Only",
       "pvp_only": "Escape from Tarkov prestige currently exists only for PvP profiles. Switch your active tracker mode to PvP to manage prestige and archived runs.",
       "current_level": "Current Prestige Level",
@@ -2076,10 +1907,8 @@
       "archive_soft_gate_manual": "{count} requirement(s) must still be checked manually in-game.",
       "archived_runs_description": "Only real tracker-archived PvP runs appear here. Setting your current prestige later does not create history entries.",
       "delete_history_cta": "Delete Selected Run",
-      "delete_history_dialog_title": "Delete Archived Run",
       "delete_history_warning": "This only removes the archived history entry. It does not restore or reset your current PvP progress.",
       "delete_history_selected_label": "Selected run",
-      "delete_history_confirm": "Delete Archived Run",
       "delete_history_success_title": "Archived Run Deleted",
       "delete_history_success_description": "The selected prestige history entry was removed.",
       "delete_history_error_description": "Failed to delete the archived prestige run. Please try again.",
@@ -2093,7 +1922,6 @@
       },
       "requirement_source_tooltip": "Source: {source}",
       "requirement_state": {
-        "complete": "Complete",
         "incomplete": "Incomplete",
         "manual": "Manual Check"
       },
@@ -2113,7 +1941,6 @@
       "label": "Display Name",
       "placeholder": "Enter your display name...",
       "save": "Save",
-      "validation_error": "Validation Error",
       "empty_error": "Display name cannot be empty",
       "max_error": "Display name cannot exceed {max} characters",
       "saved_title": "Display Name Saved",
@@ -2129,16 +1956,12 @@
       "show_less": "Show less",
       "quest": "Quest:",
       "offset": "Offset:",
-      "reset": "Reset",
       "req_count": "Req:",
       "reward_count": "Reward:",
-      "validation_error": "Validation Error",
       "limit_exceeded": "Limit Exceeded",
       "max_level": "Maximum skill level is 51.",
-      "level": "Level",
       "valid_range": "Valid range: 0-51",
       "sort": {
-        "priority": "Priority",
         "ingame": "In-Game"
       }
     },
@@ -2150,7 +1973,6 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
-      "reset": "Reset",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2165,7 +1987,6 @@
       "current_level": "Current Level",
       "set_total_xp": "Set Total XP",
       "manual_hint": "Enter your actual total XP to adjust the offset automatically.",
-      "apply": "Apply",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} to next",
       "reset_offset": "Reset XP Offset"
@@ -2217,9 +2038,6 @@
       "mode_summary_pvp": "PvP (auto)",
       "mode_summary_pve": "PvE (auto)",
       "mode_summary_both": "PvP + PvE (auto)",
-      "mode_summary_unknown": "Unknown",
-      "confirm": "Confirm Import",
-      "cancel": "Cancel",
       "success_title": "EFT Logs Imported",
       "success_description": "Marked {complete_count} tasks completed and {active_count} tasks active from game logs.",
       "error_title": "EFT Logs Import Failed",
@@ -2252,30 +2070,21 @@
       "fetch_profile": "Fetch Profile",
       "nickname": "Nickname",
       "faction": "Faction",
-      "level": "Level",
-      "prestige": "Prestige",
       "skills_count": "{count} skills detected",
       "skills_details_toggle": "View skill values",
       "skills_details_skill": "Skill",
-      "skills_details_value": "Level",
       "edition_guess": "Edition (detected)",
       "import_to_mode": "Import to Mode",
       "import_target_notice": "This data will be imported into your {mode} profile.",
-      "confirm": "Confirm Import",
-      "cancel": "Cancel",
       "success_title": "Profile Imported",
       "success_description": "Your Tarkov.dev profile has been imported successfully.",
-      "error_title": "Import Failed",
       "linked_uid": "Tarkov UID",
       "refetch_hint": "Open your Tarkov.dev profile first so it refreshes there, then refetch it here.",
       "refetch_mode_label": "Profile to refetch",
-      "refetch_mode_pvp": "PvP",
-      "refetch_mode_pve": "PvE",
       "refetch_mode_arena": "Arena",
       "refetch_mode_arena_unavailable": "Arena imports are coming soon.",
       "refetch_profile": "Refetch Profile",
       "unlink_profile": "Unlink",
-      "view_profile": "View on Tarkov.dev",
       "errors": {
         "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again."
       }
@@ -2283,19 +2092,11 @@
   },
   "hideout": {
     "collapse": "Collapse",
-    "expand": "Expand",
-    "view": {
-      "available": "Available",
-      "all": "All",
-      "maxed": "Maxed",
-      "locked": "Locked"
-    }
+    "expand": "Expand"
   },
   "tasks": {
     "view": {
-      "all": "List",
-      "map": "Map",
-      "traders": "Traders"
+      "map": "Map"
     }
   },
   "quest": {
@@ -2304,35 +2105,21 @@
   "needed_items": {
     "total": "Total:",
     "progress_format": "{current}/{total}",
-    "tasks": "Tasks",
-    "hideout_label": "Hideout",
-    "fir": "FIR",
     "non": "Non",
     "non_fir": "Non-FIR",
-    "fir_required": "Found in Raid required",
     "task_kappa_req": "Required for Kappa",
     "collected_items": "Collected Items",
     "smart_fill": "Smart Fill",
-    "reset": "Reset",
     "unknown_task": "Unknown Task",
     "unknown_station": "Unknown Station",
-    "kappa": "Kappa",
     "lvl": "Lvl",
     "needed": "needed",
     "view_details_for": "View details for {name}",
-    "level_required": "Lvl {level}",
     "locked_before": "{count} before",
-    "filters": {
-      "all": "All",
-      "tasks": "Tasks",
-      "hideout": "Hideout",
-      "completed": "Completed"
-    },
     "switch_to_expanded": "Switch to Expanded view",
     "switch_to_compact": "Switch to Compact view",
     "collected": "Collected",
     "mark_collected": "Mark as collected",
-    "ready_to_hand_over": "Ready to hand over",
     "handed_over": "Handed over",
     "aria": {
       "enter_count": "Enter item count",
@@ -2350,7 +2137,6 @@
       "decrease_hideout_count": "Decrease hideout count for {station_name}",
       "increase_hideout_count": "Increase hideout count for {station_name}"
     },
-    "item": "Item",
     "any_of_items": "Any one of these {count} items counts",
     "any_of_items_short": "Any {count}",
     "view_accepted_items": "View all {count} accepted items",
@@ -2365,14 +2151,11 @@
   },
   "skills": {
     "req": "Req",
-    "lv": "Lv",
     "required_for": "Required for: {items}",
     "required_levels": "Required levels: {items}",
     "elite_level": "ELITE Level"
   },
   "game_settings": {
-    "pvp": "PvP",
-    "pve": "PvE",
     "toggle_game_mode_label": "Toggle game mode",
     "select_faction_label": "Select faction"
   },
@@ -2409,7 +2192,5 @@
     "no_prestige": "No Prestige",
     "prestige_n": "Prestige {n}"
   },
-  "generic": {
-    "close_button": "Close"
-  }
+  "generic": {}
 }

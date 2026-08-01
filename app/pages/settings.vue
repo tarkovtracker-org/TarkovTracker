@@ -19,7 +19,7 @@
             <div class="sticky top-24">
               <nav
                 class="bg-surface-900/85 w-full rounded-xl border border-white/8 p-1.5 shadow-sm"
-                :aria-label="$t('settings.title')"
+                :aria-label="$t('common.settings')"
               >
                 <div
                   v-for="(group, groupIndex) in settingsTabGroups"
@@ -72,7 +72,7 @@
               id="prestige"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.prestige')"
+              :aria-label="$t('common.prestige')"
             >
               <PrestigeCard />
             </section>
@@ -82,7 +82,7 @@
               id="preferences"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.preferences')"
+              :aria-label="$t('common.preferences')"
             >
               <PrivacyCard />
               <TaskDisplayCard />
@@ -98,7 +98,7 @@
               id="account"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.account')"
+              :aria-label="$t('common.account')"
             >
               <ProfileSharingCard />
               <DiscordLinkCard />
@@ -110,7 +110,7 @@
                   class="hover:text-error-400 text-surface-500 flex items-center gap-1.5 text-xs transition-colors"
                 >
                   <UIcon name="i-mdi-shield-crown" class="size-3.5" />
-                  {{ $t('settings.general.admin_panel') }}
+                  {{ $t('common.admin_panel') }}
                 </NuxtLink>
               </div>
             </section>
@@ -130,7 +130,7 @@
               id="backup-restore"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.backup_restore')"
+              :aria-label="$t('common.backup_restore')"
             >
               <DataManagementCard view="backup" :session="dataManagementSession" />
             </section>
@@ -140,7 +140,7 @@
               id="api"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.api')"
+              :aria-label="$t('common.api')"
             >
               <ApiTokensCard />
             </section>
@@ -150,7 +150,7 @@
               id="streamer-tools"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.streamer_tools')"
+              :aria-label="$t('common.streamer_tools')"
             >
               <StreamerToolsPanel />
             </section>
@@ -305,7 +305,7 @@
     },
     {
       value: 'preferences',
-      label: t('settings.tabs.preferences'),
+      label: t('common.preferences'),
       icon: 'i-mdi-tune-variant',
     },
     {
@@ -315,27 +315,27 @@
     },
     {
       value: 'prestige',
-      label: t('settings.tabs.prestige'),
+      label: t('common.prestige'),
       icon: 'i-mdi-medal-outline',
     },
     {
       value: 'account',
-      label: t('settings.tabs.account'),
+      label: t('common.account'),
       icon: 'i-mdi-account-circle-outline',
     },
     {
       value: 'backup-restore',
-      label: t('settings.tabs.backup_restore'),
+      label: t('common.backup_restore'),
       icon: 'i-mdi-backup-restore',
     },
     {
       value: 'api',
-      label: t('settings.tabs.api'),
+      label: t('common.api'),
       icon: 'i-mdi-api',
     },
     {
       value: 'streamer-tools',
-      label: t('settings.tabs.streamer_tools'),
+      label: t('common.streamer_tools'),
       icon: 'i-heroicons-video-camera',
     },
   ]);

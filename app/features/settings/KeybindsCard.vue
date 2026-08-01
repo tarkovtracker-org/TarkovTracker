@@ -40,7 +40,7 @@
                     variant="ghost"
                     size="sm"
                     :aria-label="t('settings.keybinds.reset_aria', 'Reset to default')"
-                    :title="t('settings.keybinds.reset', 'Reset')"
+                    :title="t('common.reset', 'Reset')"
                     @click="resetField(field.id)"
                   />
                 </div>

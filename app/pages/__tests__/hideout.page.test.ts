@@ -212,7 +212,7 @@ describe('hideout page', () => {
         },
       },
     });
-    expect(wrapper.text()).not.toContain('page.needed_items.title');
+    expect(wrapper.text()).not.toContain('common.needed_items');
     expect(wrapper.get('[data-testid="hideout-view-switcher"]').text()).toContain(
       'PAGE.HIDEOUT.PRIMARY_VIEWS.AVAILABLE'
     );

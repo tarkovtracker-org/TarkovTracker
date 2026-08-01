@@ -9,7 +9,7 @@
         type="button"
         class="relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center"
         :aria-label="
-          chapter.complete ? t('page.storyline.mark_incomplete') : t('page.storyline.mark_complete')
+          chapter.complete ? t('page.storyline.mark_incomplete') : t('common.mark_complete')
         "
         @click="emit('toggleChapter', chapter.id)"
       >
@@ -67,7 +67,7 @@
       class="bg-surface-950/20 mb-2 rounded-md border border-white/5 p-2"
     >
       <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
-        {{ t('page.profile.storyline_requires') }}
+        {{ t('common.requires') }}
       </div>
       <ul class="space-y-0.5">
         <li
@@ -202,7 +202,7 @@
                       color="error"
                       size="xs"
                     >
-                      {{ t('page.storyline.route_blocked') }}
+                      {{ t('common.blocked') }}
                     </UBadge>
                   </span>
                   <span
@@ -299,7 +299,7 @@
                     color="warning"
                     size="xs"
                   >
-                    {{ t('page.storyline.route_optional') }}
+                    {{ t('common.optional') }}
                   </UBadge>
                   <span
                     class="text-xs"
@@ -329,7 +329,7 @@
                     color="error"
                     size="xs"
                   >
-                    {{ t('page.storyline.route_blocked') }}
+                    {{ t('common.blocked') }}
                   </UBadge>
                   <UBadge
                     v-else-if="objective.routeAlternatives.length"
@@ -467,7 +467,7 @@
                       color="error"
                       size="xs"
                     >
-                      {{ t('page.storyline.route_blocked') }}
+                      {{ t('common.blocked') }}
                     </UBadge>
                   </span>
                   <span
@@ -557,7 +557,7 @@
               <span class="min-w-0 flex-1">
                 <span class="flex flex-wrap items-center gap-1">
                   <UBadge variant="subtle" color="warning" size="xs">
-                    {{ t('page.storyline.route_optional') }}
+                    {{ t('common.optional') }}
                   </UBadge>
                   <span
                     class="text-xs"
@@ -583,7 +583,7 @@
                     color="error"
                     size="xs"
                   >
-                    {{ t('page.storyline.route_blocked') }}
+                    {{ t('common.blocked') }}
                   </UBadge>
                   <UBadge
                     v-else-if="objective.routeAlternatives.length"
@@ -680,7 +680,7 @@
         :color="chapter.complete ? 'success' : 'neutral'"
         @click="emit('toggleChapter', chapter.id)"
       >
-        {{ chapter.complete ? t('page.storyline.completed') : t('page.storyline.mark_complete') }}
+        {{ chapter.complete ? t('common.completed') : t('common.mark_complete') }}
       </UButton>
     </div>
   </div>
@@ -730,9 +730,9 @@
       return t('page.storyline.route_chosen');
     }
     if (routeState === 'blocked') {
-      return t('page.storyline.route_blocked');
+      return t('common.blocked');
     }
-    return t('page.storyline.route_available');
+    return t('common.available');
   };
   const getEndingBadgeColor = (routeState: StorylineObjectiveProgress['routeState']) => {
     if (routeState === 'chosen') {

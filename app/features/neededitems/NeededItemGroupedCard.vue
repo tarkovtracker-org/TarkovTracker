@@ -62,11 +62,11 @@
           class="text-surface-400 mb-1.5 flex items-center gap-1"
         >
           <UIcon name="i-mdi-clipboard-list" class="h-3.5 w-3.5" />
-          <span class="font-medium">{{ $t('needed_items.tasks') }}</span>
+          <span class="font-medium">{{ $t('common.tasks') }}</span>
         </div>
         <div class="flex gap-3">
           <div v-if="groupedItem.taskFir > 0" class="flex items-center gap-1">
-            <AppTooltip :text="$t('needed_items.fir_required')">
+            <AppTooltip :text="$t('common.found_in_raid_required')">
               <UIcon
                 name="i-mdi-checkbox-marked-circle-outline"
                 class="h-3 w-3"
@@ -124,11 +124,11 @@
           class="text-surface-400 mb-1.5 flex items-center gap-1"
         >
           <UIcon name="i-mdi-home" class="h-3.5 w-3.5" />
-          <span class="font-medium">{{ $t('needed_items.hideout_label') }}</span>
+          <span class="font-medium">{{ $t('common.hideout') }}</span>
         </div>
         <div class="flex gap-3">
           <div v-if="groupedItem.hideoutFir > 0" class="flex items-center gap-1">
-            <AppTooltip :text="$t('needed_items.fir_required')">
+            <AppTooltip :text="$t('common.found_in_raid_required')">
               <UIcon
                 name="i-mdi-checkbox-marked-circle-outline"
                 class="h-3 w-3"

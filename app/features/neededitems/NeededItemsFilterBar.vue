@@ -60,7 +60,7 @@
               variant="link"
               size="sm"
               icon="i-mdi-close-circle"
-              :aria-label="$t('page.needed_items.clear_search')"
+              :aria-label="$t('common.clear_search')"
               @click="$emit('update:search', '')"
             />
           </template>
@@ -285,7 +285,7 @@
     usePageSettingsDrawer('needed_items');
   const sortOptions = computed(() => [
     {
-      label: t('page.needed_items.sort.priority'),
+      label: t('common.priority'),
       value: 'priority' as SortBy,
       icon: 'i-mdi-alert-circle-outline',
     },

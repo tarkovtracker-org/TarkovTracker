@@ -23,13 +23,12 @@
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const metaTitle = computed(() => {
-    const titleKey =
-      typeof route.meta.titleKey === 'string' ? route.meta.titleKey : 'page.team.meta.title';
+    const titleKey = typeof route.meta.titleKey === 'string' ? route.meta.titleKey : 'common.team';
     return t(titleKey);
   });
   const metaDescription = computed(() => t('page.team.meta.description'));
   definePageMeta({
-    titleKey: 'page.team.meta.title',
+    titleKey: 'common.team',
   });
   useSeoMeta({
     title: metaTitle,

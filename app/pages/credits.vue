@@ -2,7 +2,7 @@
   <UContainer class="px-4 py-8">
     <div class="mx-auto flex w-full max-w-5xl flex-col gap-8">
       <header class="text-center">
-        <h1 class="sr-only">{{ t('page.credits.title') }}</h1>
+        <h1 class="sr-only">{{ t('common.credits') }}</h1>
         <p class="text-xs text-white/55">
           {{ t('page.credits.notes.alphabetical') }}
         </p>
@@ -77,7 +77,7 @@
               {{ t('page.credits.contributors.error') }}
             </p>
             <UButton size="sm" color="neutral" variant="soft" @click="() => refreshContributors()">
-              {{ t('page.credits.contributors.retry') }}
+              {{ t('common.retry') }}
             </UButton>
           </div>
           <p v-else-if="!contributors.length" class="text-surface-300 text-sm">
@@ -126,7 +126,7 @@
   import type { ContributorApiItem, ContributorsResponse } from '@/types/contributors';
   const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
-    title: computed(() => t('page.credits.title')),
+    title: computed(() => t('common.credits')),
   });
   interface CreditMember {
     contributions?: number;
@@ -195,7 +195,7 @@
     },
     {
       key: 'support_members',
-      pretitle: t('page.credits.labels.support'),
+      pretitle: t('common.support'),
       members: sortMembers([
         {
           name: 'Adealia',

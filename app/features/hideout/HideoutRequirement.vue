@@ -29,10 +29,7 @@
         <UIcon name="i-mdi-check-circle" class="text-success-300 h-6 w-6 sm:h-8 sm:w-8" />
       </div>
       <!-- FiR Badge -->
-      <AppTooltip
-        v-if="isFoundInRaid"
-        :text="$t('page.hideout.stationcard.requirement.found_in_raid')"
-      >
+      <AppTooltip v-if="isFoundInRaid" :text="$t('common.found_in_raid_required')">
         <UIcon
           name="i-mdi-checkbox-marked-circle-outline"
           class="text-warning-400 absolute -top-1 -right-1 h-3 w-3"
@@ -128,7 +125,7 @@
               close();
             "
           >
-            {{ $t('page.hideout.stationcard.requirement.apply') }}
+            {{ $t('common.apply') }}
           </UButton>
         </div>
       </template>
@@ -136,7 +133,7 @@
       <ContextMenuItem
         v-if="requirement.item.link"
         icon="/img/logos/tarkovdevlogo.webp"
-        :label="$t('page.hideout.stationcard.requirement.view_tarkov_dev')"
+        :label="$t('common.view_on_tarkov_dev')"
         @click="
           openTarkovDev();
           close();
@@ -145,7 +142,7 @@
       <ContextMenuItem
         v-if="requirement.item.wikiLink"
         icon="/img/logos/wikilogo.webp"
-        :label="$t('page.hideout.stationcard.requirement.view_wiki')"
+        :label="$t('common.view_on_wiki')"
         @click="
           openWiki();
           close();

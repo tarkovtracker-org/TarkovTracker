@@ -541,8 +541,8 @@
       case 'fence':
         return t(
           (blocker.required ?? 0) < 0
-            ? 'page.dashboard.focus.status.fence_negative'
-            : 'page.dashboard.focus.status.fence_positive',
+            ? 'common.meet_the_fence_reputation_requirement_required'
+            : 'common.meet_the_fence_reputation_requirement_required',
           { required: formatNumericValue(blocker.required) }
         );
       case 'trader-unlock':
