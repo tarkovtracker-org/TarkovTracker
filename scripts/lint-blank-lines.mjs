@@ -58,10 +58,14 @@ const getProtectedRanges = (source, filePath) => {
   const ranges = [];
   const extension = extname(filePath).toLowerCase();
   if (extension === '.vue') {
-    for (const match of source.matchAll(/<template\b[^>]*>[\s\S]*?<\/template\s*>/gi)) {
+    for (const match of source.matchAll(
+      /<template\b[^>]*>[\s\S]*?<\/template(?:[\t\n\r ]+[^>]*)?>/gi
+    )) {
       ranges.push({ end: match.index + match[0].length, start: match.index });
     }
-    for (const match of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+    for (const match of source.matchAll(
+      /<script\b[^>]*>([\s\S]*?)<\/script(?:[\t\n\r ]+[^>]*)?>/gi
+    )) {
       const contentStart = match.index + match[0].indexOf(match[1]);
       for (const range of getProtectedRanges(match[1], '.ts')) {
         ranges.push({ end: contentStart + range.end, start: contentStart + range.start });

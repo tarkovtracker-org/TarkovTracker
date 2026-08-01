@@ -239,12 +239,12 @@ const runFixtures = () => {
   }
   const vue = runFix(
     'component',
-    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n\n<script setup lang="ts">\nconst first = 1;\n\nconst second = 2;\n</script>\n',
+    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n\n<script setup lang="ts">\nconst first = 1;\n\nconst second = 2;\n</script\n data>\n',
     'vue'
   );
   if (
     vue !==
-    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n<script setup lang="ts">\nconst first = 1;\nconst second = 2;\n</script>\n'
+    '<template>\n  <div>first</div>\n\n  <div>second</div>\n</template>\n<script setup lang="ts">\nconst first = 1;\nconst second = 2;\n</script\n data>\n'
   ) {
     throw new Error(`Vue SFC handling failed:\n${vue}`);
   }
