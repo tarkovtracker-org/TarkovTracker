@@ -1499,7 +1499,7 @@
       },
       "guides": {
         "tarkovdev": {
-          "overview": "Tarkov.dev è la spina dorsale dell'ecosistema di dati della comunità. Mantiene un set di dati open-source di oggetti, missioni, trader, stazioni del rifugio e altro ancora, tutti accessibili tramite un'API gratuita GraphQL. TarkovTracker stesso utilizza questa API per rimanere aggiornato con gli ultimi dati di gioco. Se crei strumenti, guide, o semplicemente desideri cercare statistiche, Tarkov.dev è la fonte autorevole.",
+          "overview": "Tarkov.dev è la spina dorsale dell'ecosistema di dati della comunità. Mantiene un set di dati open-source di oggetti, missioni, trader, stazioni del rifugio e altro ancora, tutte accessibili tramite un'API gratuita GraphQL. TarkovTracker stesso utilizza questa API per rimanere aggiornato con gli ultimi dati di gioco. Se crei strumenti, guide, o semplicemente desideri cercare statistiche, Tarkov.dev è la fonte più autorevole.",
           "step_1_title": "Sfoglia il sito web",
           "step_1_desc": "Visita tarkov.dev per cercare oggetti, controllare i requisiti missione, visualizzare gli inventari dei commercianti ed esplorare i dati della stazione rifugio in un'interfaccia pulita e senza pubblicità.",
           "step_2_title": "Usa l'API GraphQL",
