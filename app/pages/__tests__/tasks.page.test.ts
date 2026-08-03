@@ -477,7 +477,7 @@ describe('tasks page', () => {
       .findAll('[data-testid="task-card"]')
       .map((item: { text: () => string }) => item.text());
     expect(taskIds[0]).toBe('task-focus');
-    const clearButton = wrapper.find('button[aria-label="page.tasks.clear_focused_task"]');
+    const clearButton = wrapper.find('button[aria-label="common.clear_focus"]');
     expect(clearButton.exists()).toBe(true);
     await clearButton.trigger('click');
     expect(clearPinnedTaskMock).toHaveBeenCalledTimes(1);

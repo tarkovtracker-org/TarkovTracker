@@ -72,7 +72,7 @@ export function useStreamerToolsOverlay() {
         'streamer_tools.metric_tasks_desc',
         'Completed and remaining Kappa-required tasks.'
       ),
-      label: t('streamer_tools.metric_tasks', 'Kappa Tasks'),
+      label: t('common.kappa_tasks', 'Kappa Tasks'),
       value: 'tasks',
     },
     {
@@ -112,7 +112,7 @@ export function useStreamerToolsOverlay() {
   const resolutionOptions = computed<SelectOption<OverlayResolution>[]>(() => [
     { label: t('streamer_tools.resolution_1080', '1080p'), value: '1080p' },
     { label: t('streamer_tools.resolution_1440', '1440p'), value: '1440p' },
-    { label: t('streamer_tools.resolution_custom', 'Custom Scale'), value: 'custom' },
+    { label: t('common.custom_scale', 'Custom Scale'), value: 'custom' },
   ]);
   const alignOptions = computed<SelectOption<OverlayAlign>[]>(() => [
     { label: t('streamer_tools.align_top_left', 'Top Left'), value: 'top-left' },
@@ -132,7 +132,7 @@ export function useStreamerToolsOverlay() {
   const containerOptions = computed<SelectOption<OverlayContainer>[]>(() => [
     { label: t('streamer_tools.container_canvas', 'Scene Canvas'), value: 'canvas' },
     {
-      label: t('streamer_tools.container_self_contained', 'Self Contained'),
+      label: t('common.self_contained', 'Self Contained'),
       value: 'self-contained',
     },
   ]);

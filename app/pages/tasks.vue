@@ -143,10 +143,10 @@
                     color="neutral"
                     variant="ghost"
                     size="xs"
-                    :aria-label="t('page.tasks.clear_focused_task')"
+                    :aria-label="t('common.clear_focus')"
                     @click="clearPinnedTask"
                   >
-                    {{ t('page.tasks.clear_focused_task') }}
+                    {{ t('common.clear_focus') }}
                   </UButton>
                 </div>
                 <div>
@@ -318,7 +318,7 @@
                   {{ t('page.tasks.questcard.undo') }}
                 </UButton>
                 <UButton size="xs" variant="ghost" color="secondary" @click="closeNotification">
-                  {{ t('page.tasks.filters.close') }}
+                  {{ t('common.close') }}
                 </UButton>
               </div>
             </div>

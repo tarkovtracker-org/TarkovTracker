@@ -153,7 +153,7 @@ const apiAction = (resource: Resource): ResourceAction | null => {
   if (!apiLink) return null;
   return externalAction(
     apiLink.url,
-    'page.resources.actions.api_documentation',
+    'common.api_documentation',
     'API documentation',
     LINK_ICONS.api
   );

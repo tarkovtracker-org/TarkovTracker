@@ -1,16 +1,13 @@
 import { isKnownTier, type ApiTier } from '../limits';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import type { Env } from '../types';
-
 const TIER_CACHE_TTL_SECONDS = 60;
 const TIER_FETCH_TIMEOUT_MS = 3000;
-
 interface SupporterRow {
   tier?: string | null;
   status?: string | null;
   expires_at?: string | null;
 }
-
 /**
  * Resolve the API tier for a user from public.supporters.
  * Fails open to 'free' so a Supabase hiccup never blocks authenticated traffic.
@@ -55,12 +52,10 @@ export async function resolveTier(env: Env, userId: string): Promise<ApiTier> {
   }
   return tier;
 }
-
 function hasActiveEntitlement(row: SupporterRow): boolean {
   if (row.status === 'active') return !isExpired(row.expires_at);
   return row.status === 'past_due' && Boolean(row.expires_at) && !isExpired(row.expires_at);
 }
-
 function isExpired(expiresAt: string | null | undefined): boolean {
   if (!expiresAt) return false;
   const ts = Date.parse(expiresAt);

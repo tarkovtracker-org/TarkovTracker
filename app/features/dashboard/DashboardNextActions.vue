@@ -540,10 +540,9 @@
         });
       case 'fence':
         return t(
-          (blocker.required ?? 0) < 0
-            ? 'page.dashboard.focus.status.fence_negative'
-            : 'page.dashboard.focus.status.fence_positive',
-          { required: formatNumericValue(blocker.required) }
+          'common.meet_the_fence_reputation_requirement_required',
+          { required: formatNumericValue(blocker.required) },
+          'Meet the Fence reputation requirement ({required}).'
         );
       case 'trader-unlock':
         return t('page.dashboard.focus.status.trader_unlock', {

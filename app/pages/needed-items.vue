@@ -30,7 +30,7 @@
               {{ $t('page.needed_items.error') }}
             </span>
             <UButton color="primary" @click="ensureNeededItemsData">
-              {{ $t('page.needed_items.retry') }}
+              {{ $t('common.refresh_button') }}
             </UButton>
           </div>
           <div
@@ -231,7 +231,7 @@
     settingsOpen: isSettingsDrawerOpen,
   });
   useSeoMeta({
-    title: () => t('page.needed_items.title'),
+    title: () => t('common.needed_items'),
     description: () => t('page.needed_items.meta_description'),
   });
   const props = withDefaults(

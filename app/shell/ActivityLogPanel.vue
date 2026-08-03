@@ -4,7 +4,7 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-heroicons-bell" class="text-primary-400 h-4 w-4" />
         <h3 class="text-surface-50 text-sm font-semibold">
-          {{ t('activity_log.title', 'Activity Log') }}
+          {{ t('common.activity_log', 'Activity Log') }}
         </h3>
       </div>
       <div class="flex gap-2">
@@ -51,7 +51,7 @@
             {{
               entry.source === 'api'
                 ? t('activity_log.badge_api', 'API Sync')
-                : t('activity_log.badge_manual', 'Manual')
+                : t('common.manual', 'Manual')
             }}
           </UBadge>
         </div>
@@ -132,7 +132,7 @@
   };
   const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return t('activity_log.unknown_time', 'Unknown');
+    if (Number.isNaN(date.getTime())) return t('common.unknown', 'Unknown');
     return date.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' });
   };
 </script>

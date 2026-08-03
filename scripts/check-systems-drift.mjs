@@ -21,25 +21,20 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
-
 const ROOT = process.cwd();
 const SYSTEMS_MD = join(ROOT, 'docs', 'SYSTEMS.md');
 const TARKOV_API_DIR = join(ROOT, 'app', 'server', 'api', 'tarkov');
 const LOCALES_DIR = join(ROOT, 'app', 'locales');
 const WRANGLER_TOML = join(ROOT, 'wrangler.toml');
 const PRECOMPUTED_TARKOV_TS = join(ROOT, 'app', 'server', 'utils', 'precomputedTarkov.ts');
-
 const errors = [];
 const warnings = [];
-
 function fail(message) {
   errors.push(message);
 }
-
 function readText(filePath) {
   return readFileSync(filePath, 'utf-8');
 }
-
 function listTarkovHandlers() {
   if (!existsSync(TARKOV_API_DIR)) {
     fail(`Cannot list Tarkov handlers: ${TARKOV_API_DIR} does not exist.`);
@@ -53,7 +48,6 @@ function listTarkovHandlers() {
     .filter((f) => f.endsWith('.get.ts'))
     .map((f) => f.replace(/\.get\.ts$/, ''));
 }
-
 /**
  * Extract the /api/tarkov/* endpoints from the endpoint table in SYSTEMS.md.
  * The table rows look like `| `/api/tarkov/bootstrap` | ... |`.
@@ -67,7 +61,6 @@ function extractDocumentedEndpoints(md) {
   }
   return [...new Set(endpoints)];
 }
-
 /**
  * Extract backtick-quoted file paths from the doc. Handles plain paths
  * (`app/server/utils/edgeCache.ts`) and glob patterns (`app/server/api/tarkov/*.get.ts`).
@@ -95,7 +88,6 @@ function extractDocumentedPaths(md) {
   }
   return [...paths];
 }
-
 function pathExists(relativePath) {
   const absolute = join(ROOT, relativePath);
   if (relativePath.includes('*')) {
@@ -115,7 +107,6 @@ function pathExists(relativePath) {
   if (!existsSync(absolute)) return false;
   return statSync(absolute).isFile();
 }
-
 function checkEndpoints(md) {
   const documented = extractDocumentedEndpoints(md);
   if (documented.length === 0) {
@@ -142,7 +133,6 @@ function checkEndpoints(md) {
     );
   }
 }
-
 function checkDocumentedPaths(md) {
   const paths = extractDocumentedPaths(md);
   if (paths.length === 0) {
@@ -157,7 +147,6 @@ function checkDocumentedPaths(md) {
     }
   }
 }
-
 function checkKvBinding(md) {
   // The doc states the binding name is `TARKOV_DATA` (PRECOMPUTED_KV_BINDING).
   const bindingMatch = md.match(/KV binding name is `([A-Z_]+)`/);
@@ -168,7 +157,6 @@ function checkKvBinding(md) {
     );
     return;
   }
-
   // Check wrangler.toml binding.
   if (!existsSync(WRANGLER_TOML)) {
     fail(`Cannot verify KV binding: ${WRANGLER_TOML} does not exist.`);
@@ -200,7 +188,6 @@ function checkKvBinding(md) {
         `declare it inside a [[kv_namespaces]] block.`
     );
   }
-
   // Check PRECOMPUTED_KV_BINDING constant in precomputedTarkov.ts.
   if (existsSync(PRECOMPUTED_TARKOV_TS)) {
     const source = readText(PRECOMPUTED_TARKOV_TS);
@@ -215,7 +202,6 @@ function checkKvBinding(md) {
     fail(`Cannot verify KV binding: ${PRECOMPUTED_TARKOV_TS} does not exist.`);
   }
 }
-
 function checkSupportedLanguages(md) {
   // SYSTEMS.md does not currently enumerate supported languages. When it does
   // (as a backtick-quoted, comma/space-separated list on a line containing
@@ -232,7 +218,6 @@ function checkSupportedLanguages(md) {
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.replace(/\.json$/, ''));
   const localeSet = new Set(localeFiles);
-
   // Look for an explicit language list in the doc. Capture the full section
   // after the "Supported languages" heading to handle multiline lists.
   const sectionRe = /[Ss]upported languages?[:\s]+([\s\S]*?)(?:\n#|\n##|\n$|$)/;
@@ -244,7 +229,6 @@ function checkSupportedLanguages(md) {
   const raw = match[1];
   const langCodes = [...raw.matchAll(/`([a-z]{2})`/g)].map((m) => m[1]);
   if (langCodes.length === 0) return;
-
   for (const code of langCodes) {
     if (!localeSet.has(code)) {
       fail(
@@ -261,34 +245,28 @@ function checkSupportedLanguages(md) {
     );
   }
 }
-
 function main() {
   if (!existsSync(SYSTEMS_MD)) {
     console.error(`SYSTEMS.md not found at ${SYSTEMS_MD}`);
     process.exit(1);
   }
   const md = readText(SYSTEMS_MD);
-
   checkEndpoints(md);
   checkDocumentedPaths(md);
   checkKvBinding(md);
   checkSupportedLanguages(md);
-
   if (warnings.length > 0) {
     console.warn('Warnings (non-fatal):');
     for (const w of warnings) console.warn(`  - ${w}`);
     console.warn();
   }
-
   if (errors.length > 0) {
     console.error('SYSTEMS.md drift detected:');
     for (const e of errors) console.error(`  - ${e}`);
     console.error(`\n${errors.length} error(s). Fix the doc or the code in the same PR.`);
     process.exit(1);
   }
-
   console.log('systems:check — all drift checks passed.');
   process.exit(0);
 }
-
 main();

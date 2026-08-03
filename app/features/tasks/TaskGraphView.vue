@@ -422,10 +422,10 @@
     { flush: 'post' }
   );
   const legendItems = computed(() => [
-    { label: t('page.tasks.graph.completed'), colorClass: 'bg-success-500' },
-    { label: t('page.tasks.graph.available'), colorClass: 'bg-info-500' },
-    { label: t('page.tasks.graph.locked'), colorClass: 'bg-surface-500' },
-    { label: t('page.tasks.graph.failed'), colorClass: 'bg-error-500' },
+    { label: t('common.completed'), colorClass: 'bg-success-500' },
+    { label: t('common.available'), colorClass: 'bg-info-500' },
+    { label: t('common.locked'), colorClass: 'bg-surface-500' },
+    { label: t('common.failed'), colorClass: 'bg-error-500' },
     { label: t('page.tasks.graph.flow_start'), colorClass: 'bg-primary-400' },
     { label: t('page.tasks.graph.flow_end'), colorClass: 'bg-warning-400' },
   ]);
@@ -487,7 +487,7 @@
         }}
       </UButton>
       <UButton size="xs" variant="soft" color="primary" @click="clearFocus">
-        {{ t('page.tasks.graph.clear_focus') }}
+        {{ t('common.clear_focus') }}
       </UButton>
     </div>
     <div

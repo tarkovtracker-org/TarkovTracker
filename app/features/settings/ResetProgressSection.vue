@@ -8,7 +8,7 @@
       }"
       @click="showResetPvPDialog = true"
     >
-      {{ $t('settings.data_management.reset_pvp_data') }}
+      {{ $t('common.reset_pvp_data') }}
     </UButton>
     <UButton
       icon="i-mdi-account-group"
@@ -18,7 +18,7 @@
       }"
       @click="showResetPvEDialog = true"
     >
-      {{ $t('settings.data_management.reset_pve_data') }}
+      {{ $t('common.reset_pve_data') }}
     </UButton>
     <UButton
       color="error"
@@ -27,7 +27,7 @@
       block
       @click="showResetAllDialog = true"
     >
-      {{ $t('settings.data_management.reset_all_data') }}
+      {{ $t('common.reset_all_data') }}
     </UButton>
   </div>
   <UModal v-model:open="showResetPvPDialog">
@@ -35,7 +35,7 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-alert" class="text-pvp-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('settings.data_management.reset_pvp_title') }}
+          {{ $t('common.reset_pvp_data') }}
         </h3>
       </div>
     </template>
@@ -60,7 +60,7 @@
           class="min-w-26 justify-center text-center"
           @click="close"
         >
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"
@@ -79,7 +79,7 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-alert" class="text-pve-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('settings.data_management.reset_pve_title') }}
+          {{ $t('common.reset_pve_data') }}
         </h3>
       </div>
     </template>
@@ -104,7 +104,7 @@
           class="min-w-26 justify-center text-center"
           @click="close"
         >
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"
@@ -123,7 +123,7 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-alert-octagon" class="text-error-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('settings.data_management.reset_all_title') }}
+          {{ $t('common.reset_all_data') }}
         </h3>
       </div>
     </template>
@@ -164,7 +164,7 @@
           class="min-w-26 justify-center text-center"
           @click="close"
         >
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"
@@ -217,7 +217,7 @@
     } catch (error) {
       logger.error(`[DataManagement] Error resetting ${config.errorLogContext}:`, error);
       toast.add({
-        title: t('settings.reset.error_title'),
+        title: t('common.reset_failed'),
         description: config.errorDescription,
         color: 'error',
       });

@@ -62,14 +62,14 @@
         </div>
         <!-- Group 1: Utilities (Bell + Help) -->
         <div class="flex items-center gap-1">
-          <AppTooltip :text="t('activity_log.aria_label', 'Activity Log')">
+          <AppTooltip :text="t('common.activity_log', 'Activity Log')">
             <UPopover :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
               <UButton
                 color="neutral"
                 variant="ghost"
                 size="md"
                 icon="i-heroicons-bell"
-                :aria-label="t('activity_log.aria_label', 'Activity Log')"
+                :aria-label="t('common.activity_log', 'Activity Log')"
                 class="relative h-9 w-9"
               >
                 <span v-if="activityLogStore.hasUnread" class="sr-only" aria-live="polite">
@@ -120,26 +120,26 @@
             </AppTooltip>
           </span>
           <span v-else class="hidden sm:inline-flex">
-            <AppTooltip :text="t('footer.support_button')">
+            <AppTooltip :text="t('common.support')">
               <NuxtLink
                 to="/supporter"
                 class="border-success-500/50 bg-success-500/5 text-success-400 hover:bg-success-500/10 hover:border-success-500/70 inline-flex h-9 w-9 items-center justify-center gap-1.5 rounded-md border px-0 text-[13px] font-semibold transition-colors md:w-auto md:px-3"
-                :aria-label="t('footer.support_button')"
+                :aria-label="t('common.support')"
               >
                 <UIcon name="i-mdi-heart" class="h-4 w-4 shrink-0" />
-                <span class="hidden md:inline">{{ t('footer.support_button') }}</span>
+                <span class="hidden md:inline">{{ t('common.support') }}</span>
               </NuxtLink>
             </AppTooltip>
           </span>
           <span class="sm:hidden">
-            <AppTooltip :text="t('app_bar.more_aria', 'More')">
+            <AppTooltip :text="t('common.more', 'More')">
               <UDropdownMenu :items="moreMenuItems" :content="{ align: 'end', sideOffset: 8 }">
                 <UButton
                   color="neutral"
                   variant="ghost"
                   size="md"
                   icon="i-mdi-dots-horizontal"
-                  :aria-label="t('app_bar.more_aria', 'More')"
+                  :aria-label="t('common.more', 'More')"
                   class="h-9 w-9"
                 />
               </UDropdownMenu>
@@ -256,7 +256,7 @@
     const tier = supporterTier.value;
     if (!tier) return '';
     if (tier === 'supporter') {
-      return t('app_bar.supporter_badge_label', 'Supporter');
+      return t('common.supporter', 'Supporter');
     }
     const tierKey = `page.supporter.tier_${tier}_name`;
     if (te(tierKey)) {
@@ -330,7 +330,7 @@
       },
       {
         icon: 'i-mdi-cog-outline',
-        label: t('navigation_drawer.settings'),
+        label: t('common.settings'),
         to: '/settings',
       },
     ],
@@ -359,7 +359,7 @@
       },
       {
         icon: 'i-mdi-heart-outline',
-        label: t('footer.support_button'),
+        label: t('common.support'),
         to: '/supporter',
       },
     ],
@@ -493,11 +493,25 @@
       }
       return t('page.resources.title', 'Resources & Guides');
     }
+    const commonTitles: Partial<Record<string, readonly [string, string]>> = {
+      credits: ['common.credits', 'Credits'],
+      hideout: ['common.hideout', 'Hideout'],
+      kappa: ['common.kappa_lightkeeper', 'Kappa & Lightkeeper'],
+      needed_items: ['common.needed_items', 'Needed Items'],
+      settings: ['common.settings', 'Settings'],
+      storyline: ['common.storyline', 'Storyline'],
+      tasks: ['common.tasks', 'Tasks'],
+      team: ['common.team', 'Team'],
+    };
+    const commonTitle = commonTitles[routeName];
+    if (commonTitle) {
+      return t(...commonTitle);
+    }
     const titleKeys = [
-      routeName === 'neededitems' ? 'page.needed_items.title' : `page.${routeName}.appbar_title`,
+      `page.${routeName}.appbar_title`,
       `page.${routeName}.title`,
       `page.${routeName}.meta.title`,
-      routeName === 'admin' ? 'admin.title' : '',
+      routeName === 'admin' ? 'common.admin_panel' : '',
       `navigation_drawer.${routeName}`,
     ];
     const titleKey = titleKeys.find((key) => key && te(key));

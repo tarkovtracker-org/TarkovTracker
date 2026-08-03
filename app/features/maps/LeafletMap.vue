@@ -76,7 +76,7 @@
           :class="showScavExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
           @click="showScavExtracts = !showScavExtracts"
         >
-          {{ t('maps.factions.scav') }}
+          {{ t('common.scav') }}
         </UButton>
         <UButton
           v-if="props.showSpawnToggle && hasPmcSpawns"
@@ -118,7 +118,7 @@
                   variant="ghost"
                   @click="preferencesStore.resetMapMarkerColors()"
                 >
-                  {{ t('settings.interface.maps.colors.reset') }}
+                  {{ t('common.reset') }}
                 </UButton>
               </div>
               <div class="grid gap-2 sm:grid-cols-2">
@@ -168,7 +168,7 @@
                   <div
                     class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
                   >
-                    <span>{{ t('maps.zoom_speed') }}</span>
+                    <span>{{ t('common.zoom_speed') }}</span>
                     <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
                   </div>
                   <input
@@ -178,14 +178,14 @@
                     :max="ZOOM_SPEED_MAX"
                     step="0.1"
                     class="accent-surface-200 h-1.5 w-full cursor-pointer"
-                    :aria-label="t('maps.aria.zoom_speed')"
+                    :aria-label="t('common.zoom_speed')"
                   />
                 </div>
                 <div class="space-y-1">
                   <div
                     class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
                   >
-                    <span>{{ t('maps.pan_speed') }}</span>
+                    <span>{{ t('common.pan_speed') }}</span>
                     <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
                   </div>
                   <input
@@ -195,14 +195,14 @@
                     :max="PAN_SPEED_MAX"
                     step="0.1"
                     class="accent-surface-200 h-1.5 w-full cursor-pointer"
-                    :aria-label="t('maps.aria.pan_speed')"
+                    :aria-label="t('common.pan_speed')"
                   />
                 </div>
                 <div class="space-y-1">
                   <div
                     class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
                   >
-                    <span>{{ t('maps.zone_opacity') }}</span>
+                    <span>{{ t('common.zone_opacity') }}</span>
                     <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
                   </div>
                   <input
@@ -212,7 +212,7 @@
                     :max="ZONE_OPACITY_MAX"
                     step="0.01"
                     class="accent-surface-200 h-1.5 w-full cursor-pointer"
-                    :aria-label="t('maps.aria.zone_opacity')"
+                    :aria-label="t('common.zone_opacity')"
                   />
                 </div>
                 <div class="flex items-center justify-between">
@@ -233,9 +233,7 @@
                     "
                   >
                     {{
-                      mapTooltipDensity === 'compact'
-                        ? t('maps.tooltip_density_compact')
-                        : t('maps.tooltip_density_default')
+                      mapTooltipDensity === 'compact' ? t('common.compact') : t('common.default')
                     }}
                   </button>
                 </div>
@@ -285,7 +283,7 @@
           </div>
           <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1">
             <div class="h-3 w-3 rounded-full" :style="{ backgroundColor: mapColors.PMC_SPAWN }" />
-            <span>{{ t('maps.legend.pmc_spawn') }}</span>
+            <span>{{ t('common.pmc_spawn') }}</span>
           </div>
           <div v-if="showPmcExtracts" class="flex items-center gap-1">
             <UIcon
@@ -293,7 +291,7 @@
               class="h-3 w-3"
               :style="{ color: mapColors.PMC_EXTRACT }"
             />
-            <span>{{ t('maps.legend.pmc_extract') }}</span>
+            <span>{{ t('common.pmc_extract') }}</span>
           </div>
           <div v-if="showScavExtracts" class="flex items-center gap-1">
             <UIcon
@@ -301,7 +299,7 @@
               class="h-3 w-3"
               :style="{ color: mapColors.SCAV_EXTRACT }"
             />
-            <span>{{ t('maps.legend.scav_extract') }}</span>
+            <span>{{ t('common.scav_extract') }}</span>
           </div>
           <div
             v-if="(showPmcExtracts || showScavExtracts) && hasSharedExtracts"

@@ -1,5 +1,4 @@
 import type { Tables } from './database.types.ts';
-
 export interface TaskFilterPreset {
   id: string;
   name: string;
@@ -9,7 +8,6 @@ export interface TaskFilterPreset {
     hideCompleted?: boolean;
   };
 }
-
 export type TypedUserPreferences = Omit<
   Tables<'user_preferences'>,
   'pinned_task_ids' | 'task_filter_presets'

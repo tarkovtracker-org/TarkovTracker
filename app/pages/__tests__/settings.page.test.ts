@@ -341,7 +341,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.text()).toContain('settings.general.admin_panel');
+      expect(wrapper.text()).toContain('common.admin_panel');
     });
     it('groups desktop settings tabs and keeps mobile tabs in priority order', async () => {
       const wrapper = await mountSuspended(SettingsPage, {
@@ -352,13 +352,13 @@ describe('settings page', () => {
       expect(wrapper.findAll('[data-testid="tabs"] button').map((button) => button.text())).toEqual(
         [
           'settings.tabs.progression',
-          'settings.tabs.preferences',
+          'common.preferences',
           'settings.tabs.imports',
-          'settings.tabs.prestige',
-          'settings.tabs.account',
-          'settings.tabs.backup_restore',
-          'settings.tabs.api',
-          'settings.tabs.streamer_tools',
+          'common.prestige',
+          'common.account',
+          'common.backup_restore',
+          'common.api',
+          'common.streamer_tools',
         ]
       );
     });

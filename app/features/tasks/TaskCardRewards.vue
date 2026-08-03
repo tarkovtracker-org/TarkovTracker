@@ -134,9 +134,7 @@
           class="text-surface-400 border-surface-600 inline-flex cursor-help items-center gap-1 border-b border-dotted text-xs leading-none"
         >
           <UIcon name="i-mdi-sitemap" class="h-3.5 w-3.5 shrink-0" />
-          <span class="leading-none">
-            {{ t('page.tasks.questcard.impact') }}: {{ impactCount }}
-          </span>
+          <span class="leading-none">{{ t('common.impact') }}: {{ impactCount }}</span>
         </div>
       </AppTooltip>
       <UIcon
@@ -347,7 +345,7 @@
     return hasDetailedRewards.value || hasVisibleNextTasks || hasVisiblePreviousTasks;
   });
   const getItemTooltip = (item?: { shortName?: string; name?: string }) => {
-    const name = item?.shortName || item?.name || t('page.tasks.questcard.item');
+    const name = item?.shortName || item?.name || t('common.item');
     return t('page.tasks.questcard.open_item_on_tarkov_dev', { name });
   };
   const toggleDetails = () => {

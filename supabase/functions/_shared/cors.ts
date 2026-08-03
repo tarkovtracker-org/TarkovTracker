@@ -9,19 +9,16 @@
  */
 function getAllowedOrigins(): string[] {
   const defaults = ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
-
   const extra =
     Deno.env
       .get('SUPABASE_ALLOWED_ORIGINS')
       ?.split(',')
       .map((s) => s.trim())
       .filter(Boolean) ?? [];
-
   const local: string[] = [];
   if (Deno.env.get('ALLOW_LOCALHOST_CORS') === 'true') {
     local.push('http://localhost:3000', 'http://127.0.0.1:3000');
   }
-
   const set = new Set<string>([...defaults, ...extra, ...local]);
   return Array.from(set);
 }

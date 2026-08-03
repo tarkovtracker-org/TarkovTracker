@@ -41,7 +41,7 @@ describe('DrawerGameSettings', () => {
       },
     });
     const buttons = wrapper.findAll('button');
-    const pveButton = buttons.find((button) => button.text().includes('game_settings.pve'));
+    const pveButton = buttons.find((button) => button.text().includes('common.pve'));
     expect(pveButton).toBeDefined();
     await pveButton!.trigger('click');
     expect(switchGameModeMock).toHaveBeenCalledWith(GAME_MODES.PVE);

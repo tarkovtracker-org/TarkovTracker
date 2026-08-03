@@ -37,7 +37,7 @@
           </div>
           <button
             class="text-surface-400 hover:text-white"
-            :aria-label="$t('generic.close_button')"
+            :aria-label="$t('common.close')"
             @click="$emit('update:open', false)"
           >
             <UIcon name="i-mdi-close" class="h-6 w-6" />
@@ -63,7 +63,7 @@
               </UButton>
               <UButton variant="soft" @click="handleReset">
                 <UIcon name="i-mdi-refresh" class="mr-1 h-4 w-4" />
-                {{ $t('needed_items.reset') }}
+                {{ $t('common.reset') }}
               </UButton>
             </div>
           </div>
@@ -72,7 +72,7 @@
               class="text-surface-300 mb-3 flex items-center gap-2 text-sm font-medium tracking-wide uppercase"
             >
               <UIcon name="i-mdi-clipboard-list" class="h-4 w-4" />
-              {{ $t('needed_items.tasks') }} ({{ taskObjectivesList.length }})
+              {{ $t('common.tasks') }} ({{ taskObjectivesList.length }})
             </h4>
             <div class="space-y-2">
               <div
@@ -96,7 +96,7 @@
                     </span>
                   </router-link>
                   <UBadge v-if="isKappa(obj)" color="kappa" size="xs">
-                    {{ $t('needed_items.kappa') }}
+                    {{ $t('common.kappa') }}
                   </UBadge>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
@@ -104,7 +104,7 @@
                     class="text-xs"
                     :class="obj.foundInRaid ? 'text-warning-400' : 'text-surface-400'"
                   >
-                    {{ obj.foundInRaid ? $t('needed_items.fir') : $t('needed_items.non') }}
+                    {{ obj.foundInRaid ? $t('common.fir') : $t('needed_items.non') }}
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
@@ -147,7 +147,7 @@
               class="text-surface-300 mb-3 flex items-center gap-2 text-sm font-medium tracking-wide uppercase"
             >
               <UIcon name="i-mdi-home" class="h-4 w-4" />
-              {{ $t('needed_items.hideout_label') }} ({{ hideoutModulesList.length }})
+              {{ $t('common.hideout') }} ({{ hideoutModulesList.length }})
             </h4>
             <div class="space-y-2">
               <div
@@ -182,7 +182,7 @@
                     class="text-xs"
                     :class="mod.foundInRaid ? 'text-warning-400' : 'text-surface-400'"
                   >
-                    {{ mod.foundInRaid ? $t('needed_items.fir') : $t('needed_items.non') }}
+                    {{ mod.foundInRaid ? $t('common.fir') : $t('needed_items.non') }}
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button

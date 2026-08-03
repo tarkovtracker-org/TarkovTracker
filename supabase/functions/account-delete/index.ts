@@ -6,7 +6,6 @@ import {
   createSuccessResponse,
 } from 'shared/auth';
 import type { Database } from '../_shared/database.types.ts';
-
 const AUTH_DELETE_MAX_ATTEMPTS = 4;
 const AUTH_DELETE_BASE_DELAY_MS = 300;
 const CLEANUP_MAX_ATTEMPTS = 5;
@@ -14,7 +13,6 @@ const CLEANUP_BASE_DELAY_MS = 5 * 60 * 1000;
 const CLEANUP_MAX_DELAY_MS = 60 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_ATTEMPTS = 3; // Max 3 deletion requests per minute
-
 // Interfaces to mock Supabase client typing locally
 interface PostgrestFilterBuilder<T> {
   eq(column: string, value: unknown): PostgrestFilterBuilder<T>;
@@ -27,14 +25,12 @@ interface PostgrestFilterBuilder<T> {
       | null
   ): PromiseLike<TResult1>;
 }
-
 interface PostgrestTransformBuilder {
   eq(column: string, value: unknown): Promise<{ error: unknown }>;
   or(filter: string): Promise<{ error: unknown }>;
   gte(column: string, value: unknown): this;
   order(column: string, options?: { ascending?: boolean }): this;
 }
-
 interface TypedSupabaseClient {
   from<T extends keyof Database['public']['Tables']>(
     table: T
@@ -55,12 +51,10 @@ interface TypedSupabaseClient {
   };
   rpc(fn: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
 }
-
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
-
 const getErrorMessage = (error: unknown) => {
   if (typeof error === 'string') return error;
   if (error instanceof Error) return error.message;
@@ -73,7 +67,6 @@ const getErrorMessage = (error: unknown) => {
     return String(error);
   }
 };
-
 const serializeError = (error: unknown) => {
   if (error instanceof Error) {
     return { name: error.name, message: error.message, stack: error.stack };
@@ -81,7 +74,6 @@ const serializeError = (error: unknown) => {
   if (error && typeof error === 'object') return error;
   return { message: String(error) };
 };
-
 const isNotFoundError = (error: unknown) => {
   // Check for HTTP 404 status
   if (error && typeof error === 'object') {
@@ -103,13 +95,11 @@ const isNotFoundError = (error: unknown) => {
     (message.startsWith('no user found'))
   );
 };
-
 const computeBackoffMs = (attempt: number, baseMs: number, maxMs: number) => {
   const jitter = Math.floor(Math.random() * 250);
   const delay = baseMs * Math.pow(2, Math.max(0, attempt - 1)) + jitter;
   return Math.min(delay, maxMs);
 };
-
 const deleteUserWithRetry = async (
   supabase: TypedSupabaseClient,
   userId: string
@@ -126,10 +116,8 @@ const deleteUserWithRetry = async (
   }
   return { ok: false, attempts: AUTH_DELETE_MAX_ATTEMPTS, lastError };
 };
-
 const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) => {
   const cleanupErrors: Record<string, string> = {};
-
   const { error: membershipDeleteError } = await supabase
     .from('team_memberships')
     .delete()
@@ -137,40 +125,33 @@ const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) =>
   if (membershipDeleteError) {
     cleanupErrors.team_memberships = getErrorMessage(membershipDeleteError);
   }
-
   const { error: apiTokensError } = await supabase
     .from('api_tokens')
     .delete()
     .eq('user_id', userId);
   if (apiTokensError) cleanupErrors.api_tokens = getErrorMessage(apiTokensError);
-
   const { error: progressError } = await supabase
     .from('user_progress')
     .delete()
     .eq('user_id', userId);
   if (progressError) cleanupErrors.user_progress = getErrorMessage(progressError);
-
   const { error: preferencesError } = await supabase
     .from('user_preferences')
     .delete()
     .eq('user_id', userId);
   if (preferencesError) cleanupErrors.user_preferences = getErrorMessage(preferencesError);
-
   const { error: userSystemError } = await supabase
     .from('user_system')
     .delete()
     .eq('user_id', userId);
   if (userSystemError) cleanupErrors.user_system = getErrorMessage(userSystemError);
-
   const { error: teamEventsError } = await supabase
     .from('team_events')
     .delete()
     .or(`initiated_by.eq.${userId},target_user.eq.${userId}`);
   if (teamEventsError) cleanupErrors.team_events = getErrorMessage(teamEventsError);
-
   return cleanupErrors;
 };
-
 const getDeletionJobState = async (supabase: TypedSupabaseClient, userId: string) => {
   const { data, error } = await supabase
     .from('account_deletion_jobs')
@@ -186,7 +167,6 @@ const getDeletionJobState = async (supabase: TypedSupabaseClient, userId: string
     status: job?.status ?? null,
   };
 };
-
 const recordDeletionFailure = async (
   supabase: TypedSupabaseClient,
   userId: string,
@@ -223,7 +203,6 @@ const recordDeletionFailure = async (
     console.error('[account-delete] Deletion job dead-lettered:', { userId, reason, details });
   }
 };
-
 const markDeletionCompleted = async (supabase: TypedSupabaseClient, userId: string) => {
   const now = new Date().toISOString();
   const { error } = await supabase
@@ -243,7 +222,6 @@ const markDeletionCompleted = async (supabase: TypedSupabaseClient, userId: stri
     console.error('[account-delete] Failed to mark deletion job completed:', error);
   }
 };
-
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
@@ -257,7 +235,6 @@ Deno.serve(async (req) => {
     const { user, supabase: sbClient } = authResult;
     const supabase = sbClient as unknown as TypedSupabaseClient;
     const now = new Date().toISOString();
-
     // Rate limiting: Check for recent deletion attempts
     const rateLimitTimestamp = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
     const { data: recentAttempts, error: rateLimitError } = await supabase
@@ -266,7 +243,6 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .gte('attempted_at', rateLimitTimestamp)
       .order('attempted_at', { ascending: false });
-
     if (!rateLimitError && recentAttempts && recentAttempts.length >= RATE_LIMIT_MAX_ATTEMPTS) {
       const oldestAttempt = recentAttempts[recentAttempts.length - 1];
       const attemptedAt = oldestAttempt.attempted_at;
@@ -280,7 +256,6 @@ Deno.serve(async (req) => {
         req
       );
     }
-
     // Record this deletion attempt for rate limiting
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
     const userAgent = req.headers.get('user-agent') || null;
@@ -296,7 +271,6 @@ Deno.serve(async (req) => {
       console.error('[account-delete] Failed to record deletion attempt:', attemptInsertError);
       // Continue anyway - rate limiting failure shouldn't block deletion
     }
-
     // Initialize job tracking - this MUST succeed before proceeding
     const { error: jobUpsertError } = await supabase.from('account_deletion_jobs').upsert(
       {
@@ -323,7 +297,6 @@ Deno.serve(async (req) => {
         req
       );
     }
-
     const { data: ownedTeams, error: teamQueryError } = await supabase
       .from('teams')
       .select('id')
@@ -336,7 +309,6 @@ Deno.serve(async (req) => {
       });
       return createErrorResponse('Failed to fetch owned teams', 500, req);
     }
-
     // Process all owned teams and collect errors before proceeding
     const teamErrors: Array<{ teamId: string; error: string }> = [];
     if (ownedTeams && ownedTeams.length > 0) {
@@ -386,7 +358,6 @@ Deno.serve(async (req) => {
         }
       }
     }
-
     if (teamErrors.length > 0) {
       await recordDeletionFailure(supabase, user.id, 'team_transfer_failed', {
         stage: 'team_transfer',
@@ -398,7 +369,6 @@ Deno.serve(async (req) => {
         req
       );
     }
-
     const authDeleteResult = await deleteUserWithRetry(supabase, user.id);
     if (!authDeleteResult.ok) {
       console.error('[account-delete] Failed to delete auth user:', authDeleteResult.lastError);
@@ -409,7 +379,6 @@ Deno.serve(async (req) => {
       });
       return createErrorResponse('Failed to delete account', 500, req);
     }
-
     const cleanupErrors = await cleanupUserData(supabase, user.id);
     if (Object.keys(cleanupErrors).length > 0) {
       // Sanitize errors - log table names but not error details from sensitive tables
@@ -436,7 +405,6 @@ Deno.serve(async (req) => {
         req
       );
     }
-
     await markDeletionCompleted(supabase, user.id);
     return createSuccessResponse({ success: true }, 200, req);
   } catch (error) {

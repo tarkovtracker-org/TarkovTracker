@@ -12,7 +12,7 @@
       @click="setMode(GAME_MODES.PVP)"
     >
       <UIcon name="i-mdi-sword-cross" class="h-3.5 w-3.5 shrink-0" />
-      <span class="leading-none">{{ t('settings.game_settings.pvp') }}</span>
+      <span class="leading-none">{{ t('common.pvp') }}</span>
     </button>
     <button
       type="button"
@@ -26,7 +26,7 @@
       @click="setMode(GAME_MODES.PVE)"
     >
       <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5 shrink-0" />
-      <span class="leading-none">{{ t('settings.game_settings.pve') }}</span>
+      <span class="leading-none">{{ t('common.pve') }}</span>
     </button>
   </div>
 </template>

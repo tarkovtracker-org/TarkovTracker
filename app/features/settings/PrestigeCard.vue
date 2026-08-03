@@ -5,7 +5,7 @@
       icon-color="warning"
       highlight-color="warning"
       :fill-height="false"
-      :title="$t('settings.prestige.title')"
+      :title="$t('common.prestige')"
       title-classes="text-lg font-semibold"
     >
       <template #content>
@@ -355,7 +355,7 @@
           class="min-w-26 justify-center text-center"
           @click="close"
         >
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="warning"
@@ -375,7 +375,7 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-delete-outline" class="text-error-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('settings.prestige.delete_history_dialog_title') }}
+          {{ $t('common.delete_archived_run') }}
         </h3>
       </div>
     </template>
@@ -408,7 +408,7 @@
           class="min-w-26 justify-center text-center"
           @click="close"
         >
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"
@@ -418,7 +418,7 @@
           :disabled="!selectedPrestigeRun"
           @click="deleteSelectedPrestigeRun"
         >
-          {{ $t('settings.prestige.delete_history_confirm') }}
+          {{ $t('common.delete_archived_run') }}
         </UButton>
       </div>
     </template>
@@ -605,7 +605,7 @@
       !Number.isFinite(lastActionAt) ||
       lastActionAt < firstActionAt
     ) {
-      return t('settings.data_management.prestige_history_unknown_duration');
+      return t('common.unknown');
     }
     const days = Math.max(1, Math.ceil((lastActionAt - firstActionAt) / DAY_MS));
     return t('settings.data_management.prestige_history_days_value', { days });
@@ -655,7 +655,7 @@
     return [
       {
         id: 'level',
-        label: t('settings.data_management.prestige_history_level'),
+        label: t('common.level'),
         value: String(summary.level),
       },
       {
@@ -719,7 +719,7 @@
       },
       {
         id: 'level',
-        label: t('settings.data_management.prestige_history_level'),
+        label: t('common.level'),
         delta: currentSummary.level - previousSummary.level,
       },
     ];
@@ -747,13 +747,13 @@
       });
     }
     if (row.currentValue === 'complete') {
-      return t('settings.prestige.requirement_state.complete');
+      return t('common.complete');
     }
     if (row.currentValue === 'incomplete') {
       return t('settings.prestige.requirement_state.incomplete');
     }
     return row.status === 'met'
-      ? t('settings.prestige.requirement_state.complete')
+      ? t('common.complete')
       : t('settings.prestige.requirement_state.incomplete');
   };
   const getRequirementStatusClasses = (status: PrestigeRequirementStatus) => {
@@ -860,7 +860,7 @@
     } catch (error) {
       logger.error('[PrestigeCard] Failed to sync PvP prestige level:', error);
       toast.add({
-        title: t('settings.reset.error_title'),
+        title: t('settings.prestige.sync_error_title', 'Prestige Update Failed'),
         description: t('settings.prestige.sync_error_description'),
         color: 'error',
       });
@@ -896,7 +896,7 @@
     } catch (error) {
       logger.error('[PrestigeCard] Failed to delete prestige history entry:', error);
       toast.add({
-        title: t('settings.reset.error_title'),
+        title: t('settings.prestige.delete_history_error_title', 'Delete Failed'),
         description: t('settings.prestige.delete_history_error_description'),
         color: 'error',
       });
@@ -931,7 +931,7 @@
     } catch (error) {
       logger.error('[PrestigeCard] Failed to prestige PvP data:', error);
       toast.add({
-        title: t('settings.reset.error_title'),
+        title: t('settings.prestige_pvp.error_title', 'Prestige Failed'),
         description: t('settings.prestige_pvp.error_description'),
         color: 'error',
       });

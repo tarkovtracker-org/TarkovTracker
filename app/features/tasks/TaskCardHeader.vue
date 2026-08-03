@@ -37,14 +37,14 @@
     <div class="ml-2 flex shrink-0 items-center gap-1.5">
       <AppTooltip
         v-if="task?.wikiLink && !shouldLinkToWiki"
-        :text="t('page.tasks.questcard.view_on_wiki')"
+        :text="t('common.view_on_wiki', 'View on Wiki')"
       >
         <a
           :href="toWikiUrl(task.wikiLink)"
           target="_blank"
           rel="noopener noreferrer"
           :class="ICON_BUTTON_CLASS"
-          :aria-label="t('page.tasks.questcard.view_on_wiki')"
+          :aria-label="t('common.view_on_wiki', 'View on Wiki')"
           @click.stop
         >
           <NuxtImg
@@ -58,13 +58,13 @@
           />
         </a>
       </AppTooltip>
-      <AppTooltip v-if="task?.id" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
+      <AppTooltip v-if="task?.id" :text="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')">
         <a
           :href="tarkovDevTaskUrl"
           target="_blank"
           rel="noopener noreferrer"
           :class="ICON_BUTTON_CLASS"
-          :aria-label="t('page.tasks.questcard.view_on_tarkov_dev')"
+          :aria-label="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
           @click.stop
         >
           <NuxtImg

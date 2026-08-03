@@ -6,7 +6,6 @@ import {
   isFullRefund,
   shouldActivateCheckoutSession,
 } from './stripeBilling.ts';
-
 describe('getStripeReferenceId', () => {
   it('supports string and expanded Stripe references', () => {
     expect(getStripeReferenceId('sub_123')).toBe('sub_123');
@@ -14,7 +13,6 @@ describe('getStripeReferenceId', () => {
     expect(getStripeReferenceId(null)).toBeNull();
   });
 });
-
 describe('getInvoiceSubscriptionId', () => {
   it('supports legacy and current Stripe invoice shapes', () => {
     expect(getInvoiceSubscriptionId({ subscription: 'sub_legacy' })).toBe('sub_legacy');
@@ -25,7 +23,6 @@ describe('getInvoiceSubscriptionId', () => {
     ).toBe('sub_current');
   });
 });
-
 describe('isFullRefund', () => {
   it('distinguishes full and partial refunds', () => {
     expect(isFullRefund({ refunded: true, amount: 1000, amount_refunded: 1000 })).toBe(true);
@@ -33,7 +30,6 @@ describe('isFullRefund', () => {
     expect(isFullRefund({ refunded: false, amount: 1000, amount_refunded: 500 })).toBe(false);
   });
 });
-
 describe('shouldActivateCheckoutSession', () => {
   it('requires confirmed funds for one-time payments', () => {
     expect(shouldActivateCheckoutSession({ mode: 'payment', payment_status: 'paid' })).toBe(true);
@@ -41,7 +37,6 @@ describe('shouldActivateCheckoutSession', () => {
       false
     );
   });
-
   it('allows subscriptions to be verified from their Stripe status', () => {
     expect(shouldActivateCheckoutSession({ mode: 'subscription', payment_status: 'unpaid' })).toBe(
       true
@@ -49,7 +44,6 @@ describe('shouldActivateCheckoutSession', () => {
     expect(shouldActivateCheckoutSession({ mode: 'invalid', payment_status: 'paid' })).toBe(false);
   });
 });
-
 describe('getSubscriptionUserId', () => {
   it('reads the authenticated user reference from subscription metadata', () => {
     expect(getSubscriptionUserId({ metadata: { user_id: 'user-1' } })).toBe('user-1');

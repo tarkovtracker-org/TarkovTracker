@@ -117,11 +117,11 @@ export const getMapColorOptions = (t: MapColorOptionTranslator): MapColorOption[
     { key: 'SELF_OBJECTIVE', label: t('settings.interface.maps.colors.self_objective') },
     { key: 'TEAM_OBJECTIVE', label: t('settings.interface.maps.colors.team_objective') },
     { key: 'SELECTED', label: t('settings.interface.maps.colors.selected') },
-    { key: 'PMC_EXTRACT', label: t('settings.interface.maps.colors.pmc_extract') },
-    { key: 'SCAV_EXTRACT', label: t('settings.interface.maps.colors.scav_extract') },
+    { key: 'PMC_EXTRACT', label: t('common.pmc_extract') },
+    { key: 'SCAV_EXTRACT', label: t('common.scav_extract') },
     { key: 'SHARED_EXTRACT', label: t('settings.interface.maps.colors.shared_extract') },
     { key: 'COOP_EXTRACT', label: t('settings.interface.maps.colors.coop_extract') },
-    { key: 'PMC_SPAWN', label: t('settings.interface.maps.colors.pmc_spawn') },
+    { key: 'PMC_SPAWN', label: t('common.pmc_spawn') },
   ];
 };
 export const normalizeMapMarkerColors = (value: unknown): MapMarkerColors => {

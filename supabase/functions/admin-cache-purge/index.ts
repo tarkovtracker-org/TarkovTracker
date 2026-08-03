@@ -6,10 +6,8 @@ import {
   createSuccessResponse,
   type AuthSuccess,
 } from 'shared/auth';
-
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
-
 const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
 const TARKOV_CACHE_KEYS = [
   { key: 'bootstrap', includesGameMode: false },
@@ -41,20 +39,16 @@ const TARKOV_LANGUAGES = [
   'zh',
 ];
 const TARKOV_GAME_MODES = ['regular', 'pve'];
-
 interface PurgeRequest {
   purgeType: 'all' | 'tarkov-data';
 }
-
 interface CloudflarePurgeResponse {
   success: boolean;
   errors: Array<{ code: number; message: string }>;
   messages: string[];
   result?: { id: string } | null;
 }
-
 type SupabaseClient = AuthSuccess['supabase'];
-
 /**
  * Verify user has admin privileges
  */
@@ -64,15 +58,12 @@ async function verifyAdminStatus(supabase: SupabaseClient, userId: string): Prom
     .select('is_admin')
     .eq('user_id', userId)
     .single();
-
   if (error || !data) {
     console.error('[admin-cache-purge] Error checking admin status:', error);
     return false;
   }
-
   return data.is_admin === true;
 }
-
 /**
  * Log admin action to audit table
  */
@@ -89,7 +80,6 @@ async function logAdminAction(
       req.headers.get('x-forwarded-for')?.split(',')[0] ||
       'unknown';
     const userAgent = req.headers.get('user-agent') || 'unknown';
-
     await supabase.from('admin_audit_log').insert({
       admin_user_id: adminUserId,
       action,
@@ -102,14 +92,12 @@ async function logAdminAction(
     console.error('[admin-cache-purge] Failed to log audit action:', error);
   }
 }
-
 /**
  * Purge entire Cloudflare cache for the zone
  */
 async function purgeAllCache(zoneId: string, apiToken: string): Promise<CloudflarePurgeResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
-
   try {
     const response = await fetch(`${CLOUDFLARE_API_URL}/zones/${zoneId}/purge_cache`, {
       method: 'POST',
@@ -120,9 +108,7 @@ async function purgeAllCache(zoneId: string, apiToken: string): Promise<Cloudfla
       body: JSON.stringify({ purge_everything: true }),
       signal: controller.signal,
     });
-
     clearTimeout(timeoutId);
-
     if (!response.ok) {
       const text = await response.text();
       return {
@@ -133,7 +119,6 @@ async function purgeAllCache(zoneId: string, apiToken: string): Promise<Cloudfla
         messages: [],
       };
     }
-
     try {
       return (await response.json()) as CloudflarePurgeResponse;
     } catch (e) {
@@ -166,7 +151,6 @@ async function purgeAllCache(zoneId: string, apiToken: string): Promise<Cloudfla
     clearTimeout(timeoutId);
   }
 }
-
 /**
  * Purge specific Tarkov data cache URLs
  */
@@ -193,9 +177,7 @@ async function purgeTarkovDataCache(
       return ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
     }
   })();
-
   const urlsToPurge: string[] = [];
-
   for (const base of baseUrls) {
     const cacheBase = `${base}${EDGE_CACHE_PATH}`;
     for (const entry of TARKOV_CACHE_KEYS) {
@@ -210,28 +192,23 @@ async function purgeTarkovDataCache(
       }
     }
   }
-
   // Cloudflare limits files to 30 per call
   const CHUNK_SIZE = 30;
   const chunks: string[][] = [];
   for (let i = 0; i < urlsToPurge.length; i += CHUNK_SIZE) {
     chunks.push(urlsToPurge.slice(i, i + CHUNK_SIZE));
   }
-
   const aggregatedResult: CloudflarePurgeResponse = {
     success: true,
     errors: [],
     messages: [],
     result: { id: '' },
   };
-
   const resultIds: string[] = [];
-
   // Execute purge for each chunk
   for (const chunk of chunks) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
-
     try {
       const response = await fetch(`${CLOUDFLARE_API_URL}/zones/${zoneId}/purge_cache`, {
         method: 'POST',
@@ -242,7 +219,6 @@ async function purgeTarkovDataCache(
         body: JSON.stringify({ files: chunk }),
         signal: controller.signal,
       });
-
       if (!response.ok) {
         const text = await response.text();
         aggregatedResult.success = false;
@@ -252,7 +228,6 @@ async function purgeTarkovDataCache(
         });
         continue;
       }
-
       let data: CloudflarePurgeResponse;
       try {
         data = (await response.json()) as CloudflarePurgeResponse;
@@ -264,18 +239,15 @@ async function purgeTarkovDataCache(
         });
         continue;
       }
-
       if (!data.success) {
         aggregatedResult.success = false;
         if (data.errors) {
           aggregatedResult.errors.push(...data.errors);
         }
       }
-
       if (data.messages) {
         aggregatedResult.messages.push(...data.messages);
       }
-
       if (data.result?.id) {
         resultIds.push(data.result.id);
       }
@@ -293,37 +265,29 @@ async function purgeTarkovDataCache(
       clearTimeout(timeoutId);
     }
   }
-
   // Combine IDs from all successful chunks
   aggregatedResult.result = { id: resultIds.join(',') };
-
   return aggregatedResult;
 }
-
 Deno.serve(async (req) => {
   // Handle CORS preflight
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
-
   try {
     // Validate HTTP method
     const methodError = validateMethod(req, ['POST']);
     if (methodError) return methodError;
-
     // Authenticate user
     const authResult = await authenticateUser(req);
     if ('error' in authResult) {
       return createErrorResponse(authResult.error, authResult.status, req);
     }
-
     const { user, supabase } = authResult as AuthSuccess;
-
     // Verify admin status
     const isAdmin = await verifyAdminStatus(supabase, user.id);
     if (!isAdmin) {
       return createErrorResponse('Admin access required', 403, req);
     }
-
     // Parse request body
     const rawBody = await req.text();
     let body: Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' }>;
@@ -346,37 +310,30 @@ Deno.serve(async (req) => {
       body = { purgeType: 'tarkov-data' };
     }
     const purgeType = body.purgeType!;
-
     // Validate purge type
     if (!['all', 'tarkov-data'].includes(purgeType)) {
       return createErrorResponse("Invalid purgeType. Must be 'all' or 'tarkov-data'", 400, req);
     }
-
     // Get Cloudflare credentials
     const zoneId = Deno.env.get('CLOUDFLARE_ZONE_ID');
     const apiToken = Deno.env.get('CLOUDFLARE_API_TOKEN');
-
     if (!zoneId || !apiToken) {
       console.error('[admin-cache-purge] Missing Cloudflare credentials');
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
-
     // Get base URL for cache key construction
     const baseUrl =
       Deno.env.get('APP_URL') ||
       Deno.env.get('APP_BASE_URL') ||
       Deno.env.get('SITE_URL') ||
       'https://tarkovtracker.org';
-
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;
-
     if (purgeType === 'all') {
       purgeResult = await purgeAllCache(zoneId, apiToken);
     } else {
       purgeResult = await purgeTarkovDataCache(zoneId, apiToken, baseUrl);
     }
-
     // Log the admin action
     await logAdminAction(
       supabase,
@@ -390,7 +347,6 @@ Deno.serve(async (req) => {
       },
       req
     );
-
     // Check Cloudflare response
     if (!purgeResult.success) {
       const errors = purgeResult.errors || [];
@@ -398,11 +354,9 @@ Deno.serve(async (req) => {
         errors.length > 0
           ? errors.map((e) => e.message).join(', ')
           : 'Unknown error (no details provided by Cloudflare)';
-
       console.error('[admin-cache-purge] Cloudflare purge failed:', errorMessages);
       return createErrorResponse(`Cache purge failed: ${errorMessages}`, 502, req);
     }
-
     return createSuccessResponse(
       {
         success: true,

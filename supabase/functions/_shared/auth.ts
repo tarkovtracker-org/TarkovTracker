@@ -1,11 +1,9 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersFor } from "./cors.ts";
-
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ||
   (() => {
     throw new Error("Missing SUPABASE_URL env");
   })();
-
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
   (() => {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY env");
@@ -74,21 +72,18 @@ export async function authenticateUser(
       status: 401,
     };
   }
-
   const { data, error } = await authSupabase.auth.getClaims(token);
   const claims = data && typeof data === "object" && "claims" in data
     ? (data.claims as Record<string, unknown>)
     : null;
   const userId = claims?.sub;
   const userEmail = claims?.email;
-
   if (error || typeof userId !== "string" || userId.length === 0) {
     return {
       error: "Invalid authentication token",
       status: 401,
     };
   }
-
   return {
     user: {
       id: userId,
@@ -177,7 +172,6 @@ export function validateMethod(
  */
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * Check if a value is a valid UUID
  *
@@ -187,7 +181,6 @@ const UUID_REGEX =
 export function isValidUUID(value: unknown): value is string {
   return typeof value === "string" && UUID_REGEX.test(value);
 }
-
 /**
  * Validate required fields in request body
  *
@@ -212,7 +205,6 @@ export function validateRequiredFields(
   }
   return null;
 }
-
 /**
  * Validate that specified fields are valid UUIDs.
  * Skips fields that are undefined or null (use validateRequiredFields for required fields).

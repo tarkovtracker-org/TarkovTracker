@@ -8,10 +8,8 @@ import {
     type AuthSuccess
 } from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
-
 const VALID_GAME_MODES = ["pvp", "pve"] as const
 type GameMode = typeof VALID_GAME_MODES[number]
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   const corsResponse = handleCorsPreflight(req)

@@ -6,15 +6,15 @@
           to="/terms-of-service"
           class="text-info-400 hover:text-info-300 transition-colors"
         >
-          {{ t('footer.terms_of_service') }}
+          {{ t('common.terms_of_service') }}
         </router-link>
         <span class="text-surface-500">·</span>
         <router-link to="/privacy" class="text-info-400 hover:text-info-300 transition-colors">
-          {{ t('footer.privacy_policy') }}
+          {{ t('common.privacy_policy') }}
         </router-link>
         <span class="text-surface-500">·</span>
         <router-link to="/credits" class="text-info-400 hover:text-info-300 transition-colors">
-          {{ t('footer.credits') }}
+          {{ t('common.credits') }}
         </router-link>
         <template v-if="analyticsConfigured">
           <span class="text-surface-500">·</span>

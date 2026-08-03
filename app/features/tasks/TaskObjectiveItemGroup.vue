@@ -6,7 +6,7 @@
         <div class="text-surface-100 flex items-center gap-1.5 text-sm font-medium">
           {{ title }}
           <span v-if="props.optional" class="text-warning-300 text-[10px] font-semibold uppercase">
-            ({{ t('page.tasks.questcard.objective_optional_badge') }})
+            ({{ t('common.optional') }})
           </span>
         </div>
       </div>
@@ -41,13 +41,13 @@
           v-if="isRowOptional(row)"
           class="bg-warning-500/20 text-warning-300 rounded px-1 py-0.5 text-[10px] font-semibold uppercase"
         >
-          {{ t('page.tasks.questcard.objective_optional_badge') }}
+          {{ t('common.optional') }}
         </span>
         <span
           v-if="isRowReadyToHandOver(row)"
           class="bg-info-500/20 text-info-300 rounded px-1 py-0.5 text-[10px] font-semibold"
         >
-          {{ t('page.tasks.questcard.ready_to_hand_over', 'Ready to hand over') }}
+          {{ t('common.ready_to_hand_over', 'Ready to hand over') }}
         </span>
         <AppTooltip v-if="rowHasMapLocation(row)" :text="t('page.tasks.questcard.jump_to_map')">
           <button
@@ -201,8 +201,7 @@
       map[objective.id] = {
         neededCount,
         currentCount,
-        itemName:
-          item?.name || item?.shortName || objective.description || t('page.tasks.questcard.item'),
+        itemName: item?.name || item?.shortName || objective.description || t('common.item'),
         itemIcon:
           imageItem?.iconLink ||
           imageItem?.image512pxLink ||
@@ -229,7 +228,7 @@
       const fallback: ObjectiveMeta = {
         neededCount: objective.count ?? 1,
         currentCount: tarkovStore.getObjectiveCount(objective.id),
-        itemName: objective.description || t('page.tasks.questcard.item'),
+        itemName: objective.description || t('common.item'),
         itemIcon: undefined,
         foundInRaid: objective.foundInRaid === true,
       };
