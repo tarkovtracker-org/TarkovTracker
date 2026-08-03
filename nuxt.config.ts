@@ -64,20 +64,20 @@ if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
   }
 }
 // Sitekeys are public identifiers; the secret stays in the Pages project env.
-// Preview builds default to no widget because *.pages.dev is not in the widget's
-// domain allowlist; non-production builds use Cloudflare's always-pass test keys.
-const TURNSTILE_PRODUCTION_SITE_KEY = '0x4AAAAAAEDQJTvapp0PUVaO';
+// Production and preview builds require explicit configuration so a secret can never
+// be deployed without the matching client widget. Local builds use Cloudflare test keys.
 const TURNSTILE_SITE_KEY = (
   process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ??
-  (!IS_PRODUCTION_BUILD
-    ? TURNSTILE_TEST_SITE_KEY
-    : IS_CF_PREVIEW
-      ? ''
-      : TURNSTILE_PRODUCTION_SITE_KEY)
+  (!IS_PRODUCTION_BUILD ? TURNSTILE_TEST_SITE_KEY : '')
 ).trim();
 const TURNSTILE_SECRET_KEY = (
   process.env.NUXT_TURNSTILE_SECRET_KEY ?? (IS_PRODUCTION_BUILD ? '' : TURNSTILE_TEST_SECRET_KEY)
 ).trim();
+if (IS_PRODUCTION_BUILD && Boolean(TURNSTILE_SITE_KEY) !== Boolean(TURNSTILE_SECRET_KEY)) {
+  throw new Error(
+    '[Config] NUXT_PUBLIC_TURNSTILE_SITE_KEY and NUXT_TURNSTILE_SECRET_KEY must be configured together'
+  );
+}
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',

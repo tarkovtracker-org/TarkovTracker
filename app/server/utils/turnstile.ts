@@ -10,9 +10,8 @@ type SiteverifyResponse = {
   'error-codes'?: string[];
 };
 const isAllowedHostname = (hostname: string | undefined, allowedHostnames: string[]): boolean => {
-  if (!hostname || allowedHostnames.length === 0) {
-    return true;
-  }
+  if (allowedHostnames.length === 0) return true;
+  if (!hostname) return false;
   const normalized = hostname.toLowerCase();
   return allowedHostnames.some(
     (allowed) => normalized === allowed || normalized.endsWith(`.${allowed}`)
@@ -22,16 +21,24 @@ export const verifyTurnstileToken = async (options: {
   secretKey: string;
   token: string | null | undefined;
   allowedHostnames?: string[];
+  remoteIp?: string | null;
 }): Promise<TurnstileVerification> => {
   const token = options.token?.trim() ?? '';
   if (!token) {
     return { ok: false, reason: 'missing-token' };
   }
+  if (token.length > 2048) {
+    return { ok: false, reason: 'invalid-token' };
+  }
+  const requestBody = new URLSearchParams({ secret: options.secretKey, response: token });
+  if (options.remoteIp) {
+    requestBody.set('remoteip', options.remoteIp);
+  }
   let payload: SiteverifyResponse;
   try {
     const response = await fetch(SITEVERIFY_URL, {
       method: 'POST',
-      body: new URLSearchParams({ secret: options.secretKey, response: token }),
+      body: requestBody,
       signal: AbortSignal.timeout(SITEVERIFY_TIMEOUT_MS),
     });
     if (!response.ok) {

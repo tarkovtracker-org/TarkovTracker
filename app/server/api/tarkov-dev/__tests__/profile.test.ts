@@ -313,6 +313,7 @@ describe('/api/tarkov-dev/profile', () => {
     await expect(handler({})).resolves.toEqual(body);
     expect(verifyTurnstileTokenMock).toHaveBeenCalledWith({
       allowedHostnames: expect.arrayContaining(['tarkovtracker.org', 'localhost']),
+      remoteIp: '203.0.113.10',
       secretKey: 'secret-key',
       token: 'turnstile-token',
     });

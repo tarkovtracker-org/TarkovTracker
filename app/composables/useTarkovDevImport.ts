@@ -85,6 +85,8 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     importError.value = null;
     importErrorCode.value = null;
     importErrorMeta.value = null;
+    lastFetchedSource = null;
+    staleRetryJsonUrl = null;
   }
   function setError(message: string): void {
     setCodedError(message, null, null);
@@ -144,7 +146,10 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     importState.value = 'loading';
     previewData.value = null;
     importError.value = null;
+    importErrorCode.value = null;
+    importErrorMeta.value = null;
     lastFetchedSource = null;
+    staleRetryJsonUrl = null;
     try {
       const text = await file.text();
       if (requestId !== profileUrlRequestId) return;
@@ -158,6 +163,8 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   async function parseProfileUrl(profileUrl: string): Promise<TarkovDevProfileSource | null> {
     const requestId = ++profileUrlRequestId;
     importError.value = null;
+    importErrorCode.value = null;
+    importErrorMeta.value = null;
     const source = resolveTarkovDevProfileSource(profileUrl);
     if (!source.ok) {
       if (requestId !== profileUrlRequestId) return null;

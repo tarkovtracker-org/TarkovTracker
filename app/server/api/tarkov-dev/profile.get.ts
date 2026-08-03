@@ -218,7 +218,8 @@ export default defineEventHandler(async (event) => {
     getRateLimiterBinding(event)
   );
   const trustProxy = Boolean(typedConfig.apiProtection?.trustProxy);
-  const rateLimitKey = `profile:ip:${getProxyAwareClientIdentifier(event, trustProxy)}`;
+  const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
+  const rateLimitKey = `profile:ip:${clientIdentifier}`;
   if (
     !(await consumeRateLimit(
       sharedCacheHandle,
@@ -246,6 +247,7 @@ export default defineEventHandler(async (event) => {
       secretKey: turnstileSecretKey,
       token: getRequestHeader(event, 'x-turnstile-token'),
       allowedHostnames: resolveAllowedTurnstileHostnames(typedConfig.public?.appUrl),
+      remoteIp: clientIdentifier === 'unknown' ? null : clientIdentifier,
     });
     if (!verification.ok) {
       logger.warn('Tarkov.dev profile request failed Turnstile verification', {

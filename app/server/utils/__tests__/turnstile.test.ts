@@ -31,6 +31,16 @@ describe('verifyTurnstileToken', () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it('rejects oversized tokens without calling siteverify', async () => {
+    const verifyTurnstileToken = await loadUtil();
+    await expect(
+      verifyTurnstileToken({ secretKey: 'secret', token: 'x'.repeat(2049) })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-token',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('accepts tokens that siteverify validates', async () => {
     fetchMock.mockResolvedValue(
       siteverifyResponse({ hostname: 'tarkovtracker.org', success: true })
@@ -48,6 +58,20 @@ describe('verifyTurnstileToken', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+  it('passes the client IP to siteverify when available', async () => {
+    fetchMock.mockResolvedValue(
+      siteverifyResponse({ hostname: 'tarkovtracker.org', success: true })
+    );
+    const verifyTurnstileToken = await loadUtil();
+    await verifyTurnstileToken({
+      allowedHostnames: ['tarkovtracker.org'],
+      remoteIp: '203.0.113.10',
+      secretKey: 'secret',
+      token: 'token',
+    });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body?.toString()).toContain('remoteip=203.0.113.10');
+  });
   it('rejects tokens that siteverify declines', async () => {
     fetchMock.mockResolvedValue(
       siteverifyResponse({ 'error-codes': ['invalid-input-response'], success: false })
@@ -60,6 +84,17 @@ describe('verifyTurnstileToken', () => {
   });
   it('rejects tokens minted for other hostnames', async () => {
     fetchMock.mockResolvedValue(siteverifyResponse({ hostname: 'evil.example', success: true }));
+    const verifyTurnstileToken = await loadUtil();
+    await expect(
+      verifyTurnstileToken({
+        allowedHostnames: ['tarkovtracker.org'],
+        secretKey: 'secret',
+        token: 'token',
+      })
+    ).resolves.toEqual({ ok: false, reason: 'hostname-mismatch' });
+  });
+  it('rejects successful responses without a hostname when a hostname allowlist is configured', async () => {
+    fetchMock.mockResolvedValue(siteverifyResponse({ success: true }));
     const verifyTurnstileToken = await loadUtil();
     await expect(
       verifyTurnstileToken({

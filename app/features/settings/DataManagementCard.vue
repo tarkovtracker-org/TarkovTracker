@@ -55,7 +55,7 @@
                       :color="option.value === TARKOV_DEV_ARENA_MODE ? 'neutral' : 'info'"
                       size="xs"
                       class="justify-center"
-                      :disabled="isAnyImportActive || option.disabled"
+                      :disabled="isImportFlowActive || option.disabled"
                       @click="selectTarkovDevRefetchMode(option.value)"
                     >
                       {{ option.label }}
@@ -71,7 +71,8 @@
                     color="info"
                     size="xs"
                     :disabled="
-                      isAnyImportActive ||
+                      isImportFlowActive ||
+                      !isTurnstileReady ||
                       !isTarkovDevRefetchModeSupported ||
                       tarkovDevRefetchCooldownMinutes > 0
                     "
@@ -97,7 +98,7 @@
                     variant="soft"
                     color="neutral"
                     size="xs"
-                    :disabled="isAnyImportActive"
+                    :disabled="isImportFlowActive"
                     @click="handleTarkovDevUnlink"
                   >
                     {{ $t('settings.tarkov_dev_import.unlink_profile') }}
@@ -143,7 +144,7 @@
                   icon="i-mdi-link-variant"
                   class="min-w-0 flex-1"
                   :aria-label="$t('settings.tarkov_dev_import.profile_url_label')"
-                  :disabled="isAnyImportActive"
+                  :disabled="isImportFlowActive"
                   :placeholder="$t('settings.tarkov_dev_import.profile_url_placeholder')"
                 />
                 <UButton
@@ -151,7 +152,7 @@
                   icon="i-mdi-account-search"
                   color="info"
                   class="justify-center"
-                  :disabled="isTarkovDevProfileUrlBlank || isAnyImportActive"
+                  :disabled="isTarkovDevProfileUrlBlank || isImportFlowActive || !isTurnstileReady"
                   :loading="isTarkovDevProfileUrlLoading"
                 >
                   {{ $t('settings.tarkov_dev_import.fetch_profile') }}
@@ -995,7 +996,8 @@
     reset: resetTarkovDevImportState,
   } = dataManagementSession.tarkovDev;
   const turnstileContainerRef = ref<HTMLElement | null>(null);
-  const { enabled: isTurnstileEnabled } = useTurnstileWidget(turnstileContainerRef);
+  const { enabled: isTurnstileEnabled, ready: isTurnstileReady } =
+    useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
@@ -1383,9 +1385,10 @@
   const isAnyImportPreviewActive = computed(
     () => isBackupOrEftLogsImportPreviewActive.value || isTarkovDevImportPreviewActive.value
   );
-  const isAnyImportActive = computed(
+  const isImportFlowActive = computed(
     () => isAnyImportPreviewActive.value || tarkovDevImportState.value === 'loading'
   );
+  const isAnyImportActive = computed(() => isImportFlowActive.value);
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleDateString(undefined, {
       year: 'numeric',

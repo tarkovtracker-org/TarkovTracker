@@ -45,6 +45,11 @@ const {
   },
   tarkovDevState: {
     importError: { __v_isRef: true as const, value: null as string | null },
+    importErrorCode: { __v_isRef: true as const, value: null as string | null },
+    importErrorMeta: {
+      __v_isRef: true as const,
+      value: null as Record<string, number> | null,
+    },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
     importState: {
       __v_isRef: true as const,
@@ -85,6 +90,9 @@ mockNuxtImport('useToast', () => () => ({
 vi.mock('@/utils/logger', () => ({
   logger: mockLogger,
 }));
+vi.mock('@/composables/useTurnstile', () => ({
+  useTurnstileWidget: () => ({ enabled: false, ready: ref(true) }),
+}));
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({
     exportDebugSnapshot: backupFns.exportDebugSnapshot,
@@ -104,6 +112,8 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
     importState: tarkovDevState.importState,
     previewData: tarkovDevState.previewData,
     importError: tarkovDevState.importError,
+    importErrorCode: tarkovDevState.importErrorCode,
+    importErrorMeta: tarkovDevState.importErrorMeta,
     parseFile: tarkovDevFns.parseFile,
     parseProfileUrl: tarkovDevFns.parseProfileUrl,
     confirmImport: tarkovDevFns.confirmImport,
@@ -202,6 +212,8 @@ describe('DataManagementCard', () => {
     backupState.importPreview.value = null;
     backupState.importState.value = 'idle';
     tarkovDevState.importError.value = null;
+    tarkovDevState.importErrorCode.value = null;
+    tarkovDevState.importErrorMeta.value = null;
     tarkovDevState.importState.value = 'idle';
     tarkovDevState.previewData.value = null;
     eftLogsState.importError.value = null;

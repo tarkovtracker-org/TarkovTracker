@@ -289,6 +289,27 @@ describe('useTarkovDevImport', () => {
       retry: 0,
     });
   });
+  it('clears a pending stale retry when the import flow is reset', async () => {
+    mockFetch.mockRejectedValueOnce(
+      Object.assign(new Error('stale'), {
+        data: { data: { ageDays: 12, code: 'profile_stale' } },
+        statusCode: 422,
+      })
+    );
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    composable.reset();
+    mockFetch.mockResolvedValueOnce({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(mockFetch).toHaveBeenLastCalledWith('/api/tarkov-dev/profile', {
+      query: { url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
+    });
+  });
   it('records the client cooldown after confirming a url import', async () => {
     mockFetch.mockResolvedValue({ aid: 8560316 });
     mockParseTarkovDevProfile.mockReturnValue({

@@ -22,6 +22,7 @@ export interface TurnstileTokenProvider {
 }
 export interface UseTurnstileWidgetReturn {
   enabled: boolean;
+  ready: Readonly<Ref<boolean>>;
 }
 const TOKEN_WAIT_TIMEOUT_MS = 8000;
 let scriptPromise: Promise<TurnstileApi | null> | null = null;
@@ -33,11 +34,21 @@ function loadTurnstileApi(): Promise<TurnstileApi | null> {
   const existing = readTurnstileApi();
   if (existing) return Promise.resolve(existing);
   if (!scriptPromise) {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${TURNSTILE_SCRIPT_URL}"]`
+    );
+    if (existingScript) {
+      existingScript.remove();
+    }
     scriptPromise = new Promise<TurnstileApi | null>((resolvePromise) => {
       const script = document.createElement('script');
       script.src = TURNSTILE_SCRIPT_URL;
       script.async = true;
-      script.onload = () => resolvePromise(readTurnstileApi());
+      script.onload = () => {
+        const loadedApi = readTurnstileApi();
+        if (!loadedApi) scriptPromise = null;
+        resolvePromise(loadedApi);
+      };
       script.onerror = () => {
         logger.warn('[Turnstile] Failed to load the Turnstile script');
         scriptPromise = null;
@@ -59,8 +70,9 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
   const siteKey =
     typeof config.public.turnstileSiteKey === 'string' ? config.public.turnstileSiteKey.trim() : '';
   const enabled = siteKey.length > 0;
+  const ready = ref(!enabled);
   if (!enabled) {
-    return { enabled };
+    return { enabled, ready };
   }
   let api: TurnstileApi | null = null;
   let widgetId: string | undefined;
@@ -120,12 +132,16 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
         size: 'flexible',
         theme: 'auto',
       });
-      activeProvider = provider;
+      if (widgetId !== undefined) {
+        activeProvider = provider;
+        ready.value = true;
+      }
     } catch (error) {
       logger.warn('[Turnstile] Failed to render widget:', error);
     }
   });
   onUnmounted(() => {
+    ready.value = false;
     if (activeProvider === provider) {
       activeProvider = null;
     }
@@ -139,5 +155,5 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
       widgetId = undefined;
     }
   });
-  return { enabled };
+  return { enabled, ready };
 }

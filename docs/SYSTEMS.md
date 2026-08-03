@@ -528,8 +528,10 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    configured, and calls the proxy with `retry: 0`.
 2. The proxy enforces, in order: per-IP rate limits (default 5/min then 20/hour, separate
    `tarkov-dev-profile-rate` / `tarkov-dev-profile-hourly-rate` buckets, DO binding passed when
-   available), then Turnstile verification (only when `NUXT_TURNSTILE_SECRET_KEY` is set; fails
-   open if siteverify itself is down), then the shared edge cache (`tarkov-dev-profile` prefix,
+   available), then Turnstile verification (only when the paired
+   `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and `NUXT_TURNSTILE_SECRET_KEY` are set; production config
+   rejects partial configuration and siteverify availability failures fail open), then the shared
+   edge cache (`tarkov-dev-profile` prefix,
    default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached
    for 60 s).
 3. On cache miss it fetches upstream with the shared User-Agent. With `?fresh=1` (sent by the
@@ -563,9 +565,10 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   buckets are route-specific.
 - Rate limiting runs before Turnstile verification, which runs before any cache read or upstream
   fetch, so floods cannot burn siteverify or upstream subrequests.
-- Turnstile enforcement is keyed on the server secret being configured; without it the route
-  behaves as before (no token required). Siteverify availability failures allow the request;
-  explicit verification failures reject it with `403 turnstile_failed`.
+- Turnstile enforcement is keyed on the server secret being configured; production config requires
+  the public sitekey and private secret together, so the client cannot submit before its widget is
+  ready. Without the pair the route behaves as before (no token required). Siteverify availability
+  failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
 - Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can
   never be imported from cache either.
 - A `fresh=1` request bypasses the cache read but not the rate limits, and revalidates with
