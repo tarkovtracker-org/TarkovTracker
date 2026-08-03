@@ -134,17 +134,10 @@
     "app/locales/*.json": [
       "node scripts/lint-i18n.mjs"
     ],
-    "docs/**/*.{md,markdown}": [
-      "prettier --write"
-    ],
-    "./!(DESIGN).md": [
-      "prettier --write"
-    ],
-    ".github/**/*.md": [
+    "**/*.{md,markdown}": [
       "prettier --write"
     ],
     "./DESIGN.md": [
-      "prettier --write",
       "design.md lint"
     ],
     "./nuxt.config.ts": [
@@ -166,11 +159,19 @@
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
+    "!(app)/**/*.{js,mjs,cjs}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
     "tests/**/*.{ts,tsx}": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
     "./*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "!(app|scripts|supabase|workers|.cubic)/**/*.json": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
@@ -190,26 +191,19 @@
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "scripts/**/*.{cjs,js,mjs}": [
-      "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
-    ],
     "scripts/**/*.{sh,ts,tsx}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "supabase/**/*.{cjs,js,mjs,sh,ts,tsx}": [
+    "supabase/**/*.{sh,ts,tsx}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "workers/**/*.{cjs,js,mjs,sh,ts,tsx}": [
+    "workers/**/*.{sh,ts,tsx}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
     ".cubic/**/*.json": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    ".github/**/*.{yaml,yml}": [
-      "node scripts/lint-blank-lines.mjs --fix"
-    ],
-    "./*.{yaml,yml}": [
+    "**/*.{yaml,yml}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ]
   }
