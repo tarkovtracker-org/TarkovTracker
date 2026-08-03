@@ -34,13 +34,15 @@ const excludedFiles = new Set([
 const excludedLocalePattern = /^app\/locales\/(?!en\.json$)[^/]+\.json$/;
 const excludedDirectories = ['.git/', '.nuxt/', 'coverage/', 'dist/', 'node_modules/'];
 const normalizePath = (filePath) => filePath.replaceAll('\\', '/');
+const isExcludedDirectory = (filePath, directory) =>
+  filePath.startsWith(directory) || filePath.includes(`/${directory}`);
 const isCandidate = (filePath) => {
   const normalizedPath = normalizePath(filePath);
   const extension = extname(normalizedPath).toLowerCase();
   return (
     !excludedFiles.has(normalizedPath) &&
     !excludedLocalePattern.test(normalizedPath) &&
-    !excludedDirectories.some((directory) => normalizedPath.includes(directory)) &&
+    !excludedDirectories.some((directory) => isExcludedDirectory(normalizedPath, directory)) &&
     supportedExtensions.has(extension)
   );
 };
@@ -371,12 +373,12 @@ const getYamlScalarLines = (lines, filePath) => {
     let contentIndent = null;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
-      if (/^[\t ]*$/.test(candidate)) {
+      if (/^[\t \r]*$/.test(candidate)) {
         if (keepChomping) {
           protectedLines.add(next);
           continue;
         }
-        const following = lines.slice(next + 1).find((line) => !/^[\t ]*$/.test(line));
+        const following = lines.slice(next + 1).find((line) => !/^[\t \r]*$/.test(line));
         const followingIndent = following?.match(/^[\t ]*/)?.[0].length;
         if (contentIndent === null || followingIndent >= contentIndent) protectedLines.add(next);
         continue;
@@ -421,7 +423,7 @@ const getYamlPlainScalarLines = (lines, filePath) => {
   };
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (/^[\t ]*$/.test(line)) {
+    if (/^[\t \r]*$/.test(line)) {
       if (flowDepth > 0 || rootContinuationIndent !== null) protectedLines.add(index);
       continue;
     }
@@ -436,7 +438,7 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       else protectedLines.add(index);
     }
     if (rootPlain && rootContinuationIndent === null) {
-      const following = lines.slice(index + 1).find((entry) => !/^[\t ]*$/.test(entry));
+      const following = lines.slice(index + 1).find((entry) => !/^[\t \r]*$/.test(entry));
       const followingIndent = following?.match(/^\s*/)[0].length;
       if (following && followingIndent > 0 && !isStructural(following)) {
         rootContinuationIndent = followingIndent;
@@ -450,8 +452,8 @@ const getYamlPlainScalarLines = (lines, filePath) => {
         const headerIndent = bareSequence[1].length;
         for (let next = index + 1; next < lines.length; next += 1) {
           const candidate = lines[next];
-          if (/^[\t ]*$/.test(candidate)) {
-            const following = lines.slice(next + 1).find((entry) => !/^[\t ]*$/.test(entry));
+          if (/^[\t \r]*$/.test(candidate)) {
+            const following = lines.slice(next + 1).find((entry) => !/^[\t \r]*$/.test(entry));
             if (
               following &&
               following.match(/^[\t ]*/)[0].length > headerIndent &&
@@ -485,8 +487,8 @@ const getYamlPlainScalarLines = (lines, filePath) => {
     const headerIndent = match[1].length;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
-      if (/^[\t ]*$/.test(candidate)) {
-        const following = lines.slice(next + 1).find((entry) => !/^[\t ]*$/.test(entry));
+      if (/^[\t \r]*$/.test(candidate)) {
+        const following = lines.slice(next + 1).find((entry) => !/^[\t \r]*$/.test(entry));
         if (
           following &&
           following.match(/^[\t ]*/)[0].length > headerIndent &&
@@ -512,7 +514,7 @@ const getYamlQuotedLines = (lines, filePath) => {
   let flowDepth = 0;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (quote && /^[\t ]*$/.test(line)) protectedLines.add(index);
+    if (quote && /^[\t \r]*$/.test(line)) protectedLines.add(index);
     for (let position = 0; position < line.length; position += 1) {
       const character = line[position];
       const previous = line[position - 1];
@@ -636,14 +638,17 @@ const endsWithContinuation = (line) => {
 const stripBlankLines = (source, filePath) => {
   if (/^[\t \r\n]*$/.test(source)) return { removed: 0, source };
   const lines = source.split('\n');
+  const yamlLines = ['.yaml', '.yml'].includes(extname(filePath).toLowerCase())
+    ? lines.map((line) => line.replace(/\r$/, ''))
+    : lines;
   const hasFinalNewline = source.endsWith('\n');
   const lastLine = hasFinalNewline ? lines.length - 1 : lines.length;
   const protectedRanges = getProtectedRanges(source, filePath).sort(
     (left, right) => left.start - right.start || left.end - right.end
   );
-  const yamlScalarLines = getYamlScalarLines(lines, filePath);
-  const yamlPlainScalarLines = getYamlPlainScalarLines(lines, filePath);
-  const yamlQuotedLines = getYamlQuotedLines(lines, filePath);
+  const yamlScalarLines = getYamlScalarLines(yamlLines, filePath);
+  const yamlPlainScalarLines = getYamlPlainScalarLines(yamlLines, filePath);
+  const yamlQuotedLines = getYamlQuotedLines(yamlLines, filePath);
   const isCodeFile = ['.cjs', '.js', '.mjs', '.ts', '.tsx', '.vue'].includes(
     extname(filePath).toLowerCase()
   );

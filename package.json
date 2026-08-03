@@ -127,25 +127,27 @@
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "app/locales/*.json": [
+    "app/locales/en.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "app/locales/*.json": [
       "node scripts/lint-i18n.mjs"
     ],
     "docs/**/*.{md,markdown}": [
       "prettier --write"
     ],
-    "*.md": [
+    "./!(DESIGN).md": [
       "prettier --write"
     ],
     ".github/**/*.md": [
       "prettier --write"
     ],
-    "DESIGN.md": [
+    "./DESIGN.md": [
       "prettier --write",
       "design.md lint"
     ],
-    "nuxt.config.ts": [
+    "./nuxt.config.ts": [
       "prettier --write",
       "eslint --fix",
       "node scripts/lint-blank-lines.mjs --fix"
@@ -155,12 +157,12 @@
       "eslint --fix",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "vitest*.ts": [
+    "./vitest*.ts": [
       "prettier --write",
       "eslint --fix",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "*.{js,mjs,cjs}": [
+    "./*.{js,mjs,cjs}": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
@@ -168,7 +170,7 @@
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "*.json": [
+    "./*.json": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
@@ -207,7 +209,7 @@
     ".github/**/*.{yaml,yml}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "*.{yaml,yml}": [
+    "./*.{yaml,yml}": [
       "node scripts/lint-blank-lines.mjs --fix"
     ]
   }

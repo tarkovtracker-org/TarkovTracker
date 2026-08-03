@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +25,39 @@ const runFixtures = () => {
   const yaml = runFix('scalar', 'run: |\n  first\n\n  second\nnext: value\n\n', 'yml');
   if (yaml !== 'run: |\n  first\n\n  second\nnext: value\n') {
     throw new Error(`YAML scalar protection failed:\n${yaml}`);
+  }
+  const crlfYaml = runFix(
+    'crlf-scalar',
+    'run: |\r\n  first\r\n\r\n  second\r\nnext: value\r\n\r\n',
+    'yml'
+  );
+  if (crlfYaml !== 'run: |\r\n  first\r\n\r\n  second\r\nnext: value\r\n') {
+    throw new Error(`CRLF YAML scalar protection failed:\n${crlfYaml}`);
+  }
+  const similarDirectory = join(directory, 'notdist');
+  mkdirSync(similarDirectory);
+  const similarDirectoryFile = join(similarDirectory, 'example.mjs');
+  writeFileSync(similarDirectoryFile, 'const first = 1;\n\nconst second = 2;\n');
+  execFileSync(process.execPath, [script, '--fix', similarDirectoryFile], {
+    cwd: root,
+    stdio: 'pipe',
+  });
+  const similarDirectoryOutput = readFileSync(similarDirectoryFile, 'utf8');
+  if (similarDirectoryOutput !== 'const first = 1;\nconst second = 2;\n') {
+    throw new Error(`Excluded directory boundary failed:\n${similarDirectoryOutput}`);
+  }
+  const excludedDirectory = join(directory, 'dist');
+  mkdirSync(excludedDirectory);
+  const excludedDirectoryFile = join(excludedDirectory, 'example.mjs');
+  const excludedDirectorySource = 'const first = 1;\n\nconst second = 2;\n';
+  writeFileSync(excludedDirectoryFile, excludedDirectorySource);
+  execFileSync(process.execPath, [script, '--fix', excludedDirectoryFile], {
+    cwd: root,
+    stdio: 'pipe',
+  });
+  const excludedDirectoryOutput = readFileSync(excludedDirectoryFile, 'utf8');
+  if (excludedDirectoryOutput !== excludedDirectorySource) {
+    throw new Error(`Excluded directory handling failed:\n${excludedDirectoryOutput}`);
   }
   const heredoc = runFix(
     'heredoc',

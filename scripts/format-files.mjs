@@ -30,7 +30,11 @@ const localPrettier = resolve(
   'node_modules/.bin',
   process.platform === 'win32' ? 'prettier.cmd' : 'prettier'
 );
-execFileSync(localPrettier, [mode, ...patterns], {
-  shell: process.platform === 'win32',
-  stdio: 'inherit',
-});
+try {
+  execFileSync(localPrettier, [mode, ...patterns], {
+    shell: process.platform === 'win32',
+    stdio: 'inherit',
+  });
+} catch (error) {
+  process.exit(typeof error.status === 'number' ? error.status : 1);
+}
