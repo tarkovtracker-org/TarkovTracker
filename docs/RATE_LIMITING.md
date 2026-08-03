@@ -245,8 +245,8 @@ Important:
   fallback.
 - Without it, fallback is best-effort in-memory and can under-enforce under concurrency or restarts.
 - When Turnstile is configured, the `tarkov-dev-profile-verification-rate` limit (5/min/IP) runs
-  before siteverify and **replaces** the regular per-minute limit for that branch; the two minute
-  limits never stack. Without Turnstile, the regular per-minute limit applies.
+  before siteverify and **replaces** the regular per-minute limit for that branch; the two
+  per-minute limits never stack. Without Turnstile, the regular per-minute limit applies.
 - These limits protect **app endpoints**, not the external progress API.
 - `/api/tarkov-dev/profile` layers more than the rate limit: a 15-minute shared edge cache for
   profile payloads (`NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`, 404s negative-cached 60s, browser
