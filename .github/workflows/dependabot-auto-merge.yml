@@ -18,6 +18,7 @@ permissions:
   checks: read
   contents: write
   pull-requests: write
+  statuses: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -52,12 +53,9 @@ jobs:
           fi
           case "$HEAD_REF" in
             dependabot/npm_and_yarn/lint-and-format-* | \
-            dependabot/npm_and_yarn/nuxt-ecosystem-* | \
             dependabot/npm_and_yarn/testing-tooling-* | \
             dependabot/npm_and_yarn/tailwind-tooling-* | \
-            dependabot/npm_and_yarn/release-tooling-* | \
-            dependabot/github_actions/official-actions-* | \
-            dependabot/github_actions/third-party-actions-*)
+            dependabot/npm_and_yarn/release-tooling-*)
               eligible=true
               ;;
           esac
@@ -76,9 +74,7 @@ jobs:
                   package.json | \
                   pnpm-lock.yaml | \
                   pnpm-workspace.yaml | \
-                  workers/api-gateway/package.json | \
-                  .github/workflows/*.yml | \
-                  .github/workflows/*.yaml)
+                  workers/api-gateway/package.json)
                     ;;
                   *)
                     printf '%s\n' "$file"
@@ -116,17 +112,29 @@ jobs:
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
                 --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR"))'
             )"
+            status_contexts="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
+                --jq '.statuses | sort_by(.context, .updated_at) | group_by(.context) | map(last)'
+            )"
             failing_count="$(
               jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required")] | length' <<< "$check_runs"
             )"
-            if [ "$failing_count" -gt 0 ]; then
+            failing_status_count="$(
+              jq '[.[] | select(.state == "failure" or .state == "error")] | length' <<< "$status_contexts"
+            )"
+            if [ "$failing_count" -gt 0 ] || [ "$failing_status_count" -gt 0 ]; then
               jq -r '.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required") | "::error::\(.name) concluded \(.conclusion)"' <<< "$check_runs"
+              jq -r '.[] | select(.state == "failure" or .state == "error") | "::error::\(.context) concluded \(.state)"' <<< "$status_contexts"
               exit 1
             fi
             missing_checks=()
             incomplete_checks=()
             pending_count="$(
               jq '[.[] | select(.status != "completed")] | length' <<< "$check_runs"
+            )"
+            pending_status_count="$(
+              jq '[.[] | select(.state == "pending")] | length' <<< "$status_contexts"
             )"
             for check_name in "${expected_checks[@]}"; do
               matching_check="$(
@@ -143,21 +151,23 @@ jobs:
                 incomplete_checks+=("$check_name")
               fi
             done
-            if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ]; then
+            if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$pending_status_count" -eq 0 ]; then
               echo "All checks completed."
               break
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
-              printf '::error::Timed out waiting for checks. Missing: %s. Incomplete: %s. Pending: %s.\n' \
+              printf '::error::Timed out waiting for checks. Missing: %s. Incomplete: %s. Pending checks: %s. Pending statuses: %s.\n' \
                 "${missing_checks[*]:-none}" \
                 "${incomplete_checks[*]:-none}" \
-                "$pending_count"
+                "$pending_count" \
+                "$pending_status_count"
               exit 1
             fi
-            printf 'Waiting for checks. Missing: %s. Incomplete: %s. Pending: %s.\n' \
+            printf 'Waiting for checks. Missing: %s. Incomplete: %s. Pending checks: %s. Pending statuses: %s.\n' \
               "${missing_checks[*]:-none}" \
               "${incomplete_checks[*]:-none}" \
-              "$pending_count"
+              "$pending_count" \
+              "$pending_status_count"
             sleep 30
           done
       - name: Merge Dependabot PR
@@ -171,12 +181,17 @@ jobs:
           merge_state="UNKNOWN"
           deadline=$((SECONDS + 120))
           while true; do
-            merge_state="$(
+            pr_state="$(
               gh pr view "$PR_NUMBER" \
                 --repo "$GITHUB_REPOSITORY" \
-                --json mergeStateStatus \
-                --jq '.mergeStateStatus'
+                --json headRefOid,mergeStateStatus
             )"
+            current_head_sha="$(jq -r '.headRefOid' <<< "$pr_state")"
+            merge_state="$(jq -r '.mergeStateStatus' <<< "$pr_state")"
+            if [ "$current_head_sha" != "$HEAD_SHA" ]; then
+              echo "::error::PR head changed from $HEAD_SHA to $current_head_sha after validation."
+              exit 1
+            fi
             if [ "$merge_state" != "UNKNOWN" ]; then
               break
             fi
@@ -197,5 +212,6 @@ jobs:
           esac
           gh pr merge "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
+            --match-head-commit "$HEAD_SHA" \
             --squash \
             --delete-branch

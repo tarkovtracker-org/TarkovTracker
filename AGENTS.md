@@ -199,6 +199,9 @@ Naming:
 - If a review integration cannot complete because of exhausted credits, rate limits, vendor failure, or an equivalent external blocker, document that failure on the PR, perform and report a direct self-review of the diff, and only then decide whether to merge.
 - Treat new comments created by the latest pushed commit as part of the same review cycle. Repeat until checks pass, reviews are complete, and unresolved thread count is zero.
 - After merge, run one fresh review-thread query to verify zero unresolved threads. Post-merge follow-ups are exceptional recovery, not the normal review workflow.
+- Review all Dependabot GitHub Actions PRs manually. Before merging an action SHA change, verify and
+  update repository and organization Actions allowlists when they restrict that action; do not rely
+  on the Dependabot branch checks to prove the new SHA is permitted.
 
 - Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks) for the first in-flight task.
 - Before edits, run `git status --short --branch`.

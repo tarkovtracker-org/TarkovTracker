@@ -83,16 +83,20 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 - testing tooling
 - tailwind tooling
 - release tooling
-- official GitHub Actions
-- third-party GitHub Actions minor/patch updates
 
 **Safety rules:**
 
 - Dependabot-only, `main`-targeted PRs only
 - No repository checkout in the privileged `pull_request_target` workflow
-- Only package lockfiles, package manifests, and workflow files are allowed
-- Runtime Nuxt, Cloudflare, TypeScript compiler, and catch-all dependency updates stay manual
-- PR must be mergeable and all standard CI/security checks must finish without failures
+- Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
+  change stays manual
+- Runtime Nuxt, Cloudflare, TypeScript compiler, catch-all dependencies, and all GitHub Actions
+  updates stay manual
+- GitHub Actions updates may require a repository or organization Actions allowlist change for the
+  new pinned SHA, which CI on the Dependabot branch cannot validate reliably
+- PR must stay on the validated head SHA and finish all check runs and the latest result for each
+  legacy status context without failures or pending results; the merge command also matches the
+  validated head commit to close the final race
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
 
@@ -188,8 +192,9 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Features:**
 
 - Weekly dependency update batches for the pnpm workspace (root + `workers/api-gateway`)
-- Monthly grouped GitHub Actions updates
-- Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
+- Monthly grouped GitHub Actions updates for manual review
+- Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
+  behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
 - Patch cooldown is short so safe patch updates do not sit for a full week
 - Grouped minor/patch updates for low-risk tooling families
@@ -212,9 +217,12 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Review strategy:**
 
 - Let Dependabot batch low-risk tooling updates for scheduled review windows
-- Let the auto-merge workflow clear allowlisted tooling/action PRs after checks pass
+- Let the auto-merge workflow clear allowlisted npm tooling PRs after checks pass
+- Review every GitHub Actions PR manually, including minor and patch updates; update repository and
+  organization Actions allowlists first when the pinned SHA is restricted
 - Keep major upgrades explicit
-- Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
+- Allow official GitHub-maintained actions to propose major updates when GitHub changes required
+  action runtimes, but do not auto-merge them
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
 - Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, and catch-all dependency updates manual
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
