@@ -34,7 +34,10 @@ const {
     confirmImport: vi.fn(async () => undefined),
     parseFile: vi.fn(async () => undefined),
     parseProfileUrl: vi.fn<
-      (profileUrl: string) => Promise<{
+      (
+        profileUrl: string,
+        options?: { fresh?: boolean; turnstileToken?: string | null }
+      ) => Promise<{
         mode: 'pvp' | 'pve' | null;
         profileJsonUrl: string;
         tarkovUid: number;
@@ -91,7 +94,12 @@ vi.mock('@/utils/logger', () => ({
   logger: mockLogger,
 }));
 vi.mock('@/composables/useTurnstile', () => ({
-  useTurnstileWidget: () => ({ enabled: false, ready: ref(true) }),
+  useTurnstileWidget: () => ({
+    enabled: false,
+    getToken: vi.fn(async () => null),
+    ready: ref(true),
+    reset: vi.fn(),
+  }),
 }));
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({
@@ -352,7 +360,8 @@ describe('DataManagementCard', () => {
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pve/8560316';
     await vm.handleTarkovDevProfileUrlSubmit();
     expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://tarkov.dev/players/pve/8560316'
+      'https://tarkov.dev/players/pve/8560316',
+      { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
   });
@@ -372,7 +381,8 @@ describe('DataManagementCard', () => {
     vm.tarkovDevProfileUrlInput = 'https://players.tarkov.dev/profile/8560316.json';
     await vm.handleTarkovDevProfileUrlSubmit();
     expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://players.tarkov.dev/profile/8560316.json'
+      'https://players.tarkov.dev/profile/8560316.json',
+      { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
   });
@@ -475,7 +485,8 @@ describe('DataManagementCard', () => {
       wrapper.vm
     ).handleTarkovDevRefetch();
     expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://tarkov.dev/players/pve/123456'
+      'https://tarkov.dev/players/pve/123456',
+      { fresh: true, turnstileToken: null }
     );
     expect(asVm<{ tarkovDevTargetMode: 'pvp' | 'pve' }>(wrapper.vm).tarkovDevTargetMode).toBe(
       'pve'

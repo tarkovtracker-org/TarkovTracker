@@ -248,8 +248,9 @@ export default defineNuxtConfig({
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl,
       turnstileSiteKey: TURNSTILE_SITE_KEY,
-      tarkovDevImportCooldownMinutes:
-        Number(process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES || '60') || 60,
+      tarkovDevImportCooldownMinutes: Number(
+        process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES?.trim() || '60'
+      ),
       allowDirectTokenCreateFallback:
         process.env.NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK === 'true',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,

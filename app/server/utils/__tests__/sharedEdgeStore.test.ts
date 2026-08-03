@@ -210,7 +210,7 @@ describe('consumeSharedRateLimit', () => {
     const { consumeSharedRateLimit } = await import('@/server/utils/sharedEdgeStore');
     const stubFetch = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(JSON.stringify({ allowed: true }))
+        new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 60_000 }))
     );
     const cacheMatch = vi.fn(async () => undefined);
     const handle = {
@@ -241,7 +241,10 @@ describe('consumeSharedRateLimit', () => {
       limiter: {
         idFromName: vi.fn(() => 'id-1'),
         get: vi.fn(() => ({
-          fetch: vi.fn(async () => new Response(JSON.stringify({ allowed: false }))),
+          fetch: vi.fn(
+            async () =>
+              new Response(JSON.stringify({ allowed: false, resetAt: Date.now() + 60_000 }))
+          ),
         })),
       },
     };

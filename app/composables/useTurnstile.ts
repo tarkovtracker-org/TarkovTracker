@@ -14,19 +14,16 @@ type TurnstileApi = {
   render: (container: HTMLElement, options: TurnstileRenderOptions) => string | undefined;
   reset: (widgetId?: string) => void;
   remove: (widgetId?: string) => void;
-  getResponse: (widgetId?: string) => string | undefined;
 };
-export interface TurnstileTokenProvider {
-  getToken: () => Promise<string | null>;
-  reset: () => void;
-}
 export interface UseTurnstileWidgetReturn {
   enabled: boolean;
   ready: Readonly<Ref<boolean>>;
+  getToken: () => Promise<string | null>;
+  reset: () => void;
 }
 const TOKEN_WAIT_TIMEOUT_MS = 8000;
+const SCRIPT_LOAD_RETRY_MS = 5000;
 let scriptPromise: Promise<TurnstileApi | null> | null = null;
-let activeProvider: TurnstileTokenProvider | null = null;
 function readTurnstileApi(): TurnstileApi | null {
   return (window as typeof window & { turnstile?: TurnstileApi }).turnstile ?? null;
 }
@@ -37,9 +34,7 @@ function loadTurnstileApi(): Promise<TurnstileApi | null> {
     const existingScript = document.querySelector<HTMLScriptElement>(
       `script[src="${TURNSTILE_SCRIPT_URL}"]`
     );
-    if (existingScript) {
-      existingScript.remove();
-    }
+    if (existingScript) existingScript.remove();
     scriptPromise = new Promise<TurnstileApi | null>((resolvePromise) => {
       const script = document.createElement('script');
       script.src = TURNSTILE_SCRIPT_URL;
@@ -59,62 +54,56 @@ function loadTurnstileApi(): Promise<TurnstileApi | null> {
   }
   return scriptPromise;
 }
-export function requestTurnstileToken(): Promise<string | null> {
-  return activeProvider ? activeProvider.getToken() : Promise.resolve(null);
-}
-export function notifyTurnstileTokenConsumed(): void {
-  activeProvider?.reset();
-}
 export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurnstileWidgetReturn {
   const config = useRuntimeConfig();
   const siteKey =
     typeof config.public.turnstileSiteKey === 'string' ? config.public.turnstileSiteKey.trim() : '';
   const enabled = siteKey.length > 0;
   const ready = ref(!enabled);
-  if (!enabled) {
-    return { enabled, ready };
-  }
   let api: TurnstileApi | null = null;
   let widgetId: string | undefined;
   let latestToken: string | null = null;
+  let renderGeneration = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let waiters: Array<(token: string | null) => void> = [];
   const flushWaiters = (token: string | null): void => {
     const pending = waiters;
     waiters = [];
     for (const resolveWaiter of pending) resolveWaiter(token);
   };
-  const provider: TurnstileTokenProvider = {
-    getToken: () => {
-      if (latestToken) return Promise.resolve(latestToken);
-      if (!api || widgetId === undefined) return Promise.resolve(null);
-      return new Promise<string | null>((resolveToken) => {
-        const timeout = setTimeout(() => {
-          waiters = waiters.filter((waiter) => waiter !== resolveWithCleanup);
-          resolveToken(null);
-        }, TOKEN_WAIT_TIMEOUT_MS);
-        const resolveWithCleanup = (token: string | null): void => {
-          clearTimeout(timeout);
-          resolveToken(token);
-        };
-        waiters.push(resolveWithCleanup);
-      });
-    },
-    reset: () => {
-      latestToken = null;
-      if (api && widgetId !== undefined) {
-        try {
-          api.reset(widgetId);
-        } catch (error) {
-          logger.debug('[Turnstile] Failed to reset widget:', error);
-        }
+  const removeWidget = (): void => {
+    renderGeneration += 1;
+    ready.value = !enabled;
+    latestToken = null;
+    flushWaiters(null);
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    if (api && widgetId !== undefined) {
+      try {
+        api.remove(widgetId);
+      } catch (error) {
+        logger.debug('[Turnstile] Failed to remove widget:', error);
       }
-    },
+    }
+    widgetId = undefined;
   };
-  onMounted(async () => {
-    api = await loadTurnstileApi();
-    if (!api || !container.value) return;
+  const renderWidget = async (element: HTMLElement): Promise<void> => {
+    const generation = ++renderGeneration;
+    const loadedApi = await loadTurnstileApi();
+    if (generation !== renderGeneration || container.value !== element) return;
+    if (!loadedApi) {
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        const currentContainer = container.value;
+        if (currentContainer) void renderWidget(currentContainer);
+      }, SCRIPT_LOAD_RETRY_MS);
+      return;
+    }
+    api = loadedApi;
     try {
-      widgetId = api.render(container.value, {
+      widgetId = api.render(element, {
         sitekey: siteKey,
         callback: (token: string) => {
           latestToken = token;
@@ -132,28 +121,48 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
         size: 'flexible',
         theme: 'auto',
       });
-      if (widgetId !== undefined) {
-        activeProvider = provider;
-        ready.value = true;
-      }
+      ready.value = widgetId !== undefined;
     } catch (error) {
       logger.warn('[Turnstile] Failed to render widget:', error);
     }
-  });
-  onUnmounted(() => {
-    ready.value = false;
-    if (activeProvider === provider) {
-      activeProvider = null;
-    }
-    flushWaiters(null);
+  };
+  if (enabled) {
+    watch(
+      container,
+      (element, previousElement) => {
+        if (element === previousElement) return;
+        removeWidget();
+        if (element) void renderWidget(element);
+      },
+      { flush: 'post', immediate: true }
+    );
+  }
+  onUnmounted(removeWidget);
+  const getToken = (): Promise<string | null> => {
+    if (!enabled) return Promise.resolve(null);
+    if (latestToken) return Promise.resolve(latestToken);
+    if (!ready.value || !api || widgetId === undefined) return Promise.resolve(null);
+    return new Promise<string | null>((resolveToken) => {
+      const timeout = setTimeout(() => {
+        waiters = waiters.filter((waiter) => waiter !== resolveWithCleanup);
+        resolveToken(null);
+      }, TOKEN_WAIT_TIMEOUT_MS);
+      const resolveWithCleanup = (token: string | null): void => {
+        clearTimeout(timeout);
+        resolveToken(token);
+      };
+      waiters.push(resolveWithCleanup);
+    });
+  };
+  const reset = (): void => {
+    latestToken = null;
     if (api && widgetId !== undefined) {
       try {
-        api.remove(widgetId);
+        api.reset(widgetId);
       } catch (error) {
-        logger.debug('[Turnstile] Failed to remove widget:', error);
+        logger.debug('[Turnstile] Failed to reset widget:', error);
       }
-      widgetId = undefined;
     }
-  });
-  return { enabled, ready };
+  };
+  return { enabled, getToken, ready, reset };
 }

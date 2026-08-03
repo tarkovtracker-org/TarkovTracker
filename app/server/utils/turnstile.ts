@@ -9,13 +9,14 @@ type SiteverifyResponse = {
   hostname?: string;
   'error-codes'?: string[];
 };
+const isSiteverifyResponse = (value: unknown): value is SiteverifyResponse => {
+  return value !== null && typeof value === 'object';
+};
 const isAllowedHostname = (hostname: string | undefined, allowedHostnames: string[]): boolean => {
   if (allowedHostnames.length === 0) return true;
   if (!hostname) return false;
   const normalized = hostname.toLowerCase();
-  return allowedHostnames.some(
-    (allowed) => normalized === allowed || normalized.endsWith(`.${allowed}`)
-  );
+  return allowedHostnames.some((allowed) => normalized === allowed);
 };
 export const verifyTurnstileToken = async (options: {
   secretKey: string;
@@ -44,7 +45,11 @@ export const verifyTurnstileToken = async (options: {
     if (!response.ok) {
       throw new Error(`siteverify responded ${response.status}`);
     }
-    payload = (await response.json()) as SiteverifyResponse;
+    const parsedPayload = (await response.json()) as unknown;
+    if (!isSiteverifyResponse(parsedPayload)) {
+      throw new Error('siteverify returned malformed JSON');
+    }
+    payload = parsedPayload;
   } catch (error) {
     // siteverify outages fail open: Turnstile is an abuse gate, not an integrity boundary.
     logger.warn('Turnstile siteverify unavailable; allowing request', {

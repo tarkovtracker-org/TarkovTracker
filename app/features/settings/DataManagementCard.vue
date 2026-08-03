@@ -55,7 +55,7 @@
                       :color="option.value === TARKOV_DEV_ARENA_MODE ? 'neutral' : 'info'"
                       size="xs"
                       class="justify-center"
-                      :disabled="isImportFlowActive || option.disabled"
+                      :disabled="isAnyImportActive || option.disabled"
                       @click="selectTarkovDevRefetchMode(option.value)"
                     >
                       {{ option.label }}
@@ -71,7 +71,7 @@
                     color="info"
                     size="xs"
                     :disabled="
-                      isImportFlowActive ||
+                      isAnyImportActive ||
                       !isTurnstileReady ||
                       !isTarkovDevRefetchModeSupported ||
                       tarkovDevRefetchCooldownMinutes > 0
@@ -98,7 +98,7 @@
                     variant="soft"
                     color="neutral"
                     size="xs"
-                    :disabled="isImportFlowActive"
+                    :disabled="isAnyImportActive"
                     @click="handleTarkovDevUnlink"
                   >
                     {{ $t('settings.tarkov_dev_import.unlink_profile') }}
@@ -144,7 +144,7 @@
                   icon="i-mdi-link-variant"
                   class="min-w-0 flex-1"
                   :aria-label="$t('settings.tarkov_dev_import.profile_url_label')"
-                  :disabled="isImportFlowActive"
+                  :disabled="isAnyImportActive"
                   :placeholder="$t('settings.tarkov_dev_import.profile_url_placeholder')"
                 />
                 <UButton
@@ -152,7 +152,7 @@
                   icon="i-mdi-account-search"
                   color="info"
                   class="justify-center"
-                  :disabled="isTarkovDevProfileUrlBlank || isImportFlowActive || !isTurnstileReady"
+                  :disabled="isTarkovDevProfileUrlBlank || isAnyImportActive || !isTurnstileReady"
                   :loading="isTarkovDevProfileUrlLoading"
                 >
                   {{ $t('settings.tarkov_dev_import.fetch_profile') }}
@@ -261,13 +261,26 @@
                   name="i-mdi-clock-alert-outline"
                   class="text-warning-400 mt-0.5 h-4 w-4 shrink-0"
                 />
-                <p class="text-surface-200 text-sm">
-                  {{
-                    $t('settings.tarkov_dev_import.data_age_warning', {
-                      days: tarkovDevPreviewUpdatedAgeDays ?? 0,
-                    })
-                  }}
-                </p>
+                <div class="space-y-2">
+                  <p class="text-surface-200 text-sm">
+                    {{
+                      $t('settings.tarkov_dev_import.data_age_warning', {
+                        days: tarkovDevPreviewUpdatedAgeDays ?? 0,
+                      })
+                    }}
+                  </p>
+                  <UButton
+                    icon="i-mdi-refresh"
+                    color="warning"
+                    variant="soft"
+                    size="xs"
+                    :disabled="isTarkovDevProfileUrlLoading || !isTurnstileReady"
+                    :loading="isTarkovDevProfileUrlLoading"
+                    @click="handleTarkovDevPreviewRefetch"
+                  >
+                    {{ $t('settings.tarkov_dev_import.refetch_profile') }}
+                  </UButton>
+                </div>
               </div>
             </div>
             <div
@@ -996,9 +1009,14 @@
     reset: resetTarkovDevImportState,
   } = dataManagementSession.tarkovDev;
   const turnstileContainerRef = ref<HTMLElement | null>(null);
-  const { enabled: isTurnstileEnabled, ready: isTurnstileReady } =
-    useTurnstileWidget(turnstileContainerRef);
+  const {
+    enabled: isTurnstileEnabled,
+    getToken: getTurnstileToken,
+    ready: isTurnstileReady,
+    reset: resetTurnstile,
+  } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
+  const tarkovDevRequestGeneration = ref(0);
   const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
   const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(tarkovStore.getCurrentGameMode());
@@ -1103,6 +1121,7 @@
     const minutes = Number(useRuntimeConfig().public.tarkovDevImportCooldownMinutes);
     return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 60) * 60_000;
   });
+  const cooldownNow = ref(Date.now());
   const tarkovDevErrorMessage = computed(() => {
     const code = tarkovDevImportErrorCode.value;
     if (code) {
@@ -1113,7 +1132,7 @@
   const tarkovDevPreviewUpdatedAgeDays = computed(() => {
     const updatedAt = tarkovDevPreview.value?.updatedAt;
     if (!updatedAt) return null;
-    return Math.max(0, Math.floor((Date.now() - updatedAt) / DAY_MS));
+    return Math.max(0, Math.floor((cooldownNow.value - updatedAt) / DAY_MS));
   });
   const tarkovDevPreviewUpdatedLabel = computed(() => {
     const updatedAt = tarkovDevPreview.value?.updatedAt;
@@ -1123,7 +1142,6 @@
   const isTarkovDevPreviewDataAging = computed(
     () => (tarkovDevPreviewUpdatedAgeDays.value ?? 0) >= TARKOV_DEV_AGE_WARNING_DAYS
   );
-  const cooldownNow = ref(Date.now());
   let cooldownTimer: ReturnType<typeof setInterval> | null = null;
   onMounted(() => {
     cooldownTimer = setInterval(() => {
@@ -1174,9 +1192,20 @@
     tarkovDevRefetchMode.value = mode;
     tarkovDevTargetMode.value = mode;
   }
+  async function fetchTarkovDevProfile(profileUrl: string, fresh = false) {
+    const requestGeneration = ++tarkovDevRequestGeneration.value;
+    const turnstileToken = await getTurnstileToken();
+    if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
+    if (isTurnstileEnabled && !turnstileToken) return null;
+    try {
+      return await parseTarkovDevProfileUrl(profileUrl, { fresh, turnstileToken });
+    } finally {
+      resetTurnstile();
+    }
+  }
   async function handleTarkovDevProfileUrlSubmit() {
     try {
-      const source = await parseTarkovDevProfileUrl(tarkovDevProfileUrlInput.value);
+      const source = await fetchTarkovDevProfile(tarkovDevProfileUrlInput.value);
       updateTarkovDevImportTarget(source?.mode);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_url_submit', err);
@@ -1188,10 +1217,20 @@
       if (!isTarkovDevImportableMode(refetchMode)) return;
       const linkedProfileUrl = tarkovDevProfileUrl.value;
       if (!linkedProfileUrl) return;
-      const source = await parseTarkovDevProfileUrl(linkedProfileUrl);
+      const source = await fetchTarkovDevProfile(linkedProfileUrl, true);
       updateTarkovDevImportTarget(source?.mode, source ? refetchMode : undefined);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_refetch', err);
+    }
+  }
+  async function handleTarkovDevPreviewRefetch() {
+    try {
+      const profileUrl = tarkovDevProfileUrl.value ?? tarkovDevProfileUrlInput.value;
+      if (!profileUrl) return;
+      const source = await fetchTarkovDevProfile(profileUrl, true);
+      updateTarkovDevImportTarget(source?.mode);
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_preview_refetch', err);
     }
   }
   function handleTarkovDevUnexpectedError(action: string, err: unknown) {
@@ -1212,6 +1251,7 @@
     await confirmTarkovDevImport(tarkovDevFixedTargetMode.value ?? tarkovDevTargetMode.value);
   }
   function resetTarkovDevImport() {
+    tarkovDevRequestGeneration.value += 1;
     tarkovDevFixedTargetMode.value = null;
     resetTarkovDevImportState();
   }
@@ -1385,10 +1425,9 @@
   const isAnyImportPreviewActive = computed(
     () => isBackupOrEftLogsImportPreviewActive.value || isTarkovDevImportPreviewActive.value
   );
-  const isImportFlowActive = computed(
+  const isAnyImportActive = computed(
     () => isAnyImportPreviewActive.value || tarkovDevImportState.value === 'loading'
   );
-  const isAnyImportActive = computed(() => isImportFlowActive.value);
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleDateString(undefined, {
       year: 'numeric',

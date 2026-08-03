@@ -7,24 +7,13 @@ const mockFetch = vi.fn();
 const mockParseTarkovDevProfile = vi.fn();
 const mockSetTotalSkillLevel = vi.fn();
 const mockSetTotalXP = vi.fn();
-const {
-  mockGetImportCooldownRemainingMs,
-  mockNotifyTurnstileTokenConsumed,
-  mockRecordImportCompletion,
-  mockRequestTurnstileToken,
-  mockUseRuntimeConfig,
-} = vi.hoisted(() => ({
-  mockGetImportCooldownRemainingMs: vi.fn(),
-  mockNotifyTurnstileTokenConsumed: vi.fn(),
-  mockRecordImportCompletion: vi.fn(),
-  mockRequestTurnstileToken: vi.fn(),
-  mockUseRuntimeConfig: vi.fn(),
-}));
+const { mockGetImportCooldownRemainingMs, mockRecordImportCompletion, mockUseRuntimeConfig } =
+  vi.hoisted(() => ({
+    mockGetImportCooldownRemainingMs: vi.fn(),
+    mockRecordImportCompletion: vi.fn(),
+    mockUseRuntimeConfig: vi.fn(),
+  }));
 mockNuxtImport('useRuntimeConfig', () => mockUseRuntimeConfig);
-vi.mock('@/composables/useTurnstile', () => ({
-  notifyTurnstileTokenConsumed: mockNotifyTurnstileTokenConsumed,
-  requestTurnstileToken: mockRequestTurnstileToken,
-}));
 vi.mock('@/utils/tarkovDevImportCooldown', () => ({
   getImportCooldownRemainingMs: mockGetImportCooldownRemainingMs,
   recordImportCompletion: mockRecordImportCompletion,
@@ -105,7 +94,6 @@ describe('useTarkovDevImport', () => {
     vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockGetImportCooldownRemainingMs.mockReturnValue(0);
-    mockRequestTurnstileToken.mockResolvedValue(null);
     mockUseRuntimeConfig.mockReturnValue({
       public: { tarkovDevImportCooldownMinutes: 60 },
     });
@@ -219,21 +207,21 @@ describe('useTarkovDevImport', () => {
       expect.any(Error)
     );
   });
-  it('sends the Turnstile token header when a token is available', async () => {
-    mockRequestTurnstileToken.mockResolvedValue('turnstile-token');
+  it('sends the Turnstile token header when a token is provided', async () => {
     mockFetch.mockResolvedValue({ aid: 8560316 });
     mockParseTarkovDevProfile.mockReturnValue({
       data: createImportData({ tarkovUid: 8560316 }),
       ok: true,
     });
     const composable = await loadComposable();
-    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316', {
+      turnstileToken: 'turnstile-token',
+    });
     expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
       headers: { 'x-turnstile-token': 'turnstile-token' },
       query: { url: 'https://players.tarkov.dev/profile/8560316.json' },
       retry: 0,
     });
-    expect(mockNotifyTurnstileTokenConsumed).toHaveBeenCalled();
   });
   it('blocks re-imports while the client cooldown is active', async () => {
     mockGetImportCooldownRemainingMs.mockReturnValue(30 * 60_000);
@@ -319,7 +307,7 @@ describe('useTarkovDevImport', () => {
     const composable = await loadComposable();
     await composable.parseProfileUrl('https://tarkov.dev/players/pve/8560316');
     await composable.confirmImport('pve');
-    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pve');
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pve', 60 * 60_000);
   });
   it('does not record a cooldown for file imports', async () => {
     mockParseTarkovDevProfile.mockReturnValue({

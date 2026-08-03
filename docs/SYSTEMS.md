@@ -527,17 +527,18 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    checks the per-profile client cooldown (localStorage, default 60 min after a confirmed import,
    `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES`), obtains a Turnstile token when a sitekey is
    configured, and calls the proxy with `retry: 0`.
-2. The proxy enforces, in order: per-IP rate limits (default 5/min then 20/hour, separate
-   `tarkov-dev-profile-rate` / `tarkov-dev-profile-hourly-rate` buckets, DO binding passed when
-   available), then Turnstile verification (only when the paired
+2. The proxy enforces, in order: Turnstile verification (only when the paired
    `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and `NUXT_TURNSTILE_SECRET_KEY` are set; production config
-   rejects partial configuration and siteverify availability failures fail open), then the shared
-   edge cache (`tarkov-dev-profile` prefix,
+   rejects partial configuration and siteverify availability failures fail open), per-IP rate
+   limits (default 5/min then 20/hour, separate `tarkov-dev-profile-rate` /
+   `tarkov-dev-profile-hourly-rate` buckets, DO binding passed when available), then the shared edge
+   cache (`tarkov-dev-profile` prefix,
    default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached
    for 60 s).
 3. On cache miss it fetches upstream with the shared User-Agent. With `?fresh=1` (sent by the
-   client automatically when retrying after a stale rejection) the cache read is skipped and the
-   fetch is conditional (`If-None-Match` from the cached ETag); a `304` re-stamps the cached entry.
+   client for explicit refetches and automatically after a stale rejection), serving from cache is
+   skipped; the cache is still read to obtain the ETag for conditional `If-None-Match` revalidation.
+   A `304` re-stamps a fresh cached entry without extending a payload that fails the freshness gate.
 4. The freshness gate rejects payloads whose `updated` field is older than
    `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS` (default 7, `0` disables) with a structured
    `422 profile_stale` error. Successful responses get `Cache-Control: private, max-age=<ttl>` so
@@ -564,17 +565,18 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - The browser never fetches `players.tarkov.dev` directly (no upstream CORS); the proxy is the only
   path, and it never talks to the api-gateway Worker or its daily token quotas — the rate-limit
   buckets are route-specific.
-- Rate limiting runs before Turnstile verification, which runs before any cache read or upstream
-  fetch, so floods cannot burn siteverify or upstream subrequests.
+- Turnstile verification runs before rate limiting, which runs before any cache read or upstream
+  fetch, so invalid tokens cannot consume the shared per-IP quota and admitted requests cannot
+  stampede upstream.
 - Turnstile enforcement is keyed on the server secret being configured; production config requires
   the public sitekey and private secret together, so the client cannot submit before its widget is
   ready. Without the pair the route behaves as before (no token required). Siteverify availability
   failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
 - Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can
   never be imported from cache either.
-- A `fresh=1` request bypasses the cache read but not the rate limits, and revalidates with
-  `If-None-Match` when a cached ETag exists — "I just refreshed on tarkov.dev" costs at most one
-  conditional upstream request.
+- A `fresh=1` request bypasses serving from cache but not the cache lookup or rate limits, and
+  revalidates with `If-None-Match` when a cached ETag exists — "I just refreshed on tarkov.dev"
+  costs at most one conditional upstream request.
 - The client cooldown is UX only (localStorage); the server-side cache + rate limits are the actual
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
 - Success responses are browser-cacheable (`private`), error responses never are.

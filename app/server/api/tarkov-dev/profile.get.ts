@@ -10,12 +10,13 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
-  consumeSharedRateLimit,
+  consumeSharedRateLimitWithReset,
   createSharedCacheHandle,
   getRateLimiterBinding,
   readSharedCache,
   writeSharedCache,
   type SharedCacheHandle,
+  type SharedRateLimitResult,
 } from '@/server/utils/sharedEdgeStore';
 import { verifyTurnstileToken } from '@/server/utils/turnstile';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
@@ -65,7 +66,11 @@ function createProfileFetchError(statusCode = 502) {
     data: statusCode === 404 ? { code: 'profile_not_generated' } : { code: 'profile_fetch_failed' },
   });
 }
-function createRateLimitError(event: H3Event, retryAfterSeconds: number) {
+function createRateLimitError(event: H3Event, resetAt: number | null, windowMs: number) {
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil(((resetAt ?? Date.now() + windowMs) - Date.now()) / 1000)
+  );
   setResponseHeader(event, 'Retry-After', retryAfterSeconds);
   return createError({
     statusCode: 429,
@@ -129,8 +134,8 @@ async function consumeRateLimit(
   key: string,
   limit: number,
   windowMs: number
-): Promise<boolean> {
-  return consumeSharedRateLimit(
+): Promise<SharedRateLimitResult> {
+  return consumeSharedRateLimitWithReset(
     handle,
     prefix,
     key,
@@ -167,15 +172,14 @@ async function writeCachedProfile(
   );
 }
 function resolveAllowedTurnstileHostnames(appUrl: unknown): string[] {
-  const hostnames = new Set(['tarkovtracker.org', 'localhost', '127.0.0.1']);
-  if (typeof appUrl === 'string' && appUrl.trim().length > 0) {
-    try {
-      hostnames.add(new URL(appUrl).hostname.toLowerCase());
-    } catch {
-      // Ignore unparsable app URLs; the static allowlist still applies.
-    }
+  if (typeof appUrl !== 'string' || appUrl.trim().length === 0) {
+    return ['tarkovtracker.org'];
   }
-  return [...hostnames];
+  try {
+    return [new URL(appUrl).hostname.toLowerCase()];
+  } catch {
+    return ['tarkovtracker.org'];
+  }
 }
 export default defineEventHandler(async (event) => {
   setResponseHeaders(event, { 'Cache-Control': 'no-store' });
@@ -220,28 +224,6 @@ export default defineEventHandler(async (event) => {
   const trustProxy = Boolean(typedConfig.apiProtection?.trustProxy);
   const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
   const rateLimitKey = `profile:ip:${clientIdentifier}`;
-  if (
-    !(await consumeRateLimit(
-      sharedCacheHandle,
-      PROFILE_RATE_LIMIT_PREFIX,
-      rateLimitKey,
-      rateLimitPerMinute,
-      MINUTE_MS
-    ))
-  ) {
-    throw createRateLimitError(event, 60);
-  }
-  if (
-    !(await consumeRateLimit(
-      sharedCacheHandle,
-      PROFILE_HOURLY_RATE_LIMIT_PREFIX,
-      rateLimitKey,
-      rateLimitPerHour,
-      HOUR_MS
-    ))
-  ) {
-    throw createRateLimitError(event, 3600);
-  }
   if (turnstileSecretKey) {
     const verification = await verifyTurnstileToken({
       secretKey: turnstileSecretKey,
@@ -259,6 +241,26 @@ export default defineEventHandler(async (event) => {
         data: { code: 'turnstile_failed' },
       });
     }
+  }
+  const minuteLimit = await consumeRateLimit(
+    sharedCacheHandle,
+    PROFILE_RATE_LIMIT_PREFIX,
+    rateLimitKey,
+    rateLimitPerMinute,
+    MINUTE_MS
+  );
+  if (!minuteLimit.allowed) {
+    throw createRateLimitError(event, minuteLimit.resetAt, MINUTE_MS);
+  }
+  const hourlyLimit = await consumeRateLimit(
+    sharedCacheHandle,
+    PROFILE_HOURLY_RATE_LIMIT_PREFIX,
+    rateLimitKey,
+    rateLimitPerHour,
+    HOUR_MS
+  );
+  if (!hourlyLimit.allowed) {
+    throw createRateLimitError(event, hourlyLimit.resetAt, HOUR_MS);
   }
   const wantsFresh = readSingleQueryValue(query.fresh) === '1';
   const cacheKey = source.data.profileJsonUrl;
@@ -293,13 +295,13 @@ export default defineEventHandler(async (event) => {
     throw createProfileFetchError(isAbortError(error) ? 504 : 502);
   }
   if (response.status === 304 && cached?.status === 200) {
+    enforceProfileFreshness(cached.body, maxUpdatedAgeDays);
     await writeCachedProfile(
       sharedCacheHandle,
       cacheKey,
       { ...cached, fetchedAt: Date.now() },
       cacheTtlMs
     );
-    enforceProfileFreshness(cached.body, maxUpdatedAgeDays);
     setSuccessCacheHeaders(event, cacheTtlMs);
     return cached.body;
   }

@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
-  consumeSharedRateLimitMock,
+  consumeSharedRateLimitWithResetMock,
   createSharedCacheHandleMock,
   fetchMock,
   getProxyAwareClientIdentifierMock,
@@ -16,7 +16,7 @@ const {
   verifyTurnstileTokenMock,
   writeSharedCacheMock,
 } = vi.hoisted(() => ({
-  consumeSharedRateLimitMock: vi.fn(),
+  consumeSharedRateLimitWithResetMock: vi.fn(),
   createSharedCacheHandleMock: vi.fn(),
   fetchMock: vi.fn(),
   getProxyAwareClientIdentifierMock: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock('@/server/utils/requestIdentity', () => ({
   getProxyAwareClientIdentifier: getProxyAwareClientIdentifierMock,
 }));
 vi.mock('@/server/utils/sharedEdgeStore', () => ({
-  consumeSharedRateLimit: consumeSharedRateLimitMock,
+  consumeSharedRateLimitWithReset: consumeSharedRateLimitWithResetMock,
   createSharedCacheHandle: createSharedCacheHandleMock,
   getRateLimiterBinding: getRateLimiterBindingMock,
   readSharedCache: readSharedCacheMock,
@@ -80,7 +80,7 @@ const loadHandler = async () => {
 };
 describe('/api/tarkov-dev/profile', () => {
   beforeEach(() => {
-    consumeSharedRateLimitMock.mockReset();
+    consumeSharedRateLimitWithResetMock.mockReset();
     createSharedCacheHandleMock.mockReset();
     fetchMock.mockReset();
     getProxyAwareClientIdentifierMock.mockReset();
@@ -93,7 +93,10 @@ describe('/api/tarkov-dev/profile', () => {
     useRuntimeConfigMock.mockReset();
     verifyTurnstileTokenMock.mockReset();
     writeSharedCacheMock.mockReset();
-    consumeSharedRateLimitMock.mockResolvedValue(true);
+    consumeSharedRateLimitWithResetMock.mockResolvedValue({
+      allowed: true,
+      resetAt: Date.now() + 60_000,
+    });
     createSharedCacheHandleMock.mockReturnValue(HANDLE);
     getProxyAwareClientIdentifierMock.mockReturnValue('203.0.113.10');
     getRateLimiterBindingMock.mockReturnValue(null);
@@ -121,7 +124,7 @@ describe('/api/tarkov-dev/profile', () => {
     fetchMock.mockResolvedValue(upstreamResponse(body));
     const handler = await loadHandler();
     await expect(handler({})).resolves.toEqual(body);
-    expect(consumeSharedRateLimitMock).toHaveBeenNthCalledWith(
+    expect(consumeSharedRateLimitWithResetMock).toHaveBeenNthCalledWith(
       1,
       HANDLE,
       'tarkov-dev-profile-rate',
@@ -130,7 +133,7 @@ describe('/api/tarkov-dev/profile', () => {
       60000,
       expect.any(Function)
     );
-    expect(consumeSharedRateLimitMock).toHaveBeenNthCalledWith(
+    expect(consumeSharedRateLimitWithResetMock).toHaveBeenNthCalledWith(
       2,
       HANDLE,
       'tarkov-dev-profile-hourly-rate',
@@ -172,24 +175,29 @@ describe('/api/tarkov-dev/profile', () => {
   });
   it('rejects requests when the per-minute rate limit is exceeded', async () => {
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
-    consumeSharedRateLimitMock.mockResolvedValueOnce(false);
+    consumeSharedRateLimitWithResetMock.mockResolvedValueOnce({
+      allowed: false,
+      resetAt: Date.now() + 30_000,
+    });
     const handler = await loadHandler();
     await expect(handler({})).rejects.toMatchObject({
       statusCode: 429,
-      data: { code: 'rate_limited', retryAfterSeconds: 60 },
+      data: { code: 'rate_limited', retryAfterSeconds: 30 },
     });
-    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Retry-After', 60);
+    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Retry-After', 30);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it('rejects requests when the hourly rate limit is exceeded', async () => {
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
-    consumeSharedRateLimitMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    consumeSharedRateLimitWithResetMock
+      .mockResolvedValueOnce({ allowed: true, resetAt: Date.now() + 60_000 })
+      .mockResolvedValueOnce({ allowed: false, resetAt: Date.now() + 1_800_000 });
     const handler = await loadHandler();
     await expect(handler({})).rejects.toMatchObject({
       statusCode: 429,
-      data: { code: 'rate_limited', retryAfterSeconds: 3600 },
+      data: { code: 'rate_limited', retryAfterSeconds: 1800 },
     });
-    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Retry-After', 3600);
+    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Retry-After', 1800);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it('serves a cached profile without contacting the upstream', async () => {
@@ -260,6 +268,26 @@ describe('/api/tarkov-dev/profile', () => {
       expect.any(Function)
     );
   });
+  it('does not extend the cache TTL when a 304 response still leaves a stale profile', async () => {
+    const body = { aid: 8560316, updated: Date.now() - 8 * DAY_MS };
+    getQueryMock.mockReturnValue({
+      fresh: '1',
+      url: 'https://tarkov.dev/players/regular/8560316',
+    });
+    readSharedCacheMock.mockResolvedValue({
+      body,
+      etag: 'W/"abc123"',
+      fetchedAt: Date.now() - 5_000,
+      status: 200,
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(null, { etag: null, status: 304 }));
+    const handler = await loadHandler();
+    await expect(handler({})).rejects.toMatchObject({
+      statusCode: 422,
+      data: expect.objectContaining({ code: 'profile_stale' }),
+    });
+    expect(writeSharedCacheMock).not.toHaveBeenCalled();
+  });
   it('rejects imports when the upstream profile data is too old', async () => {
     const body = { aid: 8560316, updated: Date.now() - 8 * DAY_MS };
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
@@ -298,6 +326,7 @@ describe('/api/tarkov-dev/profile', () => {
       data: { code: 'turnstile_failed' },
     });
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(consumeSharedRateLimitWithResetMock).not.toHaveBeenCalled();
   });
   it('passes the Turnstile token from the request header to verification', async () => {
     const body = freshProfileBody();
@@ -312,7 +341,7 @@ describe('/api/tarkov-dev/profile', () => {
     const handler = await loadHandler();
     await expect(handler({})).resolves.toEqual(body);
     expect(verifyTurnstileTokenMock).toHaveBeenCalledWith({
-      allowedHostnames: expect.arrayContaining(['tarkovtracker.org', 'localhost']),
+      allowedHostnames: ['tarkovtracker.org'],
       remoteIp: '203.0.113.10',
       secretKey: 'secret-key',
       token: 'turnstile-token',

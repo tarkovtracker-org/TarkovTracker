@@ -43,10 +43,16 @@ export function getImportCooldownRemainingMs(
   if (typeof importedAt !== 'number' || importedAt > now) return 0;
   return Math.max(0, importedAt + cooldownMs - now);
 }
-export function recordImportCompletion(tarkovUid: number, mode: string, now = Date.now()): void {
+export function recordImportCompletion(
+  tarkovUid: number,
+  mode: string,
+  cooldownMs: number,
+  now = Date.now()
+): void {
+  const retentionMs = Math.max(MAX_ENTRY_AGE_MS, Number.isFinite(cooldownMs) ? cooldownMs : 0);
   const retained: CooldownMap = {};
   for (const [key, importedAt] of Object.entries(readCooldownMap())) {
-    if (now - importedAt <= MAX_ENTRY_AGE_MS) {
+    if (now - importedAt <= retentionMs) {
       retained[key] = importedAt;
     }
   }

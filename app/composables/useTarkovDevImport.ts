@@ -1,5 +1,4 @@
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
-import { notifyTurnstileTokenConsumed, requestTurnstileToken } from '@/composables/useTurnstile';
 import { useXpCalculation } from '@/composables/useXpCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -29,11 +28,18 @@ export interface UseTarkovDevImportReturn {
   importErrorCode: Ref<ImportErrorCode | null>;
   importErrorMeta: Ref<Record<string, number> | null>;
   parseFile: (file: File) => Promise<void>;
-  parseProfileUrl: (profileUrl: string) => Promise<TarkovDevProfileSource | null>;
+  parseProfileUrl: (
+    profileUrl: string,
+    options?: TarkovDevProfileFetchOptions
+  ) => Promise<TarkovDevProfileSource | null>;
   confirmImport: (targetMode: GameMode, editionOverride?: number | null) => Promise<void>;
   setError: (message: string) => void;
   reset: () => void;
 }
+export type TarkovDevProfileFetchOptions = {
+  fresh?: boolean;
+  turnstileToken?: string | null;
+};
 const GENERIC_FETCH_ERROR =
   'Unable to fetch Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.';
 const DEFAULT_COOLDOWN_MINUTES = 60;
@@ -160,7 +166,10 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
       logger.error('[TarkovDevImport] Parse error:', e);
     }
   }
-  async function parseProfileUrl(profileUrl: string): Promise<TarkovDevProfileSource | null> {
+  async function parseProfileUrl(
+    profileUrl: string,
+    options: TarkovDevProfileFetchOptions = {}
+  ): Promise<TarkovDevProfileSource | null> {
     const requestId = ++profileUrlRequestId;
     importError.value = null;
     importErrorCode.value = null;
@@ -186,25 +195,24 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     }
     importState.value = 'loading';
     previewData.value = null;
-    const wantsFresh = staleRetryJsonUrl === source.data.profileJsonUrl;
+    const wantsFresh = options.fresh === true || staleRetryJsonUrl === source.data.profileJsonUrl;
     try {
-      const turnstileToken = await requestTurnstileToken();
       const json = await $fetch<unknown>('/api/tarkov-dev/profile', {
         query: {
           url: source.data.profileJsonUrl,
           ...(wantsFresh ? { fresh: '1' } : {}),
         },
-        ...(turnstileToken ? { headers: { 'x-turnstile-token': turnstileToken } } : {}),
+        ...(options.turnstileToken
+          ? { headers: { 'x-turnstile-token': options.turnstileToken } }
+          : {}),
         retry: 0,
       });
-      notifyTurnstileTokenConsumed();
       if (requestId !== profileUrlRequestId) return null;
       staleRetryJsonUrl = null;
       if (!applyProfilePayload(json)) return null;
       lastFetchedSource = source.data;
       return source.data;
     } catch (e) {
-      notifyTurnstileTokenConsumed();
       if (requestId !== profileUrlRequestId) return null;
       applyProfileUrlError(e);
       if (importErrorCode.value === 'profile_stale') {
@@ -249,7 +257,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
         tarkovStore.setGameEdition(edition);
       }
       if (lastFetchedSource && lastFetchedSource.tarkovUid === data.tarkovUid) {
-        recordImportCompletion(data.tarkovUid, lastFetchedSource.mode ?? 'pvp');
+        recordImportCompletion(data.tarkovUid, lastFetchedSource.mode ?? 'pvp', cooldownMs);
       }
       importState.value = 'success';
     } catch (e) {

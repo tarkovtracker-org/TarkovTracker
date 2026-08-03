@@ -104,7 +104,7 @@ describe('verifyTurnstileToken', () => {
       })
     ).resolves.toEqual({ ok: false, reason: 'hostname-mismatch' });
   });
-  it('accepts subdomains of allowed hostnames', async () => {
+  it('rejects subdomains that are not explicitly allowlisted', async () => {
     fetchMock.mockResolvedValue(
       siteverifyResponse({ hostname: 'www.tarkovtracker.org', success: true })
     );
@@ -115,7 +115,7 @@ describe('verifyTurnstileToken', () => {
         secretKey: 'secret',
         token: 'token',
       })
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({ ok: false, reason: 'hostname-mismatch' });
   });
   it('fails open when siteverify is unavailable', async () => {
     fetchMock.mockRejectedValue(new Error('network down'));
@@ -126,6 +126,13 @@ describe('verifyTurnstileToken', () => {
   });
   it('fails open when siteverify returns a server error', async () => {
     fetchMock.mockResolvedValue(siteverifyResponse(null, 503));
+    const verifyTurnstileToken = await loadUtil();
+    await expect(verifyTurnstileToken({ secretKey: 'secret', token: 'token' })).resolves.toEqual({
+      ok: true,
+    });
+  });
+  it('fails open when siteverify returns malformed successful JSON', async () => {
+    fetchMock.mockResolvedValue(siteverifyResponse(null));
     const verifyTurnstileToken = await loadUtil();
     await expect(verifyTurnstileToken({ secretKey: 'secret', token: 'token' })).resolves.toEqual({
       ok: true,
