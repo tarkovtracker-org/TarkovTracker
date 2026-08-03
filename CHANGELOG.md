@@ -1,3 +1,17 @@
+## [1.62.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.0...v1.62.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **ui:** make Turnstile widget visible beside the profile fetch ([40a5027](https://github.com/tarkovtracker-org/TarkovTracker/commit/40a5027c2f818859d15968f1b88aa35daa34af9c))
+
+# [1.62.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.61.1...v1.62.0) (2026-08-03)
+
+
+### Features
+
+* **api:** harden Tarkov.dev profile imports ([#628](https://github.com/tarkovtracker-org/TarkovTracker/issues/628)) ([0e8baaf](https://github.com/tarkovtracker-org/TarkovTracker/commit/0e8baaf1b808dc7ce3983cb2ce4769d024be84bd))
+
 ## [1.61.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.61.0...v1.61.1) (2026-08-03)
 
 

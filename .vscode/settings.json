@@ -1,0 +1,13 @@
+{
+  "fallow.changedSince": "origin/main",
+  "fallow.audit.gate": "new-only",
+  "fallow.audit.statusBar.enabled": true,
+  "fallow.audit.runOnSave": false,
+  "fallow.duplication.minTokens": 80,
+  "fallow.duplication.minLines": 8,
+  "fallow.duplication.minOccurrences": 2,
+  "fallow.duplication.skipLocal": true,
+  "fallow.duplication.ignoreImports": true,
+  "fallow.typeAware.enabled": true,
+  "fallow.typeAware.require": "best-effort"
+}

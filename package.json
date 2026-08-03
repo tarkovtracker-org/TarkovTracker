@@ -4,7 +4,7 @@
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
-  "version": "1.61.1",
+  "version": "1.62.1",
   "dependencies": {
     "@iconify-json/mdi": "^1.2.3",
     "@nuxt/image": "^2.0.0",
@@ -54,6 +54,7 @@
     "eslint": "^10.2.0",
     "eslint-plugin-import-x": "^4.16.2",
     "fake-indexeddb": "^6.2.5",
+    "fallow": "3.11.0",
     "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
     "knip": "^6.26.0",
@@ -84,6 +85,7 @@
     "design:lint": "design.md lint DESIGN.md",
     "deps": "taze --r --I",
     "dev": "nuxt dev",
+    "lint:fallow": "fallow audit --base origin/main --gate new-only --quiet",
     "format": "pnpm run format:prettier && NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "format:blank-lines": "node scripts/lint-blank-lines.mjs --fix",
     "format:check": "pnpm run format:check:prettier && pnpm run lint:blank-lines",

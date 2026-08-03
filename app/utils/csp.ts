@@ -4,7 +4,9 @@ export type ContentSecurityPolicyOptions = {
   clarityInstrumentationKey?: string;
   gaMeasurementId?: string;
   supabaseUrl?: string;
+  turnstileSiteKey?: string;
 };
+const TURNSTILE_CSP_ORIGIN = 'https://challenges.cloudflare.com';
 const GITHUB_IMAGE_ORIGINS = ['https://avatars.githubusercontent.com', 'https://github.com'];
 const hasConfiguredValue = (value: string | undefined): boolean => Boolean(value?.trim());
 const isLocalHttpHost = (hostname: string): boolean => {
@@ -66,6 +68,7 @@ export const getScriptSrcSources = (options: ContentSecurityPolicyOptions = {}):
     options.allowUnsafeInlineScripts ? "'unsafe-inline'" : null,
     'https://static.cloudflareinsights.com',
     'https://player.twitch.tv',
+    hasConfiguredValue(options.turnstileSiteKey) ? TURNSTILE_CSP_ORIGIN : null,
     hasGoogleAnalytics ? 'https://*.googletagmanager.com' : null,
     hasMicrosoftClarity ? 'https://*.clarity.ms' : null,
     hasMicrosoftClarity ? 'https://c.bing.com' : null,
@@ -109,8 +112,12 @@ export const getImgSrcSources = (options: ContentSecurityPolicyOptions = {}): st
     'https://assets.tarkov.dev',
   ]);
 };
-export const getFrameSrcSources = (): string[] => {
-  return getUniqueSources(["'self'", 'https://player.twitch.tv']);
+export const getFrameSrcSources = (options: ContentSecurityPolicyOptions = {}): string[] => {
+  return getUniqueSources([
+    "'self'",
+    'https://player.twitch.tv',
+    hasConfiguredValue(options.turnstileSiteKey) ? TURNSTILE_CSP_ORIGIN : null,
+  ]);
 };
 const getStyleSrcSources = (): string[] => {
   return getUniqueSources(["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com']);
@@ -122,7 +129,7 @@ export const buildContentSecurityPolicy = (options: ContentSecurityPolicyOptions
     `worker-src blob: 'self'`,
     `connect-src ${getConnectSrcSources(options).join(' ')}`,
     `img-src ${getImgSrcSources(options).join(' ')}`,
-    `frame-src ${getFrameSrcSources().join(' ')}`,
+    `frame-src ${getFrameSrcSources(options).join(' ')}`,
     `style-src ${getStyleSrcSources().join(' ')}`,
     `font-src ${getFontSrcSources().join(' ')}`,
   ].join('; ');

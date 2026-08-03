@@ -178,7 +178,7 @@ const UUID_REGEX =
  * @param value - Value to check
  * @returns true if value is a valid UUID string
  */
-export function isValidUUID(value: unknown): value is string {
+function isValidUUID(value: unknown): value is string {
   return typeof value === "string" && UUID_REGEX.test(value);
 }
 /**

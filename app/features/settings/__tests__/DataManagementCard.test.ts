@@ -12,7 +12,13 @@ const {
   toastAddMock,
   tarkovStoreState,
   mockLogger,
+  turnstileState,
 } = vi.hoisted(() => ({
+  turnstileState: {
+    enabled: false,
+    getToken: vi.fn(async (): Promise<string | null> => null),
+    reset: vi.fn(),
+  },
   backupFns: {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
@@ -34,7 +40,10 @@ const {
     confirmImport: vi.fn(async () => undefined),
     parseFile: vi.fn(async () => undefined),
     parseProfileUrl: vi.fn<
-      (profileUrl: string) => Promise<{
+      (
+        profileUrl: string,
+        options?: { fresh?: boolean; turnstileToken?: string | null }
+      ) => Promise<{
         mode: 'pvp' | 'pve' | null;
         profileJsonUrl: string;
         tarkovUid: number;
@@ -45,6 +54,11 @@ const {
   },
   tarkovDevState: {
     importError: { __v_isRef: true as const, value: null as string | null },
+    importErrorCode: { __v_isRef: true as const, value: null as string | null },
+    importErrorMeta: {
+      __v_isRef: true as const,
+      value: null as Record<string, number> | null,
+    },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
     importState: {
       __v_isRef: true as const,
@@ -85,6 +99,14 @@ mockNuxtImport('useToast', () => () => ({
 vi.mock('@/utils/logger', () => ({
   logger: mockLogger,
 }));
+vi.mock('@/composables/useTurnstile', () => ({
+  useTurnstileWidget: () => ({
+    enabled: turnstileState.enabled,
+    getToken: turnstileState.getToken,
+    ready: ref(true),
+    reset: turnstileState.reset,
+  }),
+}));
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({
     exportDebugSnapshot: backupFns.exportDebugSnapshot,
@@ -104,6 +126,8 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
     importState: tarkovDevState.importState,
     previewData: tarkovDevState.previewData,
     importError: tarkovDevState.importError,
+    importErrorCode: tarkovDevState.importErrorCode,
+    importErrorMeta: tarkovDevState.importErrorMeta,
     parseFile: tarkovDevFns.parseFile,
     parseProfileUrl: tarkovDevFns.parseProfileUrl,
     confirmImport: tarkovDevFns.confirmImport,
@@ -195,6 +219,10 @@ describe('DataManagementCard', () => {
       tarkovStoreState.tarkovUid = uid;
     });
     toastAddMock.mockReset();
+    turnstileState.enabled = false;
+    turnstileState.getToken.mockReset();
+    turnstileState.getToken.mockResolvedValue(null);
+    turnstileState.reset.mockReset();
     mockLogger.error.mockReset();
     backupState.debugExportError.value = null;
     backupState.exportError.value = null;
@@ -202,6 +230,8 @@ describe('DataManagementCard', () => {
     backupState.importPreview.value = null;
     backupState.importState.value = 'idle';
     tarkovDevState.importError.value = null;
+    tarkovDevState.importErrorCode.value = null;
+    tarkovDevState.importErrorMeta.value = null;
     tarkovDevState.importState.value = 'idle';
     tarkovDevState.previewData.value = null;
     eftLogsState.importError.value = null;
@@ -340,9 +370,61 @@ describe('DataManagementCard', () => {
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pve/8560316';
     await vm.handleTarkovDevProfileUrlSubmit();
     expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://tarkov.dev/players/pve/8560316'
+      'https://tarkov.dev/players/pve/8560316',
+      { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
+  });
+  it('passes the Turnstile token to the fetch and resets the widget afterwards', async () => {
+    turnstileState.enabled = true;
+    turnstileState.getToken.mockResolvedValue('turnstile-token');
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: 'pvp',
+      profileJsonUrl: 'https://players.tarkov.dev/pvp/8560316.json',
+      tarkovUid: 8560316,
+    });
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+      'https://tarkov.dev/players/pvp/8560316',
+      { fresh: false, turnstileToken: 'turnstile-token' }
+    );
+    expect(turnstileState.reset).toHaveBeenCalled();
+  });
+  it('surfaces a verification error and resets the widget when no token is issued', async () => {
+    turnstileState.enabled = true;
+    turnstileState.getToken.mockResolvedValue(null);
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.parseProfileUrl).not.toHaveBeenCalled();
+    expect(tarkovDevFns.setError).toHaveBeenCalled();
+    expect(turnstileState.reset).toHaveBeenCalled();
+  });
+  it('resets the Turnstile widget when a request is superseded mid-flight', async () => {
+    turnstileState.enabled = true;
+    turnstileState.getToken.mockResolvedValue('stale-token');
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      resetTarkovDevImport: () => void;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    const pending = vm.handleTarkovDevProfileUrlSubmit();
+    vm.resetTarkovDevImport();
+    await pending;
+    expect(tarkovDevFns.parseProfileUrl).not.toHaveBeenCalled();
+    expect(turnstileState.reset).toHaveBeenCalled();
   });
   it('keeps the current tarkov.dev target mode when the fetched source has no mode', async () => {
     tarkovDevFns.parseProfileUrl.mockResolvedValue({
@@ -360,7 +442,8 @@ describe('DataManagementCard', () => {
     vm.tarkovDevProfileUrlInput = 'https://players.tarkov.dev/profile/8560316.json';
     await vm.handleTarkovDevProfileUrlSubmit();
     expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://players.tarkov.dev/profile/8560316.json'
+      'https://players.tarkov.dev/profile/8560316.json',
+      { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
   });
@@ -463,7 +546,8 @@ describe('DataManagementCard', () => {
       wrapper.vm
     ).handleTarkovDevRefetch();
     expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://tarkov.dev/players/pve/123456'
+      'https://tarkov.dev/players/pve/123456',
+      { fresh: true, turnstileToken: null }
     );
     expect(asVm<{ tarkovDevTargetMode: 'pvp' | 'pve' }>(wrapper.vm).tarkovDevTargetMode).toBe(
       'pve'
@@ -506,6 +590,49 @@ describe('DataManagementCard', () => {
     const wrapper = createWrapper();
     const arenaButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_mode_arena');
     expect(arenaButton?.attributes('disabled')).toBeDefined();
+  });
+  it('disables the age-warning preview refetch button during an active cooldown', async () => {
+    const { getImportCooldownRemainingMs, recordImportCompletion } =
+      await import('@/utils/tarkovDevImportCooldown');
+    window.localStorage.clear();
+    tarkovStoreState.tarkovUid = 123456;
+    recordImportCompletion(123456, 'pvp', 60 * 60_000);
+    expect(getImportCooldownRemainingMs(123456, 'pvp', 60 * 60_000)).toBeGreaterThan(0);
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'Tester',
+      gameEditionGuess: null,
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      skills: {},
+      tarkovUid: 123456,
+      totalXP: 0,
+      updatedAt: Date.now() - 3 * 86_400_000,
+    };
+    const wrapper = createWrapper();
+    const refetchButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_profile');
+    expect(refetchButton).toBeTruthy();
+    expect(refetchButton!.attributes('disabled')).toBeDefined();
+    window.localStorage.clear();
+  });
+  it('keeps the age-warning preview refetch button enabled outside a cooldown', () => {
+    window.localStorage.clear();
+    tarkovStoreState.tarkovUid = 123456;
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'Tester',
+      gameEditionGuess: null,
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      skills: {},
+      tarkovUid: 123456,
+      totalXP: 0,
+      updatedAt: Date.now() - 3 * 86_400_000,
+    };
+    const wrapper = createWrapper();
+    const refetchButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_profile');
+    expect(refetchButton).toBeTruthy();
+    expect(refetchButton!.attributes('disabled')).toBeUndefined();
   });
   it('unlinks a tarkov.dev profile without resetting imported tracker data', () => {
     tarkovStoreState.tarkovUid = 123456;

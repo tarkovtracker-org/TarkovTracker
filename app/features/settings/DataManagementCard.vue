@@ -69,7 +69,12 @@
                     icon="i-mdi-refresh"
                     color="info"
                     size="xs"
-                    :disabled="isAnyImportActive || !isTarkovDevRefetchModeSupported"
+                    :disabled="
+                      isAnyImportActive ||
+                      !isTurnstileReady ||
+                      !isTarkovDevRefetchModeSupported ||
+                      tarkovDevRefetchCooldownMinutes > 0
+                    "
                     :loading="isTarkovDevProfileUrlLoading"
                     @click="handleTarkovDevRefetch"
                   >
@@ -98,6 +103,13 @@
                     {{ $t('settings.tarkov_dev_import.unlink_profile') }}
                   </UButton>
                 </div>
+                <p v-if="tarkovDevRefetchCooldownMinutes > 0" class="text-surface-500 text-xs">
+                  {{
+                    $t('settings.tarkov_dev_import.cooldown_hint', {
+                      minutes: tarkovDevRefetchCooldownMinutes,
+                    })
+                  }}
+                </p>
               </div>
             </template>
             <form
@@ -139,7 +151,7 @@
                   icon="i-mdi-account-search"
                   color="info"
                   class="justify-center"
-                  :disabled="isTarkovDevProfileUrlBlank || isAnyImportActive"
+                  :disabled="isTarkovDevProfileUrlBlank || isAnyImportActive || !isTurnstileReady"
                   :loading="isTarkovDevProfileUrlLoading"
                 >
                   {{ $t('settings.tarkov_dev_import.fetch_profile') }}
@@ -181,6 +193,17 @@
                 </span>
                 <span class="text-surface-100 text-sm font-semibold">
                   {{ tarkovDevPreview.prestigeLevel }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-surface-400 text-xs">
+                  {{ $t('settings.tarkov_dev_import.last_refreshed') }}
+                </span>
+                <span
+                  class="text-sm font-semibold"
+                  :class="isTarkovDevPreviewDataAging ? 'text-warning-400' : 'text-surface-100'"
+                >
+                  {{ tarkovDevPreviewUpdatedLabel }}
                 </span>
               </div>
               <div class="flex items-center justify-between px-3 py-2">
@@ -229,6 +252,41 @@
               </div>
             </div>
             <div
+              v-if="isTarkovDevPreviewDataAging"
+              class="bg-surface-900/80 rounded-md border border-white/10 px-3 py-2"
+            >
+              <div class="flex items-start gap-2">
+                <UIcon
+                  name="i-mdi-clock-alert-outline"
+                  class="text-warning-400 mt-0.5 h-4 w-4 shrink-0"
+                />
+                <div class="space-y-2">
+                  <p class="text-surface-200 text-sm">
+                    {{
+                      $t('settings.tarkov_dev_import.data_age_warning', {
+                        days: tarkovDevPreviewUpdatedAgeDays ?? 0,
+                      })
+                    }}
+                  </p>
+                  <UButton
+                    icon="i-mdi-refresh"
+                    color="warning"
+                    variant="soft"
+                    size="xs"
+                    :disabled="
+                      isTarkovDevProfileUrlLoading ||
+                      !isTurnstileReady ||
+                      tarkovDevRefetchCooldownMinutes > 0
+                    "
+                    :loading="isTarkovDevProfileUrlLoading"
+                    @click="handleTarkovDevPreviewRefetch"
+                  >
+                    {{ $t('settings.tarkov_dev_import.refetch_profile') }}
+                  </UButton>
+                </div>
+              </div>
+            </div>
+            <div
               v-if="tarkovDevFixedTargetMode"
               class="bg-surface-900/80 rounded-md border border-white/10 px-3 py-2"
             >
@@ -264,6 +322,12 @@
               </UButton>
             </div>
           </template>
+          <div v-if="isTurnstileEnabled" class="space-y-1">
+            <p class="text-surface-500 text-xs">
+              {{ $t('settings.tarkov_dev_import.turnstile_hint') }}
+            </p>
+            <div ref="turnstileContainerRef"></div>
+          </div>
           <div
             v-if="tarkovDevImportState === 'success'"
             role="status"
@@ -279,7 +343,7 @@
             />
           </div>
           <div
-            v-if="tarkovDevImportState === 'error' && tarkovDevImportError"
+            v-if="tarkovDevImportState === 'error' && tarkovDevErrorMessage"
             role="alert"
             aria-live="assertive"
             aria-atomic="true"
@@ -289,7 +353,7 @@
               color="error"
               variant="soft"
               :title="$t('common.import_failed')"
-              :description="tarkovDevImportError"
+              :description="tarkovDevErrorMessage"
             />
           </div>
         </div>
@@ -843,6 +907,7 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useTurnstileWidget } from '@/composables/useTurnstile';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
   import {
     useDataManagementSession,
@@ -856,6 +921,7 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, sortSkillsByGameOrder, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   const TARKOV_DEV_ARENA_MODE = 'arena' as const;
   type DataManagementView = 'all' | 'imports' | 'backup';
@@ -866,6 +932,7 @@
     value: TarkovDevRefetchMode;
   };
   const { t } = useI18n({ useScope: 'global' });
+  const runtimeConfig = useRuntimeConfig();
   const props = withDefaults(
     defineProps<{
       session?: DataManagementSession;
@@ -944,12 +1011,22 @@
     importState: tarkovDevImportState,
     previewData: tarkovDevPreview,
     importError: tarkovDevImportError,
+    importErrorCode: tarkovDevImportErrorCode,
+    importErrorMeta: tarkovDevImportErrorMeta,
     parseProfileUrl: parseTarkovDevProfileUrl,
     confirmImport: confirmTarkovDevImport,
     setError: setTarkovDevImportError,
     reset: resetTarkovDevImportState,
   } = dataManagementSession.tarkovDev;
+  const turnstileContainerRef = ref<HTMLElement | null>(null);
+  const {
+    enabled: isTurnstileEnabled,
+    getToken: getTurnstileToken,
+    ready: isTurnstileReady,
+    reset: resetTurnstile,
+  } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
+  const tarkovDevRequestGeneration = ref(0);
   const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
   const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(tarkovStore.getCurrentGameMode());
@@ -1048,6 +1125,59 @@
     );
   }
   const editionLabel = computed(() => getEditionLabel(tarkovDevPreview.value?.gameEditionGuess));
+  const DAY_MS = 86_400_000;
+  const TARKOV_DEV_AGE_WARNING_DAYS = 2;
+  const tarkovDevImportCooldownMs = computed(() => {
+    const minutes = Number(runtimeConfig.public.tarkovDevImportCooldownMinutes);
+    return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 60) * 60_000;
+  });
+  const cooldownNow = ref(Date.now());
+  const tarkovDevErrorMessage = computed(() => {
+    const code = tarkovDevImportErrorCode.value;
+    if (code) {
+      return t(`settings.tarkov_dev_import.errors.${code}`, tarkovDevImportErrorMeta.value ?? {}, {
+        default: t('settings.tarkov_dev_import.errors.unexpected_profile_flow'),
+      });
+    }
+    return tarkovDevImportError.value ?? '';
+  });
+  const tarkovDevPreviewUpdatedAgeDays = computed(() => {
+    const updatedAt = tarkovDevPreview.value?.updatedAt;
+    if (!updatedAt) return null;
+    return Math.max(0, Math.floor((cooldownNow.value - updatedAt) / DAY_MS));
+  });
+  const tarkovDevPreviewUpdatedLabel = computed(() => {
+    const updatedAt = tarkovDevPreview.value?.updatedAt;
+    if (!updatedAt) return t('settings.tarkov_dev_import.last_refreshed_unknown');
+    return formatDate(updatedAt);
+  });
+  const isTarkovDevPreviewDataAging = computed(
+    () => (tarkovDevPreviewUpdatedAgeDays.value ?? 0) >= TARKOV_DEV_AGE_WARNING_DAYS
+  );
+  let cooldownTimer: ReturnType<typeof setInterval> | null = null;
+  onMounted(() => {
+    cooldownTimer = setInterval(() => {
+      cooldownNow.value = Date.now();
+    }, 30_000);
+  });
+  onUnmounted(() => {
+    if (cooldownTimer) clearInterval(cooldownTimer);
+  });
+  watch(tarkovDevImportState, (state) => {
+    if (state === 'success') cooldownNow.value = Date.now();
+  });
+  const tarkovDevRefetchCooldownMinutes = computed(() => {
+    const uid = tarkovUid.value;
+    const mode = tarkovDevRefetchMode.value;
+    if (uid === null || !isTarkovDevImportableMode(mode)) return 0;
+    const remainingMs = getImportCooldownRemainingMs(
+      uid,
+      mode,
+      tarkovDevImportCooldownMs.value,
+      cooldownNow.value
+    );
+    return Math.ceil(remainingMs / 60_000);
+  });
   const tarkovDevFixedTargetModeLabel = computed(() =>
     tarkovDevFixedTargetMode.value === GAME_MODES.PVE ? t('common.pve') : t('common.pvp')
   );
@@ -1074,9 +1204,23 @@
     tarkovDevRefetchMode.value = mode;
     tarkovDevTargetMode.value = mode;
   }
+  async function fetchTarkovDevProfile(profileUrl: string, fresh = false) {
+    const requestGeneration = ++tarkovDevRequestGeneration.value;
+    try {
+      const turnstileToken = await getTurnstileToken();
+      if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
+      if (isTurnstileEnabled && !turnstileToken) {
+        setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
+        return null;
+      }
+      return await parseTarkovDevProfileUrl(profileUrl, { fresh, turnstileToken });
+    } finally {
+      resetTurnstile();
+    }
+  }
   async function handleTarkovDevProfileUrlSubmit() {
     try {
-      const source = await parseTarkovDevProfileUrl(tarkovDevProfileUrlInput.value);
+      const source = await fetchTarkovDevProfile(tarkovDevProfileUrlInput.value);
       updateTarkovDevImportTarget(source?.mode);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_url_submit', err);
@@ -1088,10 +1232,20 @@
       if (!isTarkovDevImportableMode(refetchMode)) return;
       const linkedProfileUrl = tarkovDevProfileUrl.value;
       if (!linkedProfileUrl) return;
-      const source = await parseTarkovDevProfileUrl(linkedProfileUrl);
+      const source = await fetchTarkovDevProfile(linkedProfileUrl, true);
       updateTarkovDevImportTarget(source?.mode, source ? refetchMode : undefined);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_refetch', err);
+    }
+  }
+  async function handleTarkovDevPreviewRefetch() {
+    try {
+      const profileUrl = tarkovDevProfileUrl.value ?? tarkovDevProfileUrlInput.value;
+      if (!profileUrl) return;
+      const source = await fetchTarkovDevProfile(profileUrl, true);
+      updateTarkovDevImportTarget(source?.mode);
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_preview_refetch', err);
     }
   }
   function handleTarkovDevUnexpectedError(action: string, err: unknown) {
@@ -1112,7 +1266,9 @@
     await confirmTarkovDevImport(tarkovDevFixedTargetMode.value ?? tarkovDevTargetMode.value);
   }
   function resetTarkovDevImport() {
+    tarkovDevRequestGeneration.value += 1;
     tarkovDevFixedTargetMode.value = null;
+    resetTurnstile();
     resetTarkovDevImportState();
   }
   async function handleEftLogsFolderChange(event: Event) {

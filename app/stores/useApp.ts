@@ -7,21 +7,7 @@ const state = () => ({
 });
 export const useAppStore = defineStore('app', {
   state,
-  getters: {
-    isDrawerRailMode(): boolean {
-      return this.drawerRail;
-    },
-  },
   actions: {
-    setDrawerShow(show: boolean) {
-      this.drawerShow = show;
-    },
-    toggleDrawerShow() {
-      this.drawerShow = !this.drawerShow;
-    },
-    setDrawerRail(val: boolean) {
-      this.drawerRail = val;
-    },
     toggleDrawerRail() {
       this.drawerRail = !this.drawerRail;
     },

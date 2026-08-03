@@ -111,39 +111,4 @@ describe('useSystemStore', () => {
       });
     });
   });
-  describe('Token Getters', () => {
-    /**
-     * NOTE: These tests verify the userTokens and userTokenCount getter logic.
-     * Pinia getters in the Nuxt test environment don't properly react to state changes,
-     * so we test the getter logic directly against different state configurations.
-     */
-    it('should return empty array when tokens is undefined', () => {
-      const store = useSystemStore();
-      const result = store.userTokens;
-      expect(result).toEqual([]);
-    });
-    it('should return token array when tokens exist', () => {
-      const store = useSystemStore();
-      const mockTokens = ['token1', 'token2'];
-      store.$patch({ tokens: mockTokens } as Partial<SystemState>);
-      // Verify state was updated
-      expect(store.$state.tokens).toEqual(mockTokens);
-      const result = store.userTokens;
-      expect(result).toEqual(mockTokens);
-    });
-    it('should return 0 count when no tokens', () => {
-      const store = useSystemStore();
-      const result = store.userTokenCount;
-      expect(result).toBe(0);
-    });
-    it('should return correct token count', () => {
-      const store = useSystemStore();
-      const mockTokens = ['token1', 'token2', 'token3'];
-      store.$patch({ tokens: mockTokens } as Partial<SystemState>);
-      // Verify state was updated
-      expect(store.$state.tokens).toEqual(mockTokens);
-      const result = store.userTokenCount;
-      expect(result).toBe(3);
-    });
-  });
 });

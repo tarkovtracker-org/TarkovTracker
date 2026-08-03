@@ -15,7 +15,8 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - analytics tooling, MCP access, or external data integrations
 - deprecated patterns that agents must avoid
 - behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
-  pipeline, multi-layer caching, overlay corrections, precompute workflow)
+  pipeline, multi-layer caching, overlay corrections, precompute workflow, Tarkov.dev profile
+  import)
 - community health policy: security reporting (`SECURITY.md`), support routing
   (`SUPPORT.md`), or code of conduct (`CODE_OF_CONDUCT.md`)
 
@@ -75,7 +76,7 @@ Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` |
 
 Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
 
-Lint: `pnpm run lint` (zero warnings) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
+Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
 i18n check: `pnpm run i18n:check` | Supabase types: `pnpm run supabase:types` | OpenAPI validate: `pnpm run validate:openapi` | Deps: `pnpm run deps` | KV precompute: `pnpm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
 

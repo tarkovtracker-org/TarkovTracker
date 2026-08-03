@@ -505,7 +505,6 @@ export interface StaticMapData {
 // Store Types
 export interface SystemState extends StateTree {
   user_id?: string | null;
-  tokens?: string[];
   team?: string | null;
   // Keep raw team_id from Supabase for backwards/compat and reactivity
   team_id?: string | null;
@@ -516,10 +515,7 @@ export interface SystemState extends StateTree {
   is_admin?: boolean;
 }
 export interface SystemGetters extends _GettersTree<SystemState> {
-  userTokens: (state: SystemState) => string[];
-  userTokenCount: (state: SystemState) => number;
   userTeam: (state: SystemState) => string | null;
-  userTeamIsOwn: (state: SystemState) => boolean;
   isAdmin: (state: SystemState) => boolean;
 }
 export interface TeamState extends StateTree {

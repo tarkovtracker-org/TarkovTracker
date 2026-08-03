@@ -46,7 +46,7 @@ export interface StreamerToolsSettings {
   trackColor: string;
   trackOpacity: number;
 }
-export const STREAMER_TOOLS_SETTINGS_STORAGE_KEY = 'streamer_tools:overlay_settings:v1';
+const STREAMER_TOOLS_SETTINGS_STORAGE_KEY = 'streamer_tools:overlay_settings:v1';
 export const DEFAULT_STREAMER_TOOLS_SETTINGS: StreamerToolsSettings = {
   accent: 'kappa',
   align: 'bottom-left',
