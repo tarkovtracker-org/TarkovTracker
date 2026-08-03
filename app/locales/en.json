@@ -2080,6 +2080,10 @@
       "nickname": "Nickname",
       "faction": "Faction",
       "skills_count": "{count} skills detected",
+      "last_refreshed": "Tarkov.dev data updated",
+      "last_refreshed_unknown": "Unknown",
+      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
+      "cooldown_hint": "Imported recently. You can re-import this profile in about {minutes} min.",
       "skills_details_toggle": "View skill values",
       "skills_details_skill": "Skill",
       "edition_guess": "Edition (detected)",
@@ -2095,7 +2099,13 @@
       "refetch_profile": "Refetch Profile",
       "unlink_profile": "Unlink",
       "errors": {
-        "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again."
+        "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again.",
+        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
+        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
+        "profile_not_generated": "Tarkov.dev has no snapshot for this profile yet. Open the profile page on Tarkov.dev once, let it load, then fetch again.",
+        "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
+        "verification_failed": "Human verification failed. Reload the page and try again.",
+        "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again."
       }
     }
   },

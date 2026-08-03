@@ -15,7 +15,8 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - analytics tooling, MCP access, or external data integrations
 - deprecated patterns that agents must avoid
 - behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
-  pipeline, multi-layer caching, overlay corrections, precompute workflow)
+  pipeline, multi-layer caching, overlay corrections, precompute workflow, Tarkov.dev profile
+  import)
 - community health policy: security reporting (`SECURITY.md`), support routing
   (`SUPPORT.md`), or code of conduct (`CODE_OF_CONDUCT.md`)
 
