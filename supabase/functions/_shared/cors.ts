@@ -40,12 +40,3 @@ export function corsHeadersFor(req: Request): Record<string, string> {
   }
   return headers;
 }
-// Backward-compat export to avoid immediate runtime breakage in places where
-// a Request object is not available. This intentionally does NOT include an
-// origin and should only be used for pre-flight responses that aren't
-// security-sensitive. Prefer using corsHeadersFor(req) everywhere.
-export const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  Vary: 'Origin',
-};

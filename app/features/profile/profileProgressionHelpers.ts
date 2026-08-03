@@ -1,8 +1,7 @@
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
 export const DAY_MS = 24 * 60 * 60 * 1000;
-export const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object');
 const isApiTaskUpdate = (value: unknown): value is ApiTaskUpdate => {
@@ -54,7 +53,7 @@ export const countDaysInclusive = (start: number, end: number): number => {
   }
   return Math.max(1, Math.ceil((end - start) / DAY_MS));
 };
-export const normalizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
+const normalizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }

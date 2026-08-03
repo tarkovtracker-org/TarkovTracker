@@ -20,6 +20,7 @@ node_modules
 .fleet
 .idea
 .vscode/settings.json
+!.vscode/settings.json
 /logs/
 *.log
 .env

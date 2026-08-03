@@ -22,6 +22,44 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  fallow:
+    name: Fallow audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.14.0 --activate
+      - name: Setup pnpm cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Resolve Fallow base
+        id: fallow-base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE="origin/main"
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+      - name: Audit changed files
+        run: pnpm exec fallow audit --base "${{ steps.fallow-base.outputs.base }}" --gate new-only --quiet
   lint-format:
     name: Lint & Format
     runs-on: ubuntu-latest

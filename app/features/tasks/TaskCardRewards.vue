@@ -300,7 +300,6 @@
     level: number;
   }
   const props = defineProps<{
-    taskId: string;
     traderStandingRewards: TraderStanding[];
     skillRewards: SkillReward[];
     traderUnlockReward?: TraderUnlock | TraderUnlock[] | null;

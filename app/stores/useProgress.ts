@@ -40,13 +40,11 @@ function getGameModeData(store: Store<string, UserState> | undefined): UserProgr
 type TeamStoresMap = Record<string, Store<string, UserState>>;
 type CompletionsMap = Record<string, Record<string, boolean>>;
 type FailedTasksMap = Record<string, Record<string, boolean>>;
-type TraderLevelsMap = Record<string, Record<string, number>>;
 type FactionMap = Record<string, string>;
 type TaskAvailabilityMap = Record<string, Record<string, boolean>>;
 type ObjectiveCompletionsMap = Record<string, Record<string, boolean>>;
 type HideoutLevelMap = Record<string, Record<string, number>>;
 type InvalidTasksMap = Record<string, Record<string, boolean>>;
-type InvalidObjectivesMap = Record<string, Record<string, boolean>>;
 /*
 type ProgressGetters = {
   teamStores: TeamStoresMap;
@@ -128,26 +126,6 @@ export const useProgressStore = defineStore('progress', () => {
   const tasksCompletions = computed(() => taskStatusFlags.value.completions);
   const tasksFailed = computed(() => taskStatusFlags.value.failures);
   const gameEditionData = computed<GameEdition[]>(() => metadataStore.editions);
-  const traderLevelsAchieved = computed(() => {
-    const perfTimer = perfStart('[Progress] traderLevelsAchieved', {
-      traders: metadataStore.traders.length,
-    });
-    const levels: TraderLevelsMap = {};
-    if (!metadataStore.traders.length || Object.keys(visibleTeamStores.value).length === 0) {
-      perfEnd(perfTimer, { skipped: true });
-      return {};
-    }
-    for (const teamId of Object.keys(visibleTeamStores.value)) {
-      levels[teamId] = {};
-      const store = visibleTeamStores.value[teamId];
-      for (const trader of metadataStore.traders) {
-        const currentData = getGameModeData(store);
-        levels[teamId]![trader.id] = currentData.traders?.[trader.id]?.level ?? 0;
-      }
-    }
-    perfEnd(perfTimer, { traders: metadataStore.traders.length });
-    return levels;
-  });
   const playerFaction = computed(() => {
     const perfTimer = perfStart('[Progress] playerFaction');
     const faction: FactionMap = {};
@@ -439,27 +417,6 @@ export const useProgressStore = defineStore('progress', () => {
     perfEnd(perfTimer, { tasks: metadataStore.tasks.length, teams: teamIds.length });
     return invalids;
   });
-  const invalidObjectives = computed(() => {
-    const perfTimer = perfStart('[Progress] invalidObjectives', {
-      objectives: metadataStore.objectives.length,
-    });
-    const invalids: InvalidObjectivesMap = {};
-    const teamIds = Object.keys(visibleTeamStores.value);
-    if (metadataStore.objectives.length === 0 || teamIds.length === 0) {
-      perfEnd(perfTimer, { skipped: true });
-      return {};
-    }
-    const invalidByTeam = invalidProgressByTeam.value;
-    for (const objective of metadataStore.objectives) {
-      invalids[objective.id] = {};
-      for (const teamId of teamIds) {
-        invalids[objective.id]![teamId] =
-          invalidByTeam[teamId]?.invalidObjectives?.[objective.id] ?? false;
-      }
-    }
-    perfEnd(perfTimer, { objectives: metadataStore.objectives.length, teams: teamIds.length });
-    return invalids;
-  });
   const hideoutLevels = computed(() => {
     const perfTimer = perfStart('[Progress] hideoutLevels', {
       stations: metadataStore.hideoutStations.length,
@@ -721,54 +678,12 @@ export const useProgressStore = defineStore('progress', () => {
     // For teammates or when manual mode, use stored level
     return currentData?.level ?? 1;
   };
-  const getFaction = (teamId: string): string => {
-    const store = visibleTeamStores.value[teamId];
-    const currentData = getGameModeData(store);
-    return currentData?.pmcFaction ?? 'USEC';
-  };
-  const getTeammateStore = (teamId: string): Store<string, UserState> | null => {
-    return teammateStores.value[teamId] || null;
-  };
-  const hasCompletedTask = (teamId: string, taskId: string): boolean => {
-    const storeKey = getTeamIndex(teamId);
-    const store = teamStores.value[storeKey];
-    const currentData = getGameModeData(store);
-    const taskCompletion = currentData?.taskCompletions?.[taskId];
-    const flags = getCompletionFlags(taskCompletion);
-    return flags.complete && !flags.failed;
-  };
   const getTaskStatus = (teamId: string, taskId: string): 'completed' | 'failed' | 'incomplete' => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
     const currentData = getGameModeData(store);
     const taskCompletion = currentData?.taskCompletions?.[taskId];
     return getTaskStatusFromFlags(taskCompletion);
-  };
-  const getProgressPercentage = (teamId: string, category: string): number => {
-    const storeKey = getTeamIndex(teamId);
-    const store = teamStores.value[storeKey];
-    if (!store?.$state) return 0;
-    // Get current gamemode data, with fallback to legacy structure
-    const currentGameMode = store.$state.currentGameMode || GAME_MODES.PVP;
-    const currentData = store.$state[currentGameMode] || store.$state;
-    switch (category) {
-      case 'tasks': {
-        const totalTasks = Object.keys(currentData.taskCompletions || {}).length;
-        const completedTasks = Object.values(currentData.taskCompletions || {}).filter(
-          (completion) => getCompletionFlags(completion).complete
-        ).length;
-        return totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-      }
-      case 'hideout': {
-        const totalModules = Object.keys(currentData.hideoutModules || {}).length;
-        const completedModules = Object.values(currentData.hideoutModules || {}).filter(
-          (module) => module?.complete === true
-        ).length;
-        return totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
-      }
-      default:
-        return 0;
-    }
   };
   const tasksState = computed<Record<string, TaskState>>(() => {
     const state: Record<string, TaskState> = {};
@@ -835,23 +750,17 @@ export const useProgressStore = defineStore('progress', () => {
     tasksFailed,
     tasksState,
     gameEditionData,
-    traderLevelsAchieved,
     playerFaction,
     unlockedTasks,
     objectiveCompletions,
     invalidTasks,
-    invalidObjectives,
     hideoutLevels,
     moduleCompletions,
     modulePartCompletions,
     getTeamIndex,
     getDisplayName,
     getLevel,
-    getFaction,
-    getTeammateStore,
-    hasCompletedTask,
     getTaskStatus,
-    getProgressPercentage,
     migrateDuplicateObjectiveProgress,
   };
 });

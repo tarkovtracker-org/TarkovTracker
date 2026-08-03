@@ -2,7 +2,7 @@
  * In-memory cache is per Worker instance; entries are not shared across the edge.
  * If you need distributed caching, use a Durable Object or Cloudflare KV.
  */
-export type CacheEntry = {
+type CacheEntry = {
   value: unknown;
   expiresAt: number;
 };
