@@ -113,11 +113,17 @@ jobs:
       - name: Type check
         run: pnpm run typecheck
   test:
-    name: Test
+    name: Test (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+        total: [4]
     env:
       CI: 'true'
+      VITEST_SHARD: ${{ matrix.shard }}/${{ matrix.total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -138,8 +144,8 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Test with coverage
-        run: pnpm run test:coverage
+      - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
+        run: pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/${{ matrix.total }}
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
@@ -147,17 +153,17 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage/lcov.info
-          flags: unittests
+          flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
       - name: Upload test results to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           report_type: test_results
           files: ./test-report.junit.xml
-          flags: unittests
+          flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
   validate:
     name: Validate

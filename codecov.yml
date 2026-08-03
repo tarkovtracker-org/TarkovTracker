@@ -4,6 +4,19 @@ coverage:
       default:
         target: auto
         threshold: 5%
+      # Absolute floor replacing the vitest per-metric thresholds
+      # (branches: 15, functions: 20, lines: 20, statements: 20) that were
+      # disabled when test sharding landed. Codecov merges the per-shard lcov
+      # uploads, so this gate sees the full-project coverage number. Actual
+      # coverage is ~56% statements / ~45% branches, so 20% is a catastrophic-
+      # drop guard, not a quality bar — same role the vitest thresholds played.
+      absolute-floor:
+        target: 20
+        threshold: 0%
+      # Fork PRs intentionally skip the coverage upload (no org secrets) and
+      # Codecov statuses default to if_not_found: success, so forks are not
+      # blocked on missing reports. Dependabot auto-merge polls commit status
+      # contexts, so a failed absolute-floor status still blocks merges.
     patch:
       default:
         target: auto
