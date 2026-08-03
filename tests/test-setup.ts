@@ -105,7 +105,7 @@ const mockFetch = vi.fn(
 );
 const delegator = vi.fn(async (input: FetchInput, init?: RequestInit): Promise<unknown> => {
   const current = (globalThis as Record<string, unknown>).$fetch;
-  if (current && current !== delegator) {
+  if (current && current !== delegator && vi.isMockFunction(current)) {
     return (current as (i: FetchInput, init?: RequestInit) => unknown)(input, init);
   }
   return mockFetch(input, init);
