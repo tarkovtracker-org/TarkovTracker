@@ -1,13 +1,11 @@
 {
   "admin": {
-    "title": "Панель администратора",
     "verifying_access": "Verifying admin access...",
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
-    "unknown_user": "Неизвестно",
     "cache_management_title": "Управление кешированием",
     "last_purge_description": "Last purge: {type} at {timestamp}",
     "tarkov_data_cache_label": "Tarkov Data Cache",
@@ -46,13 +44,8 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_tier_supporter": "Supporter",
-    "supporter_tier_scav": "Дикие",
-    "supporter_tier_timmy": "Timmy",
-    "supporter_tier_chad": "Chad",
     "supporter_enabled_label": "Enabled",
     "supporter_disabled_label": "Disabled",
-    "supporter_override_save_button": "Применить",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
@@ -70,13 +63,11 @@
     "hidden_label": "Скрыто",
     "user_label": "Пользователь",
     "user_avatar_alt": "Аватар пользователя",
-    "supporter_badge_label": "Supporter",
     "supporter_badge_aria": "Manage your supporter subscription ({tier})",
     "help_community_aria": "Help & community",
     "community_section": "Community",
     "keyboard_shortcuts": "Keyboard shortcuts",
     "report_problem": "Report a problem",
-    "more_aria": "Показать больше",
     "login_aria": "Log in to your account"
   },
   "omnibar": {
@@ -89,21 +80,16 @@
     "hint_min_chars": "Type at least 2 characters to search...",
     "no_results": "No results found for \"{query}\".",
     "group_tasks": "Tasks / Quests",
-    "group_items": "Необходимые предметы",
     "group_hideout": "Hideout Stations"
   },
   "activity_log": {
-    "title": "Activity Log",
-    "aria_label": "Activity Log",
     "unread_indicator": "You have unread activity",
     "mark_read": "Mark read",
     "clear": "Clear",
     "empty": "No activity recorded yet.",
     "badge_api": "API Sync",
-    "badge_manual": "Вручную",
     "api_synced": "API Progress Synced",
     "more_count": "+ещё {count}",
-    "unknown_time": "Неизвестно",
     "entry": {
       "completed": "Completed Task: {name}",
       "uncompleted": "Uncompleted Task: {name}",
@@ -126,9 +112,7 @@
     "shrink": "Сжать стрим",
     "title": "{streamer} live"
   },
-  "buttons": {
-    "retry": "Попробовать ещё раз"
-  },
+  "buttons": {},
   "errors": {
     "generic_fallback": "Непредвиденная ошибка. Пожалуйста, попробуйте снова.",
     "chunk_load_blocked": "Не удалось загрузить обязательный файл приложения. Попробуйте ещё раз. Если ошибка повторяется, доступ может блокироваться провайдером или в вашем регионе.",
@@ -142,7 +126,6 @@
     "copy_details": "Копировать детали",
     "copy_success": "Скопировано",
     "status_prefix": "Ошибка",
-    "page_not_found": "Страница не найдена",
     "page_not_found_description": "Страница, которую вы ищете, не существует.",
     "access_blocked": "Доступ заблокирован",
     "service_unavailable": "Сервис недоступен",
@@ -159,7 +142,6 @@
     "subtitle_error": "Часть данных не загружена",
     "first_load_info": "Это может занять некоторое время при первой загрузке. Данные будут кэшированы для следующих посещений.",
     "partial_data_info": "Приложение будет работать с неполными данными. Вы можете попробовать ещё раз или продолжить в любом случае.",
-    "retry": "Попробовать ещё раз",
     "continue_anyway": "Продолжить в любом случае"
   },
   "toast": {
@@ -223,7 +205,112 @@
     "finish": "Завершить",
     "back_to_top": "Наверх",
     "refresh_button": "Попробовать снова",
-    "opens_in_new_tab": "Открыть в новой вкладке"
+    "opens_in_new_tab": "Открыть в новой вкладке",
+    "available": "Доступно",
+    "tasks": "Задачи",
+    "level": "Уровень",
+    "locked": "Заблокировано",
+    "all": "Все",
+    "completed": "Выполнено",
+    "status_completed": "выполнена",
+    "hideout": "Hideout",
+    "unknown": "Неизвестен",
+    "failed": "Неудачный",
+    "status_failed": "провалена",
+    "complete": "Complete",
+    "pvp": "PvP",
+    "pve": "PvE",
+    "retry": "Повторить",
+    "open_tasks": "Открытые задачи",
+    "view_on_tarkov_dev": "Посмотреть на Tarkov.dev",
+    "reset": "Reset",
+    "scav": "Скет",
+    "apply": "Применить",
+    "more": "Ещё",
+    "needed_items": "Необходимые элементы",
+    "task": "Задача",
+    "lightkeeper": "Хранитель",
+    "kappa": "Kappa",
+    "storyline": "Линия истории",
+    "mark_complete": "Пометить завершенным",
+    "maps": "Карты",
+    "clear_search": "Очистить поиск",
+    "settings": "Настройки",
+    "credits": "Кредиты",
+    "support": "Поддержка",
+    "privacy_policy": "Политика конфиденциальности",
+    "terms_of_service": "Условия предоставления услуг",
+    "tarkov_dev": "Tarkov.dev",
+    "streamer_tools": "Инструменты \"Стример\"",
+    "prestige": "Prestige",
+    "backup_restore": "Резервное копирование и восстановление",
+    "confirm_import": "Подтвердить импорт",
+    "admin_panel": "Панель администратора",
+    "supporter": "Сторонник",
+    "timmy": "Timmy",
+    "chad": "Чад",
+    "activity_log": "Журнал активности",
+    "manual": "Ручной",
+    "page_not_found": "Страница не найдена",
+    "open_hideout": "Открыть скрытие",
+    "zoom_speed": "Масштаб",
+    "pan_speed": "Скорость пана",
+    "zone_opacity": "Прозрачность зоны",
+    "default": "По умолчанию",
+    "compact": "Компактный",
+    "pmc_spawn": "Появление PMC",
+    "pmc_extract": "Извлечь PMC",
+    "scav_extract": "Экстракт Scav",
+    "dashboard": "Панель",
+    "meet_the_fence_reputation_requirement_required": "Соответствие требованиям для репутации Fence ({required}).",
+    "objectives": "Цели",
+    "kappa_tasks": "Каппа",
+    "getting_started": "Начало работы",
+    "progress": "Прогресс",
+    "blocked": "Заблокирован",
+    "optional": "Опционально",
+    "lv": "Lv",
+    "kappa_lightkeeper": "Каппа и Светлохранитель",
+    "list": "Список",
+    "traders": "Трейдеры",
+    "clear_focus": "Очистить фокус",
+    "lvl_level": "Lvl {level}",
+    "impact": "По зависимым заданиям",
+    "appearance": "Внешний вид",
+    "requires": "Требуется",
+    "view_on_wiki": "Просмотр в вики",
+    "item": "Пункт 1",
+    "reset_failed": "Сбой сброса",
+    "was_status": "был {status}",
+    "fail": "Сбой",
+    "accept": "Принять",
+    "ready_to_hand_over": "Готов к передаче",
+    "objective": "Цель",
+    "maxed": "Макс.",
+    "found_in_raid_required": "Найден в Рейде",
+    "fir": "РК",
+    "priority": "Приоритет",
+    "team": "Команда",
+    "show": "Показать",
+    "hide": "Скрыть",
+    "login": "Логин",
+    "overview": "Общий обзор",
+    "api_documentation": "Документация по API",
+    "tarkov_changes": "Tarkov Изменения",
+    "api": "API",
+    "game_settings": "Настройки игры",
+    "custom_scale": "Пользовательский масштаб",
+    "self_contained": "Самосохранено",
+    "progress_track": "Путь прогресса",
+    "account": "Аккаунт",
+    "preferences": "Настройки",
+    "game_edition": "Издание игры",
+    "reset_pvp_data": "Сбросить данные PvP",
+    "reset_pve_data": "Сбросить данные PvE",
+    "reset_all_data": "Сбросить все данные",
+    "import_failed": "Не удалось импортировать",
+    "delete_archived_run": "Удалить Запуск в Архив",
+    "validation_error": "Ошибка проверки"
   },
   "page_help": {
     "button": "Помощь",
@@ -275,9 +362,6 @@
             "one": "На странице заданий отметьте квесты, которые сейчас доступны вам в игре у каждого торговца. Так цепочки зависимостей заполняются намного быстрее, чем если вручную закрывать старые задания по одному.",
             "two": "Если что-то выглядит неверно, используйте меню карточки задания, чтобы сообщить о проблеме в данных, а не насильно переводить трекер в неверное состояние.",
             "three": "После этой проверки используйте кнопку помощи в верхней панели на поддерживаемых страницах, чтобы снова открыть гид по странице или этот онбординг."
-          },
-          "actions": {
-            "open": "Открыть задания"
           }
         }
       }
@@ -307,7 +391,6 @@
         }
       },
       "actions": {
-        "tasks": "Открыть задания",
         "needed_items": "Открыть нужные предметы"
       }
     },
@@ -336,8 +419,7 @@
         }
       },
       "actions": {
-        "needed_items": "Предметы для заданий",
-        "hideout": "Открыть убежище"
+        "needed_items": "Предметы для заданий"
       }
     },
     "needed_items": {
@@ -363,10 +445,6 @@
           "bullet_one": "Если предмет неожиданно пропадает, причина обычно в одном из фильтров панели.",
           "bullet_two": "Сортировка по приоритету лучше всего подходит, когда вы хотите сначала увидеть самые важные предметы."
         }
-      },
-      "actions": {
-        "tasks": "Открыть задания",
-        "hideout": "Открыть убежище"
       }
     },
     "hideout": {
@@ -394,26 +472,19 @@
         }
       },
       "actions": {
-        "needed_items": "Предметы убежища",
-        "tasks": "Открыть задания"
+        "needed_items": "Предметы убежища"
       }
     }
   },
   "maps": {
-    "zoom_speed": "Скорость масштабирования",
-    "pan_speed": "Скорость перемещения",
-    "zone_opacity": "Прозрачность зон",
     "tooltip_density": "Tooltips",
-    "tooltip_density_default": "Default",
-    "tooltip_density_compact": "Компактная",
     "map_settings": "Настройки карты",
     "not_available_title": "Карта недоступна",
     "not_available_description": "Интерактивная карта для {mapName} пока недоступна. Мы ждём появления совместимой карты.",
     "placeholder": "этой локации",
     "floors": "Этажи",
     "factions": {
-      "pmc": "ЧВК",
-      "scav": "Дикие"
+      "pmc": "ЧВК"
     },
     "layers": {
       "pmc_spawns": "Спавны ЧВК"
@@ -421,9 +492,6 @@
     "legend": {
       "your_objectives": "Ваши цели",
       "team_objectives": "Цели команды",
-      "pmc_spawn": "Спавн ЧВК",
-      "pmc_extract": "Выход ЧВК",
-      "scav_extract": "Выход Диких",
       "shared_extract": "Общий выход (любая фракция)",
       "coop_extract": "Совместный выход (ЧВК + Дикий)"
     },
@@ -438,9 +506,6 @@
       }
     },
     "aria": {
-      "zoom_speed": "Скорость масштабирования",
-      "pan_speed": "Скорость перемещения",
-      "zone_opacity": "Прозрачность зон",
       "tooltip_density": "Tooltip density"
     },
     "tooltip": {
@@ -448,14 +513,10 @@
       "go_to_in_task_list": "Перейти к цели в списке заданий",
       "complete": "Завершить цель",
       "uncomplete": "Отменить завершение цели",
-      "objective_unavailable": "Цель недоступна.",
-      "task_fallback": "Задание"
+      "objective_unavailable": "Цель недоступна."
     }
   },
   "page": {
-    "index": {
-      "title": "Панель управления"
-    },
     "dashboard": {
       "changelog": {
         "title": "Что нового",
@@ -463,7 +524,6 @@
         "hide": "Скрыть обновления",
         "loading": "Загрузка обновлений...",
         "error": "Не удалось загрузить обновления.",
-        "retry": "Повторить",
         "empty": "Пока нет обновлений.",
         "view_all": "Посмотреть все"
       },
@@ -550,8 +610,6 @@
           "level_one": "Достигните уровня {required} (остался 1 уровень).",
           "level_other": "Достигните уровня {required} (осталось {count} уровней).",
           "prerequisite": "Выполните {tasks}.",
-          "fence_positive": "Достигните требования по репутации Скупщика ({required}).",
-          "fence_negative": "Достигните требования по репутации Скупщика ({required}).",
           "trader_unlock": "Выполните {task}, чтобы открыть {trader}.",
           "complete": "Блокеров нет. Всё видимое уже выполнено."
         },
@@ -567,12 +625,8 @@
       },
       "progress": {
         "title": "Детализация прогресса",
-        "tasks": "Задания",
-        "objectives": "Цели",
         "items": "Предметы заданий",
         "hideout_items": "Предметы для убежища",
-        "kappa": "Задания на Каппу",
-        "lightkeeper": "Смотритель маяка",
         "filtered_status_active": "Отфильтровано настройками заданий",
         "filtered_status_inactive": "Все типы заданий включены",
         "filtered_warning_tooltip": "Эти показатели учитывают ваши фильтры заданий (Каппа, Смотритель маяка и обычные задания)."
@@ -583,15 +637,12 @@
       },
       "milestones": {
         "title": "Ключевые этапы",
-        "starter": "Начало пути",
         "halfway": "Половина пути",
         "veteran": "Почти готово",
         "kappa": {
-          "title": "Каппа",
           "subtitle": "Контейнер получен"
         },
         "lightkeeper": {
-          "title": "Смотритель маяка",
           "subtitle": "Торговец разблокирован"
         }
       },
@@ -609,15 +660,7 @@
         "locked_summary": "{count} traders locked",
         "sort": {
           "aria_label": "Sort traders",
-          "direction_aria_label": "Toggle sort direction",
-          "default": "Default",
-          "progress": "Progress",
-          "level": "Уровень"
-        }
-      },
-      "stats": {
-        "failed": {
-          "stat": "Провалено"
+          "direction_aria_label": "Toggle sort direction"
         }
       }
     },
@@ -627,7 +670,6 @@
       "back": "Назад к панели управления",
       "loading": "Загрузка истории изменений...",
       "error": "Не удалось загрузить историю изменений.",
-      "retry": "Повторить",
       "empty": "Пока нет записей истории изменений.",
       "load_more": "Загрузить ещё",
       "types": {
@@ -639,26 +681,20 @@
       }
     },
     "storyline": {
-      "title": "Сюжет",
       "subtitle": "Отслеживайте прогресс по сюжетным главам Tarkov.",
       "chapters_complete": "глав завершено",
       "wip_title": "В разработке",
       "wip_badge": "WIP",
       "wip_description": "Эта функция всё ещё находится в разработке. По мере того как мы продолжаем структурировать данные, контент и функциональность будут расширяться и дорабатываться. Спасибо за терпение!",
       "no_data": "Нет данных по сюжетным главам.",
-      "mark_complete": "Отметить как выполнено",
       "mark_incomplete": "Отметить как невыполнено",
-      "completed": "Выполнено",
       "endings": "Endings",
       "route_choice": "Route choice",
-      "route_available": "Available",
       "route_chosen": "Route selected",
-      "route_blocked": "Blocked",
       "route_blocks": "Blocks: {objectives}",
       "route_blocked_by": "Blocked by: {objectives}",
       "route_decision": "Decision {index}",
       "route_choose_one": "Choose one",
-      "route_optional": "Optional",
       "route_required_steps": "Required steps",
       "route_optional_steps": "Optional steps",
       "route_selected_hint": "This route is active.",
@@ -673,41 +709,24 @@
     "kappa": {
       "title": "Kappa & Lightkeeper Tracker",
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
-      "tabs": {
-        "kappa": "Каппа",
-        "lightkeeper": "Смотритель маяка"
-      },
-      "stats": {
-        "available": "Available",
-        "locked": "Заблокировано",
-        "failed": "Провалено"
-      },
       "row": {
-        "level_prefix": "Ур",
         "level_met_aria": "Required level {required}, you are level {current}",
         "level_unmet_aria": "Requires level {required}, you are level {current}",
         "level_title": "Required level {required} (you are {current})",
         "level_summary": "Lv {required} (you {current})",
         "trader_level": "{trader} Lv{level}",
-        "status_complete": "Выполнено",
-        "status_failed": "Провалено",
-        "status_locked": "Заблокировано",
-        "status_available": "Available",
-        "action_complete": "Отметить как выполнено",
         "action_uncomplete": "Mark uncomplete",
         "action_reset_failed": "Reset failed",
         "locked_by": "Requires: {task}"
       },
       "empty": "No tasks for this list yet.",
       "summary": {
-        "progress": "Progress",
         "complete": "complete",
         "final_goal": "Final Kappa Goal"
       },
       "trader_selector": {
         "label": "Select Trader"
       },
-      "appbar_title": "Kappa & Lightkeeper",
       "trader": {
         "other": "Other"
       }
@@ -723,7 +742,7 @@
       "tier_login_cta": "Log in to subscribe",
       "tier_change_cta": "Change plan in billing portal",
       "current_tier_badge": "Current tier",
-      "tier_scav_name": "Дикие",
+      "tier_scav_name": "Скет",
       "tier_scav_tagline": "Just trying to get by",
       "tier_timmy_name": "Timmy",
       "tier_timmy_tagline": "Learning the ropes",
@@ -790,25 +809,15 @@
       "billing_yearly_interval": "year"
     },
     "tasks": {
-      "title": "Задания",
       "primary_views": {
-        "list": "Список",
-        "maps": "Карты",
-        "traders": "Торговцы",
         "graph": "Схема"
       },
       "graph": {
         "focus_mode_active": "Зависимые задания для {taskName}",
         "isolate_chain": "Изолировать цепочку",
         "show_context": "Показать контекст",
-        "clear_focus": "Сбросить фокус",
         "no_tasks": "Задания для этого торговца не найдены.",
         "mobile_unavailable": "Схема лучше отображается в полноэкранном режиме.",
-        "node_level": "Ур. {level}",
-        "completed": "Выполнено",
-        "available": "Доступно",
-        "locked": "Заблокировано",
-        "failed": "Провалено",
         "legend": "Легенда",
         "flow_start": "Начало (нет предыдущих)",
         "flow_end": "Конец (нет последующих)",
@@ -820,21 +829,12 @@
         "alpha_notice": "Схема находится в альфа-версии. Вид и функции могут часто меняться по мере улучшения.",
         "resize_handle": "Изменить высоту схемы"
       },
-      "secondary_views": {
-        "all": "Все",
-        "available": "Доступные",
-        "completed": "Завершенные",
-        "locked": "Заблокированные",
-        "failed": "Проваленные"
-      },
       "user_views": {
-        "all": "Все",
         "yourself": "Свои"
       },
       "search": {
         "placeholder": "Поиск...",
-        "aria_label": "Поиск заданий",
-        "clear": "Очистить поиск"
+        "aria_label": "Поиск заданий"
       },
       "sort": {
         "none": "Порядок по умолчанию",
@@ -848,14 +848,10 @@
         "descending": "По убыванию",
         "aria_label": "Сортировка заданий"
       },
-      "filters": {
-        "close": "Закрыть"
-      },
       "settings": {
         "title": "Настройки заданий",
         "tabs": {
           "filters": "Фильтры заданий",
-          "appearance": "Вид",
           "filter_bar": "Панель фильтров",
           "advanced": "Расширенные"
         },
@@ -898,8 +894,7 @@
           "repair_failed_confirm": "Восстановить проваленные задания, сняв отметку \"Провалено\" там, где не выполнены условия провала?",
           "repair_failed_done": "Убран статус \"Провалено\" для {count} заданий.",
           "repair_failed_error": "Не удалось восстановить проваленные задания",
-          "repair_failed_action": "Восстановить",
-          "repair_failed_cancel": "Отмена"
+          "repair_failed_action": "Восстановить"
         }
       },
       "no_tasks_found": "Задания не найдены. Попробуйте изменить фильтры или обновить уровень.",
@@ -925,7 +920,6 @@
       "pinned_tasks_section": "Закреплённые задания",
       "focused_task_section": "Выбранное задание",
       "focused_task_description": "Открыто по ссылке на задание, чтобы сразу было видно, где продолжить.",
-      "clear_focused_task": "Сбросить фокус",
       "global_tasks_section": "Глобальные задания",
       "questcard": {
         "pin_task": "Закрепить задание",
@@ -938,33 +932,22 @@
         "trader_level_badge": "{trader} LL{level}",
         "wiki": "Страница на Wiki",
         "locked_before": "Заданий до: {count}",
-        "requires": "Требует",
         "unlocks_next": "Разблокирует дальше:",
-        "impact": "Зависимые задания:",
-        "more": "Показать больше",
         "copy_task_link": "Копировать ссылку на задание",
         "copy_key_name": "Скопировать название ключа",
         "report_data_issue": "Сообщить об ошибке данных",
         "tarkov_dev_logo": "Логотип Tarkov.dev",
-        "view_on_tarkov_dev": "Открыть на Tarkov.dev",
-        "view_on_wiki": "Открыть в вики",
         "view_task_on_wiki": "Открыть {name} на Wiki",
         "hand_over": "Передать",
         "hand_over_fir": "Передать (Найдено в рейде)",
         "decrease": "Уменьшить",
         "increase": "Увеличить",
-        "complete": "Выполнено",
-        "mark_complete": "Отметить как выполненное",
         "uncomplete": "Не выполненный",
-        "completed": "Завершённый",
         "not_completed": "Незавершённый",
         "of": "из",
-        "item": "Предмет",
         "mark_failed": "Отметить как проваленное",
-        "complete_button": "Завершить",
         "available_button": "Отметить Доступным",
         "uncomplete_button": "Отметить Незавершённым",
-        "reset_failed": "Сбросить провал",
         "reset_item_counts": "Сбросить счётчики предметов",
         "reset_item_counts_disabled_complete": "Отметьте задание незавершённым, чтобы сбросить счётчики",
         "reset_item_counts_disabled_failed": "Отметьте задание доступным, чтобы сбросить счётчики",
@@ -982,11 +965,9 @@
         "mark_failed_confirm": "Отметить это задание как проваленное? Это только для проблем с данными, не рекомендуется и может заблокировать цепочки заданий.",
         "reset_item_counts_confirm": "Сбросить все счётчики предметов этого задания?",
         "failed_because": "Провалено из-за",
-        "failed_because_was": "было {status}",
         "failed_because_status_tooltip": "Автоматически провалено, когда «{name}» было {status}",
         "failed_because_unknown": "Провалено вручную или данные отсутствуют",
         "blocked_because": "Заблокировано из-за",
-        "blocked_because_was": "было {status}",
         "blocked_because_status_tooltip": "Навсегда заблокировано — «{name}» было {status}",
         "blocked_because_unknown": "Заблокировано из-за требований",
         "keys_disclaimer_tooltip": "Основано на данных API и не всегда точно требуется. Двери могут быть уже открыты. Проверяйте в игре или на Wiki перед покупкой ключей.",
@@ -997,28 +978,20 @@
         "copy_equipment_name": "Скопировать название предмета",
         "requirement_status_active": "активно/принято",
         "requirement_status_available": "доступно",
-        "requirement_status_completed": "завершено",
-        "requirement_status_failed": "провалено",
         "requirement_status_not_started": "не начато",
         "requires_must_be": "должно быть {status}",
         "requires_currently": "сейчас {status}",
-        "requires_action_complete": "Завершить",
-        "requires_action_fail": "Провалить",
-        "requires_action_accept": "Принять",
         "requires_tooltip_action": "Нужно {action} «{name}», чтобы разблокировать это задание",
         "requires_tooltip_conflict": "«{name}» сейчас {current}, но нужно {expected} — это задание может быть навсегда заблокировано",
         "requires_progress": "{completed} из {total} предварительных условий выполнено",
         "requires_progress_tooltip": "Далее: {tasks}",
         "requires_progress_tooltip_overflow": "Далее: {tasks} и еще {count}",
-        "objective_optional_badge": "Необязательно",
-        "ready_to_hand_over": "Готово к сдаче",
         "objectives_hidden": "{count} целей не на этой карте ({uncompleted} не завершено)",
         "needed_by": "Требуется: {names}",
         "unlocks_next_tooltip": "Количество заданий, которые станут доступны после выполнения этого задания",
         "impact_tooltip": "Количество незавершенных заданий, которые зависят от выполнения этого задания",
         "reward_items": "Предметы:",
         "unlocks_purchase": "Разблокирует покупку:",
-        "blocked": "Заблокировано",
         "blocked_tooltip": "Это задание навсегда заблокировано и никогда не может быть выполнено из-за решений, принятых в других заданиях",
         "edition_exclusive_tooltip": "Это задание доступно только игрокам с изданием {editions}.",
         "any_map": "Любая",
@@ -1026,7 +999,6 @@
         "jump_to_map": "Перейти к карте",
         "any_location_tooltip": "Это задание можно выполнить на любой карте",
         "click_to_edit": "Нажмите, чтобы изменить",
-        "fail_button": "Провалить",
         "find": "Найти",
         "find_and_hand_over": "Найти и передать",
         "find_and_hand_over_fir": "Найти в рейде и передать",
@@ -1039,18 +1011,14 @@
         "alternatives_badge": "{count} alt",
         "location_tooltip": "Цели задания находятся на карте {map}",
         "next_tasks": "Следующее(ие) задание(я):",
-        "objective": "Цель",
-        "objectives": "Цели",
         "open_item_on_tarkov_dev": "Открыть {name} на tarkov.dev",
         "previous_tasks": "Предыдущее(ие) задание(я):",
         "progress": "Прогресс {completed}/{total}",
         "rewards": "Награды",
-        "task": "Задание",
         "unlocks_count": "{count} разблокировок"
       }
     },
     "hideout": {
-      "title": "Убежище",
       "summary": "Отслеживайте улучшения модулей, блокеры и то, что готово к следующей постройке.",
       "loading": "Загружаем данные об убежище",
       "station_link_label": "Перейти к {name}",
@@ -1066,14 +1034,7 @@
         "trader_loyalty": "Учитывать уровни лояльности",
         "confirm_title": "Включить учёт требований доступности?",
         "confirm_description": "Включение {requirement} может убрать улучшения убежища, которые больше не соответствуют требованиям.",
-        "confirm_cancel": "Отмена",
         "confirm_confirm": "Включить"
-      },
-      "primary_views": {
-        "all": "Все",
-        "locked": "Заблокировано",
-        "available": "Доступно",
-        "maxed": "Максимум"
       },
       "stationcard": {
         "level": "Готово к постройке | Уровень {count} | Уровень {count}",
@@ -1094,30 +1055,21 @@
         "status_upgraded": "{name} улучшено до {level} уровня",
         "status_downgraded": "{name} понижено с {level} уровня",
         "requirement": {
-          "found_in_raid": "Требуется «Найдено в рейде»",
           "mark_complete": "Отметить выполненным ({count})",
           "mark_incomplete": "Отметить невыполненным",
-          "set_custom_amount": "Указать количество:",
-          "apply": "Применить",
-          "view_tarkov_dev": "Смотреть на tarkov.dev",
-          "view_wiki": "Смотреть на Wiki"
+          "set_custom_amount": "Указать количество:"
         }
       }
     },
     "needed_items": {
-      "title": "Необходимые предметы",
       "meta_description": "Просматривайте все предметы, нужные для активных заданий и улучшений убежища. Фильтруйте по квестам, крафтам и требованиям «Найдено в рейде».",
       "loading": "Загружаем данные заданий и убежища",
       "search_placeholder": "Поиск предметов, заданий или модулей убежища...",
-      "clear_search": "Очистить поиск",
       "items": "предметы",
       "empty": "Нет предметов, соответствующих вашему поиску.",
       "error": "Не удалось загрузить необходимые предметы.",
-      "retry": "Попробовать снова",
       "filters": {
-        "all": "Все",
         "label": "Фильтры",
-        "fir": "Найдено в рейде",
         "non_fir": "Не найдено в рейде",
         "hide_owned": "СКРЫТЬ В НАЛИЧИИ",
         "hide_non_fir_special_equipment_title": "Скрыть специальное снаряжение без галочки (например, маркеры MS2000, Wi‑Fi камеры)",
@@ -1128,7 +1080,6 @@
       },
       "sort": {
         "label": "Сортировать",
-        "priority": "Приоритету",
         "name": "Названию",
         "category": "Категории",
         "count": "Количеству"
@@ -1144,7 +1095,6 @@
       }
     },
     "settings": {
-      "title": "Настройки",
       "card": {
         "apitokens": {
           "title": "API Токены",
@@ -1190,15 +1140,13 @@
             "gamemode_title": "Режим игры",
             "permissions_title": "Разрешения",
             "note_label": "Метка или заметка",
-            "note_placeholder": "Например: стрим-оверлей, бот клана, личное приложение",
-            "cancel": "Отмена"
+            "note_placeholder": "Например: стрим-оверлей, бот клана, личное приложение"
           }
         }
       }
     },
     "team": {
       "meta": {
-        "title": "Команда",
         "description": "Объединяйтесь с товарищами по команде для отслеживания прогресса Escape from Tarkov. Делитесь выполненными заданиями, уровнем убежища и координируйте сбор предметов."
       },
       "card": {
@@ -1215,9 +1163,7 @@
         },
         "teamoptions": {
           "title": "Настройка интеграции с командой",
-          "section_tasks": "Задания",
           "section_items": "Предметы",
-          "section_maps": "Карты",
           "toggle_tasks": "Скрывать задания членов команды",
           "toggle_items": "Скрывать нужные предметы членов команды",
           "toggle_non_fir": "Скрывать нужные предметы без статуса \"Найдено в рейде\"",
@@ -1236,8 +1182,6 @@
           "leave_team_error": "Не удалось покинуть вашу команду.",
           "no_team": "Вы не состоите в команде.",
           "team_invite_url_label": "Ссылка для приглашения в команду",
-          "show_link": "Показать",
-          "hide_link": "Скрыть",
           "copy_link": "Копировать",
           "link_hidden_message": "Нажмите «Показать», чтобы отобразить ссылку для приглашения в команду.",
           "user_not_authenticated": "Пользователь не авторизован.",
@@ -1245,13 +1189,11 @@
         },
         "teaminvite": {
           "description": "Вы получили приглашение в команду на TarkovTracker",
-          "accept": "Принять",
           "decline": "Отклонить"
         }
       }
     },
     "credits": {
-      "title": "Благодарности",
       "sections": {
         "original_creator": "Первоначальный создатель проекта:",
         "staff": "Команда TarkovTracker.org:",
@@ -1262,7 +1204,6 @@
       "labels": {
         "creators": "Создатели",
         "staff": "Основная команда",
-        "support": "Поддержка",
         "testers": "Бета-тестеры",
         "contributors": "Контрибьюторы"
       },
@@ -1273,20 +1214,16 @@
       "contributors": {
         "loading": "Загрузка контрибьюторов...",
         "error": "Сейчас не удалось загрузить контрибьюторов.",
-        "retry": "Повторить",
         "empty": "Пока контрибьюторы не найдены.",
         "contributions": "{count} вкладов"
       }
     },
     "login": {
-      "title": "Войти",
       "subtitle": "Войдите, чтобы получить доступ к своему аккаунту",
       "continue_twitch": "Продолжить с Twitch",
       "continue_discord": "Продолжить с Discord",
       "continue_google": "Продолжить с Google",
       "continue_github": "Продолжить с GitHub",
-      "privacy_policy": "Политика конфиденциальности",
-      "terms_of_service": "Условия использования",
       "popup_blocked_title": "Всплывающее окно заблокировано",
       "popup_blocked_description": "Ваш браузер заблокировал окно входа. Перенаправляем...",
       "authenticating": "Авторизация...",
@@ -1296,7 +1233,6 @@
       "success_title": "Вход выполнен",
       "success_description": "Вы вошли через {provider}.",
       "login_options": "Варианты входа",
-      "meta_title": "Войти",
       "meta_description": "Sign in to TarkovTracker to sync your progress across devices and collaborate with your team."
     },
     "profile": {
@@ -1319,10 +1255,6 @@
       "mode_toggle_label": "Выберите режим профиля",
       "copy_snapshot": "Copy Snapshot",
       "view_tasks": "Открыть Задания",
-      "tab_overview": "Обзор",
-      "tab_tasks": "Задания",
-      "tab_hideout": "Убежище",
-      "tab_storyline": "Сюжет",
       "story_no_tasks": "Waiting for task metadata to build your story.",
       "story_start": "{mode} profile is just getting started.",
       "story_complete": "Main task storyline completed.",
@@ -1343,22 +1275,13 @@
       "no_storyline": "Для этого профиля нет данных по сюжету.",
       "storyline_auto_start": "Автозапуск",
       "storyline_discovered": "Обнаружено",
-      "storyline_requires": "Требуется",
       "storyline_objectives_main": "Основные цели",
       "storyline_objectives_optional": "Дополнительные цели",
-      "view_tarkov_dev": "Смотреть на Tarkov.dev",
       "no_hideout": "Для этого профиля нет данных по убежищу.",
-      "hideout_level": "Уровень",
-      "hideout_fallback": "Убежище",
       "hideout_item_fallback": "Hideout item",
       "hideout_module_fallback": "Hideout upgrade",
       "level_prefix": "Ур.",
       "no_tasks": "Для этого профиля нет доступных заданий.",
-      "task_fallback": "Задание",
-      "section_available": "Доступные",
-      "section_locked": "Заблокированные",
-      "section_completed": "Выполненные",
-      "objective_fallback": "Цель",
       "no_objectives": "Нет целей",
       "activity_timeline": "Хронология активности",
       "timeline_subtitle": "Последние события прогресса с отметками времени",
@@ -1398,35 +1321,25 @@
       "kappa_remaining": "Осталось: {count}"
     },
     "not_found": {
-      "title": "Страница не найдена",
       "not_found_description": "Извините, страница не найдена!"
     },
     "terms_of_service": {
-      "title": "Условия использования",
       "table_of_contents": "Table of contents",
       "index_button": "Index"
-    },
-    "privacy": {
-      "title": "Политика конфиденциальности"
     },
     "resources": {
       "title": "Resources & Guides",
       "subtitle": "Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.",
       "search_placeholder": "Search tools and guides...",
-      "clear_search": "Очистить поиск",
       "clear_filters": "Clear filters",
       "no_results": "No resources match your search.",
       "results_count": "{count} resources found",
       "results_count_one": "1 resource found",
       "filter_label": "Filter resources by category",
-      "more": "Показать больше",
       "more_actions": "More actions",
       "suggest_title": "Know a useful Tarkov resource?",
       "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
       "suggest_cta": "Suggest a resource",
-      "filters": {
-        "all": "Все"
-      },
       "categories": {
         "companion_apps": "Companion Apps",
         "data_and_apis": "Data & Developer Tools",
@@ -1440,7 +1353,6 @@
       "actions": {
         "setup_guide": "Setup guide",
         "read_guide": "Read guide",
-        "api_documentation": "API documentation",
         "open_calculator": "Open calculator",
         "view_changes": "View changes",
         "open_tool": "Open tool",
@@ -1465,12 +1377,9 @@
         "project_website": "Project website",
         "github": "View source",
         "discord": "Community support",
-        "api": "API documentation",
         "download": "Download"
       },
       "guide_sections": {
-        "overview": "Обзор",
-        "setup": "Начало пути",
         "troubleshooting": "Troubleshooting",
         "tips": "Tips & Tricks",
         "faq": "Common Questions"
@@ -1493,7 +1402,7 @@
           "description": "Calculate possible Cultist Circle rewards from the items you contribute."
         },
         "tarkovchanges": {
-          "name": "Tarkov Changes",
+          "name": "Tarkov Изменения",
           "description": "Review item, quest, and gameplay changes between Tarkov updates."
         }
       },
@@ -1588,10 +1497,6 @@
       "discord": "Discord",
       "github": "GitHub"
     },
-    "support_button": "Поддержать разработку",
-    "terms_of_service": "Условия использования",
-    "privacy_policy": "Политика конфиденциальности",
-    "credits": "Благодарности",
     "analytics_preferences": "Настройки аналитики",
     "game_attribution": "Escape from Tarkov и связанный игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games Limited и ее лицензиаров. Все права защищены. TarkovTracker является неофициальным фанатским проектом и не связан с Battlestate Games и не одобрен ею."
   },
@@ -1600,34 +1505,18 @@
     "close_menu": "Закрыть меню",
     "toggle": "Переключить боковое меню",
     "brand_name": "TarkovTracker.org",
-    "home": "Панель управления",
-    "api": "API",
     "login": "Войти",
     "logout": "Выйти",
-    "level": "Уровень",
-    "team": "Команда",
-    "storyline": "Сюжет",
-    "tasks": "Задания",
-    "hideout": "Убежище",
-    "needed_items": "Нужные предметы",
-    "supporter": "Поддержка",
-    "tarkovdev": "Tarkov.dev",
     "ratscanner": "Rat Scanner",
     "tarkovguru": "Tarkov Guru",
-    "tarkovchanges": "Tarkov Changes",
     "tarkovmonitor": "Tarkov Монитор",
-    "credits": "Благодарности",
     "resources": "Resources",
-    "settings": "Настройки",
     "profile": "Профиль",
-    "kappa": "Kappa & Lightkeeper",
     "section_navigation": "Навигация",
-    "section_game_settings": "Настройки игры",
     "section_external": "Внешние ресурсы",
     "account_menu": "Меню аккаунта",
     "edition_label": "Издание",
     "mode_auto": "Авто",
-    "mode_manual": "Вручную",
     "auto_level_enabled": "Включён автоматический расчёт уровня",
     "level_display_auto": "Уровень {level} (автоматический расчёт включён)",
     "level_display_editable": "Уровень {level} - нажмите или Enter, чтобы изменить",
@@ -1640,7 +1529,6 @@
     "title_with_mode": "Профиль {name} {mode}"
   },
   "streamer_tools": {
-    "title": "Инструменты стримера",
     "subtitle": "Создавайте ссылки на источник браузера для OBS, Streamlabs Desktop, XSplit и vMix для отображения прогресса Каппы в прямом эфире.",
     "manage_sharing": "Управление доступом",
     "login_required": "Войдите, чтобы создать персональные ссылки на оверлей стримера.",
@@ -1649,11 +1537,8 @@
     "content_title": "Контент",
     "mode_label": "Режим игры",
     "metric_label": "Виджет",
-    "mode_pvp": "PvP",
-    "mode_pve": "PvE",
     "platform_obs": "OBS Studio / Streamlabs Desktop",
     "platform_xsplit": "XSplit / vMix",
-    "appearance_title": "Внешний вид",
     "customize_options": "Настроить параметры оверлея",
     "reset_defaults": "Сбросить",
     "layout_label": "Макет",
@@ -1706,7 +1591,6 @@
     "interval_300s": "Каждые 5 минут",
     "interval_600s": "Каждые 10 минут",
     "metric_tasks_desc": "Выполненные и оставшиеся задания Каппы.",
-    "metric_tasks": "Задания Каппы",
     "metric_items_desc": "Собранные и оставшиеся предметы Каппы.",
     "metric_items": "Предметы Каппы",
     "metric_summary_desc": "Задания и предметы в одном виджете.",
@@ -1738,13 +1622,9 @@
     "resolution_label": "Разрешение",
     "resolution_1080": "1080p",
     "resolution_1440": "1440p",
-    "resolution_custom": "Свой масштаб",
     "container_label": "Контейнер",
     "container_canvas": "Полотно сцены",
-    "container_self_contained": "Самодостаточный",
-    "self_contained_hint_label": "Самодостаточный",
     "self_contained_hint": "Выводит только границы виджета. Перемещайте браузерный источник в OBS/Streamlabs вместо изменения выравнивания оверлея.",
-    "custom_scale": "Свой масштаб",
     "custom_scale_percent": "Масштаб",
     "font_label": "Шрифт",
     "show_title": "Показывать заголовок",
@@ -1752,27 +1632,18 @@
     "colors_text": "Текст",
     "colors_card": "Карточка",
     "colors_border": "Граница",
-    "colors_progress": "Полоса прогресса",
     "text_color": "Цвет текста",
     "card_color": "Цвет карточки",
     "card_opacity": "Прозрачность карточки",
     "border_color": "Цвет границы",
     "border_opacity": "Прозрачность границы",
-    "track_color": "Цвет трека прогресса",
     "track_opacity": "Прозрачность трека"
   },
   "settings": {
-    "title": "Настройки",
     "locale": "Язык",
     "tabs": {
-      "account": "Аккаунт",
       "progression": "Прогресс",
-      "prestige": "Престиж",
-      "preferences": "Предпочтения",
-      "imports": "Импорт",
-      "backup_restore": "Резервные копии",
-      "api": "API",
-      "streamer_tools": "Инструменты стримера"
+      "imports": "Импорт"
     },
     "tab_groups": {
       "game": "Игра",
@@ -1808,12 +1679,11 @@
         "description": "Управляйте API-токенами TarkovTracker и интеграциями аккаунта."
       },
       "streamer_tools": {
-        "title": "Инструменты стримера",
+        "title": "Инструменты \"Стример\"",
         "description": "Configure TarkovTracker browser-source overlays for streaming."
       }
     },
     "density": {
-      "compact": "Компактная",
       "comfortable": "Комфортная"
     },
     "account": {
@@ -1826,8 +1696,7 @@
     },
     "general": {
       "privacy_mode": "Режим стримера",
-      "privacy_mode_hint": "Скрывает конфиденциальную информацию во время трансляции.",
-      "admin_panel": "Панель администратора"
+      "privacy_mode_hint": "Скрывает конфиденциальную информацию во время трансляции."
     },
     "interface": {
       "tasks": {
@@ -1840,7 +1709,6 @@
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
       },
       "maps": {
-        "title": "Карты",
         "show_extracts": "Показывать выходы по умолчанию",
         "zoom_speed": "Скорость масштабирования",
         "pan_speed": "Скорость перемещения",
@@ -1848,15 +1716,11 @@
         "colors": {
           "title": "Цвета карты",
           "description": "Настройте цвета маркеров для лучшей читаемости и удобства восприятия.",
-          "reset": "Сбросить",
           "self_objective": "Ваша цель",
           "team_objective": "Цель команды",
           "selected": "Закреплённая цель",
-          "pmc_extract": "Выход ЧВК",
-          "scav_extract": "Выход Диких",
           "shared_extract": "Общий выход",
-          "coop_extract": "Совместный выход",
-          "pmc_spawn": "Место появления ЧВК"
+          "coop_extract": "Совместный выход"
         }
       },
       "links": {
@@ -1866,7 +1730,6 @@
       }
     },
     "game_profile": {
-      "game_edition": "Издание игры",
       "game_edition_with_value": "Издание {edition}"
     },
     "profile_sharing": {
@@ -1874,8 +1737,6 @@
       "description": "Управляйте видимостью профилей игровых режимов по общей ссылке.",
       "public": "Публичный",
       "private": "Приватный",
-      "mode_pvp": "PvP",
-      "mode_pve": "PvE",
       "toggle_pvp_label": "Toggle PvP profile sharing",
       "toggle_pve_label": "Toggle PvE profile sharing",
       "copy_pvp_link": "Copy PvP profile link",
@@ -1883,27 +1744,17 @@
       "login_required": "Войдите, чтобы управлять видимостью общего профиля."
     },
     "game_settings": {
-      "title": "Настройки игры",
-      "pvp": "PvP",
-      "pve": "PvE",
       "switch_mode_failed": "Не удалось сменить режим игры, попробуйте еще раз",
       "switch_mode_fetch_failed": "Режим игры изменён, но обновить данные не удалось. Повторите попытку."
     },
     "data_management": {
-      "reset_pvp_title": "Сбросить данные PvP",
-      "reset_pvp_data": "Сбросить данные PvP",
       "reset_pvp_confirmation": "Вы уверены, что хотите сбросить свой прогресс в PvP?",
       "reset_pvp_warning": "Это навсегда удалит весь ваш PvP прогресс, включая задания, убежище и уровень. Ваши данные PvE не будут затронуты.",
-      "reset_pve_title": "Сбросить данные PvE",
-      "reset_pve_data": "Сбросить данные PvE",
       "reset_pve_confirmation": "Вы уверены, что хотите сбросить свой прогресс в PvE?",
       "reset_pve_warning": "Это навсегда удалит весь ваш PvE прогресс, включая задания, убежище и уровень. Ваши данные PvP не будут затронуты.",
-      "reset_all_title": "Сбросить все данные",
-      "reset_all_data": "Сбросить все данные",
       "reset_all_confirmation": "Вы уверены, что хотите сбросить ВЕСЬ свой прогресс?",
       "reset_all_warning": "Это навсегда удалит ВЕСЬ ваш прогресс для режимов PvP и PvE. Это действие нельзя отменить!",
       "prestige_pvp_warning": "Ваш текущий PvP-прогон будет архивирован, затем прогресс PvP будет сброшен для следующего уровня престижа. Данные PvE не затрагиваются.",
-      "reset_cancel": "Отмена",
       "reset_confirm": "Сбросить",
       "export_description": "Скачайте резервную копию прогресса для режимов PvP и PvE.",
       "export_button": "Экспортировать резервную копию",
@@ -1921,13 +1772,11 @@
       "tarkov_dev_section_description": "Импортировать метаданные профиля, включая уровень, фракцию и навыки",
       "eft_logs_section_title": "Импорт логов игры EFT",
       "eft_logs_section_description": "Импортировать прогресс заданий из файлов игровых логов",
-      "backup_restore_section_title": "Резервная копия и восстановление",
       "backup_restore_section_description": "Экспортировать резервную копию или восстановить из ранее экспортированного файла",
       "debug_section_title": "Снимок для отладки",
       "import_backup_title": "Восстановить из резервной копии",
       "import_backup_description": "Восстановить прогресс из файла резервной копии TarkovTracker",
       "import_preview_exported_at": "Экспортировано",
-      "import_preview_game_edition": "Издание игры",
       "import_preview_pvp_level": "Уровень PvP",
       "import_preview_pvp_tasks": "Задания PvP",
       "import_preview_pve_level": "Уровень PvE",
@@ -1936,11 +1785,8 @@
       "import_target_pvp": "Только PvP",
       "import_target_pve": "Только PvE",
       "import_target_both": "PvP и PvE",
-      "import_confirm": "Подтвердить импорт",
-      "import_cancel": "Отмена",
       "import_success_title": "Копия импортирована",
       "import_success_description": "Ваш прогресс был успешно восстановлен.",
-      "import_error_title": "Ошибка импорта",
       "export_error_title": "Ошибка экспорта",
       "debug_export_error_title": "Не удалось экспортировать отладочный снимок",
       "reset_title": "Сбросить прогресс",
@@ -1951,14 +1797,12 @@
       "prestige_history_select": "Выбрать прогон",
       "prestige_history_option": "P{from} → P{to} • {when}",
       "prestige_history_unknown_date": "Неизвестная дата",
-      "prestige_history_level": "Уровень",
       "prestige_history_completed_tasks": "Выполненные задания",
       "prestige_history_failed_tasks": "Проваленные задания",
       "prestige_history_completed_objectives": "Выполненные цели",
       "prestige_history_completed_hideout_modules": "Модули убежища",
       "prestige_history_completed_story_chapters": "Главы сюжета",
       "prestige_history_duration": "Длительность прогона",
-      "prestige_history_unknown_duration": "Неизвестно",
       "prestige_history_days_value": "{days} дн.",
       "prestige_history_compare_title": "Сравнение с предыдущим прогоном",
       "prestige_history_compare_subtitle": "Текущий престиж {from} по сравнению с престижем {to}"
@@ -1966,10 +1810,8 @@
     "prestige_pvp": {
       "success_title": "Престиж PvP выполнен",
       "success_description": "Ваш PvP-профиль повышен до престижа {level}.",
+      "error_title": "Неудачное величие",
       "error_description": "Не удалось выполнить престиж PvP. Пожалуйста, попробуйте ещё раз."
-    },
-    "reset": {
-      "error_title": "Сброс не выполнен"
     },
     "reset_pvp": {
       "success_title": "Сброс данных PvP",
@@ -1995,11 +1837,8 @@
       "auth_methods_label": "Способы входа",
       "member_since_label": "Участник с",
       "account_id_label": "ID аккаунта",
-      "unknown_label": "Неизвестно",
       "account_deletion_title": "Удаление аккаунта",
       "login_required_delete": "Войдите, чтобы удалить аккаунт",
-      "action_show": "Показать",
-      "action_hide": "Скрыть",
       "show_username": "Показать имя пользователя",
       "hide_username": "Скрыть имя пользователя",
       "show_email": "Показать эл. почту",
@@ -2052,7 +1891,6 @@
       "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
     },
     "prestige": {
-      "title": "Престиж",
       "pvp_only_title": "Престиж доступен только в PvP",
       "pvp_only": "Переключитесь в режим PvP, чтобы сделать престиж PvP-профиля.",
       "current_level": "Текущий уровень престижа",
@@ -2076,15 +1914,15 @@
       "archive_soft_gate_manual": "Требований, которые ещё нужно проверить вручную в игре: {count}.",
       "archived_runs_description": "Здесь отображаются только реальные PvP-забеги, архивированные трекером. Поздняя установка текущего престижа не создаёт записи в истории.",
       "delete_history_cta": "Удалить выбранный забег",
-      "delete_history_dialog_title": "Удалить архивный забег",
       "delete_history_warning": "Это удалит только архивную запись в истории. Текущий прогресс PvP не будет восстановлен или сброшен.",
       "delete_history_selected_label": "Выбранный забег",
-      "delete_history_confirm": "Удалить архивный забег",
       "delete_history_success_title": "Архивный забег удалён",
       "delete_history_success_description": "Выбранная запись истории престижа была удалена.",
+      "delete_history_error_title": "Не удалось удалить",
       "delete_history_error_description": "Не удалось удалить архивный забег престижа. Попробуйте ещё раз.",
       "sync_success_title": "Престиж обновлён",
       "sync_success_description": "Престиж в трекере теперь установлен на {level}. Текущий прогресс сохранён.",
+      "sync_error_title": "Сбой обновления величия",
       "sync_error_description": "Не удалось обновить престиж в трекере. Попробуйте ещё раз.",
       "requirement_source": {
         "tarkov_dev": "Tarkov.dev",
@@ -2093,7 +1931,6 @@
       },
       "requirement_source_tooltip": "Источник: {source}",
       "requirement_state": {
-        "complete": "Выполнено",
         "incomplete": "Не выполнено",
         "manual": "Проверить вручную"
       },
@@ -2113,7 +1950,6 @@
       "label": "Отображаемое имя",
       "placeholder": "Введите отображаемое имя...",
       "save": "Сохранить",
-      "validation_error": "Ошибка проверки",
       "empty_error": "Отображаемое имя не может быть пустым",
       "max_error": "Отображаемое имя не может быть длиннее {max} символов",
       "saved_title": "Отображаемое имя сохранено",
@@ -2129,16 +1965,12 @@
       "show_less": "Показать меньше",
       "quest": "За задание:",
       "offset": "Смещение:",
-      "reset": "Сбросить",
       "req_count": "Требуется в:",
       "reward_count": "Награда:",
-      "validation_error": "Ошибка проверки",
       "limit_exceeded": "Превышен лимит",
       "max_level": "Максимальный уровень навыка — 51.",
-      "level": "Уровень",
       "valid_range": "Допустимый диапазон: 0–51.",
       "sort": {
-        "priority": "Приоритет",
         "ingame": "В игре"
       }
     },
@@ -2150,7 +1982,6 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
-      "reset": "Сбросить",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2165,7 +1996,6 @@
       "current_level": "Текущий уровень",
       "set_total_xp": "Установить количество опыта",
       "manual_hint": "Введите текущее общее количество очков опыта, чтобы автоматически скорректировать смещение.",
-      "apply": "Применить",
       "xp_amount": "{amount} XP",
       "xp_to_next": "Осталось: {amount}",
       "reset_offset": "Сбросить смещение опыта"
@@ -2217,9 +2047,6 @@
       "mode_summary_pvp": "PvP (авто)",
       "mode_summary_pve": "PvE (авто)",
       "mode_summary_both": "PvP + PvE (авто)",
-      "mode_summary_unknown": "Неизвестно",
-      "confirm": "Подтвердить импорт",
-      "cancel": "Отмена",
       "success_title": "Логи EFT импортированы",
       "success_description": "Отмечено {complete_count} заданий как завершенные и {active_count} заданий как активные на основе игровых логов.",
       "error_title": "Ошибка импорта логов EFT",
@@ -2252,30 +2079,21 @@
       "fetch_profile": "Загрузить профиль",
       "nickname": "Никнейм",
       "faction": "Фракция",
-      "level": "Уровень",
-      "prestige": "Престиж",
       "skills_count": "Обнаружено навыков: {count}",
       "skills_details_toggle": "Показать значения навыков",
       "skills_details_skill": "Навык",
-      "skills_details_value": "Уровень",
       "edition_guess": "Издание (определено)",
       "import_to_mode": "Импортировать в режим",
       "import_target_notice": "Эти данные будут импортированы в ваш профиль {mode}.",
-      "confirm": "Подтвердить импорт",
-      "cancel": "Отмена",
       "success_title": "Профиль импортирован",
       "success_description": "Ваш профиль Tarkov.dev успешно импортирован.",
-      "error_title": "Ошибка импорта",
       "linked_uid": "UID Tarkov",
       "refetch_hint": "Сначала откройте свой профиль Tarkov.dev, чтобы он обновился там, затем загрузите его здесь повторно.",
       "refetch_mode_label": "Профиль для загрузки",
-      "refetch_mode_pvp": "PvP",
-      "refetch_mode_pve": "PvE",
       "refetch_mode_arena": "Arena",
       "refetch_mode_arena_unavailable": "Импорт Arena появится позже.",
       "refetch_profile": "Обновить профиль",
       "unlink_profile": "Отвязать",
-      "view_profile": "Открыть на Tarkov.dev",
       "errors": {
         "unexpected_profile_flow": "Что-то пошло не так при загрузке профиля Tarkov.dev. Попробуйте ещё раз."
       }
@@ -2283,19 +2101,11 @@
   },
   "hideout": {
     "collapse": "Свернуть",
-    "expand": "Развернуть",
-    "view": {
-      "available": "Доступные",
-      "all": "Все",
-      "maxed": "Максимальные",
-      "locked": "Заблокированные"
-    }
+    "expand": "Развернуть"
   },
   "tasks": {
     "view": {
-      "all": "Список",
-      "map": "Карта",
-      "traders": "Торговцы"
+      "map": "Карта"
     }
   },
   "quest": {
@@ -2304,35 +2114,21 @@
   "needed_items": {
     "total": "Всего:",
     "progress_format": "{current}/{total}",
-    "tasks": "Задания",
-    "hideout_label": "Убежище",
-    "fir": "Найдено в рейде",
     "non": "Нет",
     "non_fir": "Не \"Найдено в рейде\"",
-    "fir_required": "Требуется найти в рейде",
     "task_kappa_req": "Требуется для Каппы",
     "collected_items": "Собранные предметы",
     "smart_fill": "Умное заполнение",
-    "reset": "Сбросить",
     "unknown_task": "Неизвестное задание",
     "unknown_station": "Неизвестный модуль",
-    "kappa": "КАППА",
     "lvl": "Уровень",
     "needed": "Нужен",
     "view_details_for": "Посмотреть подробности для {name}",
-    "level_required": "Ур. {level}",
     "locked_before": "До: {count}",
-    "filters": {
-      "all": "Все",
-      "tasks": "Задания",
-      "hideout": "Убежище",
-      "completed": "Завершено"
-    },
     "switch_to_expanded": "Переключиться на расширенный вид",
     "switch_to_compact": "Переключиться на компактный вид",
     "collected": "Найдено",
     "mark_collected": "Отметить как найденное",
-    "ready_to_hand_over": "Готово к сдаче",
     "handed_over": "Сдано",
     "aria": {
       "enter_count": "Введите количество предметов",
@@ -2350,7 +2146,6 @@
       "decrease_hideout_count": "Уменьшить счётчик убежища для {station_name}",
       "increase_hideout_count": "Увеличить счётчик убежища для {station_name}"
     },
-    "item": "Предмет",
     "any_of_items": "Any one of these {count} items counts",
     "any_of_items_short": "Any {count}",
     "view_accepted_items": "View all {count} accepted items",
@@ -2365,14 +2160,11 @@
   },
   "skills": {
     "req": "Требование",
-    "lv": "Ур",
     "required_for": "Требуется для: {items}",
     "required_levels": "Требуемые уровни: {items}",
     "elite_level": "Уровень ELITE"
   },
   "game_settings": {
-    "pvp": "PVP",
-    "pve": "PVE",
     "toggle_game_mode_label": "Toggle game mode",
     "select_faction_label": "Select faction"
   },
@@ -2409,7 +2201,5 @@
     "no_prestige": "Без престижа",
     "prestige_n": "Престиж {n}"
   },
-  "generic": {
-    "close_button": "Закрыть"
-  }
+  "generic": {}
 }
