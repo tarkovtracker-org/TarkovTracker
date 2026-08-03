@@ -11,6 +11,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Jobs:**
 
 - `Lint & Format` — ESLint + Prettier checks
+- `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Per-shard coverage is merged by Codecov.
 - `Validate` — Production Nuxt build + artifact upload (main branch only)
@@ -69,11 +70,11 @@ introduce a new pinned SHA.
 
 ## Check Count
 
-| Context       | Checks                                                                                                                        |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| PR            | ~13 (Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Dependabot PR | ~14 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                          |
-| Main push     | ~12 (Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)               |
+| Context       | Checks                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR            | ~14 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
+| Dependabot PR | ~15 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                                        |
+| Main push     | ~13 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Workers, Security Scan, CodeQL, Release)               |
 
 \*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
 
