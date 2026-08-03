@@ -25,7 +25,7 @@
           />
           <div class="text-center">
             <div class="text-surface-400 text-xs tracking-wide uppercase">
-              {{ $t('navigation_drawer.level') }}
+              {{ $t('common.level') }}
             </div>
             <div class="mt-1 text-3xl leading-none font-bold sm:text-4xl">
               {{ level }}

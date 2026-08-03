@@ -159,6 +159,7 @@ Naming:
 - When adding user-facing copy: add key to `en.json` only, run `pnpm run i18n:check`. Crowdin handles propagation.
 - Crowdin-only PRs that change only non-English exports are excluded from repository-owned CI, PR metadata, security, and Dependabot workflows via their `paths-ignore` filters. Changes to source code or `en.json` still run normal checks.
 - Add keys consistently with existing namespace patterns. Keep locale keys stable to avoid churn.
+- The `common.*` namespace holds shared translations for values that appear across multiple features (e.g. `common.cancel`, `common.available`, `common.tasks`). When adding user-facing copy that duplicates an existing value, reference the `common.*` key instead of creating a new duplicate. If no `common.*` key exists yet, add one and reference it from all call sites. This reduces Crowdin translation segments and keeps the source locale compact.
 - Avoid hard-coded user-facing strings in components.
 - The sole exception to not editing non-English locale files is fixing a broken Crowdin export PR; even then, only touch the file(s) Crowdin produced.
 

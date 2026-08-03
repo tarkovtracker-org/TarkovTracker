@@ -432,7 +432,7 @@
       return 'needed_items.handed_over';
     }
     if (isCollected.value) {
-      return 'needed_items.ready_to_hand_over';
+      return 'common.ready_to_hand_over';
     }
     return 'needed_items.not_collected';
   });

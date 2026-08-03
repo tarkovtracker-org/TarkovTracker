@@ -141,7 +141,7 @@ describe('DisplayNameCard', () => {
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'error',
-        title: 'settings.display_name.validation_error',
+        title: 'common.validation_error',
       })
     );
   });

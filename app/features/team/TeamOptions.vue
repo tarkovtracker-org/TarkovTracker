@@ -7,7 +7,7 @@
       <div class="space-y-6 px-4 py-4">
         <div class="space-y-3">
           <h3 class="text-surface-200 text-sm font-semibold tracking-wider uppercase">
-            {{ $t('page.team.card.teamoptions.section_tasks') }}
+            {{ $t('common.tasks') }}
           </h3>
           <div
             class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
@@ -73,7 +73,7 @@
         <USeparator />
         <div class="space-y-3">
           <h3 class="text-surface-200 text-sm font-semibold tracking-wider uppercase">
-            {{ $t('page.team.card.teamoptions.section_maps') }}
+            {{ $t('common.maps') }}
           </h3>
           <div
             class="bg-surface-800/50 border-surface-700 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"

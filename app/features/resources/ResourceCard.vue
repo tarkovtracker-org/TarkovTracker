@@ -79,7 +79,7 @@
           icon="i-mdi-dots-horizontal"
           class="text-surface-200 min-h-9 min-w-9 px-3 hover:text-white"
           :aria-label="t('page.resources.more_actions', 'More actions')"
-          :label="t('page.resources.more', 'More')"
+          :label="t('common.more', 'More')"
           trailing-icon="i-mdi-chevron-down"
         />
       </UDropdownMenu>

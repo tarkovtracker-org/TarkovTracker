@@ -317,13 +317,7 @@
                       </span>
                       <span class="ml-1 font-mono font-medium">{{ maskedUsername }}</span>
                     </span>
-                    <AppTooltip
-                      :text="
-                        showUsername
-                          ? $t('settings.account_data.action_hide')
-                          : $t('settings.account_data.action_show')
-                      "
-                    >
+                    <AppTooltip :text="showUsername ? $t('common.hide') : $t('common.show')">
                       <UButton
                         size="xs"
                         variant="ghost"
@@ -347,13 +341,7 @@
                       </span>
                       <span class="ml-1 font-mono font-medium">{{ maskedEmail }}</span>
                     </span>
-                    <AppTooltip
-                      :text="
-                        showEmail
-                          ? $t('settings.account_data.action_hide')
-                          : $t('settings.account_data.action_show')
-                      "
-                    >
+                    <AppTooltip :text="showEmail ? $t('common.hide') : $t('common.show')">
                       <UButton
                         size="xs"
                         variant="ghost"
@@ -389,7 +377,7 @@
                         </UBadge>
                       </template>
                       <span v-else class="text-surface-500">
-                        {{ $t('settings.account_data.unknown_label') }}
+                        {{ $t('common.unknown') }}
                       </span>
                     </span>
                   </div>
@@ -413,13 +401,7 @@
                   {{ $t('settings.account_data.account_id_label') }}:
                 </span>
                 <code class="bg-surface-700 rounded px-2 py-1 text-xs">{{ maskedAccountId }}</code>
-                <AppTooltip
-                  :text="
-                    showAccountId
-                      ? $t('settings.account_data.action_hide')
-                      : $t('settings.account_data.action_show')
-                  "
-                >
+                <AppTooltip :text="showAccountId ? $t('common.hide') : $t('common.show')">
                   <UButton
                     size="xs"
                     variant="ghost"
@@ -575,7 +557,7 @@
     <template #footer="{ close }">
       <div class="flex justify-end">
         <UButton variant="ghost" color="neutral" :disabled="isDeleting" @click="close">
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"

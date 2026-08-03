@@ -55,7 +55,7 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <DashboardProgressCard
                 icon="i-mdi-checkbox-marked-circle-outline"
-                :label="$t('page.dashboard.progress.tasks')"
+                :label="$t('common.tasks')"
                 :completed="dashboardStats.completedTasks.value"
                 :total="dashboardStats.totalTasks.value"
                 :percentage="totalTasksPercentageNum"
@@ -64,7 +64,7 @@
               />
               <DashboardProgressCard
                 icon="i-mdi-briefcase-search"
-                :label="$t('page.dashboard.progress.objectives')"
+                :label="$t('common.objectives')"
                 :completed="dashboardStats.completedObjectives.value"
                 :total="dashboardStats.totalObjectives.value"
                 :percentage="totalObjectivesPercentageNum"
@@ -91,7 +91,7 @@
               />
               <DashboardProgressCard
                 icon="i-mdi-trophy"
-                :label="$t('page.dashboard.progress.kappa')"
+                :label="$t('common.kappa_tasks')"
                 :completed="dashboardStats.completedKappaTasks.value"
                 :total="dashboardStats.totalKappaTasks.value"
                 :percentage="totalKappaTasksPercentageNum"
@@ -100,7 +100,7 @@
               />
               <DashboardProgressCard
                 icon="i-mdi-lighthouse"
-                :label="$t('page.dashboard.progress.lightkeeper')"
+                :label="$t('common.lightkeeper')"
                 :completed="dashboardStats.completedLightkeeperTasks.value"
                 :total="dashboardStats.totalLightkeeperTasks.value"
                 :percentage="totalLightkeeperTasksPercentageNum"
@@ -233,7 +233,7 @@
           >
             <DashboardMilestoneCard
               title="25%"
-              :subtitle="$t('page.dashboard.milestones.starter')"
+              :subtitle="$t('common.getting_started')"
               :is-achieved="totalTasksPercentageNum >= 25"
               achieved-icon="i-mdi-check-circle"
               unachieved-icon="i-mdi-circle-outline"
@@ -256,7 +256,7 @@
               color="success"
             />
             <DashboardMilestoneCard
-              :title="$t('page.dashboard.milestones.kappa.title')"
+              :title="$t('common.kappa')"
               :subtitle="$t('page.dashboard.milestones.kappa.subtitle')"
               :is-achieved="totalKappaTasksPercentageNum >= 100"
               achieved-icon="i-mdi-trophy"
@@ -264,7 +264,7 @@
               color="kappa"
             />
             <DashboardMilestoneCard
-              :title="$t('page.dashboard.milestones.lightkeeper.title')"
+              :title="$t('common.lightkeeper')"
               :subtitle="$t('page.dashboard.milestones.lightkeeper.subtitle')"
               :is-achieved="totalLightkeeperTasksPercentageNum >= 100"
               achieved-icon="i-mdi-lighthouse"
@@ -352,9 +352,9 @@
     traderSortDirection.value = traderSortDirection.value === 'desc' ? 'asc' : 'desc';
   };
   const traderSortOptions = computed(() => [
-    { value: 'default', label: t('page.dashboard.traders.sort.default') },
-    { value: 'progress', label: t('page.dashboard.traders.sort.progress') },
-    { value: 'level', label: t('page.dashboard.traders.sort.level') },
+    { value: 'default', label: t('common.default') },
+    { value: 'progress', label: t('common.progress') },
+    { value: 'level', label: t('common.level') },
   ]);
   const traderStats = computed(() => {
     const stats = dashboardStats.traderStats.value || [];

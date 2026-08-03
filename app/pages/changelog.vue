@@ -19,7 +19,7 @@
         <UIcon name="i-mdi-alert-circle" class="text-error-400 mb-2 h-8 w-8" />
         <p class="text-surface-400 mb-4">{{ t('page.changelog.error') }}</p>
         <UButton color="primary" variant="soft" @click="retryLoadChangelog">
-          {{ t('page.changelog.retry') }}
+          {{ t('common.refresh_button') }}
         </UButton>
       </div>
       <div v-else-if="!groupedEntries.length" class="text-surface-400 py-12 text-center">

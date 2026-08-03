@@ -122,8 +122,8 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
     locale: mockLocale,
-    t: (key: string, params?: Record<string, unknown>) =>
-      params ? `${key}:${Object.values(params).join('|')}` : key,
+    t: (key: string, params?: Record<string, unknown> | string) =>
+      params && typeof params === 'object' ? `${key}:${Object.values(params).join('|')}` : key,
   }),
 }));
 const UAlert = {
@@ -245,6 +245,22 @@ describe('PrestigeCard', () => {
       })
     );
   });
+  it('uses the prestige update failure title when sync fails', async () => {
+    syncPvpPrestigeLevelMock.mockRejectedValueOnce(new Error('sync failed'));
+    const wrapper = createWrapper();
+    await flushPromises();
+    await wrapper.find('select').setValue('2');
+    const syncButton = findButtonByText(wrapper, 'settings.prestige.set_current');
+    expect(syncButton).toBeTruthy();
+    await syncButton!.trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        title: 'settings.prestige.sync_error_title',
+      })
+    );
+  });
   it('shows a warning when lowering tracker prestige', async () => {
     const wrapper = createWrapper();
     await flushPromises();
@@ -310,6 +326,26 @@ describe('PrestigeCard', () => {
     expect(prestigePvPMock).toHaveBeenCalledTimes(1);
     expect(syncPvpPrestigeLevelMock).not.toHaveBeenCalled();
   });
+  it('uses the prestige archive failure title when archiving fails', async () => {
+    prestigePvPMock.mockRejectedValueOnce(new Error('archive failed'));
+    const wrapper = createWrapper();
+    await flushPromises();
+    const openButton = findButtonByText(wrapper, 'settings.prestige.archive_cta');
+    expect(openButton).toBeTruthy();
+    await openButton!.trigger('click');
+    await wrapper.find('input').setValue('settings.prestige.confirm_word');
+    const archiveButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().includes('settings.prestige.archive_cta'));
+    await archiveButtons[archiveButtons.length - 1]!.trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        title: 'settings.prestige_pvp.error_title',
+      })
+    );
+  });
   it('deletes the selected archived run without changing current progress', async () => {
     fetchPrestigeRunsMock.mockResolvedValue([
       createPrestigeRun('run-1'),
@@ -322,7 +358,7 @@ describe('PrestigeCard', () => {
     await openDeleteButton!.trigger('click');
     const deleteButtons = wrapper
       .findAll('button')
-      .filter((button) => button.text().includes('settings.prestige.delete_history_confirm'));
+      .filter((button) => button.text().includes('common.delete_archived_run'));
     const confirmDeleteButton = deleteButtons[deleteButtons.length - 1];
     expect(confirmDeleteButton).toBeTruthy();
     await confirmDeleteButton!.trigger('click');
@@ -335,6 +371,26 @@ describe('PrestigeCard', () => {
       expect.objectContaining({
         color: 'success',
         title: 'settings.prestige.delete_history_success_title',
+      })
+    );
+  });
+  it('uses the delete failure title when deleting history fails', async () => {
+    fetchPrestigeRunsMock.mockResolvedValue([createPrestigeRun('run-1')]);
+    deletePrestigeRunMock.mockRejectedValueOnce(new Error('delete failed'));
+    const wrapper = createWrapper();
+    await flushPromises();
+    const openDeleteButton = findButtonByText(wrapper, 'settings.prestige.delete_history_cta');
+    expect(openDeleteButton).toBeTruthy();
+    await openDeleteButton!.trigger('click');
+    const deleteButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().includes('common.delete_archived_run'));
+    await deleteButtons[deleteButtons.length - 1]!.trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        title: 'settings.prestige.delete_history_error_title',
       })
     );
   });

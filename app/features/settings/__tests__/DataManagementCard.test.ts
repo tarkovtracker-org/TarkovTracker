@@ -458,9 +458,7 @@ describe('DataManagementCard', () => {
     tarkovStoreState.tarkovUid = 123456;
     const wrapper = createWrapper();
     expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
-    await findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_mode_pve')!.trigger(
-      'click'
-    );
+    await findButtonByText(wrapper, 'common.pve')!.trigger('click');
     await asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(
       wrapper.vm
     ).handleTarkovDevRefetch();
@@ -499,7 +497,7 @@ describe('DataManagementCard', () => {
     ).handleTarkovDevRefetch();
     await wrapper.vm.$nextTick();
     expect(wrapper.text()).toContain(
-      'settings.tarkov_dev_import.import_target_notice:{"mode":"settings.game_settings.pve"}'
+      'settings.tarkov_dev_import.import_target_notice:{"mode":"common.pve"}'
     );
     expect(wrapper.text()).not.toContain('settings.tarkov_dev_import.import_to_mode');
   });

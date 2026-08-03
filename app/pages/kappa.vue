@@ -139,17 +139,17 @@
     groupedByTraderWithoutFence.value.find((g) => g.trader.id === selectedTraderId.value)
   );
   const tabLabel = computed(() =>
-    activeTab.value === 'kappa' ? t('page.kappa.tabs.kappa') : t('page.kappa.tabs.lightkeeper')
+    activeTab.value === 'kappa' ? t('common.kappa') : t('common.lightkeeper')
   );
   const tabItems = computed(() => [
     {
-      label: t('page.kappa.tabs.kappa'),
+      label: t('common.kappa'),
       value: 'kappa' as KappaTabKey,
       count: kappaTotals.value.total,
       iconName: 'i-mdi-trophy',
     },
     {
-      label: t('page.kappa.tabs.lightkeeper'),
+      label: t('common.lightkeeper'),
       value: 'lightkeeper' as KappaTabKey,
       count: lightkeeperTotals.value.total,
       iconName: 'i-mdi-lighthouse',

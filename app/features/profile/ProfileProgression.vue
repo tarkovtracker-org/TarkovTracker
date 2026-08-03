@@ -34,7 +34,7 @@
                   class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                 >
                   <UIcon name="i-mdi-open-in-new" class="h-3 w-3" />
-                  {{ t('page.profile.view_tarkov_dev') }}
+                  {{ t('common.view_on_tarkov_dev', 'View on Tarkov.dev') }}
                 </NuxtLink>
               </div>
               <p class="text-surface-300 text-sm sm:text-base">
@@ -732,13 +732,13 @@
       }
     >();
     for (const task of countedTasks.value) {
-      const taskName = task.name || t('page.profile.task_fallback', 'Task');
+      const taskName = task.name || t('common.task', 'Task');
       for (const objective of task.objectives ?? []) {
         if (!objective?.id) {
           continue;
         }
         lookup.set(objective.id, {
-          description: objective.description || t('page.profile.objective_fallback', 'Objective'),
+          description: objective.description || t('common.objective', 'Objective'),
           taskName,
         });
       }
@@ -758,7 +758,7 @@
   const hideoutModuleLabelById = computed(() => {
     const lookup = new Map<string, string>();
     for (const station of metadataStore.hideoutStations ?? []) {
-      const stationName = station.name || t('page.profile.hideout_fallback');
+      const stationName = station.name || t('common.hideout', 'Hideout');
       for (const level of station.levels ?? []) {
         if (!level?.id) {
           continue;
@@ -978,7 +978,7 @@
           icon: 'i-mdi-checkbox-marked-circle-outline',
           subtitle: task.trader?.name || t('page.profile.timeline_task', 'Task completion'),
           timestamp,
-          title: task.name || t('page.profile.task_fallback', 'Task'),
+          title: task.name || t('common.task', 'Task'),
           tone: 'success',
         });
         continue;
@@ -989,7 +989,7 @@
           icon: 'i-mdi-close-circle-outline',
           subtitle: t('page.profile.timeline_failed', 'Task branch failed'),
           timestamp,
-          title: task.name || t('page.profile.task_fallback', 'Task'),
+          title: task.name || t('common.task', 'Task'),
           tone: 'error',
         });
       }
@@ -1403,7 +1403,7 @@
     {
       id: 'level',
       icon: 'i-mdi-account-star-outline',
-      label: t('navigation_drawer.level', 'Level'),
+      label: t('common.level', 'Level'),
       meta: t('page.profile.level_meta', {
         faction: modeFaction.value,
         mode: modeLabel.value,
@@ -1415,7 +1415,7 @@
     {
       id: 'tasks',
       icon: 'i-mdi-clipboard-check-outline',
-      label: t('page.dashboard.progress.tasks', 'Tasks'),
+      label: t('common.tasks', 'Tasks'),
       meta: t('page.profile.tasks_meta', {
         failed: formatNumber(failedTasks.value),
         remaining: formatNumber(remainingTasks.value),
@@ -1427,7 +1427,7 @@
     {
       id: 'objectives',
       icon: 'i-mdi-target',
-      label: t('page.dashboard.progress.objectives', 'Objectives'),
+      label: t('common.objectives', 'Objectives'),
       meta: t('page.profile.objectives_meta', {
         completion_pct: objectiveCompletionPct.value.toFixed(1),
       }),
@@ -1438,7 +1438,7 @@
     {
       id: 'hideout',
       icon: 'i-mdi-home-city-outline',
-      label: t('navigation_drawer.hideout', 'Hideout'),
+      label: t('common.hideout', 'Hideout'),
       meta: t('page.profile.hideout_meta', {
         completed_parts: formatNumber(completedHideoutParts.value),
       }),
@@ -1465,7 +1465,7 @@
       iconClass: 'text-kappa-300',
       id: 'kappa',
       percentage: calculatePercentageNum(completedKappaTasks.value, totalKappaTasks.value),
-      title: t('page.dashboard.progress.kappa', 'Kappa Tasks'),
+      title: t('common.kappa_tasks', 'Kappa Tasks'),
       total: totalKappaTasks.value,
     },
     {
@@ -1478,7 +1478,7 @@
         completedLightkeeperTasks.value,
         totalLightkeeperTasks.value
       ),
-      title: t('page.dashboard.progress.lightkeeper', 'Lightkeeper'),
+      title: t('common.lightkeeper', 'Lightkeeper'),
       total: totalLightkeeperTasks.value,
     },
     {
@@ -1498,21 +1498,21 @@
   const selectedTabIndex = ref(0);
   const profileTabItems = computed(() => [
     {
-      label: t('page.profile.tab_overview'),
+      label: t('common.overview', 'Overview'),
       icon: 'i-mdi-view-dashboard-outline',
     },
     {
-      label: t('page.profile.tab_tasks'),
+      label: t('common.tasks', 'Tasks'),
       icon: 'i-mdi-clipboard-check-outline',
       badge: `${formatNumber(completedTasks.value)}/${formatNumber(totalTasks.value)}`,
     },
     {
-      label: t('page.profile.tab_hideout'),
+      label: t('common.hideout', 'Hideout'),
       icon: 'i-mdi-home-city-outline',
       badge: `${formatNumber(completedHideoutModules.value)}/${formatNumber(totalHideoutModules.value)}`,
     },
     {
-      label: t('page.profile.tab_storyline'),
+      label: t('common.storyline', 'Storyline'),
       icon: 'i-mdi-book-open-variant',
       badge:
         totalStoryMainObjectives.value > 0
