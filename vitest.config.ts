@@ -6,9 +6,7 @@ const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:54321';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'test-anon-key';
 const logLevel = process.env.VITE_LOG_LEVEL || 'warn';
 const isSharded = Boolean(process.env.VITEST_SHARD);
-const ciReporters = isSharded
-  ? (['default', 'junit', 'github-actions'] as const)
-  : (['default', 'junit'] as const);
+const ciReporters = isSharded ? ['default', 'junit', 'github-actions'] : ['default', 'junit'];
 export default defineVitestConfig({
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
