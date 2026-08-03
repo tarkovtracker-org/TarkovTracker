@@ -2080,6 +2080,10 @@
       "nickname": "Přezdívka",
       "faction": "Frakce",
       "skills_count": "Zjištěno {count} dovedností",
+      "last_refreshed": "Údaje Tarkov.dev byly aktualizovány",
+      "last_refreshed_unknown": "Neznámý",
+      "data_age_warning": "Tento Tarkov.dev snímek je {days} dní starý. Pokud jste od té doby hráli, otevřete svůj profil na Tarkov.dev takže se obnoví, načíst znovu před importem.",
+      "cooldown_hint": "Nedávno importováno. Tento profil můžete znovu importovat do {minutes} min.",
       "skills_details_toggle": "Zobrazit hodnoty dovedností",
       "skills_details_skill": "Dovednost",
       "edition_guess": "Editace (zjištěna)",
@@ -2095,7 +2099,13 @@
       "refetch_profile": "Obnovit profil",
       "unlink_profile": "Odpojit",
       "errors": {
-        "unexpected_profile_flow": "Při načítání profilu Tarkov.dev nastala chyba. Zkuste to znovu."
+        "unexpected_profile_flow": "Při načítání profilu Tarkov.dev nastala chyba. Zkuste to znovu.",
+        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
+        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
+        "profile_not_generated": "Tarkov.dev zatím nemá žádný snímek pro tento profil. Otevřete profilovou stránku na Tarkov.dev jednou, nechte ji načíst, poté znovu načtěte.",
+        "rate_limited": "Příliš mnoho pokusů o import. Počkejte asi {minutes} min a zkuste to znovu.",
+        "verification_failed": "Lidské ověření se nezdařilo. Znovu načtěte stránku a zkuste to znovu.",
+        "fetch_failed": "Profil Tarkov.dev nelze načíst. Otevřete profil na Tarkov.dev, zkuste to znovu."
       }
     }
   },
