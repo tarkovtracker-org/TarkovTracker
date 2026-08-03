@@ -212,6 +212,7 @@ Naming:
 - Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `wip`.
+- Release-producing types: `feat` triggers a minor release; `fix`, `perf`, `refactor`, and `revert` trigger a patch release. Other types do not release unless they contain a breaking change or match an explicit rule in `.releaserc.json`.
 - Header max 100 chars. Subject must not be UPPER_CASE.
 
 ## Environment Variables
