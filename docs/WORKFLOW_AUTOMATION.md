@@ -59,6 +59,7 @@ Semantic versioning with automated releases:
 - `fix:` → patch version bump
 - `perf:` → patch version bump
 - `refactor:` → patch version bump
+- `revert:` → patch version bump
 - `BREAKING CHANGE:` → major version bump
 
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
