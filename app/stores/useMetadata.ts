@@ -22,11 +22,7 @@ import {
   sortMapsByGameOrder,
   sortTradersByGameOrder,
 } from '@/utils/constants';
-import {
-  getExcludedTaskIdsForEdition as getExcludedTaskIds,
-  getExclusiveEditionsForTask as getTaskExclusiveEditions,
-  isTaskAvailableForEdition as checkTaskEdition,
-} from '@/utils/editionHelpers';
+import { getExcludedTaskIdsForEdition as getExcludedTaskIds } from '@/utils/editionHelpers';
 import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
 import { queueIdleTask } from '@/utils/idleScheduler';
 import { logger } from '@/utils/logger';
@@ -263,22 +259,6 @@ export const useMetadataStore = defineStore('metadata', {
       (state) =>
       (editionValue: number | undefined): Set<string> =>
         getExcludedTaskIds(editionValue, state.editions),
-    /**
-     * Check if a task is available for a given edition.
-     * Uses shared helper from editionHelpers.ts
-     */
-    isTaskAvailableForEdition:
-      (state) =>
-      (taskId: string, editionValue: number | undefined): boolean =>
-        checkTaskEdition(taskId, editionValue, state.editions),
-    /**
-     * Get editions that a task is exclusive to.
-     * Returns array of editions that have this task in their exclusiveTaskIds.
-     */
-    getExclusiveEditionsForTask:
-      (state) =>
-      (taskId: string): GameEdition[] =>
-        getTaskExclusiveEditions(taskId, state.editions),
     getObjectiveModeCountDifference:
       (state) =>
       (objectiveId: string): { pvp: number; pve: number } | undefined =>
@@ -991,6 +971,8 @@ export const useMetadataStore = defineStore('metadata', {
         throwOnError: true,
       });
     },
+    // Fallow cannot follow this method through the typed composable boundary.
+    // fallow-ignore-next-line unused-store-member -- accessed through typed composable boundary
     async fetchMapSpawnsData(forceRefresh = false) {
       if (this.mapSpawnsLoaded && !forceRefresh) return;
       const requestLanguage = this.languageCode;

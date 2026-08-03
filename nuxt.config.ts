@@ -442,6 +442,7 @@ export default defineNuxtConfig({
         { names: new Set(['string']), sourcePattern: '/app/utils/constants' },
         { names: new Set(['string']), sourcePattern: '/app/utils/mapTime' },
         { names: new Set(['string']), sourcePattern: '/app/utils/skillHelpers' },
+        { names: new Set(['actions']), sourcePattern: '/app/stores/useApp' },
         { names: new Set(['getters']), sourcePattern: '/app/stores/useApp' },
         { names: new Set(['actions']), sourcePattern: '/app/stores/useTarkov' },
         {

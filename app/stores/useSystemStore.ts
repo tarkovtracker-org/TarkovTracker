@@ -26,12 +26,19 @@ export function hasTeamInState(state: SystemState, gameMode?: 'pvp' | 'pve'): bo
  */
 export const useSystemStore = defineStore<string, SystemState, SystemGetters>('system', {
   state: (): SystemState => ({
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     user_id: null,
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     tokens: [],
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     team: null,
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     team_id: null,
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     pvp_team_id: null,
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     pve_team_id: null,
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     is_admin: false,
   }),
   getters: {
@@ -41,6 +48,7 @@ export const useSystemStore = defineStore<string, SystemState, SystemGetters>('s
     userTokenCount(state) {
       return state?.tokens?.length || 0;
     },
+    // fallow-ignore-next-line unused-store-member -- state hydrated/accessed via Supabase $state and middleware
     userTeam(state): string | null {
       return getTeamIdFromState(state);
     },

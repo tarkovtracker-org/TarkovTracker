@@ -26,6 +26,41 @@ permissions:
   contents: read
 
 jobs:
+  fallow:
+    name: Fallow audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.14.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve Fallow base
+        id: fallow-base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Audit changed files
+        run: pnpm exec fallow audit --base "${{ steps.fallow-base.outputs.base }}" --gate new-only --quiet
+
   lint-format:
     name: Lint & Format
     runs-on: ubuntu-latest

@@ -700,11 +700,6 @@ export const useProgressStore = defineStore('progress', () => {
     // For teammates or when manual mode, use stored level
     return currentData?.level ?? 1;
   };
-  const getFaction = (teamId: string): string => {
-    const store = visibleTeamStores.value[teamId];
-    const currentData = getGameModeData(store);
-    return currentData?.pmcFaction ?? 'USEC';
-  };
   const getTaskStatus = (teamId: string, taskId: string): 'completed' | 'failed' | 'incomplete' => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
@@ -781,6 +776,8 @@ export const useProgressStore = defineStore('progress', () => {
     unlockedTasks,
     objectiveCompletions,
     invalidTasks,
+    // Fallow cannot observe consumers that access this setup-store value through a computed map.
+    // fallow-ignore-next-line unused-store-member -- accessed through dynamic computed store maps
     invalidObjectives,
     hideoutLevels,
     moduleCompletions,
@@ -788,7 +785,6 @@ export const useProgressStore = defineStore('progress', () => {
     getTeamIndex,
     getDisplayName,
     getLevel,
-    getFaction,
     getTaskStatus,
     migrateDuplicateObjectiveProgress,
   };

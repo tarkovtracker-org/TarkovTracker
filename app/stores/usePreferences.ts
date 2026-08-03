@@ -721,6 +721,8 @@ export const usePreferencesStore = defineStore('preferences', {
       const clamped = Math.min(0.5, Math.max(0.05, opacity));
       this.mapZoneOpacity = clamped;
     },
+    // Fallow cannot follow this action through the typed map-controls composable boundary.
+    // fallow-ignore-next-line unused-store-member -- accessed through typed map-controls composable
     setMapTooltipDensity(density: 'default' | 'compact') {
       this.mapTooltipDensity = density;
     },

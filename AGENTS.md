@@ -75,7 +75,7 @@ Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` |
 
 Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
 
-Lint: `pnpm run lint` (zero warnings) | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint fix) | Typecheck: `pnpm run typecheck`
+Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint fix) | Typecheck: `pnpm run typecheck`
 
 i18n check: `pnpm run i18n:check` | Supabase types: `pnpm run supabase:types` | OpenAPI validate: `pnpm run validate:openapi` | Deps: `pnpm run deps` | KV precompute: `pnpm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
 
