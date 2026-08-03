@@ -542,8 +542,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    A `304` re-stamps a fresh cached entry without extending a payload that fails the freshness gate.
 4. The freshness gate rejects payloads whose `updated` field is older than
    `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS` (default 7, `0` disables) with a structured
-   `422 profile_stale` error. Successful responses get `Cache-Control: private, max-age=<ttl>` so
-   repeat clicks are served from the browser cache; all error paths stay `no-store`.
+   `422 profile_stale` error. Ordinary successful responses get
+   `Cache-Control: private, max-age=<ttl>` so repeat clicks are served from the browser cache;
+   explicit `fresh=1` responses and all error paths stay `no-store`.
 5. The client parser surfaces `updated` as `updatedAt`; the preview UI shows the snapshot date and
    warns when it is 2+ days old. Structured error codes (`profile_stale`, `profile_not_generated`,
    `rate_limited`, `cooldown_active`, `turnstile_failed`) map to localized, actionable messages.
@@ -573,6 +574,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   the public sitekey and private secret together, so the client cannot submit before its widget is
   ready. Without the pair the route behaves as before (no token required). Siteverify availability
   failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
+- Cached and upstream `200` payloads must pass the import profile schema before use. Invalid cached
+  entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
 - Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can
   never be imported from cache either.
 - A `fresh=1` request bypasses serving from cache but not the cache lookup or rate limits, and
@@ -580,7 +583,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   costs at most one conditional upstream request.
 - The client cooldown is UX only (localStorage); the server-side cache + rate limits are the actual
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
-- Success responses are browser-cacheable (`private`), error responses never are.
+- Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
+  error responses never are.
 
 ---
 

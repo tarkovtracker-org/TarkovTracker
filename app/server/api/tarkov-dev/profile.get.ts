@@ -20,6 +20,7 @@ import {
 } from '@/server/utils/sharedEdgeStore';
 import { verifyTurnstileToken } from '@/server/utils/turnstile';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
+import { validateTarkovDevProfile } from '@/utils/tarkovDevProfileParser';
 import { resolveTarkovDevProfileSource } from '@/utils/tarkovDevProfileSource';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 import type { H3Event } from 'h3';
@@ -95,7 +96,10 @@ function isCachedProfileEntry(value: unknown): value is CachedProfileEntry {
   if (typeof candidate.fetchedAt !== 'number' || !Number.isFinite(candidate.fetchedAt)) {
     return false;
   }
-  return candidate.status === 200 || candidate.status === 404;
+  return (
+    candidate.status === 404 ||
+    (candidate.status === 200 && validateTarkovDevProfile(candidate.body))
+  );
 }
 function readUpdatedAt(body: unknown): number | null {
   if (!body || typeof body !== 'object') return null;
@@ -116,7 +120,11 @@ function enforceProfileFreshness(body: unknown, maxUpdatedAgeDays: number): void
     data: { code: 'profile_stale', ageDays, maxUpdatedAgeDays, updatedAt },
   });
 }
-function setSuccessCacheHeaders(event: H3Event, cacheTtlMs: number): void {
+function setSuccessCacheHeaders(event: H3Event, cacheTtlMs: number, wantsFresh: boolean): void {
+  if (wantsFresh) {
+    setResponseHeader(event, 'Cache-Control', 'no-store');
+    return;
+  }
   const maxAgeSeconds = Math.max(1, Math.floor(cacheTtlMs / 1000));
   setResponseHeader(event, 'Cache-Control', `private, max-age=${maxAgeSeconds}`);
 }
@@ -283,7 +291,7 @@ export default defineEventHandler(async (event) => {
       throw createProfileFetchError(404);
     }
     enforceProfileFreshness(cached.body, maxUpdatedAgeDays);
-    setSuccessCacheHeaders(event, cacheTtlMs);
+    setSuccessCacheHeaders(event, cacheTtlMs, wantsFresh);
     return cached.body;
   }
   const upstreamHeaders: Record<string, string> = {
@@ -315,7 +323,7 @@ export default defineEventHandler(async (event) => {
       { ...cached, fetchedAt: Date.now() },
       cacheTtlMs
     );
-    setSuccessCacheHeaders(event, cacheTtlMs);
+    setSuccessCacheHeaders(event, cacheTtlMs, wantsFresh);
     return cached.body;
   }
   if (response.status === 404) {
@@ -349,6 +357,13 @@ export default defineEventHandler(async (event) => {
     });
     throw createProfileFetchError();
   }
+  if (!validateTarkovDevProfile(body)) {
+    logger.error('Tarkov.dev profile returned an invalid payload', {
+      profileJsonUrl: source.data.profileJsonUrl,
+      status: response.status,
+    });
+    throw createProfileFetchError();
+  }
   enforceProfileFreshness(body, maxUpdatedAgeDays);
   await writeCachedProfile(
     sharedCacheHandle,
@@ -361,6 +376,6 @@ export default defineEventHandler(async (event) => {
     },
     cacheTtlMs
   );
-  setSuccessCacheHeaders(event, cacheTtlMs);
+  setSuccessCacheHeaders(event, cacheTtlMs, wantsFresh);
   return body;
 });

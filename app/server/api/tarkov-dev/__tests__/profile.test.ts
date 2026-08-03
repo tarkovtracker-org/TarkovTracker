@@ -62,7 +62,16 @@ vi.mock('@/server/utils/turnstile', () => ({
 const HANDLE = { cache: null, origin: { host: 'test.local', protocol: 'https:' } };
 const PROFILE_JSON_URL = 'https://players.tarkov.dev/profile/8560316.json';
 const DAY_MS = 86_400_000;
-const freshProfileBody = () => ({ aid: 8560316, updated: Date.now() - 60_000 });
+const freshProfileBody = (updated = Date.now() - 60_000) => ({
+  aid: 8560316,
+  info: {
+    experience: 1000,
+    nickname: 'TestPlayer',
+    side: 'Usec',
+  },
+  skills: { Common: [] },
+  updated,
+});
 const upstreamResponse = (
   body: unknown,
   { etag = 'W/"abc123"', status = 200 }: { etag?: string | null; status?: number } = {}
@@ -267,9 +276,21 @@ describe('/api/tarkov-dev/profile', () => {
       900000,
       expect.any(Function)
     );
+    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Cache-Control', 'no-store');
+  });
+  it('does not allow the browser to cache a fresh upstream response', async () => {
+    const body = freshProfileBody();
+    getQueryMock.mockReturnValue({
+      fresh: '1',
+      url: 'https://tarkov.dev/players/regular/8560316',
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(body));
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual(body);
+    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Cache-Control', 'no-store');
   });
   it('does not extend the cache TTL when a 304 response still leaves a stale profile', async () => {
-    const body = { aid: 8560316, updated: Date.now() - 8 * DAY_MS };
+    const body = freshProfileBody(Date.now() - 8 * DAY_MS);
     getQueryMock.mockReturnValue({
       fresh: '1',
       url: 'https://tarkov.dev/players/regular/8560316',
@@ -289,7 +310,7 @@ describe('/api/tarkov-dev/profile', () => {
     expect(writeSharedCacheMock).not.toHaveBeenCalled();
   });
   it('rejects imports when the upstream profile data is too old', async () => {
-    const body = { aid: 8560316, updated: Date.now() - 8 * DAY_MS };
+    const body = freshProfileBody(Date.now() - 8 * DAY_MS);
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
     fetchMock.mockResolvedValue(upstreamResponse(body));
     const handler = await loadHandler();
@@ -300,7 +321,7 @@ describe('/api/tarkov-dev/profile', () => {
     expect(writeSharedCacheMock).not.toHaveBeenCalled();
   });
   it('allows imports with old data when the freshness gate is disabled', async () => {
-    const body = { aid: 8560316, updated: Date.now() - 30 * DAY_MS };
+    const body = freshProfileBody(Date.now() - 30 * DAY_MS);
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
     useRuntimeConfigMock.mockReturnValue({
       apiProtection: { trustProxy: true },
@@ -311,6 +332,36 @@ describe('/api/tarkov-dev/profile', () => {
     fetchMock.mockResolvedValue(upstreamResponse(body));
     const handler = await loadHandler();
     await expect(handler({})).resolves.toEqual(body);
+  });
+  it('treats an invalid cached profile as a miss', async () => {
+    const body = freshProfileBody();
+    getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
+    readSharedCacheMock.mockResolvedValue({
+      body: { error: 'temporary upstream failure' },
+      etag: 'W/"bad"',
+      fetchedAt: Date.now(),
+      status: 200,
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(body));
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual(body);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      PROFILE_JSON_URL,
+      expect.objectContaining({
+        headers: expect.not.objectContaining({ 'if-none-match': 'W/"bad"' }),
+      })
+    );
+  });
+  it('rejects and does not cache an invalid upstream profile payload', async () => {
+    getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
+    fetchMock.mockResolvedValue(upstreamResponse({ error: 'temporary upstream failure' }));
+    const handler = await loadHandler();
+    await expect(handler({})).rejects.toMatchObject({
+      statusCode: 502,
+      data: { code: 'profile_fetch_failed' },
+    });
+    expect(writeSharedCacheMock).not.toHaveBeenCalled();
   });
   it('rejects requests that fail Turnstile verification when enforcement is enabled', async () => {
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
