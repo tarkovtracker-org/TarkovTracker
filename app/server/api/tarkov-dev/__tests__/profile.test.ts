@@ -297,7 +297,7 @@ describe('/api/tarkov-dev/profile', () => {
       statusCode: 422,
       data: expect.objectContaining({ code: 'profile_stale', maxUpdatedAgeDays: 7 }),
     });
-    expect(writeSharedCacheMock).toHaveBeenCalled();
+    expect(writeSharedCacheMock).not.toHaveBeenCalled();
   });
   it('allows imports with old data when the freshness gate is disabled', async () => {
     const body = { aid: 8560316, updated: Date.now() - 30 * DAY_MS };

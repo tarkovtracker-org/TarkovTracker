@@ -349,6 +349,7 @@ export default defineEventHandler(async (event) => {
     });
     throw createProfileFetchError();
   }
+  enforceProfileFreshness(body, maxUpdatedAgeDays);
   await writeCachedProfile(
     sharedCacheHandle,
     cacheKey,
@@ -360,7 +361,6 @@ export default defineEventHandler(async (event) => {
     },
     cacheTtlMs
   );
-  enforceProfileFreshness(body, maxUpdatedAgeDays);
   setSuccessCacheHeaders(event, cacheTtlMs);
   return body;
 });
