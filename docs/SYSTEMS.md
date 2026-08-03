@@ -527,12 +527,13 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    checks the per-profile client cooldown (localStorage, default 60 min after a confirmed import,
    `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES`), obtains a Turnstile token when a sitekey is
    configured, and calls the proxy with `retry: 0`.
-2. The proxy enforces, in order: Turnstile verification (only when the paired
-   `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and `NUXT_TURNSTILE_SECRET_KEY` are set; production config
-   rejects partial configuration and siteverify availability failures fail open), per-IP rate
-   limits (default 5/min then 20/hour, separate `tarkov-dev-profile-rate` /
-   `tarkov-dev-profile-hourly-rate` buckets, DO binding passed when available), then the shared edge
-   cache (`tarkov-dev-profile` prefix,
+2. The proxy enforces, in order: a pre-verification per-IP rate limit when Turnstile is configured,
+   Turnstile verification (production requires paired `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and
+   `NUXT_TURNSTILE_SECRET_KEY`; siteverify availability failures fail open), then the hourly per-IP
+   limit. Without Turnstile, the normal minute limit runs in the first position. The separate
+   `tarkov-dev-profile-verification-rate`, `tarkov-dev-profile-rate`, and
+   `tarkov-dev-profile-hourly-rate` buckets use the DO binding when available. The shared edge cache
+   follows (`tarkov-dev-profile` prefix,
    default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached
    for 60 s).
 3. On cache miss it fetches upstream with the shared User-Agent. With `?fresh=1` (sent by the
@@ -565,9 +566,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - The browser never fetches `players.tarkov.dev` directly (no upstream CORS); the proxy is the only
   path, and it never talks to the api-gateway Worker or its daily token quotas — the rate-limit
   buckets are route-specific.
-- Turnstile verification runs before rate limiting, which runs before any cache read or upstream
-  fetch, so invalid tokens cannot consume the shared per-IP quota and admitted requests cannot
-  stampede upstream.
+- A minute-scale limiter always runs before siteverify or any cache/upstream access. When Turnstile
+  is enabled it uses the verification bucket, so invalid tokens cannot hammer siteverify while the
+  hourly admitted-request quota remains reserved for verified traffic.
 - Turnstile enforcement is keyed on the server secret being configured; production config requires
   the public sitekey and private secret together, so the client cannot submit before its widget is
   ready. Without the pair the route behaves as before (no token required). Siteverify availability

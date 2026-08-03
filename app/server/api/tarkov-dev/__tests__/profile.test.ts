@@ -326,7 +326,15 @@ describe('/api/tarkov-dev/profile', () => {
       data: { code: 'turnstile_failed' },
     });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(consumeSharedRateLimitWithResetMock).not.toHaveBeenCalled();
+    expect(consumeSharedRateLimitWithResetMock).toHaveBeenCalledOnce();
+    expect(consumeSharedRateLimitWithResetMock).toHaveBeenCalledWith(
+      HANDLE,
+      'tarkov-dev-profile-verification-rate',
+      'profile:ip:203.0.113.10',
+      5,
+      60000,
+      expect.any(Function)
+    );
   });
   it('passes the Turnstile token from the request header to verification', async () => {
     const body = freshProfileBody();

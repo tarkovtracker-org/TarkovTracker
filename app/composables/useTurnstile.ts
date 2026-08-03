@@ -23,6 +23,7 @@ export interface UseTurnstileWidgetReturn {
 }
 const TOKEN_WAIT_TIMEOUT_MS = 8000;
 const SCRIPT_LOAD_RETRY_MS = 5000;
+const MAX_SCRIPT_LOAD_ATTEMPTS = 3;
 let scriptPromise: Promise<TurnstileApi | null> | null = null;
 function readTurnstileApi(): TurnstileApi | null {
   return (window as typeof window & { turnstile?: TurnstileApi }).turnstile ?? null;
@@ -64,6 +65,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
   let widgetId: string | undefined;
   let latestToken: string | null = null;
   let renderGeneration = 0;
+  let scriptLoadAttempts = 0;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let waiters: Array<(token: string | null) => void> = [];
   const flushWaiters = (token: string | null): void => {
@@ -91,9 +93,11 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
   };
   const renderWidget = async (element: HTMLElement): Promise<void> => {
     const generation = ++renderGeneration;
+    scriptLoadAttempts += 1;
     const loadedApi = await loadTurnstileApi();
     if (generation !== renderGeneration || container.value !== element) return;
     if (!loadedApi) {
+      if (scriptLoadAttempts >= MAX_SCRIPT_LOAD_ATTEMPTS) return;
       retryTimer = setTimeout(() => {
         retryTimer = null;
         const currentContainer = container.value;
@@ -101,6 +105,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
       }, SCRIPT_LOAD_RETRY_MS);
       return;
     }
+    scriptLoadAttempts = 0;
     api = loadedApi;
     try {
       widgetId = api.render(element, {

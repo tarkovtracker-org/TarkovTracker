@@ -138,4 +138,11 @@ describe('verifyTurnstileToken', () => {
       ok: true,
     });
   });
+  it('fails open when siteverify returns malformed response fields', async () => {
+    fetchMock.mockResolvedValue(siteverifyResponse({ hostname: 42, success: true }));
+    const verifyTurnstileToken = await loadUtil();
+    await expect(verifyTurnstileToken({ secretKey: 'secret', token: 'token' })).resolves.toEqual({
+      ok: true,
+    });
+  });
 });

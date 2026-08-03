@@ -31,6 +31,7 @@ const DEFAULT_PROFILE_CACHE_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_PROFILE_MAX_UPDATED_AGE_DAYS = 7;
 const PROFILE_NOT_FOUND_CACHE_TTL_MS = 60_000;
 const PROFILE_CACHE_PREFIX = 'tarkov-dev-profile';
+const PROFILE_VERIFICATION_RATE_LIMIT_PREFIX = 'tarkov-dev-profile-verification-rate';
 const PROFILE_RATE_LIMIT_PREFIX = 'tarkov-dev-profile-rate';
 const PROFILE_HOURLY_RATE_LIMIT_PREFIX = 'tarkov-dev-profile-hourly-rate';
 const MINUTE_MS = 60_000;
@@ -225,6 +226,16 @@ export default defineEventHandler(async (event) => {
   const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
   const rateLimitKey = `profile:ip:${clientIdentifier}`;
   if (turnstileSecretKey) {
+    const verificationLimit = await consumeRateLimit(
+      sharedCacheHandle,
+      PROFILE_VERIFICATION_RATE_LIMIT_PREFIX,
+      rateLimitKey,
+      rateLimitPerMinute,
+      MINUTE_MS
+    );
+    if (!verificationLimit.allowed) {
+      throw createRateLimitError(event, verificationLimit.resetAt, MINUTE_MS);
+    }
     const verification = await verifyTurnstileToken({
       secretKey: turnstileSecretKey,
       token: getRequestHeader(event, 'x-turnstile-token'),
@@ -242,13 +253,15 @@ export default defineEventHandler(async (event) => {
       });
     }
   }
-  const minuteLimit = await consumeRateLimit(
-    sharedCacheHandle,
-    PROFILE_RATE_LIMIT_PREFIX,
-    rateLimitKey,
-    rateLimitPerMinute,
-    MINUTE_MS
-  );
+  const minuteLimit = turnstileSecretKey
+    ? { allowed: true, resetAt: null }
+    : await consumeRateLimit(
+        sharedCacheHandle,
+        PROFILE_RATE_LIMIT_PREFIX,
+        rateLimitKey,
+        rateLimitPerMinute,
+        MINUTE_MS
+      );
   if (!minuteLimit.allowed) {
     throw createRateLimitError(event, minuteLimit.resetAt, MINUTE_MS);
   }

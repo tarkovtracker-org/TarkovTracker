@@ -10,7 +10,18 @@ type SiteverifyResponse = {
   'error-codes'?: string[];
 };
 const isSiteverifyResponse = (value: unknown): value is SiteverifyResponse => {
-  return value !== null && typeof value === 'object';
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  if ('success' in candidate && typeof candidate.success !== 'boolean') return false;
+  if ('hostname' in candidate && typeof candidate.hostname !== 'string') return false;
+  if (
+    'error-codes' in candidate &&
+    (!Array.isArray(candidate['error-codes']) ||
+      !candidate['error-codes'].every((code) => typeof code === 'string'))
+  ) {
+    return false;
+  }
+  return true;
 };
 const isAllowedHostname = (hostname: string | undefined, allowedHostnames: string[]): boolean => {
   if (allowedHostnames.length === 0) return true;
