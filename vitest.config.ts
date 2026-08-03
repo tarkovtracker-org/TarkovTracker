@@ -5,6 +5,10 @@ import { configDefaults } from 'vitest/config';
 const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:54321';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'test-anon-key';
 const logLevel = process.env.VITE_LOG_LEVEL || 'warn';
+const isSharded = Boolean(process.env.VITEST_SHARD);
+const ciReporters = isSharded
+  ? (['default', 'junit', 'github-actions'] as const)
+  : (['default', 'junit'] as const);
 export default defineVitestConfig({
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
@@ -33,7 +37,7 @@ export default defineVitestConfig({
     testTimeout: 30000,
     hookTimeout: 60000,
     watch: false,
-    reporters: process.env.CI ? ['default', 'junit'] : ['default'],
+    reporters: process.env.CI ? ciReporters : ['default'],
     outputFile: 'test-report.junit.xml',
     passWithNoTests: false,
     coverage: {
@@ -42,12 +46,18 @@ export default defineVitestConfig({
       reporter: ['text', 'json-summary', 'lcov', 'cobertura'],
       include: ['app/**/*.{ts,vue}'],
       exclude: ['app/**/*.d.ts', 'app/**/__tests__/**'],
-      thresholds: {
-        branches: 15,
-        functions: 20,
-        lines: 20,
-        statements: 20,
-      },
+      // Per-shard coverage is partial; Codecov merges the lcov uploads and
+      // enforces thresholds via codecov.yml status checks on the full result.
+      ...(isSharded
+        ? {}
+        : {
+            thresholds: {
+              branches: 15,
+              functions: 20,
+              lines: 20,
+              statements: 20,
+            },
+          }),
     },
   },
 });

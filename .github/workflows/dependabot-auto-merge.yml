@@ -97,7 +97,10 @@ jobs:
           expected_checks=(
             "Lint & Format"
             "Type Check"
-            "Test"
+            "Test (shard 1/4)"
+            "Test (shard 2/4)"
+            "Test (shard 3/4)"
+            "Test (shard 4/4)"
             "Validate"
             "Supabase DB"
             "Workers"
