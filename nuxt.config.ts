@@ -591,25 +591,17 @@ export default defineNuxtConfig({
       },
     },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: (id) => {
-            if (id.includes('node_modules/leaflet')) {
-              return 'vendor-leaflet';
-            }
-            if (id.includes('node_modules/@supabase')) {
-              return 'vendor-supabase';
-            }
-            if (
-              id.includes('node_modules/vue') ||
-              id.includes('node_modules/pinia') ||
-              id.includes('node_modules/ufo') ||
-              id.includes('node_modules/ofetch') ||
-              id.includes('node_modules/defu') ||
-              id.includes('node_modules/h3')
-            ) {
-              return 'vendor-core';
-            }
+          codeSplitting: {
+            groups: [
+              { name: 'vendor-leaflet', test: /node_modules[\\/]leaflet/ },
+              { name: 'vendor-supabase', test: /node_modules[\\/]@supabase/ },
+              {
+                name: 'vendor-core',
+                test: /node_modules[\\/](vue|pinia|ufo|ofetch|defu|h3)/,
+              },
+            ],
           },
         },
       },

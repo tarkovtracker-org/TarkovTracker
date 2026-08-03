@@ -103,7 +103,19 @@ const mockFetch = vi.fn(
     throw new Error(`Unmocked fetch call to: ${url}. Add a mock for this URL in test-setup.ts`);
   }
 );
-vi.stubGlobal('$fetch', mockFetch);
+// Nuxt 4.5 auto-imports `$fetch` as a module binding captured at import time
+// (`export const $fetch = globalThis.$fetch`), so per-test `vi.stubGlobal('$fetch', …)`
+// no longer replaces the binding the stores hold. Delegate at call time to the
+// current global instead, falling back to the URL-router mock when no per-test
+// stub is active.
+const delegator = vi.fn(async (input: FetchInput, init?: RequestInit): Promise<unknown> => {
+  const current = (globalThis as Record<string, unknown>).$fetch;
+  if (current && current !== delegator) {
+    return (current as (i: FetchInput, init?: RequestInit) => unknown)(input, init);
+  }
+  return mockFetch(input, init);
+});
+vi.stubGlobal('$fetch', delegator);
 // Auto-unmount VTU wrappers after each test
 try {
   enableAutoUnmount(afterEach);
