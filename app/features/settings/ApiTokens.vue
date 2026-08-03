@@ -229,7 +229,7 @@
       <template #footer="{ close }">
         <div class="flex justify-end gap-2">
           <UButton color="neutral" variant="ghost" @click="close">
-            {{ t('page.settings.card.apitokens.form.cancel') }}
+            {{ t('common.cancel') }}
           </UButton>
           <UButton
             color="primary"

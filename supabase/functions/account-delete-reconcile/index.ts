@@ -7,7 +7,6 @@ import {
   type AuthSuccess,
 } from 'shared/auth';
 import type { Database } from '../_shared/database.types.ts';
-
 const AUTH_DELETE_MAX_ATTEMPTS = 4;
 const AUTH_DELETE_BASE_DELAY_MS = 300;
 const AUTH_DELETE_MAX_DELAY_MS = 5000;
@@ -15,7 +14,6 @@ const CLEANUP_BASE_DELAY_MS = 5 * 60 * 1000;
 const CLEANUP_MAX_DELAY_MS = 60 * 60 * 1000;
 const DEFAULT_BATCH_LIMIT = 20;
 const MAX_BATCH_LIMIT = 100;
-
 interface PostgrestFilterBuilder<T> {
   eq(column: string, value: unknown): PostgrestFilterBuilder<T>;
   order(column: string, options?: unknown): PostgrestFilterBuilder<T>;
@@ -27,12 +25,10 @@ interface PostgrestFilterBuilder<T> {
       | null
   ): PromiseLike<TResult1>;
 }
-
 interface PostgrestTransformBuilder {
   eq(column: string, value: unknown): Promise<{ error: unknown }>;
   or(filter: string): Promise<{ error: unknown }>;
 }
-
 interface TypedSupabaseClient {
   from<T extends keyof Database['public']['Tables']>(
     table: T
@@ -51,7 +47,6 @@ interface TypedSupabaseClient {
     };
   };
 }
-
 interface ReconcileRequest {
   action?: 'list' | 'process';
   userId?: string;
@@ -59,12 +54,10 @@ interface ReconcileRequest {
   includeDeadLettered?: boolean;
   dryRun?: boolean;
 }
-
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
-
 const getErrorMessage = (error: unknown) => {
   if (typeof error === 'string') return error;
   if (error instanceof Error) return error.message;
@@ -77,7 +70,6 @@ const getErrorMessage = (error: unknown) => {
     return String(error);
   }
 };
-
 const serializeError = (error: unknown) => {
   if (error instanceof Error) {
     return { name: error.name, message: error.message, stack: error.stack };
@@ -85,7 +77,6 @@ const serializeError = (error: unknown) => {
   if (error && typeof error === 'object') return error;
   return { message: String(error) };
 };
-
 const isNotFoundError = (error: unknown) => {
   if (error && typeof error === 'object' && 'status' in error) {
     const status = (error as { status?: number }).status;
@@ -98,13 +89,11 @@ const isNotFoundError = (error: unknown) => {
     (message.includes('not found') && message.includes('user'))
   );
 };
-
 const computeBackoffMs = (attempt: number, baseMs: number, maxMs: number) => {
   const jitter = Math.floor(Math.random() * 250);
   const delay = baseMs * Math.pow(2, Math.max(0, attempt - 1)) + jitter;
   return Math.min(delay, maxMs);
 };
-
 const deleteUserWithRetry = async (
   supabase: TypedSupabaseClient,
   userId: string
@@ -127,10 +116,8 @@ const deleteUserWithRetry = async (
   }
   return { ok: false, attempts: AUTH_DELETE_MAX_ATTEMPTS, lastError };
 };
-
 const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) => {
   const cleanupErrors: Record<string, string> = {};
-
   const deletionPromises = [
     {
       tableKey: 'team_memberships',
@@ -168,7 +155,6 @@ const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) =>
         throw tableError;
       })
   );
-
   const results = await Promise.allSettled(deletionPromises);
   for (const result of results) {
     if (result.status === 'fulfilled') {
@@ -183,10 +169,8 @@ const cleanupUserData = async (supabase: TypedSupabaseClient, userId: string) =>
       reason && typeof reason === 'object' && 'cause' in reason ? reason.cause : reason;
     cleanupErrors[tableKey] = getErrorMessage(error);
   }
-
   return cleanupErrors;
 };
-
 const getDeletionJobState = async (supabase: TypedSupabaseClient, userId: string) => {
   const { data, error } = await supabase
     .from('account_deletion_jobs')
@@ -203,7 +187,6 @@ const getDeletionJobState = async (supabase: TypedSupabaseClient, userId: string
     status: job?.status ?? null,
   };
 };
-
 const recordDeletionFailure = async (
   supabase: TypedSupabaseClient,
   userId: string,
@@ -244,7 +227,6 @@ const recordDeletionFailure = async (
     });
   }
 };
-
 const markDeletionCompleted = async (supabase: TypedSupabaseClient, userId: string) => {
   const now = new Date().toISOString();
   const { error } = await supabase
@@ -264,7 +246,6 @@ const markDeletionCompleted = async (supabase: TypedSupabaseClient, userId: stri
     console.error('[account-delete-reconcile] Failed to mark deletion job completed:', error);
   }
 };
-
 async function verifyAdminStatus(
   supabase: TypedSupabaseClient,
   userId: string
@@ -274,15 +255,12 @@ async function verifyAdminStatus(
     .select('is_admin')
     .eq('user_id', userId)
     .limit(1);
-
   if (error || !data || data.length === 0) {
     console.error('[account-delete-reconcile] Error checking admin status:', error);
     return false;
   }
-
   return data[0]?.is_admin === true;
 }
-
 const listJobs = async (
   supabase: TypedSupabaseClient,
   limit: number,
@@ -302,21 +280,17 @@ const listJobs = async (
     'updated_at',
     'dead_lettered_at',
   ].join(',');
-
   const { data, error } = await supabase
     .from('account_deletion_jobs')
     .select(selectColumns)
     .or(statusFilter)
     .order('next_run_at', { ascending: true, nullsFirst: false })
     .limit(limit);
-
   if (error) {
     return { data: null, error } as const;
   }
-
   return { data: data ?? [], error: null } as const;
 };
-
 const processDeletionJob = async (
   supabase: TypedSupabaseClient,
   userId: string,
@@ -324,18 +298,15 @@ const processDeletionJob = async (
 ) => {
   const now = new Date().toISOString();
   const { status } = await getDeletionJobState(supabase, userId);
-
   if (status === 'completed') {
     return { userId, status: 'completed', skipped: true };
   }
   if (status === 'dead_lettered') {
     return { userId, status: 'dead_lettered', skipped: true };
   }
-
   if (dryRun) {
     return { userId, status: status ?? 'pending', dryRun: true };
   }
-
   const { error: jobUpsertError } = await supabase
     .from('account_deletion_jobs')
     .upsert(
@@ -353,7 +324,6 @@ const processDeletionJob = async (
   if (jobUpsertError) {
     console.error('[account-delete-reconcile] Failed to upsert deletion job:', jobUpsertError);
   }
-
   const authDeleteResult = await deleteUserWithRetry(supabase, userId);
   if (!authDeleteResult.ok) {
     await recordDeletionFailure(supabase, userId, 'auth_delete_failed', {
@@ -363,7 +333,6 @@ const processDeletionJob = async (
     });
     return { userId, status: 'failed', stage: 'auth_delete' };
   }
-
   const cleanupErrors = await cleanupUserData(supabase, userId);
   if (Object.keys(cleanupErrors).length > 0) {
     await recordDeletionFailure(supabase, userId, 'cleanup_failed', {
@@ -372,11 +341,9 @@ const processDeletionJob = async (
     });
     return { userId, status: 'failed', stage: 'cleanup', errors: cleanupErrors };
   }
-
   await markDeletionCompleted(supabase, userId);
   return { userId, status: 'completed' };
 };
-
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
@@ -387,27 +354,23 @@ Deno.serve(async (req) => {
     if ('error' in authResult) {
       return createErrorResponse(authResult.error, authResult.status, req);
     }
-
     const { user, supabase: sbClient } = authResult as AuthSuccess;
     const supabase = sbClient as unknown as TypedSupabaseClient;
     const isAdmin = await verifyAdminStatus(supabase, user.id);
     if (!isAdmin) {
       return createErrorResponse('Forbidden', 403, req);
     }
-
     let body: ReconcileRequest = {};
     try {
       body = (await req.json()) as ReconcileRequest;
     } catch {
       body = {};
     }
-
     const action = body.action ?? (body.userId ? 'process' : 'list');
     const limit = Math.min(
       Math.max(body.limit ?? DEFAULT_BATCH_LIMIT, 1),
       MAX_BATCH_LIMIT
     );
-
     if (action === 'list') {
       const { data, error } = await listJobs(supabase, limit, Boolean(body.includeDeadLettered));
       if (error) {
@@ -416,7 +379,6 @@ Deno.serve(async (req) => {
       }
       return createSuccessResponse({ success: true, jobs: data }, 200, req);
     }
-
     const results: Array<Record<string, unknown>> = [];
     if (body.userId) {
       results.push(await processDeletionJob(supabase, body.userId, Boolean(body.dryRun)));
@@ -432,7 +394,6 @@ Deno.serve(async (req) => {
         results.push(await processDeletionJob(supabase, job.user_id, Boolean(body.dryRun)));
       }
     }
-
     return createSuccessResponse({ success: true, results }, 200, req);
   } catch (error) {
     console.error('[account-delete-reconcile] Unexpected error:', error);

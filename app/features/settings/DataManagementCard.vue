@@ -85,7 +85,7 @@
                     rel="noopener noreferrer"
                     :disabled="!tarkovDevProfileUrl"
                   >
-                    {{ $t('settings.tarkov_dev_import.view_profile') }}
+                    {{ $t('common.view_on_tarkov_dev') }}
                   </UButton>
                   <UButton
                     icon="i-mdi-link-off"
@@ -169,7 +169,7 @@
               </div>
               <div class="flex items-center justify-between px-3 py-2">
                 <span class="text-surface-400 text-xs">
-                  {{ $t('settings.tarkov_dev_import.level') }}
+                  {{ $t('common.level') }}
                 </span>
                 <span class="text-surface-100 text-sm font-semibold">
                   {{ previewLevel }}
@@ -177,7 +177,7 @@
               </div>
               <div class="flex items-center justify-between px-3 py-2">
                 <span class="text-surface-400 text-xs">
-                  {{ $t('settings.tarkov_dev_import.prestige') }}
+                  {{ $t('common.prestige') }}
                 </span>
                 <span class="text-surface-100 text-sm font-semibold">
                   {{ tarkovDevPreview.prestigeLevel }}
@@ -204,7 +204,7 @@
                       {{ $t('settings.tarkov_dev_import.skills_details_skill') }}
                     </div>
                     <div class="text-surface-500 text-right text-xs font-semibold">
-                      {{ $t('settings.tarkov_dev_import.skills_details_value') }}
+                      {{ $t('common.level') }}
                     </div>
                     <template v-for="skill in tarkovDevSkillDetails" :key="skill.id">
                       <div class="text-surface-200 truncate font-mono text-xs">
@@ -252,7 +252,7 @@
                 class="flex-1"
                 @click="handleTarkovDevConfirm"
               >
-                {{ $t('settings.tarkov_dev_import.confirm') }}
+                {{ $t('common.confirm_import') }}
               </UButton>
               <UButton
                 variant="soft"
@@ -260,7 +260,7 @@
                 class="flex-1"
                 @click="resetTarkovDevImport()"
               >
-                {{ $t('settings.tarkov_dev_import.cancel') }}
+                {{ $t('common.cancel') }}
               </UButton>
             </div>
           </template>
@@ -288,7 +288,7 @@
               icon="i-mdi-alert-circle"
               color="error"
               variant="soft"
-              :title="$t('settings.tarkov_dev_import.error_title')"
+              :title="$t('common.import_failed')"
               :description="tarkovDevImportError"
             />
           </div>
@@ -553,10 +553,10 @@
                 class="flex-1"
                 @click="handleEftLogsConfirm"
               >
-                {{ $t('settings.log_import.confirm') }}
+                {{ $t('common.confirm_import') }}
               </UButton>
               <UButton variant="soft" color="neutral" class="flex-1" @click="resetEftLogsImport()">
-                {{ $t('settings.log_import.cancel') }}
+                {{ $t('common.cancel') }}
               </UButton>
             </div>
           </template>
@@ -604,7 +604,7 @@
       icon-color="primary"
       highlight-color="primary"
       :fill-height="false"
-      :title="$t('settings.data_management.backup_restore_section_title')"
+      :title="$t('common.backup_restore')"
       title-classes="text-lg font-semibold"
     >
       <template #content>
@@ -693,7 +693,7 @@
               </div>
               <div class="flex items-center justify-between px-3 py-2">
                 <span class="text-surface-400 text-xs">
-                  {{ $t('settings.data_management.import_preview_game_edition') }}
+                  {{ $t('common.game_edition') }}
                 </span>
                 <span class="text-surface-100 text-sm font-semibold">
                   {{ editionLabelFromBackup }}
@@ -773,10 +773,10 @@
                 class="flex-1"
                 @click="handleBackupConfirm"
               >
-                {{ $t('settings.data_management.import_confirm') }}
+                {{ $t('common.confirm_import') }}
               </UButton>
               <UButton variant="soft" color="neutral" class="flex-1" @click="resetBackupImport()">
-                {{ $t('settings.data_management.import_cancel') }}
+                {{ $t('common.cancel') }}
               </UButton>
             </div>
           </template>
@@ -804,7 +804,7 @@
               icon="i-mdi-alert-circle"
               color="error"
               variant="soft"
-              :title="$t('settings.data_management.import_error_title')"
+              :title="$t('common.import_failed')"
               :description="backupImportError"
             />
           </div>
@@ -989,12 +989,12 @@
   const tarkovDevRefetchModeOptions = computed<TarkovDevRefetchModeOption[]>(() => [
     {
       disabled: false,
-      label: t('settings.tarkov_dev_import.refetch_mode_pvp'),
+      label: t('common.pvp'),
       value: GAME_MODES.PVP,
     },
     {
       disabled: false,
-      label: t('settings.tarkov_dev_import.refetch_mode_pve'),
+      label: t('common.pve'),
       value: GAME_MODES.PVE,
     },
     {
@@ -1049,9 +1049,7 @@
   }
   const editionLabel = computed(() => getEditionLabel(tarkovDevPreview.value?.gameEditionGuess));
   const tarkovDevFixedTargetModeLabel = computed(() =>
-    tarkovDevFixedTargetMode.value === GAME_MODES.PVE
-      ? t('settings.game_settings.pve')
-      : t('settings.game_settings.pvp')
+    tarkovDevFixedTargetMode.value === GAME_MODES.PVE ? t('common.pve') : t('common.pvp')
   );
   const tarkovDevImportTargetNotice = computed(() =>
     t('settings.tarkov_dev_import.import_target_notice', {
@@ -1240,7 +1238,7 @@
     if (eftLogsHasPvpMatches.value) {
       return t('settings.log_import.mode_summary_pvp');
     }
-    return t('settings.log_import.mode_summary_unknown');
+    return t('common.unknown');
   });
   const editionLabelFromBackup = computed(() => getEditionLabel(backupPreview.value?.gameEdition));
   const showImportTools = computed(() => props.view === 'all' || props.view === 'imports');

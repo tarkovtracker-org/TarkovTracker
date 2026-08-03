@@ -1,5 +1,4 @@
 name: Dependabot Auto Merge
-
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -15,16 +14,14 @@ on:
       - 'app/locales/ru.json'
       - 'app/locales/uk.json'
       - 'app/locales/zh.json'
-
 permissions:
   checks: read
   contents: write
   pull-requests: write
-
+  statuses: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
-
 jobs:
   auto-merge:
     name: Auto-merge safe Dependabot PR
@@ -43,39 +40,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           eligible=false
-
           if [ "$BASE_REF" != "main" ]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Dependabot auto-merge only targets main."
             exit 0
           fi
-
           if jq -e '.pull_request.draft' "$GITHUB_EVENT_PATH" >/dev/null; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Draft PRs are not auto-merged."
             exit 0
           fi
-
           case "$HEAD_REF" in
             dependabot/npm_and_yarn/lint-and-format-* | \
-            dependabot/npm_and_yarn/nuxt-ecosystem-* | \
             dependabot/npm_and_yarn/testing-tooling-* | \
             dependabot/npm_and_yarn/tailwind-tooling-* | \
-            dependabot/npm_and_yarn/release-tooling-* | \
-            dependabot/github_actions/official-actions-* | \
-            dependabot/github_actions/third-party-actions-*)
+            dependabot/npm_and_yarn/release-tooling-*)
               eligible=true
               ;;
           esac
-
           if [ "$eligible" != "true" ]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Dependabot group is outside the low-risk auto-merge allowlist."
             exit 0
           fi
-
           invalid_files="$(
             gh pr view "$PR_NUMBER" \
               --repo "$GITHUB_REPOSITORY" \
@@ -86,9 +74,7 @@ jobs:
                   package.json | \
                   pnpm-lock.yaml | \
                   pnpm-workspace.yaml | \
-                  workers/api-gateway/package.json | \
-                  .github/workflows/*.yml | \
-                  .github/workflows/*.yaml)
+                  workers/api-gateway/package.json)
                     ;;
                   *)
                     printf '%s\n' "$file"
@@ -96,22 +82,18 @@ jobs:
                 esac
               done
           )"
-
           if [ -n "$invalid_files" ]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Dependabot PR changes files outside the auto-merge allowlist:"
             printf '%s\n' "$invalid_files"
             exit 0
           fi
-
           echo "eligible=true" >> "$GITHUB_OUTPUT"
-
       - name: Wait for checks
         if: steps.gate.outputs.eligible == 'true'
         shell: bash
         run: |
           set -euo pipefail
-
           expected_checks=(
             "Lint & Format"
             "Type Check"
@@ -123,103 +105,103 @@ jobs:
             "Security Scan"
             "CodeQL"
           )
-
           deadline=$((SECONDS + 1500))
-
           while true; do
             check_runs="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
                 --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR"))'
             )"
-
+            status_contexts="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
+                --jq '.statuses | sort_by(.context, .updated_at) | group_by(.context) | map(last)'
+            )"
             failing_count="$(
               jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required")] | length' <<< "$check_runs"
             )"
-
-            if [ "$failing_count" -gt 0 ]; then
+            failing_status_count="$(
+              jq '[.[] | select(.state == "failure" or .state == "error")] | length' <<< "$status_contexts"
+            )"
+            if [ "$failing_count" -gt 0 ] || [ "$failing_status_count" -gt 0 ]; then
               jq -r '.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required") | "::error::\(.name) concluded \(.conclusion)"' <<< "$check_runs"
+              jq -r '.[] | select(.state == "failure" or .state == "error") | "::error::\(.context) concluded \(.state)"' <<< "$status_contexts"
               exit 1
             fi
-
             missing_checks=()
             incomplete_checks=()
             pending_count="$(
               jq '[.[] | select(.status != "completed")] | length' <<< "$check_runs"
             )"
-
+            pending_status_count="$(
+              jq '[.[] | select(.state == "pending")] | length' <<< "$status_contexts"
+            )"
             for check_name in "${expected_checks[@]}"; do
               matching_check="$(
                 jq --arg name "$check_name" '[.[] | select(.name == $name)]' <<< "$check_runs"
               )"
-
               if [ "$(jq 'length' <<< "$matching_check")" -eq 0 ]; then
                 missing_checks+=("$check_name")
                 continue
               fi
-
               incomplete_count="$(
                 jq '[.[] | select(.status != "completed")] | length' <<< "$matching_check"
               )"
-
               if [ "$incomplete_count" -gt 0 ]; then
                 incomplete_checks+=("$check_name")
               fi
             done
-
-            if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ]; then
+            if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$pending_status_count" -eq 0 ]; then
               echo "All checks completed."
               break
             fi
-
             if [ "$SECONDS" -ge "$deadline" ]; then
-              printf '::error::Timed out waiting for checks. Missing: %s. Incomplete: %s. Pending: %s.\n' \
+              printf '::error::Timed out waiting for checks. Missing: %s. Incomplete: %s. Pending checks: %s. Pending statuses: %s.\n' \
                 "${missing_checks[*]:-none}" \
                 "${incomplete_checks[*]:-none}" \
-                "$pending_count"
+                "$pending_count" \
+                "$pending_status_count"
               exit 1
             fi
-
-            printf 'Waiting for checks. Missing: %s. Incomplete: %s. Pending: %s.\n' \
+            printf 'Waiting for checks. Missing: %s. Incomplete: %s. Pending checks: %s. Pending statuses: %s.\n' \
               "${missing_checks[*]:-none}" \
               "${incomplete_checks[*]:-none}" \
-              "$pending_count"
+              "$pending_count" \
+              "$pending_status_count"
             sleep 30
           done
-
       - name: Merge Dependabot PR
         if: steps.gate.outputs.eligible == 'true'
         shell: bash
         run: |
           set -euo pipefail
-
           # GitHub recomputes mergeability asynchronously, so the status can be
           # UNKNOWN for a short window right after checks settle. Poll until it
           # resolves instead of failing on the transient state.
           merge_state="UNKNOWN"
           deadline=$((SECONDS + 120))
-
           while true; do
-            merge_state="$(
+            pr_state="$(
               gh pr view "$PR_NUMBER" \
                 --repo "$GITHUB_REPOSITORY" \
-                --json mergeStateStatus \
-                --jq '.mergeStateStatus'
+                --json headRefOid,mergeStateStatus
             )"
-
+            current_head_sha="$(jq -r '.headRefOid' <<< "$pr_state")"
+            merge_state="$(jq -r '.mergeStateStatus' <<< "$pr_state")"
+            if [ "$current_head_sha" != "$HEAD_SHA" ]; then
+              echo "::error::PR head changed from $HEAD_SHA to $current_head_sha after validation."
+              exit 1
+            fi
             if [ "$merge_state" != "UNKNOWN" ]; then
               break
             fi
-
             if [ "$SECONDS" -ge "$deadline" ]; then
               echo "::error::Timed out waiting for merge state to resolve (still UNKNOWN)."
               exit 1
             fi
-
             echo "Merge state is UNKNOWN; waiting for GitHub to recompute mergeability."
             sleep 10
           done
-
           case "$merge_state" in
             CLEAN | UNSTABLE)
               ;;
@@ -228,8 +210,8 @@ jobs:
               exit 1
               ;;
           esac
-
           gh pr merge "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
+            --match-head-commit "$HEAD_SHA" \
             --squash \
             --delete-branch

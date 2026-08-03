@@ -12,7 +12,7 @@
         <div class="flex items-center gap-1">
           <UButton
             size="xs"
-            :label="$t('settings.skills.sort.priority')"
+            :label="$t('common.priority')"
             :variant="skillSortMode === 'priority' ? 'solid' : 'outline'"
             :color="skillSortMode === 'priority' ? 'primary' : 'neutral'"
             @click="setSkillSortMode('priority')"
@@ -84,7 +84,7 @@
                       "
                     >
                       <UBadge color="accent" variant="soft" size="xs">
-                        {{ $t('skills.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
+                        {{ $t('common.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
                       </UBadge>
                     </UTooltip>
                   </div>
@@ -129,7 +129,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <label :for="getSkillInputId(skill.key)" class="sr-only">
-                  {{ formatSkillName(skill.name) }} {{ $t('settings.skills.level') }}
+                  {{ formatSkillName(skill.name) }} {{ $t('common.level') }}
                 </label>
                 <UInput
                   :id="getSkillInputId(skill.key)"
@@ -159,7 +159,7 @@
                   :disabled="getSkillOffset(skill.key) === 0"
                   @click="resetOffset(skill.key)"
                 >
-                  {{ $t('settings.skills.reset') }}
+                  {{ $t('common.reset') }}
                 </UButton>
               </div>
             </div>
@@ -289,7 +289,7 @@
   const showInvalidSkillValueToast = () => {
     toast.add({
       id: 'skill-invalid-value-error',
-      title: t('settings.skills.validation_error'),
+      title: t('common.validation_error'),
       description: t('settings.skills.valid_range', `Valid range: 0-${MAX_SKILL_LEVEL}`),
       color: 'error',
       icon: 'i-mdi-alert-circle',

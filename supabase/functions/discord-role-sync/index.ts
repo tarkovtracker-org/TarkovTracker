@@ -12,18 +12,15 @@ import {
   syncLinkedAccountRole,
   syncRolesForSupporter,
 } from '../_shared/discord.ts';
-
 type DiscordAccountLink = {
   discord_user_id: string;
 };
-
 type Supporter = {
   expires_at: string | null;
   has_ever_supported: boolean;
   status: 'active' | 'past_due' | 'expired' | 'cancelled';
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
 };
-
 function isActive(supporter: Supporter | null): boolean {
   if (!supporter) return false;
   if (supporter.status === 'active') return true;
@@ -31,19 +28,15 @@ function isActive(supporter: Supporter | null): boolean {
   const expiresAt = Date.parse(supporter.expires_at);
   return Number.isFinite(expiresAt) && expiresAt > Date.now();
 }
-
 Deno.serve(async (req: Request) => {
   const cors = handleCorsPreflight(req);
   if (cors) return cors;
-
   const methodError = validateMethod(req, ['POST']);
   if (methodError) return methodError;
-
   const auth = await authenticateUser(req);
   if ('error' in auth) {
     return createErrorResponse(auth.error, auth.status, req);
   }
-
   const { data: link, error: linkError } = await auth.supabase
     .from('discord_account_links')
     .select('discord_user_id')
@@ -56,10 +49,8 @@ Deno.serve(async (req: Request) => {
   if (!link) {
     return createErrorResponse('No Discord account is linked to this user', 404, req);
   }
-
   try {
     await syncLinkedAccountRole(link.discord_user_id);
-
     const { data: supporter, error: supporterError } = await auth.supabase
       .from('supporters')
       .select('tier, status, expires_at, has_ever_supported')
@@ -86,6 +77,5 @@ Deno.serve(async (req: Request) => {
     console.error('[discord-role-sync] Discord role synchronization failed:', error);
     return createErrorResponse('Unable to synchronize Discord roles', 502, req);
   }
-
   return createSuccessResponse({ synced: true }, 200, req);
 });

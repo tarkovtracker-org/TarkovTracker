@@ -22,11 +22,7 @@
               size="xs"
               @click="linkVisible = !linkVisible"
             >
-              {{
-                linkVisible
-                  ? $t('page.team.card.myteam.hide_link')
-                  : $t('page.team.card.myteam.show_link')
-              }}
+              {{ linkVisible ? $t('common.hide') : $t('common.show') }}
             </UButton>
             <UButton
               v-if="linkVisible"

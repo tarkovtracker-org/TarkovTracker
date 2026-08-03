@@ -1,3 +1,11 @@
+## [1.61.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.61.0...v1.61.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **release:** publish patch versions for refactors ([#617](https://github.com/tarkovtracker-org/TarkovTracker/issues/617)) ([f3c393d](https://github.com/tarkovtracker-org/TarkovTracker/commit/f3c393dd6f423b29c65a2e2d4317dd2b0d5d624d))
+* **ci:** require manual review for action bumps ([#627](https://github.com/tarkovtracker-org/TarkovTracker/issues/627)) ([423040b](https://github.com/tarkovtracker-org/TarkovTracker/commit/423040beeb8f5652f1e653a373415ea2d9012fcd))
+
 # [1.61.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.5...v1.61.0) (2026-07-31)
 
 

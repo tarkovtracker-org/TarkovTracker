@@ -211,7 +211,7 @@
   };
   const errorTitle = computed(() => {
     if (statusCode.value === 404) {
-      return t('error.page_not_found', 'Page Not Found');
+      return t('common.page_not_found', 'Page Not Found');
     }
     if (statusCode.value === 403) {
       return t('error.access_blocked', 'Access Blocked');

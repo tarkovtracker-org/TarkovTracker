@@ -46,7 +46,7 @@
           </div>
           <div class="space-y-2">
             <p class="text-surface-200 text-sm font-semibold">
-              {{ $t('page.tasks.title') }}
+              {{ $t('common.tasks') }}
             </p>
             <SelectMenuFixed
               v-model="taskDefaultView"
@@ -57,7 +57,7 @@
           </div>
           <div class="space-y-2">
             <p class="text-surface-200 text-sm font-semibold">
-              {{ $t('page.hideout.title') }}
+              {{ $t('common.hideout') }}
             </p>
             <SelectMenuFixed
               v-model="hideoutDefaultView"
@@ -101,7 +101,7 @@
     set: (val) => preferencesStore.setTaskCardDensity(val),
   });
   const densityOptions = computed(() => [
-    { label: t('settings.density.compact'), value: 'compact' },
+    { label: t('common.compact'), value: 'compact' },
     { label: t('settings.density.comfortable'), value: 'comfortable' },
   ]);
   const taskDefaultView = computed({
@@ -109,18 +109,18 @@
     set: (val) => preferencesStore.setTaskPrimaryView(val),
   });
   const taskViewOptions = computed(() => [
-    { label: t('tasks.view.all'), value: 'all' },
+    { label: t('common.list'), value: 'all' },
     { label: t('tasks.view.map'), value: 'maps' },
-    { label: t('tasks.view.traders'), value: 'traders' },
+    { label: t('common.traders'), value: 'traders' },
   ]);
   const hideoutDefaultView = computed({
     get: () => preferencesStore.getHideoutPrimaryView,
     set: (val) => preferencesStore.setHideoutPrimaryView(val),
   });
   const hideoutViewOptions = computed(() => [
-    { label: t('hideout.view.available'), value: 'available' },
-    { label: t('hideout.view.all'), value: 'all' },
-    { label: t('hideout.view.maxed'), value: 'maxed' },
-    { label: t('hideout.view.locked'), value: 'locked' },
+    { label: t('common.available'), value: 'available' },
+    { label: t('common.all'), value: 'all' },
+    { label: t('common.maxed'), value: 'maxed' },
+    { label: t('common.locked'), value: 'locked' },
   ]);
 </script>

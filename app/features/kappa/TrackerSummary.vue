@@ -2,7 +2,7 @@
   <div class="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
       <span class="text-[13px] font-semibold text-white">
-        {{ label }} {{ t('page.kappa.summary.progress') }}
+        {{ label }} {{ t('common.progress') }}
       </span>
       <span class="text-surface-300 text-xs tabular-nums">
         {{ completed }} / {{ total }} {{ t('page.kappa.summary.complete') }}
@@ -14,13 +14,13 @@
         {{ displayPercent }}%
       </span>
       <span class="text-surface-500 text-[11px] tabular-nums">
-        {{ t('page.kappa.stats.available') }} {{ available }}
+        {{ t('common.available') }} {{ available }}
       </span>
       <span class="text-surface-500 text-[11px] tabular-nums">
-        {{ t('page.kappa.stats.locked') }} {{ locked }}
+        {{ t('common.locked') }} {{ locked }}
       </span>
       <span class="text-surface-500 text-[11px] tabular-nums">
-        {{ t('page.kappa.stats.failed') }} {{ failed }}
+        {{ t('common.failed') }} {{ failed }}
       </span>
     </div>
     <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
@@ -72,7 +72,7 @@
                 : 'border-error-500/30 bg-error-500/10 text-error-300'
             "
           >
-            {{ t('page.kappa.row.level_prefix', 'Lv') }} {{ minLevel }}
+            {{ t('common.lv', 'Lv') }} {{ minLevel }}
           </span>
         </div>
       </div>
@@ -172,9 +172,9 @@
       case 'failed':
         return t('page.kappa.row.action_reset_failed', 'Reset failed') + `: ${name}`;
       case 'locked':
-        return t('page.kappa.row.status_locked', 'Locked') + `: ${name}`;
+        return t('common.locked', 'Locked') + `: ${name}`;
       default:
-        return t('page.kappa.row.action_complete', 'Mark complete') + `: ${name}`;
+        return t('common.mark_complete', 'Mark complete') + `: ${name}`;
     }
   });
   function onToggleCollector() {

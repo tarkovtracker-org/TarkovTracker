@@ -84,7 +84,7 @@ describe('ResetProgressSection', () => {
     });
   it('requires confirm word before resetting all data', async () => {
     const wrapper = createWrapper();
-    const openResetAllButton = findButtonByText(wrapper, 'settings.data_management.reset_all_data');
+    const openResetAllButton = findButtonByText(wrapper, 'common.reset_all_data');
     expect(openResetAllButton).toBeTruthy();
     await openResetAllButton!.trigger('click');
     const confirmButton = findButtonByText(wrapper, 'settings.data_management.reset_confirm');
@@ -107,13 +107,13 @@ describe('ResetProgressSection', () => {
   });
   it('clears the reset-all confirm input when the dialog closes', async () => {
     const wrapper = createWrapper();
-    const openResetAllButton = findButtonByText(wrapper, 'settings.data_management.reset_all_data');
+    const openResetAllButton = findButtonByText(wrapper, 'common.reset_all_data');
     expect(openResetAllButton).toBeTruthy();
     await openResetAllButton!.trigger('click');
     const input = wrapper.find('input');
     expect(input.exists()).toBe(true);
     await input.setValue('settings.danger_zone.confirm_word');
-    const cancelButton = findButtonByText(wrapper, 'settings.data_management.reset_cancel');
+    const cancelButton = findButtonByText(wrapper, 'common.cancel');
     expect(cancelButton).toBeTruthy();
     await cancelButton!.trigger('click');
     await flushPromises();
@@ -122,7 +122,7 @@ describe('ResetProgressSection', () => {
   });
   it('resets PvP data from the confirmation dialog', async () => {
     const wrapper = createWrapper();
-    const openButton = findButtonByText(wrapper, 'settings.data_management.reset_pvp_data');
+    const openButton = findButtonByText(wrapper, 'common.reset_pvp_data');
     expect(openButton).toBeTruthy();
     await openButton!.trigger('click');
     const confirmButton = findButtonByText(wrapper, 'settings.data_management.reset_confirm');
@@ -139,7 +139,7 @@ describe('ResetProgressSection', () => {
   });
   it('resets PvE data from the confirmation dialog', async () => {
     const wrapper = createWrapper();
-    const openButton = findButtonByText(wrapper, 'settings.data_management.reset_pve_data');
+    const openButton = findButtonByText(wrapper, 'common.reset_pve_data');
     expect(openButton).toBeTruthy();
     await openButton!.trigger('click');
     const confirmButton = findButtonByText(wrapper, 'settings.data_management.reset_confirm');

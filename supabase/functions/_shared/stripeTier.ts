@@ -2,25 +2,20 @@
  * Pure Stripe price/metadata → supporter tier helpers.
  * Kept dependency-free so Vitest can cover the mapping without Deno edge runtime.
  */
-
-const SUPPORTER_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
+export const SUPPORTER_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
 export type SupporterTier = (typeof SUPPORTER_TIERS)[number];
-
 export const TIER_PRICE_ENV_NAMES = {
   scav: ['STRIPE_PRICE_SCAV_MONTHLY', 'STRIPE_PRICE_SCAV_6MONTH', 'STRIPE_PRICE_SCAV_YEARLY'],
   timmy: ['STRIPE_PRICE_TIMMY_MONTHLY', 'STRIPE_PRICE_TIMMY_6MONTH', 'STRIPE_PRICE_TIMMY_YEARLY'],
   chad: ['STRIPE_PRICE_CHAD_MONTHLY', 'STRIPE_PRICE_CHAD_6MONTH', 'STRIPE_PRICE_CHAD_YEARLY'],
 } as const;
-
 type StripeSubscriptionLike = {
   items?: { data?: Array<{ price?: { id?: unknown } }> };
   metadata?: { tier?: unknown };
 };
-
 export function isSupporterTier(value: unknown): value is SupporterTier {
   return typeof value === 'string' && SUPPORTER_TIERS.includes(value as SupporterTier);
 }
-
 export function resolveTierFromPriceId(
   priceId: unknown,
   priceIdsByTier: Record<string, string[]>
@@ -31,7 +26,6 @@ export function resolveTierFromPriceId(
   }
   return null;
 }
-
 export function getTierPriceConfig(getEnv: (name: string) => string | undefined): {
   missing: string[];
   priceIdsByTier: Record<string, string[]>;
@@ -50,7 +44,6 @@ export function getTierPriceConfig(getEnv: (name: string) => string | undefined)
   }
   return { missing, priceIdsByTier };
 }
-
 export function resolveSubscriptionTier(
   subscription: unknown,
   fallbackTier: unknown,

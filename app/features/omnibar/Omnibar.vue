@@ -79,7 +79,7 @@
   }));
   const itemGroup = computed<CommandPaletteGroup>(() => ({
     id: 'items',
-    label: t('omnibar.group_items', 'Needed Items'),
+    label: t('common.needed_items', 'Needed Items'),
     ignoreFilter: true,
     items: results.value.items.map((item) => ({
       id: item.id,

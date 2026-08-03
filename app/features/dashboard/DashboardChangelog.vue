@@ -33,7 +33,7 @@
         <div v-else-if="error" class="text-surface-300 flex items-center gap-2 text-xs">
           <span>{{ t('page.dashboard.changelog.error') }}</span>
           <UButton size="xs" color="neutral" variant="link" @click="retry">
-            {{ t('page.dashboard.changelog.retry') }}
+            {{ t('common.retry', 'Retry') }}
           </UButton>
         </div>
         <div v-else-if="showEmpty" class="text-surface-300 text-xs">

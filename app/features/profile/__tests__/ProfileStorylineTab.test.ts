@@ -261,13 +261,13 @@ describe('ProfileStorylineTab', () => {
   });
   it('does not emit chapter toggle events when read-only', async () => {
     const wrapper = await createWrapper(true);
-    const chapterButton = wrapper.find('button[aria-label="page.storyline.mark_complete"]');
+    const chapterButton = wrapper.find('button[aria-label="common.mark_complete"]');
     expect(chapterButton.exists()).toBe(false);
     wrapper.unmount();
   });
   it('emits chapter toggle events when editable', async () => {
     const wrapper = await createWrapper(false);
-    const chapterButton = wrapper.get('button[aria-label="page.storyline.mark_complete"]');
+    const chapterButton = wrapper.get('button[aria-label="common.mark_complete"]');
     await chapterButton.trigger('click');
     expect(wrapper.emitted('toggleChapter')).toEqual([['chapter-1']]);
     wrapper.unmount();

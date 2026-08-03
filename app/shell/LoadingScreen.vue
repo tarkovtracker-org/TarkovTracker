@@ -44,7 +44,7 @@
             :loading="isRetrying"
             @click="handleRetry"
           >
-            {{ $t('loading_screen.retry') }}
+            {{ $t('common.retry') }}
           </UButton>
           <UButton color="neutral" variant="outline" :disabled="isRetrying" @click="handleContinue">
             {{ $t('loading_screen.continue_anyway') }}

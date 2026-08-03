@@ -147,7 +147,7 @@
                 class="flex items-center gap-1"
               >
                 <UIcon name="i-mdi-account" class="h-3.5 w-3.5" />
-                {{ $t('needed_items.level_required', { level: levelRequired }) }}
+                {{ $t('common.lvl_level', { level: levelRequired }) }}
               </span>
               <span v-if="lockedBefore > 0" class="flex items-center gap-1">
                 <UIcon name="i-mdi-lock-outline" class="h-3.5 w-3.5" />
@@ -249,7 +249,7 @@
   watch(acceptedItemsOpen, (isOpen) => setCyclingPaused(isOpen));
   onBeforeUnmount(() => setCyclingPaused(false));
   const cardAriaLabel = computed(() => {
-    const itemName = item.value?.name || t('needed_items.item');
+    const itemName = item.value?.name || t('common.item');
     const status =
       currentCount.value >= neededCount.value
         ? t('needed_items.collected')

@@ -56,7 +56,11 @@ performance/accessibility work instead of treating the current floors as long-te
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
 
 **Trigger:** Dependabot PR opened/updated/reopened/ready for review
-**Jobs:** `Auto-merge safe Dependabot PR` (allowlist gate, wait for CI/security checks, squash merge)
+**Jobs:** `Auto-merge safe Dependabot PR` (npm tooling allowlist gate, wait for check runs and
+legacy status contexts, verify and match the validated head SHA, squash merge). Every GitHub Actions
+workflow-file change requires manual review, including changes to permissions, triggers, or commands.
+Action updates additionally require repository or organization allowlist verification when they
+introduce a new pinned SHA.
 
 ### Stale (`stale.yml`)
 

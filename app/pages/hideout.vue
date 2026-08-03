@@ -58,13 +58,13 @@
                     variant="ghost"
                     size="sm"
                     data-help-target="hideout-settings-button"
-                    :aria-label="t('settings.title')"
+                    :aria-label="t('common.settings')"
                     :aria-pressed="isSettingsOpen"
                     :class="isSettingsOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
                     @click="toggleSettingsDrawer"
                   >
                     <span class="hidden sm:inline">
-                      {{ t('settings.title').toUpperCase() }}
+                      {{ t('common.settings').toUpperCase() }}
                     </span>
                   </UButton>
                 </div>
@@ -92,7 +92,7 @@
               <template #footer>
                 <div class="flex justify-end gap-2 px-4 pb-4">
                   <UButton color="neutral" variant="ghost" @click="cancelPrereqToggle">
-                    {{ helpText('page.hideout.prereq_filters.confirm_cancel', 'Cancel') }}
+                    {{ helpText('common.cancel', 'Cancel') }}
                   </UButton>
                   <UButton color="warning" variant="solid" @click="confirmPrereqToggle">
                     {{ helpText('page.hideout.prereq_filters.confirm_confirm', 'Enable') }}
@@ -642,28 +642,28 @@
   };
   const primaryViews = computed<HideoutPrimaryViewOption[]>(() => [
     {
-      title: t('page.hideout.primary_views.all'),
+      title: t('common.all'),
       icon: 'mdi-clipboard-check',
       view: 'all',
       count: stationCounts.value.all,
       badgeColor: 'bg-secondary-600',
     },
     {
-      title: t('page.hideout.primary_views.available'),
+      title: t('common.available'),
       icon: 'mdi-tag-arrow-up-outline',
       view: 'available',
       count: stationCounts.value.available,
       badgeColor: 'bg-info-600',
     },
     {
-      title: t('page.hideout.primary_views.locked'),
+      title: t('common.locked'),
       icon: 'mdi-lock',
       view: 'locked',
       count: stationCounts.value.locked,
       badgeColor: 'bg-surface-600',
     },
     {
-      title: t('page.hideout.primary_views.maxed'),
+      title: t('common.maxed'),
       icon: 'mdi-arrow-collapse-up',
       view: 'maxed',
       count: stationCounts.value.maxed,

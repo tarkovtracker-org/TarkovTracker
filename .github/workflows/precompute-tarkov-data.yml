@@ -1,5 +1,4 @@
 name: Precompute Tarkov Data
-
 # Runs the heavy tasks-core fetch/adapt/overlay pipeline off Cloudflare and
 # writes the resulting payloads to the TARKOV_DATA KV namespace (7-day TTL).
 # The Pages request handlers read these entries via edgeCache's `precomputed`
@@ -13,7 +12,6 @@ name: Precompute Tarkov Data
 #   secret CLOUDFLARE_API_TOKEN          - scoped to Workers KV Storage: Edit
 #   variable CLOUDFLARE_ACCOUNT_ID       - account that owns the namespace
 #   variable TARKOV_DATA_KV_NAMESPACE_ID - id of the TARKOV_DATA namespace
-
 on:
   schedule:
     # Every 12h, matching CACHE_TTL_DEFAULT (43200s) in the app.
@@ -28,44 +26,36 @@ on:
         description: 'Restrict to one game mode (regular or pve). Empty runs both.'
         required: false
         type: string
-
 concurrency:
   group: precompute-tarkov-data
   cancel-in-progress: false
-
 permissions:
   contents: read
   issues: write
-
 jobs:
   precompute:
     name: Precompute tasks-core payloads
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Precompute and write to KV
         # Filters flow through env vars, never shell interpolation, so
         # workflow_dispatch inputs cannot inject into the run command.
@@ -76,7 +66,6 @@ jobs:
           PRECOMPUTE_LANG: ${{ inputs.lang }}
           PRECOMPUTE_GAME_MODE: ${{ inputs.gameMode }}
         run: pnpm run precompute:tarkov
-
       - name: Open or update failure issue
         if: failure() && github.event_name == 'schedule'
         continue-on-error: true

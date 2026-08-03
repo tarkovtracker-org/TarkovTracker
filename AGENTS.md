@@ -75,7 +75,7 @@ Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` |
 
 Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
 
-Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint fix) | Typecheck: `pnpm run typecheck`
+Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
 i18n check: `pnpm run i18n:check` | Supabase types: `pnpm run supabase:types` | OpenAPI validate: `pnpm run validate:openapi` | Deps: `pnpm run deps` | KV precompute: `pnpm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
 
@@ -84,10 +84,11 @@ i18n check: `pnpm run i18n:check` | Supabase types: `pnpm run supabase:types` | 
 Before finishing any agent task:
 
 - Run the smallest relevant validation (typecheck for TS changes, lint for code changes, i18n:check for locale changes).
+- `pnpm run lint:blank-lines` checks supported source and configuration files while preserving Markdown, generated files, and blank lines inside multiline strings/comments.
 - State what validation was run and what passed/failed.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
-- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier + eslint --fix on staged files). Do not run `pnpm run format` manually unless the hook is bypassed or cannot run (missing `node_modules` / husky harness). CI `format:check` is the gate; never commit knowing hooks were skipped without formatting staged paths yourself.
+- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier, ESLint, and the blank-line fixer on staged files). Do not run `pnpm run format` manually unless the hook is bypassed or cannot run (missing `node_modules` / husky harness). CI `format:check` is the gate; never commit knowing hooks were skipped without formatting staged paths yourself.
 - Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
 - Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
@@ -159,6 +160,7 @@ Naming:
 - When adding user-facing copy: add key to `en.json` only, run `pnpm run i18n:check`. Crowdin handles propagation.
 - Crowdin-only PRs that change only non-English exports are excluded from repository-owned CI, PR metadata, security, and Dependabot workflows via their `paths-ignore` filters. Changes to source code or `en.json` still run normal checks.
 - Add keys consistently with existing namespace patterns. Keep locale keys stable to avoid churn.
+- The `common.*` namespace holds shared translations for values that appear across multiple features (e.g. `common.cancel`, `common.available`, `common.tasks`). When adding user-facing copy that duplicates an existing value, reference the `common.*` key instead of creating a new duplicate. If no `common.*` key exists yet, add one and reference it from all call sites. This reduces Crowdin translation segments and keeps the source locale compact.
 - Avoid hard-coded user-facing strings in components.
 - The sole exception to not editing non-English locale files is fixing a broken Crowdin export PR; even then, only touch the file(s) Crowdin produced.
 
@@ -197,6 +199,9 @@ Naming:
 - If a review integration cannot complete because of exhausted credits, rate limits, vendor failure, or an equivalent external blocker, document that failure on the PR, perform and report a direct self-review of the diff, and only then decide whether to merge.
 - Treat new comments created by the latest pushed commit as part of the same review cycle. Repeat until checks pass, reviews are complete, and unresolved thread count is zero.
 - After merge, run one fresh review-thread query to verify zero unresolved threads. Post-merge follow-ups are exceptional recovery, not the normal review workflow.
+- Review all Dependabot GitHub Actions PRs manually. Before merging an action SHA change, verify and
+  update repository and organization Actions allowlists when they restrict that action; do not rely
+  on the Dependabot branch checks to prove the new SHA is permitted.
 
 - Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks) for the first in-flight task.
 - Before edits, run `git status --short --branch`.
@@ -208,9 +213,10 @@ Naming:
   - Worktree convention: path `.wt/<branch>` (co-located, gitignored), created via `bash scripts/wt.sh add <branch>`. The script runs `scripts/setup-worktree.sh` so husky + lint-staged work on commit. State the worktree path in every status update so the user knows which checkout the agent is operating in.
   - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. Never run `git restore`, `git checkout --`, `git clean`, or `git reset` on a working tree with changes you did not make — if the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
   - After a worktree's PR merges, remove it with `bash scripts/wt.sh rm <branch>` so stale worktrees and branches don't accumulate.
-- Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
+- Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue; `node scripts/lint-blank-lines.mjs --fix` for supported source/config files) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `wip`.
+- Release-producing types: `feat` triggers a minor release; `fix`, `perf`, `refactor`, and `revert` trigger a patch release. Other types do not release unless they contain a breaking change or match an explicit rule in `.releaserc.json`.
 - Header max 100 chars. Subject must not be UPPER_CASE.
 
 ## Environment Variables
