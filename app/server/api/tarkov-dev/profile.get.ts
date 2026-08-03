@@ -22,6 +22,7 @@ import { verifyTurnstileToken } from '@/server/utils/turnstile';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { validateTarkovDevProfile } from '@/utils/tarkovDevProfileParser';
 import { resolveTarkovDevProfileSource } from '@/utils/tarkovDevProfileSource';
+import { TURNSTILE_TEST_SECRET_KEY } from '@/utils/turnstileKeys';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 import type { H3Event } from 'h3';
 const logger = createLogger('TarkovDevProfileApi');
@@ -180,7 +181,10 @@ async function writeCachedProfile(
     logSharedStoreFailure('Tarkov.dev profile cache operation failed')
   );
 }
-function resolveAllowedTurnstileHostnames(appUrl: unknown): string[] {
+function resolveAllowedTurnstileHostnames(appUrl: unknown, secretKey: string): string[] {
+  // Cloudflare's test secret reports hostname "example.com" for every origin, so pinning is
+  // skipped for it. It only ever validates test-key tokens, never production ones.
+  if (secretKey === TURNSTILE_TEST_SECRET_KEY) return [];
   if (typeof appUrl !== 'string' || appUrl.trim().length === 0) {
     return ['tarkovtracker.org'];
   }
@@ -247,7 +251,10 @@ export default defineEventHandler(async (event) => {
     const verification = await verifyTurnstileToken({
       secretKey: turnstileSecretKey,
       token: getRequestHeader(event, 'x-turnstile-token'),
-      allowedHostnames: resolveAllowedTurnstileHostnames(typedConfig.public?.appUrl),
+      allowedHostnames: resolveAllowedTurnstileHostnames(
+        typedConfig.public?.appUrl,
+        turnstileSecretKey
+      ),
       remoteIp: clientIdentifier === 'unknown' ? null : clientIdentifier,
     });
     if (!verification.ok) {

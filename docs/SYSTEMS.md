@@ -574,6 +574,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   the public sitekey and private secret together, so the client cannot submit before its widget is
   ready. Without the pair the route behaves as before (no token required). Siteverify availability
   failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
+- Siteverify responses are pinned to the `NUXT_PUBLIC_APP_URL` hostname, so a token minted on
+  another origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
+  reports `example.com` for every origin; it only validates test-key tokens, never production ones.
 - Cached and upstream `200` payloads must pass the import profile schema before use. Invalid cached
   entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
 - Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can

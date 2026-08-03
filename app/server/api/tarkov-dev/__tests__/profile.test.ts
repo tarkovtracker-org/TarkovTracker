@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TURNSTILE_TEST_SECRET_KEY } from '@/utils/turnstileKeys';
 const {
   consumeSharedRateLimitWithResetMock,
   createSharedCacheHandleMock,
@@ -405,6 +406,38 @@ describe('/api/tarkov-dev/profile', () => {
       secretKey: 'secret-key',
       token: 'turnstile-token',
     });
+  });
+  it('skips hostname pinning for the Cloudflare test secret', async () => {
+    const body = freshProfileBody();
+    getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
+    getRequestHeaderMock.mockReturnValue('turnstile-token');
+    useRuntimeConfigMock.mockReturnValue({
+      apiProtection: { trustProxy: true },
+      public: { appUrl: 'http://localhost:3000' },
+      turnstileSecretKey: TURNSTILE_TEST_SECRET_KEY,
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(body));
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual(body);
+    expect(verifyTurnstileTokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ allowedHostnames: [] })
+    );
+  });
+  it('pins the allowlist to the configured app hostname for a real secret', async () => {
+    const body = freshProfileBody();
+    getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
+    getRequestHeaderMock.mockReturnValue('turnstile-token');
+    useRuntimeConfigMock.mockReturnValue({
+      apiProtection: { trustProxy: true },
+      public: { appUrl: 'http://localhost:3000' },
+      turnstileSecretKey: 'real-secret-key',
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(body));
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual(body);
+    expect(verifyTurnstileTokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ allowedHostnames: ['localhost'] })
+    );
   });
   it('returns a timeout error when upstream profile fetching times out', async () => {
     getQueryMock.mockReturnValue({ url: 'https://tarkov.dev/players/regular/8560316' });
