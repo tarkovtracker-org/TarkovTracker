@@ -34,11 +34,15 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-          cache: 'pnpm'
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
+      - name: Setup pnpm cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Resolve Fallow base
