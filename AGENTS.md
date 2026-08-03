@@ -92,7 +92,7 @@ Before finishing any agent task:
 - Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
 - Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`).
-- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff) and disables per-shard coverage thresholds (Codecov merges the per-shard lcov uploads and enforces thresholds via `codecov.yml`). Local `pnpm run test` / `pnpm run test:coverage` remain unsharded with thresholds active.
+- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff) and disables per-shard coverage thresholds (Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`). Local `pnpm run test` / `pnpm run test:coverage` remain unsharded with vitest thresholds active.
 
 ## Production Readiness Review
 
