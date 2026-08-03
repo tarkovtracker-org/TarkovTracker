@@ -91,6 +91,7 @@
     "format:check": "pnpm run format:check:prettier && pnpm run lint:blank-lines",
     "format:check:prettier": "node scripts/format-files.mjs --check",
     "format:prettier": "node scripts/format-files.mjs --write",
+    "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",
     "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0 && pnpm run lint:blank-lines",
