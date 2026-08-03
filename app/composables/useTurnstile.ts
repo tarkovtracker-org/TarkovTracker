@@ -21,9 +21,9 @@ export interface UseTurnstileWidgetReturn {
   getToken: () => Promise<string | null>;
   reset: () => void;
 }
-const TOKEN_WAIT_TIMEOUT_MS = 8000;
-const SCRIPT_LOAD_RETRY_MS = 5000;
-const MAX_SCRIPT_LOAD_ATTEMPTS = 3;
+export const TOKEN_WAIT_TIMEOUT_MS = 8000;
+export const SCRIPT_LOAD_RETRY_MS = 5000;
+export const MAX_SCRIPT_LOAD_ATTEMPTS = 3;
 let scriptPromise: Promise<TurnstileApi | null> | null = null;
 function readTurnstileApi(): TurnstileApi | null {
   return (window as typeof window & { turnstile?: TurnstileApi }).turnstile ?? null;

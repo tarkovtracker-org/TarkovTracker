@@ -530,6 +530,48 @@ describe('DataManagementCard', () => {
     const arenaButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_mode_arena');
     expect(arenaButton?.attributes('disabled')).toBeDefined();
   });
+  it('disables the age-warning preview refetch button during an active cooldown', async () => {
+    const { getImportCooldownRemainingMs, recordImportCompletion } =
+      await import('@/utils/tarkovDevImportCooldown');
+    window.localStorage.clear();
+    tarkovStoreState.tarkovUid = 123456;
+    recordImportCompletion(123456, 'pvp', 60 * 60_000);
+    expect(getImportCooldownRemainingMs(123456, 'pvp', 60 * 60_000)).toBeGreaterThan(0);
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'Tester',
+      gameEditionGuess: null,
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      skills: {},
+      tarkovUid: 123456,
+      totalXP: 0,
+      updatedAt: Date.now() - 3 * 86_400_000,
+    };
+    const wrapper = createWrapper();
+    const refetchButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_profile');
+    expect(refetchButton).toBeTruthy();
+    expect(refetchButton!.attributes('disabled')).toBeDefined();
+    window.localStorage.clear();
+  });
+  it('keeps the age-warning preview refetch button enabled outside a cooldown', () => {
+    tarkovStoreState.tarkovUid = 123456;
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'Tester',
+      gameEditionGuess: null,
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      skills: {},
+      tarkovUid: 123456,
+      totalXP: 0,
+      updatedAt: Date.now() - 3 * 86_400_000,
+    };
+    const wrapper = createWrapper();
+    const refetchButton = findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_profile');
+    expect(refetchButton).toBeTruthy();
+    expect(refetchButton!.attributes('disabled')).toBeUndefined();
+  });
   it('unlinks a tarkov.dev profile without resetting imported tracker data', () => {
     tarkovStoreState.tarkovUid = 123456;
     const wrapper = createWrapper();

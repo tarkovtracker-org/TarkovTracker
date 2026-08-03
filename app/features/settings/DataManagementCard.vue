@@ -274,7 +274,11 @@
                     color="warning"
                     variant="soft"
                     size="xs"
-                    :disabled="isTarkovDevProfileUrlLoading || !isTurnstileReady"
+                    :disabled="
+                      isTarkovDevProfileUrlLoading ||
+                      !isTurnstileReady ||
+                      tarkovDevRefetchCooldownMinutes > 0
+                    "
                     :loading="isTarkovDevProfileUrlLoading"
                     @click="handleTarkovDevPreviewRefetch"
                   >
@@ -1125,7 +1129,9 @@
   const tarkovDevErrorMessage = computed(() => {
     const code = tarkovDevImportErrorCode.value;
     if (code) {
-      return t(`settings.tarkov_dev_import.errors.${code}`, tarkovDevImportErrorMeta.value ?? {});
+      return t(`settings.tarkov_dev_import.errors.${code}`, tarkovDevImportErrorMeta.value ?? {}, {
+        default: t('settings.tarkov_dev_import.errors.unexpected_profile_flow'),
+      });
     }
     return tarkovDevImportError.value ?? '';
   });

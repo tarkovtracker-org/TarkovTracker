@@ -2,7 +2,12 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UseTurnstileWidgetReturn } from '@/composables/useTurnstile';
+import {
+  MAX_SCRIPT_LOAD_ATTEMPTS,
+  SCRIPT_LOAD_RETRY_MS,
+  TOKEN_WAIT_TIMEOUT_MS,
+  type UseTurnstileWidgetReturn,
+} from '@/composables/useTurnstile';
 const { useRuntimeConfigMock } = vi.hoisted(() => ({
   useRuntimeConfigMock: vi.fn(),
 }));
@@ -132,7 +137,7 @@ describe('useTurnstileWidget', () => {
     setTurnstileApi(api);
     const { result, wrapper } = await mountHarness();
     const pendingToken = result.getToken();
-    await vi.advanceTimersByTimeAsync(8000);
+    await vi.advanceTimersByTimeAsync(TOKEN_WAIT_TIMEOUT_MS);
     await expect(pendingToken).resolves.toBeNull();
     getOptions().callback('late-token');
     await expect(result.getToken()).resolves.toBe('late-token');
@@ -176,17 +181,17 @@ describe('useTurnstileWidget', () => {
       await flushMicrotasks();
     };
     await failCurrentScript();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(SCRIPT_LOAD_RETRY_MS);
     await flushMicrotasks();
     await failCurrentScript();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(SCRIPT_LOAD_RETRY_MS);
     await flushMicrotasks();
     await failCurrentScript();
-    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(SCRIPT_LOAD_RETRY_MS * 2);
     await flushMicrotasks();
     const scriptAppendCount = () =>
       appendSpy.mock.calls.filter(([node]) => node instanceof HTMLScriptElement).length;
-    expect(scriptAppendCount()).toBe(3);
+    expect(scriptAppendCount()).toBe(MAX_SCRIPT_LOAD_ATTEMPTS);
     expect(result.ready.value).toBe(false);
     container.value = null;
     await flushMicrotasks();

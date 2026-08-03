@@ -528,10 +528,10 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES`), obtains a Turnstile token when a sitekey is
    configured, and calls the proxy with `retry: 0`.
 2. The proxy enforces, in order: a pre-verification per-IP rate limit when Turnstile is configured,
-   Turnstile verification (production requires paired `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and
-   `NUXT_TURNSTILE_SECRET_KEY`; siteverify availability failures fail open), then the hourly per-IP
-   limit. Without Turnstile, the normal minute limit runs in the first position. The separate
-   `tarkov-dev-profile-verification-rate`, `tarkov-dev-profile-rate`, and
+   Turnstile verification (production requires `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and
+   `NUXT_TURNSTILE_SECRET_KEY` to be paired; siteverify availability failures fail open), then the
+   hourly per-IP limit. Without Turnstile, the normal minute limit runs in the first position. The
+   separate `tarkov-dev-profile-verification-rate`, `tarkov-dev-profile-rate`, and
    `tarkov-dev-profile-hourly-rate` buckets use the DO binding when available. The shared edge cache
    follows (`tarkov-dev-profile` prefix,
    default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached

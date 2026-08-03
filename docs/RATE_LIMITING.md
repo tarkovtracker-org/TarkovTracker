@@ -228,12 +228,12 @@ flowchart TB
   R --> DATA[Supabase REST / app data]
 ```
 
-| Endpoint                       | Prefix / key style                                               | Default                       | Env override                                                                                   |
-| ------------------------------ | ---------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| `/api/team/members`            | `team-members-rate:*`                                            | 120 / min                     | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`                                                      |
-| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`                                          | 120 / min                     | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`                                                    |
-| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-rate:*` + `tarkov-dev-profile-hourly-rate:*` | 5 / min / IP + 20 / hour / IP | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE`, `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR` |
-| `/api/logs/client`             | `client-logs-rate:ip:...`                                        | 10 / min / IP                 | fixed in route                                                                                 |
+| Endpoint                       | Prefix / key style                                                                                          | Default                                      | Env override                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `/api/team/members`            | `team-members-rate:*`                                                                                       | 120 / min                                    | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`                                                      |
+| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`                                                                                     | 120 / min                                    | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`                                                    |
+| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-verification-rate:*` + `tarkov-dev-profile-rate:*` + `tarkov-dev-profile-hourly-rate:*` | 5 / min / IP + 5 / min / IP + 20 / hour / IP | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE`, `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR` |
+| `/api/logs/client`             | `client-logs-rate:ip:...`                                                                                   | 10 / min / IP                                | fixed in route                                                                                 |
 
 Implementation: `app/server/utils/sharedEdgeStore.ts`
 
