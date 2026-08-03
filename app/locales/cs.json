@@ -2084,6 +2084,7 @@
       "last_refreshed_unknown": "Neznámý",
       "data_age_warning": "Tento Tarkov.dev snímek je {days} dní starý. Pokud jste od té doby hráli, otevřete svůj profil na Tarkov.dev takže se obnoví, načíst znovu před importem.",
       "cooldown_hint": "Nedávno importováno. Tento profil můžete znovu importovat do {minutes} min.",
+      "turnstile_hint": "Dokončete lidské ověření pro načtení vašeho profilu.",
       "skills_details_toggle": "Zobrazit hodnoty dovedností",
       "skills_details_skill": "Dovednost",
       "edition_guess": "Editace (zjištěna)",
