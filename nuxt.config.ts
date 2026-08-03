@@ -207,9 +207,10 @@ export default defineNuxtConfig({
       Number(process.env.NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE || '5') || 5,
     tarkovDevProfileRateLimitPerHour:
       Number(process.env.NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR || '20') || 20,
-    // 0 disables the freshness gate, so the raw value must survive without a truthiness fallback.
+    // 0 disables the freshness gate, so the raw value must survive without a truthiness fallback;
+    // an empty-string env var must not silently disable the gate either.
     tarkovDevProfileMaxUpdatedAgeDays: Number(
-      process.env.NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS ?? '7'
+      process.env.NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS?.trim() || '7'
     ),
     turnstileSecretKey: TURNSTILE_SECRET_KEY,
     // API protection configuration (server-only)
