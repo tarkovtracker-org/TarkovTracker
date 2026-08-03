@@ -72,6 +72,7 @@
                     :disabled="
                       isAnyImportActive ||
                       !isTurnstileReady ||
+                      !isTurnstileSolved ||
                       !isTarkovDevRefetchModeSupported ||
                       tarkovDevRefetchCooldownMinutes > 0
                     "
@@ -151,7 +152,12 @@
                   icon="i-mdi-account-search"
                   color="info"
                   class="justify-center"
-                  :disabled="isTarkovDevProfileUrlBlank || isAnyImportActive || !isTurnstileReady"
+                  :disabled="
+                    isTarkovDevProfileUrlBlank ||
+                    isAnyImportActive ||
+                    !isTurnstileReady ||
+                    !isTurnstileSolved
+                  "
                   :loading="isTarkovDevProfileUrlLoading"
                 >
                   {{ $t('settings.tarkov_dev_import.fetch_profile') }}
@@ -276,6 +282,7 @@
                     :disabled="
                       isTarkovDevProfileUrlLoading ||
                       !isTurnstileReady ||
+                      !isTurnstileSolved ||
                       tarkovDevRefetchCooldownMinutes > 0
                     "
                     :loading="isTarkovDevProfileUrlLoading"
@@ -1024,6 +1031,7 @@
     getToken: getTurnstileToken,
     ready: isTurnstileReady,
     reset: resetTurnstile,
+    solved: isTurnstileSolved,
   } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevRequestGeneration = ref(0);
@@ -1204,16 +1212,32 @@
     tarkovDevRefetchMode.value = mode;
     tarkovDevTargetMode.value = mode;
   }
+  type TurnstileVerification = { status: 'failed' } | { status: 'ok'; token: string | null };
+  function turnstileVerificationPending(): boolean {
+    return isTurnstileEnabled && !isTurnstileSolved.value;
+  }
+  function turnstileTokenMissing(token: string | null): boolean {
+    return isTurnstileEnabled && token === null;
+  }
+  async function verifyTurnstileToken(): Promise<TurnstileVerification> {
+    if (turnstileVerificationPending()) return { status: 'failed' };
+    const token = await getTurnstileToken();
+    if (turnstileTokenMissing(token)) return { status: 'failed' };
+    return { status: 'ok', token };
+  }
   async function fetchTarkovDevProfile(profileUrl: string, fresh = false) {
     const requestGeneration = ++tarkovDevRequestGeneration.value;
     try {
-      const turnstileToken = await getTurnstileToken();
-      if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
-      if (isTurnstileEnabled && !turnstileToken) {
+      const verification = await verifyTurnstileToken();
+      if (verification.status === 'failed') {
         setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
         return null;
       }
-      return await parseTarkovDevProfileUrl(profileUrl, { fresh, turnstileToken });
+      if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
+      return await parseTarkovDevProfileUrl(profileUrl, {
+        fresh,
+        turnstileToken: verification.token,
+      });
     } finally {
       resetTurnstile();
     }
