@@ -2080,6 +2080,10 @@
       "nickname": "Nickname",
       "faction": "Faction",
       "skills_count": "{count} skills detected",
+      "last_refreshed": "Dane Tarkov.dev zaktualizowane",
+      "last_refreshed_unknown": "Nieznane",
+      "cooldown_hint": "Zaimportowano ostatnio. Możesz ponownie zaimportować ten profil za około {minutes} min.",
+      "turnstile_hint": "Ukończ weryfikację ludzką poniżej, aby pobrać swój profil.",
       "skills_details_toggle": "View skill values",
       "skills_details_skill": "Skill",
       "edition_guess": "Edition (detected)",
@@ -2095,7 +2099,12 @@
       "refetch_profile": "Refetch Profile",
       "unlink_profile": "Unlink",
       "errors": {
-        "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again."
+        "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again.",
+        "profile_stale": "Tarkov.dev ostatnio odświeżał ten profil {days} dni temu, który jest zbyt stary, aby importować. Otwórz stronę profilową na Tarkov.dev, pozwól załadować, a następnie pobierz ponownie.",
+        "profile_not_generated": "Tarkov.dev nie ma jeszcze zrzutu dla tego profilu. Otwórz stronę profilową na Tarkov.dev raz, pozwól załadować, a następnie pobierz ponownie.",
+        "rate_limited": "Zbyt wiele prób importu. Poczekaj na {minutes} min, a następnie spróbuj ponownie.",
+        "verification_failed": "Weryfikacja człowieka nie powiodła się. Odśwież stronę i spróbuj ponownie.",
+        "fetch_failed": "Nie można pobrać profilu Tarkov.dev. Otwórz profil na Tarkov.dev, a następnie spróbuj ponownie."
       }
     }
   },

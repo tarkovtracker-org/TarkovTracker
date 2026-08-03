@@ -2080,6 +2080,9 @@
       "nickname": "昵称",
       "faction": "阵营",
       "skills_count": "检测到 {count} 个技能",
+      "last_refreshed": "Tarkov.dev 数据已更新",
+      "last_refreshed_unknown": "未知的",
+      "turnstile_hint": "完成下面的人类验证以获取您的个人资料。",
       "skills_details_toggle": "查看技能数值",
       "skills_details_skill": "技能",
       "edition_guess": "版本（已检测）",
@@ -2095,7 +2098,10 @@
       "refetch_profile": "重新获取资料",
       "unlink_profile": "取消关联",
       "errors": {
-        "unexpected_profile_flow": "获取 Tarkov.dev 资料时出错。请重试。"
+        "unexpected_profile_flow": "获取 Tarkov.dev 资料时出错。请重试。",
+        "profile_not_generated": "Tarkov.dev尚无此个人资料的快照。打开Tarkov.dev上的个人资料页面一次，让它加载，然后再次获取。",
+        "verification_failed": "人类验证失败。重新加载页面然后重试。",
+        "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。"
       }
     }
   },

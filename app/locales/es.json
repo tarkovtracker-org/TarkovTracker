@@ -2080,6 +2080,10 @@
       "nickname": "Apodo",
       "faction": "Facción",
       "skills_count": "{count} habilidades detectadas",
+      "last_refreshed": "Datos Tarkov.dev actualizados",
+      "last_refreshed_unknown": "Desconocido",
+      "cooldown_hint": "Importado recientemente. Puedes volver a importar este perfil en aproximadamente {minutes} min.",
+      "turnstile_hint": "Completa la verificación humana a continuación para obtener tu perfil.",
       "skills_details_toggle": "Ver valores de habilidades",
       "skills_details_skill": "Habilidad",
       "edition_guess": "Edición (detectada)",
@@ -2095,7 +2099,12 @@
       "refetch_profile": "Volver a obtener perfil",
       "unlink_profile": "Desvincular",
       "errors": {
-        "unexpected_profile_flow": "Algo salió mal al obtener el perfil de Tarkov.dev. Inténtalo de nuevo."
+        "unexpected_profile_flow": "Algo salió mal al obtener el perfil de Tarkov.dev. Inténtalo de nuevo.",
+        "cooldown_active": "Has importado este perfil recientemente. Puedes volver a importarlo en aproximadamente {minutes} min.",
+        "profile_not_generated": "Tarkov.dev todavía no tiene una instantánea para este perfil. Abra la página de perfil en Tarkov.dev una vez, déjelo cargar, y vuelva a buscar.",
+        "rate_limited": "Demasiados intentos de importación. Espera {minutes} min, luego vuelve a intentarlo.",
+        "verification_failed": "Falló la verificación humana. Recarga la página e inténtalo de nuevo.",
+        "fetch_failed": "No se puede obtener el perfil de Tarkov.dev. Abra el perfil en Tarkov.dev, y vuelva a intentarlo."
       }
     }
   },

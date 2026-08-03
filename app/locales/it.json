@@ -2080,6 +2080,11 @@
       "nickname": "Nickname",
       "faction": "Fazione",
       "skills_count": "{count} abilità rilevate",
+      "last_refreshed": "Dati Tarkov.dev aggiornati",
+      "last_refreshed_unknown": "Sconosciuto",
+      "data_age_warning": "Questa istantanea di Tarkov.dev è {days} giorni di età. Se hai giocato da allora, apri il tuo profilo su Tarkov.dev quindi si aggiorna, quindi recupera di nuovo prima dell'importazione.",
+      "cooldown_hint": "Importato di recente. Puoi re-importare questo profilo in circa {minutes} min.",
+      "turnstile_hint": "Completa la verifica umana qui sotto per recuperare il tuo profilo.",
       "skills_details_toggle": "Visualizza valori abilità",
       "skills_details_skill": "Abilità",
       "edition_guess": "Edizione (rilevata)",
@@ -2095,7 +2100,13 @@
       "refetch_profile": "Riscarica profilo",
       "unlink_profile": "Scollega",
       "errors": {
-        "unexpected_profile_flow": "Qualcosa è andato storto durante il recupero del profilo Tarkov.dev. Riprova."
+        "unexpected_profile_flow": "Qualcosa è andato storto durante il recupero del profilo Tarkov.dev. Riprova.",
+        "cooldown_active": "Hai importato questo profilo di recente. Puoi reimportarlo in circa {minutes} min.",
+        "profile_stale": "Tarkov.dev ultimo aggiornato questo profilo {days} giorni fa, che è troppo vecchio per importare. Aprire la pagina del profilo su Tarkov.dev, lasciarlo caricare, poi recuperare di nuovo.",
+        "profile_not_generated": "Tarkov.dev non ha ancora nessuna istantanea per questo profilo. Aprire la pagina del profilo su Tarkov.dev una volta, lasciarlo caricare, quindi recuperare di nuovo.",
+        "rate_limited": "Troppi tentativi di importazione. Attendere {minutes} min, quindi riprovare.",
+        "verification_failed": "Verifica umana non riuscita. Ricarica la pagina e riprova.",
+        "fetch_failed": "Impossibile recuperare il profilo Tarkov.dev. Aprire il profilo su Tarkov.dev, quindi riprovare."
       }
     }
   },

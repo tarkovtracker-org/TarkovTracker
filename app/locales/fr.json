@@ -2080,6 +2080,10 @@
       "nickname": "Pseudo",
       "faction": "Force",
       "skills_count": "{count} compétences détectées",
+      "last_refreshed": "Données Tarkov.dev mises à jour",
+      "last_refreshed_unknown": "Inconnu",
+      "cooldown_hint": "Importé récemment. Vous pouvez réimporter ce profil dans environ {minutes} min.",
+      "turnstile_hint": "Complétez la vérification humaine ci-dessous pour récupérer votre profil.",
       "skills_details_toggle": "Voir les valeurs des compétences",
       "skills_details_skill": "Compétence",
       "edition_guess": "Édition (détectée)",
@@ -2095,7 +2099,12 @@
       "refetch_profile": "Récupérer à nouveau",
       "unlink_profile": "Dissocier",
       "errors": {
-        "unexpected_profile_flow": "Un problème est survenu pendant la récupération du profil Tarkov.dev. Réessayez."
+        "unexpected_profile_flow": "Un problème est survenu pendant la récupération du profil Tarkov.dev. Réessayez.",
+        "cooldown_active": "Vous avez importé ce profil récemment. Vous pouvez le réimporter dans environ {minutes} min.",
+        "profile_not_generated": "Tarkov.dev n'a pas encore d'instantané pour ce profil. Ouvrez une fois la page de profil sur Tarkov.dev, laissez-la charger, puis récupérez à nouveau.",
+        "rate_limited": "Trop de tentatives d'importation. Attendez à propos de {minutes} min, puis réessayez.",
+        "verification_failed": "Échec de la vérification humaine. Rechargez la page et réessayez.",
+        "fetch_failed": "Impossible de récupérer le profil Tarkov.dev. Ouvrez le profil sur Tarkov.dev, puis réessayez."
       }
     }
   },

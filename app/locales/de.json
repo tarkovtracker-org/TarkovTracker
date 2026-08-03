@@ -2080,6 +2080,10 @@
       "nickname": "Spielername",
       "faction": "Fraktion",
       "skills_count": "{count} Fertigkeiten erkannt",
+      "last_refreshed": "Tarkov.dev-Daten aktualisiert",
+      "last_refreshed_unknown": "Unbekannt",
+      "cooldown_hint": "Kürzlich importiert. Sie können dieses Profil in etwa {minutes} min erneut importieren.",
+      "turnstile_hint": "Schließe die nachfolgende menschliche Verifizierung ab, um dein Profil zu holen.",
       "skills_details_toggle": "Fertigkeitswerte anzeigen",
       "skills_details_skill": "Fertigkeit",
       "edition_guess": "Edition (erkannt)",
@@ -2095,7 +2099,13 @@
       "refetch_profile": "Profil erneut abrufen",
       "unlink_profile": "Verknüpfung entfernen",
       "errors": {
-        "unexpected_profile_flow": "Beim Abrufen des Tarkov.dev-Profils ist etwas schiefgelaufen. Versuche es erneut."
+        "unexpected_profile_flow": "Beim Abrufen des Tarkov.dev-Profils ist etwas schiefgelaufen. Versuche es erneut.",
+        "cooldown_active": "Sie haben dieses Profil kürzlich importiert. Sie können es in etwa {minutes} min.",
+        "profile_stale": "Tarkov.dev hat dieses Profil zuletzt aktualisiert {days} Tage, die zu alt ist, um es zu importieren. Öffnen Sie die Profilseite auf Tarkov.dev, lassen Sie sie laden und holen Sie sich erneut.",
+        "profile_not_generated": "Tarkov.dev hat noch keinen Schnappschuss für dieses Profil. Öffne einmal die Profilseite auf Tarkov.dev, lass es laden und hole es erneut.",
+        "rate_limited": "Zu viele Importversuche. Warten Sie auf {minutes} Min, dann versuchen Sie es erneut.",
+        "verification_failed": "Die menschliche Verifizierung ist fehlgeschlagen. Laden Sie die Seite neu und versuchen Sie es erneut.",
+        "fetch_failed": "Das Tarkov.dev Profil konnte nicht abgerufen werden. Öffne das Profil auf Tarkov.dev und versuche es erneut."
       }
     }
   },
