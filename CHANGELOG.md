@@ -1,3 +1,10 @@
+## [1.62.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.1...v1.62.2) (2026-08-03)
+
+
+### Bug Fixes
+
+* **ui:** gate profile fetch buttons on Turnstile completion ([32ea531](https://github.com/tarkovtracker-org/TarkovTracker/commit/32ea53168c66b19105897b5816956905188218bf))
+
 ## [1.62.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.0...v1.62.1) (2026-08-03)
 
 
