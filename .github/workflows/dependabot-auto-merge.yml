@@ -95,6 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           expected_checks=(
+            "Fallow audit"
             "Lint & Format"
             "Type Check"
             "Test (shard 1/4)"
@@ -103,6 +104,7 @@ jobs:
             "Test (shard 4/4)"
             "Validate"
             "Supabase DB"
+            "Systems drift check"
             "Workers"
             "PR Meta"
             "Security Scan"
