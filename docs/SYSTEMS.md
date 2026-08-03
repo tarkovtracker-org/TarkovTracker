@@ -513,9 +513,10 @@ sequenceDiagram
 ## 7. Tarkov.dev profile import
 
 **Summary.** Settings → Data Management lets a user import their in-game profile (level/XP,
-skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots at
-`players.tarkov.dev/profile/<aid>.json` (PvP) / `players.tarkov.dev/pve/<aid>.json` (PvE). The
-upstream JSON only refreshes when a human views the player page on tarkov.dev (Turnstile-guarded
+skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots on the
+players.tarkov.dev host (the `profile/{aid}` path for PvP and `pve/{aid}` for PvE, each with a
+JSON suffix). The upstream JSON only refreshes when a human views the player page on tarkov.dev
+(Turnstile-guarded
 there); tarkov.dev purges its CDN copy on refresh, so a new snapshot is visible to us immediately.
 The upstream sends no CORS headers, so the browser cannot fetch it directly — everything goes
 through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse controls.
