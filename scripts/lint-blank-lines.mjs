@@ -185,6 +185,7 @@ const getProtectedRanges = (source, filePath) => {
   }
   if (!['.cjs', '.js', '.mjs', '.ts', '.tsx'].includes(extension)) return ranges;
   if (!typescript) {
+    if (extension === '.tsx') return [{ end: source.length, start: 0 }];
     const findTemplateEnd = (start) => {
       let interpolationDepth = 0;
       let interpolationQuote = null;
@@ -442,8 +443,29 @@ const getYamlPlainScalarLines = (lines, filePath) => {
       }
     }
     if (/^\s*#/.test(line)) continue;
-    const match = line.match(/^(\s*)(?:[^\n:]+:\s*|:\s*|[-]\s+)(.*)$/);
+    const match = line.match(/^(\s*)(?:[^\n:]+:\s*|:\s*|[-]\s*)(.*)$/);
     if (!match || !match[2]) {
+      const bareSequence = line.match(/^(\s*)-\s*(?:#.*)?$/);
+      if (bareSequence) {
+        const headerIndent = bareSequence[1].length;
+        for (let next = index + 1; next < lines.length; next += 1) {
+          const candidate = lines[next];
+          if (/^[\t ]*$/.test(candidate)) {
+            const following = lines.slice(next + 1).find((entry) => !/^[\t ]*$/.test(entry));
+            if (
+              following &&
+              following.match(/^[\t ]*/)[0].length > headerIndent &&
+              !isStructural(following)
+            ) {
+              protectedLines.add(next);
+            }
+            continue;
+          }
+          const candidateIndent = candidate.match(/^\s*/)[0].length;
+          if (candidateIndent <= headerIndent || isStructural(candidate)) break;
+          protectedLines.add(next);
+        }
+      }
       updateFlowContext(line);
       continue;
     }

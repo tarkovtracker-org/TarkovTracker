@@ -298,6 +298,17 @@ const runFixtures = () => {
   if (quotedYamlSequence !== '- "first\n\nsecond"\n- next\n') {
     throw new Error(`Quoted YAML sequence protection failed:\n${quotedYamlSequence}`);
   }
+  const bareSequenceScalar = runFix(
+    'bare-sequence-scalar',
+    'items:\n  -\n    first paragraph\n\n    second paragraph\n  - next\nnext: value\n\n',
+    'yml'
+  );
+  if (
+    bareSequenceScalar !==
+    'items:\n  -\n    first paragraph\n\n    second paragraph\n  - next\nnext: value\n'
+  ) {
+    throw new Error(`Bare YAML sequence scalar protection failed:\n${bareSequenceScalar}`);
+  }
   const keepChompAtEof = runFix(
     'keep-chomp-at-eof',
     'run: |2+\n    first\n\nfolded: >2+\n    second\n\n',
@@ -363,6 +374,15 @@ const runFixtures = () => {
   );
   if (!jsx.includes('<pre>first\n\nsecond</pre>')) {
     throw new Error(`JSX text protection failed:\n${jsx}`);
+  }
+  const fallbackJsx = runFix(
+    'fallback-jsx-text',
+    'const view = <pre>first\n\nsecond</pre>;\n\nconst value = 1;\n',
+    'tsx',
+    true
+  );
+  if (fallbackJsx !== 'const view = <pre>first\n\nsecond</pre>;\n\nconst value = 1;\n') {
+    throw new Error(`Fallback JSX text protection failed:\n${fallbackJsx}`);
   }
   const shellSlashArgument = runFix(
     'shell-slash-argument',
