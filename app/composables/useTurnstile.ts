@@ -18,6 +18,8 @@ type TurnstileApi = {
 export interface UseTurnstileWidgetReturn {
   enabled: boolean;
   ready: Readonly<Ref<boolean>>;
+  /** True once the widget has issued a usable token; false until the challenge is solved. */
+  solved: Readonly<Ref<boolean>>;
   getToken: () => Promise<string | null>;
   reset: () => void;
 }
@@ -61,6 +63,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
     typeof config.public.turnstileSiteKey === 'string' ? config.public.turnstileSiteKey.trim() : '';
   const enabled = siteKey.length > 0;
   const ready = ref(!enabled);
+  const solved = ref(!enabled);
   let api: TurnstileApi | null = null;
   let widgetId: string | undefined;
   let latestToken: string | null = null;
@@ -77,6 +80,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
     renderGeneration += 1;
     scriptLoadAttempts = 0;
     ready.value = !enabled;
+    solved.value = !enabled;
     latestToken = null;
     flushWaiters(null);
     if (retryTimer) {
@@ -113,14 +117,17 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
         sitekey: siteKey,
         callback: (token: string) => {
           latestToken = token;
+          solved.value = true;
           flushWaiters(token);
         },
         'error-callback': () => {
           latestToken = null;
+          solved.value = false;
           flushWaiters(null);
         },
         'expired-callback': () => {
           latestToken = null;
+          solved.value = false;
         },
         appearance: 'always',
         'refresh-expired': 'auto',
@@ -162,6 +169,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
   };
   const reset = (): void => {
     latestToken = null;
+    solved.value = false;
     if (api && widgetId !== undefined) {
       try {
         api.reset(widgetId);
@@ -170,5 +178,5 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
       }
     }
   };
-  return { enabled, getToken, ready, reset };
+  return { enabled, getToken, ready, reset, solved };
 }

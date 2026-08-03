@@ -72,6 +72,7 @@
                     :disabled="
                       isAnyImportActive ||
                       !isTurnstileReady ||
+                      !isTurnstileSolved ||
                       !isTarkovDevRefetchModeSupported ||
                       tarkovDevRefetchCooldownMinutes > 0
                     "
@@ -151,7 +152,12 @@
                   icon="i-mdi-account-search"
                   color="info"
                   class="justify-center"
-                  :disabled="isTarkovDevProfileUrlBlank || isAnyImportActive || !isTurnstileReady"
+                  :disabled="
+                    isTarkovDevProfileUrlBlank ||
+                    isAnyImportActive ||
+                    !isTurnstileReady ||
+                    !isTurnstileSolved
+                  "
                   :loading="isTarkovDevProfileUrlLoading"
                 >
                   {{ $t('settings.tarkov_dev_import.fetch_profile') }}
@@ -276,6 +282,7 @@
                     :disabled="
                       isTarkovDevProfileUrlLoading ||
                       !isTurnstileReady ||
+                      !isTurnstileSolved ||
                       tarkovDevRefetchCooldownMinutes > 0
                     "
                     :loading="isTarkovDevProfileUrlLoading"
@@ -1024,6 +1031,7 @@
     getToken: getTurnstileToken,
     ready: isTurnstileReady,
     reset: resetTurnstile,
+    solved: isTurnstileSolved,
   } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevRequestGeneration = ref(0);
@@ -1207,6 +1215,10 @@
   async function fetchTarkovDevProfile(profileUrl: string, fresh = false) {
     const requestGeneration = ++tarkovDevRequestGeneration.value;
     try {
+      if (isTurnstileEnabled && !isTurnstileSolved.value) {
+        setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
+        return null;
+      }
       const turnstileToken = await getTurnstileToken();
       if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
       if (isTurnstileEnabled && !turnstileToken) {

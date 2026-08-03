@@ -104,14 +104,32 @@ describe('useTurnstileWidget', () => {
     const { result, wrapper } = await mountHarness();
     expect(result.ready.value).toBe(true);
     expect(getOptions().appearance).toBe('always');
+    expect(result.solved.value).toBe(false);
     const pendingToken = result.getToken();
     getOptions().callback('verified-token');
     await expect(pendingToken).resolves.toBe('verified-token');
+    expect(result.solved.value).toBe(true);
     await expect(result.getToken()).resolves.toBe('verified-token');
     result.reset();
     expect(api.reset).toHaveBeenCalledWith('widget-1');
+    expect(result.solved.value).toBe(false);
     wrapper.unmount();
     expect(api.remove).toHaveBeenCalledWith('widget-1');
+    expect(result.solved.value).toBe(false);
+  });
+  it('clears solved state when the widget reports an error or the token expires', async () => {
+    const { api, getOptions } = createApi();
+    setTurnstileApi(api);
+    const { result, wrapper } = await mountHarness();
+    getOptions().callback('verified-token');
+    expect(result.solved.value).toBe(true);
+    getOptions()['expired-callback']();
+    expect(result.solved.value).toBe(false);
+    getOptions().callback('verified-token');
+    expect(result.solved.value).toBe(true);
+    getOptions()['error-callback']();
+    expect(result.solved.value).toBe(false);
+    wrapper.unmount();
   });
   it('resolves token waiters when the widget reports an error', async () => {
     const { api, getOptions } = createApi();

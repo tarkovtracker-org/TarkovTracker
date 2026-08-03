@@ -18,6 +18,7 @@ const {
     enabled: false,
     getToken: vi.fn(async (): Promise<string | null> => null),
     reset: vi.fn(),
+    solved: { __v_isRef: true as const, value: true as boolean },
   },
   backupFns: {
     confirmBackupImport: vi.fn(async () => undefined),
@@ -105,6 +106,7 @@ vi.mock('@/composables/useTurnstile', () => ({
     getToken: turnstileState.getToken,
     ready: ref(true),
     reset: turnstileState.reset,
+    solved: turnstileState.solved,
   }),
 }));
 vi.mock('@/composables/useDataBackup', () => ({
@@ -223,6 +225,7 @@ describe('DataManagementCard', () => {
     turnstileState.getToken.mockReset();
     turnstileState.getToken.mockResolvedValue(null);
     turnstileState.reset.mockReset();
+    turnstileState.solved.value = true;
     mockLogger.error.mockReset();
     backupState.debugExportError.value = null;
     backupState.exportError.value = null;
@@ -395,6 +398,28 @@ describe('DataManagementCard', () => {
       { fresh: false, turnstileToken: 'turnstile-token' }
     );
     expect(turnstileState.reset).toHaveBeenCalled();
+  });
+  it('disables the fetch profile button until the Turnstile challenge is solved', async () => {
+    turnstileState.enabled = true;
+    turnstileState.solved.value = false;
+    const wrapper = createWrapper();
+    const vm = asVm<{ tarkovDevProfileUrlInput: string }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    await wrapper.vm.$nextTick();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')?.attributes('disabled')
+    ).toBeDefined();
+    wrapper.unmount();
+    turnstileState.solved.value = true;
+    const solvedWrapper = createWrapper();
+    const solvedVm = asVm<{ tarkovDevProfileUrlInput: string }>(solvedWrapper.vm);
+    solvedVm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    await solvedWrapper.vm.$nextTick();
+    expect(
+      findButtonByText(solvedWrapper, 'settings.tarkov_dev_import.fetch_profile')?.attributes(
+        'disabled'
+      )
+    ).toBeUndefined();
   });
   it('surfaces a verification error and resets the widget when no token is issued', async () => {
     turnstileState.enabled = true;
