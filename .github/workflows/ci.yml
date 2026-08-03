@@ -49,10 +49,14 @@ jobs:
         id: fallow-base
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            BASE="${{ github.event.pull_request.base.sha }}"
           else
-            echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            BASE="${{ github.event.before }}"
           fi
+          if [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE="origin/main"
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
       - name: Audit changed files
         run: pnpm exec fallow audit --base "${{ steps.fallow-base.outputs.base }}" --gate new-only --quiet
   lint-format:

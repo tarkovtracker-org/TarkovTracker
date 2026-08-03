@@ -45,7 +45,6 @@ type TaskAvailabilityMap = Record<string, Record<string, boolean>>;
 type ObjectiveCompletionsMap = Record<string, Record<string, boolean>>;
 type HideoutLevelMap = Record<string, Record<string, number>>;
 type InvalidTasksMap = Record<string, Record<string, boolean>>;
-type InvalidObjectivesMap = Record<string, Record<string, boolean>>;
 /*
 type ProgressGetters = {
   teamStores: TeamStoresMap;
@@ -418,27 +417,6 @@ export const useProgressStore = defineStore('progress', () => {
     perfEnd(perfTimer, { tasks: metadataStore.tasks.length, teams: teamIds.length });
     return invalids;
   });
-  const invalidObjectives = computed(() => {
-    const perfTimer = perfStart('[Progress] invalidObjectives', {
-      objectives: metadataStore.objectives.length,
-    });
-    const invalids: InvalidObjectivesMap = {};
-    const teamIds = Object.keys(visibleTeamStores.value);
-    if (metadataStore.objectives.length === 0 || teamIds.length === 0) {
-      perfEnd(perfTimer, { skipped: true });
-      return {};
-    }
-    const invalidByTeam = invalidProgressByTeam.value;
-    for (const objective of metadataStore.objectives) {
-      invalids[objective.id] = {};
-      for (const teamId of teamIds) {
-        invalids[objective.id]![teamId] =
-          invalidByTeam[teamId]?.invalidObjectives?.[objective.id] ?? false;
-      }
-    }
-    perfEnd(perfTimer, { objectives: metadataStore.objectives.length, teams: teamIds.length });
-    return invalids;
-  });
   const hideoutLevels = computed(() => {
     const perfTimer = perfStart('[Progress] hideoutLevels', {
       stations: metadataStore.hideoutStations.length,
@@ -776,9 +754,6 @@ export const useProgressStore = defineStore('progress', () => {
     unlockedTasks,
     objectiveCompletions,
     invalidTasks,
-    // Fallow cannot observe consumers that access this setup-store value through a computed map.
-    // fallow-ignore-next-line unused-store-member -- accessed through dynamic computed store maps
-    invalidObjectives,
     hideoutLevels,
     moduleCompletions,
     modulePartCompletions,

@@ -98,7 +98,6 @@
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "lint:unused": "knip --reporter compact",
-    "fallow": "fallow",
     "postinstall": "nuxt prepare",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
     "prepare": "husky || true",

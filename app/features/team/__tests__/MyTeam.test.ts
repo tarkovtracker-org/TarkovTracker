@@ -42,7 +42,6 @@ const mockEdgeFunctions = {
 };
 const mockSystemState = reactive<SystemState>({
   user_id: null,
-  tokens: [],
   team: null,
   team_id: null,
   pvp_team_id: null,
@@ -169,7 +168,6 @@ describe('MyTeam store interactions', () => {
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockReturnValue('TestPMC');
     mockSystemState.user_id = null;
-    mockSystemState.tokens = [];
     mockSystemState.team = null;
     mockSystemState.team_id = null;
     mockSystemState.pvp_team_id = null;

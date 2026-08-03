@@ -221,18 +221,13 @@
     'update:modelValue': [value: FilterType];
     'update:search': [value: string];
     'update:viewMode': [value: ViewMode];
-    // fallow-ignore-next-line unused-component-emit -- consumed via parent v-model binding
     'update:firFilter': [value: FirFilter];
     'update:groupByItem': [value: boolean];
-    // fallow-ignore-next-line unused-component-emit -- consumed via parent v-model binding
     'update:hideTeamItems': [value: boolean];
-    // fallow-ignore-next-line unused-component-emit -- consumed via parent v-model binding
     'update:hideNonFirSpecialEquipment': [value: boolean];
-    // fallow-ignore-next-line unused-component-emit -- consumed via parent v-model binding
     'update:kappaOnly': [value: boolean];
     'update:sortBy': [value: SortBy];
     'update:sortDirection': [value: SortDirection];
-    // fallow-ignore-next-line unused-component-emit -- consumed via parent v-model binding
     'update:hideOwned': [value: boolean];
     'update:cardStyle': [value: CardStyle];
   }>();
