@@ -2084,6 +2084,7 @@
       "last_refreshed_unknown": "Desconocido",
       "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Importado recientemente. Puedes volver a importar este perfil en aproximadamente {minutes} min.",
+      "turnstile_hint": "Completa la verificación humana a continuación para obtener tu perfil.",
       "skills_details_toggle": "Ver valores de habilidades",
       "skills_details_skill": "Habilidad",
       "edition_guess": "Edición (detectada)",
