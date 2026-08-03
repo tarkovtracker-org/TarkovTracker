@@ -228,12 +228,12 @@ flowchart TB
   R --> DATA[Supabase REST / app data]
 ```
 
-| Endpoint                       | Prefix / key style                                                                                          | Default                                      | Env override                                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `/api/team/members`            | `team-members-rate:*`                                                                                       | 120 / min                                    | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`                                                      |
-| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`                                                                                     | 120 / min                                    | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`                                                    |
-| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-verification-rate:*` + `tarkov-dev-profile-rate:*` + `tarkov-dev-profile-hourly-rate:*` | 5 / min / IP + 5 / min / IP + 20 / hour / IP | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE`, `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR` |
-| `/api/logs/client`             | `client-logs-rate:ip:...`                                                                                   | 10 / min / IP                                | fixed in route                                                                                 |
+| Endpoint                       | Prefix / key style                                                                                          | Default                                                      | Env override                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `/api/team/members`            | `team-members-rate:*`                                                                                       | 120 / min                                                    | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`                                                      |
+| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`                                                                                     | 120 / min                                                    | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`                                                    |
+| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-verification-rate:*` + `tarkov-dev-profile-rate:*` + `tarkov-dev-profile-hourly-rate:*` | 5 / min / IP (verification) or 5 / min / IP + 20 / hour / IP | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE`, `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR` |
+| `/api/logs/client`             | `client-logs-rate:ip:...`                                                                                   | 10 / min / IP                                                | fixed in route                                                                                 |
 
 Implementation: `app/server/utils/sharedEdgeStore.ts`
 
@@ -244,6 +244,9 @@ Important:
   `getRateLimiterBinding`; `/api/logs/client` intentionally stays on the Cache API + in-memory
   fallback.
 - Without it, fallback is best-effort in-memory and can under-enforce under concurrency or restarts.
+- When Turnstile is configured, the `tarkov-dev-profile-verification-rate` limit (5/min/IP) runs
+  before siteverify and **replaces** the regular per-minute limit for that branch; the two minute
+  limits never stack. Without Turnstile, the regular per-minute limit applies.
 - These limits protect **app endpoints**, not the external progress API.
 - `/api/tarkov-dev/profile` layers more than the rate limit: a 15-minute shared edge cache for
   profile payloads (`NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`, 404s negative-cached 60s, browser

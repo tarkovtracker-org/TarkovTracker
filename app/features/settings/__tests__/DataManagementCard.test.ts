@@ -555,6 +555,7 @@ describe('DataManagementCard', () => {
     window.localStorage.clear();
   });
   it('keeps the age-warning preview refetch button enabled outside a cooldown', () => {
+    window.localStorage.clear();
     tarkovStoreState.tarkovUid = 123456;
     tarkovDevState.importState.value = 'preview';
     tarkovDevState.previewData.value = {
