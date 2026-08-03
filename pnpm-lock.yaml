@@ -5,7 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@nuxt/test-utils>h3-next': npm:h3@2.0.1-rc.20
   '@nuxt/test-utils>srvx': ^0.11.15
   '@tiptap/core': 3.14.0
   '@tiptap/pm': 3.14.0
