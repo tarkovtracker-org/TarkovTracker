@@ -122,7 +122,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
         'expired-callback': () => {
           latestToken = null;
         },
-        appearance: 'interaction-only',
+        appearance: 'always',
         'refresh-expired': 'auto',
         size: 'flexible',
         theme: 'auto',

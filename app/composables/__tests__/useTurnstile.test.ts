@@ -19,6 +19,7 @@ vi.mock('@/utils/logger', () => ({
   },
 }));
 type RenderOptions = {
+  appearance: 'always' | 'execute' | 'interaction-only';
   callback: (token: string) => void;
   'error-callback': () => void;
   'expired-callback': () => void;
@@ -102,6 +103,7 @@ describe('useTurnstileWidget', () => {
     setTurnstileApi(api);
     const { result, wrapper } = await mountHarness();
     expect(result.ready.value).toBe(true);
+    expect(getOptions().appearance).toBe('always');
     const pendingToken = result.getToken();
     getOptions().callback('verified-token');
     await expect(pendingToken).resolves.toBe('verified-token');

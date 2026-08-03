@@ -28,7 +28,6 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.tarkov_dev_section_description') }}
           </p>
-          <div v-if="isTurnstileEnabled" ref="turnstileContainerRef"></div>
           <template v-if="!isTarkovDevImportPreviewActive">
             <template v-if="isLinked">
               <div class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3">
@@ -323,6 +322,12 @@
               </UButton>
             </div>
           </template>
+          <div v-if="isTurnstileEnabled" class="space-y-1">
+            <p class="text-surface-500 text-xs">
+              {{ $t('settings.tarkov_dev_import.turnstile_hint') }}
+            </p>
+            <div ref="turnstileContainerRef"></div>
+          </div>
           <div
             v-if="tarkovDevImportState === 'success'"
             role="status"
