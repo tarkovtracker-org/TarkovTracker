@@ -2082,8 +2082,6 @@
       "skills_count": "检测到 {count} 个技能",
       "last_refreshed": "Tarkov.dev 数据已更新",
       "last_refreshed_unknown": "未知的",
-      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
-      "cooldown_hint": "Imported recently. You can re-import this profile in about {minutes} min.",
       "turnstile_hint": "完成下面的人类验证以获取您的个人资料。",
       "skills_details_toggle": "查看技能数值",
       "skills_details_skill": "技能",
@@ -2101,10 +2099,7 @@
       "unlink_profile": "取消关联",
       "errors": {
         "unexpected_profile_flow": "获取 Tarkov.dev 资料时出错。请重试。",
-        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
-        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev尚无此个人资料的快照。打开Tarkov.dev上的个人资料页面一次，让它加载，然后再次获取。",
-        "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
         "verification_failed": "人类验证失败。重新加载页面然后重试。",
         "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。"
       }

@@ -2082,7 +2082,6 @@
       "skills_count": "{count} compétences détectées",
       "last_refreshed": "Données Tarkov.dev mises à jour",
       "last_refreshed_unknown": "Inconnu",
-      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Importé récemment. Vous pouvez réimporter ce profil dans environ {minutes} min.",
       "turnstile_hint": "Complétez la vérification humaine ci-dessous pour récupérer votre profil.",
       "skills_details_toggle": "Voir les valeurs des compétences",
@@ -2102,7 +2101,6 @@
       "errors": {
         "unexpected_profile_flow": "Un problème est survenu pendant la récupération du profil Tarkov.dev. Réessayez.",
         "cooldown_active": "Vous avez importé ce profil récemment. Vous pouvez le réimporter dans environ {minutes} min.",
-        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev n'a pas encore d'instantané pour ce profil. Ouvrez une fois la page de profil sur Tarkov.dev, laissez-la charger, puis récupérez à nouveau.",
         "rate_limited": "Trop de tentatives d'importation. Attendez à propos de {minutes} min, puis réessayez.",
         "verification_failed": "Échec de la vérification humaine. Rechargez la page et réessayez.",

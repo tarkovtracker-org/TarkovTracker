@@ -2082,7 +2082,6 @@
       "skills_count": "Обнаружено навыков: {count}",
       "last_refreshed": "Данные Tarkov.dev обновлены",
       "last_refreshed_unknown": "Неизвестен",
-      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Недавно импортировано. Вы можете повторно импортировать этот профиль примерно за {minutes} мин.",
       "turnstile_hint": "Заполните проверку ниже для получения профиля.",
       "skills_details_toggle": "Показать значения навыков",

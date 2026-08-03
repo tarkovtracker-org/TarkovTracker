@@ -2101,8 +2101,6 @@
       "unlink_profile": "Odpojit",
       "errors": {
         "unexpected_profile_flow": "Při načítání profilu Tarkov.dev nastala chyba. Zkuste to znovu.",
-        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
-        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev zatím nemá žádný snímek pro tento profil. Otevřete profilovou stránku na Tarkov.dev jednou, nechte ji načíst, poté znovu načtěte.",
         "rate_limited": "Příliš mnoho pokusů o import. Počkejte asi {minutes} min a zkuste to znovu.",
         "verification_failed": "Lidské ověření se nezdařilo. Znovu načtěte stránku a zkuste to znovu.",

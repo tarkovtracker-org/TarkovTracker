@@ -2101,7 +2101,6 @@
       "unlink_profile": "Unlink",
       "errors": {
         "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again.",
-        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
         "profile_stale": "Tarkov.dev atualizou pela última vez este perfil {days} dias, que é muito antigo para importar. Abra a página de perfil no Tarkov.dev, deixe-o carregar, depois procure novamente.",
         "profile_not_generated": "Tarkov.dev ainda não tem nenhuma fotografia para este perfil. Abra a página de perfil no Tarkov.dev uma vez, deixe-o carregar, e então busque novamente.",
         "rate_limited": "Muitas tentativas de importação. Aguarde pelo {minutes} min, e tente novamente.",
