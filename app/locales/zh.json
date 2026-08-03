@@ -2084,6 +2084,7 @@
       "last_refreshed_unknown": "未知的",
       "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Imported recently. You can re-import this profile in about {minutes} min.",
+      "turnstile_hint": "完成下面的人类验证以获取您的个人资料。",
       "skills_details_toggle": "查看技能数值",
       "skills_details_skill": "技能",
       "edition_guess": "版本（已检测）",
