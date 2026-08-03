@@ -131,18 +131,20 @@ describe('verifyTurnstileToken', () => {
       ok: true,
     });
   });
-  it('fails open when siteverify returns malformed successful JSON', async () => {
+  it('fails closed when siteverify returns malformed successful JSON', async () => {
     fetchMock.mockResolvedValue(siteverifyResponse(null));
     const verifyTurnstileToken = await loadUtil();
     await expect(verifyTurnstileToken({ secretKey: 'secret', token: 'token' })).resolves.toEqual({
-      ok: true,
+      ok: false,
+      reason: 'invalid-token',
     });
   });
-  it('fails open when siteverify returns malformed response fields', async () => {
+  it('fails closed when siteverify returns malformed response fields', async () => {
     fetchMock.mockResolvedValue(siteverifyResponse({ hostname: 42, success: true }));
     const verifyTurnstileToken = await loadUtil();
     await expect(verifyTurnstileToken({ secretKey: 'secret', token: 'token' })).resolves.toEqual({
-      ok: true,
+      ok: false,
+      reason: 'invalid-token',
     });
   });
 });

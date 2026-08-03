@@ -1196,7 +1196,10 @@
     const requestGeneration = ++tarkovDevRequestGeneration.value;
     const turnstileToken = await getTurnstileToken();
     if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
-    if (isTurnstileEnabled && !turnstileToken) return null;
+    if (isTurnstileEnabled && !turnstileToken) {
+      setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
+      return null;
+    }
     try {
       return await parseTarkovDevProfileUrl(profileUrl, { fresh, turnstileToken });
     } finally {

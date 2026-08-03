@@ -46,7 +46,7 @@ export const verifyTurnstileToken = async (options: {
   if (options.remoteIp) {
     requestBody.set('remoteip', options.remoteIp);
   }
-  let payload: SiteverifyResponse;
+  let parsedPayload: unknown;
   try {
     const response = await fetch(SITEVERIFY_URL, {
       method: 'POST',
@@ -56,11 +56,7 @@ export const verifyTurnstileToken = async (options: {
     if (!response.ok) {
       throw new Error(`siteverify responded ${response.status}`);
     }
-    const parsedPayload = (await response.json()) as unknown;
-    if (!isSiteverifyResponse(parsedPayload)) {
-      throw new Error('siteverify returned malformed JSON');
-    }
-    payload = parsedPayload;
+    parsedPayload = (await response.json()) as unknown;
   } catch (error) {
     // siteverify outages fail open: Turnstile is an abuse gate, not an integrity boundary.
     logger.warn('Turnstile siteverify unavailable; allowing request', {
@@ -68,6 +64,10 @@ export const verifyTurnstileToken = async (options: {
     });
     return { ok: true };
   }
+  if (!isSiteverifyResponse(parsedPayload)) {
+    return { ok: false, reason: 'invalid-token' };
+  }
+  const payload = parsedPayload;
   if (payload.success !== true) {
     return { ok: false, reason: 'invalid-token' };
   }

@@ -75,6 +75,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
   };
   const removeWidget = (): void => {
     renderGeneration += 1;
+    scriptLoadAttempts = 0;
     ready.value = !enabled;
     latestToken = null;
     flushWaiters(null);
