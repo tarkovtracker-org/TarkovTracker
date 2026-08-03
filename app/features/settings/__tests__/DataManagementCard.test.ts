@@ -12,7 +12,13 @@ const {
   toastAddMock,
   tarkovStoreState,
   mockLogger,
+  turnstileState,
 } = vi.hoisted(() => ({
+  turnstileState: {
+    enabled: false,
+    getToken: vi.fn(async (): Promise<string | null> => null),
+    reset: vi.fn(),
+  },
   backupFns: {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
@@ -95,10 +101,10 @@ vi.mock('@/utils/logger', () => ({
 }));
 vi.mock('@/composables/useTurnstile', () => ({
   useTurnstileWidget: () => ({
-    enabled: false,
-    getToken: vi.fn(async () => null),
+    enabled: turnstileState.enabled,
+    getToken: turnstileState.getToken,
     ready: ref(true),
-    reset: vi.fn(),
+    reset: turnstileState.reset,
   }),
 }));
 vi.mock('@/composables/useDataBackup', () => ({
@@ -213,6 +219,10 @@ describe('DataManagementCard', () => {
       tarkovStoreState.tarkovUid = uid;
     });
     toastAddMock.mockReset();
+    turnstileState.enabled = false;
+    turnstileState.getToken.mockReset();
+    turnstileState.getToken.mockResolvedValue(null);
+    turnstileState.reset.mockReset();
     mockLogger.error.mockReset();
     backupState.debugExportError.value = null;
     backupState.exportError.value = null;
@@ -364,6 +374,57 @@ describe('DataManagementCard', () => {
       { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
+  });
+  it('passes the Turnstile token to the fetch and resets the widget afterwards', async () => {
+    turnstileState.enabled = true;
+    turnstileState.getToken.mockResolvedValue('turnstile-token');
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: 'pvp',
+      profileJsonUrl: 'https://players.tarkov.dev/pvp/8560316.json',
+      tarkovUid: 8560316,
+    });
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+      'https://tarkov.dev/players/pvp/8560316',
+      { fresh: false, turnstileToken: 'turnstile-token' }
+    );
+    expect(turnstileState.reset).toHaveBeenCalled();
+  });
+  it('surfaces a verification error and resets the widget when no token is issued', async () => {
+    turnstileState.enabled = true;
+    turnstileState.getToken.mockResolvedValue(null);
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(tarkovDevFns.parseProfileUrl).not.toHaveBeenCalled();
+    expect(tarkovDevFns.setError).toHaveBeenCalled();
+    expect(turnstileState.reset).toHaveBeenCalled();
+  });
+  it('resets the Turnstile widget when a request is superseded mid-flight', async () => {
+    turnstileState.enabled = true;
+    turnstileState.getToken.mockResolvedValue('stale-token');
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      resetTarkovDevImport: () => void;
+      tarkovDevProfileUrlInput: string;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
+    const pending = vm.handleTarkovDevProfileUrlSubmit();
+    vm.resetTarkovDevImport();
+    await pending;
+    expect(tarkovDevFns.parseProfileUrl).not.toHaveBeenCalled();
+    expect(turnstileState.reset).toHaveBeenCalled();
   });
   it('keeps the current tarkov.dev target mode when the fetched source has no mode', async () => {
     tarkovDevFns.parseProfileUrl.mockResolvedValue({

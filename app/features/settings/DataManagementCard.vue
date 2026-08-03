@@ -927,6 +927,7 @@
     value: TarkovDevRefetchMode;
   };
   const { t } = useI18n({ useScope: 'global' });
+  const runtimeConfig = useRuntimeConfig();
   const props = withDefaults(
     defineProps<{
       session?: DataManagementSession;
@@ -1122,7 +1123,7 @@
   const DAY_MS = 86_400_000;
   const TARKOV_DEV_AGE_WARNING_DAYS = 2;
   const tarkovDevImportCooldownMs = computed(() => {
-    const minutes = Number(useRuntimeConfig().public.tarkovDevImportCooldownMinutes);
+    const minutes = Number(runtimeConfig.public.tarkovDevImportCooldownMinutes);
     return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 60) * 60_000;
   });
   const cooldownNow = ref(Date.now());
@@ -1200,13 +1201,13 @@
   }
   async function fetchTarkovDevProfile(profileUrl: string, fresh = false) {
     const requestGeneration = ++tarkovDevRequestGeneration.value;
-    const turnstileToken = await getTurnstileToken();
-    if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
-    if (isTurnstileEnabled && !turnstileToken) {
-      setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
-      return null;
-    }
     try {
+      const turnstileToken = await getTurnstileToken();
+      if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
+      if (isTurnstileEnabled && !turnstileToken) {
+        setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
+        return null;
+      }
       return await parseTarkovDevProfileUrl(profileUrl, { fresh, turnstileToken });
     } finally {
       resetTurnstile();
@@ -1262,6 +1263,7 @@
   function resetTarkovDevImport() {
     tarkovDevRequestGeneration.value += 1;
     tarkovDevFixedTargetMode.value = null;
+    resetTurnstile();
     resetTarkovDevImportState();
   }
   async function handleEftLogsFolderChange(event: Event) {
