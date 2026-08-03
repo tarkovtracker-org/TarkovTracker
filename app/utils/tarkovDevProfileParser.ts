@@ -9,6 +9,7 @@ export interface TarkovDevImportResult {
   prestigeLevel: number;
   skills: Record<string, number>;
   gameEditionGuess: number | null;
+  updatedAt: number | null;
 }
 export type ParseResult = { ok: true; data: TarkovDevImportResult } | { ok: false; error: string };
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -38,6 +39,11 @@ export function validateTarkovDevProfile(data: unknown): data is {
   if (!isRecord(data.skills)) return false;
   if (!Array.isArray(data.skills.Common)) return false;
   return true;
+}
+function readUpdatedAt(data: unknown): number | null {
+  if (!isRecord(data)) return null;
+  const updated = data.updated;
+  return typeof updated === 'number' && Number.isFinite(updated) && updated > 0 ? updated : null;
 }
 function mapMemberCategoryToEdition(memberCategory: unknown): number | null {
   if (typeof memberCategory !== 'number') return null;
@@ -82,6 +88,7 @@ export function parseTarkovDevProfile(data: unknown): ParseResult {
       prestigeLevel,
       skills,
       gameEditionGuess: mapMemberCategoryToEdition(data.info.memberCategory),
+      updatedAt: readUpdatedAt(data),
     },
   };
 }

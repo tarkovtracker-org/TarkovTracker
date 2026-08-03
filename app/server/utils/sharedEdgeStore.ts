@@ -14,6 +14,10 @@ export type SharedCacheHandle = {
   origin: SharedCacheOrigin;
   limiter?: SharedRateLimitNamespace | null;
 };
+export type SharedRateLimitResult = {
+  allowed: boolean;
+  resetAt: number | null;
+};
 type SharedCacheEnvelope<T> = {
   expiresAt: number;
   payload: T;
@@ -172,7 +176,7 @@ const consumeInMemoryRateLimit = (
   key: string,
   limit: number,
   windowMs: number
-): SharedRateLimitEntry | null => {
+): SharedRateLimitResult => {
   const now = Date.now();
   const entry = getInMemoryRateLimitEntry(key, now) ?? {
     count: 0,
@@ -180,14 +184,14 @@ const consumeInMemoryRateLimit = (
   };
   if (entry.count >= limit) {
     setInMemoryRateLimitEntry(key, entry);
-    return null;
+    return { allowed: false, resetAt: entry.resetAt };
   }
   const nextEntry = {
     count: entry.count + 1,
     resetAt: entry.resetAt,
   };
   setInMemoryRateLimitEntry(key, nextEntry);
-  return nextEntry;
+  return { allowed: true, resetAt: nextEntry.resetAt };
 };
 const isRateLimitNamespace = (value: unknown): value is SharedRateLimitNamespace => {
   if (!value || typeof value !== 'object') {
@@ -282,7 +286,7 @@ const consumeDurableRateLimit = async (
   limit: number,
   windowMs: number,
   onError?: SharedCacheErrorHandler
-): Promise<boolean | null> => {
+): Promise<SharedRateLimitResult | null> => {
   const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DURABLE_RATE_LIMIT_TIMEOUT_MS);
@@ -304,8 +308,12 @@ const consumeDurableRateLimit = async (
       });
       return null;
     }
-    const data = (await response.json()) as { allowed?: unknown };
-    if (typeof data.allowed !== 'boolean') {
+    const data = (await response.json()) as { allowed?: unknown; resetAt?: unknown };
+    if (
+      typeof data.allowed !== 'boolean' ||
+      typeof data.resetAt !== 'number' ||
+      !Number.isFinite(data.resetAt)
+    ) {
       onError?.({
         action: 'read',
         error: new Error('rate limiter returned malformed payload'),
@@ -314,7 +322,7 @@ const consumeDurableRateLimit = async (
       });
       return null;
     }
-    return data.allowed;
+    return { allowed: data.allowed, resetAt: data.resetAt };
   } catch (error) {
     onError?.({ action: 'read', error, key, prefix });
     return null;
@@ -346,8 +354,19 @@ export const consumeSharedRateLimit = async (
   windowMs: number,
   onError?: SharedCacheErrorHandler
 ): Promise<boolean> => {
+  return (await consumeSharedRateLimitWithReset(handle, prefix, key, limit, windowMs, onError))
+    .allowed;
+};
+export const consumeSharedRateLimitWithReset = async (
+  handle: SharedCacheHandle,
+  prefix: string,
+  key: string,
+  limit: number,
+  windowMs: number,
+  onError?: SharedCacheErrorHandler
+): Promise<SharedRateLimitResult> => {
   if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(windowMs) || windowMs <= 0) {
-    return true;
+    return { allowed: true, resetAt: null };
   }
   if (handle.limiter) {
     const durableResult = await consumeDurableRateLimit(
@@ -364,7 +383,7 @@ export const consumeSharedRateLimit = async (
   }
   const inMemoryKey = `${prefix}:${key}`;
   if (!handle.cache) {
-    return consumeInMemoryRateLimit(inMemoryKey, limit, windowMs) !== null;
+    return consumeInMemoryRateLimit(inMemoryKey, limit, windowMs);
   }
   const now = Date.now();
   const existing = await readSharedCache<unknown>(handle, prefix, key, onError);
@@ -382,7 +401,7 @@ export const consumeSharedRateLimit = async (
   const entry = resolveRateLimitEntry(localEntry, sharedEntry, hasActiveSharedEntry);
   if (entry.count >= limit) {
     setInMemoryRateLimitEntry(inMemoryKey, entry);
-    return false;
+    return { allowed: false, resetAt: entry.resetAt };
   }
   const nextEntry: SharedRateLimitEntry = {
     count: entry.count + 1,
@@ -391,5 +410,5 @@ export const consumeSharedRateLimit = async (
   setInMemoryRateLimitEntry(inMemoryKey, nextEntry);
   const ttlMs = Math.max(1, nextEntry.resetAt - now);
   await writeSharedCache(handle, prefix, key, nextEntry, ttlMs, onError);
-  return true;
+  return { allowed: true, resetAt: nextEntry.resetAt };
 };

@@ -228,20 +228,32 @@ flowchart TB
   R --> DATA[Supabase REST / app data]
 ```
 
-| Endpoint                       | Prefix / key style          | Default       | Env override                                |
-| ------------------------------ | --------------------------- | ------------- | ------------------------------------------- |
-| `/api/team/members`            | `team-members-rate:*`       | 120 / min     | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`   |
-| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`     | 120 / min     | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE` |
-| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-rate:*` | 30 / min / IP | fixed in route                              |
-| `/api/logs/client`             | `client-logs-rate:ip:...`   | 10 / min / IP | fixed in route                              |
+| Endpoint                       | Prefix / key style                                                                                          | Default                                                      | Env override                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `/api/team/members`            | `team-members-rate:*`                                                                                       | 120 / min                                                    | `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`                                                      |
+| `/api/profile/[userId]/[mode]` | `shared-profile-rate:*`                                                                                     | 120 / min                                                    | `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`                                                    |
+| `/api/tarkov-dev/profile`      | `tarkov-dev-profile-verification-rate:*` + `tarkov-dev-profile-rate:*` + `tarkov-dev-profile-hourly-rate:*` | 5 / min / IP (verification) or 5 / min / IP + 20 / hour / IP | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE`, `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR` |
+| `/api/logs/client`             | `client-logs-rate:ip:...`                                                                                   | 10 / min / IP                                                | fixed in route                                                                                 |
 
 Implementation: `app/server/utils/sharedEdgeStore.ts`
 
 Important:
 
-- When the DO binding is present, enforcement is shared across isolates.
+- When the DO binding is present, enforcement is shared across isolates. `/api/team/members`,
+  `/api/profile/[userId]/[mode]`, and `/api/tarkov-dev/profile` pass the binding via
+  `getRateLimiterBinding`; `/api/logs/client` intentionally stays on the Cache API + in-memory
+  fallback.
 - Without it, fallback is best-effort in-memory and can under-enforce under concurrency or restarts.
+- When Turnstile is configured, the `tarkov-dev-profile-verification-rate` limit (5/min/IP) runs
+  before siteverify and **replaces** the regular per-minute limit for that branch; the two
+  per-minute limits never stack. Without Turnstile, the regular per-minute limit applies.
 - These limits protect **app endpoints**, not the external progress API.
+- `/api/tarkov-dev/profile` layers more than the rate limit: a 15-minute shared edge cache for
+  profile payloads (`NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`, 404s negative-cached 60s, browser
+  `Cache-Control: private`), an `updated`-age freshness gate
+  (`NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`, default 7, `0` disables), and optional
+  Cloudflare Turnstile verification (production requires paired `NUXT_PUBLIC_TURNSTILE_SITE_KEY`
+  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/SYSTEMS.md` §7 for the full flow.
 - Most static game-data routes (`/api/tarkov/*`) are not enrolled in this limiter. They are served
   through `edgeCache` with CDN/WAF abuse protection and have no route-specific rate limit. The
   `/api/tarkov/cache-meta` endpoint is an exception — it queries Supabase directly and relies on its

@@ -20,6 +20,8 @@ and have an agent verify the answer against the code.
 4. [Overlay corrections](#4-overlay-corrections) — fixing wrong upstream data
 5. [Precompute workflow](#5-precompute-workflow) — warming KV off the request path
 6. [Progress API data flow](#6-progress-api-data-flow) — how an external `GET /progress` is served
+7. [Tarkov.dev profile import](#7-tarkovdev-profile-import) — player profile fetch, caching,
+   freshness gate, abuse controls
 
 ---
 
@@ -505,6 +507,87 @@ sequenceDiagram
   when the client accepts gzip but explicitly refused identity (`identity;q=0`), in which case
   uncompressed is not an acceptable response and the threshold is bypassed. If no acceptable
   encoding exists the gateway returns `406 no_acceptable_encoding`.
+
+---
+
+## 7. Tarkov.dev profile import
+
+**Summary.** Settings → Data Management lets a user import their in-game profile (level/XP,
+skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots on the
+players.tarkov.dev host (the `profile/{aid}` path for PvP and `pve/{aid}` for PvE, each with a
+JSON suffix). The upstream JSON only refreshes when a human views the player page on tarkov.dev
+(Turnstile-guarded
+there); tarkov.dev purges its CDN copy on refresh, so a new snapshot is visible to us immediately.
+The upstream sends no CORS headers, so the browser cannot fetch it directly — everything goes
+through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse controls.
+
+### Flow
+
+1. Client (`useTarkovDevImport.parseProfileUrl`) resolves the pasted URL to the upstream JSON URL,
+   checks the per-profile client cooldown (localStorage, default 60 min after a confirmed import,
+   `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES`), obtains a Turnstile token when a sitekey is
+   configured, and calls the proxy with `retry: 0`.
+2. The proxy enforces, in order: a pre-verification per-IP rate limit when Turnstile is configured,
+   Turnstile verification (production requires `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and
+   `NUXT_TURNSTILE_SECRET_KEY` to be paired; siteverify availability failures fail open), then the
+   hourly per-IP limit. Without Turnstile, the normal minute limit runs in the first position. The
+   separate `tarkov-dev-profile-verification-rate`, `tarkov-dev-profile-rate`, and
+   `tarkov-dev-profile-hourly-rate` buckets use the DO binding when available. The shared edge cache
+   follows (`tarkov-dev-profile` prefix,
+   default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached
+   for 60 s).
+3. On cache miss it fetches upstream with the shared User-Agent. With `?fresh=1` (sent by the
+   client for explicit refetches and automatically after a stale rejection), serving from cache is
+   skipped; the cache is still read to obtain the ETag for conditional `If-None-Match` revalidation.
+   A `304` re-stamps a fresh cached entry without extending a payload that fails the freshness gate.
+4. The freshness gate rejects payloads whose `updated` field is older than
+   `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS` (default 7, `0` disables) with a structured
+   `422 profile_stale` error. Ordinary successful responses get
+   `Cache-Control: private, max-age=<ttl>` so repeat clicks are served from the browser cache;
+   explicit `fresh=1` responses and all error paths stay `no-store`.
+5. The client parser surfaces `updated` as `updatedAt`; the preview UI shows the snapshot date and
+   warns when it is 2+ days old. Structured error codes (`profile_stale`, `profile_not_generated`,
+   `rate_limited`, `cooldown_active`, `turnstile_failed`) map to localized, actionable messages.
+
+### Files
+
+- `app/server/api/tarkov-dev/profile.get.ts` — proxy: limits, Turnstile, cache, freshness gate
+- `app/server/utils/turnstile.ts` — siteverify wrapper (fail-open on availability errors)
+- `app/utils/tarkovDevProfileSource.ts`, `app/utils/tarkovDevProfileParser.ts` — URL resolution and
+  payload parsing (`updatedAt`)
+- `app/composables/useTarkovDevImport.ts` — client flow, cooldown check, error-code mapping,
+  automatic `fresh=1` retry after a stale rejection
+- `app/composables/useTurnstile.ts`, `app/utils/turnstileKeys.ts` — widget lifecycle + test keys
+- `app/utils/tarkovDevImportCooldown.ts` — localStorage cooldown bookkeeping
+- `app/features/settings/DataManagementCard.vue` — import UI, snapshot age, cooldown countdown
+- `docs/RATE_LIMITING.md` — limiter ownership for this route
+
+### Invariants
+
+- The browser never fetches `players.tarkov.dev` directly (no upstream CORS); the proxy is the only
+  path, and it never talks to the api-gateway Worker or its daily token quotas — the rate-limit
+  buckets are route-specific.
+- A minute-scale limiter always runs before siteverify or any cache/upstream access. When Turnstile
+  is enabled it uses the verification bucket, so invalid tokens cannot hammer siteverify while the
+  hourly admitted-request quota remains reserved for verified traffic.
+- Turnstile enforcement is keyed on the server secret being configured; production config requires
+  the public sitekey and private secret together, so the client cannot submit before its widget is
+  ready. Without the pair the route behaves as before (no token required). Siteverify availability
+  failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
+- Siteverify responses are pinned to the `NUXT_PUBLIC_APP_URL` hostname, so a token minted on
+  another origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
+  reports `example.com` for every origin; it only validates test-key tokens, never production ones.
+- Cached and upstream `200` payloads must pass the import profile schema before use. Invalid cached
+  entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
+- Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can
+  never be imported from cache either.
+- A `fresh=1` request bypasses serving from cache but not the cache lookup or rate limits, and
+  revalidates with `If-None-Match` when a cached ETag exists — "I just refreshed on tarkov.dev"
+  costs at most one conditional upstream request.
+- The client cooldown is UX only (localStorage); the server-side cache + rate limits are the actual
+  cost protection, per the design principle in `docs/RATE_LIMITING.md`.
+- Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
+  error responses never are.
 
 ---
 
