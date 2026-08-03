@@ -118,7 +118,7 @@ jobs:
           flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
       - name: Upload test results to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

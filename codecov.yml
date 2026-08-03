@@ -13,6 +13,10 @@ coverage:
       absolute-floor:
         target: 20
         threshold: 0%
+      # Fork PRs intentionally skip the coverage upload (no org secrets) and
+      # Codecov statuses default to if_not_found: success, so forks are not
+      # blocked on missing reports. Dependabot auto-merge polls commit status
+      # contexts, so a failed absolute-floor status still blocks merges.
     patch:
       default:
         target: auto
