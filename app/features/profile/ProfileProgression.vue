@@ -71,6 +71,16 @@
                 <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5 shrink-0" />
                 <span class="leading-none">PvE</span>
               </button>
+              <button
+                type="button"
+                :aria-pressed="selectedMode === GAME_MODES.SEASONAL"
+                class="focus:ring-warning-400 flex min-h-8 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
+                :class="seasonalToggleClass"
+                @click="selectedMode = GAME_MODES.SEASONAL"
+              >
+                <UIcon name="i-mdi-calendar-star" class="h-3.5 w-3.5 shrink-0" />
+                <span class="leading-none">S1</span>
+              </button>
             </div>
             <div class="flex flex-wrap gap-2">
               <UButton
@@ -247,7 +257,12 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import {
+    ACTIVE_SEASON_NUMBER,
+    GAME_MODES,
+    isImportableGameMode,
+    type GameMode,
+  } from '@/utils/constants';
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
@@ -330,6 +345,15 @@
       storyHighlight: 'pve',
       timelineHighlight: 'pve',
     },
+    seasonal: {
+      heroBackdrop: 'bg-gradient-to-r from-warning-950 via-warning-900/25 to-surface-900',
+      icon: 'i-mdi-calendar-star',
+      iconTint: 'text-warning-300',
+      label: 'Seasonal PvP',
+      modeBadgeClass: 'border border-warning-500/30 bg-warning-700/20 text-warning-200',
+      storyHighlight: 'pvp',
+      timelineHighlight: 'pvp',
+    },
   };
   const statToneClasses = {
     primary: {
@@ -401,6 +425,39 @@
     normalizeMode(route.params.mode) ??
       normalizeMode(route.query.mode) ??
       tarkovStore.getCurrentGameMode()
+  );
+  const profileVisibility = reactive<Record<GameMode, boolean>>({
+    pvp: false,
+    pve: false,
+    seasonal: false,
+  });
+  const loadProfileVisibility = async () => {
+    profileVisibility.pvp = false;
+    profileVisibility.pve = false;
+    profileVisibility.seasonal = false;
+    const userId = $supabase.user.id;
+    if (!$supabase.user.loggedIn || !userId) return;
+    const { data, error } = await $supabase.client
+      .from('user_game_mode_progress')
+      .select('game_mode,season_number,profile_public')
+      .eq('user_id', userId)
+      .in('game_mode', [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]);
+    if (error) {
+      logger.warn('[Profile] Failed to load profile visibility:', error);
+      return;
+    }
+    for (const row of data ?? []) {
+      const mode = row.game_mode as GameMode;
+      if (!(mode in profileVisibility)) continue;
+      const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+      if (row.season_number !== expectedSeason) continue;
+      profileVisibility[mode] = row.profile_public === true;
+    }
+  };
+  watch(
+    () => ($supabase.user.loggedIn ? $supabase.user.id : null),
+    () => void loadProfileVisibility(),
+    { immediate: true }
   );
   watch(
     () => [route.params.mode, route.query.mode] as const,
@@ -540,21 +597,24 @@
   const modeLabel = computed(() => modeTheme.value.label);
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 text-pvp-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
+      ? 'bg-pvp-800 text-pvp-100 shadow-inner'
       : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300'
   );
   const pveToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVE
-      ? 'bg-pve-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+      ? 'bg-pve-600 text-white shadow-inner'
       : 'bg-transparent text-pve-500 hover:bg-pve-950/50 hover:text-pve-300'
+  );
+  const seasonalToggleClass = computed(() =>
+    selectedMode.value === GAME_MODES.SEASONAL
+      ? 'bg-warning-700 text-warning-50 shadow-inner'
+      : 'bg-transparent text-warning-500 hover:bg-warning-950/50 hover:text-warning-300'
   );
   const modeData = computed<UserProgressData>(() => {
     if (isViewingSharedProfile.value) {
       return sharedProfileData.value ?? DEFAULT_PROGRESS_DATA;
     }
-    return selectedMode.value === GAME_MODES.PVE
-      ? tarkovStore.getPvEProgressData()
-      : tarkovStore.getPvPProgressData();
+    return tarkovStore.getModeProgressData(selectedMode.value);
   });
   const isViewingCurrentMode = computed(
     () => !isViewingSharedProfile.value && selectedMode.value === tarkovStore.getCurrentGameMode()
@@ -582,6 +642,7 @@
   const modeFaction = computed(() => modeData.value.pmcFaction ?? 'USEC');
   const tarkovDevProfileUrl = computed(() => {
     if (isViewingSharedProfile.value) return undefined;
+    if (!isImportableGameMode(selectedMode.value)) return undefined;
     return buildTarkovDevProfileUrl(tarkovStore.getTarkovUid(), selectedMode.value);
   });
   const profileLevel = computed(() => {
@@ -1360,10 +1421,7 @@
     if (isViewingSharedProfile.value) {
       return false;
     }
-    const modeIsPublic =
-      selectedMode.value === GAME_MODES.PVE
-        ? preferencesStore.getProfileSharePvePublic
-        : preferencesStore.getProfileSharePvpPublic;
+    const modeIsPublic = profileVisibility[selectedMode.value];
     return !modeIsPublic;
   });
   const shareAccessLabel = computed(() => {

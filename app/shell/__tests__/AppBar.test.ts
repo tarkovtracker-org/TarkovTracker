@@ -46,6 +46,7 @@ const routeState = reactive({
 const mockTarkovStore = {
   getCurrentGameMode: vi.fn(() => 'pvp'),
   getDisplayName: vi.fn(() => ''),
+  getModeDisplayName: vi.fn((): string | null => null),
   getPvEProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
   getPvPProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
 };
@@ -387,6 +388,7 @@ describe('AppBar page title', () => {
     mockSupabase.user.username = '';
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockReturnValue('');
+    mockTarkovStore.getModeDisplayName.mockReturnValue(null);
     mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
     mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
   });
@@ -443,6 +445,7 @@ describe('AppBar page title', () => {
     mockSupabase.user.id = 'user-1';
     mockSupabase.user.username = 'AccountUsername';
     mockTarkovStore.getDisplayName.mockReturnValue('OwnDisplayName');
+    mockTarkovStore.getModeDisplayName.mockReturnValue('OwnProgressName');
     mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: 'OwnProgressName' });
     const wrapper = await mountAppBar();
     expect(wrapper.text()).toContain('app_bar.hidden_label Profile PVP');

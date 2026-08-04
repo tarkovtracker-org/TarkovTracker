@@ -13,8 +13,12 @@ import {
   type OverlayResolution,
   type OverlaySize,
 } from '@/features/streamer-tools/composables/useStreamerToolsSettings';
-import { usePreferencesStore } from '@/stores/usePreferences';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import {
+  GAME_MODE_VALUES,
+  getGameModeSeasonNumber,
+  isGameMode,
+  type GameMode,
+} from '@/utils/constants';
 interface IntervalOption {
   label: string;
   value: number;
@@ -31,7 +35,6 @@ interface SelectOption<T extends string> {
 export function useStreamerToolsOverlay() {
   const persistedSettings = usePersistedStreamerToolsSettings();
   const { t } = useI18n({ useScope: 'global' });
-  const preferencesStore = usePreferencesStore();
   const { $supabase } = useNuxtApp();
   const runtimeConfig = useRuntimeConfig();
   const selectedMode = ref<GameMode>(persistedSettings.value.mode);
@@ -221,11 +224,28 @@ export function useStreamerToolsOverlay() {
       ? $supabase.user.id
       : null
   );
-  const isModePublic = computed(() => {
-    return selectedMode.value === GAME_MODES.PVE
-      ? preferencesStore.getProfileSharePvePublic
-      : preferencesStore.getProfileSharePvpPublic;
+  const modeVisibility = reactive<Record<GameMode, boolean>>({
+    pvp: false,
+    pve: false,
+    seasonal: false,
   });
+  const loadModeVisibility = async () => {
+    for (const mode of GAME_MODE_VALUES) modeVisibility[mode] = false;
+    const userId = currentUserId.value;
+    if (!userId) return;
+    const { data } = await $supabase.client
+      .from('user_game_mode_progress')
+      .select('game_mode,season_number,profile_public')
+      .eq('user_id', userId);
+    for (const row of data ?? []) {
+      if (!isGameMode(row.game_mode)) continue;
+      const mode = row.game_mode;
+      if (row.season_number !== getGameModeSeasonNumber(mode)) continue;
+      modeVisibility[mode] = row.profile_public === true;
+    }
+  };
+  const isModePublic = computed(() => modeVisibility[selectedMode.value] === true);
+  watch(currentUserId, () => void loadModeVisibility(), { immediate: true });
   const appOrigin = computed(() => {
     if (import.meta.client && typeof window !== 'undefined') return window.location.origin;
     const configured = runtimeConfig.public.appUrl;

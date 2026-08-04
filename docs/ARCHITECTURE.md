@@ -142,12 +142,13 @@ TarkovTracker uses a **three-store pattern** with Pinia plus a computed facade:
 
 **Location:** `app/stores/useTarkov.ts`
 
-Manages user progress data with dual game mode support (PvP/PvE).
+Manages isolated progress for persistent PvP, persistent PvE, and numbered Seasonal PvP.
 
 **Key Features:**
 
 - localStorage persistence with user ID validation
 - Supabase real-time sync with debouncing (5s)
+- Normalized Supabase rows keyed by `(user_id, game_mode, season_number)`
 - Multi-device conflict resolution
 - Data migration for legacy formats
 - Task repair mechanisms
@@ -160,10 +161,11 @@ Manages user progress data with dual game mode support (PvP/PvE).
 - The app does **not** persist a long-lived "linked mode" or "imported mode" field.
 - Unlinking a tarkov.dev account clears only the saved `tarkovUid`; it does not roll back imported
   progress, profile, skill, level, edition, or prestige fields.
-- Refetching a linked profile asks for the profile mode first because PvP, PvE, and future Arena
-  profile JSON use the same account id but different tarkov.dev mode routes.
-- Tarkov.dev imports always ask the user which mode to write into and default that choice to the
-  current active mode.
+- Refetching a linked profile asks for a persistent profile mode because PvP and PvE profile JSON
+  use the same account id but different tarkov.dev mode routes.
+- Tarkov.dev imports always ask which persistent mode to write into and default to the current mode
+  when it is importable. Seasonal is visible but locked until its profile route, parser, and field
+  compatibility are verified for the active season.
 - The import UI accepts a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetches
   `players.tarkov.dev/profile/{uid}.json` through the public `/api/tarkov-dev/profile` proxy, and
   parses that JSON with the existing Tarkov.dev profile parser.
@@ -173,6 +175,7 @@ Manages user progress data with dual game mode support (PvP/PvE).
   so the UI asks users to open the profile before importing.
 - Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
   `regular` for PvP, `pve` for PvE.
+- EFT-log imports are also locked for Seasonal until the active-season data source is verified.
 - Legacy embedded `tarkovDevProfile` payloads are sanitized out of stored progress data and should
   not be reintroduced as long-lived state.
 
@@ -220,8 +223,9 @@ sequenceDiagram
     Note over UI,DB: Initial Load
     UI->>Store: initializeTarkovSync()
     Store->>Local: Load cached state
-    Store->>DB: Fetch user_progress
-    DB-->>Store: Return data
+    Store->>DB: Fetch user_progress account metadata
+    Store->>DB: Fetch user_game_mode_progress rows
+    DB-->>Store: Return account metadata + active mode rows
     Store->>Store: Merge & resolve conflicts
     Store->>Local: Persist state
     Store->>RT: Subscribe to changes
@@ -230,10 +234,10 @@ sequenceDiagram
     UI->>Store: Update task completion
     Store->>Local: Persist immediately
     Store->>Sync: Queue debounced sync
-    Sync->>DB: Upsert (after 5s debounce)
+    Sync->>DB: RPC upsert exact mode/season rows (after 5s debounce)
 
     Note over UI,DB: Remote Update
-    RT-->>Store: Postgres change event
+    RT-->>Store: Account or exact mode/season change event
     Store->>Store: Detect self-origin
     Store->>Store: Merge with local
     Store->>UI: Trigger re-render
@@ -245,6 +249,12 @@ sequenceDiagram
 2. **Timestamp-Based Merging**: Newer entries take precedence
 3. **Max Value Preservation**: For counts and levels, keep the higher value
 4. **Self-Origin Filtering**: Ignore echoed updates from own device (< 3s threshold)
+
+Persistent PvP and PvE use season number `0`. Seasonal PvP uses the active positive season number
+(`1` for the initial integration). The legacy `user_progress` row remains the account-metadata
+source and temporarily mirrors PvP/PvE for rolling compatibility; Seasonal progress exists only in
+`user_game_mode_progress`. See [`SYSTEMS.md`](./SYSTEMS.md#7-game-mode-and-seasonal-progress-storage)
+for the storage, RLS, team, sharing, prestige, backup, and compatibility invariants.
 
 ## Authentication
 
@@ -303,6 +313,8 @@ sequenceDiagram
 ### Tarkov Data API
 
 All game data is fetched through Nuxt server routes that proxy to `json.tarkov.dev` static data.
+Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`, and
+`seasonal` → `pvp-season`.
 
 | Endpoint                       | Purpose              | Cache TTL |
 | ------------------------------ | -------------------- | --------- |

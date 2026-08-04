@@ -52,7 +52,7 @@
                     <UButton
                       type="submit"
                       icon="i-mdi-check"
-                      :color="mode"
+                      :color="getModeColor(mode)"
                       variant="soft"
                       size="sm"
                       class="min-w-24"
@@ -100,6 +100,7 @@
   const DISPLAY_NAME_MODES = [
     GAME_MODES.PVP,
     GAME_MODES.PVE,
+    GAME_MODES.SEASONAL,
   ] as const satisfies readonly GameMode[];
   type DisplayNameMode = (typeof DISPLAY_NAME_MODES)[number];
   const { t } = useI18n({ useScope: 'global' });
@@ -113,10 +114,15 @@
   const localDisplayNames = reactive<Record<DisplayNameMode, string>>({
     [GAME_MODES.PVP]: '',
     [GAME_MODES.PVE]: '',
+    [GAME_MODES.SEASONAL]: '',
   });
   const getDisplayNameInputId = (mode: DisplayNameMode) => `settings-display-name-input-${mode}`;
-  const getModeLabel = (mode: DisplayNameMode) =>
-    mode === GAME_MODES.PVE ? t('common.pve') : t('common.pvp');
+  const getModeLabel = (mode: DisplayNameMode) => {
+    if (mode === GAME_MODES.PVE) return t('common.pve');
+    if (mode === GAME_MODES.SEASONAL) return t('common.seasonal_pvp');
+    return t('common.pvp');
+  };
+  const getModeColor = (mode: DisplayNameMode) => (mode === GAME_MODES.SEASONAL ? 'warning' : mode);
   const getStoredDisplayName = (mode: DisplayNameMode) =>
     tarkovStore.getModeDisplayName(mode) || '';
   const getDisplayNameValidationError = (mode: DisplayNameMode) => {
@@ -139,17 +145,24 @@
     const trimmed = localDisplayNames[mode].trim();
     return trimmed !== getStoredDisplayName(mode) && trimmed.length > 0;
   };
-  const getModeBadgeClass = (mode: DisplayNameMode) =>
-    mode === GAME_MODES.PVE
-      ? 'border-pve-500/30 bg-pve-700/25 text-pve-200'
-      : 'border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+  const getModeBadgeClass = (mode: DisplayNameMode) => {
+    if (mode === GAME_MODES.PVE) return 'border-pve-500/30 bg-pve-700/25 text-pve-200';
+    if (mode === GAME_MODES.SEASONAL) {
+      return 'border-warning-500/30 bg-warning-700/20 text-warning-200';
+    }
+    return 'border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+  };
   const getModePanelClass = (mode: DisplayNameMode) => {
     if (currentGameMode.value !== mode) {
       return 'border-white/8 bg-surface-950/40';
     }
-    return mode === GAME_MODES.PVE
-      ? 'border-pve-500/30 bg-pve-950/15 ring-1 ring-pve-500/20'
-      : 'border-pvp-500/30 bg-pvp-950/15 ring-1 ring-pvp-500/20';
+    if (mode === GAME_MODES.PVE) {
+      return 'border-pve-500/30 bg-pve-950/15 ring-1 ring-pve-500/20';
+    }
+    if (mode === GAME_MODES.SEASONAL) {
+      return 'border-warning-500/30 bg-warning-950/15 ring-1 ring-warning-500/20';
+    }
+    return 'border-pvp-500/30 bg-pvp-950/15 ring-1 ring-pvp-500/20';
   };
   const saveDisplayName = (mode: DisplayNameMode) => {
     const validationError = getDisplayNameValidationError(mode);

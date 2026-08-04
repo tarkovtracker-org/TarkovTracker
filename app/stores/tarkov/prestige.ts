@@ -1,6 +1,6 @@
 import { defaultState, type UserProgressData } from '@/stores/progressState';
 import { getNextProgressEpoch } from '@/stores/tarkov/progressMerge';
-import { SPECIAL_STATIONS } from '@/utils/constants';
+import { GAME_MODES, SPECIAL_STATIONS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   buildSkillKeyAliases,
@@ -58,7 +58,8 @@ export type PrestigeRunSummary = {
 export type PrestigeRunRecord = {
   createdAt: string;
   id: string;
-  mode: 'pvp' | 'pve';
+  mode: GameMode;
+  seasonNumber: number;
   prestigeFrom: number;
   prestigeTo: number;
   summary: PrestigeRunSummary;
@@ -66,7 +67,8 @@ export type PrestigeRunRecord = {
 export type UserPrestigeRunRow = {
   created_at?: string | null;
   id?: string | null;
-  mode?: 'pvp' | 'pve' | null;
+  mode?: GameMode | null;
+  season_number?: number | null;
   prestige_from?: number | null;
   prestige_to?: number | null;
   summary?: Record<string, unknown> | null;
@@ -250,13 +252,13 @@ export const getNextPrestigeLevel = (level: number): number | null => {
   if (currentLevel >= MAX_PRESTIGE_LEVEL) return null;
   return currentLevel + 1;
 };
-export const toSafeInteger = (value: unknown, fallback = 0): number => {
+const toSafeInteger = (value: unknown, fallback = 0): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return fallback;
   }
   return Math.trunc(value);
 };
-export const collectTimestamp = (timestamps: number[], value: number | undefined) => {
+const collectTimestamp = (timestamps: number[], value: number | undefined) => {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
     timestamps.push(Math.trunc(value));
   }
@@ -579,7 +581,7 @@ export const summarizePrestigeRequirementRows = (
     unmetTrackedCount,
   };
 };
-export const parsePrestigeSummary = (value: unknown): PrestigeRunSummary => {
+const parsePrestigeSummary = (value: unknown): PrestigeRunSummary => {
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const toCount = (input: unknown): number => Math.max(0, toSafeInteger(input, 0));
   const toNullableTimestamp = (input: unknown): number | null => {
@@ -607,7 +609,9 @@ export const parsePrestigeRunRows = (
   const parsed: PrestigeRunRecord[] = [];
   for (const row of rows) {
     if (!row || typeof row.id !== 'string' || !row.id) continue;
-    const mode = row.mode === 'pve' ? 'pve' : 'pvp';
+    const mode = Object.values(GAME_MODES).includes(row.mode as GameMode)
+      ? (row.mode as GameMode)
+      : GAME_MODES.PVP;
     const createdAt =
       typeof row.created_at === 'string' ? row.created_at : new Date().toISOString();
     const prestigeFrom = clampPrestigeLevel(toSafeInteger(row.prestige_from, 0));
@@ -619,6 +623,10 @@ export const parsePrestigeRunRows = (
       createdAt,
       id: row.id,
       mode,
+      seasonNumber:
+        typeof row.season_number === 'number' && Number.isInteger(row.season_number)
+          ? row.season_number
+          : 0,
       prestigeFrom,
       prestigeTo,
       summary: parsePrestigeSummary(row.summary),

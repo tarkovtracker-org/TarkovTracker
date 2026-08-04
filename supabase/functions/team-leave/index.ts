@@ -10,7 +10,7 @@ import {
 } from 'shared/auth';
 import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
 const LEAVE_COOLDOWN_MINUTES = 5
-const VALID_GAME_MODES = ["pvp", "pve"] as const
+const VALID_GAME_MODES = ["pvp", "pve", "seasonal"] as const
 type GameMode = typeof VALID_GAME_MODES[number]
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -80,20 +80,21 @@ Deno.serve(async (req) => {
       }
       // If no other members, disband the team by:
       // 1. Clear user_system team_id first (to avoid FK constraint)
-      const { error: systemError } = await supabase
-        .from("user_system")
-        .upsert({
-          user_id: user.id,
-          [teamIdColumn]: null,
-          updated_at: new Date().toISOString()
-        })
-      if (systemError) {
-        console.error("user_system upsert failed:", systemError)
-        // If the table is missing in an environment, don't block disbanding the team
-        if (systemError.code !== "42P01") {
-          return createErrorResponse("Failed to update user system state", 500, req)
+      if (game_mode !== "seasonal") {
+        const { error: systemError } = await supabase
+          .from("user_system")
+          .upsert({
+            user_id: user.id,
+            [teamIdColumn]: null,
+            updated_at: new Date().toISOString()
+          })
+        if (systemError) {
+          console.error("user_system upsert failed:", systemError)
+          if (systemError.code !== "42P01") {
+            return createErrorResponse("Failed to update user system state", 500, req)
+          }
+          console.warn("user_system table missing, continuing without system state update")
         }
-        console.warn("user_system table missing, continuing without system state update")
       }
       // 2. Delete all memberships (including owner's)
       const { error: membershipDeleteError } = await supabase
@@ -166,20 +167,21 @@ Deno.serve(async (req) => {
       // Leave succeeded but audit log failed - continue with warning
     }
     // Clear user_system team_id for the leaver (using correct game mode column)
-    const { error: systemError } = await supabase
-      .from("user_system")
-      .upsert({
-        user_id: user.id,
-        [teamIdColumn]: null,
-        updated_at: new Date().toISOString()
-      })
-    if (systemError) {
-      console.error("user_system upsert failed:", systemError)
-      // If the table is missing in an environment, don't block leaving the team
-      if (systemError.code !== "42P01") {
-        return createErrorResponse("Failed to update user system state", 500, req)
+    if (game_mode !== "seasonal") {
+      const { error: systemError } = await supabase
+        .from("user_system")
+        .upsert({
+          user_id: user.id,
+          [teamIdColumn]: null,
+          updated_at: new Date().toISOString()
+        })
+      if (systemError) {
+        console.error("user_system upsert failed:", systemError)
+        if (systemError.code !== "42P01") {
+          return createErrorResponse("Failed to update user system state", 500, req)
+        }
+        console.warn("user_system table missing, continuing without system state update")
       }
-      console.warn("user_system table missing, continuing without system state update")
     }
     return createSuccessResponse({
       success: true,

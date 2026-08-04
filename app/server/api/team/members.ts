@@ -9,6 +9,7 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
+import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('TeamMembers');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,16 +32,16 @@ const buildRestPath = (resource: string, params: Record<string, string | number>
 };
 type ProfileRow = {
   user_id: string;
-  current_game_mode?: string | null;
-  pvp_display_name?: string | null;
-  pvp_level?: number | null;
-  pvp_tasks_completed?: number | null;
-  pve_display_name?: string | null;
-  pve_level?: number | null;
-  pve_tasks_completed?: number | null;
+  progress_data?: unknown;
+};
+type EditionRow = {
+  game_edition?: unknown;
+  user_id: string;
 };
 type MemberProfile = {
   displayName: string | null;
+  gameEdition: number;
+  gameMode: GameMode;
   level: number | null;
   tasksCompleted: number | null;
 };
@@ -57,16 +58,31 @@ const sanitizeProfileDisplayName = (value: unknown): string | null => {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed.slice(0, 64) : null;
 };
-function mapProfile(p: ProfileRow): MemberProfile {
-  const isPve = ((p.current_game_mode as 'pvp' | 'pve' | null) || 'pvp') === 'pve';
-  const level = toFiniteProfileNumber(isPve ? p.pve_level : p.pvp_level);
-  const tasksCompleted = toFiniteProfileNumber(
-    isPve ? p.pve_tasks_completed : p.pvp_tasks_completed
-  );
+function mapProfile(p: ProfileRow, gameMode: GameMode, gameEdition: unknown): MemberProfile {
+  const progress =
+    p.progress_data && typeof p.progress_data === 'object'
+      ? (p.progress_data as Record<string, unknown>)
+      : {};
+  const level = toFiniteProfileNumber(progress.level);
+  const completions =
+    progress.taskCompletions && typeof progress.taskCompletions === 'object'
+      ? Object.values(progress.taskCompletions as Record<string, unknown>)
+      : [];
+  const tasksCompleted = completions.filter(
+    (completion) =>
+      completion &&
+      typeof completion === 'object' &&
+      (completion as { complete?: unknown }).complete === true
+  ).length;
   return {
-    displayName: sanitizeProfileDisplayName(isPve ? p.pve_display_name : p.pvp_display_name),
+    displayName: sanitizeProfileDisplayName(progress.displayName),
+    gameEdition:
+      typeof gameEdition === 'number' && Number.isFinite(gameEdition)
+        ? Math.max(1, Math.trunc(gameEdition))
+        : 1,
+    gameMode,
     level: level !== null ? Math.max(1, Math.trunc(level)) : null,
-    tasksCompleted: tasksCompleted !== null ? Math.max(0, Math.trunc(tasksCompleted)) : null,
+    tasksCompleted,
   };
 }
 const toPositiveInteger = (value: unknown, fallback: number): number => {
@@ -293,10 +309,25 @@ export default defineEventHandler(async (event) => {
       `Timed out while loading team members data (${path.split('?')[0] || 'unknown'})`
     );
   };
+  const serviceFetch = async (path: string): Promise<Response | null> => {
+    if (!supabaseServiceKey) return null;
+    return fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/${path}`,
+      {
+        headers: {
+          apikey: supabaseServiceKey,
+          Authorization: `Bearer ${supabaseServiceKey}`,
+          Accept: 'application/json',
+        },
+      },
+      REST_FETCH_TIMEOUT_MS,
+      `Timed out while loading team metadata (${path.split('?')[0] || 'unknown'})`
+    );
+  };
   const membershipResp = await restFetch(
     buildRestPath('team_memberships', {
       limit: 1,
-      select: 'user_id',
+      select: 'user_id,game_mode',
       team_id: `eq.${teamId}`,
       user_id: `eq.${userId}`,
     })
@@ -304,10 +335,18 @@ export default defineEventHandler(async (event) => {
   if (!membershipResp.ok) {
     throw createError({ statusCode: 500, statusMessage: 'Failed membership check' });
   }
-  const membershipJson = (await membershipResp.json()) as Array<{ user_id: string }>;
+  const membershipJson = (await membershipResp.json()) as Array<{
+    game_mode: string;
+    user_id: string;
+  }>;
   if (!membershipJson?.length) {
     throw createError({ statusCode: 403, statusMessage: 'Not a team member' });
   }
+  const gameModeValue = membershipJson[0]?.game_mode;
+  if (!isGameMode(gameModeValue)) {
+    throw createError({ statusCode: 500, statusMessage: 'Team has an invalid game mode' });
+  }
+  const gameMode: GameMode = gameModeValue;
   const membersResp = await restFetch(
     buildRestPath('team_memberships', {
       select: 'user_id',
@@ -323,32 +362,42 @@ export default defineEventHandler(async (event) => {
   if (validMemberIds.length > 0) {
     const idsParam = `in.(${validMemberIds.map((id) => `"${id}"`).join(',')})`;
     const profilesResp = await restFetch(
-      buildRestPath('team_member_summary', {
-        select:
-          'user_id,current_game_mode,pvp_display_name,pvp_level,pvp_tasks_completed,pve_display_name,pve_level,pve_tasks_completed',
+      buildRestPath('user_game_mode_progress', {
+        game_mode: `eq.${gameMode}`,
+        season_number: `eq.${getGameModeSeasonNumber(gameMode)}`,
+        select: 'user_id,progress_data',
         user_id: idsParam,
       })
     );
+    const editionsResp = await serviceFetch(
+      buildRestPath('user_progress', {
+        select: 'user_id,game_edition',
+        user_id: idsParam,
+      })
+    );
+    const editions = editionsResp?.ok ? ((await editionsResp.json()) as EditionRow[]) : [];
+    const editionsByUserId = new Map(editions.map((row) => [row.user_id, row.game_edition]));
     if (profilesResp.ok) {
       const profiles = (await profilesResp.json()) as ProfileRow[];
       for (const p of profiles) {
-        profileMap[p.user_id] = mapProfile(p);
+        profileMap[p.user_id] = mapProfile(p, gameMode, editionsByUserId.get(p.user_id));
       }
     } else {
       const errorText = await profilesResp.text();
       logger.error(`Profiles fetch error (${profilesResp.status}):`, errorText);
       for (const id of validMemberIds) {
         const resp = await restFetch(
-          buildRestPath('team_member_summary', {
-            select:
-              'user_id,current_game_mode,pvp_display_name,pvp_level,pvp_tasks_completed,pve_display_name,pve_level,pve_tasks_completed',
+          buildRestPath('user_game_mode_progress', {
+            game_mode: `eq.${gameMode}`,
+            season_number: `eq.${getGameModeSeasonNumber(gameMode)}`,
+            select: 'user_id,progress_data',
             user_id: `eq.${id}`,
           })
         );
         if (!resp.ok) continue;
         const profiles = (await resp.json()) as ProfileRow[];
         for (const p of profiles) {
-          profileMap[p.user_id] = mapProfile(p);
+          profileMap[p.user_id] = mapProfile(p, gameMode, editionsByUserId.get(p.user_id));
         }
       }
     }

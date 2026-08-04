@@ -239,7 +239,9 @@ export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] => {
     .slice(0, API_UPDATE_HISTORY_LIMIT);
 };
 const sanitizeGameMode = (value: unknown): GameMode => {
-  return value === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
+  return Object.values(GAME_MODES).includes(value as GameMode)
+    ? (value as GameMode)
+    : GAME_MODES.PVP;
 };
 export const sanitizeGameEdition = (value: unknown): number => {
   const edition =
@@ -267,7 +269,9 @@ export const hasDeprecatedTarkovDevProfileData = (value: unknown): boolean => {
     return true;
   }
   return (
-    hasDeprecatedTarkovDevProfileData(value.pvp) || hasDeprecatedTarkovDevProfileData(value.pve)
+    hasDeprecatedTarkovDevProfileData(value.pvp) ||
+    hasDeprecatedTarkovDevProfileData(value.pve) ||
+    hasDeprecatedTarkovDevProfileData(value.seasonal)
   );
 };
 // Keep this canonical sanitizer aligned with the persisted DB sanitizer in the
@@ -329,6 +333,7 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
       tarkovUid: null,
       pvp: createDefaultOwnedProgressData(),
       pve: createDefaultOwnedProgressData(),
+      seasonal: createDefaultOwnedProgressData(),
     };
   }
   return {
@@ -337,6 +342,7 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
     tarkovUid: sanitizeTarkovUid(value.tarkovUid),
     pvp: sanitizeOwnedProgressData(value.pvp),
     pve: sanitizeOwnedProgressData(value.pve),
+    seasonal: sanitizeOwnedProgressData(value.seasonal),
   };
 };
 export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgressData> => {

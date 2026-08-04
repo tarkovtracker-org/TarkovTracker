@@ -480,6 +480,8 @@ describe('useTeamStore', () => {
       const store = useTeamStore();
       const initialProfile: MemberProfile = {
         displayName: 'Player',
+        gameEdition: 4,
+        gameMode: 'seasonal',
         level: 10,
         tasksCompleted: 5,
       };
@@ -494,6 +496,7 @@ describe('useTeamStore', () => {
         state.memberProfiles = {
           ...state.memberProfiles,
           [broadcastData.userId]: {
+            ...state.memberProfiles?.[broadcastData.userId],
             displayName: broadcastData.displayName ?? null,
             level: broadcastData.level ?? null,
             tasksCompleted: broadcastData.tasksCompleted ?? null,
@@ -502,6 +505,8 @@ describe('useTeamStore', () => {
       });
       expect(store.memberProfiles?.['user-1']?.level).toBe(15);
       expect(store.memberProfiles?.['user-1']?.tasksCompleted).toBe(10);
+      expect(store.memberProfiles?.['user-1']?.gameEdition).toBe(4);
+      expect(store.memberProfiles?.['user-1']?.gameMode).toBe('seasonal');
     });
   });
 });

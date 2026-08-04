@@ -82,19 +82,23 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
-  import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import {
+    getTeamIdFromState,
+    getTeamIdStateKey,
+    useSystemStoreWithSupabase,
+  } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useTeamStoreWithSupabase } from '@/stores/useTeamStore';
   import { delay } from '@/utils/async';
-  import { GAME_MODES, LIMITS } from '@/utils/constants';
+  import { GAME_MODES, LIMITS, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
-  import type { SystemState, TeamState } from '@/types/tarkov';
+  import type { TeamState } from '@/types/tarkov';
   import type { CreateTeamResponse, LeaveTeamResponse } from '@/types/team';
   const { t } = useI18n({ useScope: 'global' });
   const { teamStore } = useTeamStoreWithSupabase();
   const { systemStore, hasInitiallyLoaded } = useSystemStoreWithSupabase();
-  function getCurrentGameMode(): 'pvp' | 'pve' {
-    return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
+  function getCurrentGameMode(): GameMode {
+    return tarkovStore.getCurrentGameMode?.() || GAME_MODES.PVP;
   }
   function getTeamId(): string | null {
     return getTeamIdFromState(systemStore.$state, getCurrentGameMode());
@@ -103,6 +107,16 @@
   const { $supabase } = useNuxtApp();
   const toast = useToast();
   const { createTeam, leaveTeam } = useEdgeFunctions();
+  const setLocalTeamId = (mode: GameMode, teamId: string | null) => {
+    const key = getTeamIdStateKey(mode);
+    systemStore.$patch((state) => {
+      state[key] = teamId;
+      if (mode === GAME_MODES.PVP) {
+        state.team = teamId;
+        state.team_id = teamId;
+      }
+    });
+  };
   const isLoggedIn = computed(() => $supabase.user.loggedIn);
   const linkVisible = ref(false);
   const generateRandomName = (length: number = LIMITS.RANDOM_NAME_LENGTH) =>
@@ -161,10 +175,7 @@
         throw membershipError;
       }
       if (membership?.team_id) {
-        const teamIdColumn = currentGameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-        systemStore.$patch({
-          [teamIdColumn]: membership.team_id,
-        } as Partial<SystemState>);
+        setLocalTeamId(currentGameMode, membership.team_id);
         showNotification(
           `You are already in a ${currentGameMode.toUpperCase()} team. Leave your current team first.`,
           'error'
@@ -182,8 +193,7 @@
         logger.error('[MyTeam] Invalid response structure - missing team object');
         throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
       }
-      const teamIdColumn = currentGameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-      systemStore.$patch({ [teamIdColumn]: result.team.id } as Partial<SystemState>);
+      setLocalTeamId(currentGameMode, result.team.id);
       const teamResponse = result.team as unknown as {
         id: string;
         ownerId: string;
@@ -241,7 +251,6 @@
   const handleLeaveTeam = async () => {
     loading.value.leaveTeam = true;
     const currentGameMode = getCurrentGameMode();
-    const teamIdColumn = currentGameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
     try {
       validateAuth();
       const currentTeamId = getTeamId();
@@ -253,11 +262,7 @@
         .eq('game_mode', currentGameMode)
         .maybeSingle();
       if (!membershipData && !membershipError) {
-        systemStore.$patch({
-          [teamIdColumn]: null,
-          team: null,
-          team_id: null,
-        } as Partial<SystemState>);
+        setLocalTeamId(currentGameMode, null);
         const { data: allMembers } = await $supabase.client
           .from('team_memberships')
           .select('user_id')
@@ -303,11 +308,7 @@
       if (!result.success) {
         throw new Error(t('page.team.card.myteam.leave_team_error'));
       }
-      systemStore.$patch({
-        [teamIdColumn]: null,
-        team: null,
-        team_id: null,
-      } as Partial<SystemState>);
+      setLocalTeamId(currentGameMode, null);
       teamStore.$reset();
       await delay(500);
       await nextTick();

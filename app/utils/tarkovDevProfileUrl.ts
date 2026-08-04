@@ -1,7 +1,7 @@
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { GAME_MODES, type ImportableGameMode } from '@/utils/constants';
 export const buildTarkovDevProfileUrl = (
   tarkovUid: number | null,
-  mode: GameMode | null | undefined
+  mode: ImportableGameMode | null | undefined
 ) => {
   if (tarkovUid === null || !Number.isFinite(tarkovUid) || tarkovUid <= 0) {
     return undefined;

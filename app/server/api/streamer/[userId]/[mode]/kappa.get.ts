@@ -9,7 +9,7 @@ import {
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { createLogger } from '@/server/utils/logger';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
-import { API_GAME_MODES, GAME_MODES, type GameMode } from '@/utils/constants';
+import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import type {
   GameEdition,
   TarkovTaskObjectivesQueryResult,
@@ -49,13 +49,7 @@ type SharedProgressData = {
   taskObjectives: Record<string, TaskObjectiveProgress>;
 };
 const normalizeMode = (value: string | undefined): GameMode | null => {
-  if (value === GAME_MODES.PVE) {
-    return GAME_MODES.PVE;
-  }
-  if (value === GAME_MODES.PVP) {
-    return GAME_MODES.PVP;
-  }
-  return null;
+  return isGameMode(value) ? value : null;
 };
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));

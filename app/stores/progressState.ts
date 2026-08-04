@@ -8,7 +8,7 @@
  * - Main tarkov store (user's own progress)
  * - Teammate stores (dynamically created for each team member)
  *
- * Supports dual game mode tracking (PVP and PVE) with separate progress data.
+ * Supports independent progress for every game mode.
  * Each game mode maintains its own independent progress: level, faction, tasks,
  * hideout modules, and trader relationships.
  *
@@ -30,6 +30,7 @@ export interface UserState {
   tarkovUid: number | null;
   pvp: UserProgressData;
   pve: UserProgressData;
+  seasonal: UserProgressData;
 }
 const defaultProgressData: UserProgressData = {
   level: 1,
@@ -54,6 +55,7 @@ export const defaultState: UserState = {
   tarkovUid: null,
   pvp: structuredClone(defaultProgressData),
   pve: structuredClone(defaultProgressData),
+  seasonal: structuredClone(defaultProgressData),
 };
 // Migration function to convert legacy data structure to new gamemode-aware structure
 export function migrateToGameModeStructure(legacyData: unknown): UserState {
@@ -72,6 +74,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
       tarkovUid: (data.tarkovUid as number | null) ?? null,
       pvp: sanitizeOwnedProgressData(data.pvp),
       pve: sanitizeOwnedProgressData(data.pve),
+      seasonal: sanitizeOwnedProgressData(data.seasonal),
     };
   }
   // Handle partial migration case - has currentGameMode but missing pvp/pve structure
@@ -86,11 +89,14 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     const hasPve = 'pve' in data;
     const migratedLegacy = sanitizeOwnedProgressData(data);
     return {
-      currentGameMode: data.currentGameMode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP,
+      currentGameMode: Object.values(GAME_MODES).includes(data.currentGameMode as GameMode)
+        ? (data.currentGameMode as GameMode)
+        : GAME_MODES.PVP,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
       tarkovUid: (data.tarkovUid as number | null) ?? null,
       pvp: hasPvp ? sanitizeOwnedProgressData(data.pvp) : migratedLegacy,
       pve: hasPve ? sanitizeOwnedProgressData(data.pve) : structuredClone(defaultProgressData),
+      seasonal: structuredClone(defaultProgressData),
     };
   }
   // Create new structure with migrated data from legacy format
@@ -101,6 +107,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     tarkovUid: (data.tarkovUid as number | null) ?? null,
     pvp: sanitizeOwnedProgressData(data),
     pve: structuredClone(defaultProgressData),
+    seasonal: structuredClone(defaultProgressData),
   };
 }
 // Helper to get current gamemode data
@@ -148,7 +155,7 @@ export const getters = {
     return currentData.displayName === '' ? null : (currentData.displayName ?? null);
   },
   getModeDisplayName: (state: UserState) => (mode: GameMode) => {
-    const modeData = mode === GAME_MODES.PVE ? state.pve : state.pvp;
+    const modeData = state[mode];
     return modeData.displayName === '' ? null : (modeData.displayName ?? null);
   },
   getObjectiveCount: (state: UserState) => (objectiveId: string) =>
@@ -166,8 +173,10 @@ export const getters = {
   isHideoutModuleComplete: (state: UserState) => (hideoutId: string) =>
     getCurrentData(state)?.hideoutModules?.[hideoutId]?.complete ?? false,
   getCurrentProgressData: (state: UserState) => () => getCurrentData(state),
+  getModeProgressData: (state: UserState) => (mode: GameMode) => state[mode],
   getPvPProgressData: (state: UserState) => () => state.pvp,
   getPvEProgressData: (state: UserState) => () => state.pve,
+  getSeasonalProgressData: (state: UserState) => () => state.seasonal,
   getTraderLevel: (state: UserState) => (traderId: string) =>
     getCurrentData(state)?.traders?.[traderId]?.level ?? 1,
   getTraderReputation: (state: UserState) => (traderId: string) =>
@@ -250,7 +259,7 @@ export const actions = {
     currentData.displayName = typeof name === 'string' ? name : null;
   },
   setModeDisplayName(this: UserState, mode: GameMode, name: string | null) {
-    const modeData = mode === GAME_MODES.PVE ? this.pve : this.pvp;
+    const modeData = this[mode];
     modeData.displayName = typeof name === 'string' ? name : null;
   },
   setXpOffset(this: UserState, offset: number) {

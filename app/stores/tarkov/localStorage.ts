@@ -70,7 +70,7 @@ export const backupProgressStorageValue = (rawValue: string, storedUserId: strin
     logger.debug(`[TarkovStore] Data backed up to ${backupKey}`);
   }
 };
-export const parsePersistedProgressState = (
+const parsePersistedProgressState = (
   rawValue: string | null | undefined,
   userId: string | null
 ): PersistedProgressSnapshot | null => {
@@ -128,5 +128,6 @@ export const patchStoreState = (
     state.tarkovUid = sanitizedSnapshot.tarkovUid;
     state.pvp = sanitizedSnapshot.pvp;
     state.pve = sanitizedSnapshot.pve;
+    state.seasonal = sanitizedSnapshot.seasonal;
   });
 };

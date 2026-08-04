@@ -1,4 +1,4 @@
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { isGameMode, type GameMode } from '@/utils/constants';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -17,13 +17,7 @@ export const normalizeMode = (value: unknown): GameMode | null => {
   if (Array.isArray(value)) {
     return normalizeMode(value[0]);
   }
-  if (value === GAME_MODES.PVE) {
-    return GAME_MODES.PVE;
-  }
-  if (value === GAME_MODES.PVP) {
-    return GAME_MODES.PVP;
-  }
-  return null;
+  return isGameMode(value) ? value : null;
 };
 export const normalizeUserId = (value: unknown): string | null => {
   if (Array.isArray(value)) {

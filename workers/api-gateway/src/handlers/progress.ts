@@ -1,4 +1,5 @@
 import { getTasks, getHideoutStations } from '../services/tarkov';
+import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { logger } from '../utils/logger';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
@@ -13,6 +14,8 @@ import type {
   TarkovTask,
   ApiTaskUpdate,
   ApiUpdateMeta,
+  GameMode,
+  ProgressDataField,
 } from '../types';
 const DISPLAY_NAME_CACHE_TTL_SECONDS = 86400;
 interface ProgressMergePayload {
@@ -44,7 +47,7 @@ function diffCompletions(
 async function mergeProgressData(
   env: Env,
   token: ApiToken,
-  dataField: 'pvp_data' | 'pve_data',
+  dataField: ProgressDataField,
   payload: ProgressMergePayload,
   logContext: { action: string; taskIds?: string[] }
 ): Promise<void> {
@@ -84,6 +87,53 @@ async function mergeProgressData(
     throw new Error('Progress row not found for user');
   }
   logger.info('progress write', logEntry);
+}
+const getProgressDataField = (gameMode: GameMode): ProgressDataField => {
+  if (gameMode === 'pve') return 'pve_data';
+  if (gameMode === 'seasonal') return 'seasonal_data';
+  return 'pvp_data';
+};
+const getServiceHeaders = (env: Env) => ({
+  Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+  apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+});
+async function fetchUserProgressMode(
+  env: Env,
+  userId: string,
+  gameMode: GameMode
+): Promise<UserProgressModeRow | null> {
+  const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${getGameModeSeasonNumber(gameMode)}&select=user_id,progress_data&limit=1`;
+  const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=user_id,game_edition&limit=1`;
+  const [modeResponse, metadataResponse] = await Promise.all([
+    fetch(modeUrl, { headers: getServiceHeaders(env) }),
+    fetch(metadataUrl, { headers: getServiceHeaders(env) }),
+  ]);
+  if (!modeResponse.ok || !metadataResponse.ok) {
+    throw new Error('Failed to fetch user progress');
+  }
+  const modeRows = (await modeResponse.json()) as Array<{
+    progress_data: UserProgressModeRow['progress_data'];
+    user_id: string;
+  }>;
+  const metadataRows = (await metadataResponse.json()) as Array<{
+    game_edition: number | null;
+    user_id: string;
+  }>;
+  const modeRow = modeRows[0];
+  if (!modeRow) return null;
+  return {
+    user_id: modeRow.user_id,
+    game_edition: metadataRows[0]?.game_edition ?? 1,
+    progress_data: modeRow.progress_data,
+  };
+}
+async function fetchCurrentProgressData(
+  env: Env,
+  userId: string,
+  gameMode: GameMode
+): Promise<Record<string, unknown>> {
+  const row = await fetchUserProgressMode(env, userId, gameMode);
+  return (row?.progress_data as Record<string, unknown> | null) ?? {};
 }
 function getMetaString(metadata: Record<string, unknown>, key: string): string | null {
   return typeof metadata[key] === 'string' ? (metadata[key] as string) : null;
@@ -283,23 +333,11 @@ const updateDependentTasks = (
 export async function handleGetProgress(
   env: Env,
   token: ApiToken,
-  gameMode: 'pvp' | 'pve'
+  gameMode: GameMode
 ): Promise<ProgressResponse> {
   // Select only the requested game mode's JSONB blob to reduce Supabase egress
   // and Worker memory; the other mode's column is not needed for this response.
-  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
-  const url = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=user_id,game_edition,${dataField}&limit=1`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!response.ok) {
-    throw new Error('Failed to fetch user progress');
-  }
-  const rows = (await response.json()) as UserProgressModeRow[];
-  const row = rows[0] || null;
+  const row = await fetchUserProgressMode(env, token.user_id, gameMode);
   const gameEdition = row?.game_edition ?? 1;
   // Extract game mode specific data
   const progressData = extractGameModeData(row, gameMode);
@@ -334,9 +372,9 @@ export async function handleUpdateLevel(
   env: Env,
   token: ApiToken,
   level: number,
-  gameMode: 'pvp' | 'pve'
+  gameMode: GameMode
 ): Promise<{ level: number; message: string }> {
-  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const dataField = getProgressDataField(gameMode);
   await mergeProgressData(env, token, dataField, { set: { level } }, { action: 'update-level' });
   return { level, message: 'Level updated successfully' };
 }
@@ -348,9 +386,9 @@ export async function handleUpdateObjective(
   token: ApiToken,
   objectiveId: string,
   update: { state?: string; count?: number },
-  gameMode: 'pvp' | 'pve'
+  gameMode: GameMode
 ): Promise<{ objectiveId: string; state?: string; count?: number; message: string }> {
-  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const dataField = getProgressDataField(gameMode);
   const updateTime = Date.now();
   // Build the patch from `update` only and let the RPC's per-key objective
   // merge preserve untouched fields server-side. Reading the current objective
@@ -388,22 +426,11 @@ export async function handleUpdateTask(
   token: ApiToken,
   taskId: string,
   state: TaskState,
-  gameMode: 'pvp' | 'pve'
+  gameMode: GameMode
 ): Promise<{ taskId: string; state: string; message: string }> {
   const updateTime = Date.now();
-  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
-  const getUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=${dataField}`;
-  const getRes = await fetch(getUrl, {
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!getRes.ok) {
-    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
-  }
-  const rows = (await getRes.json()) as Array<Record<string, unknown>>;
-  const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
+  const dataField = getProgressDataField(gameMode);
+  const currentData = await fetchCurrentProgressData(env, token.user_id, gameMode);
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
   const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
@@ -443,23 +470,12 @@ export async function handleUpdateTasks(
   env: Env,
   token: ApiToken,
   updates: BatchTaskUpdate[],
-  gameMode: 'pvp' | 'pve'
+  gameMode: GameMode
 ): Promise<{ updatedTasks: string[]; message: string }> {
-  const dataField = gameMode === 'pve' ? 'pve_data' : 'pvp_data';
+  const dataField = getProgressDataField(gameMode);
   const updateTime = Date.now();
   // Fetch current data
-  const getUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=${dataField}`;
-  const getRes = await fetch(getUrl, {
-    headers: {
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!getRes.ok) {
-    throw new Error(`Failed to fetch current progress (HTTP ${getRes.status})`);
-  }
-  const rows = (await getRes.json()) as Array<Record<string, unknown>>;
-  const currentData = (rows[0]?.[dataField] as Record<string, unknown>) || {};
+  const currentData = await fetchCurrentProgressData(env, token.user_id, gameMode);
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
   const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();

@@ -25,6 +25,7 @@ const mockLogger = {
   warn: vi.fn(),
 };
 const i18nMessages: Record<string, string> = {
+  'settings.data_management.seasonal_import_locked': 'Seasonal PvP imports are temporarily locked.',
   'settings.log_import.selected_files': 'Selected files',
   'settings.log_import.selected_files_count': '{count} selected files',
   'settings.log_import.errors.apply_import_failed':
@@ -184,6 +185,18 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
     expect(composable.importState.value).toBe('success');
+  });
+  it('rejects seasonal imports before mutating task progress', async () => {
+    const composable = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log', {
+      type: 'text/plain',
+    });
+    await composable.parseFile(file);
+    await (composable.confirmImport as (mode: string) => Promise<void>)('seasonal');
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importError.value).toBe('Seasonal PvP imports are temporarily locked.');
+    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
   it('backfills required prerequisite tasks when importing a later completed task', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';

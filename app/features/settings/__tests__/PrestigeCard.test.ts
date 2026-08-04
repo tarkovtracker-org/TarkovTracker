@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive, ref } from 'vue';
 import PrestigeCard from '@/features/settings/PrestigeCard.vue';
 import type { PrestigeRunRecord } from '@/stores/useTarkov';
+import type { GameMode } from '@/utils/constants';
 const {
   deletePrestigeRunMock,
   fetchPrestigeRunsMock,
@@ -11,10 +12,10 @@ const {
   syncPvpPrestigeLevelMock,
   toastAddMock,
 } = vi.hoisted(() => ({
-  deletePrestigeRunMock: vi.fn(async (_runId: string, _mode: 'pvp' | 'pve') => undefined),
+  deletePrestigeRunMock: vi.fn(async (_runId: string, _mode: GameMode) => undefined),
   fetchPrestigeRunsMock: vi.fn(async (): Promise<PrestigeRunRecord[]> => []),
-  prestigePvPMock: vi.fn(async () => undefined),
-  syncPvpPrestigeLevelMock: vi.fn(async (_level: number) => undefined),
+  prestigePvPMock: vi.fn(async (_mode: GameMode) => undefined),
+  syncPvpPrestigeLevelMock: vi.fn(async (_mode: GameMode, _level: number) => undefined),
   toastAddMock: vi.fn(),
 }));
 const mockSupabaseUser = reactive({
@@ -23,7 +24,7 @@ const mockSupabaseUser = reactive({
 });
 const mockLocale = ref('en-US');
 const mockState = reactive({
-  currentGameMode: 'pvp' as 'pvp' | 'pve',
+  currentGameMode: 'pvp' as GameMode,
   prestigeLevel: 4,
   level: 20,
 });
@@ -100,7 +101,7 @@ vi.mock('@/stores/useTarkov', () => ({
     deletePrestigeRun: deletePrestigeRunMock,
     fetchPrestigeRuns: fetchPrestigeRunsMock,
     getGameEdition: () => 1,
-    getPvPProgressData: () => ({
+    getCurrentProgressData: () => ({
       hideoutModules: {},
       level: mockState.level,
       prestigeLevel: mockState.prestigeLevel,
@@ -108,12 +109,12 @@ vi.mock('@/stores/useTarkov', () => ({
       storyChapters: {},
       taskCompletions: {},
     }),
-    prestigePvP: vi.fn(async () => {
-      await prestigePvPMock();
+    prestigeMode: vi.fn(async (mode: GameMode) => {
+      await prestigePvPMock(mode);
       mockState.prestigeLevel += 1;
     }),
-    syncPvpPrestigeLevel: vi.fn(async (level: number) => {
-      await syncPvpPrestigeLevelMock(level);
+    syncPrestigeLevel: vi.fn(async (mode: GameMode, level: number) => {
+      await syncPvpPrestigeLevelMock(mode, level);
       mockState.prestigeLevel = level;
     }),
   }),
@@ -167,6 +168,7 @@ const createPrestigeRun = (id: string): PrestigeRunRecord => ({
   createdAt: '2026-03-01T00:00:00.000Z',
   id,
   mode: 'pvp',
+  seasonNumber: 0,
   prestigeFrom: 3,
   prestigeTo: 4,
   summary: {
@@ -236,7 +238,7 @@ describe('PrestigeCard', () => {
     expect(syncButton).toBeTruthy();
     await syncButton!.trigger('click');
     await flushPromises();
-    expect(syncPvpPrestigeLevelMock).toHaveBeenCalledWith(2);
+    expect(syncPvpPrestigeLevelMock).toHaveBeenCalledWith('pvp', 2);
     expect(prestigePvPMock).not.toHaveBeenCalled();
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -308,6 +310,18 @@ describe('PrestigeCard', () => {
     expect(wrapper.text()).toContain('settings.prestige.pvp_only');
     expect(wrapper.text()).not.toContain('settings.prestige.set_current');
   });
+  it('loads and updates Seasonal prestige independently', async () => {
+    mockState.currentGameMode = 'seasonal';
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(fetchPrestigeRunsMock).toHaveBeenCalledWith('seasonal', 20);
+    await wrapper.find('select').setValue('2');
+    const syncButton = findButtonByText(wrapper, 'settings.prestige.set_current');
+    expect(syncButton).toBeTruthy();
+    await syncButton!.trigger('click');
+    await flushPromises();
+    expect(syncPvpPrestigeLevelMock).toHaveBeenCalledWith('seasonal', 2);
+  });
   it('archives a run only after explicit confirmation', async () => {
     const wrapper = createWrapper();
     await flushPromises();
@@ -323,7 +337,7 @@ describe('PrestigeCard', () => {
     expect(confirmButton).toBeTruthy();
     await confirmButton!.trigger('click');
     await flushPromises();
-    expect(prestigePvPMock).toHaveBeenCalledTimes(1);
+    expect(prestigePvPMock).toHaveBeenCalledWith('pvp');
     expect(syncPvpPrestigeLevelMock).not.toHaveBeenCalled();
   });
   it('uses the prestige archive failure title when archiving fails', async () => {

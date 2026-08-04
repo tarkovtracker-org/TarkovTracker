@@ -1053,6 +1053,11 @@ export const useMetadataStore = defineStore('metadata', {
           return;
         }
         const requestApiMode = this.getApiGameMode();
+        if (requestApiMode === API_GAME_MODES[GAME_MODES.SEASONAL]) {
+          this.objectiveModeCountDifferences = markRaw({});
+          this.objectiveModeCountDifferencesHydrated = true;
+          return;
+        }
         const requestLanguageCode = this.languageCode;
         const requestTasks = this.tasks;
         const currentCounts = this.buildObjectiveCountMap(requestTasks);

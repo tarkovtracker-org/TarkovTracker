@@ -1,7 +1,12 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import {
+  GAME_MODES,
+  IMPORTABLE_GAME_MODES,
+  isImportableGameMode,
+  type ImportableGameMode,
+} from '@/utils/constants';
 import {
   isEftBackendLogFileName,
   isEftNotificationLogFileName,
@@ -34,7 +39,7 @@ export interface UseEftLogsImportReturn {
   parseFiles: (files: File[]) => Promise<void>;
   previewData: Ref<EftLogsImportPreviewData | null>;
   setIncludedVersions: (versions: string[]) => void;
-  confirmImport: (targetMode: GameMode) => Promise<void>;
+  confirmImport: (targetMode: ImportableGameMode) => Promise<void>;
   reset: () => void;
 }
 interface EftLogsImportErrorValues {
@@ -316,19 +321,24 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   async function parseFile(file: File): Promise<void> {
     await parseFiles([file]);
   }
-  async function confirmImport(targetMode: GameMode): Promise<void> {
+  async function confirmImport(targetMode: ImportableGameMode): Promise<void> {
     if (!previewData.value) return;
+    if (!isImportableGameMode(targetMode)) {
+      importState.value = 'error';
+      importError.value = t('settings.data_management.seasonal_import_locked');
+      return;
+    }
     const originalMode = tarkovStore.getCurrentGameMode();
     let activeMode = originalMode;
     const tasksMap = new Map<string, Task>();
     metadataStore.tasks.forEach((task) => {
       tasksMap.set(task.id, task);
     });
-    const completedTaskIdsByMode: Record<GameMode, Set<string>> = {
+    const completedTaskIdsByMode: Record<ImportableGameMode, Set<string>> = {
       [GAME_MODES.PVP]: new Set(previewData.value.matchedTaskIdsByMode[GAME_MODES.PVP]),
       [GAME_MODES.PVE]: new Set(previewData.value.matchedTaskIdsByMode[GAME_MODES.PVE]),
     };
-    const startedTaskIdsByMode: Record<GameMode, Set<string>> = {
+    const startedTaskIdsByMode: Record<ImportableGameMode, Set<string>> = {
       [GAME_MODES.PVP]: new Set(previewData.value.matchedStartedTaskIdsByMode[GAME_MODES.PVP]),
       [GAME_MODES.PVE]: new Set(previewData.value.matchedStartedTaskIdsByMode[GAME_MODES.PVE]),
     };
@@ -340,7 +350,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     }
     let importFailure: unknown = null;
     try {
-      for (const mode of [GAME_MODES.PVP, GAME_MODES.PVE] as const) {
+      for (const mode of IMPORTABLE_GAME_MODES) {
         const completedTaskIds = completedTaskIdsByMode[mode];
         const startedTaskIds = startedTaskIdsByMode[mode];
         const processedCompletedTaskIds = new Set<string>();

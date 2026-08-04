@@ -71,6 +71,21 @@ describe('useSystemStore', () => {
         };
         expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBe('pve-team-456');
       });
+      it('should return seasonal_team_id for Seasonal mode', () => {
+        const state: SystemState = {
+          pvp_team_id: 'pvp-team-123',
+          seasonal_team_id: 'seasonal-team-789',
+        };
+        expect(getTeamIdFromState(state, GAME_MODES.SEASONAL)).toBe('seasonal-team-789');
+      });
+      it('should not fall back to a persistent team for Seasonal mode', () => {
+        const state: SystemState = {
+          pvp_team_id: 'pvp-team-123',
+          team: 'legacy-team-789',
+          team_id: 'legacy-team-id-999',
+        };
+        expect(getTeamIdFromState(state, GAME_MODES.SEASONAL)).toBeNull();
+      });
       it('should fall back to legacy team field if mode-specific field is missing', () => {
         const state: SystemState = {
           team: 'legacy-team-789',
@@ -89,6 +104,7 @@ describe('useSystemStore', () => {
         const state: SystemState = {};
         expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBeNull();
         expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBeNull();
+        expect(getTeamIdFromState(state, GAME_MODES.SEASONAL)).toBeNull();
       });
     });
     describe('hasTeamInState', () => {
@@ -102,6 +118,7 @@ describe('useSystemStore', () => {
         const state: SystemState = {};
         expect(hasTeamInState(state, GAME_MODES.PVP)).toBe(false);
         expect(hasTeamInState(state, GAME_MODES.PVE)).toBe(false);
+        expect(hasTeamInState(state, GAME_MODES.SEASONAL)).toBe(false);
       });
       it('should return true for legacy team field', () => {
         const state: SystemState = {

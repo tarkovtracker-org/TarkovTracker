@@ -1,5 +1,5 @@
 <template>
-  <div class="grid gap-3 md:grid-cols-3">
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     <UButton
       icon="i-mdi-shield-sword"
       block
@@ -9,6 +9,15 @@
       @click="showResetPvPDialog = true"
     >
       {{ $t('common.reset_pvp_data') }}
+    </UButton>
+    <UButton
+      icon="i-mdi-calendar-star"
+      color="warning"
+      variant="soft"
+      block
+      @click="showResetSeasonalDialog = true"
+    >
+      {{ $t('common.reset_seasonal_data') }}
     </UButton>
     <UButton
       icon="i-mdi-account-group"
@@ -68,6 +77,45 @@
           class="ml-auto min-w-30 justify-center text-center"
           :loading="resetting"
           @click="resetPvPData"
+        >
+          {{ $t('settings.data_management.reset_confirm') }}
+        </UButton>
+      </div>
+    </template>
+  </UModal>
+  <UModal v-model:open="showResetSeasonalDialog">
+    <template #header>
+      <div class="flex items-center gap-2">
+        <UIcon name="i-mdi-alert" class="text-warning-400 h-5 w-5" />
+        <h3 class="text-lg font-semibold">
+          {{ $t('common.reset_seasonal_data') }}
+        </h3>
+      </div>
+    </template>
+    <template #body>
+      <div class="space-y-3">
+        <UAlert
+          icon="i-mdi-alert"
+          color="warning"
+          variant="subtle"
+          :title="$t('settings.data_management.reset_seasonal_confirmation')"
+        />
+        <p class="text-surface-200 text-sm">
+          {{ $t('settings.data_management.reset_seasonal_warning') }}
+        </p>
+      </div>
+    </template>
+    <template #footer="{ close }">
+      <div class="flex w-full items-center gap-3">
+        <UButton color="neutral" variant="soft" @click="close">
+          {{ $t('common.cancel') }}
+        </UButton>
+        <UButton
+          color="error"
+          variant="solid"
+          class="ml-auto"
+          :loading="resetting"
+          @click="resetSeasonalData"
         >
           {{ $t('settings.data_management.reset_confirm') }}
         </UButton>
@@ -197,6 +245,7 @@
   const resetting = ref(false);
   const showResetPvPDialog = ref(false);
   const showResetPvEDialog = ref(false);
+  const showResetSeasonalDialog = ref(false);
   const showResetAllDialog = ref(false);
   const resetAllConfirmText = ref('');
   watch(showResetAllDialog, (isOpen) => {
@@ -240,6 +289,14 @@
     errorLogContext: 'PvE data',
     errorDescription: t('settings.reset_pve.error_description'),
     dialogRef: showResetPvEDialog,
+  });
+  const resetSeasonalData = createResetHandler({
+    resetFn: () => tarkovStore.resetSeasonalData(),
+    successTitle: t('settings.reset_seasonal.success_title'),
+    successDescription: t('settings.reset_seasonal.success_description'),
+    errorLogContext: 'Seasonal PvP data',
+    errorDescription: t('settings.reset_seasonal.error_description'),
+    dialogRef: showResetSeasonalDialog,
   });
   const resetAllData = createResetHandler({
     resetFn: () => tarkovStore.resetAllData(),

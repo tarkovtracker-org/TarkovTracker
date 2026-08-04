@@ -98,13 +98,21 @@ const {
   type SupabaseErrorLike = { code?: string; message: string } | null;
   type SingleResult = { data: RemoteRow | null; error: SupabaseErrorLike };
   type UpsertResult = { error: SupabaseErrorLike };
+  type SyncRpcArgs = {
+    p_current_game_mode: string;
+    p_game_edition: number;
+    p_tarkov_uid: number | null;
+    p_modes: Record<string, UserProgressData>;
+  };
   const single = vi.fn(async (): Promise<SingleResult> => ({
     data: createRemoteRow(),
     error: null,
   }));
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
-  const upsert = vi.fn(async (): Promise<UpsertResult> => ({ error: null }));
+  const upsert = vi.fn(async (_name?: string, _args?: SyncRpcArgs): Promise<UpsertResult> => ({
+    error: null,
+  }));
   const from = vi.fn(() => ({
     eq,
     select,
@@ -142,6 +150,7 @@ const {
       channel: vi.fn(() => channel),
       from,
       removeChannel: vi.fn(),
+      rpc: upsert,
     },
   };
   const loggerMock = {
@@ -282,6 +291,12 @@ const waitForBackgroundTasks = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
+const getLastSyncPayload = () => {
+  const call = upsert.mock.calls.at(-1);
+  expect(call?.[0]).toBe('sync_user_game_mode_progress');
+  if (!call?.[1]) throw new Error('Expected a sync RPC payload');
+  return call[1];
+};
 const setLocalProgress = (level = 5) => {
   const store = useTarkovStore();
   store.$patch((state) => {
@@ -377,12 +392,7 @@ describe('useTarkov sync integration', () => {
     });
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(7);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 7 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 7 }));
   });
   it('refreshes metadata after restoring scoped progress with a different game mode', async () => {
     localStorage.setItem(
@@ -469,12 +479,7 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(1);
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(9);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 9 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
   it('restores guest-scoped wrapped local progress for authenticated users before migration', async () => {
     localStorage.setItem(
@@ -496,12 +501,7 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(1);
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(9);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 9 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
   it('uses the preserved scoped snapshot after auth reset overwrites localStorage', async () => {
     const store = useTarkovStore();
@@ -545,12 +545,7 @@ describe('useTarkov sync integration', () => {
     expect(overwrittenSnapshot.data?.pvp?.level).toBe(1);
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(9);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-2',
-        pvp_data: expect.objectContaining({ level: 9 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
   it('restores the previous user snapshot after logout resets the store', async () => {
     const store = useTarkovStore();
@@ -648,12 +643,7 @@ describe('useTarkov sync integration', () => {
     });
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(11);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 11 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 11 }));
   });
   it('restores a legacy unscoped snapshot after logout resets the store', async () => {
     const store = useTarkovStore();
@@ -767,12 +757,7 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 10 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 10 }));
   });
   it('preserves item-only local progress over older remote data on refresh', async () => {
     localStorage.setItem(
@@ -803,23 +788,20 @@ describe('useTarkov sync integration', () => {
       complete: false,
       count: 1,
     });
-    expect(upsert).toHaveBeenCalledWith(
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(
       expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({
-          taskObjectives: {
-            'objective-1': {
-              complete: false,
-              count: 2,
-            },
+        taskObjectives: {
+          'objective-1': {
+            complete: false,
+            count: 2,
           },
-          hideoutParts: {
-            'part-1': {
-              complete: false,
-              count: 1,
-            },
+        },
+        hideoutParts: {
+          'part-1': {
+            complete: false,
+            count: 1,
           },
-        }),
+        },
       })
     );
   });
@@ -878,18 +860,19 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    expect(upsert).toHaveBeenCalledWith(
+    expect(getLastSyncPayload()).toEqual(
       expect.objectContaining({
-        current_game_mode: 'pve',
-        pvp_data: expect.objectContaining({
-          level: 1,
-          progressEpoch: 3,
+        p_current_game_mode: 'pve',
+        p_modes: expect.objectContaining({
+          pvp: expect.objectContaining({
+            level: 1,
+            progressEpoch: 3,
+          }),
+          pve: expect.objectContaining({
+            level: 8,
+            progressEpoch: 0,
+          }),
         }),
-        pve_data: expect.objectContaining({
-          level: 8,
-          progressEpoch: 0,
-        }),
-        user_id: 'user-1',
       })
     );
     expect(store.pvp.level).toBe(1);
@@ -1011,16 +994,9 @@ describe('useTarkov sync integration', () => {
       data?: typeof defaultState;
     };
     expect(upsert).toHaveBeenCalled();
-    const lastUpsertCall = upsert.mock.calls.at(-1);
-    if (!lastUpsertCall) {
-      throw new Error('Expected an upsert payload');
-    }
-    const lastUpsertPayload = lastUpsertCall.at(0) as unknown as {
-      pve_data?: Record<string, unknown>;
-      pvp_data?: Record<string, unknown>;
-    };
-    expect(lastUpsertPayload.pvp_data).not.toHaveProperty('tarkovDevProfile');
-    expect(lastUpsertPayload.pve_data).not.toHaveProperty('tarkovDevProfile');
+    const lastSyncPayload = getLastSyncPayload();
+    expect(lastSyncPayload.p_modes.pvp).not.toHaveProperty('tarkovDevProfile');
+    expect(lastSyncPayload.p_modes.pve).not.toHaveProperty('tarkovDevProfile');
     expect(persistedSnapshot.data?.pvp).not.toHaveProperty('tarkovDevProfile');
     expect(persistedSnapshot.data?.pve).not.toHaveProperty('tarkovDevProfile');
     expect(store.pvp).not.toHaveProperty('tarkovDevProfile');
@@ -1096,23 +1072,20 @@ describe('useTarkov sync integration', () => {
       count: 1,
     });
     expect(upsert).toHaveBeenCalledTimes(1);
-    expect(upsert).toHaveBeenCalledWith(
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(
       expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({
-          taskObjectives: {
-            'objective-1': {
-              complete: false,
-              count: 2,
-            },
+        taskObjectives: {
+          'objective-1': {
+            complete: false,
+            count: 2,
           },
-          hideoutParts: {
-            'part-1': {
-              complete: false,
-              count: 1,
-            },
+        },
+        hideoutParts: {
+          'part-1': {
+            complete: false,
+            count: 1,
           },
-        }),
+        },
       })
     );
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);

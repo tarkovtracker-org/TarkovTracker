@@ -14,14 +14,14 @@ import {
   usePreferencesStore,
 } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedProgressData, sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 const BACKUP_FORMAT = 'tarkovtracker-backup' as const;
 const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
-const SUPPORTED_VERSIONS = [1] as const;
-type GameMode = 'pvp' | 'pve';
+const SUPPORTED_VERSIONS = [1, 2] as const;
 type Faction = 'USEC' | 'BEAR';
 interface TarkovTrackerExport {
   _format: typeof BACKUP_FORMAT;
@@ -33,6 +33,8 @@ interface TarkovTrackerExport {
   tarkovUid: number | null;
   pvp: UserProgressData;
   pve: UserProgressData;
+  seasonNumber?: number;
+  seasonal?: UserProgressData;
 }
 interface DebugExportAuthContext {
   loggedIn: boolean;
@@ -106,9 +108,20 @@ export interface BackupPreviewData {
     taskCount: number;
     prestigeLevel: number;
   };
+  seasonal: {
+    level: number;
+    faction: Faction;
+    displayName: string | null;
+    taskCount: number;
+    prestigeLevel: number;
+  } | null;
 }
 export type BackupImportState = 'idle' | 'preview' | 'success' | 'error';
-type BackupImportTargetModes = { pvp: boolean; pve: boolean };
+export type BackupImportTargetModes = {
+  pvp: boolean;
+  pve: boolean;
+  seasonal?: boolean;
+};
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
   exportError: Ref<string | null>;
@@ -222,7 +235,12 @@ function sanitizeProgressData(
 function validateBackup(json: unknown):
   | {
       ok: true;
-      data: { export: TarkovTrackerExport; pvp: UserProgressData; pve: UserProgressData };
+      data: {
+        export: TarkovTrackerExport;
+        pvp: UserProgressData;
+        pve: UserProgressData;
+        seasonal: UserProgressData | null;
+      };
     }
   | { ok: false; error: string } {
   if (!isPlainObject(json)) {
@@ -234,8 +252,11 @@ function validateBackup(json: unknown):
   if (!SUPPORTED_VERSIONS.includes(json._version as (typeof SUPPORTED_VERSIONS)[number])) {
     return { ok: false, error: `Unsupported backup version: ${json._version}` };
   }
-  if (json.currentGameMode !== 'pvp' && json.currentGameMode !== 'pve') {
-    return { ok: false, error: 'Invalid currentGameMode — must be "pvp" or "pve"' };
+  if (
+    !isGameMode(json.currentGameMode) ||
+    (json._version === 1 && json.currentGameMode === GAME_MODES.SEASONAL)
+  ) {
+    return { ok: false, error: 'Invalid currentGameMode' };
   }
   const edition = json.gameEdition;
   if (typeof edition !== 'number' || !Number.isInteger(edition) || edition < 1 || edition > 6) {
@@ -255,19 +276,36 @@ function validateBackup(json: unknown):
   if (!pveResult.ok) {
     return { ok: false, error: `PvE data: ${pveResult.error}` };
   }
+  const seasonalResult =
+    json._version === 2 ? sanitizeProgressData(json.seasonal) : ({ ok: true, data: null } as const);
+  if (!seasonalResult.ok) {
+    return { ok: false, error: `Seasonal data: ${seasonalResult.error}` };
+  }
+  if (
+    json._version === 2 &&
+    (typeof json.seasonNumber !== 'number' ||
+      !Number.isInteger(json.seasonNumber) ||
+      json.seasonNumber <= 0)
+  ) {
+    return { ok: false, error: 'Invalid seasonNumber' };
+  }
+  const seasonal =
+    json._version === 2 && json.seasonNumber === ACTIVE_SEASON_NUMBER ? seasonalResult.data : null;
   return {
     ok: true,
     data: {
       export: json as unknown as TarkovTrackerExport,
       pvp: pvpResult.data,
       pve: pveResult.data,
+      seasonal,
     },
   };
 }
 function buildPreview(
   exportData: TarkovTrackerExport,
   pvp: UserProgressData,
-  pve: UserProgressData
+  pve: UserProgressData,
+  seasonal: UserProgressData | null
 ): BackupPreviewData {
   const modePreview = (data: UserProgressData) => ({
     level: data.level,
@@ -283,6 +321,7 @@ function buildPreview(
     tarkovUid: exportData.tarkovUid,
     pvp: modePreview(pvp),
     pve: modePreview(pve),
+    seasonal: seasonal ? modePreview(seasonal) : null,
   };
 }
 function stripInternalSyncMetadata(data: UserProgressData): UserProgressData {
@@ -386,6 +425,7 @@ async function sanitizeTarkovStateForDebug(state: unknown): Promise<UserState> {
   clonedState.tarkovUid = null;
   clonedState.pvp = sanitizeProgressForDebug(clonedState.pvp);
   clonedState.pve = sanitizeProgressForDebug(clonedState.pve);
+  clonedState.seasonal = sanitizeProgressForDebug(clonedState.seasonal);
   return clonedState;
 }
 function getStorageKeys(storage: Storage | null): string[] {
@@ -598,6 +638,7 @@ export function useDataBackup(): UseDataBackupReturn {
   const importError = ref<string | null>(null);
   let parsedPvp: UserProgressData | null = null;
   let parsedPve: UserProgressData | null = null;
+  let parsedSeasonal: UserProgressData | null = null;
   let parsedExport: TarkovTrackerExport | null = null;
   function resetImport(): void {
     importState.value = 'idle';
@@ -605,6 +646,7 @@ export function useDataBackup(): UseDataBackupReturn {
     importError.value = null;
     parsedPvp = null;
     parsedPve = null;
+    parsedSeasonal = null;
     parsedExport = null;
   }
   async function exportProgress(): Promise<void> {
@@ -617,9 +659,12 @@ export function useDataBackup(): UseDataBackupReturn {
       const pveData = stripInternalSyncMetadata(
         cloneStateSnapshot(tarkovStore.getPvEProgressData())
       );
+      const seasonalData = stripInternalSyncMetadata(
+        cloneStateSnapshot(tarkovStore.getSeasonalProgressData())
+      );
       const backup: TarkovTrackerExport = {
         _format: BACKUP_FORMAT,
-        _version: 1,
+        _version: 2,
         exportedAt: Date.now(),
         appVersion: String(runtimeConfig.public.appVersion ?? 'unknown'),
         currentGameMode: tarkovStore.getCurrentGameMode(),
@@ -627,6 +672,8 @@ export function useDataBackup(): UseDataBackupReturn {
         tarkovUid: tarkovStore.getTarkovUid(),
         pvp: pvpData,
         pve: pveData,
+        seasonNumber: ACTIVE_SEASON_NUMBER,
+        seasonal: seasonalData,
       };
       await downloadJsonFile('tarkovtracker-backup', backup);
     } catch (error) {
@@ -724,8 +771,14 @@ export function useDataBackup(): UseDataBackupReturn {
       }
       parsedPvp = result.data.pvp;
       parsedPve = result.data.pve;
+      parsedSeasonal = result.data.seasonal;
       parsedExport = result.data.export;
-      importPreview.value = buildPreview(result.data.export, result.data.pvp, result.data.pve);
+      importPreview.value = buildPreview(
+        result.data.export,
+        result.data.pvp,
+        result.data.pve,
+        result.data.seasonal
+      );
       importState.value = 'preview';
     } catch (e) {
       importState.value = 'error';
@@ -743,8 +796,10 @@ export function useDataBackup(): UseDataBackupReturn {
       const exportData = parsedExport;
       const importPvp = targetModes.pvp;
       const importPve = targetModes.pve;
-      const importBoth = importPvp && importPve;
-      if (!importPvp && !importPve) {
+      const importSeasonal = targetModes.seasonal && parsedSeasonal !== null;
+      const importAllAvailable =
+        importPvp && importPve && (parsedSeasonal === null || importSeasonal);
+      if (!importPvp && !importPve && !importSeasonal) {
         return;
       }
       tarkovStore.$patch((state: UserState) => {
@@ -754,14 +809,21 @@ export function useDataBackup(): UseDataBackupReturn {
         if (importPve) {
           state.pve = createImportedProgressData(pveData, state.pve);
         }
-        if (importBoth) {
+        if (importSeasonal && parsedSeasonal) {
+          state.seasonal = createImportedProgressData(parsedSeasonal, state.seasonal);
+        }
+        if (importAllAvailable) {
           state.gameEdition = exportData.gameEdition;
           state.tarkovUid = exportData.tarkovUid;
+        }
+        if (targetModes[exportData.currentGameMode]) {
           state.currentGameMode = exportData.currentGameMode;
         } else if (importPvp) {
-          state.currentGameMode = 'pvp';
+          state.currentGameMode = GAME_MODES.PVP;
         } else if (importPve) {
-          state.currentGameMode = 'pve';
+          state.currentGameMode = GAME_MODES.PVE;
+        } else if (importSeasonal) {
+          state.currentGameMode = GAME_MODES.SEASONAL;
         }
       });
       importState.value = 'success';

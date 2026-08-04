@@ -2,11 +2,8 @@ import { useToastI18n } from '@/composables/useToastI18n';
 import { maybeNotifyApiUpdate, runApiUpdateHandlers } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
-import {
-  buildUpsertPayload,
-  coerceGameMode,
-  mergeProgressData,
-} from '@/stores/tarkov/progressMerge';
+import { coerceGameMode, mergeProgressData } from '@/stores/tarkov/progressMerge';
+import { syncProgressState } from '@/stores/tarkov/progressPersistence';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
@@ -14,6 +11,7 @@ import {
   SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
 } from '@/stores/tarkov/syncTimeline';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   hasDeprecatedTarkovDevProfileData,
@@ -102,6 +100,7 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       tarkovUid: merged.tarkovUid ?? null,
       pvp: merged.pvp ?? localState.pvp,
       pve: merged.pve ?? localState.pve,
+      seasonal: localState.seasonal,
     };
     const cleanupDeprecatedRemoteProgress = async () => {
       if (deprecatedRemoteCleanupInFlight) {
@@ -122,9 +121,7 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       lastDeprecatedRemoteCleanupAttemptAt = now;
       recordLocalSyncTime();
       try {
-        const { error } = await $supabase.client
-          .from('user_progress')
-          .upsert(buildUpsertPayload(currentUserId, nextState));
+        const { error } = await syncProgressState($supabase.client, currentUserId, nextState);
         if (error) {
           deprecatedRemoteCleanupFailureCount += 1;
           logger.error(
@@ -194,6 +191,7 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       state.tarkovUid = nextState.tarkovUid;
       state.pvp = nextState.pvp;
       state.pve = nextState.pve;
+      state.seasonal = nextState.seasonal;
     });
     if (syncResumeTimer) {
       clearTimeout(syncResumeTimer);
@@ -207,6 +205,52 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       toastI18n.showProgressMerged(totalConflicts);
     }
   };
+  const handleModeProgressChange = (payload: { new: unknown }) => {
+    if (!$supabase.user.loggedIn || $supabase.user.id !== currentUserId) return;
+    if (!payload.new || typeof payload.new !== 'object') return;
+    const row = payload.new as {
+      game_mode?: unknown;
+      progress_data?: unknown;
+      season_number?: unknown;
+      updated_at?: unknown;
+    };
+    if (!isGameMode(row.game_mode)) return;
+    const mode = row.game_mode;
+    const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+    if (row.season_number !== expectedSeason) return;
+    const localState = sanitizeOwnedUserState(tarkovStore.$state);
+    const remoteProgress = sanitizeOwnedProgressData(row.progress_data);
+    const nextProgress = mergeProgressData(localState[mode], remoteProgress);
+    if (deepEqual(nextProgress, localState[mode])) return;
+    const conflicts = detectDataConflicts(localState[mode], remoteProgress);
+    const parsedUpdatedAt =
+      typeof row.updated_at === 'string' ? Date.parse(row.updated_at) : Number.NaN;
+    const updateTime = Number.isNaN(parsedUpdatedAt) ? Date.now() : parsedUpdatedAt;
+    const apiUpdateHandled = maybeNotifyApiUpdate(
+      mode,
+      remoteProgress,
+      metadataStore,
+      updateTime,
+      toastI18n
+    );
+    const controller = getRegisteredSyncController();
+    if (controller) {
+      controller.pause();
+      pausedSyncController = controller;
+    }
+    tarkovStore.$patch((state) => {
+      state[mode] = nextProgress;
+    });
+    if (syncResumeTimer) clearTimeout(syncResumeTimer);
+    syncResumeTimer = setTimeout(() => {
+      syncResumeTimer = null;
+      pausedSyncController?.resume();
+      pausedSyncController = null;
+    }, SYNC_RESUME_DELAY_MS);
+    if (conflicts.hasConflict && !apiUpdateHandled && !isLikelySelfOriginUpdate(updateTime)) {
+      toastI18n.showProgressMerged(conflicts.conflictCount);
+    }
+  };
   realtimeChannel = $supabase.client
     .channel(`user_progress_${currentUserId}`)
     .on(
@@ -218,6 +262,16 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
         filter: `user_id=eq.${currentUserId}`,
       },
       handleProgressChange
+    )
+    .on(
+      'postgres_changes' as const,
+      {
+        event: '*',
+        schema: 'public',
+        table: 'user_game_mode_progress',
+        filter: `user_id=eq.${currentUserId}`,
+      },
+      handleModeProgressChange
     )
     .on(
       'postgres_changes' as const,

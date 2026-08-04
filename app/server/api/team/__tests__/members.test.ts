@@ -84,7 +84,9 @@ describe('Team Members API', () => {
         mockFetch
           .mockResolvedValueOnce({
             ok: true,
-            json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+            json: async () => [
+              { game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' },
+            ],
           })
           .mockResolvedValueOnce({
             ok: true,
@@ -95,10 +97,22 @@ describe('Team Members API', () => {
             json: async () => [
               {
                 user_id: '11111111-1111-4111-8111-111111111111',
-                current_game_mode: 'pvp',
-                pvp_display_name: 'Player1',
-                pvp_level: 15,
-                pvp_tasks_completed: 10,
+                progress_data: {
+                  displayName: 'Player1',
+                  level: 15,
+                  taskCompletions: Object.fromEntries(
+                    Array.from({ length: 10 }, (_, index) => [`task-${index}`, { complete: true }])
+                  ),
+                },
+              },
+            ],
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => [
+              {
+                game_edition: 3,
+                user_id: '11111111-1111-4111-8111-111111111111',
               },
             ],
           });
@@ -108,6 +122,8 @@ describe('Team Members API', () => {
           profiles: {
             '11111111-1111-4111-8111-111111111111': {
               displayName: 'Player1',
+              gameEdition: 3,
+              gameMode: 'pvp',
               level: 15,
               tasksCompleted: 10,
             },
@@ -134,11 +150,11 @@ describe('Team Members API', () => {
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -199,7 +215,7 @@ describe('Team Members API', () => {
         // Mock successful membership check
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
         })
         // Mock failed fetch all members
         .mockResolvedValueOnce({
@@ -215,7 +231,7 @@ describe('Team Members API', () => {
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
         })
         // Mock fetch all members
         .mockResolvedValueOnce({
@@ -231,17 +247,36 @@ describe('Team Members API', () => {
           json: async () => [
             {
               user_id: '11111111-1111-4111-8111-111111111111',
-              current_game_mode: 'pvp',
-              pvp_display_name: 'Player1',
-              pvp_level: 15,
-              pvp_tasks_completed: 10,
+              progress_data: {
+                displayName: 'Player1',
+                level: 15,
+                taskCompletions: Object.fromEntries(
+                  Array.from({ length: 10 }, (_, index) => [`task-${index}`, { complete: true }])
+                ),
+              },
             },
             {
               user_id: '22222222-2222-4222-8222-222222222222',
-              current_game_mode: 'pve',
-              pve_display_name: 'Player2',
-              pve_level: 20,
-              pve_tasks_completed: 15,
+              progress_data: {
+                displayName: 'Player2',
+                level: 20,
+                taskCompletions: Object.fromEntries(
+                  Array.from({ length: 15 }, (_, index) => [`task-${index}`, { complete: true }])
+                ),
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              game_edition: 3,
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+            {
+              game_edition: 4,
+              user_id: '22222222-2222-4222-8222-222222222222',
             },
           ],
         });
@@ -252,11 +287,15 @@ describe('Team Members API', () => {
         profiles: {
           '11111111-1111-4111-8111-111111111111': {
             displayName: 'Player1',
+            gameEdition: 3,
+            gameMode: 'pvp',
             level: 15,
             tasksCompleted: 10,
           },
           '22222222-2222-4222-8222-222222222222': {
             displayName: 'Player2',
+            gameEdition: 4,
+            gameMode: 'pvp',
             level: 20,
             tasksCompleted: 15,
           },
@@ -273,7 +312,9 @@ describe('Team Members API', () => {
           // Mock successful membership check
           .mockResolvedValueOnce({
             ok: true,
-            json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+            json: async () => [
+              { game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' },
+            ],
           })
           // Mock fetch all members
           .mockResolvedValueOnce({
@@ -286,16 +327,28 @@ describe('Team Members API', () => {
             status: 500,
             text: async () => 'Internal server error',
           })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => [
+              {
+                game_edition: 2,
+                user_id: '11111111-1111-4111-8111-111111111111',
+              },
+            ],
+          })
           // Mock individual profile fetch succeeds
           .mockResolvedValueOnce({
             ok: true,
             json: async () => [
               {
                 user_id: '11111111-1111-4111-8111-111111111111',
-                current_game_mode: 'pvp',
-                pvp_display_name: 'Player1',
-                pvp_level: 10,
-                pvp_tasks_completed: 5,
+                progress_data: {
+                  displayName: 'Player1',
+                  level: 10,
+                  taskCompletions: Object.fromEntries(
+                    Array.from({ length: 5 }, (_, index) => [`task-${index}`, { complete: true }])
+                  ),
+                },
               },
             ],
           });
@@ -303,6 +356,8 @@ describe('Team Members API', () => {
         const result = await handler(mockEvent as H3Event);
         expect(result.profiles['11111111-1111-4111-8111-111111111111']).toEqual({
           displayName: 'Player1',
+          gameEdition: 2,
+          gameMode: 'pvp',
           level: 10,
           tasksCompleted: 5,
         });
@@ -346,7 +401,7 @@ describe('Team Members API', () => {
         // Mock membership check
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
         })
         // Mock fetch all members
         .mockResolvedValueOnce({

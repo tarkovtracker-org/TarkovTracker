@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       return createErrorResponse("gameMode and permissions are required", 400, req)
     }
     if (!isTokenGameMode(gameMode)) {
-      return createErrorResponse("gameMode must be 'pvp' or 'pve'", 400, req)
+      return createErrorResponse("gameMode must be 'pvp', 'pve', or 'seasonal'", 400, req)
     }
     if (body.tokenValue !== undefined && typeof body.tokenValue !== "string") {
       return createErrorResponse("tokenValue must be a string", 400, req)

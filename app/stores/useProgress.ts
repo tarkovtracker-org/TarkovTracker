@@ -4,7 +4,6 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { useTeammateStores, useTeamStore } from '@/stores/useTeamStore';
 import {
-  GAME_MODES,
   resolveTraderUnlockTaskIds,
   SPECIAL_STATIONS,
   TASK_STATE,
@@ -29,12 +28,7 @@ import type { Store } from 'pinia';
 function getGameModeData(store: Store<string, UserState> | undefined): UserProgressData {
   if (!store) return createDefaultOwnedProgressData();
   const currentGameMode = store.$state.currentGameMode;
-  const modeData =
-    currentGameMode === GAME_MODES.PVP
-      ? store.$state.pvp
-      : currentGameMode === GAME_MODES.PVE
-        ? store.$state.pve
-        : undefined;
+  const modeData = store.$state[currentGameMode];
   return modeData ?? createDefaultOwnedProgressData();
 }
 type TeamStoresMap = Record<string, Store<string, UserState>>;
@@ -174,7 +168,7 @@ export const useProgressStore = defineStore('progress', () => {
       if (!store) continue;
       const currentData = getGameModeData(store);
       teamDataCache.set(teamId, {
-        mode: store.$state.currentGameMode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP,
+        mode: store.$state.currentGameMode,
         level: getLevel(teamId),
         faction: currentData?.pmcFaction ?? 'USEC',
         completions: currentData?.taskCompletions ?? {},

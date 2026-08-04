@@ -16,7 +16,7 @@ type StoryChapterEntry = UserProgressData['storyChapters'][string];
 type StoryObjectiveEntry = NonNullable<StoryChapterEntry['objectives']>[string];
 type TimestampedCompletionEntry = { complete?: boolean; timestamp?: number };
 export const coerceGameMode = (mode?: string | null): GameMode => {
-  return mode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
+  return Object.values(GAME_MODES).includes(mode as GameMode) ? (mode as GameMode) : GAME_MODES.PVP;
 };
 export const hasProgress = (data: unknown): boolean => {
   const state = data as UserState;
@@ -29,12 +29,16 @@ export const hasProgress = (data: unknown): boolean => {
       Object.keys(mode.hideoutParts || {}).length > 0 ||
       Object.keys(mode.hideoutModules || {}).length > 0 ||
       Object.keys(mode.storyChapters || {}).length > 0);
-  return Boolean(modeHasData(state.pvp) || modeHasData(state.pve));
+  return Boolean(modeHasData(state.pvp) || modeHasData(state.pve) || modeHasData(state.seasonal));
 };
 export const buildUpsertPayload = (
   userId: string,
   state: UserState,
-  partial?: Partial<{ pvp_data: UserProgressData; pve_data: UserProgressData }>
+  partial?: Partial<{
+    pvp_data: UserProgressData;
+    pve_data: UserProgressData;
+    seasonal_data: UserProgressData;
+  }>
 ) => ({
   user_id: userId,
   current_game_mode: state.currentGameMode || GAME_MODES.PVP,
@@ -42,6 +46,9 @@ export const buildUpsertPayload = (
   tarkov_uid: state.tarkovUid ?? null,
   pvp_data: sanitizeOwnedProgressData(partial?.pvp_data ?? state.pvp ?? defaultState.pvp),
   pve_data: sanitizeOwnedProgressData(partial?.pve_data ?? state.pve ?? defaultState.pve),
+  seasonal_data: sanitizeOwnedProgressData(
+    partial?.seasonal_data ?? state.seasonal ?? defaultState.seasonal
+  ),
 });
 export const toProgressEpoch = (modeData: UserProgressData | undefined): number => {
   if (
@@ -80,7 +87,7 @@ const warnDroppedStoryChapters = (
     remoteEpoch,
   });
 };
-export const mergeTimestampedCompletion = <T extends TimestampedCompletionEntry>(
+const mergeTimestampedCompletion = <T extends TimestampedCompletionEntry>(
   local: T | undefined,
   remote: T | undefined
 ): T | undefined => {
@@ -155,7 +162,7 @@ const mergeHideoutModules = (
   }
   return merged;
 };
-export const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
+const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
   local: T | undefined,
   remote: T | undefined
 ): T => {
@@ -179,7 +186,7 @@ export const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
   }
   return merged;
 };
-export const normalizeTaskCompletionEntry = (
+const normalizeTaskCompletionEntry = (
   completion: RawTaskCompletion
 ): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
   if (completion === null || completion === undefined) return undefined;
@@ -244,7 +251,7 @@ export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | nul
     ...(tasks.length ? { tasks } : {}),
   };
 };
-export const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
+const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
   if (!Array.isArray(value)) return [];
   const deduped = new Map<string, ApiUpdateMeta>();
   for (const entry of value) {
@@ -259,7 +266,7 @@ export const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[
     .sort((a, b) => b.at - a.at)
     .slice(0, API_UPDATE_HISTORY_LIMIT);
 };
-export const buildApiUpdateHistory = (data: UserProgressData | undefined): ApiUpdateMeta[] => {
+const buildApiUpdateHistory = (data: UserProgressData | undefined): ApiUpdateMeta[] => {
   if (!data) return [];
   const history = normalizeApiUpdateHistoryEntries(data.apiUpdateHistory);
   const latest = normalizeApiUpdateMetaEntry(data.lastApiUpdate);
@@ -268,7 +275,7 @@ export const buildApiUpdateHistory = (data: UserProgressData | undefined): ApiUp
   }
   return normalizeApiUpdateHistoryEntries([latest, ...history]);
 };
-export const mergeApiUpdateHistory = (
+const mergeApiUpdateHistory = (
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined
 ): ApiUpdateMeta[] => {

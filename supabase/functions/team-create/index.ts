@@ -9,7 +9,7 @@ import {
 } from 'shared/auth';
 import { enforceUserMutationRateLimit } from '../_shared/rate-limit.ts';
 const MAX_TEAM_MEMBERS = 5;
-const VALID_GAME_MODES = ['pvp', 'pve'] as const;
+const VALID_GAME_MODES = ['pvp', 'pve', 'seasonal'] as const;
 type GameMode = (typeof VALID_GAME_MODES)[number];
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     if (existingMembership && existingMembership.length > 0) {
       // Heal stale state: ensure user_system reflects existing team for UI sync
       const existingTeamId = existingMembership[0].team_id;
-      if (existingTeamId) {
+      if (existingTeamId && game_mode !== 'seasonal') {
         const teamIdColumn = game_mode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
         const { error: systemHealError } = await supabase.from('user_system').upsert({
           user_id: user.id,
@@ -138,15 +138,17 @@ Deno.serve(async (req) => {
       return createErrorResponse('Failed to create team membership', 500, req);
     }
     // Upsert user_system with the correct team_id column based on game mode
-    const teamIdColumn = game_mode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-    const { error: systemError } = await supabase.from('user_system').upsert({
-      user_id: user.id,
-      [teamIdColumn]: team.id,
-      updated_at: new Date().toISOString(),
-    });
-    if (systemError) {
-      console.error('user_system upsert failed:', systemError);
-      return createErrorResponse('Failed to update user system state', 500, req);
+    if (game_mode !== 'seasonal') {
+      const teamIdColumn = game_mode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
+      const { error: systemError } = await supabase.from('user_system').upsert({
+        user_id: user.id,
+        [teamIdColumn]: team.id,
+        updated_at: new Date().toISOString(),
+      });
+      if (systemError) {
+        console.error('user_system upsert failed:', systemError);
+        return createErrorResponse('Failed to update user system state', 500, req);
+      }
     }
     // Log team creation event
     await supabase.from('team_events').insert({

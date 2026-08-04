@@ -171,6 +171,13 @@ Naming:
 - Pinia stores in `app/stores/`, auto-registered by Nuxt. Use `pinia-plugin-persistedstate` where applicable.
 - Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
+- Internal game modes are `pvp`, `pve`, and `seasonal`; game-data requests map Seasonal to the
+  upstream `pvp-season` slug. Active Seasonal progress is keyed by season number in
+  `user_game_mode_progress`, while `user_progress` remains the account-metadata and rolling-deploy
+  compatibility row for persistent PvP/PvE.
+- Keep `ACTIVE_SEASON_NUMBER` in the app and Worker synchronized with
+  `private.active_season_number()` in the database migration. Tarkov.dev profile and EFT-log
+  imports must remain unavailable for Seasonal until their Season profile data is verified.
 - Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 

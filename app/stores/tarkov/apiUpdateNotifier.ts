@@ -2,13 +2,18 @@ import {
   normalizeApiTaskUpdates,
   normalizeApiUpdateMetaEntry,
 } from '@/stores/tarkov/progressMerge';
+import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import type { ToastTranslate, useToastI18n } from '@/composables/useToastI18n';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
 import type { useMetadataStore } from '@/stores/useMetadata';
 const API_UPDATE_FRESHNESS_MS = 30000;
-const lastApiUpdateIds: { pvp: string | null; pve: string | null } = { pvp: null, pve: null };
-export const getToastTranslator = (): ToastTranslate => {
+const lastApiUpdateIds: Record<GameMode, string | null> = {
+  pvp: null,
+  pve: null,
+  seasonal: null,
+};
+const getToastTranslator = (): ToastTranslate => {
   try {
     const { $i18n } = useNuxtApp();
     if (typeof $i18n?.t === 'function') {
@@ -31,7 +36,7 @@ export const getToastTranslator = (): ToastTranslate => {
     return key;
   };
 };
-export const formatApiUpdateDescription = (
+const formatApiUpdateDescription = (
   updates: ApiTaskUpdate[],
   metadataStore: ReturnType<typeof useMetadataStore>,
   translate: ToastTranslate
@@ -50,11 +55,11 @@ export const formatApiUpdateDescription = (
   const suffix = remaining > 0 ? translate('toast.api_updated.more', { count: remaining }) : '';
   return `${label}: ${formatted.join(', ')}${suffix}.`;
 };
-export const getApiUpdateMeta = (data: UserProgressData | undefined): ApiUpdateMeta | null => {
+const getApiUpdateMeta = (data: UserProgressData | undefined): ApiUpdateMeta | null => {
   return normalizeApiUpdateMetaEntry(data?.lastApiUpdate);
 };
 export const maybeNotifyApiUpdate = (
-  mode: 'pvp' | 'pve',
+  mode: GameMode,
   data: UserProgressData | undefined,
   metadataStore: ReturnType<typeof useMetadataStore>,
   updateTime: number,
@@ -81,6 +86,5 @@ export const runApiUpdateHandlers = (handlers: Array<() => boolean>): boolean =>
   return handled;
 };
 export const resetApiUpdateState = (): void => {
-  lastApiUpdateIds.pvp = null;
-  lastApiUpdateIds.pve = null;
+  for (const mode of GAME_MODE_VALUES) lastApiUpdateIds[mode] = null;
 };

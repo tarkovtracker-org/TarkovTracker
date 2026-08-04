@@ -67,7 +67,13 @@
               </div>
               <div class="flex flex-wrap gap-1.5 text-xs">
                 <UBadge
-                  :color="token.gameMode === 'pve' ? 'info' : 'warning'"
+                  :color="
+                    token.gameMode === 'pve'
+                      ? 'info'
+                      : token.gameMode === 'seasonal'
+                        ? 'warning'
+                        : 'primary'
+                  "
                   variant="solid"
                   size="xs"
                 >
@@ -284,7 +290,13 @@
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
-  import { API_PERMISSIONS, GAME_MODE_OPTIONS, GAME_MODES, type GameMode } from '@/utils/constants';
+  import {
+    API_PERMISSIONS,
+    GAME_MODE_OPTIONS,
+    GAME_MODES,
+    getGameModeLabel,
+    type GameMode,
+  } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
   import type { RawTokenRow, TokenPermission, TokenRow } from '@/types/api';
@@ -368,7 +380,7 @@
     return t('page.settings.card.apitokens.list.last_used_tooltip', { value });
   };
   const formatGameMode = (mode: GameMode) => {
-    return mode === GAME_MODES.PVE ? 'PvE' : 'PvP';
+    return getGameModeLabel(mode);
   };
   const permissionLabel = (value: TokenPermission) => {
     return permissionOptions.value.find((perm) => perm.value === value)?.label || value;
@@ -482,7 +494,7 @@
   const generateToken = (gameMode: GameMode) => {
     const bytes = crypto.getRandomValues(new Uint8Array(9));
     const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    const prefix = gameMode === GAME_MODES.PVE ? 'PVE' : 'PVP';
+    const prefix = gameMode.toUpperCase();
     return `${prefix}_${hex}`;
   };
   const hashToken = async (token: string) => {

@@ -78,8 +78,8 @@ export const DEFAULT_STREAMER_TOOLS_SETTINGS: StreamerToolsSettings = {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 const sanitizeMode = (value: unknown): GameMode => {
-  if (value === GAME_MODES.PVE || value === GAME_MODES.PVP) {
-    return value;
+  if (Object.values(GAME_MODES).includes(value as GameMode)) {
+    return value as GameMode;
   }
   return DEFAULT_STREAMER_TOOLS_SETTINGS.mode;
 };

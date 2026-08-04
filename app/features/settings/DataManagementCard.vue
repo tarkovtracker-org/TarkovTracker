@@ -308,7 +308,13 @@
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.tarkov_dev_import.import_to_mode') }}
               </label>
-              <GameModeToggle v-model="tarkovDevTargetMode" />
+              <GameModeToggle
+                v-model="tarkovDevTargetMode"
+                :disabled-modes="[GAME_MODES.SEASONAL]"
+              />
+              <p class="text-warning-300 text-xs">
+                {{ $t('settings.data_management.seasonal_import_locked') }}
+              </p>
             </div>
             <div class="flex gap-2">
               <UButton
@@ -609,7 +615,7 @@
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.log_import.import_unknown_to_mode') }}
               </label>
-              <GameModeToggle v-model="eftLogsTargetMode" />
+              <GameModeToggle v-model="eftLogsTargetMode" :disabled-modes="[GAME_MODES.SEASONAL]" />
               <p class="text-surface-400 text-xs">
                 {{ $t('settings.log_import.import_unknown_to_mode_hint') }}
               </p>
@@ -802,12 +808,30 @@
                   {{ backupPreview.pve.taskCount }}
                 </span>
               </div>
+              <template v-if="backupPreview.seasonal">
+                <div class="flex items-center justify-between px-3 py-2">
+                  <span class="text-surface-400 text-xs">
+                    {{ $t('settings.data_management.import_preview_seasonal_level') }}
+                  </span>
+                  <span class="text-surface-100 text-sm font-semibold">
+                    {{ backupPreview.seasonal.level }} ({{ backupPreview.seasonal.faction }})
+                  </span>
+                </div>
+                <div class="flex items-center justify-between px-3 py-2">
+                  <span class="text-surface-400 text-xs">
+                    {{ $t('settings.data_management.import_preview_seasonal_tasks') }}
+                  </span>
+                  <span class="text-surface-100 text-sm font-semibold">
+                    {{ backupPreview.seasonal.taskCount }}
+                  </span>
+                </div>
+              </template>
             </div>
             <div class="space-y-1">
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.data_management.import_target_label') }}
               </label>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <UButton
                   :variant="importTarget === 'pvp' ? 'solid' : 'soft'"
                   color="primary"
@@ -827,13 +851,23 @@
                   {{ $t('settings.data_management.import_target_pve') }}
                 </UButton>
                 <UButton
-                  :variant="importTarget === 'both' ? 'solid' : 'soft'"
+                  :variant="importTarget === GAME_MODES.SEASONAL ? 'solid' : 'soft'"
                   color="primary"
                   size="sm"
                   block
-                  @click="importTarget = 'both'"
+                  :disabled="!backupPreview.seasonal"
+                  @click="importTarget = GAME_MODES.SEASONAL"
                 >
-                  {{ $t('settings.data_management.import_target_both') }}
+                  {{ $t('common.seasonal_pvp') }}
+                </UButton>
+                <UButton
+                  :variant="importTarget === 'all' ? 'solid' : 'soft'"
+                  color="primary"
+                  size="sm"
+                  block
+                  @click="importTarget = 'all'"
+                >
+                  {{ $t('settings.data_management.import_target_all') }}
                 </UButton>
               </div>
             </div>
@@ -926,13 +960,18 @@
     type MetadataStoreTaskLookup,
   } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, sortSkillsByGameOrder, type GameMode } from '@/utils/constants';
+  import {
+    GAME_MODES,
+    sortSkillsByGameOrder,
+    type GameMode,
+    type ImportableGameMode,
+  } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   const TARKOV_DEV_ARENA_MODE = 'arena' as const;
   type DataManagementView = 'all' | 'imports' | 'backup';
-  type TarkovDevRefetchMode = GameMode | typeof TARKOV_DEV_ARENA_MODE;
+  type TarkovDevRefetchMode = ImportableGameMode | typeof TARKOV_DEV_ARENA_MODE;
   type TarkovDevRefetchModeOption = {
     disabled: boolean;
     label: string;
@@ -967,7 +1006,7 @@
     resetImport: resetBackupImport,
   } = dataManagementSession.backup;
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
-  const importTarget = ref<'pvp' | 'pve' | 'both'>('both');
+  const importTarget = ref<GameMode | 'all'>('all');
   async function handleExportProgress() {
     try {
       await exportProgress();
@@ -1003,8 +1042,11 @@
   }
   async function handleBackupConfirm() {
     await confirmBackupImport({
-      pvp: importTarget.value === 'pvp' || importTarget.value === 'both',
-      pve: importTarget.value === 'pve' || importTarget.value === 'both',
+      pvp: importTarget.value === GAME_MODES.PVP || importTarget.value === 'all',
+      pve: importTarget.value === GAME_MODES.PVE || importTarget.value === 'all',
+      seasonal:
+        backupPreview.value?.seasonal !== null &&
+        (importTarget.value === GAME_MODES.SEASONAL || importTarget.value === 'all'),
     });
     if (backupImportState.value === 'success') {
       toast.add({
@@ -1035,9 +1077,11 @@
   } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevRequestGeneration = ref(0);
-  const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
-  const tarkovDevTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
-  const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(tarkovStore.getCurrentGameMode());
+  const currentImportableMode = (): ImportableGameMode =>
+    tarkovStore.getCurrentGameMode() === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
+  const tarkovDevFixedTargetMode = ref<ImportableGameMode | null>(null);
+  const tarkovDevTargetMode = ref<ImportableGameMode>(currentImportableMode());
+  const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(currentImportableMode());
   const isTarkovDevProfileUrlBlank = computed(
     () => tarkovDevProfileUrlInput.value.trim().length === 0
   );
@@ -1056,7 +1100,7 @@
     t('settings.log_import.session_folder_example_path')
   );
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
-  const eftLogsTargetMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
+  const eftLogsTargetMode = ref<ImportableGameMode>(currentImportableMode());
   const eftLogsNoQuestEventsError = computed(() =>
     t('settings.log_import.errors.no_quest_events_found')
   );
@@ -1088,8 +1132,10 @@
       value: TARKOV_DEV_ARENA_MODE,
     },
   ]);
-  function isTarkovDevImportableMode(mode: TarkovDevRefetchMode): mode is GameMode {
-    return mode !== TARKOV_DEV_ARENA_MODE;
+  function isTarkovDevImportableMode(
+    mode: GameMode | typeof TARKOV_DEV_ARENA_MODE
+  ): mode is ImportableGameMode {
+    return mode === GAME_MODES.PVP || mode === GAME_MODES.PVE;
   }
   const isTarkovDevRefetchModeSupported = computed(() =>
     isTarkovDevImportableMode(tarkovDevRefetchMode.value)
@@ -1199,9 +1245,10 @@
   }
   function updateTarkovDevImportTarget(
     sourceMode: GameMode | null | undefined,
-    fallbackMode?: GameMode
+    fallbackMode?: ImportableGameMode
   ) {
-    const targetMode = sourceMode ?? fallbackMode ?? null;
+    const targetMode =
+      sourceMode && isTarkovDevImportableMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
     tarkovDevFixedTargetMode.value = targetMode;
     if (!targetMode) return;
     tarkovDevRefetchMode.value = targetMode;
@@ -1283,7 +1330,7 @@
   }
   function handleTarkovDevUnlink() {
     tarkovDevFixedTargetMode.value = null;
-    tarkovDevRefetchMode.value = tarkovStore.getCurrentGameMode();
+    tarkovDevRefetchMode.value = currentImportableMode();
     tarkovStore.setTarkovUid(null);
   }
   async function handleTarkovDevConfirm() {

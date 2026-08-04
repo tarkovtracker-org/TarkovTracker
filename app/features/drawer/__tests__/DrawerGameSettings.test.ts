@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
 import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
 import { GAME_MODES } from '@/utils/constants';
 const switchGameModeMock = vi.fn(async () => undefined);
@@ -40,10 +41,8 @@ describe('DrawerGameSettings', () => {
         },
       },
     });
-    const buttons = wrapper.findAll('button');
-    const pveButton = buttons.find((button) => button.text().includes('common.pve'));
-    expect(pveButton).toBeDefined();
-    await pveButton!.trigger('click');
+    wrapper.findComponent(SelectMenuFixed).vm.$emit('update:modelValue', GAME_MODES.PVE);
+    await vi.waitFor(() => expect(switchGameModeMock).toHaveBeenCalled());
     expect(switchGameModeMock).toHaveBeenCalledWith(GAME_MODES.PVE);
     expect(fetchAllDataMock).toHaveBeenCalled();
     expect(setLoadingMock).toHaveBeenCalled();

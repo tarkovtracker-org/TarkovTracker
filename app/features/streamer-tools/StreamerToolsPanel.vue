@@ -117,6 +117,20 @@
                   >
                     {{ t('common.pve', 'PvE') }}
                   </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    :aria-checked="selectedMode === GAME_MODES.SEASONAL"
+                    class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
+                    :class="
+                      selectedMode === GAME_MODES.SEASONAL
+                        ? 'bg-warning-700 text-warning-50'
+                        : 'text-warning-300 hover:bg-warning-950/60'
+                    "
+                    @click="selectedMode = GAME_MODES.SEASONAL"
+                  >
+                    {{ t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  </button>
                 </div>
               </article>
               <article class="space-y-2">
