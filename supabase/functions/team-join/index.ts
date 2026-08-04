@@ -1,156 +1,163 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-    authenticateUser,
-    handleCorsPreflight,
-    validateMethod,
-    validateRequiredFields,
-    createErrorResponse,
-    createSuccessResponse,
-    type AuthSuccess
-} from 'shared/auth';
-import { enforceUserMutationRateLimit } from "../_shared/rate-limit.ts"
-const VALID_GAME_MODES = ["pvp", "pve", "seasonal"] as const
-type GameMode = typeof VALID_GAME_MODES[number]
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  const corsResponse = handleCorsPreflight(req)
-  if (corsResponse) return corsResponse
-  try {
-    // Validate HTTP method
-    const methodError = validateMethod(req, ["POST"])
-    if (methodError) return methodError
-    // Authenticate user
-    const authResult = await authenticateUser(req)
-    if ("error" in authResult) {
-      return createErrorResponse(authResult.error, authResult.status, req)
-    }
-    const { user, supabase } = authResult as AuthSuccess
-    const rateLimitResponse = await enforceUserMutationRateLimit(req, supabase, user.id, "team-join")
-    if (rateLimitResponse) return rateLimitResponse
-    // Parse and validate request body
-    const body = await req.json()
-    const joinCode =
-      typeof body.join_code === "string"
-        ? body.join_code
-        : typeof (body as Record<string, unknown>).password === "string"
-          ? (body as { password: string }).password
-          : undefined
-    const fieldsError = validateRequiredFields(req, { ...body, join_code: joinCode }, ["teamId", "join_code"])
-    if (fieldsError) return fieldsError
-    const { teamId } = body
-    const join_code = joinCode as string
-    // Get team details first to know the game_mode
-    const { data: team, error: teamError } = await supabase
-      .from("teams")
-      .select("id, name, join_code, max_members, game_mode")
-      .eq("id", teamId)
-      .single()
-    if (teamError || !team) {
-      console.error("Team lookup failed:", teamError)
-      return createErrorResponse("Team not found", 404, req)
-    }
-    // Get the team's game mode
-    const game_mode: GameMode = VALID_GAME_MODES.includes(team.game_mode as GameMode) 
-      ? team.game_mode as GameMode 
-      : "pvp"
-    // Verify join code
-    if (team.join_code !== join_code) {
-      return createErrorResponse("Invalid team join code", 403, req)
-    }
-    // Check if user is already in a team for this game mode
-    const { data: existingMembership, error: membershipCheckError } = await supabase
-      .from("team_memberships")
-      .select("team_id, game_mode")
-      .eq("user_id", user.id)
-      .eq("game_mode", game_mode)
-      .limit(1)
-    if (membershipCheckError) {
-      console.error("Membership check failed:", membershipCheckError)
-      return createErrorResponse("Failed to check existing team membership", 500, req)
-    }
-    if (existingMembership && existingMembership.length > 0) {
-      const existingTeamId = existingMembership[0].team_id
-      if (existingTeamId && game_mode !== "seasonal") {
-        const teamIdColumn = game_mode === "pve" ? "pve_team_id" : "pvp_team_id"
-        const { error: systemHealError } = await supabase
-          .from("user_system")
-          .upsert({
-            user_id: user.id,
-            [teamIdColumn]: existingTeamId,
-            updated_at: new Date().toISOString()
-          })
-        if (systemHealError) {
-          console.error("user_system heal failed:", systemHealError)
-        }
-      }
-      return createErrorResponse(`You are already a member of a ${game_mode.toUpperCase()} team. Leave your current team first.`, 400, req)
-    }
-    // Check if team is full
-    const { data: currentMembers, error: membersError } = await supabase
-      .from("team_memberships")
-      .select("user_id", { count: "exact", head: false })
-      .eq("team_id", teamId)
-    if (membersError) {
-      console.error("Members count failed:", membersError)
-      return createErrorResponse("Failed to check team capacity", 500, req)
-    }
-    if (currentMembers && currentMembers.length >= team.max_members) {
-      return createErrorResponse("Team is full", 400, req)
-    }
-    // Add user to team with game_mode
-    const { error: joinError } = await supabase
-      .from("team_memberships")
-      .insert({
-        team_id: teamId,
-        user_id: user.id,
-        role: "member",
-        game_mode: game_mode,
-        joined_at: new Date().toISOString()
-      })
-    if (joinError) {
-      console.error("Team join failed:", joinError)
-      // Check for unique constraint violation (already a member somehow)
-      if (joinError.code === "23505") {
-        return createErrorResponse("You are already a member of this team", 409, req)
-      }
-      return createErrorResponse("Failed to join team", 500, req)
-    }
-    // Log team join event
-    await supabase
-      .from("team_events")
-      .insert({
-        team_id: teamId,
-        event_type: "member_joined",
-        target_user: user.id,
-        initiated_by: user.id,
-        event_data: { team_name: team.name },
-        created_at: new Date().toISOString()
-      })
-    // Update user_system with the correct team_id column based on game mode
-    if (game_mode !== "seasonal") {
-      const teamIdColumn = game_mode === "pve" ? "pve_team_id" : "pvp_team_id"
-      const { error: systemError } = await supabase
-        .from("user_system")
-        .upsert({
-          user_id: user.id,
-          [teamIdColumn]: teamId,
-          updated_at: new Date().toISOString()
-        })
-      if (systemError) {
-        console.error("user_system upsert failed:", systemError)
-        return createErrorResponse("Failed to update user system state", 500, req)
-      }
-    }
-    return createSuccessResponse({
-      success: true,
-      message: "Successfully joined team",
-      team: {
-        id: team.id,
-        name: team.name,
-        gameMode: game_mode
-      }
-    }, 200, req)
-  } catch (error) {
-    console.error("Team join error:", error)
-    return createErrorResponse("Internal server error", 500, req)
+  createErrorResponse,
+  createSuccessResponse,
+  validateRequiredFields,
+} from '../_shared/auth.ts';
+import {
+  acceptMutationStep,
+  authenticateMutation,
+  readJoinCodeBody,
+  rejectMutationStep,
+  type MutationStep,
+} from '../_shared/authenticated-mutation.ts';
+import { isTeamGameMode, teamIdColumnForMode, type TeamGameMode } from '../_shared/team-mode.ts';
+import { rejectExistingTeamMembership } from '../_shared/team-membership.ts';
+type TeamRow = {
+  game_mode: string;
+  id: string;
+  join_code: string;
+  max_members: number;
+  name: string;
+};
+type JoinContext = {
+  gameMode: TeamGameMode;
+  joinCode: string;
+  req: Request;
+  supabase: SupabaseClient;
+  team: TeamRow;
+  teamId: string;
+  userId: string;
+};
+const getTeamGameMode = (team: TeamRow): TeamGameMode =>
+  isTeamGameMode(team.game_mode) ? team.game_mode : 'pvp';
+const loadTeam = async (
+  req: Request,
+  supabase: SupabaseClient,
+  teamId: string
+): Promise<MutationStep<TeamRow>> => {
+  const { data, error } = await supabase
+    .from('teams')
+    .select('id, name, join_code, max_members, game_mode')
+    .eq('id', teamId)
+    .single();
+  if (error || !data) {
+    console.error('Team lookup failed:', error);
+    return rejectMutationStep(createErrorResponse('Team not found', 404, req));
   }
-})
+  return acceptMutationStep(data as TeamRow);
+};
+const prepareJoin = async (req: Request): Promise<MutationStep<JoinContext>> => {
+  const auth = await authenticateMutation(req, 'team-join');
+  if (auth.response) return rejectMutationStep(auth.response);
+  const { body, joinCode } = await readJoinCodeBody(req);
+  const fieldsError = validateRequiredFields(req, { ...body, join_code: joinCode }, [
+    'teamId',
+    'join_code',
+  ]);
+  if (fieldsError) return rejectMutationStep(fieldsError);
+  const teamId = String(body.teamId);
+  const loaded = await loadTeam(req, auth.supabase, teamId);
+  if (loaded.response) return rejectMutationStep(loaded.response);
+  return acceptMutationStep({
+    gameMode: getTeamGameMode(loaded.value),
+    joinCode: joinCode as string,
+    req,
+    supabase: auth.supabase,
+    team: loaded.value,
+    teamId,
+    userId: auth.user.id,
+  });
+};
+const rejectFullTeam = async (context: JoinContext): Promise<Response | null> => {
+  const { data, error } = await context.supabase
+    .from('team_memberships')
+    .select('user_id', { count: 'exact', head: false })
+    .eq('team_id', context.teamId);
+  if (error) {
+    console.error('Members count failed:', error);
+    return createErrorResponse('Failed to check team capacity', 500, context.req);
+  }
+  if (data && data.length >= context.team.max_members) {
+    return createErrorResponse('Team is full', 400, context.req);
+  }
+  return null;
+};
+const validateJoinEligibility = async (context: JoinContext): Promise<Response | null> => {
+  if (context.team.join_code !== context.joinCode) {
+    return createErrorResponse('Invalid team join code', 403, context.req);
+  }
+  const membershipError = await rejectExistingTeamMembership(
+    context.req,
+    context.supabase,
+    context.userId,
+    context.gameMode
+  );
+  if (membershipError) return membershipError;
+  return rejectFullTeam(context);
+};
+const insertMembership = async (context: JoinContext): Promise<Response | null> => {
+  const { error } = await context.supabase.from('team_memberships').insert({
+    team_id: context.teamId,
+    user_id: context.userId,
+    role: 'member',
+    game_mode: context.gameMode,
+    joined_at: new Date().toISOString(),
+  });
+  if (!error) return null;
+  console.error('Team join failed:', error);
+  if (error.code === '23505') {
+    return createErrorResponse('You are already a member of this team', 409, context.req);
+  }
+  return createErrorResponse('Failed to join team', 500, context.req);
+};
+const recordJoinEvent = (context: JoinContext) =>
+  context.supabase.from('team_events').insert({
+    team_id: context.teamId,
+    event_type: 'member_joined',
+    target_user: context.userId,
+    initiated_by: context.userId,
+    event_data: { team_name: context.team.name },
+    created_at: new Date().toISOString(),
+  });
+const updateTeamSystemState = async (context: JoinContext): Promise<Response | null> => {
+  const { error } = await context.supabase.from('user_system').upsert({
+    user_id: context.userId,
+    [teamIdColumnForMode(context.gameMode)]: context.teamId,
+    updated_at: new Date().toISOString(),
+  });
+  if (!error) return null;
+  console.error('user_system upsert failed:', error);
+  return createErrorResponse('Failed to update user system state', 500, context.req);
+};
+const persistJoin = async (context: JoinContext): Promise<Response | null> => {
+  const insertError = await insertMembership(context);
+  if (insertError) return insertError;
+  await recordJoinEvent(context);
+  return updateTeamSystemState(context);
+};
+const createJoinResponse = (context: JoinContext) =>
+  createSuccessResponse(
+    {
+      success: true,
+      message: 'Successfully joined team',
+      team: { id: context.team.id, name: context.team.name, gameMode: context.gameMode },
+    },
+    200,
+    context.req
+  );
+const handleTeamJoin = async (req: Request): Promise<Response> => {
+  const prepared = await prepareJoin(req);
+  if (prepared.response) return prepared.response;
+  const eligibilityError = await validateJoinEligibility(prepared.value);
+  if (eligibilityError) return eligibilityError;
+  const persistError = await persistJoin(prepared.value);
+  if (persistError) return persistError;
+  return createJoinResponse(prepared.value);
+};
+Deno.serve((req) =>
+  handleTeamJoin(req).catch((error) => {
+    console.error('Team join error:', error);
+    return createErrorResponse('Internal server error', 500, req);
+  })
+);

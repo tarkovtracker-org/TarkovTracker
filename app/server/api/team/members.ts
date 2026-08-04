@@ -67,13 +67,14 @@ function mapProfile(p: ProfileRow, gameMode: GameMode, gameEdition: unknown): Me
   const completions =
     progress.taskCompletions && typeof progress.taskCompletions === 'object'
       ? Object.values(progress.taskCompletions as Record<string, unknown>)
-      : [];
-  const tasksCompleted = completions.filter(
-    (completion) =>
-      completion &&
-      typeof completion === 'object' &&
-      (completion as { complete?: unknown }).complete === true
-  ).length;
+      : null;
+  const tasksCompleted =
+    completions?.filter(
+      (completion) =>
+        completion &&
+        typeof completion === 'object' &&
+        (completion as { complete?: unknown }).complete === true
+    ).length ?? null;
   return {
     displayName: sanitizeProfileDisplayName(progress.displayName),
     gameEdition:
@@ -369,13 +370,24 @@ export default defineEventHandler(async (event) => {
         user_id: idsParam,
       })
     );
-    const editionsResp = await serviceFetch(
-      buildRestPath('user_progress', {
-        select: 'user_id,game_edition',
-        user_id: idsParam,
-      })
-    );
-    const editions = editionsResp?.ok ? ((await editionsResp.json()) as EditionRow[]) : [];
+    let editions: EditionRow[] = [];
+    try {
+      const editionsResp = await serviceFetch(
+        buildRestPath('user_progress', {
+          select: 'user_id,game_edition',
+          user_id: idsParam,
+        })
+      );
+      if (editionsResp?.ok) {
+        editions = (await editionsResp.json()) as EditionRow[];
+      } else {
+        logger.warn('Team edition metadata fetch failed', { status: editionsResp?.status });
+      }
+    } catch (error) {
+      logger.warn('Team edition metadata fetch failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     const editionsByUserId = new Map(editions.map((row) => [row.user_id, row.game_edition]));
     if (profilesResp.ok) {
       const profiles = (await profilesResp.json()) as ProfileRow[];

@@ -304,6 +304,49 @@ describe('Team Members API', () => {
     });
   });
   describe('Profile fallback handling', () => {
+    it('keeps profiles available when optional edition metadata fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+        mockFetch
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => [
+              { game_mode: 'seasonal', user_id: '11111111-1111-4111-8111-111111111111' },
+            ],
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => [
+              {
+                user_id: '11111111-1111-4111-8111-111111111111',
+                progress_data: { displayName: 'Seasonal Player', level: 12 },
+              },
+            ],
+          })
+          .mockResolvedValueOnce({ ok: false, status: 503 });
+        const { default: handler } = await import('@/server/api/team/members');
+        const result = await handler(mockEvent as H3Event);
+        expect(result.profiles['11111111-1111-4111-8111-111111111111']).toEqual({
+          displayName: 'Seasonal Player',
+          gameEdition: 1,
+          gameMode: 'seasonal',
+          level: 12,
+          tasksCompleted: null,
+        });
+        expect(warnSpy).toHaveBeenCalledWith(
+          '[TeamMembers]',
+          'Team edition metadata fetch failed',
+          { status: 503 }
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
     it('should fall back to individual fetches if bulk fetch fails', async () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       try {

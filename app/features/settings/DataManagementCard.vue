@@ -313,7 +313,11 @@
                 :disabled-modes="[GAME_MODES.SEASONAL]"
               />
               <p class="text-warning-300 text-xs">
-                {{ $t('settings.data_management.seasonal_import_locked') }}
+                {{
+                  $t('settings.data_management.seasonal_import_locked', {
+                    season: ACTIVE_SEASON_NUMBER,
+                  })
+                }}
               </p>
             </div>
             <div class="flex gap-2">
@@ -880,7 +884,7 @@
               >
                 {{ $t('common.confirm_import') }}
               </UButton>
-              <UButton variant="soft" color="neutral" class="flex-1" @click="resetBackupImport()">
+              <UButton variant="soft" color="neutral" class="flex-1" @click="resetBackupPreview">
                 {{ $t('common.cancel') }}
               </UButton>
             </div>
@@ -961,6 +965,7 @@
   } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
+    ACTIVE_SEASON_NUMBER,
     GAME_MODES,
     sortSkillsByGameOrder,
     type GameMode,
@@ -1007,6 +1012,10 @@
   } = dataManagementSession.backup;
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
   const importTarget = ref<GameMode | 'all'>('all');
+  function resetBackupPreview() {
+    importTarget.value = 'all';
+    resetBackupImport();
+  }
   async function handleExportProgress() {
     try {
       await exportProgress();
@@ -1037,17 +1046,19 @@
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+    importTarget.value = 'all';
     await parseBackupFile(file);
     input.value = '';
   }
+  const backupTargetIncludes = (mode: GameMode): boolean =>
+    importTarget.value === mode || importTarget.value === 'all';
   async function handleBackupConfirm() {
-    await confirmBackupImport({
-      pvp: importTarget.value === GAME_MODES.PVP || importTarget.value === 'all',
-      pve: importTarget.value === GAME_MODES.PVE || importTarget.value === 'all',
-      seasonal:
-        backupPreview.value?.seasonal !== null &&
-        (importTarget.value === GAME_MODES.SEASONAL || importTarget.value === 'all'),
-    });
+    const selection = {
+      pvp: backupTargetIncludes(GAME_MODES.PVP),
+      pve: backupTargetIncludes(GAME_MODES.PVE),
+      seasonal: backupPreview.value?.seasonal !== null && backupTargetIncludes(GAME_MODES.SEASONAL),
+    };
+    await confirmBackupImport(selection);
     if (backupImportState.value === 'success') {
       toast.add({
         title: t('settings.data_management.import_success_title'),
@@ -1132,9 +1143,7 @@
       value: TARKOV_DEV_ARENA_MODE,
     },
   ]);
-  function isTarkovDevImportableMode(
-    mode: GameMode | typeof TARKOV_DEV_ARENA_MODE
-  ): mode is ImportableGameMode {
+  function isTarkovDevImportableMode(mode: unknown): mode is ImportableGameMode {
     return mode === GAME_MODES.PVP || mode === GAME_MODES.PVE;
   }
   const isTarkovDevRefetchModeSupported = computed(() =>
@@ -1247,8 +1256,7 @@
     sourceMode: GameMode | null | undefined,
     fallbackMode?: ImportableGameMode
   ) {
-    const targetMode =
-      sourceMode && isTarkovDevImportableMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
+    const targetMode = isTarkovDevImportableMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
     tarkovDevFixedTargetMode.value = targetMode;
     if (!targetMode) return;
     tarkovDevRefetchMode.value = targetMode;

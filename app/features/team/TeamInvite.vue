@@ -37,7 +37,7 @@
     useSystemStoreWithSupabase,
   } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import { GAME_MODE_VALUES, GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const { systemStore } = useSystemStoreWithSupabase();
   const tarkovStore = useTarkovStore();
@@ -52,11 +52,13 @@
     return !!(route.query.team && route.query.code);
   });
   const inInviteTeam = computed(() => {
-    const currentTeamId = getTeamIdFromState(systemStore.$state, getCurrentGameMode());
     const queryTeam = route.query.team;
     const inviteTeamId = Array.isArray(queryTeam) ? queryTeam[0] : queryTeam;
-    if (!inviteTeamId || !currentTeamId) return false;
-    return String(currentTeamId) === String(inviteTeamId);
+    if (!inviteTeamId) return false;
+    return GAME_MODE_VALUES.some((mode) => {
+      const currentTeamId = getTeamIdFromState(systemStore.$state, mode);
+      return currentTeamId !== null && String(currentTeamId) === String(inviteTeamId);
+    });
   });
   const declined = ref(false);
   const accepting = ref(false);

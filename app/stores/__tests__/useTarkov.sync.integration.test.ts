@@ -19,6 +19,7 @@ const {
   i18nTranslate,
   loggerMock,
   metadataStoreMock,
+  modeProgressResult,
   pauseSync,
   resumeSync,
   setRealtimeCallback,
@@ -108,17 +109,36 @@ const {
     data: createRemoteRow(),
     error: null,
   }));
+  const modeProgressResult: {
+    data: Array<{ game_mode: string; progress_data: unknown; season_number: number }>;
+    error: SupabaseErrorLike;
+  } = { data: [], error: null };
+  const modeProgressQuery = {
+    in: vi.fn(),
+    then: <TResult1 = typeof modeProgressResult, TResult2 = never>(
+      onfulfilled?: ((value: typeof modeProgressResult) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+    ) => Promise.resolve(modeProgressResult).then(onfulfilled, onrejected),
+  };
+  modeProgressQuery.in.mockImplementation(() => modeProgressQuery);
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
   const upsert = vi.fn(async (_name?: string, _args?: SyncRpcArgs): Promise<UpsertResult> => ({
     error: null,
   }));
-  const from = vi.fn(() => ({
-    eq,
-    select,
-    single,
-    upsert,
-  }));
+  const from = vi.fn((table: string) => {
+    if (table === 'user_game_mode_progress') {
+      return {
+        select: vi.fn(() => ({ eq: vi.fn(() => modeProgressQuery) })),
+      };
+    }
+    return {
+      eq,
+      select,
+      single,
+      upsert,
+    };
+  });
   const channel = {
     on: vi.fn((_: string, __: Record<string, unknown>, callback: typeof realtimeState.callback) => {
       realtimeState.callback = callback;
@@ -166,6 +186,7 @@ const {
     i18nTranslate,
     loggerMock,
     metadataStoreMock,
+    modeProgressResult,
     pauseSync,
     resumeSync,
     setRealtimeCallback: (callback: ((payload: { new: unknown; old: unknown }) => void) | null) => {
@@ -320,6 +341,8 @@ describe('useTarkov sync integration', () => {
     metadataStoreMock.refresh.mockClear();
     metadataStoreMock.refresh.mockResolvedValue(undefined);
     metadataStoreMock.tasks = [];
+    modeProgressResult.data = [];
+    modeProgressResult.error = null;
     single.mockResolvedValue({ data: createRemoteRow(), error: null });
     upsert.mockResolvedValue({ error: null });
     channel.on.mockImplementation((_: string, __: Record<string, unknown>, callback) => {
@@ -1489,6 +1512,28 @@ describe('useTarkov sync integration', () => {
     expect(loggerMock.error).toHaveBeenCalledWith(
       '[TarkovStore] Failed to persist post-load data migration/repair:',
       expect.objectContaining({ message: 'post-load cleanup failed' })
+    );
+  });
+  it('aborts initialization when normalized mode progress cannot be loaded', async () => {
+    modeProgressResult.error = { message: 'mode progress unavailable' };
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[TarkovStore] Could not load normalized mode progress',
+      expect.objectContaining({ message: 'mode progress unavailable' })
+    );
+  });
+  it('preserves local progress when online profile reset fails', async () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.pvp.level = 42;
+    });
+    upsert.mockResolvedValueOnce({ error: { message: 'reset failed' } });
+    await store.resetOnlineProfile();
+    expect(store.pvp.level).toBe(42);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      'Error resetting online profile:',
+      expect.objectContaining({ message: 'Failed to reset online profile: reset failed' })
     );
   });
   it('shows load_failed and aborts sync for multi-provider account with no progress row', async () => {

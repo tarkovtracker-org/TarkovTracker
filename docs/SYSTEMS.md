@@ -563,6 +563,9 @@ flowchart LR
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
 - `app/composables/useDataBackup.ts` — season-aware native backups
+- `app/server/api/profile/[userId]/[mode].get.ts`,
+  `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
+  mode-aware sharing and team routes
 - `app/utils/constants.ts`, `workers/api-gateway/src/utils/gameMode.ts` — runtime active-season
   constants and upstream mode mapping
 
@@ -574,7 +577,8 @@ flowchart LR
 - Historical Seasonal rows are retained but never merged into the active season.
 - Authenticated users can write only their own progress. Teammate reads require a shared team in
   the same game mode; cross-mode teammates and outsiders cannot read a row.
-- `user_progress` is owner-only. Account-wide teammate metadata is exposed only through the
+- New clients read teammate progress from mode rows. The legacy teammate policy on `user_progress`
+  remains during rolling deployment; account-wide metadata for new clients is exposed through the
   authenticated team-members endpoint after explicit membership validation.
 - The public API, profile sharing, teams, prestige, backups, and streamer tools use the exact mode
   and active season. No Seasonal operation may silently fall back to persistent PvP.

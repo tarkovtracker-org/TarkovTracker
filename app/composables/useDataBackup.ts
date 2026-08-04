@@ -232,6 +232,79 @@ function sanitizeProgressData(
     data: sanitizeOwnedProgressData(stripped),
   };
 }
+type SanitizedBackupModes = {
+  pve: UserProgressData;
+  pvp: UserProgressData;
+  seasonal: UserProgressData | null;
+};
+const validateBackupFormat = (json: Record<string, unknown>): string | null => {
+  if (json._format !== BACKUP_FORMAT) return 'Invalid file format — not a TarkovTracker backup';
+  if (!SUPPORTED_VERSIONS.includes(json._version as (typeof SUPPORTED_VERSIONS)[number])) {
+    return `Unsupported backup version: ${json._version}`;
+  }
+  return null;
+};
+const isValidBackupEdition = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 6;
+const isValidBackupMode = (json: Record<string, unknown>): boolean =>
+  isGameMode(json.currentGameMode) &&
+  (json._version !== 1 || json.currentGameMode !== GAME_MODES.SEASONAL);
+const validateBackupIdentity = (json: Record<string, unknown>): string | null => {
+  if (!isValidBackupMode(json)) return 'Invalid currentGameMode';
+  if (!isValidBackupEdition(json.gameEdition)) {
+    return 'Invalid gameEdition — must be integer 1-6';
+  }
+  return null;
+};
+const isValidBackupTarkovUid = (value: unknown): boolean =>
+  value === null || (typeof value === 'number' && Number.isFinite(value));
+const isValidBackupSeasonNumber = (value: unknown): boolean =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0;
+const validateBackupAccount = (json: Record<string, unknown>): string | null => {
+  if (!isValidBackupTarkovUid(json.tarkovUid)) {
+    return 'Invalid tarkovUid — must be a number or null';
+  }
+  if (json._version === 2 && !isValidBackupSeasonNumber(json.seasonNumber)) {
+    return 'Invalid seasonNumber';
+  }
+  return null;
+};
+type SanitizedModeResult = { ok: true; data: UserProgressData } | { ok: false; error: string };
+const sanitizeNamedBackupMode = (label: string, raw: unknown): SanitizedModeResult => {
+  const result = sanitizeProgressData(raw);
+  return result.ok ? result : { ok: false, error: `${label} data: ${result.error}` };
+};
+const sanitizePersistentBackupModes = (
+  json: Record<string, unknown>
+): { ok: true; pve: UserProgressData; pvp: UserProgressData } | { ok: false; error: string } => {
+  const pvp = sanitizeNamedBackupMode('PvP', json.pvp);
+  if (!pvp.ok) return pvp;
+  const pve = sanitizeNamedBackupMode('PvE', json.pve);
+  if (!pve.ok) return pve;
+  return { ok: true, pve: pve.data, pvp: pvp.data };
+};
+const sanitizeSeasonalBackupMode = (
+  json: Record<string, unknown>
+): SanitizedModeResult | { ok: true; data: null } => {
+  if (json._version !== 2) return { ok: true, data: null };
+  return sanitizeNamedBackupMode('Seasonal', json.seasonal);
+};
+const sanitizeBackupModes = (
+  json: Record<string, unknown>
+): { ok: true; data: SanitizedBackupModes } | { ok: false; error: string } => {
+  const persistent = sanitizePersistentBackupModes(json);
+  if (!persistent.ok) return persistent;
+  const seasonal = sanitizeSeasonalBackupMode(json);
+  if (!seasonal.ok) return seasonal;
+  return {
+    ok: true,
+    data: {
+      pvp: persistent.pvp,
+      pve: persistent.pve,
+      seasonal: seasonal.data,
+    },
+  };
+};
 function validateBackup(json: unknown):
   | {
       ok: true;
@@ -246,57 +319,22 @@ function validateBackup(json: unknown):
   if (!isPlainObject(json)) {
     return { ok: false, error: 'Invalid file format — expected a JSON object' };
   }
-  if (json._format !== BACKUP_FORMAT) {
-    return { ok: false, error: 'Invalid file format — not a TarkovTracker backup' };
-  }
-  if (!SUPPORTED_VERSIONS.includes(json._version as (typeof SUPPORTED_VERSIONS)[number])) {
-    return { ok: false, error: `Unsupported backup version: ${json._version}` };
-  }
-  if (
-    !isGameMode(json.currentGameMode) ||
-    (json._version === 1 && json.currentGameMode === GAME_MODES.SEASONAL)
-  ) {
-    return { ok: false, error: 'Invalid currentGameMode' };
-  }
-  const edition = json.gameEdition;
-  if (typeof edition !== 'number' || !Number.isInteger(edition) || edition < 1 || edition > 6) {
-    return { ok: false, error: 'Invalid gameEdition — must be integer 1-6' };
-  }
-  if (
-    json.tarkovUid !== null &&
-    (typeof json.tarkovUid !== 'number' || !Number.isFinite(json.tarkovUid))
-  ) {
-    return { ok: false, error: 'Invalid tarkovUid — must be a number or null' };
-  }
-  const pvpResult = sanitizeProgressData(json.pvp);
-  if (!pvpResult.ok) {
-    return { ok: false, error: `PvP data: ${pvpResult.error}` };
-  }
-  const pveResult = sanitizeProgressData(json.pve);
-  if (!pveResult.ok) {
-    return { ok: false, error: `PvE data: ${pveResult.error}` };
-  }
-  const seasonalResult =
-    json._version === 2 ? sanitizeProgressData(json.seasonal) : ({ ok: true, data: null } as const);
-  if (!seasonalResult.ok) {
-    return { ok: false, error: `Seasonal data: ${seasonalResult.error}` };
-  }
-  if (
-    json._version === 2 &&
-    (typeof json.seasonNumber !== 'number' ||
-      !Number.isInteger(json.seasonNumber) ||
-      json.seasonNumber <= 0)
-  ) {
-    return { ok: false, error: 'Invalid seasonNumber' };
-  }
+  const validationError = [
+    validateBackupFormat(json),
+    validateBackupIdentity(json),
+    validateBackupAccount(json),
+  ].find((error) => error !== null);
+  if (validationError) return { ok: false, error: validationError };
+  const modes = sanitizeBackupModes(json);
+  if (!modes.ok) return modes;
   const seasonal =
-    json._version === 2 && json.seasonNumber === ACTIVE_SEASON_NUMBER ? seasonalResult.data : null;
+    json._version === 2 && json.seasonNumber === ACTIVE_SEASON_NUMBER ? modes.data.seasonal : null;
   return {
     ok: true,
     data: {
       export: json as unknown as TarkovTrackerExport,
-      pvp: pvpResult.data,
-      pve: pveResult.data,
+      pvp: modes.data.pvp,
+      pve: modes.data.pve,
       seasonal,
     },
   };
@@ -796,7 +834,12 @@ export function useDataBackup(): UseDataBackupReturn {
       const exportData = parsedExport;
       const importPvp = targetModes.pvp;
       const importPve = targetModes.pve;
-      const importSeasonal = targetModes.seasonal && parsedSeasonal !== null;
+      const importSeasonal = targetModes.seasonal === true && parsedSeasonal !== null;
+      const importedModes: Record<GameMode, boolean> = {
+        pvp: importPvp,
+        pve: importPve,
+        seasonal: importSeasonal,
+      };
       const importAllAvailable =
         importPvp && importPve && (parsedSeasonal === null || importSeasonal);
       if (!importPvp && !importPve && !importSeasonal) {
@@ -816,7 +859,7 @@ export function useDataBackup(): UseDataBackupReturn {
           state.gameEdition = exportData.gameEdition;
           state.tarkovUid = exportData.tarkovUid;
         }
-        if (targetModes[exportData.currentGameMode]) {
+        if (importedModes[exportData.currentGameMode]) {
           state.currentGameMode = exportData.currentGameMode;
         } else if (importPvp) {
           state.currentGameMode = GAME_MODES.PVP;

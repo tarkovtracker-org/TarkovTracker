@@ -1306,6 +1306,32 @@ describe('useDataBackup', () => {
       expect(mockState.tarkovUid).toBe(12345);
       expect(mockState.currentGameMode).toBe('pve');
     });
+    it('does not activate Seasonal when its historical progress was not imported', async () => {
+      const historicalSeasonBackup = {
+        ...validBackup,
+        _version: 2,
+        currentGameMode: 'seasonal',
+        seasonNumber: 2,
+        seasonal: validBackup.pvp,
+      };
+      const { parseBackupFile, confirmBackupImport } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(historicalSeasonBackup)));
+      await confirmBackupImport({ pvp: true, pve: true, seasonal: true });
+      const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+        state: Record<string, unknown>
+      ) => void;
+      const mockState = {
+        currentGameMode: 'pve',
+        gameEdition: 1,
+        pvp: { level: 1, progressEpoch: 5 },
+        pve: { level: 1, progressEpoch: 7 },
+        seasonal: { level: 30, progressEpoch: 2 },
+        tarkovUid: null,
+      };
+      patchFn(mockState);
+      expect(mockState.currentGameMode).toBe('pvp');
+      expect(mockState.seasonal).toEqual({ level: 30, progressEpoch: 2 });
+    });
     it.each(['pvp', 'pve'] as const)(
       'ignores legacy tarkovUidMode=%s metadata in backup payloads',
       async (legacyMode) => {

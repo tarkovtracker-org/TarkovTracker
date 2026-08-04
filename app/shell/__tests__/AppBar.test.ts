@@ -57,17 +57,20 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     locale: localeRef,
     setLocale,
     t: (key: string, params?: Record<string, unknown> | string) => {
+      const templates: Record<string, string> = {
+        'common.pve': 'PVE',
+        'common.pvp': 'PVP',
+        'common.seasonal_pvp': 'SEASONAL PVP',
+        'profile.title_with_mode': '{name} Profile {mode}',
+      };
       if (params && typeof params === 'object' && !Array.isArray(params)) {
-        const templates: Record<string, string> = {
-          'profile.title_with_mode': '{name} Profile {mode}',
-        };
         const template = templates[key] ?? key;
         return Object.entries(params).reduce(
           (result, [k, v]) => result.replaceAll(`{${k}}`, String(v)),
           template
         );
       }
-      return key;
+      return templates[key] ?? key;
     },
     te: () => false,
   }),

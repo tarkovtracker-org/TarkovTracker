@@ -14,11 +14,11 @@ import {
   type OverlaySize,
 } from '@/features/streamer-tools/composables/useStreamerToolsSettings';
 import {
-  GAME_MODE_VALUES,
-  getGameModeSeasonNumber,
-  isGameMode,
-  type GameMode,
-} from '@/utils/constants';
+  createProfileVisibility,
+  isCurrentProfileVisibilityRequest,
+  loadCurrentProfileVisibility,
+} from '@/utils/profileVisibility';
+import type { GameMode } from '@/utils/constants';
 interface IntervalOption {
   label: string;
   value: number;
@@ -224,25 +224,34 @@ export function useStreamerToolsOverlay() {
       ? $supabase.user.id
       : null
   );
-  const modeVisibility = reactive<Record<GameMode, boolean>>({
-    pvp: false,
-    pve: false,
-    seasonal: false,
-  });
+  const modeVisibility = reactive(createProfileVisibility());
+  let modeVisibilityLoadId = 0;
   const loadModeVisibility = async () => {
-    for (const mode of GAME_MODE_VALUES) modeVisibility[mode] = false;
+    const requestId = ++modeVisibilityLoadId;
+    Object.assign(modeVisibility, createProfileVisibility());
     const userId = currentUserId.value;
     if (!userId) return;
-    const { data } = await $supabase.client
-      .from('user_game_mode_progress')
-      .select('game_mode,season_number,profile_public')
-      .eq('user_id', userId);
-    for (const row of data ?? []) {
-      if (!isGameMode(row.game_mode)) continue;
-      const mode = row.game_mode;
-      if (row.season_number !== getGameModeSeasonNumber(mode)) continue;
-      modeVisibility[mode] = row.profile_public === true;
-    }
+    const result = await loadCurrentProfileVisibility(
+      () =>
+        $supabase.client
+          .from('user_game_mode_progress')
+          .select('game_mode,season_number,profile_public')
+          .eq('user_id', userId),
+      () =>
+        isCurrentProfileVisibilityRequest(
+          requestId,
+          modeVisibilityLoadId,
+          userId,
+          currentUserId.value
+        )
+    );
+    if (!result.current) return;
+    if (!result.error) Object.assign(modeVisibility, result.visibility);
+    else
+      logger.warn('[StreamerToolsOverlay] Failed to load profile visibility:', {
+        error: result.error,
+        userId,
+      });
   };
   const isModePublic = computed(() => modeVisibility[selectedMode.value] === true);
   watch(currentUserId, () => void loadModeVisibility(), { immediate: true });

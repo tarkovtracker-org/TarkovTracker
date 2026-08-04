@@ -79,7 +79,7 @@
                 @click="selectedMode = GAME_MODES.SEASONAL"
               >
                 <UIcon name="i-mdi-calendar-star" class="h-3.5 w-3.5 shrink-0" />
-                <span class="leading-none">S1</span>
+                <span class="leading-none">S{{ ACTIVE_SEASON_NUMBER }}</span>
               </button>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -266,6 +266,11 @@
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
+  import {
+    createProfileVisibility,
+    isCurrentProfileVisibilityRequest,
+    loadCurrentProfileVisibility,
+  } from '@/utils/profileVisibility';
   import { computeInvalidProgress } from '@/utils/progressInvalidation';
   import {
     orderedStoryObjectives,
@@ -426,33 +431,41 @@
       normalizeMode(route.query.mode) ??
       tarkovStore.getCurrentGameMode()
   );
-  const profileVisibility = reactive<Record<GameMode, boolean>>({
-    pvp: false,
-    pve: false,
-    seasonal: false,
-  });
-  const loadProfileVisibility = async () => {
-    profileVisibility.pvp = false;
-    profileVisibility.pve = false;
-    profileVisibility.seasonal = false;
-    const userId = $supabase.user.id;
-    if (!$supabase.user.loggedIn || !userId) return;
-    const { data, error } = await $supabase.client
-      .from('user_game_mode_progress')
-      .select('game_mode,season_number,profile_public')
-      .eq('user_id', userId)
-      .in('game_mode', [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]);
-    if (error) {
-      logger.warn('[Profile] Failed to load profile visibility:', error);
+  const profileVisibility = reactive(createProfileVisibility());
+  let profileVisibilityLoadId = 0;
+  const currentProfileUserId = () => ($supabase.user.loggedIn ? $supabase.user.id : null);
+  const applyLoadedProfileVisibility = (
+    result: Awaited<ReturnType<typeof loadCurrentProfileVisibility>>,
+    userId: string
+  ) => {
+    if (!result.current) return;
+    if (result.error) {
+      logger.warn('[Profile] Failed to load profile visibility:', { error: result.error, userId });
       return;
     }
-    for (const row of data ?? []) {
-      const mode = row.game_mode as GameMode;
-      if (!(mode in profileVisibility)) continue;
-      const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
-      if (row.season_number !== expectedSeason) continue;
-      profileVisibility[mode] = row.profile_public === true;
-    }
+    Object.assign(profileVisibility, result.visibility);
+  };
+  const loadProfileVisibility = async () => {
+    const requestId = ++profileVisibilityLoadId;
+    Object.assign(profileVisibility, createProfileVisibility());
+    const userId = currentProfileUserId();
+    if (!userId) return;
+    const result = await loadCurrentProfileVisibility(
+      () =>
+        $supabase.client
+          .from('user_game_mode_progress')
+          .select('game_mode,season_number,profile_public')
+          .eq('user_id', userId)
+          .in('game_mode', [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]),
+      () =>
+        isCurrentProfileVisibilityRequest(
+          requestId,
+          profileVisibilityLoadId,
+          userId,
+          currentProfileUserId()
+        )
+    );
+    applyLoadedProfileVisibility(result, userId);
   };
   watch(
     () => ($supabase.user.loggedIn ? $supabase.user.id : null),

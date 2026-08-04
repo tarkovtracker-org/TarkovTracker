@@ -798,6 +798,7 @@ export type Database = {
           is_admin: boolean
           pve_team_id: string | null
           pvp_team_id: string | null
+          seasonal_team_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -807,6 +808,7 @@ export type Database = {
           is_admin?: boolean
           pve_team_id?: string | null
           pvp_team_id?: string | null
+          seasonal_team_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -816,6 +818,7 @@ export type Database = {
           is_admin?: boolean
           pve_team_id?: string | null
           pvp_team_id?: string | null
+          seasonal_team_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -830,6 +833,13 @@ export type Database = {
           {
             foreignKeyName: "user_system_team_id_fkey"
             columns: ["pvp_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_system_seasonal_team_id_fkey"
+            columns: ["seasonal_team_id"]
             isOneToOne: false
             referencedRelation: "teams"
             referencedColumns: ["id"]

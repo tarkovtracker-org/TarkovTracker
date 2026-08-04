@@ -157,96 +157,109 @@
   const showNotification = (message: string, color: 'primary' | 'error' = 'primary') => {
     toast.add({ title: message, color: color === 'error' ? 'error' : 'primary' });
   };
+  const restoreExistingMembership = async (mode: GameMode): Promise<boolean> => {
+    const { data, error } = await $supabase.client
+      .from('team_memberships')
+      .select('team_id')
+      .eq('user_id', $supabase.user.id)
+      .eq('game_mode', mode)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data?.team_id) return false;
+    setLocalTeamId(mode, data.team_id);
+    showNotification(
+      `You are already in a ${mode.toUpperCase()} team. Leave your current team first.`,
+      'error'
+    );
+    return true;
+  };
+  const applyCreatedTeam = (
+    result: CreateTeamResponse,
+    generatedJoinCode: string,
+    mode: GameMode
+  ) => {
+    if (!result.team) throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
+    const team = result.team as typeof result.team & { join_code?: string; joinCode?: string };
+    const joinCode = team.joinCode ?? team.join_code ?? generatedJoinCode;
+    setLocalTeamId(mode, team.id);
+    teamStore.$patch({
+      joinCode,
+      join_code: joinCode,
+      owner: team.ownerId,
+      owner_id: team.ownerId,
+      members: [team.ownerId],
+    } as Partial<TeamState>);
+  };
+  const verifyCreatedMembership = async (teamId: string, mode: GameMode) => {
+    await delay(500);
+    const { data, error } = await $supabase.client
+      .from('team_memberships')
+      .select('team_id')
+      .eq('user_id', $supabase.user.id)
+      .eq('team_id', teamId)
+      .eq('game_mode', mode)
+      .maybeSingle();
+    if (error) logger.error('[MyTeam] Verification query error:', error);
+    if (!data) throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
+  };
+  const ensureOwnerDisplayName = async (ownerId: string) => {
+    await nextTick();
+    if (ownerId !== $supabase.user.id || tarkovStore.getDisplayName()) return;
+    tarkovStore.setDisplayName(`${tarkovStore.getCurrentGameMode().toUpperCase()}-PMC`);
+  };
+  const getTeamErrorDetailMessage = (details: unknown): string | null => {
+    if (!details) return null;
+    if (typeof details !== 'object') return null;
+    if (!('error' in details)) return null;
+    return String(details.error);
+  };
+  const getDetailedTeamError = (error: object): string | null => {
+    if (!('details' in error)) return null;
+    return getTeamErrorDetailMessage(error.details);
+  };
+  const toErrorObject = (error: unknown): object | null => {
+    if (!error) return null;
+    if (typeof error !== 'object') return null;
+    return error;
+  };
+  const getCreateTeamErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) return error.message;
+    const errorObject = toErrorObject(error);
+    const detailed = errorObject ? getDetailedTeamError(errorObject) : null;
+    if (detailed) return detailed;
+    return t('page.team.card.myteam.create_team_error');
+  };
+  const requireCreatedTeam = (result: CreateTeamResponse) => {
+    if (!result.team) throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
+    return result.team;
+  };
+  const createTeamWorkflow = async () => {
+    validateAuth();
+    const currentGameMode = getCurrentGameMode();
+    if (await restoreExistingMembership(currentGameMode)) return;
+    const generatedJoinCode = buildJoinCode();
+    const result = (await createTeam(
+      buildTeamName(),
+      generatedJoinCode,
+      5,
+      currentGameMode
+    )) as CreateTeamResponse;
+    const team = requireCreatedTeam(result);
+    applyCreatedTeam(result, generatedJoinCode, currentGameMode);
+    await verifyCreatedMembership(team.id, currentGameMode);
+    await ensureOwnerDisplayName(team.ownerId);
+    showNotification(t('page.team.card.myteam.create_team_success'));
+  };
   const handleCreateTeam = async () => {
     loading.value.createTeam = true;
-    const generatedJoinCode = buildJoinCode();
-    const generatedTeamName = buildTeamName();
-    const currentGameMode = getCurrentGameMode();
     try {
-      validateAuth();
-      const { data: membership, error: membershipError } = await $supabase.client
-        .from('team_memberships')
-        .select('team_id, game_mode')
-        .eq('user_id', $supabase.user.id)
-        .eq('game_mode', currentGameMode)
-        .maybeSingle();
-      if (membershipError) {
-        logger.error('[MyTeam] Error checking membership:', membershipError);
-        throw membershipError;
-      }
-      if (membership?.team_id) {
-        setLocalTeamId(currentGameMode, membership.team_id);
-        showNotification(
-          `You are already in a ${currentGameMode.toUpperCase()} team. Leave your current team first.`,
-          'error'
-        );
-        loading.value.createTeam = false;
-        return;
-      }
-      const result = (await createTeam(
-        generatedTeamName,
-        generatedJoinCode,
-        5,
-        currentGameMode
-      )) as CreateTeamResponse;
-      if (!result?.team) {
-        logger.error('[MyTeam] Invalid response structure - missing team object');
-        throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
-      }
-      setLocalTeamId(currentGameMode, result.team.id);
-      const teamResponse = result.team as unknown as {
-        id: string;
-        ownerId: string;
-        joinCode?: string;
-        join_code?: string;
-      };
-      const joinCode = teamResponse.joinCode ?? teamResponse.join_code ?? generatedJoinCode;
-      teamStore.$patch({
-        joinCode: joinCode,
-        join_code: joinCode,
-        owner: result.team.ownerId,
-        owner_id: result.team.ownerId,
-        members: [result.team.ownerId],
-      } as Partial<TeamState>);
-      await delay(500);
-      const { data: verification, error: verificationError } = await $supabase.client
-        .from('team_memberships')
-        .select('team_id, game_mode')
-        .eq('user_id', $supabase.user.id)
-        .eq('team_id', result.team.id)
-        .eq('game_mode', currentGameMode)
-        .maybeSingle();
-      if (verificationError) {
-        logger.error('[MyTeam] Verification query error:', verificationError);
-      }
-      if (!verification) {
-        logger.error('[MyTeam] Team membership not found in database after creation');
-        throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
-      }
-      await nextTick();
-      if (result.team.ownerId === $supabase.user.id) {
-        if (!tarkovStore.getDisplayName()) {
-          const defaultName = `${tarkovStore.getCurrentGameMode().toUpperCase()}-PMC`;
-          tarkovStore.setDisplayName(defaultName);
-        }
-      }
-      showNotification(t('page.team.card.myteam.create_team_success'));
+      await createTeamWorkflow();
     } catch (error: unknown) {
       logger.error('[MyTeam] Error creating team:', error);
-      const message =
-        error &&
-        typeof error === 'object' &&
-        'details' in error &&
-        error.details &&
-        typeof error.details === 'object' &&
-        'error' in error.details
-          ? String(error.details.error)
-          : error instanceof Error
-            ? error.message
-            : t('page.team.card.myteam.create_team_error');
-      showNotification(message, 'error');
+      showNotification(getCreateTeamErrorMessage(error), 'error');
+    } finally {
+      loading.value.createTeam = false;
     }
-    loading.value.createTeam = false;
   };
   const handleLeaveTeam = async () => {
     loading.value.leaveTeam = true;

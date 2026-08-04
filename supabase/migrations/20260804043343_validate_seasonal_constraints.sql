@@ -1,0 +1,14 @@
+ALTER TABLE public.user_progress
+  VALIDATE CONSTRAINT user_progress_current_game_mode_check;
+ALTER TABLE public.teams
+  VALIDATE CONSTRAINT teams_game_mode_check;
+ALTER TABLE public.team_memberships
+  VALIDATE CONSTRAINT team_memberships_game_mode_check;
+ALTER TABLE public.api_tokens
+  VALIDATE CONSTRAINT api_tokens_game_mode_check;
+ALTER TABLE public.api_tokens
+  VALIDATE CONSTRAINT api_tokens_token_value_game_mode_match;
+ALTER TABLE public.user_prestige_runs
+  VALIDATE CONSTRAINT user_prestige_runs_mode_check;
+ALTER TABLE public.user_prestige_runs
+  VALIDATE CONSTRAINT user_prestige_runs_season_check;

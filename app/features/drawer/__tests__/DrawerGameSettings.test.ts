@@ -38,10 +38,15 @@ describe('DrawerGameSettings', () => {
       global: {
         stubs: {
           UIcon: true,
+          USelectMenu: {
+            props: ['items'],
+            template:
+              '<button @click="$emit(\'update:modelValue\', items[1].value)">select</button>',
+          },
         },
       },
     });
-    wrapper.findComponent(SelectMenuFixed).vm.$emit('update:modelValue', GAME_MODES.PVE);
+    await wrapper.findComponent(SelectMenuFixed).find('button').trigger('click');
     await vi.waitFor(() => expect(switchGameModeMock).toHaveBeenCalled());
     expect(switchGameModeMock).toHaveBeenCalledWith(GAME_MODES.PVE);
     expect(fetchAllDataMock).toHaveBeenCalled();

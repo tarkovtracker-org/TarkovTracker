@@ -5,7 +5,7 @@ GRANT USAGE ON SCHEMA private TO authenticated;
 CREATE OR REPLACE FUNCTION private.active_season_number()
 RETURNS SMALLINT
 LANGUAGE sql
-IMMUTABLE
+STABLE
 SECURITY INVOKER
 SET search_path = ''
 AS $$
@@ -18,7 +18,8 @@ ALTER TABLE public.user_progress
   DROP CONSTRAINT IF EXISTS user_progress_current_game_mode_check;
 ALTER TABLE public.user_progress
   ADD CONSTRAINT user_progress_current_game_mode_check
-  CHECK (current_game_mode IN ('pvp', 'pve', 'seasonal'));
+  CHECK (current_game_mode IN ('pvp', 'pve', 'seasonal'))
+  NOT VALID;
 
 CREATE TABLE public.user_game_mode_progress (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -58,7 +59,8 @@ $$;
 
 CREATE OR REPLACE FUNCTION private.can_access_user_game_mode(
   p_user_id UUID,
-  p_game_mode TEXT
+  p_game_mode TEXT,
+  p_season_number SMALLINT
 )
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -77,17 +79,22 @@ AS $$
       WHERE viewer.user_id = (SELECT auth.uid())
         AND viewer.game_mode = p_game_mode
         AND teammate.user_id = p_user_id
+        AND (
+          p_game_mode <> 'seasonal'
+          OR p_season_number = private.active_season_number()
+        )
     );
 $$;
 
-REVOKE ALL ON FUNCTION private.can_access_user_game_mode(UUID, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private.can_access_user_game_mode(UUID, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION private.can_access_user_game_mode(UUID, TEXT, SMALLINT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.can_access_user_game_mode(UUID, TEXT, SMALLINT)
+  TO authenticated;
 
 CREATE POLICY "Users can view own and teammate mode progress"
   ON public.user_game_mode_progress
   FOR SELECT
   TO authenticated
-  USING ((SELECT private.can_access_user_game_mode(user_id, game_mode)));
+  USING ((SELECT private.can_access_user_game_mode(user_id, game_mode, season_number)));
 
 CREATE POLICY "Users can insert own mode progress"
   ON public.user_game_mode_progress
@@ -241,13 +248,6 @@ CREATE POLICY "Users can update own progress"
   USING ((SELECT auth.uid()) = user_id)
   WITH CHECK ((SELECT auth.uid()) = user_id);
 
-DROP POLICY IF EXISTS "Users can view own and teammates progress" ON public.user_progress;
-CREATE POLICY "Users can view own progress"
-  ON public.user_progress
-  FOR SELECT
-  TO authenticated
-  USING ((SELECT auth.uid()) = user_id);
-
 GRANT SELECT, INSERT, UPDATE ON public.user_progress TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_progress TO service_role;
 
@@ -342,10 +342,17 @@ GRANT EXECUTE ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIG
 
 ALTER TABLE public.teams DROP CONSTRAINT IF EXISTS teams_game_mode_check;
 ALTER TABLE public.teams
-  ADD CONSTRAINT teams_game_mode_check CHECK (game_mode IN ('pvp', 'pve', 'seasonal'));
+  ADD CONSTRAINT teams_game_mode_check CHECK (game_mode IN ('pvp', 'pve', 'seasonal'))
+  NOT VALID;
 ALTER TABLE public.team_memberships DROP CONSTRAINT IF EXISTS team_memberships_game_mode_check;
 ALTER TABLE public.team_memberships
-  ADD CONSTRAINT team_memberships_game_mode_check CHECK (game_mode IN ('pvp', 'pve', 'seasonal'));
+  ADD CONSTRAINT team_memberships_game_mode_check CHECK (game_mode IN ('pvp', 'pve', 'seasonal'))
+  NOT VALID;
+ALTER TABLE public.user_system
+  ADD COLUMN IF NOT EXISTS seasonal_team_id UUID
+  REFERENCES public.teams(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_user_system_seasonal_team_id
+  ON public.user_system(seasonal_team_id);
 
 CREATE OR REPLACE FUNCTION public.sync_user_system_team_memberships()
 RETURNS trigger
@@ -355,9 +362,10 @@ AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.game_mode = 'seasonal' THEN
-      RETURN NEW;
-    END IF;
-    IF NEW.game_mode = 'pve' THEN
+      UPDATE public.user_system
+      SET seasonal_team_id = NEW.team_id, updated_at = now()
+      WHERE user_id = NEW.user_id;
+    ELSIF NEW.game_mode = 'pve' THEN
       UPDATE public.user_system
       SET pve_team_id = NEW.team_id, updated_at = now()
       WHERE user_id = NEW.user_id;
@@ -371,9 +379,10 @@ BEGIN
 
   IF TG_OP = 'DELETE' THEN
     IF OLD.game_mode = 'seasonal' THEN
-      RETURN OLD;
-    END IF;
-    IF OLD.game_mode = 'pve' THEN
+      UPDATE public.user_system
+      SET seasonal_team_id = NULL, updated_at = now()
+      WHERE user_id = OLD.user_id AND seasonal_team_id = OLD.team_id;
+    ELSIF OLD.game_mode = 'pve' THEN
       UPDATE public.user_system
       SET pve_team_id = NULL, updated_at = now()
       WHERE user_id = OLD.user_id AND pve_team_id = OLD.team_id;
@@ -394,13 +403,18 @@ BEGIN
       UPDATE public.user_system
       SET pvp_team_id = NULL, updated_at = now()
       WHERE user_id = OLD.user_id AND pvp_team_id = OLD.team_id;
+    ELSIF OLD.game_mode = 'seasonal' THEN
+      UPDATE public.user_system
+      SET seasonal_team_id = NULL, updated_at = now()
+      WHERE user_id = OLD.user_id AND seasonal_team_id = OLD.team_id;
     END IF;
   END IF;
 
   IF NEW.game_mode = 'seasonal' THEN
-    RETURN NEW;
-  END IF;
-  IF NEW.game_mode = 'pve' THEN
+    UPDATE public.user_system
+    SET seasonal_team_id = NEW.team_id, updated_at = now()
+    WHERE user_id = NEW.user_id;
+  ELSIF NEW.game_mode = 'pve' THEN
     UPDATE public.user_system
     SET pve_team_id = NEW.team_id, updated_at = now()
     WHERE user_id = NEW.user_id;
@@ -469,7 +483,8 @@ $$;
 
 ALTER TABLE public.api_tokens DROP CONSTRAINT IF EXISTS api_tokens_game_mode_check;
 ALTER TABLE public.api_tokens
-  ADD CONSTRAINT api_tokens_game_mode_check CHECK (game_mode IN ('pvp', 'pve', 'seasonal'));
+  ADD CONSTRAINT api_tokens_game_mode_check CHECK (game_mode IN ('pvp', 'pve', 'seasonal'))
+  NOT VALID;
 ALTER TABLE public.api_tokens DROP CONSTRAINT IF EXISTS api_tokens_token_value_game_mode_match;
 ALTER TABLE public.api_tokens
   ADD CONSTRAINT api_tokens_token_value_game_mode_match
@@ -485,13 +500,15 @@ ALTER TABLE public.user_prestige_runs
 ALTER TABLE public.user_prestige_runs
   DROP CONSTRAINT IF EXISTS user_prestige_runs_mode_check;
 ALTER TABLE public.user_prestige_runs
-  ADD CONSTRAINT user_prestige_runs_mode_check CHECK (mode IN ('pvp', 'pve', 'seasonal'));
+  ADD CONSTRAINT user_prestige_runs_mode_check CHECK (mode IN ('pvp', 'pve', 'seasonal'))
+  NOT VALID;
 ALTER TABLE public.user_prestige_runs
   ADD CONSTRAINT user_prestige_runs_season_check
   CHECK (
     (mode IN ('pvp', 'pve') AND season_number = 0)
     OR (mode = 'seasonal' AND season_number > 0)
-  );
+  )
+  NOT VALID;
 DROP INDEX IF EXISTS public.idx_user_prestige_runs_user_mode_created;
 CREATE INDEX idx_user_prestige_runs_user_mode_season_created
   ON public.user_prestige_runs(user_id, mode, season_number, created_at DESC);
@@ -544,6 +561,28 @@ BEGIN
     RAISE EXCEPTION 'p_set must be a JSON object';
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM public.user_progress WHERE user_id = p_user_id) THEN
+    RETURN 0;
+  END IF;
+  INSERT INTO public.user_game_mode_progress (
+    user_id,
+    game_mode,
+    season_number,
+    progress_data
+  )
+  SELECT
+    p_user_id,
+    v_game_mode,
+    v_season_number,
+    CASE v_game_mode
+      WHEN 'pvp' THEN pvp_data
+      WHEN 'pve' THEN pve_data
+      ELSE '{}'::jsonb
+    END
+  FROM public.user_progress
+  WHERE user_id = p_user_id
+  ON CONFLICT (user_id, game_mode, season_number) DO NOTHING;
+
   SELECT progress_data
   INTO v_data
   FROM public.user_game_mode_progress
@@ -551,20 +590,6 @@ BEGIN
     AND game_mode = v_game_mode
     AND season_number = v_season_number
   FOR UPDATE;
-
-  IF NOT FOUND THEN
-    IF NOT EXISTS (SELECT 1 FROM public.user_progress WHERE user_id = p_user_id) THEN
-      RETURN 0;
-    END IF;
-    SELECT CASE v_game_mode
-      WHEN 'pvp' THEN pvp_data
-      WHEN 'pve' THEN pve_data
-      ELSE '{}'::jsonb
-    END
-    INTO v_data
-    FROM public.user_progress
-    WHERE user_id = p_user_id;
-  END IF;
 
   IF v_data IS NULL OR jsonb_typeof(v_data) <> 'object' THEN
     v_data := '{}'::jsonb;
@@ -598,15 +623,11 @@ BEGIN
     v_data := v_data || p_set;
   END IF;
 
-  INSERT INTO public.user_game_mode_progress (
-    user_id,
-    game_mode,
-    season_number,
-    progress_data
-  )
-  VALUES (p_user_id, v_game_mode, v_season_number, v_data)
-  ON CONFLICT (user_id, game_mode, season_number) DO UPDATE
-  SET progress_data = EXCLUDED.progress_data;
+  UPDATE public.user_game_mode_progress
+  SET progress_data = v_data
+  WHERE user_id = p_user_id
+    AND game_mode = v_game_mode
+    AND season_number = v_season_number;
 
   IF v_game_mode = 'pvp' THEN
     UPDATE public.user_progress SET pvp_data = v_data WHERE user_id = p_user_id;

@@ -1,3 +1,7 @@
+import {
+  extractUserMetadataDisplayName,
+  extractUserMetadataUsername,
+} from '../../../../app/utils/userMetadata';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { logger } from '../utils/logger';
@@ -120,11 +124,10 @@ async function fetchUserProgressMode(
     user_id: string;
   }>;
   const modeRow = modeRows[0];
-  if (!modeRow) return null;
   return {
-    user_id: modeRow.user_id,
+    user_id: modeRow?.user_id ?? userId,
     game_edition: metadataRows[0]?.game_edition ?? 1,
-    progress_data: modeRow.progress_data,
+    progress_data: modeRow?.progress_data ?? null,
   };
 }
 async function fetchCurrentProgressData(
@@ -132,56 +135,13 @@ async function fetchCurrentProgressData(
   userId: string,
   gameMode: GameMode
 ): Promise<Record<string, unknown>> {
-  const row = await fetchUserProgressMode(env, userId, gameMode);
-  return (row?.progress_data as Record<string, unknown> | null) ?? {};
-}
-function getMetaString(metadata: Record<string, unknown>, key: string): string | null {
-  return typeof metadata[key] === 'string' ? (metadata[key] as string) : null;
-}
-function extractUsername(
-  userMetadata: Record<string, unknown>,
-  email: string | null,
-  provider: string | null
-): string | null {
-  if (provider === 'discord') {
-    const globalName = getMetaString(userMetadata, 'global_name');
-    const username = getMetaString(userMetadata, 'username');
-    const preferredUsername = getMetaString(userMetadata, 'preferred_username');
-    const fullName = getMetaString(userMetadata, 'full_name');
-    const legacyName = getMetaString(userMetadata, 'name');
-    return (
-      globalName ||
-      username ||
-      preferredUsername ||
-      fullName ||
-      legacyName?.split('#')[0] ||
-      email?.split('@')[0] ||
-      null
-    );
-  }
-  if (provider === 'twitch') {
-    return (
-      getMetaString(userMetadata, 'preferred_username') ||
-      getMetaString(userMetadata, 'name') ||
-      email?.split('@')[0] ||
-      null
-    );
-  }
-  return getMetaString(userMetadata, 'name') || email?.split('@')[0] || null;
-}
-function extractDisplayName(
-  userMetadata: Record<string, unknown>,
-  provider: string | null,
-  username: string | null
-): string | null {
-  const fullName = getMetaString(userMetadata, 'full_name');
-  if (provider === 'discord') {
-    return username;
-  }
-  if (provider === 'twitch') {
-    return fullName || username;
-  }
-  return fullName || username;
+  const url = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${getGameModeSeasonNumber(gameMode)}&select=progress_data&limit=1`;
+  const response = await fetch(url, { headers: getServiceHeaders(env) });
+  if (!response.ok) throw new Error('Failed to fetch user progress');
+  const rows = (await response.json()) as Array<{
+    progress_data: Record<string, unknown> | null;
+  }>;
+  return rows[0]?.progress_data ?? {};
 }
 async function getUserDisplayName(env: Env, userId: string): Promise<string | null> {
   const cacheKey = `user-display:${userId}`;
@@ -208,8 +168,8 @@ async function getUserDisplayName(env: Env, userId: string): Promise<string | nu
       data.app_metadata && typeof data.app_metadata === 'object' ? data.app_metadata : {};
     const provider = typeof appMetadata.provider === 'string' ? appMetadata.provider : null;
     const email = typeof data.email === 'string' ? data.email : null;
-    const username = extractUsername(userMetadata, email, provider);
-    const displayName = extractDisplayName(userMetadata, provider, username);
+    const username = extractUserMetadataUsername(userMetadata, email, provider);
+    const displayName = extractUserMetadataDisplayName(userMetadata, provider, username);
     const resolved = displayName || username || (email ? email.split('@')[0] : null);
     if (resolved) {
       setMemoryCache(cacheKey, resolved, DISPLAY_NAME_CACHE_TTL_SECONDS);
@@ -340,7 +300,7 @@ export async function handleGetProgress(
   const row = await fetchUserProgressMode(env, token.user_id, gameMode);
   const gameEdition = row?.game_edition ?? 1;
   // Extract game mode specific data
-  const progressData = extractGameModeData(row, gameMode);
+  const progressData = extractGameModeData(row);
   const fallbackDisplayName =
     progressData?.displayName?.trim() || (await getUserDisplayName(env, token.user_id));
   // Fetch task and hideout data (cached)

@@ -268,11 +268,7 @@ export const hasDeprecatedTarkovDevProfileData = (value: unknown): boolean => {
   if (Object.prototype.hasOwnProperty.call(value, 'tarkovDevProfile')) {
     return true;
   }
-  return (
-    hasDeprecatedTarkovDevProfileData(value.pvp) ||
-    hasDeprecatedTarkovDevProfileData(value.pve) ||
-    hasDeprecatedTarkovDevProfileData(value.seasonal)
-  );
+  return ['pvp', 'pve', 'seasonal'].some((mode) => hasDeprecatedTarkovDevProfileData(value[mode]));
 };
 // Keep this canonical sanitizer aligned with the persisted DB sanitizer in the
 // tarkovDevProfile cleanup migration when changing stored progress fields.

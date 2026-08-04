@@ -5,13 +5,17 @@ import mapsData from '@/data/maps.json';
 import { type FetchResponse, isFetchError, isFetchSuccess } from '@/stores/tarkov/fetchResponse';
 import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemPicker';
 import {
+  getMetadataGameMode,
+  migrateMetadataDuplicateObjectiveProgress,
+  repairMetadataCompletedTaskObjectives,
+  repairMetadataFailedTaskStates,
+} from '@/stores/tarkov/metadataStoreBridge';
+import {
   type PromiseKey,
   getPromiseRequestIdStore,
   getPromiseRequestKeyStore,
   getPromiseStore,
 } from '@/stores/tarkov/promiseStore';
-import { useProgressStore } from '@/stores/useProgress';
-import { useTarkovStore } from '@/stores/useTarkov';
 import {
   API_GAME_MODES,
   API_SUPPORTED_LANGUAGES,
@@ -429,7 +433,6 @@ export const useMetadataStore = defineStore('metadata', {
      * @param localeOverride - Optional locale override to use instead of useSafeLocale()
      */
     updateLanguageAndGameMode(localeOverride?: string) {
-      const store = useTarkovStore();
       const effectiveLocale = localeOverride || useSafeLocale().value;
       logger.debug('[MetadataStore] updateLanguageAndGameMode - raw locale:', effectiveLocale);
       // Update language code
@@ -440,7 +443,7 @@ export const useMetadataStore = defineStore('metadata', {
         this.languageCode = extractLanguageCode(effectiveLocale, [...API_SUPPORTED_LANGUAGES]);
       }
       // Update game mode
-      this.currentGameMode = store.getCurrentGameMode();
+      this.currentGameMode = getMetadataGameMode();
     },
     setLoading(isLoading: boolean) {
       this.loading = isLoading;
@@ -1026,7 +1029,7 @@ export const useMetadataStore = defineStore('metadata', {
           });
           this.hydrateTaskItems({ rebuildDerivedData: false });
           this.rebuildTaskDerivedData();
-          useTarkovStore().repairFailedTaskStates();
+          repairMetadataFailedTaskStates();
           this.fetchObjectiveModeCountDifferences(forceRefresh).catch((err) =>
             logger.warn('[MetadataStore] Failed to fetch objective mode count differences:', err)
           );
@@ -1646,16 +1649,14 @@ export const useMetadataStore = defineStore('metadata', {
           (task) => Array.isArray(task.objectives) && task.objectives.length > 0
         );
         if (deduped.duplicateObjectiveIds.size > 0) {
-          const progressStore = useProgressStore();
-          progressStore.migrateDuplicateObjectiveProgress(deduped.duplicateObjectiveIds);
+          migrateMetadataDuplicateObjectiveProgress(deduped.duplicateObjectiveIds);
         }
-        const tarkovStore = useTarkovStore();
-        tarkovStore.repairCompletedTaskObjectives();
+        repairMetadataCompletedTaskObjectives();
         if (rebuildDerivedData) {
           this.rebuildTaskDerivedData();
         }
         if (repairFailedTaskStates) {
-          tarkovStore.repairFailedTaskStates();
+          repairMetadataFailedTaskStates();
         }
       }
       perfEnd(perfTimer, {
@@ -1959,11 +1960,9 @@ export const useMetadataStore = defineStore('metadata', {
       // Note: Don't set tasksObjectivesHydrated here - it's managed by processTasksCoreData
       // and mergeTaskObjectives to properly track the two-phase loading
       if (deduped.duplicateObjectiveIds.size > 0) {
-        const progressStore = useProgressStore();
-        progressStore.migrateDuplicateObjectiveProgress(deduped.duplicateObjectiveIds);
+        migrateMetadataDuplicateObjectiveProgress(deduped.duplicateObjectiveIds);
       }
-      const tarkovStore = useTarkovStore();
-      tarkovStore.repairCompletedTaskObjectives();
+      repairMetadataCompletedTaskObjectives();
       this.maps = markRaw(data.maps || []);
       this.mapSpawnsLoaded = false;
       this.traders = markRaw(data.traders || []);
@@ -1972,7 +1971,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       this.rebuildTaskDerivedData();
       if (this.tasks.length > 0) {
-        tarkovStore.repairFailedTaskStates();
+        repairMetadataFailedTaskStates();
       }
       perfEnd(perfTimer, {
         tasks: this.tasks.length,

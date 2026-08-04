@@ -11,7 +11,7 @@ import {
   SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
 } from '@/stores/tarkov/syncTimeline';
 import { useMetadataStore } from '@/stores/useMetadata';
-import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode } from '@/utils/constants';
+import { GAME_MODES, getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   hasDeprecatedTarkovDevProfileData,
@@ -33,6 +33,11 @@ type TarkovStoreLike = {
   $state: UserState;
   $patch(mutator: (state: UserState) => void): void;
 };
+type RealtimeModeProgress = {
+  mode: GameMode;
+  progress: UserProgressData;
+  updateTime: number;
+};
 let syncControllerGetter: SyncControllerGetter = () => null;
 let realtimeChannel: unknown = null;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -49,6 +54,48 @@ const getDeprecatedRemoteCleanupCooldownMs = () =>
   deprecatedRemoteCleanupFailureCount >= DEPRECATED_REMOTE_CLEANUP_FAST_RETRY_LIMIT
     ? DEPRECATED_REMOTE_CLEANUP_FAILURE_BACKOFF_MS
     : SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS;
+const parseRealtimeUpdateTime = (value: unknown): number => {
+  const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+};
+const isActiveRealtimeModeRow = (
+  row: Record<string, unknown>
+): row is Record<string, unknown> & { game_mode: GameMode } =>
+  isGameMode(row.game_mode) && row.season_number === getGameModeSeasonNumber(row.game_mode);
+const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as Record<string, unknown>;
+  if (!isActiveRealtimeModeRow(row)) return null;
+  return {
+    mode: row.game_mode,
+    progress: sanitizeOwnedProgressData(row.progress_data),
+    updateTime: parseRealtimeUpdateTime(row.updated_at),
+  };
+};
+const pauseRegisteredSyncController = (): void => {
+  const controller = getRegisteredSyncController();
+  if (!controller) return;
+  controller.pause();
+  pausedSyncController = controller;
+};
+const scheduleSyncResume = (): void => {
+  if (syncResumeTimer) clearTimeout(syncResumeTimer);
+  syncResumeTimer = setTimeout(() => {
+    syncResumeTimer = null;
+    pausedSyncController?.resume();
+    pausedSyncController = null;
+  }, SYNC_RESUME_DELAY_MS);
+};
+const notifyModeConflict = (
+  conflicts: ReturnType<typeof detectDataConflicts>,
+  apiUpdateHandled: boolean,
+  updateTime: number,
+  toastI18n: ReturnType<typeof useToastI18n>
+): void => {
+  if (conflicts.hasConflict && !apiUpdateHandled && !isLikelySelfOriginUpdate(updateTime)) {
+    toastI18n.showProgressMerged(conflicts.conflictCount);
+  }
+};
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
@@ -58,6 +105,19 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
   if (realtimeChannel) {
     await cleanupRealtimeListener();
   }
+  const latestModeUpdateTimes = new Map<GameMode, number>();
+  const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
+    const latestUpdateTime = latestModeUpdateTimes.get(mode);
+    if (latestUpdateTime !== undefined && updateTime < latestUpdateTime) return false;
+    latestModeUpdateTimes.set(mode, updateTime);
+    return true;
+  };
+  const acceptRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
+    const remote = parseRealtimeModeProgress(value);
+    return remote && acceptModeUpdate(remote.mode, remote.updateTime) ? remote : null;
+  };
+  const isCurrentRealtimeUser = () =>
+    $supabase.user.loggedIn && $supabase.user.id === currentUserId;
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
     if (!$supabase.user.loggedIn || $supabase.user.id !== currentUserId) {
@@ -73,6 +133,12 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     };
     const parsedUpdateTime = remoteData.updated_at ? Date.parse(remoteData.updated_at) : NaN;
     const updateTime = Number.isNaN(parsedUpdateTime) ? Date.now() : parsedUpdateTime;
+    const pvpProgress = acceptModeUpdate(GAME_MODES.PVP, updateTime)
+      ? remoteData.pvp_data
+      : undefined;
+    const pveProgress = acceptModeUpdate(GAME_MODES.PVE, updateTime)
+      ? remoteData.pve_data
+      : undefined;
     const timeSinceLastSync = updateTime - getLastLocalSyncTime();
     const remoteHadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData({
       pvp: remoteData.pvp_data,
@@ -91,8 +157,12 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
         remoteData.tarkov_uid === undefined
           ? localState.tarkovUid
           : sanitizeTarkovUid(remoteData.tarkov_uid),
-      pvp: mergeProgressData(localState.pvp, sanitizeOwnedProgressData(remoteData.pvp_data)),
-      pve: mergeProgressData(localState.pve, sanitizeOwnedProgressData(remoteData.pve_data)),
+      pvp: pvpProgress
+        ? mergeProgressData(localState.pvp, sanitizeOwnedProgressData(pvpProgress))
+        : localState.pvp,
+      pve: pveProgress
+        ? mergeProgressData(localState.pve, sanitizeOwnedProgressData(pveProgress))
+        : localState.pve,
     };
     const nextState: UserState = {
       currentGameMode: merged.currentGameMode ?? localState.currentGameMode,
@@ -167,24 +237,20 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       logger.debug('[TarkovStore] Realtime update matches local state; skipping patch');
       return;
     }
-    const pvpConflicts = detectDataConflicts(localState.pvp, remoteData.pvp_data);
-    const pveConflicts = detectDataConflicts(localState.pve, remoteData.pve_data);
+    const pvpConflicts = detectDataConflicts(localState.pvp, pvpProgress);
+    const pveConflicts = detectDataConflicts(localState.pve, pveProgress);
     const hasRealConflict = pvpConflicts.hasConflict || pveConflicts.hasConflict;
     const totalConflicts = pvpConflicts.conflictCount + pveConflicts.conflictCount;
     const apiUpdateHandled = runApiUpdateHandlers([
-      () => maybeNotifyApiUpdate('pvp', remoteData.pvp_data, metadataStore, updateTime, toastI18n),
-      () => maybeNotifyApiUpdate('pve', remoteData.pve_data, metadataStore, updateTime, toastI18n),
+      () => maybeNotifyApiUpdate('pvp', pvpProgress, metadataStore, updateTime, toastI18n),
+      () => maybeNotifyApiUpdate('pve', pveProgress, metadataStore, updateTime, toastI18n),
     ]);
     logger.debug('[TarkovStore] Remote update detected, applying changes', {
       hasRealConflict,
       totalConflicts,
       isLikelySelfOrigin,
     });
-    const controller = getRegisteredSyncController();
-    if (controller) {
-      controller.pause();
-      pausedSyncController = controller;
-    }
+    pauseRegisteredSyncController();
     tarkovStore.$patch((state) => {
       state.currentGameMode = nextState.currentGameMode;
       state.gameEdition = nextState.gameEdition;
@@ -193,39 +259,20 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       state.pve = nextState.pve;
       state.seasonal = nextState.seasonal;
     });
-    if (syncResumeTimer) {
-      clearTimeout(syncResumeTimer);
-    }
-    syncResumeTimer = setTimeout(() => {
-      syncResumeTimer = null;
-      pausedSyncController?.resume();
-      pausedSyncController = null;
-    }, SYNC_RESUME_DELAY_MS);
+    scheduleSyncResume();
     if (hasRealConflict && !apiUpdateHandled && !isLikelySelfOrigin) {
       toastI18n.showProgressMerged(totalConflicts);
     }
   };
   const handleModeProgressChange = (payload: { new: unknown }) => {
-    if (!$supabase.user.loggedIn || $supabase.user.id !== currentUserId) return;
-    if (!payload.new || typeof payload.new !== 'object') return;
-    const row = payload.new as {
-      game_mode?: unknown;
-      progress_data?: unknown;
-      season_number?: unknown;
-      updated_at?: unknown;
-    };
-    if (!isGameMode(row.game_mode)) return;
-    const mode = row.game_mode;
-    const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
-    if (row.season_number !== expectedSeason) return;
+    if (!isCurrentRealtimeUser()) return;
+    const remote = acceptRealtimeModeProgress(payload.new);
+    if (!remote) return;
+    const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const remoteProgress = sanitizeOwnedProgressData(row.progress_data);
     const nextProgress = mergeProgressData(localState[mode], remoteProgress);
     if (deepEqual(nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
-    const parsedUpdatedAt =
-      typeof row.updated_at === 'string' ? Date.parse(row.updated_at) : Number.NaN;
-    const updateTime = Number.isNaN(parsedUpdatedAt) ? Date.now() : parsedUpdatedAt;
     const apiUpdateHandled = maybeNotifyApiUpdate(
       mode,
       remoteProgress,
@@ -233,23 +280,12 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       updateTime,
       toastI18n
     );
-    const controller = getRegisteredSyncController();
-    if (controller) {
-      controller.pause();
-      pausedSyncController = controller;
-    }
+    pauseRegisteredSyncController();
     tarkovStore.$patch((state) => {
       state[mode] = nextProgress;
     });
-    if (syncResumeTimer) clearTimeout(syncResumeTimer);
-    syncResumeTimer = setTimeout(() => {
-      syncResumeTimer = null;
-      pausedSyncController?.resume();
-      pausedSyncController = null;
-    }, SYNC_RESUME_DELAY_MS);
-    if (conflicts.hasConflict && !apiUpdateHandled && !isLikelySelfOriginUpdate(updateTime)) {
-      toastI18n.showProgressMerged(conflicts.conflictCount);
-    }
+    scheduleSyncResume();
+    notifyModeConflict(conflicts, apiUpdateHandled, updateTime, toastI18n);
   };
   realtimeChannel = $supabase.client
     .channel(`user_progress_${currentUserId}`)

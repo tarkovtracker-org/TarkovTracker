@@ -1,7 +1,6 @@
 import { computeInvalidProgress } from './invalidation';
 import type {
   UserProgressData,
-  GameMode,
   UserProgressModeRow,
   TarkovTask,
   TarkovHideoutStation,
@@ -17,8 +16,7 @@ const CULTIST_CIRCLE_STATION_ID = '667298e75ea6b4493c08f266';
  * Extract game mode specific data from user progress row
  */
 export function extractGameModeData(
-  row: UserProgressModeRow | null,
-  _gameMode: GameMode
+  row: UserProgressModeRow | null
 ): UserProgressData | null {
   if (!row) return null;
   return row.progress_data ?? null;

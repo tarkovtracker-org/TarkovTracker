@@ -1,4 +1,4 @@
-const TOKEN_GAME_MODES = ['pvp', 'pve', 'seasonal'] as const;
+export const TOKEN_GAME_MODES = ['pvp', 'pve', 'seasonal'] as const;
 export type TokenGameMode = (typeof TOKEN_GAME_MODES)[number];
 const TOKEN_VALUE_PATTERN = /^(PVP|PVE|SEASONAL)_[0-9a-f]{18}$/;
 export const isTokenGameMode = (value: unknown): value is TokenGameMode =>

@@ -98,8 +98,13 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
-  import { GAME_MODES, getGameModeSeasonNumber, type GameMode } from '@/utils/constants';
+  import { GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import {
+    createProfileVisibility,
+    isCurrentProfileVisibilityRequest,
+    loadCurrentProfileVisibility,
+  } from '@/utils/profileVisibility';
   import type { SupabaseUser } from '@/types/supabase-plugin';
   const { t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
@@ -110,16 +115,17 @@
     const value = typedUser.value?.id;
     return typeof value === 'string' && value.trim().length > 0 ? value : null;
   });
-  const visibility = reactive<Record<GameMode, boolean>>({
-    pvp: false,
-    pve: false,
-    seasonal: false,
-  });
+  const visibility = reactive(createProfileVisibility());
   const saving = reactive<Record<GameMode, boolean>>({
     pvp: false,
     pve: false,
     seasonal: false,
   });
+  const visibilitySaveIds: Record<GameMode, number> = {
+    pvp: 0,
+    pve: 0,
+    seasonal: 0,
+  };
   const loadError = ref('');
   let visibilityLoadId = 0;
   const buildShareUrl = (mode: GameMode): string => {
@@ -149,54 +155,84 @@
   ]);
   const loadVisibility = async () => {
     const requestId = ++visibilityLoadId;
-    visibility.pvp = false;
-    visibility.pve = false;
-    visibility.seasonal = false;
+    Object.assign(visibility, createProfileVisibility());
     const userId = profileUserId.value;
     if (!userId) return;
     loadError.value = '';
-    const { data, error } = await $supabase.client
-      .from('user_game_mode_progress')
-      .select('game_mode,season_number,profile_public')
-      .eq('user_id', userId);
-    if (requestId !== visibilityLoadId || profileUserId.value !== userId) return;
-    if (error) {
-      loadError.value = t(
-        'settings.profile_sharing.load_failed',
-        'Unable to load sharing settings.'
-      );
-      logger.error('[ProfileSharingCard] Failed to load visibility:', error);
+    const result = await loadCurrentProfileVisibility(
+      () =>
+        $supabase.client
+          .from('user_game_mode_progress')
+          .select('game_mode,season_number,profile_public')
+          .eq('user_id', userId),
+      () =>
+        isCurrentProfileVisibilityRequest(requestId, visibilityLoadId, userId, profileUserId.value)
+    );
+    if (!result.current) return;
+    if (!result.error) {
+      Object.assign(visibility, result.visibility);
       return;
     }
-    for (const row of data ?? []) {
-      const mode = row.game_mode as GameMode;
-      if (!(mode in visibility)) continue;
-      if (row.season_number !== getGameModeSeasonNumber(mode)) continue;
-      visibility[mode] = row.profile_public === true;
-    }
+    loadError.value = t('settings.profile_sharing.load_failed', 'Unable to load sharing settings.');
+    logger.error('[ProfileSharingCard] Failed to load visibility:', {
+      error: result.error,
+      userId,
+    });
+  };
+  const createVisibilitySaveGuard = (mode: GameMode, requestId: number, userId: string) => () =>
+    isCurrentProfileVisibilityRequest(
+      requestId,
+      visibilitySaveIds[mode],
+      userId,
+      profileUserId.value
+    );
+  const restoreFailedVisibilitySave = (
+    mode: GameMode,
+    previous: boolean,
+    error: unknown,
+    isCurrentSave: () => boolean
+  ) => {
+    if (!isCurrentSave()) return;
+    visibility[mode] = previous;
+    loadError.value = t(
+      'settings.profile_sharing.save_failed',
+      'Unable to update sharing settings.'
+    );
+    logger.error('[ProfileSharingCard] Failed to update visibility:', { error, mode });
+  };
+  const finishVisibilitySave = (mode: GameMode, isCurrentSave: () => boolean) => {
+    if (isCurrentSave()) saving[mode] = false;
+  };
+  const beginVisibilitySave = (mode: GameMode) => {
+    if (saving[mode]) return null;
+    const userId = profileUserId.value;
+    if (!userId) return null;
+    const requestId = ++visibilitySaveIds[mode];
+    return {
+      isCurrent: createVisibilitySaveGuard(mode, requestId, userId),
+    };
+  };
+  const persistVisibility = async (mode: GameMode, value: boolean) => {
+    const { error } = await $supabase.client.rpc('set_game_mode_profile_visibility', {
+      p_game_mode: mode,
+      p_profile_public: value,
+      p_season_number: getGameModeSeasonNumber(mode),
+    });
+    if (error) throw error;
   };
   const setVisibility = async (mode: GameMode, value: boolean) => {
-    if (saving[mode]) return;
+    const save = beginVisibilitySave(mode);
+    if (!save) return;
     const previous = visibility[mode];
     visibility[mode] = value;
     saving[mode] = true;
     loadError.value = '';
     try {
-      const { error } = await $supabase.client.rpc('set_game_mode_profile_visibility', {
-        p_game_mode: mode,
-        p_profile_public: value,
-        p_season_number: getGameModeSeasonNumber(mode),
-      });
-      if (error) throw error;
+      await persistVisibility(mode, value);
     } catch (error) {
-      visibility[mode] = previous;
-      loadError.value = t(
-        'settings.profile_sharing.save_failed',
-        'Unable to update sharing settings.'
-      );
-      logger.error('[ProfileSharingCard] Failed to update visibility:', { error, mode });
+      restoreFailedVisibilitySave(mode, previous, error, save.isCurrent);
     } finally {
-      saving[mode] = false;
+      finishVisibilitySave(mode, save.isCurrent);
     }
   };
   const copyShareUrl = async (url: string) => {
@@ -210,5 +246,15 @@
     visibility[mode]
       ? t('settings.profile_sharing.public', 'Public')
       : t('settings.profile_sharing.private', 'Private');
-  watch(profileUserId, () => void loadVisibility(), { immediate: true });
+  watch(
+    profileUserId,
+    () => {
+      for (const mode of [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]) {
+        visibilitySaveIds[mode] += 1;
+        saving[mode] = false;
+      }
+      void loadVisibility();
+    },
+    { immediate: true }
+  );
 </script>

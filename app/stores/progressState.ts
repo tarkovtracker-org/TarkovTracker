@@ -87,16 +87,22 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
     const data = legacyData as Record<string, unknown>;
     const hasPvp = 'pvp' in data;
     const hasPve = 'pve' in data;
+    const hasSeasonal = 'seasonal' in data;
+    const currentGameMode = Object.values(GAME_MODES).includes(data.currentGameMode as GameMode)
+      ? (data.currentGameMode as GameMode)
+      : GAME_MODES.PVP;
     const migratedLegacy = sanitizeOwnedProgressData(data);
     return {
-      currentGameMode: Object.values(GAME_MODES).includes(data.currentGameMode as GameMode)
-        ? (data.currentGameMode as GameMode)
-        : GAME_MODES.PVP,
+      currentGameMode,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
       tarkovUid: (data.tarkovUid as number | null) ?? null,
       pvp: hasPvp ? sanitizeOwnedProgressData(data.pvp) : migratedLegacy,
       pve: hasPve ? sanitizeOwnedProgressData(data.pve) : structuredClone(defaultProgressData),
-      seasonal: structuredClone(defaultProgressData),
+      seasonal: hasSeasonal
+        ? sanitizeOwnedProgressData(data.seasonal)
+        : currentGameMode === GAME_MODES.SEASONAL
+          ? migratedLegacy
+          : structuredClone(defaultProgressData),
     };
   }
   // Create new structure with migrated data from legacy format

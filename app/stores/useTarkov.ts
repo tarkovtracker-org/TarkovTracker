@@ -29,6 +29,7 @@ import {
   safeSetItem,
   type PersistedProgressSnapshot,
 } from '@/stores/tarkov/localStorage';
+import { registerTarkovMetadataHooks } from '@/stores/tarkov/metadataStoreBridge';
 import {
   buildPrestigeResetData,
   buildPrestigeRunSummary,
@@ -145,6 +146,94 @@ type TarkovStoreInstance = UserState & {
     gameModeData: UserProgressData,
     tasksMap: Map<string, Task>
   ): number;
+};
+const assertPrestigeMode = (mode: GameMode) => {
+  if (mode === GAME_MODES.PVE) throw new Error('Prestige is not supported for PvE.');
+};
+const requirePrestigeSession = () => {
+  const { $supabase } = useNuxtApp();
+  const userId = $supabase.user.id;
+  if (!$supabase.user.loggedIn || !userId) {
+    throw new Error('User not logged in. Cannot prestige profile.');
+  }
+  return { $supabase, userId };
+};
+const patchProgressState = (store: TarkovStoreInstance, nextState: UserState) => {
+  store.$patch((state) => {
+    state.currentGameMode = nextState.currentGameMode;
+    state.gameEdition = nextState.gameEdition;
+    state.tarkovUid = nextState.tarkovUid;
+    state.pvp = nextState.pvp;
+    state.pve = nextState.pve;
+    state.seasonal = nextState.seasonal;
+  });
+};
+const throwSyncError = (error: { message: string } | null, message: string) => {
+  if (error) throw new Error(`${message}: ${error.message}`);
+};
+const buildOnlineResetState = (store: TarkovStoreInstance): UserState => {
+  const freshState = structuredClone(defaultState);
+  freshState.pvp.progressEpoch = getNextProgressEpoch(store.pvp);
+  freshState.pve.progressEpoch = getNextProgressEpoch(store.pve);
+  freshState.seasonal.progressEpoch = getNextProgressEpoch(store.seasonal);
+  return freshState;
+};
+const persistOnlineReset = async (
+  store: TarkovStoreInstance,
+  client: ReturnType<typeof useNuxtApp>['$supabase']['client'],
+  userId: string
+) => {
+  const freshState = buildOnlineResetState(store);
+  const { error } = await syncProgressState(client, userId, freshState);
+  throwSyncError(error, 'Failed to reset online profile');
+  clearProgressStorage();
+  patchProgressState(store, freshState);
+};
+const persistPrestigeLevel = async (
+  store: TarkovStoreInstance,
+  mode: GameMode,
+  nextModeData: UserProgressData
+) => {
+  const { $supabase } = useNuxtApp();
+  if (!$supabase.user.loggedIn || !$supabase.user.id) return;
+  const nextState = cloneStateSnapshot(store.$state);
+  nextState[mode] = nextModeData;
+  const { error } = await syncProgressState($supabase.client, $supabase.user.id, nextState);
+  if (error) throw new Error(`Failed to sync prestige level: ${error.message}`);
+  recordLocalSyncTime();
+};
+const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) => {
+  const { $supabase } = useNuxtApp();
+  const currentPrestige = clampPrestigeLevel(store[mode].prestigeLevel ?? 0);
+  if (currentPrestige >= 6) throw new Error('Maximum prestige level reached.');
+  const nextPrestige = currentPrestige + 1;
+  const archivedProgress = cloneStateSnapshot(store[mode]);
+  const resetModeData = buildPrestigeResetData(archivedProgress, nextPrestige);
+  const nextState = cloneStateSnapshot(store.$state);
+  nextState[mode] = resetModeData;
+  const currentGameMode = store.$state.currentGameMode;
+  const gameEdition = store.$state.gameEdition;
+  const tarkovUid = store.$state.tarkovUid;
+  const { error } = await $supabase.client.rpc('archive_prestige_run_and_reset_progress', {
+    p_archived_progress: archivedProgress,
+    p_created_at: new Date().toISOString(),
+    p_current_game_mode: currentGameMode,
+    p_game_edition: gameEdition,
+    p_mode: mode,
+    p_season_number: getGameModeSeasonNumber(mode),
+    p_prestige_from: currentPrestige,
+    p_prestige_to: nextPrestige,
+    p_pve_data: nextState.pve,
+    p_pvp_data: nextState.pvp,
+    p_seasonal_data: nextState.seasonal,
+    p_summary: buildPrestigeRunSummary(archivedProgress),
+    p_tarkov_uid: tarkovUid,
+  });
+  throwSyncError(error, 'Failed to update prestige progress');
+  recordLocalSyncTime();
+  store.$patch((state) => {
+    state[mode] = resetModeData;
+  });
 };
 // ============================================================================
 // Store Definition
@@ -263,20 +352,7 @@ const tarkovActions = {
       return;
     }
     try {
-      const freshState = structuredClone(defaultState);
-      freshState.pvp.progressEpoch = getNextProgressEpoch(this.pvp);
-      freshState.pve.progressEpoch = getNextProgressEpoch(this.pve);
-      freshState.seasonal.progressEpoch = getNextProgressEpoch(this.seasonal);
-      await syncProgressState($supabase.client, $supabase.user.id, freshState);
-      clearProgressStorage();
-      this.$patch((state) => {
-        state.currentGameMode = freshState.currentGameMode;
-        state.gameEdition = freshState.gameEdition;
-        state.tarkovUid = freshState.tarkovUid;
-        state.pvp = freshState.pvp;
-        state.pve = freshState.pve;
-        state.seasonal = freshState.seasonal;
-      });
+      await persistOnlineReset(this, $supabase.client, $supabase.user.id);
     } catch (error) {
       logger.error('Error resetting online profile:', error);
     }
@@ -310,30 +386,17 @@ const tarkovActions = {
     await tarkovActions.syncPrestigeLevel.call(this, GAME_MODES.PVP, level);
   },
   async syncPrestigeLevel(this: TarkovStoreInstance, mode: GameMode, level: number) {
-    if (mode === GAME_MODES.PVE) {
-      throw new Error('Prestige is not supported for PvE.');
-    }
+    assertPrestigeMode(mode);
     const nextPrestigeLevel = clampPrestigeLevel(level);
     const currentPrestigeLevel = clampPrestigeLevel(this[mode].prestigeLevel || 0);
-    if (nextPrestigeLevel === currentPrestigeLevel) {
-      return;
-    }
+    if (nextPrestigeLevel === currentPrestigeLevel) return;
     const nextModeData = cloneStateSnapshot(this[mode]);
     nextModeData.prestigeLevel = nextPrestigeLevel;
     // ponytail: do NOT bump progressEpoch here. The epoch contract is "a full
     // reset/prestige wipe happened and wins over older progress"; bumping it for
     // a prestige-level-only edit makes mergeProgressData's epoch early-return
     // silently drop the other device's storyChapters (storyline progress loss).
-    const { $supabase } = useNuxtApp();
-    if ($supabase.user.loggedIn && $supabase.user.id) {
-      const nextState = cloneStateSnapshot(this.$state);
-      nextState[mode] = nextModeData;
-      const { error } = await syncProgressState($supabase.client, $supabase.user.id, nextState);
-      if (error) {
-        throw new Error(`Failed to sync prestige level: ${error.message}`);
-      }
-      recordLocalSyncTime();
-    }
+    await persistPrestigeLevel(this, mode, nextModeData);
     this.$patch((state) => {
       state[mode] = nextModeData;
     });
@@ -342,52 +405,9 @@ const tarkovActions = {
     await tarkovActions.prestigeMode.call(this, GAME_MODES.PVP);
   },
   async prestigeMode(this: TarkovStoreInstance, mode: GameMode) {
-    if (mode === GAME_MODES.PVE) {
-      throw new Error('Prestige is not supported for PvE.');
-    }
-    const { $supabase } = useNuxtApp();
-    const userId = $supabase.user.id;
-    if (!$supabase.user.loggedIn || !userId) {
-      throw new Error('User not logged in. Cannot prestige profile.');
-    }
-    const currentPrestige = clampPrestigeLevel(this[mode].prestigeLevel || 0);
-    if (currentPrestige >= 6) {
-      throw new Error('Maximum prestige level reached.');
-    }
-    const nextPrestige = currentPrestige + 1;
-    const archivedProgress = cloneStateSnapshot(this[mode]);
-    const archivedAt = Date.now();
-    const summary = buildPrestigeRunSummary(archivedProgress);
-    const resetModeData = buildPrestigeResetData(archivedProgress, nextPrestige);
-    const nextState = cloneStateSnapshot(this.$state);
-    nextState[mode] = resetModeData;
-    await executeWithSyncPause(async () => {
-      const { error: prestigeError } = await $supabase.client.rpc(
-        'archive_prestige_run_and_reset_progress',
-        {
-          p_archived_progress: archivedProgress,
-          p_created_at: new Date(archivedAt).toISOString(),
-          p_current_game_mode: this.$state.currentGameMode || GAME_MODES.PVP,
-          p_game_edition: this.$state.gameEdition || defaultState.gameEdition,
-          p_mode: mode,
-          p_season_number: getGameModeSeasonNumber(mode),
-          p_prestige_from: currentPrestige,
-          p_prestige_to: nextPrestige,
-          p_pve_data: nextState.pve,
-          p_pvp_data: nextState.pvp,
-          p_seasonal_data: nextState.seasonal,
-          p_summary: summary,
-          p_tarkov_uid: this.$state.tarkovUid ?? null,
-        }
-      );
-      if (prestigeError) {
-        throw new Error(`Failed to update prestige progress: ${prestigeError.message}`);
-      }
-      recordLocalSyncTime();
-      this.$patch((state) => {
-        state[mode] = resetModeData;
-      });
-    });
+    assertPrestigeMode(mode);
+    requirePrestigeSession();
+    await executeWithSyncPause(() => archivePrestigeRun(this, mode));
   },
   async fetchPrestigeRuns(
     this: TarkovStoreInstance,
@@ -1033,6 +1053,15 @@ export function getSyncController() {
   return syncController;
 }
 registerSyncControllerGetter(() => syncController);
+registerTarkovMetadataHooks({
+  getCurrentGameMode: () => useTarkovStore().getCurrentGameMode(),
+  repairCompletedTaskObjectives: () => {
+    useTarkovStore().repairCompletedTaskObjectives();
+  },
+  repairFailedTaskStates: () => {
+    useTarkovStore().repairFailedTaskStates();
+  },
+});
 const syncMetadataAfterStartup = (tarkovStore: TarkovStore) => {
   const metadataStore = useMetadataStore();
   if (metadataStore.currentGameMode === tarkovStore.getCurrentGameMode()) {
@@ -1324,10 +1353,11 @@ export async function initializeTarkovSync() {
         ? await loadModeProgress($supabase.client as unknown as ModeProgressClient, currentUserId)
         : { data: {}, error: null };
       if (modeProgressResult.error) {
-        logger.warn(
-          '[TarkovStore] Could not load normalized mode progress; using legacy PvP/PvE data',
+        logger.error(
+          '[TarkovStore] Could not load normalized mode progress',
           modeProgressResult.error
         );
+        return { hadRemoteData, needsRemoteCleanup, ok: false };
       }
       // Normalize Supabase data with defaults for safety
       const normalizedRemote = data

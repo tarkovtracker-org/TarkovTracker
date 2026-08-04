@@ -1,15 +1,15 @@
 import { defineStore } from 'pinia';
+import { registerProgressMetadataHooks } from '@/stores/tarkov/metadataStoreBridge';
+import {
+  buildTaskAvailability,
+  type TaskAvailabilityMap,
+  type TaskAvailabilityTeamData,
+} from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { useTeammateStores, useTeamStore } from '@/stores/useTeamStore';
-import {
-  resolveTraderUnlockTaskIds,
-  SPECIAL_STATIONS,
-  TASK_STATE,
-  type GameMode,
-  type TaskState,
-} from '@/utils/constants';
+import { SPECIAL_STATIONS, TASK_STATE, type TaskState } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { computeInvalidProgress } from '@/utils/progressInvalidation';
@@ -20,10 +20,9 @@ import {
   isTaskActive,
   isTaskComplete,
   isTaskFailed,
-  type RawTaskCompletion,
 } from '@/utils/taskStatus';
 import type { UserProgressData, UserState } from '@/stores/progressState';
-import type { GameEdition, Task, TaskRequirement } from '@/types/tarkov';
+import type { GameEdition, Task } from '@/types/tarkov';
 import type { Store } from 'pinia';
 function getGameModeData(store: Store<string, UserState> | undefined): UserProgressData {
   if (!store) return createDefaultOwnedProgressData();
@@ -31,11 +30,31 @@ function getGameModeData(store: Store<string, UserState> | undefined): UserProgr
   const modeData = store.$state[currentGameMode];
   return modeData ?? createDefaultOwnedProgressData();
 }
+const createTaskAvailabilityTeamData = (
+  store: Store<string, UserState>,
+  level: number
+): TaskAvailabilityTeamData => {
+  const currentData = getGameModeData(store);
+  return {
+    mode: store.$state.currentGameMode,
+    level,
+    faction: currentData.pmcFaction ?? 'USEC',
+    completions: currentData.taskCompletions ?? {},
+    traders: currentData.traders ?? {},
+  };
+};
+const hasTaskAvailabilityInputs = (tasks: Task[], teamIds: string[]) =>
+  [tasks.length > 0, teamIds.length > 0].every(Boolean);
+const getFenceTraderId = (
+  traders: Array<{ id: string; normalizedName?: string }>
+): string | null => {
+  const fence = traders.find((trader) => trader.normalizedName === 'fence');
+  return fence ? fence.id : null;
+};
 type TeamStoresMap = Record<string, Store<string, UserState>>;
 type CompletionsMap = Record<string, Record<string, boolean>>;
 type FailedTasksMap = Record<string, Record<string, boolean>>;
 type FactionMap = Record<string, string>;
-type TaskAvailabilityMap = Record<string, Record<string, boolean>>;
 type ObjectiveCompletionsMap = Record<string, Record<string, boolean>>;
 type HideoutLevelMap = Record<string, Record<string, number>>;
 type InvalidTasksMap = Record<string, Record<string, boolean>>;
@@ -147,196 +166,23 @@ export const useProgressStore = defineStore('progress', () => {
     const available: TaskAvailabilityMap = {};
     const tasks = metadataStore.tasks as Task[];
     const teamIds = Object.keys(visibleTeamStores.value);
-    if (tasks.length === 0 || teamIds.length === 0) {
+    if (!hasTaskAvailabilityInputs(tasks, teamIds)) {
       perfEnd(perfTimer, { skipped: true });
       return {};
     }
-    // Pre-collect all team data once (avoid repeated getGameModeData calls)
-    // Use getLevel() to respect automatic level calculation preference for 'self'
-    const teamDataCache = new Map<
-      string,
-      {
-        mode: GameMode;
-        level: number;
-        faction: string;
-        completions: Record<string, RawTaskCompletion>;
-        traders: Record<string, { level?: number; reputation?: number }>;
-      }
-    >();
-    for (const teamId of teamIds) {
-      const store = visibleTeamStores.value[teamId];
-      if (!store) continue;
-      const currentData = getGameModeData(store);
-      teamDataCache.set(teamId, {
-        mode: store.$state.currentGameMode,
-        level: getLevel(teamId),
-        faction: currentData?.pmcFaction ?? 'USEC',
-        completions: currentData?.taskCompletions ?? {},
-        traders: currentData?.traders ?? {},
-      });
+    const teamDataCache = new Map<string, TaskAvailabilityTeamData>();
+    for (const [teamId, store] of Object.entries(visibleTeamStores.value)) {
+      teamDataCache.set(teamId, createTaskAvailabilityTeamData(store, getLevel(teamId)));
     }
-    const tasksById = new Map(tasks.map((task) => [task.id, task]));
-    const normalizeStatuses = (statuses?: string[]) =>
-      (statuses ?? []).map((status) => status.toLowerCase());
-    const hasAnyStatus = (statuses: string[], values: string[]) =>
-      values.some((value) => statuses.includes(value));
-    const fenceTrader = metadataStore.traders.find((t) => t.normalizedName === 'fence');
-    // Initialize availability map
-    for (const task of tasks) {
-      available[task.id] = {};
-    }
-    // Compute availability per team with memoization to keep status-aware chains consistent
-    for (const teamId of teamIds) {
-      const teamData = teamDataCache.get(teamId);
-      if (!teamData) continue;
-      const availabilityMemo = new Map<string, boolean>();
-      const unlockableMemo = new Map<string, boolean>();
-      const visitingAvailable = new Set<string>();
-      const visitingUnlockable = new Set<string>();
-      const isRequirementSatisfied = (requirement: TaskRequirement): boolean => {
-        const reqTaskId = requirement?.task?.id;
-        if (!reqTaskId) return true;
-        const requirementStatus = normalizeStatuses(requirement.status);
-        const requiresComplete =
-          requirementStatus.length === 0 ||
-          hasAnyStatus(requirementStatus, ['complete', 'completed']);
-        const requiresActive = hasAnyStatus(requirementStatus, ['active', 'accept', 'accepted']);
-        const requiresFailed = hasAnyStatus(requirementStatus, ['failed']);
-        const completion = teamData.completions[reqTaskId];
-        const isComplete = isTaskComplete(completion);
-        const isFailed = isTaskFailed(completion);
-        const isActive = isTaskActive(completion);
-        if (requiresComplete && isComplete) return true;
-        if (requiresFailed && isFailed) return true;
-        if (requiresActive) {
-          if (isActive || isComplete) return true;
-          // Treat "available" as "accepted" when no explicit active state is stored.
-          if (isTaskUnlockable(reqTaskId)) return true;
-        }
-        return false;
-      };
-      const computeTaskAvailability = (
-        taskId: string,
-        allowCompleted: boolean,
-        memo: Map<string, boolean>,
-        visiting: Set<string>
-      ): boolean => {
-        if (memo.has(taskId)) return memo.get(taskId)!;
-        if (visiting.has(taskId)) return false;
-        const task = tasksById.get(taskId);
-        if (!task) return false;
-        visiting.add(taskId);
-        // Early exit: already complete (unless we allow completed tasks)
-        if (!allowCompleted && isTaskComplete(teamData.completions[taskId])) {
-          memo.set(taskId, false);
-          visiting.delete(taskId);
-          return false;
-        }
-        // Check failed requirements
-        if (task.failedRequirements) {
-          for (const req of task.failedRequirements) {
-            if (req?.task?.id && isTaskFailed(teamData.completions[req.task.id])) {
-              memo.set(taskId, false);
-              visiting.delete(taskId);
-              return false;
-            }
-          }
-        }
-        // Level check
-        if (task.minPlayerLevel && teamData.level < task.minPlayerLevel) {
-          memo.set(taskId, false);
-          visiting.delete(taskId);
-          return false;
-        }
-        // Trader loyalty level and reputation checks - gated behind a user
-        // preference (defaults on, mirroring hideout's require-trader-loyalty).
-        // When disabled, trader standing requirements are display-only.
-        if (preferencesStore.getTasksRequireTraderLevels) {
-          // Trader loyalty level check - user's trader level must meet each requirement
-          if (task.traderLevelRequirements?.length) {
-            for (const req of task.traderLevelRequirements) {
-              const traderId = req?.trader?.id;
-              if (!traderId) continue;
-              const userTraderLevel = teamData.traders?.[traderId]?.level ?? 1;
-              if (userTraderLevel < req.level) {
-                memo.set(taskId, false);
-                visiting.delete(taskId);
-                return false;
-              }
-            }
-          }
-          // Trader reputation check - positive requirements gate for every trader:
-          // user needs at least this much reputation.
-          // Negative requirements are Fence-specific (low-karma path): user needs
-          // at most this much (or worse) karma.
-          if (task.traderRequirements?.length) {
-            for (const req of task.traderRequirements) {
-              const traderId = req?.trader?.id;
-              if (!traderId) continue;
-              const userRep = teamData.traders?.[traderId]?.reputation ?? 0;
-              if (req.value >= 0) {
-                if (userRep < req.value) {
-                  memo.set(taskId, false);
-                  visiting.delete(taskId);
-                  return false;
-                }
-              } else if (fenceTrader && traderId === fenceTrader.id && userRep > req.value) {
-                memo.set(taskId, false);
-                visiting.delete(taskId);
-                return false;
-              }
-            }
-          }
-        }
-        // Prerequisites check
-        if (task.taskRequirements) {
-          for (const req of task.taskRequirements) {
-            if (!isRequirementSatisfied(req)) {
-              memo.set(taskId, false);
-              visiting.delete(taskId);
-              return false;
-            }
-          }
-        }
-        // Faction check
-        if (
-          task.factionName &&
-          task.factionName !== 'Any' &&
-          task.factionName !== teamData.faction
-        ) {
-          memo.set(taskId, false);
-          visiting.delete(taskId);
-          return false;
-        }
-        // Trader unlock check - some traders require completing a specific task to unlock
-        const traderName = task.trader?.normalizedName || task.trader?.name?.toLowerCase();
-        if (traderName) {
-          const modeUnlockTaskIds = resolveTraderUnlockTaskIds(traderName, teamData.mode).filter(
-            (unlockTaskId) => unlockTaskId !== taskId && tasksById.has(unlockTaskId)
-          );
-          if (
-            modeUnlockTaskIds.length > 0 &&
-            !modeUnlockTaskIds.some((unlockTaskId) =>
-              isTaskComplete(teamData.completions[unlockTaskId])
-            )
-          ) {
-            memo.set(taskId, false);
-            visiting.delete(taskId);
-            return false;
-          }
-        }
-        memo.set(taskId, true);
-        visiting.delete(taskId);
-        return true;
-      };
-      const isTaskUnlockable = (taskId: string): boolean =>
-        computeTaskAvailability(taskId, true, unlockableMemo, visitingUnlockable);
-      const isTaskAvailable = (taskId: string): boolean =>
-        computeTaskAvailability(taskId, false, availabilityMemo, visitingAvailable);
-      for (const task of tasks) {
-        available[task.id]![teamId] = isTaskAvailable(task.id);
-      }
-    }
+    Object.assign(
+      available,
+      buildTaskAvailability(
+        tasks,
+        teamDataCache,
+        getFenceTraderId(metadataStore.traders),
+        preferencesStore.getTasksRequireTraderLevels
+      )
+    );
     perfEnd(perfTimer, { tasks: tasks.length, teams: teamIds.length });
     return available;
   });
@@ -757,4 +603,8 @@ export const useProgressStore = defineStore('progress', () => {
     getTaskStatus,
     migrateDuplicateObjectiveProgress,
   };
+});
+registerProgressMetadataHooks({
+  migrateDuplicateObjectiveProgress: (duplicateObjectiveIds) =>
+    useProgressStore().migrateDuplicateObjectiveProgress(duplicateObjectiveIds),
 });

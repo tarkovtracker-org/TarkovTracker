@@ -70,6 +70,19 @@ interface TeamStoreInstance {
   cleanup: () => void;
 }
 type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
+export const resolveTeammateIdentity = (
+  profile: MemberProfile | undefined,
+  fallbackMode: GameMode
+) => {
+  const identity = {
+    currentGameMode: fallbackMode,
+    gameEdition: defaultState.gameEdition,
+  };
+  if (!profile) return identity;
+  identity.currentGameMode = profile.gameMode ?? fallbackMode;
+  identity.gameEdition = profile.gameEdition ?? defaultState.gameEdition;
+  return identity;
+};
 function cloneTaskCompletions(
   taskCompletions: TaskCompletionSnapshot | undefined
 ): TaskCompletionSnapshot {
@@ -493,6 +506,11 @@ export function useTeammateStores() {
         for (const teammate of newTeammatesArray) {
           if (!teammateStores.value[teammate]) {
             createTeammateStore(teammate);
+          } else {
+            const memberProfile = teamStore.memberProfiles?.[teammate];
+            teammateStores.value[teammate].$patch((state) => {
+              Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
+            });
           }
         }
       } catch (error) {
@@ -536,8 +554,7 @@ export function useTeammateStores() {
       teammateStores.value[teammateId] = storeInstance;
       const memberProfile = teamStore.memberProfiles?.[teammateId];
       storeInstance.$patch((state) => {
-        state.currentGameMode = memberProfile?.gameMode ?? getCurrentGameMode();
-        state.gameEdition = memberProfile?.gameEdition ?? defaultState.gameEdition;
+        Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
       });
       const applyModeProgress = (row: Record<string, unknown>) => {
         const mode = row.game_mode as GameMode;
@@ -591,6 +608,7 @@ export function useTeammateStores() {
         if (data.userId !== teammateId) return;
         // Update the teammate store with the task change
         const modeKey = data.gameMode;
+        if (!Object.values(GAME_MODES).includes(modeKey)) return;
         const currentModeData = storeInstance.$state[modeKey] || {};
         const currentCompletions =
           (

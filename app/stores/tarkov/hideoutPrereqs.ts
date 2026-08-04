@@ -210,6 +210,95 @@ const computeTotalSkills = (
   });
   return result;
 };
+const collectCompletedModuleIds = (currentData: UserProgressData): Set<string> =>
+  new Set(
+    Object.entries(currentData.hideoutModules ?? {})
+      .filter(([, state]) => state?.complete)
+      .map(([moduleId]) => moduleId)
+  );
+const collectRemovedModules = (
+  completedModuleIds: Set<string>,
+  validModules: Set<string>
+): Set<string> =>
+  new Set([...completedModuleIds].filter((moduleId) => !validModules.has(moduleId)));
+const collectModuleItemIds = (
+  removedModules: Set<string>,
+  modules: HideoutModuleMeta[]
+): Set<string> => {
+  const modulesById = new Map(modules.map((module) => [module.id, module]));
+  return new Set(
+    [...removedModules].flatMap((moduleId) => modulesById.get(moduleId)?.itemRequirementIds ?? [])
+  );
+};
+const uncompleteModules = (
+  store: TarkovStoreInstance,
+  removedModules: Set<string>,
+  modules: HideoutModuleMeta[]
+): Set<string> => {
+  for (const moduleId of removedModules) actions.setHideoutModuleUncomplete.call(store, moduleId);
+  return collectModuleItemIds(removedModules, modules);
+};
+const resetHideoutPartItems = (store: TarkovStoreInstance, itemIds: Set<string>) => {
+  if (!itemIds.size) return;
+  store.$patch((state) => {
+    const currentData = state[state.currentGameMode];
+    const hideoutParts =
+      currentData.hideoutParts && typeof currentData.hideoutParts === 'object'
+        ? currentData.hideoutParts
+        : {};
+    currentData.hideoutParts = hideoutParts;
+    for (const itemId of itemIds) {
+      const existing = hideoutParts[itemId];
+      hideoutParts[itemId] = {
+        ...(existing && typeof existing === 'object' ? existing : {}),
+        complete: false,
+      };
+    }
+  });
+};
+type HideoutEnforcementContext = {
+  completedModuleIds: Set<string>;
+  currentData: UserProgressData;
+  metadataStore: ReturnType<typeof useMetadataStore>;
+  modules: HideoutModuleMeta[];
+  options: Pick<
+    HideoutCheckOptions,
+    'requireSkillLevels' | 'requireStationLevels' | 'requireTraderLoyalty'
+  >;
+  stations: HideoutStation[];
+};
+const getHideoutRequirementOptions = (): HideoutEnforcementContext['options'] | null => {
+  const preferences = usePreferencesStore();
+  const options = {
+    requireSkillLevels: preferences.getHideoutRequireSkillLevels,
+    requireStationLevels: preferences.getHideoutRequireStationLevels,
+    requireTraderLoyalty: preferences.getHideoutRequireTraderLoyalty,
+  };
+  return Object.values(options).some(Boolean) ? options : null;
+};
+const buildProgressEnforcementContext = (
+  store: TarkovStoreInstance,
+  metadataStore: ReturnType<typeof useMetadataStore>,
+  stations: HideoutStation[],
+  options: HideoutEnforcementContext['options']
+): HideoutEnforcementContext | null => {
+  const currentData = store[store.currentGameMode];
+  const completedModuleIds = collectCompletedModuleIds(currentData);
+  if (!completedModuleIds.size) return null;
+  const modules = buildHideoutModuleMeta(stations);
+  if (!modules.length) return null;
+  return { completedModuleIds, currentData, metadataStore, modules, options, stations };
+};
+const buildHideoutEnforcementContext = (
+  store: TarkovStoreInstance
+): HideoutEnforcementContext | null => {
+  const metadataStore = useMetadataStore();
+  const stations = metadataStore.hideoutStations;
+  if (!stations.length) return null;
+  const options = getHideoutRequirementOptions();
+  if (!options) return null;
+  return buildProgressEnforcementContext(store, metadataStore, stations, options);
+};
 export const notifyHideoutPrereqEnforcement = (removedCount: number) => {
   if (!removedCount || !import.meta.client) return;
   try {
@@ -220,67 +309,19 @@ export const notifyHideoutPrereqEnforcement = (removedCount: number) => {
   }
 };
 export const enforceHideoutPrereqs = (store: TarkovStoreInstance): string[] => {
-  const metadataStore = useMetadataStore();
-  const stations = metadataStore.hideoutStations;
-  if (!stations.length) return [];
-  const preferencesStore = usePreferencesStore();
-  const requireStationLevels = preferencesStore.getHideoutRequireStationLevels;
-  const requireSkillLevels = preferencesStore.getHideoutRequireSkillLevels;
-  const requireTraderLoyalty = preferencesStore.getHideoutRequireTraderLoyalty;
-  if (!requireStationLevels && !requireSkillLevels && !requireTraderLoyalty) return [];
-  const currentData = store[store.currentGameMode];
-  const modulesState = currentData.hideoutModules ?? {};
-  const completedModuleIds = new Set<string>();
-  for (const [moduleId, state] of Object.entries(modulesState)) {
-    if (state?.complete) {
-      completedModuleIds.add(moduleId);
-    }
-  }
-  if (!completedModuleIds.size) return [];
-  const modules = buildHideoutModuleMeta(stations);
-  if (!modules.length) return [];
+  const context = buildHideoutEnforcementContext(store);
+  if (!context) return [];
+  const { completedModuleIds, currentData, metadataStore, modules, options, stations } = context;
   const edition = metadataStore.editions.find((entry) => entry.value === store.gameEdition);
   const skillKeyAliases = buildSkillKeyAliases(metadataStore.tasks);
   const validModules = resolveValidHideoutModules(modules, stations, completedModuleIds, edition, {
-    requireStationLevels,
-    requireSkillLevels,
-    requireTraderLoyalty,
+    ...options,
     skills: computeTotalSkills(currentData, metadataStore.tasks, skillKeyAliases),
     skillKeyAliases,
     traders: currentData.traders ?? {},
   });
-  const removedModules = new Set<string>();
-  for (const moduleId of completedModuleIds) {
-    if (!validModules.has(moduleId)) {
-      removedModules.add(moduleId);
-    }
-  }
+  const removedModules = collectRemovedModules(completedModuleIds, validModules);
   if (!removedModules.size) return [];
-  const modulesById = new Map(modules.map((module) => [module.id, module]));
-  const itemIdsToReset = new Set<string>();
-  for (const moduleId of removedModules) {
-    actions.setHideoutModuleUncomplete.call(store, moduleId);
-    const module = modulesById.get(moduleId);
-    if (!module?.itemRequirementIds?.length) continue;
-    for (const itemId of module.itemRequirementIds) {
-      itemIdsToReset.add(itemId);
-    }
-  }
-  if (itemIdsToReset.size) {
-    store.$patch((state) => {
-      const currentData = state[state.currentGameMode];
-      if (!currentData.hideoutParts || typeof currentData.hideoutParts !== 'object') {
-        currentData.hideoutParts = {};
-      }
-      const hideoutParts = currentData.hideoutParts as Record<string, Record<string, unknown>>;
-      for (const itemId of itemIdsToReset) {
-        const existing = hideoutParts[itemId];
-        hideoutParts[itemId] = {
-          ...(existing && typeof existing === 'object' ? existing : {}),
-          complete: false,
-        };
-      }
-    });
-  }
+  resetHideoutPartItems(store, uncompleteModules(store, removedModules, modules));
   return Array.from(removedModules);
 };

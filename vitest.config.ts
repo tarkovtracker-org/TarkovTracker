@@ -20,6 +20,7 @@ export default defineVitestConfig({
     exclude: [
       ...configDefaults.exclude,
       'workers/**',
+      '**/*.deno.test.ts',
       '**/node_modules/**',
       '**/.codex/**',
       '**/.wt/**',

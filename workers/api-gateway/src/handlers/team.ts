@@ -2,13 +2,7 @@ import { getTasks, getHideoutStations } from '../services/tarkov';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
-import type {
-  Env,
-  ApiToken,
-  GameMode,
-  UserProgressModeRow,
-  ProgressResponseData,
-} from '../types';
+import type { Env, ApiToken, GameMode, UserProgressModeRow, ProgressResponseData } from '../types';
 // Team member from database
 interface TeamMember {
   user_id: string;
@@ -17,6 +11,14 @@ interface TeamMember {
 interface TeamMembershipRow {
   team_id: string;
 }
+type ProgressRow = {
+  progress_data: UserProgressModeRow['progress_data'];
+  user_id: string;
+};
+type EditionRow = {
+  game_edition: number | null;
+  user_id: string;
+};
 // Team progress response format (matching RatScanner expectations)
 export interface TeamProgressResponse {
   data: ProgressResponseData[];
@@ -25,6 +27,60 @@ export interface TeamProgressResponse {
     hiddenTeammates: string[];
   };
 }
+const getServiceHeaders = (env: Env) => ({
+  Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+  apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+});
+const buildProgressResponse = (
+  self: string,
+  data: ProgressResponseData[]
+): TeamProgressResponse => ({
+  data,
+  meta: { hiddenTeammates: [], self },
+});
+const fetchUserModeRow = async (
+  env: Env,
+  userId: string,
+  gameMode: GameMode
+): Promise<UserProgressModeRow> => {
+  const seasonNumber = getGameModeSeasonNumber(gameMode);
+  const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
+  const editionUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=user_id,game_edition&limit=1`;
+  const [progressResponse, editionResponse] = await Promise.all([
+    fetch(progressUrl, { headers: getServiceHeaders(env) }),
+    fetch(editionUrl, { headers: getServiceHeaders(env) }),
+  ]);
+  if (!progressResponse.ok || !editionResponse.ok) throw new Error('Failed to fetch user progress');
+  const progressRows = (await progressResponse.json()) as ProgressRow[];
+  const editionRows = (await editionResponse.json()) as EditionRow[];
+  return {
+    user_id: progressRows[0]?.user_id ?? userId,
+    game_edition: editionRows[0]?.game_edition ?? 1,
+    progress_data: progressRows[0]?.progress_data ?? null,
+  };
+};
+const transformUserModeRow = async (
+  env: Env,
+  row: UserProgressModeRow,
+  userId: string,
+  gameMode: GameMode
+): Promise<ProgressResponseData> => {
+  const progressData = extractGameModeData(row);
+  const fallbackDisplayName =
+    progressData?.displayName?.trim() || (await getUserDisplayName(env, userId));
+  const [tasks, hideoutStations] = await Promise.all([
+    getTasks(gameMode),
+    getHideoutStations(gameMode),
+  ]);
+  return transformProgress(
+    progressData,
+    userId,
+    row.game_edition,
+    tasks,
+    hideoutStations,
+    fallbackDisplayName
+  );
+};
 /**
  * Get display name for a user from Supabase auth
  */
@@ -136,14 +192,8 @@ export async function handleGetTeamProgress(
   if (!progressRes.ok || !editionsRes.ok) {
     throw new Error('Failed to fetch team progress');
   }
-  const progressRows = (await progressRes.json()) as Array<{
-    progress_data: UserProgressModeRow['progress_data'];
-    user_id: string;
-  }>;
-  const editionRows = (await editionsRes.json()) as Array<{
-    game_edition: number | null;
-    user_id: string;
-  }>;
+  const progressRows = (await progressRes.json()) as ProgressRow[];
+  const editionRows = (await editionsRes.json()) as EditionRow[];
   // Step 4: Fetch task and hideout data (cached)
   const [tasks, hideoutStations] = await Promise.all([
     getTasks(gameMode),
@@ -154,15 +204,13 @@ export async function handleGetTeamProgress(
     memberIds.map(async (memberId) => {
       const progressRow = progressRows.find((row) => row.user_id === memberId);
       const editionRow = editionRows.find((row) => row.user_id === memberId);
-      const row: UserProgressModeRow | null = progressRow
-        ? {
-            user_id: memberId,
-            game_edition: editionRow?.game_edition ?? 1,
-            progress_data: progressRow.progress_data,
-          }
-        : null;
-      const gameEdition = row?.game_edition ?? 1;
-      const progressData = extractGameModeData(row, gameMode);
+      const row: UserProgressModeRow = {
+        user_id: memberId,
+        game_edition: editionRow?.game_edition ?? 1,
+        progress_data: progressRow?.progress_data ?? null,
+      };
+      const gameEdition = row.game_edition;
+      const progressData = extractGameModeData(row);
       const fallbackDisplayName =
         progressData?.displayName?.trim() || (await getUserDisplayName(env, memberId));
       return transformProgress(
@@ -191,62 +239,7 @@ async function getSoloProgress(
   token: ApiToken,
   gameMode: GameMode
 ): Promise<TeamProgressResponse> {
-  const seasonNumber = getGameModeSeasonNumber(gameMode);
-  const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${token.user_id}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
-  const editionUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${token.user_id}&select=user_id,game_edition&limit=1`;
-  const [progressResponse, editionResponse] = await Promise.all([
-    fetch(progressUrl, {
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      },
-    }),
-    fetch(editionUrl, {
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      },
-    }),
-  ]);
-  if (!progressResponse.ok || !editionResponse.ok) {
-    throw new Error('Failed to fetch user progress');
-  }
-  const progressRows = (await progressResponse.json()) as Array<{
-    progress_data: UserProgressModeRow['progress_data'];
-    user_id: string;
-  }>;
-  const editionRows = (await editionResponse.json()) as Array<{
-    game_edition: number | null;
-    user_id: string;
-  }>;
-  const row: UserProgressModeRow | null = progressRows[0]
-    ? {
-        user_id: progressRows[0].user_id,
-        game_edition: editionRows[0]?.game_edition ?? 1,
-        progress_data: progressRows[0].progress_data,
-      }
-    : null;
-  const gameEdition = row?.game_edition ?? 1;
-  const progressData = extractGameModeData(row, gameMode);
-  const fallbackDisplayName =
-    progressData?.displayName?.trim() || (await getUserDisplayName(env, token.user_id));
-  const [tasks, hideoutStations] = await Promise.all([
-    getTasks(gameMode),
-    getHideoutStations(gameMode),
-  ]);
-  const data = transformProgress(
-    progressData,
-    token.user_id,
-    gameEdition,
-    tasks,
-    hideoutStations,
-    fallbackDisplayName
-  );
-  return {
-    data: [data],
-    meta: {
-      self: token.user_id,
-      hiddenTeammates: [],
-    },
-  };
+  const row = await fetchUserModeRow(env, token.user_id, gameMode);
+  const data = await transformUserModeRow(env, row, token.user_id, gameMode);
+  return buildProgressResponse(token.user_id, [data]);
 }

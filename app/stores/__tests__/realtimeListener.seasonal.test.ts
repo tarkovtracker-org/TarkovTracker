@@ -90,7 +90,9 @@ describe('seasonal progress realtime synchronization', () => {
   it('ignores historical Seasonal rows', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);
-    handlers.get('user_game_mode_progress')?.({
+    const handler = handlers.get('user_game_mode_progress');
+    expect(handler).toBeDefined();
+    handler?.({
       new: {
         game_mode: 'seasonal',
         progress_data: { level: 44 },
@@ -99,5 +101,52 @@ describe('seasonal progress realtime synchronization', () => {
       },
     });
     expect(state.seasonal).toEqual(defaultState.seasonal);
+  });
+  it('ignores an older normalized snapshot after a newer one', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    const handler = handlers.get('user_game_mode_progress');
+    handler?.({
+      new: {
+        game_mode: 'seasonal',
+        progress_data: { displayName: 'newer', level: 30, xpOffset: 300 },
+        season_number: 1,
+        updated_at: '2026-08-04T12:00:00.000Z',
+      },
+    });
+    handler?.({
+      new: {
+        game_mode: 'seasonal',
+        progress_data: { displayName: 'older', level: 20, xpOffset: 200 },
+        season_number: 1,
+        updated_at: '2026-08-04T11:00:00.000Z',
+      },
+    });
+    expect(state.seasonal.displayName).toBe('newer');
+    expect(state.seasonal.level).toBe(30);
+    expect(state.seasonal.xpOffset).toBe(300);
+  });
+  it('does not let an older legacy row overwrite newer normalized progress', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    handlers.get('user_game_mode_progress')?.({
+      new: {
+        game_mode: 'pvp',
+        progress_data: { displayName: 'newer', level: 30, xpOffset: 300 },
+        season_number: 0,
+        updated_at: '2026-08-04T12:00:00.000Z',
+      },
+    });
+    handlers.get('user_progress')?.({
+      new: {
+        current_game_mode: 'pvp',
+        pve_data: defaultState.pve,
+        pvp_data: { displayName: 'older', level: 20, xpOffset: 200 },
+        updated_at: '2026-08-04T11:00:00.000Z',
+      },
+    });
+    expect(state.pvp.displayName).toBe('newer');
+    expect(state.pvp.level).toBe(30);
+    expect(state.pvp.xpOffset).toBe(300);
   });
 });

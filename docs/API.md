@@ -447,11 +447,11 @@ All endpoints return errors in this format:
 
 The client caches API responses in IndexedDB with keys like:
 
-- `tasks-core-json-v2-regular-en`
-- `hideout-json-v1-pve-de`
-- `tasks-core-json-v2-pvp-season-en`
-- `items-lite-json-v1-regular-en`
-- `prestige-all-json-v1-en`
+- `tarkov-tasks-core-regular-en`
+- `tarkov-hideout-pve-de`
+- `tarkov-tasks-core-pvp-season-en`
+- `tarkov-items-lite-regular-en`
+- `tarkov-prestige-all-regular-en`
 
 ### Server-Side (Edge)
 

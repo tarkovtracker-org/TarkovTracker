@@ -1,5 +1,5 @@
 import { useStorage } from '@vueuse/core';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { GAME_MODES, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 export type OverlayMetric = 'items' | 'summary' | 'tasks';
 export type OverlayAccent = 'custom' | 'info' | 'kappa' | 'success' | 'warning';
 export type OverlayAlign =
@@ -78,7 +78,7 @@ export const DEFAULT_STREAMER_TOOLS_SETTINGS: StreamerToolsSettings = {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 const sanitizeMode = (value: unknown): GameMode => {
-  if (Object.values(GAME_MODES).includes(value as GameMode)) {
+  if (GAME_MODE_VALUES.includes(value as GameMode)) {
     return value as GameMode;
   }
   return DEFAULT_STREAMER_TOOLS_SETTINGS.mode;

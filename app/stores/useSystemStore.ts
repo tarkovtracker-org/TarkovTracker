@@ -1,6 +1,7 @@
 import { defineStore, type Store } from 'pinia';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
+import { collectTeamMembershipIds } from '@/utils/teamMemberships';
 import type { SystemGetters, SystemState } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 import type { PostgrestError, RealtimeChannel } from '@supabase/supabase-js';
@@ -104,6 +105,13 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
   const systemStore = useSystemStore();
   const { $supabase } = useNuxtApp();
   const membershipChannel = ref<RealtimeChannel | null>(null);
+  let membershipRequestId = 0;
+  let membershipSessionId = 0;
+  const getAuthenticatedUserId = (): string | null =>
+    $supabase.user?.loggedIn ? ($supabase.user.id ?? null) : null;
+  const isCurrentMembershipSession = (sessionId: number, userId?: string) =>
+    sessionId === membershipSessionId &&
+    (userId === undefined || getAuthenticatedUserId() === userId);
   /**
    * Handles system data snapshots from Supabase.
    *
@@ -131,9 +139,12 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     if (data) {
       // User ID from the user_system row
       const userId = (data as { user_id?: string | null }).user_id ?? null;
+      if (!userId || userId !== getAuthenticatedUserId()) return;
       // Handle game-mode-specific team IDs
       const pvpTeamId = (data as { pvp_team_id?: string | null }).pvp_team_id ?? null;
       const pveTeamId = (data as { pve_team_id?: string | null }).pve_team_id ?? null;
+      const seasonalTeamId =
+        (data as { seasonal_team_id?: string | null }).seasonal_team_id ?? null;
       // Legacy team_id field for backwards compatibility
       const legacyTeamId = (data as { team_id?: string | null }).team_id ?? null;
       // Admin status (server-validated, client cannot modify - see SECURITY NOTE above)
@@ -142,7 +153,7 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
         user_id: userId,
         pvp_team_id: pvpTeamId,
         pve_team_id: pveTeamId,
-        seasonal_team_id: systemStore.$state.seasonal_team_id ?? null,
+        seasonal_team_id: seasonalTeamId,
         // Keep legacy fields updated for backwards compatibility
         team: legacyTeamId || pvpTeamId,
         team_id: legacyTeamId || pvpTeamId,
@@ -160,23 +171,15 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
       } as Partial<SystemState>);
     }
   };
-  const refreshTeamMemberships = async () => {
-    const userId = $supabase.user?.id;
-    if (!$supabase.user?.loggedIn || !userId) return;
+  const refreshTeamMemberships = async (userId: string, sessionId: number) => {
+    const requestId = ++membershipRequestId;
     const { data, error } = await $supabase.client
       .from('team_memberships')
       .select('team_id,game_mode')
       .eq('user_id', userId);
+    if (requestId !== membershipRequestId || !isCurrentMembershipSession(sessionId, userId)) return;
     if (error) return;
-    const teamIds: Partial<Record<GameMode, string | null>> = {
-      pvp: null,
-      pve: null,
-      seasonal: null,
-    };
-    for (const membership of data ?? []) {
-      const mode = membership.game_mode as GameMode;
-      if (mode in teamIds) teamIds[mode] = membership.team_id;
-    }
+    const teamIds = collectTeamMembershipIds(data);
     systemStore.$patch((state) => {
       state.pvp_team_id = teamIds.pvp ?? null;
       state.pve_team_id = teamIds.pve ?? null;
@@ -203,10 +206,13 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     membershipChannel.value = null;
   };
   const setupMembershipChannel = async () => {
+    const sessionId = ++membershipSessionId;
     await cleanupMembershipChannel();
-    const userId = $supabase.user?.id;
-    if (!$supabase.user?.loggedIn || !userId) return;
-    await refreshTeamMemberships();
+    if (!isCurrentMembershipSession(sessionId)) return;
+    const userId = getAuthenticatedUserId();
+    if (!userId) return;
+    await refreshTeamMemberships(userId, sessionId);
+    if (!isCurrentMembershipSession(sessionId, userId)) return;
     membershipChannel.value = $supabase.client
       .channel(`system-team-memberships-${userId}`)
       .on(
@@ -217,13 +223,24 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
           table: 'team_memberships',
           filter: `user_id=eq.${userId}`,
         },
-        () => void refreshTeamMemberships()
+        () => void refreshTeamMemberships(userId, sessionId)
       )
       .subscribe();
   };
-  watch(
+  const stopMembershipAuthWatch = watch(
     () => [$supabase.user?.loggedIn, $supabase.user?.id] as const,
-    () => void setupMembershipChannel(),
+    () => {
+      systemStore.$patch({
+        user_id: getAuthenticatedUserId(),
+        pvp_team_id: null,
+        pve_team_id: null,
+        seasonal_team_id: null,
+        team: null,
+        team_id: null,
+        is_admin: false,
+      } as Partial<SystemState>);
+      void setupMembershipChannel();
+    },
     { immediate: true }
   );
   // Helper functions that provide properly typed access to team state
@@ -242,6 +259,8 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     hasInitiallyLoaded,
     loadError,
     cleanup: () => {
+      membershipSessionId += 1;
+      stopMembershipAuthWatch();
       cleanup();
       void cleanupMembershipChannel();
     },

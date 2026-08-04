@@ -72,8 +72,13 @@
       value: GAME_MODES.SEASONAL,
     },
   ]);
-  const currentModeOption = computed(() =>
-    modeOptions.value.find((option) => option.value === currentGameMode.value)!
+  const currentModeOption = computed(
+    () =>
+      modeOptions.value.find((option) => option.value === currentGameMode.value) ?? {
+        icon: 'i-mdi-sword-cross',
+        label: t('common.pvp'),
+        value: GAME_MODES.PVP,
+      }
   );
   const { loading: dataLoading } = storeToRefs(metadataStore);
   async function switchMode(mode: GameMode) {

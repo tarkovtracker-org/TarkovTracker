@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useTeamStore } from '@/stores/useTeamStore';
+import { resolveTeammateIdentity, useTeamStore } from '@/stores/useTeamStore';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
 type TeamPatch = Omit<Partial<TeamState>, 'members'> & {
   join_code?: string | null;
@@ -476,6 +476,21 @@ describe('useTeamStore', () => {
     });
   });
   describe('Profile Data Updates', () => {
+    it('refreshes a retained teammate identity when mode and edition change', () => {
+      const initial = resolveTeammateIdentity(undefined, 'pvp');
+      const refreshed = resolveTeammateIdentity(
+        {
+          displayName: 'Player',
+          gameEdition: 4,
+          gameMode: 'seasonal',
+          level: 10,
+          tasksCompleted: 5,
+        },
+        initial.currentGameMode
+      );
+      expect(initial).toEqual({ currentGameMode: 'pvp', gameEdition: 1 });
+      expect(refreshed).toEqual({ currentGameMode: 'seasonal', gameEdition: 4 });
+    });
     it('should handle progress broadcast update pattern', () => {
       const store = useTeamStore();
       const initialProfile: MemberProfile = {
