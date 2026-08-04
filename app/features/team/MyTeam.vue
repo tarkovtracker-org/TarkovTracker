@@ -107,6 +107,10 @@
   const { $supabase } = useNuxtApp();
   const toast = useToast();
   const { createTeam, leaveTeam } = useEdgeFunctions();
+  const clearRemovedLegacyTeamId = (state: typeof systemStore.$state, removedTeamId: string) => {
+    if (state.team === removedTeamId) state.team = null;
+    if (state.team_id === removedTeamId) state.team_id = null;
+  };
   const setLocalTeamId = (
     mode: GameMode,
     teamId: string | null,
@@ -119,8 +123,7 @@
         state.team = teamId;
         state.team_id = teamId;
       } else if (teamId === null && removedTeamId) {
-        if (state.team === removedTeamId) state.team = null;
-        if (state.team_id === removedTeamId) state.team_id = null;
+        clearRemovedLegacyTeamId(state, removedTeamId);
       }
     });
   };
