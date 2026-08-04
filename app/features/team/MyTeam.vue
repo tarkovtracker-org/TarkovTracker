@@ -285,7 +285,7 @@
         .eq('game_mode', currentGameMode)
         .maybeSingle();
       if (!membershipData && !membershipError) {
-        setLocalTeamId(currentGameMode, null);
+        setLocalTeamId(currentGameMode, null, currentTeamId);
         const { data: allMembers } = await $supabase.client
           .from('team_memberships')
           .select('user_id')
