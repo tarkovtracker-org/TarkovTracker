@@ -75,7 +75,7 @@ const transformUserModeRow = async (
   return transformProgress(
     progressData,
     userId,
-    row.game_edition,
+    row.game_edition ?? 1,
     tasks,
     hideoutStations,
     fallbackDisplayName
@@ -209,14 +209,13 @@ export async function handleGetTeamProgress(
         game_edition: editionRow?.game_edition ?? 1,
         progress_data: progressRow?.progress_data ?? null,
       };
-      const gameEdition = row.game_edition;
       const progressData = extractGameModeData(row);
       const fallbackDisplayName =
         progressData?.displayName?.trim() || (await getUserDisplayName(env, memberId));
       return transformProgress(
         progressData,
         memberId,
-        gameEdition,
+        row.game_edition ?? 1,
         tasks,
         hideoutStations,
         fallbackDisplayName
