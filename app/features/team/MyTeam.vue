@@ -107,13 +107,20 @@
   const { $supabase } = useNuxtApp();
   const toast = useToast();
   const { createTeam, leaveTeam } = useEdgeFunctions();
-  const setLocalTeamId = (mode: GameMode, teamId: string | null) => {
+  const setLocalTeamId = (
+    mode: GameMode,
+    teamId: string | null,
+    removedTeamId: string | null = null
+  ) => {
     const key = getTeamIdStateKey(mode);
     systemStore.$patch((state) => {
       state[key] = teamId;
       if (mode === GAME_MODES.PVP) {
         state.team = teamId;
         state.team_id = teamId;
+      } else if (teamId === null && removedTeamId) {
+        if (state.team === removedTeamId) state.team = null;
+        if (state.team_id === removedTeamId) state.team_id = null;
       }
     });
   };
@@ -321,7 +328,7 @@
       if (!result.success) {
         throw new Error(t('page.team.card.myteam.leave_team_error'));
       }
-      setLocalTeamId(currentGameMode, null);
+      setLocalTeamId(currentGameMode, null, currentTeamIdForLeave);
       teamStore.$reset();
       await delay(500);
       await nextTick();
