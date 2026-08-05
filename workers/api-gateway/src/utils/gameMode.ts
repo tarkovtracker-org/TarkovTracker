@@ -1,11 +1,19 @@
-import type { Env, GameMode } from '../types';
+import type { Env, GameMode } from '@/types';
+const getSupabaseUrl = (env: Env): URL => {
+  const url = new URL(env.SUPABASE_URL);
+  if (url.protocol !== 'https:') throw new Error('Supabase URL must use HTTPS');
+  return url;
+};
 const getServiceHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
 });
 const getActiveSeasonNumber = async (env: Env): Promise<number> => {
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/get_active_season_number`, {
+  const supabaseUrl = getSupabaseUrl(env);
+  const rpcUrl = new URL('/rest/v1/rpc/get_active_season_number', supabaseUrl);
+  const response = await fetch(rpcUrl, {
     method: 'POST',
+    redirect: 'error',
     headers: { ...getServiceHeaders(env), 'Content-Type': 'application/json' },
     body: '{}',
   });
