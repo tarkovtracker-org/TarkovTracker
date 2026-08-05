@@ -198,6 +198,7 @@ export default defineEventHandler(async (event) => {
     config.teamMembersCacheTtlMs,
     DEFAULT_TEAM_MEMBERS_CACHE_TTL_MS
   );
+  const forceRefresh = getQuery(event).refresh === '1';
   const typedConfig = config as ApiProtectionConfig;
   const trustProxy = Boolean(typedConfig.apiProtection?.trustProxy);
   const sharedCacheHandle = createSharedCacheHandle(
@@ -249,7 +250,7 @@ export default defineEventHandler(async (event) => {
   if (!isValidUuid(userId)) {
     throw createError({ statusCode: 401, statusMessage: 'Invalid token' });
   }
-  if (!isTestEnvironment) {
+  if (!isTestEnvironment && !forceRefresh) {
     const userRateLimitKey = `team-members:user:${teamId}:${userId}`;
     if (
       !(await consumeRateLimit(sharedCacheHandle, userRateLimitKey, teamMembersRateLimitPerMinute))

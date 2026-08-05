@@ -8,7 +8,7 @@ import {
 } from '@/stores/tarkov/metadataStoreBridge';
 describe('metadata store bridge', () => {
   beforeEach(() => {
-    resetProgressMetadataHydration();
+    resetProgressMetadataHydration({ preserveMetadata: false });
   });
   it('replays known objective migrations for stores hydrated later', () => {
     const migrate = vi.fn();
@@ -20,13 +20,14 @@ describe('metadata store bridge', () => {
     expect(migrate).toHaveBeenCalledTimes(2);
     expect(migrate).toHaveBeenLastCalledWith(duplicateObjectiveIds);
   });
-  it('does not replay migrations from a previous session', () => {
+  it('replays the validated metadata mapping for a new session', () => {
     const migrate = vi.fn();
     registerProgressMetadataHooks({ migrateDuplicateObjectiveProgress: migrate });
     migrateMetadataDuplicateObjectiveProgress(new Map([['old', ['old:new']]]));
     markProgressMetadataHydrated();
     resetProgressMetadataHydration();
+    markProgressMetadataHydrated();
     replayProgressMetadataMigration();
-    expect(migrate).toHaveBeenCalledTimes(1);
+    expect(migrate).toHaveBeenCalledTimes(3);
   });
 });

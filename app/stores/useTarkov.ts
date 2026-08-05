@@ -1185,6 +1185,7 @@ export async function initializeTarkovSync() {
         return;
       }
       logger.warn('[TarkovStore] Supabase sync user changed; resetting');
+      resetProgressMetadataHydration();
       resetTarkovSync('user changed');
     }
     logger.debug('[TarkovStore] Setting up Supabase sync and listener');

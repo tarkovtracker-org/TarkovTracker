@@ -128,7 +128,8 @@ export const useEdgeFunctions = () => {
     return await invokeSupabaseFunction<T>(fnName, body, method);
   };
   const getTeamMembers = async (
-    teamId: string
+    teamId: string,
+    forceRefresh = false
   ): Promise<{
     members: string[];
     profiles?: Record<string, MemberProfile>;
@@ -140,7 +141,7 @@ export const useEdgeFunctions = () => {
         profiles?: Record<string, MemberProfile>;
       }>(`/api/team/members`, {
         method: 'GET',
-        query: { teamId },
+        query: forceRefresh ? { refresh: '1', teamId } : { teamId },
         headers: {
           Authorization: `Bearer ${token}`,
         },

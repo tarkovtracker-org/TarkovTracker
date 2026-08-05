@@ -39,13 +39,17 @@ export const registerProgressMetadataHooks = (hooks: ProgressMetadataHooks): voi
   flushPendingDuplicateObjectiveProgress();
 };
 export const markProgressMetadataHydrated = (): void => {
+  const hadPendingMigrations = pendingDuplicateObjectiveIds.size > 0;
   progressHydrated = true;
   flushPendingDuplicateObjectiveProgress();
+  if (!hadPendingMigrations && progressHooks && knownDuplicateObjectiveIds.size > 0) {
+    progressHooks.migrateDuplicateObjectiveProgress(new Map(knownDuplicateObjectiveIds));
+  }
 };
-export const resetProgressMetadataHydration = (): void => {
+export const resetProgressMetadataHydration = (options?: { preserveMetadata?: boolean }): void => {
   progressHydrated = false;
   pendingDuplicateObjectiveIds = new Map();
-  knownDuplicateObjectiveIds = new Map();
+  if (options?.preserveMetadata === false) knownDuplicateObjectiveIds = new Map();
 };
 export const replayProgressMetadataMigration = (): void => {
   if (!progressHydrated || !progressHooks || knownDuplicateObjectiveIds.size === 0) return;

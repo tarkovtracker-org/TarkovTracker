@@ -30,6 +30,7 @@ const {
   single,
   supabaseContext,
   update,
+  updateQuery,
   rpc,
   useSupabaseSyncMock,
 } = vi.hoisted(() => {
@@ -217,6 +218,7 @@ const {
     single,
     supabaseContext,
     update,
+    updateQuery,
     rpc,
     useSupabaseSyncMock,
     get realtimeCallback() {
@@ -1469,6 +1471,7 @@ describe('useTarkov sync integration', () => {
     });
     await waitForBackgroundTasks();
     expect(update).toHaveBeenCalledTimes(1);
+    expect(updateQuery.is).toHaveBeenCalledWith('updated_at', null);
   });
   it('backs off deprecated remote cleanup retries after repeated failures and retries again later', async () => {
     vi.useFakeTimers();

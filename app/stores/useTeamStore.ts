@@ -72,6 +72,12 @@ interface TeamStoreInstance {
 }
 type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
 const TEAM_PROGRESS_REFRESH_DELAY_MS = 5500;
+const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: string): void => {
+  logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
+    error,
+    teammateId,
+  });
+};
 export type TeammateIdentity = {
   currentGameMode: GameMode;
   gameEdition: number;
@@ -260,7 +266,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     const requestVersion = ++latestMembersRequestVersion;
     const inFlightRequest = (async () => {
       const { getTeamMembers } = useEdgeFunctions();
-      const result = await getTeamMembers(currentTeamId);
+      const result = await getTeamMembers(currentTeamId, force);
       if (requestVersion !== latestMembersRequestVersion) {
         return;
       }
@@ -311,13 +317,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           void refreshMembers();
         }
       )
-      .on('broadcast', { event: 'progress' }, (payload) => {
-        const data = (payload?.payload || {}) as MemberProfileBroadcast;
-        if (data.userId) {
-          teamStore.$patch((state) => {
-            state.memberProfiles = mergeMemberProfileBroadcast(state.memberProfiles || {}, data);
-          });
-        }
+      .on('broadcast', { event: 'progress' }, () => {
         if (progressRefreshTimer) clearTimeout(progressRefreshTimer);
         progressRefreshTimer = setTimeout(() => {
           progressRefreshTimer = null;
@@ -596,19 +596,13 @@ export function useTeammateStores() {
             .select('game_mode,season_number,progress_data')
             .eq('user_id', teammateId);
           if (error) {
-            logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
-              error,
-              teammateId,
-            });
+            logTeammateModeProgressHydrationFailure(error, teammateId);
             return;
           }
-          for (const row of data ?? []) applyModeProgress(row as Record<string, unknown>);
+          data?.forEach((row) => applyModeProgress(row as Record<string, unknown>));
           replayProgressMetadataMigration();
         } catch (error) {
-          logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
-            error,
-            teammateId,
-          });
+          logTeammateModeProgressHydrationFailure(error, teammateId);
         }
       };
       const modeChannel = $supabase.client
