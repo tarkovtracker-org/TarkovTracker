@@ -571,21 +571,13 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-DECLARE
-  v_rate_limit RECORD;
 BEGIN
-  SELECT *
-  INTO v_rate_limit
-  FROM public.consume_mutation_rate_limit('team-join', (SELECT auth.uid())::TEXT, 30, 600);
-  IF NOT COALESCE(v_rate_limit.allowed, FALSE) THEN
-    RAISE EXCEPTION 'Team join rate limit exceeded';
-  END IF;
   PERFORM public.join_team(p_team_id, p_join_code, (SELECT auth.uid()));
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.sync_user_system_team_memberships()
 RETURNS trigger

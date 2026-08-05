@@ -124,6 +124,26 @@ describe('useEdgeFunctions.getTeamMembers', () => {
     await expect(edgeFunctions.getTeamMembers('team-1')).rejects.toBe(secondError);
     expect(mockSupabaseClient.functions.invoke).not.toHaveBeenCalled();
   });
+  it('requests fresh team members when force refresh is enabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      members: ['member-1'],
+      profiles: {},
+    });
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    const edgeFunctions = useEdgeFunctions();
+    await expect(edgeFunctions.getTeamMembers('team-1', true)).resolves.toEqual({
+      members: ['member-1'],
+      profiles: {},
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/team/members',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer token-1' },
+        method: 'GET',
+        query: { refresh: '1', teamId: 'team-1' },
+      })
+    );
+  });
 });
 describe('useEdgeFunctions.team mutations', () => {
   beforeEach(() => {

@@ -35,8 +35,10 @@ export const registerTarkovMetadataHooks = (hooks: TarkovMetadataHooks): void =>
   tarkovHooks = hooks;
 };
 export const registerProgressMetadataHooks = (hooks: ProgressMetadataHooks): void => {
+  const hadPendingMigrations = pendingDuplicateObjectiveIds.size > 0;
   progressHooks = hooks;
   flushPendingDuplicateObjectiveProgress();
+  if (!hadPendingMigrations && progressHydrated) replayProgressMetadataMigration();
 };
 export const markProgressMetadataHydrated = (): void => {
   const hadPendingMigrations = pendingDuplicateObjectiveIds.size > 0;

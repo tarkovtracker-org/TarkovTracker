@@ -250,7 +250,7 @@ export default defineEventHandler(async (event) => {
   if (!isValidUuid(userId)) {
     throw createError({ statusCode: 401, statusMessage: 'Invalid token' });
   }
-  if (!isTestEnvironment && !forceRefresh) {
+  if (!isTestEnvironment) {
     const userRateLimitKey = `team-members:user:${teamId}:${userId}`;
     if (
       !(await consumeRateLimit(sharedCacheHandle, userRateLimitKey, teamMembersRateLimitPerMinute))
@@ -259,7 +259,7 @@ export default defineEventHandler(async (event) => {
     }
   }
   const teamMembersCacheKey = `${teamId}:${userId}`;
-  if (!isTestEnvironment) {
+  if (!isTestEnvironment && !forceRefresh) {
     const cached = await getCachedTeamMembers(sharedCacheHandle, teamMembersCacheKey);
     if (cached) {
       return cached;

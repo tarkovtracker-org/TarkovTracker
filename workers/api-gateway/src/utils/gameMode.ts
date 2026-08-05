@@ -10,7 +10,10 @@ const getServiceHeaders = (env: Env) => ({
 });
 const getActiveSeasonNumber = async (env: Env): Promise<number> => {
   const supabaseUrl = getSupabaseUrl(env);
-  const rpcUrl = new URL('/rest/v1/rpc/get_active_season_number', supabaseUrl);
+  const rpcUrl = new URL(supabaseUrl);
+  rpcUrl.pathname = `${rpcUrl.pathname.replace(/\/+$/, '')}/rest/v1/rpc/get_active_season_number`;
+  rpcUrl.search = '';
+  rpcUrl.hash = '';
   const response = await fetch(rpcUrl, {
     method: 'POST',
     redirect: 'error',

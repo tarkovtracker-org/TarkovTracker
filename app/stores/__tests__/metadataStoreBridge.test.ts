@@ -30,4 +30,13 @@ describe('metadata store bridge', () => {
     replayProgressMetadataMigration();
     expect(migrate).toHaveBeenCalledTimes(3);
   });
+  it('replays retained mappings when progress hooks register after hydration', () => {
+    const migrate = vi.fn();
+    const duplicateObjectiveIds = new Map([['objective-1', ['objective-1:task-1']]]);
+    migrateMetadataDuplicateObjectiveProgress(duplicateObjectiveIds);
+    markProgressMetadataHydrated();
+    registerProgressMetadataHooks({ migrateDuplicateObjectiveProgress: migrate });
+    expect(migrate).toHaveBeenCalledTimes(1);
+    expect(migrate).toHaveBeenCalledWith(duplicateObjectiveIds);
+  });
 });
