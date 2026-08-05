@@ -590,16 +590,26 @@ export function useTeammateStores() {
         });
       };
       const hydrateModeProgress = async () => {
-        const { data, error } = await $supabase.client
-          .from('user_game_mode_progress')
-          .select('game_mode,season_number,progress_data')
-          .eq('user_id', teammateId);
-        if (error) {
-          logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', error);
-          return;
+        try {
+          const { data, error } = await $supabase.client
+            .from('user_game_mode_progress')
+            .select('game_mode,season_number,progress_data')
+            .eq('user_id', teammateId);
+          if (error) {
+            logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
+              error,
+              teammateId,
+            });
+            return;
+          }
+          for (const row of data ?? []) applyModeProgress(row as Record<string, unknown>);
+          replayProgressMetadataMigration();
+        } catch (error) {
+          logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
+            error,
+            teammateId,
+          });
         }
-        for (const row of data ?? []) applyModeProgress(row as Record<string, unknown>);
-        replayProgressMetadataMigration();
       };
       const modeChannel = $supabase.client
         .channel(`teammate-mode-progress-${teammateId}`)
