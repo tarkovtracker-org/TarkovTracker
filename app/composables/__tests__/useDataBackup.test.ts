@@ -1349,13 +1349,16 @@ describe('useDataBackup', () => {
       const mockState = {
         currentGameMode: 'pve',
         gameEdition: 1,
-        pvp: { level: 1 },
+        pvp: { level: 1, progressEpoch: 5 },
         pve: { level: 7 },
         seasonal: { level: 30 },
-        tarkovUid: null,
+        tarkovUid: 67890,
       };
       patchFn(mockState);
       expect(mockState.currentGameMode).toBe('pvp');
+      expect(mockState.gameEdition).toBe(1);
+      expect(mockState.tarkovUid).toBe(67890);
+      expect(mockState.seasonal).toEqual({ level: 30 });
     });
     it.each(['pvp', 'pve'] as const)(
       'ignores legacy tarkovUidMode=%s metadata in backup payloads',

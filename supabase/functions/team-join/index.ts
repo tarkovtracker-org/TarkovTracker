@@ -116,6 +116,7 @@ const persistJoin = async (context: JoinContext): Promise<Response | null> => {
   const { error } = await context.supabase.rpc('join_team', {
     p_join_code: context.joinCode,
     p_team_id: context.teamId,
+    p_user_id: context.userId,
   });
   if (!error) return null;
   console.error('Team join failed:', error);

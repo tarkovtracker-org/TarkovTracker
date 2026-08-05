@@ -101,12 +101,14 @@ const shouldIgnoreModeProgressUpdate = (
   nextProgress: UserProgressData,
   localProgress: UserProgressData
 ): boolean => {
-  if (!isLikelySelfOriginUpdate(updateTime)) return deepEqual(nextProgress, localProgress);
-  logger.debug('[TarkovStore] Ignoring mode realtime update - likely self-origin', {
-    mode,
-    threshold: SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
-  });
-  return true;
+  const stateUnchanged = deepEqual(nextProgress, localProgress);
+  if (stateUnchanged && isLikelySelfOriginUpdate(updateTime)) {
+    logger.debug('[TarkovStore] Ignoring mode realtime update - likely self-origin', {
+      mode,
+      threshold: SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
+    });
+  }
+  return stateUnchanged;
 };
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
@@ -203,10 +205,13 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       lastDeprecatedRemoteCleanupAttemptAt = now;
       recordLocalSyncTime();
       try {
-        const { error } = await $supabase.client
+        if (!remoteData.updated_at) return;
+        const { data, error } = await $supabase.client
           .from('user_progress')
           .update({ pvp_data: nextState.pvp, pve_data: nextState.pve })
-          .eq('user_id', currentUserId);
+          .eq('user_id', currentUserId)
+          .eq('updated_at', remoteData.updated_at)
+          .select('user_id');
         if (error) {
           deprecatedRemoteCleanupFailureCount += 1;
           logger.error(
@@ -217,6 +222,19 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
             },
             error
           );
+          return;
+        }
+        if (!data?.length) {
+          const { data: current, error: refetchError } = await $supabase.client
+            .from('user_progress')
+            .select('updated_at')
+            .eq('user_id', currentUserId)
+            .single();
+          logger.debug('[TarkovStore] Skipped stale deprecated remote cleanup', {
+            currentUpdatedAt: current?.updated_at,
+            error: refetchError,
+            remoteUpdatedAt: remoteData.updated_at,
+          });
           return;
         }
         deprecatedRemoteCleanupFailureCount = 0;

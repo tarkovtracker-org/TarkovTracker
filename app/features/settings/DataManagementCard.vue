@@ -976,6 +976,7 @@
   import { logger } from '@/utils/logger';
   import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
+  import type { BackupImportTargetModes } from '@/composables/useDataBackup';
   const TARKOV_DEV_ARENA_MODE = 'arena' as const;
   type DataManagementView = 'all' | 'imports' | 'backup';
   type TarkovDevRefetchMode = ImportableGameMode | typeof TARKOV_DEV_ARENA_MODE;

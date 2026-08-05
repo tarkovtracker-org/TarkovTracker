@@ -43,7 +43,7 @@ const fetchUserModeRow = async (
   userId: string,
   gameMode: GameMode
 ): Promise<UserProgressModeRow> => {
-  const seasonNumber = getGameModeSeasonNumber(gameMode);
+  const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
   const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
   const editionUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=user_id,game_edition&limit=1`;
   const [progressResponse, editionResponse] = await Promise.all([
@@ -180,7 +180,7 @@ export async function handleGetTeamProgress(
   if (memberIds.length === 0) {
     return await getSoloProgress(env, token, gameMode);
   }
-  const seasonNumber = getGameModeSeasonNumber(gameMode);
+  const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
   const ids = memberIds.join(',');
   const progressUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=in.(${ids})&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data`;
   const editionsUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=in.(${ids})&select=user_id,game_edition`;

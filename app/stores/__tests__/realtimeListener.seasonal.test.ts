@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
+import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
 const showProgressMerged = vi.fn();
 const { channel, handlers, supabaseContext } = vi.hoisted(() => {
   const handlers = new Map<string, (payload: { new: unknown }) => void>();
@@ -67,6 +68,7 @@ describe('seasonal progress realtime synchronization', () => {
   afterEach(async () => {
     const { cleanupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await cleanupRealtimeListener();
+    resetSyncTimeline();
     vi.clearAllMocks();
   });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
@@ -125,6 +127,27 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.seasonal.displayName).toBe('newer');
     expect(state.seasonal.level).toBe(30);
     expect(state.seasonal.xpOffset).toBe(300);
+  });
+  it('applies a divergent normalized update during the self-origin window', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-04T12:00:00.000Z'));
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      await setupRealtimeListener(store);
+      const handler = handlers.get('user_game_mode_progress');
+      recordLocalSyncTime();
+      handler?.({
+        new: {
+          game_mode: 'seasonal',
+          progress_data: { level: 22 },
+          season_number: 1,
+          updated_at: '2026-08-04T12:00:01.000Z',
+        },
+      });
+      expect(state.seasonal.level).toBe(22);
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('does not let an older legacy row overwrite newer normalized progress', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');

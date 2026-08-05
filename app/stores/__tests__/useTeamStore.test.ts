@@ -508,6 +508,8 @@ describe('useTeamStore', () => {
       const broadcastData = {
         userId: 'user-1',
         displayName: 'UpdatedPlayer',
+        gameEdition: 99,
+        gameMode: 'pve' as const,
         level: 15,
         tasksCompleted: 10,
       };

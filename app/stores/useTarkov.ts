@@ -29,7 +29,10 @@ import {
   safeSetItem,
   type PersistedProgressSnapshot,
 } from '@/stores/tarkov/localStorage';
-import { registerTarkovMetadataHooks } from '@/stores/tarkov/metadataStoreBridge';
+import {
+  markProgressMetadataHydrated,
+  registerTarkovMetadataHooks,
+} from '@/stores/tarkov/metadataStoreBridge';
 import {
   buildPrestigeResetData,
   buildPrestigeRunSummary,
@@ -200,6 +203,18 @@ const persistPrestigeLevel = async (
   if (error) throw new Error(`Failed to sync prestige level: ${error.message}`);
   recordLocalSyncTime();
 };
+const syncProgressIfLoggedIn = async (store: TarkovStoreInstance, errorMessage: string) => {
+  const { $supabase } = useNuxtApp();
+  const userId = $supabase.user.id;
+  if (!$supabase.user.loggedIn || !userId) return;
+  try {
+    recordLocalSyncTime();
+    const { error } = await syncProgressState($supabase.client, userId, store.$state);
+    throwSyncError(error, errorMessage);
+  } catch (error) {
+    logger.error(errorMessage, error);
+  }
+};
 const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) => {
   const { $supabase } = useNuxtApp();
   const currentPrestige = clampPrestigeLevel(store[mode].prestigeLevel ?? 0);
@@ -284,15 +299,7 @@ const tarkovActions = {
   },
   async switchGameMode(this: TarkovStoreInstance, mode: GameMode) {
     actions.switchGameMode.call(this, mode);
-    const { $supabase } = useNuxtApp();
-    if ($supabase.user.loggedIn && $supabase.user.id) {
-      try {
-        recordLocalSyncTime(); // Track for self-origin filtering
-        await syncProgressState($supabase.client, $supabase.user.id, this.$state);
-      } catch (error) {
-        logger.error('Error syncing gamemode to backend:', error);
-      }
-    }
+    await syncProgressIfLoggedIn(this, 'Error syncing gamemode to backend:');
   },
   async migrateDataIfNeeded(this: TarkovStoreInstance) {
     const needsMigration =
@@ -315,7 +322,12 @@ const tarkovActions = {
       if ($supabase.user.loggedIn && $supabase.user.id) {
         try {
           recordLocalSyncTime(); // Track for self-origin filtering
-          await syncProgressState($supabase.client, $supabase.user.id, this.$state);
+          const { error } = await syncProgressState(
+            $supabase.client,
+            $supabase.user.id,
+            this.$state
+          );
+          if (error) throw error;
         } catch (error) {
           logger.error('Error saving migrated data to Supabase:', error);
         }
@@ -325,7 +337,12 @@ const tarkovActions = {
       if ($supabase.user.loggedIn && $supabase.user.id) {
         try {
           recordLocalSyncTime();
-          await syncProgressState($supabase.client, $supabase.user.id, this.$state);
+          const { error } = await syncProgressState(
+            $supabase.client,
+            $supabase.user.id,
+            this.$state
+          );
+          if (error) throw error;
         } catch (error) {
           logger.error('Error saving task completion migration to Supabase:', error);
         }
@@ -1062,7 +1079,7 @@ const syncMetadataAfterStartup = (tarkovStore: TarkovStore) => {
   }
   void (async () => {
     try {
-      await metadataStore.initialize();
+      await metadataStore.initialize({ gameMode: tarkovStore.getCurrentGameMode() });
       if (metadataStore.currentGameMode === tarkovStore.getCurrentGameMode()) {
         return;
       }
@@ -1513,6 +1530,7 @@ export async function initializeTarkovSync() {
       logger.error('[TarkovStore] Initial load failed; sync not started');
       throw new Error('Supabase initial load failed');
     }
+    markProgressMetadataHydrated();
     syncMetadataAfterStartup(tarkovStore);
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;

@@ -7,7 +7,8 @@ ALTER TABLE public.team_memberships
 ALTER TABLE public.api_tokens
   VALIDATE CONSTRAINT api_tokens_game_mode_check;
 UPDATE public.api_tokens
-SET token_value = NULL
+SET token_value = NULL,
+    is_active = FALSE
 WHERE token_value IS NOT NULL
   AND token_value NOT LIKE upper(game_mode) || '\_%' ESCAPE '\';
 ALTER TABLE public.api_tokens

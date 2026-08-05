@@ -152,17 +152,27 @@ describe('Shared Profile API', () => {
     }
   });
   it('returns 504 when auth context resolution times out', async () => {
+    vi.useFakeTimers();
     runtimeConfig.supabaseServiceKey = '';
     mockGetRequestHeader.mockImplementation((_, key: string) => {
       if (key === 'authorization') return 'Bearer owner-token';
       return undefined;
     });
-    mockFetch.mockRejectedValueOnce(createAbortError());
+    mockFetch.mockImplementationOnce(
+      (_url: string, init: RequestInit) =>
+        new Promise((_, reject) => {
+          init.signal?.addEventListener('abort', () => reject(createAbortError()), { once: true });
+        })
+    );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+    const result = handler(mockEvent as H3Event);
+    const expectation = expect(result).rejects.toMatchObject({
       statusCode: 504,
       statusMessage: 'Timed out while validating shared profile access',
     });
+    await vi.advanceTimersByTimeAsync(8000);
+    await expectation;
+    vi.useRealTimers();
   });
   it('returns 504 when shared profile resource loading times out', async () => {
     mockFetch.mockRejectedValueOnce(createAbortError());

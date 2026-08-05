@@ -100,20 +100,12 @@ export const mergeMemberProfileBroadcast = (
   data: MemberProfileBroadcast
 ): Record<string, MemberProfile> => {
   const existingProfile = profiles[data.userId];
-  const {
-    displayName = null,
-    gameEdition = existingProfile?.gameEdition,
-    gameMode = existingProfile?.gameMode,
-    level = null,
-    tasksCompleted = null,
-  } = data;
+  const { displayName = null, level = null, tasksCompleted = null } = data;
   return {
     ...profiles,
     [data.userId]: {
       ...existingProfile,
       displayName,
-      gameEdition,
-      gameMode,
       level,
       tasksCompleted,
     },
@@ -312,16 +304,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           void refreshMembers();
         }
       )
-      .on('broadcast', { event: 'progress' }, (payload) => {
-        const data = (payload?.payload || {}) as Partial<MemberProfileBroadcast>;
-        if (!data?.userId) return;
-        // Update memberProfiles with the broadcasted snapshot
-        teamStore.$patch((state) => {
-          state.memberProfiles = mergeMemberProfileBroadcast(
-            state.memberProfiles || {},
-            data as MemberProfileBroadcast
-          );
-        });
+      .on('broadcast', { event: 'progress' }, () => {
+        void refreshMembers();
       })
       .on('broadcast', { event: 'task-update' }, (payload) => {
         const data = (payload?.payload || {}) as {

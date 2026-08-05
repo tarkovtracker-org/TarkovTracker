@@ -128,6 +128,20 @@ const {
     error: null,
   }));
   const update = vi.fn(async (): Promise<RpcResult> => ({ error: null }));
+  const updateQuery = {
+    eq: vi.fn(() => updateQuery),
+    select: vi.fn(async () => {
+      const result = await update();
+      return {
+        data: result.error ? null : [{ user_id: 'user-1' }],
+        error: result.error,
+      };
+    }),
+    then: <TResult1 = RpcResult, TResult2 = never>(
+      onfulfilled?: ((value: RpcResult) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+    ) => update().then(onfulfilled, onrejected),
+  };
   const from = vi.fn((table: string) => {
     if (table === 'user_game_mode_progress') {
       return {
@@ -138,7 +152,7 @@ const {
       eq,
       select,
       single,
-      update: vi.fn(() => ({ eq: vi.fn(() => update()) })),
+      update: vi.fn(() => updateQuery),
       upsert: rpc,
     };
   });
@@ -1155,7 +1169,7 @@ describe('useTarkov sync integration', () => {
         tarkov_uid: null,
         pvp_data: progressWithTaskState('task-1', true),
         pve_data: progressWithTaskState('task-2', false),
-        updated_at: '2000-01-01T00:00:00.000Z',
+        updated_at: '2026-02-22T12:00:00.000Z',
       },
       old: {},
     });
@@ -1452,7 +1466,7 @@ describe('useTarkov sync integration', () => {
         tarkov_uid: null,
         pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
         pve_data: progressWithLevel(1),
-        updated_at: '2000-01-01T00:00:00.000Z',
+        updated_at: '2026-02-22T12:00:00.000Z',
       };
       callback?.({ new: payload, old: {} });
       await waitForBackgroundTasks();

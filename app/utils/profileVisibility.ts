@@ -4,7 +4,6 @@ import {
   isGameMode,
   type GameMode,
 } from '@/utils/constants';
-import { logger } from '@/utils/logger';
 export type ProfileVisibilityRow = {
   game_mode: unknown;
   profile_public: unknown;
@@ -23,10 +22,7 @@ const createLoadedProfileVisibility = (
   current: boolean
 ): LoadedProfileVisibility => {
   if (!current) return { current: false };
-  if (result.error) {
-    logger.error('[ProfileVisibility] Failed to load profile visibility:', result.error);
-    return { current: true, error: result.error, visibility: null };
-  }
+  if (result.error) return { current: true, error: result.error, visibility: null };
   return { current: true, error: null, visibility: collectProfileVisibility(result.data) };
 };
 export const isCurrentProfileVisibilityRequest = (

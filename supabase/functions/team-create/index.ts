@@ -11,7 +11,7 @@ import {
   rejectMutationStep,
   type MutationStep,
 } from '../_shared/authenticated-mutation.ts';
-import { isTeamGameMode, teamIdColumnForMode, type TeamGameMode } from '../_shared/team-mode.ts';
+import { isTeamGameMode, type TeamGameMode } from '../_shared/team-mode.ts';
 import { rejectExistingTeamMembership } from '../_shared/team-membership.ts';
 const DEFAULT_MAX_TEAM_MEMBERS = 5;
 type TeamRow = {
@@ -110,78 +110,22 @@ const createTeamInsertError = (req: Request, error: { code?: string } | null): R
   return createErrorResponse('Failed to create team', 500, req);
 };
 const insertTeam = async (context: CreateContext): Promise<MutationStep<TeamRow>> => {
-  const { data, error } = await context.supabase
-    .from('teams')
-    .insert({
-      name: context.name.trim(),
-      join_code: context.joinCode,
-      max_members: context.maxMembers,
-      owner_id: context.userId,
-      game_mode: context.gameMode,
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  const { data, error } = await context.supabase.rpc('create_team_with_owner', {
+    p_game_mode: context.gameMode,
+    p_join_code: context.joinCode,
+    p_max_members: context.maxMembers,
+    p_name: context.name.trim(),
+    p_owner_id: context.userId,
+  });
   if (error || !data) return rejectMutationStep(createTeamInsertError(context.req, error));
   return acceptMutationStep(data as TeamRow);
 };
-const insertOwnerMembership = async (context: PersistedCreateContext): Promise<Response | null> => {
-  const { error } = await context.supabase.from('team_memberships').insert({
-    team_id: context.team.id,
-    user_id: context.userId,
-    role: 'owner',
-    game_mode: context.gameMode,
-    joined_at: new Date().toISOString(),
-  });
-  if (!error) return null;
-  console.error('Membership creation failed:', error);
-  await context.supabase.from('teams').delete().eq('id', context.team.id);
-  return createErrorResponse('Failed to create team membership', 500, context.req);
-};
-const updateTeamSystemState = async (context: PersistedCreateContext): Promise<Response | null> => {
-  const { error } = await context.supabase.from('user_system').upsert({
-    user_id: context.userId,
-    [teamIdColumnForMode(context.gameMode)]: context.team.id,
-    updated_at: new Date().toISOString(),
-  });
-  if (!error) return null;
-  console.error('user_system upsert failed:', error);
-  const { error: membershipRollbackError } = await context.supabase
-    .from('team_memberships')
-    .delete()
-    .eq('team_id', context.team.id);
-  const { error: teamRollbackError } = await context.supabase
-    .from('teams')
-    .delete()
-    .eq('id', context.team.id);
-  if (membershipRollbackError || teamRollbackError) {
-    console.error('Failed to roll back team creation:', {
-      membershipRollbackError,
-      teamRollbackError,
-      teamId: context.team.id,
-    });
-  }
-  return createErrorResponse('Failed to update user system state', 500, context.req);
-};
-const recordTeamCreated = (context: PersistedCreateContext) =>
-  context.supabase.from('team_events').insert({
-    team_id: context.team.id,
-    event_type: 'team_created',
-    initiated_by: context.userId,
-    event_data: { team_name: context.team.name, max_members: context.maxMembers },
-    created_at: new Date().toISOString(),
-  });
 const persistTeamCreate = async (
   context: CreateContext
 ): Promise<MutationStep<PersistedCreateContext>> => {
   const inserted = await insertTeam(context);
   if (inserted.response) return rejectMutationStep(inserted.response);
   const persisted = { ...context, team: inserted.value };
-  const membershipError = await insertOwnerMembership(persisted);
-  if (membershipError) return rejectMutationStep(membershipError);
-  const systemError = await updateTeamSystemState(persisted);
-  if (systemError) return rejectMutationStep(systemError);
-  await recordTeamCreated(persisted);
   return acceptMutationStep(persisted);
 };
 const createTeamResponse = (context: PersistedCreateContext) =>

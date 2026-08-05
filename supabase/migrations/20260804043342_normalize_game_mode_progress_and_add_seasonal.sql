@@ -388,18 +388,100 @@ ALTER TABLE public.user_system
   FOREIGN KEY (seasonal_team_id) REFERENCES public.teams(id) ON DELETE SET NULL
   NOT VALID;
 
-CREATE OR REPLACE FUNCTION public.join_team(p_team_id UUID, p_join_code TEXT)
+CREATE OR REPLACE FUNCTION public.create_team_with_owner(
+  p_name TEXT,
+  p_join_code TEXT,
+  p_max_members INTEGER,
+  p_owner_id UUID,
+  p_game_mode TEXT
+)
+RETURNS public.teams
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_team public.teams%ROWTYPE;
+BEGIN
+  IF p_owner_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  IF p_game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
+    RAISE EXCEPTION 'Invalid game mode';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public.team_memberships
+    WHERE user_id = p_owner_id
+      AND game_mode = p_game_mode
+  ) THEN
+    RAISE EXCEPTION 'You are already a member of a team for this game mode';
+  END IF;
+
+  INSERT INTO public.teams (name, join_code, max_members, owner_id, game_mode, created_at)
+  VALUES (p_name, p_join_code, p_max_members, p_owner_id, p_game_mode, now())
+  RETURNING * INTO v_team;
+
+  INSERT INTO public.team_memberships (team_id, user_id, role, game_mode, joined_at)
+  VALUES (v_team.id, p_owner_id, 'owner', p_game_mode, now());
+
+  IF p_game_mode = 'pvp' THEN
+    INSERT INTO public.user_system (user_id, pvp_team_id, updated_at)
+    VALUES (p_owner_id, v_team.id, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET pvp_team_id = EXCLUDED.pvp_team_id, updated_at = EXCLUDED.updated_at;
+  ELSIF p_game_mode = 'pve' THEN
+    INSERT INTO public.user_system (user_id, pve_team_id, updated_at)
+    VALUES (p_owner_id, v_team.id, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET pve_team_id = EXCLUDED.pve_team_id, updated_at = EXCLUDED.updated_at;
+  ELSE
+    INSERT INTO public.user_system (user_id, seasonal_team_id, updated_at)
+    VALUES (p_owner_id, v_team.id, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET seasonal_team_id = EXCLUDED.seasonal_team_id, updated_at = EXCLUDED.updated_at;
+  END IF;
+
+  INSERT INTO public.team_events (
+    team_id,
+    event_type,
+    initiated_by,
+    event_data,
+    created_at
+  )
+  VALUES (
+    v_team.id,
+    'team_created',
+    p_owner_id,
+    jsonb_build_object('team_name', v_team.name, 'max_members', v_team.max_members),
+    now()
+  );
+  RETURN v_team;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_team_with_owner(TEXT, TEXT, INTEGER, UUID, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_team_with_owner(TEXT, TEXT, INTEGER, UUID, TEXT)
+  TO service_role;
+
+DROP FUNCTION IF EXISTS public.join_team(UUID, TEXT);
+
+CREATE OR REPLACE FUNCTION public.join_team(
+  p_team_id UUID,
+  p_join_code TEXT,
+  p_user_id UUID
+)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_user_id UUID := (SELECT auth.uid());
   v_team public.teams%ROWTYPE;
   v_member_count INTEGER;
 BEGIN
-  IF v_user_id IS NULL THEN
+  IF p_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
@@ -411,7 +493,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Team not found';
   END IF;
-  IF v_team.join_code <> p_join_code THEN
+  IF v_team.join_code IS NULL OR p_join_code IS NULL OR v_team.join_code <> p_join_code THEN
     RAISE EXCEPTION 'Invalid team join code';
   END IF;
   IF v_team.game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
@@ -420,7 +502,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM public.team_memberships
-    WHERE user_id = v_user_id
+    WHERE user_id = p_user_id
       AND game_mode = v_team.game_mode
   ) THEN
     RAISE EXCEPTION 'You are already a member of a team for this game mode';
@@ -430,7 +512,7 @@ BEGIN
   INTO v_member_count
   FROM public.team_memberships
   WHERE team_id = v_team.id;
-  IF v_member_count >= v_team.max_members THEN
+  IF v_team.max_members IS NULL OR v_member_count >= v_team.max_members THEN
     RAISE EXCEPTION 'Team is full';
   END IF;
 
@@ -441,21 +523,21 @@ BEGIN
     game_mode,
     joined_at
   )
-  VALUES (v_team.id, v_user_id, 'member', v_team.game_mode, now());
+  VALUES (v_team.id, p_user_id, 'member', v_team.game_mode, now());
 
   IF v_team.game_mode = 'pvp' THEN
     INSERT INTO public.user_system (user_id, pvp_team_id, updated_at)
-    VALUES (v_user_id, v_team.id, now())
+    VALUES (p_user_id, v_team.id, now())
     ON CONFLICT (user_id) DO UPDATE
     SET pvp_team_id = EXCLUDED.pvp_team_id, updated_at = EXCLUDED.updated_at;
   ELSIF v_team.game_mode = 'pve' THEN
     INSERT INTO public.user_system (user_id, pve_team_id, updated_at)
-    VALUES (v_user_id, v_team.id, now())
+    VALUES (p_user_id, v_team.id, now())
     ON CONFLICT (user_id) DO UPDATE
     SET pve_team_id = EXCLUDED.pve_team_id, updated_at = EXCLUDED.updated_at;
   ELSE
     INSERT INTO public.user_system (user_id, seasonal_team_id, updated_at)
-    VALUES (v_user_id, v_team.id, now())
+    VALUES (p_user_id, v_team.id, now())
     ON CONFLICT (user_id) DO UPDATE
     SET seasonal_team_id = EXCLUDED.seasonal_team_id, updated_at = EXCLUDED.updated_at;
   END IF;
@@ -471,16 +553,16 @@ BEGIN
   VALUES (
     v_team.id,
     'member_joined',
-    v_user_id,
-    v_user_id,
+    p_user_id,
+    p_user_id,
     jsonb_build_object('team_name', v_team.name),
     now()
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT, UUID) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.sync_user_system_team_memberships()
 RETURNS trigger

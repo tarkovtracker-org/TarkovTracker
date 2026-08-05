@@ -4,6 +4,7 @@ import {
 } from '../../../../app/utils/userMetadata';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { logger } from '../utils/logger';
+import { getGameModeSeasonNumber } from '../utils/gameMode';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
 import type {
@@ -100,25 +101,12 @@ const getServiceHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
 });
-const getActiveSeasonNumber = async (env: Env): Promise<number> => {
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/get_active_season_number`, {
-    method: 'POST',
-    headers: { ...getServiceHeaders(env), 'Content-Type': 'application/json' },
-    body: '{}',
-  });
-  if (!response.ok) throw new Error('Failed to fetch active season');
-  const value = Number(await response.json());
-  if (!Number.isInteger(value) || value <= 0) throw new Error('Invalid active season');
-  return value;
-};
-const getSeasonNumber = async (env: Env, gameMode: GameMode): Promise<number> =>
-  gameMode === 'seasonal' ? getActiveSeasonNumber(env) : 0;
 async function fetchUserProgressMode(
   env: Env,
   userId: string,
   gameMode: GameMode
 ): Promise<UserProgressModeRow | null> {
-  const seasonNumber = await getSeasonNumber(env, gameMode);
+  const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
   const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
   const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=user_id,game_edition&limit=1`;
   const [modeResponse, metadataResponse] = await Promise.all([
@@ -148,7 +136,7 @@ async function fetchCurrentProgressData(
   userId: string,
   gameMode: GameMode
 ): Promise<Record<string, unknown>> {
-  const seasonNumber = await getSeasonNumber(env, gameMode);
+  const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
   const url = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=progress_data&limit=1`;
   const response = await fetch(url, { headers: getServiceHeaders(env) });
   if (!response.ok) throw new Error('Failed to fetch user progress');
