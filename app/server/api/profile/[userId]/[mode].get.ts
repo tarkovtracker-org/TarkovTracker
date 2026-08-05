@@ -685,10 +685,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
   }
   const modeProgressRows = (await modeProgressResponse.json()) as ModeProgressRow[];
-  const modeProgressRow = modeProgressRows[0];
-  if (!modeProgressRow) {
-    throw createError({ statusCode: 404, statusMessage: 'Profile mode not found' });
-  }
+  const modeProgressRow: ModeProgressRow = modeProgressRows[0] ?? {
+    user_id: userId,
+    progress_data: null,
+    profile_public: false,
+  };
   let preferencesRow: PreferencesRow | null = null;
   if (preferencesResponse.ok) {
     const preferenceRows = (await preferencesResponse.json()) as PreferencesRow[];

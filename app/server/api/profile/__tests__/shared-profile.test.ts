@@ -259,6 +259,42 @@ describe('Shared Profile API', () => {
       visibility: 'public',
     });
   });
+  it('treats a missing Seasonal row as private instead of not found', async () => {
+    mockGetRouterParam.mockImplementation((_, key: string) => {
+      if (key === 'userId') return '11111111-1111-4111-8111-111111111111';
+      if (key === 'mode') return 'seasonal';
+      return undefined;
+    });
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce(preferencesResponse());
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+  });
+  it('returns an empty owner payload when the Seasonal row does not exist yet', async () => {
+    runtimeConfig.supabaseServiceKey = '';
+    mockGetRequestHeader.mockImplementation((_, key: string) => {
+      if (key === 'authorization') return 'Bearer owner-token';
+      return undefined;
+    });
+    mockGetRouterParam.mockImplementation((_, key: string) => {
+      if (key === 'userId') return '11111111-1111-4111-8111-111111111111';
+      if (key === 'mode') return 'seasonal';
+      return undefined;
+    });
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
+      })
+      .mockResolvedValueOnce(progressResponse(2))
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce(preferencesResponse());
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ data: null, mode: 'seasonal', visibility: 'owner' });
+  });
   it('derives failed branch tasks from task failure metadata', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return '11111111-1111-4111-8111-111111111111';
