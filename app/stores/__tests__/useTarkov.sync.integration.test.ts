@@ -116,13 +116,21 @@ const {
   const modeProgressResult: {
     data: Array<{ game_mode: string; progress_data: unknown; season_number: number }>;
     error: SupabaseErrorLike;
+    errorSequence?: SupabaseErrorLike[];
   } = { data: [], error: null };
   const modeProgressQuery = {
     in: vi.fn(),
     then: <TResult1 = typeof modeProgressResult, TResult2 = never>(
       onfulfilled?: ((value: typeof modeProgressResult) => TResult1 | PromiseLike<TResult1>) | null,
       onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
-    ) => Promise.resolve(modeProgressResult).then(onfulfilled, onrejected),
+    ) => {
+      const queued = modeProgressResult.errorSequence;
+      const value =
+        queued && queued.length > 0
+          ? { ...modeProgressResult, data: [], error: queued.shift() ?? null }
+          : modeProgressResult;
+      return Promise.resolve(value).then(onfulfilled, onrejected);
+    },
   };
   modeProgressQuery.in.mockImplementation(() => modeProgressQuery);
   const eq = vi.fn(() => ({ single }));
@@ -372,6 +380,7 @@ describe('useTarkov sync integration', () => {
     metadataStoreMock.tasks = [];
     modeProgressResult.data = [];
     modeProgressResult.error = null;
+    modeProgressResult.errorSequence = [];
     single.mockResolvedValue({ data: createRemoteRow(), error: null });
     rpc.mockResolvedValue({ error: null });
     update.mockResolvedValue({ error: null });
@@ -1475,6 +1484,19 @@ describe('useTarkov sync integration', () => {
       '[TarkovStore] Could not load normalized mode progress',
       expect.objectContaining({ message: 'mode progress unavailable' })
     );
+  });
+  it('retries and recovers when normalized mode progress fails transiently', async () => {
+    modeProgressResult.errorSequence = [{ message: 'transient mode progress error' }];
+    await initializeTarkovSync();
+    expect(modeProgressResult.errorSequence).toHaveLength(0);
+    expect(loggerMock.debug).toHaveBeenCalledWith(
+      expect.stringContaining('Retrying normalized mode progress load')
+    );
+    expect(loggerMock.error).not.toHaveBeenCalledWith(
+      '[TarkovStore] Could not load normalized mode progress',
+      expect.anything()
+    );
+    expect(useSupabaseSyncMock).toHaveBeenCalled();
   });
   it('preserves local progress when online profile reset fails', async () => {
     const store = useTarkovStore();

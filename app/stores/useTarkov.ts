@@ -1360,10 +1360,20 @@ export async function initializeTarkovSync() {
         logger.error('[TarkovStore] Error loading data from Supabase:', error);
         return { hadRemoteData, needsRemoteCleanup, ok: false };
       }
-      const modeProgressResult = await loadModeProgress(
+      let modeProgressResult = await loadModeProgress(
         $supabase.client as unknown as ModeProgressClient,
         currentUserId
       );
+      for (let attempt = 1; attempt < LOAD_RETRY_COUNT && modeProgressResult.error; attempt++) {
+        logger.debug(
+          `[TarkovStore] Retrying normalized mode progress load (${attempt + 1}/${LOAD_RETRY_COUNT})`
+        );
+        await delay(LOAD_RETRY_DELAY_MS);
+        modeProgressResult = await loadModeProgress(
+          $supabase.client as unknown as ModeProgressClient,
+          currentUserId
+        );
+      }
       if (modeProgressResult.error) {
         logger.error(
           '[TarkovStore] Could not load normalized mode progress',
