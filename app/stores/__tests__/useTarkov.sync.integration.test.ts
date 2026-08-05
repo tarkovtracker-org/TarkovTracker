@@ -9,8 +9,10 @@ import {
   resetTarkovSync,
   useTarkovStore,
 } from '@/stores/useTarkov';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { UserProgressData } from '@/stores/progressState';
+import type { Task } from '@/types/tarkov';
 const {
   channel,
   cleanupSync,
@@ -97,7 +99,7 @@ const {
     }),
     initialize: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
-    tasks: [] as Array<{ id: string; name: string }>,
+    tasks: [] as Task[],
   };
   type RemoteRow = ReturnType<typeof createRemoteRow>;
   type SupabaseErrorLike = { code?: string; message: string } | null;
@@ -1497,6 +1499,45 @@ describe('useTarkov sync integration', () => {
       expect.anything()
     );
     expect(useSupabaseSyncMock).toHaveBeenCalled();
+  });
+  it('persists Seasonal objective-only failed-task repairs during startup', async () => {
+    metadataStoreMock.tasks = [
+      {
+        id: 'task-seasonal-failed',
+        alternatives: [],
+        failConditions: [],
+        objectives: [{ id: 'objective-1', count: 3 }],
+      },
+    ];
+    const seasonalProgress: UserProgressData = {
+      ...progressWithLevel(1),
+      taskCompletions: {
+        'task-seasonal-failed': { complete: false, failed: true, manual: true },
+      },
+      taskObjectives: { 'objective-1': { complete: true, count: 3 } },
+    };
+    modeProgressResult.data = [
+      {
+        game_mode: 'seasonal',
+        season_number: ACTIVE_SEASON_NUMBER,
+        progress_data: seasonalProgress,
+      },
+    ];
+    const store = useTarkovStore();
+    await initializeTarkovSync();
+    expect(store.seasonal.taskObjectives['objective-1']).toMatchObject({
+      complete: false,
+      count: 0,
+    });
+    expect(store.seasonal.taskCompletions['task-seasonal-failed']).toMatchObject({
+      failed: true,
+      manual: true,
+    });
+    const syncedSeasonal = getLastSyncPayload().p_modes.seasonal as UserProgressData;
+    expect(syncedSeasonal.taskObjectives['objective-1']).toMatchObject({
+      complete: false,
+      count: 0,
+    });
   });
   it('preserves local progress when online profile reset fails', async () => {
     const store = useTarkovStore();
