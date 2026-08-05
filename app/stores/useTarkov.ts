@@ -488,7 +488,14 @@ const tarkovActions = {
     const tasks = metadataStore.tasks;
     if (!tasks || tasks.length === 0) {
       logger.debug('[TarkovStore] No tasks available for repair, skipping');
-      return { pvpRepaired: 0, pveRepaired: 0, seasonalRepaired: 0 };
+      return {
+        pvpRepaired: 0,
+        pveRepaired: 0,
+        seasonalRepaired: 0,
+        pvpCleared: 0,
+        pveCleared: 0,
+        seasonalCleared: 0,
+      };
     }
     // Create a map for O(1) task lookup
     const tasksMap = new Map<string, Task>();
@@ -553,7 +560,14 @@ const tarkovActions = {
         `[TarkovStore] Cleared objectives for failed tasks - PvP: ${pvpCleared}, PvE: ${pveCleared}, Seasonal: ${seasonalCleared}`
       );
     }
-    return { pvpRepaired, pveRepaired, seasonalRepaired };
+    return {
+      pvpRepaired,
+      pveRepaired,
+      seasonalRepaired,
+      pvpCleared,
+      pveCleared,
+      seasonalCleared,
+    };
   },
   /**
    * Repair objective states for completed tasks.
@@ -902,6 +916,9 @@ const tarkovActions = {
     pvpRepaired: number;
     pveRepaired: number;
     seasonalRepaired: number;
+    pvpCleared: number;
+    pveCleared: number;
+    seasonalCleared: number;
   };
   repairCompletedTaskObjectives(): {
     pvpRepaired: number;
@@ -1559,6 +1576,9 @@ export async function initializeTarkovSync() {
       failedRepairResult.pvpRepaired > 0 ||
       failedRepairResult.pveRepaired > 0 ||
       failedRepairResult.seasonalRepaired > 0 ||
+      failedRepairResult.pvpCleared > 0 ||
+      failedRepairResult.pveCleared > 0 ||
+      failedRepairResult.seasonalCleared > 0 ||
       completedObjectivesRepairResult.pvpRepaired > 0 ||
       completedObjectivesRepairResult.pveRepaired > 0 ||
       completedObjectivesRepairResult.seasonalRepaired > 0;
