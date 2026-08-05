@@ -1,9 +1,7 @@
 import type { Env, GameMode } from '@/types';
-import { getMemoryCache, setMemoryCache } from './memory-cache';
-// The active season changes at most once per season, so resolve get_active_season_number once per
-// Worker isolate instead of on every seasonal request. Staleness is bounded by the TTL at rollover.
-export const ACTIVE_SEASON_CACHE_KEY = 'season:active-number';
-const ACTIVE_SEASON_CACHE_TTL_SECONDS = 60;
+// Resolved fresh from the database on every seasonal request. Caching the value risks returning a
+// stale season during the rollover window while the write path (merge_progress_data) resolves the
+// current season server-side, which would read and write progress under disagreeing seasons.
 const getSupabaseUrl = (env: Env): URL => {
   const url = new URL(env.SUPABASE_URL);
   if (url.protocol !== 'https:') throw new Error('Supabase URL must use HTTPS');
@@ -14,8 +12,6 @@ const getServiceHeaders = (env: Env) => ({
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
 });
 const getActiveSeasonNumber = async (env: Env): Promise<number> => {
-  const cached = getMemoryCache<number>(ACTIVE_SEASON_CACHE_KEY);
-  if (cached !== null) return cached;
   const supabaseUrl = getSupabaseUrl(env);
   const rpcUrl = new URL(supabaseUrl);
   rpcUrl.pathname = `${rpcUrl.pathname.replace(/\/+$/, '')}/rest/v1/rpc/get_active_season_number`;
@@ -30,7 +26,6 @@ const getActiveSeasonNumber = async (env: Env): Promise<number> => {
   if (!response.ok) throw new Error('Failed to fetch active season');
   const value = Number(await response.json());
   if (!Number.isInteger(value) || value <= 0) throw new Error('Invalid active season');
-  setMemoryCache(ACTIVE_SEASON_CACHE_KEY, value, ACTIVE_SEASON_CACHE_TTL_SECONDS);
   return value;
 };
 export const getGameModeSeasonNumber = async (env: Env, gameMode: GameMode): Promise<number> =>

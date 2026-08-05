@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ACTIVE_SEASON_CACHE_KEY, getGameModeSeasonNumber } from '../utils/gameMode';
-import { deleteMemoryCache } from '../utils/memory-cache';
+import { getGameModeSeasonNumber } from '../utils/gameMode';
 import type { Env } from '../types';
 const env = {
   SUPABASE_URL: 'https://supabase.example/project',
@@ -9,7 +8,6 @@ const env = {
 describe('getGameModeSeasonNumber', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    deleteMemoryCache(ACTIVE_SEASON_CACHE_KEY);
   });
   it('preserves the Supabase URL path when fetching the active season', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(3)));
@@ -19,12 +17,12 @@ describe('getGameModeSeasonNumber', () => {
       'https://supabase.example/project/rest/v1/rpc/get_active_season_number'
     );
   });
-  it('caches the active season across seasonal calls within the TTL', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(2)));
+  it('resolves the active season fresh on each seasonal call', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify(2)));
     vi.stubGlobal('fetch', fetchMock);
     await expect(getGameModeSeasonNumber(env, 'seasonal')).resolves.toBe(2);
     await expect(getGameModeSeasonNumber(env, 'seasonal')).resolves.toBe(2);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it('resolves non-seasonal modes to 0 without a network call', async () => {
     const fetchMock = vi.fn();
