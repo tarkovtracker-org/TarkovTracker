@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker, { ApiGatewayRateLimiter } from '../index';
+import { ACTIVE_SEASON_CACHE_KEY } from '../utils/gameMode';
 import { deleteMemoryCache } from '../utils/memory-cache';
 import type { Env, GameMode } from '../types';
 const makeLimiter = (
@@ -230,6 +231,7 @@ beforeEach(() => {
   deleteMemoryCache('tarkov:hideout:regular');
   deleteMemoryCache('tarkov:hideout:pve');
   deleteMemoryCache('tarkov:hideout:pvp-season');
+  deleteMemoryCache(ACTIVE_SEASON_CACHE_KEY);
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('Unmocked fetch: missing test handler', { status: 500 }))

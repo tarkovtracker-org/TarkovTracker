@@ -28,6 +28,9 @@ export const fetchWithTimeout = async (
   const timeout = setTimeout(() => timeoutController.abort(), timeoutMs);
   try {
     const response = await fetch(url, { ...init, signal });
+    // Buffer the body while the abort signal is still armed so the timeout covers the full body
+    // download, not just the response headers; the returned Response is detached from the signal.
+    // The arrayBuffer guard lets non-standard/mocked responses pass through untouched in tests.
     if (typeof response.arrayBuffer !== 'function') return response;
     const body = await readResponseBody(response);
     return new Response(body, {
