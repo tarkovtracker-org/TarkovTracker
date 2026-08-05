@@ -9,7 +9,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { useTeammateStores, useTeamStore } from '@/stores/useTeamStore';
-import { SPECIAL_STATIONS, TASK_STATE, type TaskState } from '@/utils/constants';
+import { GAME_MODES, SPECIAL_STATIONS, TASK_STATE, type TaskState } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { computeInvalidProgress } from '@/utils/progressInvalidation';
@@ -571,24 +571,12 @@ export const useProgressStore = defineStore('progress', () => {
       return updated;
     };
     Object.values(teamStores.value).forEach((store) => {
-      const pvpObjectives = store?.$state?.pvp?.taskObjectives;
-      const pveObjectives = store?.$state?.pve?.taskObjectives;
-      const seasonalObjectives = store?.$state?.seasonal?.taskObjectives;
-      const nextPvpObjectives = migrateObjectiveMap(pvpObjectives);
-      const nextPveObjectives = migrateObjectiveMap(pveObjectives);
-      const nextSeasonalObjectives = migrateObjectiveMap(seasonalObjectives);
-      if (pvpObjectives && nextPvpObjectives && nextPvpObjectives !== pvpObjectives) {
-        store.$state.pvp.taskObjectives = nextPvpObjectives;
-      }
-      if (pveObjectives && nextPveObjectives && nextPveObjectives !== pveObjectives) {
-        store.$state.pve.taskObjectives = nextPveObjectives;
-      }
-      if (
-        seasonalObjectives &&
-        nextSeasonalObjectives &&
-        nextSeasonalObjectives !== seasonalObjectives
-      ) {
-        store.$state.seasonal.taskObjectives = nextSeasonalObjectives;
+      for (const mode of Object.values(GAME_MODES)) {
+        const objectives = store?.$state?.[mode]?.taskObjectives;
+        const nextObjectives = migrateObjectiveMap(objectives);
+        if (objectives && nextObjectives && nextObjectives !== objectives) {
+          store.$state[mode].taskObjectives = nextObjectives;
+        }
       }
     });
   };

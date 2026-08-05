@@ -147,7 +147,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
         with:
-          deno-version: v2.0.3
+          deno-version: v2.9.4
       - name: Run Deno tests
         run: deno test supabase/functions/_shared/team-mode.deno.test.ts
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}

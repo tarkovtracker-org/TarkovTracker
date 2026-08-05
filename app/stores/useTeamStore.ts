@@ -98,17 +98,27 @@ export type MemberProfileBroadcast = {
 export const mergeMemberProfileBroadcast = (
   profiles: Record<string, MemberProfile>,
   data: MemberProfileBroadcast
-): Record<string, MemberProfile> => ({
-  ...profiles,
-  [data.userId]: {
-    ...profiles[data.userId],
-    displayName: data.displayName ?? null,
-    gameEdition: data.gameEdition ?? profiles[data.userId]?.gameEdition,
-    gameMode: data.gameMode ?? profiles[data.userId]?.gameMode,
-    level: data.level ?? null,
-    tasksCompleted: data.tasksCompleted ?? null,
-  },
-});
+): Record<string, MemberProfile> => {
+  const existingProfile = profiles[data.userId];
+  const {
+    displayName = null,
+    gameEdition = existingProfile?.gameEdition,
+    gameMode = existingProfile?.gameMode,
+    level = null,
+    tasksCompleted = null,
+  } = data;
+  return {
+    ...profiles,
+    [data.userId]: {
+      ...existingProfile,
+      displayName,
+      gameEdition,
+      gameMode,
+      level,
+      tasksCompleted,
+    },
+  };
+};
 function cloneTaskCompletions(
   taskCompletions: TaskCompletionSnapshot | undefined
 ): TaskCompletionSnapshot {
