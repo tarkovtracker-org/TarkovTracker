@@ -813,7 +813,8 @@ BEGIN
     RAISE EXCEPTION 'p_set must be a JSON object';
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM public.user_progress WHERE user_id = p_user_id) THEN
+  PERFORM 1 FROM public.user_progress WHERE user_id = p_user_id FOR NO KEY UPDATE;
+  IF NOT FOUND THEN
     RETURN 0;
   END IF;
   INSERT INTO public.user_game_mode_progress (
