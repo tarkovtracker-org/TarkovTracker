@@ -1,19 +1,17 @@
 import { useToastI18n } from '@/composables/useToastI18n';
-import { maybeNotifyApiUpdate, runApiUpdateHandlers } from '@/stores/tarkov/apiUpdateNotifier';
+import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { coerceGameMode, mergeProgressData } from '@/stores/tarkov/progressMerge';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
-  recordLocalSyncTime,
   SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
 } from '@/stores/tarkov/syncTimeline';
 import { useMetadataStore } from '@/stores/useMetadata';
-import { GAME_MODES, getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
+import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
-  hasDeprecatedTarkovDevProfileData,
   sanitizeGameEdition,
   sanitizeOwnedProgressData,
   sanitizeOwnedUserState,
@@ -21,8 +19,6 @@ import {
 } from '@/utils/progressSanitizers';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
-const DEPRECATED_REMOTE_CLEANUP_FAST_RETRY_LIMIT = 3;
-const DEPRECATED_REMOTE_CLEANUP_FAILURE_BACKOFF_MS = 30000;
 export type SyncControllerHandle = {
   pause: () => void;
   resume: () => void;
@@ -37,22 +33,21 @@ type RealtimeModeProgress = {
   progress: UserProgressData;
   updateTime: number;
 };
+type LegacyProgressMetadata = {
+  current_game_mode?: string;
+  game_edition?: number;
+  tarkov_uid?: number | null;
+  updated_at?: string | null;
+};
 let syncControllerGetter: SyncControllerGetter = () => null;
 let realtimeChannel: unknown = null;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let pausedSyncController: SyncControllerHandle | null = null;
-let deprecatedRemoteCleanupInFlight = false;
-let lastDeprecatedRemoteCleanupAttemptAt = 0;
-let deprecatedRemoteCleanupFailureCount = 0;
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
   syncControllerGetter = getter;
 };
 export const getRegisteredSyncController = (): SyncControllerHandle | null =>
   syncControllerGetter();
-const getDeprecatedRemoteCleanupCooldownMs = () =>
-  deprecatedRemoteCleanupFailureCount >= DEPRECATED_REMOTE_CLEANUP_FAST_RETRY_LIMIT
-    ? DEPRECATED_REMOTE_CLEANUP_FAILURE_BACKOFF_MS
-    : SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS;
 const parseRealtimeUpdateTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isNaN(parsed) ? Date.now() : parsed;
@@ -71,6 +66,25 @@ const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null 
     updateTime: parseRealtimeUpdateTime(row.updated_at),
   };
 };
+const buildLegacyMetadataState = (
+  remoteData: LegacyProgressMetadata,
+  localState: UserState
+): UserState => ({
+  currentGameMode: remoteData.current_game_mode
+    ? coerceGameMode(remoteData.current_game_mode)
+    : localState.currentGameMode,
+  gameEdition:
+    remoteData.game_edition === undefined
+      ? localState.gameEdition
+      : sanitizeGameEdition(remoteData.game_edition),
+  tarkovUid:
+    remoteData.tarkov_uid === undefined
+      ? localState.tarkovUid
+      : sanitizeTarkovUid(remoteData.tarkov_uid),
+  pvp: localState.pvp,
+  pve: localState.pve,
+  seasonal: localState.seasonal,
+});
 const pauseRegisteredSyncController = (): void => {
   const controller = getRegisteredSyncController();
   if (!controller) return;
@@ -102,13 +116,34 @@ const shouldIgnoreModeProgressUpdate = (
   localProgress: UserProgressData
 ): boolean => {
   const stateUnchanged = deepEqual(nextProgress, localProgress);
-  if (stateUnchanged && isLikelySelfOriginUpdate(updateTime)) {
+  if (!stateUnchanged) return false;
+  if (isLikelySelfOriginUpdate(updateTime)) {
     logger.debug('[TarkovStore] Ignoring mode realtime update - likely self-origin', {
       mode,
       threshold: SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
     });
+  } else {
+    logger.debug('[TarkovStore] Mode realtime update matches local state; skipping patch', {
+      mode,
+    });
   }
-  return stateUnchanged;
+  return true;
+};
+const shouldIgnoreLegacyMetadataUpdate = (
+  updateTime: number,
+  nextState: UserState,
+  localState: UserState
+): boolean => {
+  if (!deepEqual(nextState, localState)) return false;
+  if (isLikelySelfOriginUpdate(updateTime)) {
+    logger.debug('[TarkovStore] Ignoring realtime update - likely self-origin', {
+      threshold: SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
+      timeSinceLastSync: updateTime - getLastLocalSyncTime(),
+    });
+  } else {
+    logger.debug('[TarkovStore] Realtime update matches local state; skipping patch');
+  }
+  return true;
 };
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
@@ -134,153 +169,14 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     $supabase.user.loggedIn && $supabase.user.id === currentUserId;
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
-    if (!$supabase.user.loggedIn || $supabase.user.id !== currentUserId) {
-      return;
-    }
-    const remoteData = payload.new as {
-      current_game_mode?: string;
-      game_edition?: number;
-      tarkov_uid?: number | null;
-      pvp_data?: UserProgressData;
-      pve_data?: UserProgressData;
-      updated_at?: string | null;
-    };
-    const parsedUpdateTime = remoteData.updated_at ? Date.parse(remoteData.updated_at) : NaN;
-    const updateTime = Number.isNaN(parsedUpdateTime) ? Date.now() : parsedUpdateTime;
-    const pvpProgress = acceptModeUpdate(GAME_MODES.PVP, updateTime)
-      ? remoteData.pvp_data
-      : undefined;
-    const pveProgress = acceptModeUpdate(GAME_MODES.PVE, updateTime)
-      ? remoteData.pve_data
-      : undefined;
-    const timeSinceLastSync = updateTime - getLastLocalSyncTime();
-    const remoteHadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData({
-      pvp: remoteData.pvp_data,
-      pve: remoteData.pve_data,
-    });
+    if (!isCurrentRealtimeUser()) return;
+    const remoteData = payload.new as LegacyProgressMetadata;
+    const updateTime = parseRealtimeUpdateTime(remoteData.updated_at);
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const merged: Partial<UserState> = {
-      currentGameMode: remoteData.current_game_mode
-        ? coerceGameMode(remoteData.current_game_mode)
-        : localState.currentGameMode,
-      gameEdition:
-        remoteData.game_edition === undefined
-          ? localState.gameEdition
-          : sanitizeGameEdition(remoteData.game_edition),
-      tarkovUid:
-        remoteData.tarkov_uid === undefined
-          ? localState.tarkovUid
-          : sanitizeTarkovUid(remoteData.tarkov_uid),
-      pvp: pvpProgress
-        ? mergeProgressData(localState.pvp, sanitizeOwnedProgressData(pvpProgress))
-        : localState.pvp,
-      pve: pveProgress
-        ? mergeProgressData(localState.pve, sanitizeOwnedProgressData(pveProgress))
-        : localState.pve,
-    };
-    const nextState: UserState = {
-      currentGameMode: merged.currentGameMode ?? localState.currentGameMode,
-      gameEdition: merged.gameEdition ?? localState.gameEdition,
-      tarkovUid: merged.tarkovUid ?? null,
-      pvp: merged.pvp ?? localState.pvp,
-      pve: merged.pve ?? localState.pve,
-      seasonal: localState.seasonal,
-    };
-    const cleanupDeprecatedRemoteProgress = async () => {
-      if (deprecatedRemoteCleanupInFlight) {
-        return;
-      }
-      if (!$supabase.user.loggedIn || $supabase.user.id !== currentUserId) {
-        return;
-      }
-      const now = Date.now();
-      const cleanupCooldownMs = getDeprecatedRemoteCleanupCooldownMs();
-      if (
-        lastDeprecatedRemoteCleanupAttemptAt > 0 &&
-        now - lastDeprecatedRemoteCleanupAttemptAt < cleanupCooldownMs
-      ) {
-        return;
-      }
-      deprecatedRemoteCleanupInFlight = true;
-      lastDeprecatedRemoteCleanupAttemptAt = now;
-      recordLocalSyncTime();
-      try {
-        const updateQuery = $supabase.client
-          .from('user_progress')
-          .update({ pvp_data: nextState.pvp, pve_data: nextState.pve })
-          .eq('user_id', currentUserId);
-        const { data, error } = remoteData.updated_at
-          ? await updateQuery.eq('updated_at', remoteData.updated_at).select('user_id')
-          : await updateQuery.is('updated_at', null).select('user_id');
-        if (error) {
-          deprecatedRemoteCleanupFailureCount += 1;
-          logger.error(
-            '[TarkovStore] Failed to clean deprecated remote progress payload:',
-            {
-              cooldownMs: getDeprecatedRemoteCleanupCooldownMs(),
-              failureCount: deprecatedRemoteCleanupFailureCount,
-            },
-            error
-          );
-          return;
-        }
-        if (!data?.length) {
-          const { data: current, error: refetchError } = await $supabase.client
-            .from('user_progress')
-            .select('updated_at')
-            .eq('user_id', currentUserId)
-            .single();
-          logger.debug('[TarkovStore] Skipped stale deprecated remote cleanup', {
-            currentUpdatedAt: current?.updated_at,
-            error: refetchError,
-            remoteUpdatedAt: remoteData.updated_at,
-          });
-          return;
-        }
-        deprecatedRemoteCleanupFailureCount = 0;
-        lastDeprecatedRemoteCleanupAttemptAt = 0;
-        logger.debug('[TarkovStore] Cleaned deprecated remote progress payload');
-      } catch (error: unknown) {
-        deprecatedRemoteCleanupFailureCount += 1;
-        logger.error(
-          '[TarkovStore] Failed to clean deprecated remote progress payload:',
-          {
-            cooldownMs: getDeprecatedRemoteCleanupCooldownMs(),
-            failureCount: deprecatedRemoteCleanupFailureCount,
-          },
-          error
-        );
-      } finally {
-        deprecatedRemoteCleanupInFlight = false;
-      }
-    };
-    const stateUnchanged = deepEqual(nextState, localState);
+    const nextState = buildLegacyMetadataState(remoteData, localState);
+    if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
-    if (remoteHadDeprecatedProgressData) {
-      void cleanupDeprecatedRemoteProgress();
-    }
-    if (isLikelySelfOrigin && stateUnchanged) {
-      logger.debug('[TarkovStore] Ignoring realtime update - likely self-origin', {
-        timeSinceLastSync,
-        threshold: SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
-      });
-      return;
-    }
-    if (stateUnchanged) {
-      logger.debug('[TarkovStore] Realtime update matches local state; skipping patch');
-      return;
-    }
-    const pvpConflicts = detectDataConflicts(localState.pvp, pvpProgress);
-    const pveConflicts = detectDataConflicts(localState.pve, pveProgress);
-    const hasRealConflict = pvpConflicts.hasConflict || pveConflicts.hasConflict;
-    const totalConflicts = pvpConflicts.conflictCount + pveConflicts.conflictCount;
-    const apiUpdateHandled = runApiUpdateHandlers([
-      () => maybeNotifyApiUpdate('pvp', pvpProgress, metadataStore, updateTime, toastI18n),
-      () => maybeNotifyApiUpdate('pve', pveProgress, metadataStore, updateTime, toastI18n),
-    ]);
-    logger.debug('[TarkovStore] Remote update detected, applying changes', {
-      hasRealConflict,
-      totalConflicts,
+    logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
       isLikelySelfOrigin,
     });
     pauseRegisteredSyncController();
@@ -293,9 +189,6 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       state.seasonal = nextState.seasonal;
     });
     scheduleSyncResume();
-    if (hasRealConflict && !apiUpdateHandled && !isLikelySelfOrigin) {
-      toastI18n.showProgressMerged(totalConflicts);
-    }
   };
   const handleModeProgressChange = (payload: { new: unknown }) => {
     if (!isCurrentRealtimeUser()) return;
@@ -373,9 +266,4 @@ export async function cleanupRealtimeListener(): Promise<void> {
     pausedSyncController.resume();
     pausedSyncController = null;
   }
-}
-export function resetRealtimeState(): void {
-  deprecatedRemoteCleanupInFlight = false;
-  lastDeprecatedRemoteCleanupAttemptAt = 0;
-  deprecatedRemoteCleanupFailureCount = 0;
 }

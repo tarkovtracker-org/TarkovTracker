@@ -149,7 +149,7 @@ describe('seasonal progress realtime synchronization', () => {
       vi.useRealTimers();
     }
   });
-  it('does not let an older legacy row overwrite newer normalized progress', async () => {
+  it('does not let a newer legacy row overwrite authoritative normalized progress', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);
     handlers.get('user_game_mode_progress')?.({
@@ -165,7 +165,7 @@ describe('seasonal progress realtime synchronization', () => {
         current_game_mode: 'pvp',
         pve_data: defaultState.pve,
         pvp_data: { displayName: 'older', level: 20, xpOffset: 200 },
-        updated_at: '2026-08-04T11:00:00.000Z',
+        updated_at: '2026-08-04T13:00:00.000Z',
       },
     });
     expect(state.pvp.displayName).toBe('newer');

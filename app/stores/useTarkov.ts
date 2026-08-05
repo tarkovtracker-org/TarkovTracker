@@ -57,7 +57,6 @@ import {
 import {
   cleanupRealtimeListener,
   registerSyncControllerGetter,
-  resetRealtimeState,
   setupRealtimeListener,
 } from '@/stores/tarkov/realtimeListener';
 import {
@@ -1145,7 +1144,6 @@ export function resetTarkovSync(
   syncUserId = null;
   shownLocalIgnoreReasons.clear();
   resetSyncTimeline();
-  resetRealtimeState();
   resetApiUpdateState();
 }
 export function resetTarkovStoreForSessionTransition(

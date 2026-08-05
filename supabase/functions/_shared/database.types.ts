@@ -896,7 +896,7 @@ export type Database = {
               p_pve_data?: Json
               p_pvp_data: Json
               p_summary: Json
-              p_tarkov_uid: number
+              p_tarkov_uid: number | null
             }
             Returns: undefined
           }
@@ -914,7 +914,7 @@ export type Database = {
               p_season_number: number
               p_seasonal_data: Json
               p_summary: Json
-              p_tarkov_uid: number
+              p_tarkov_uid: number | null
             }
             Returns: undefined
           }
@@ -1009,7 +1009,7 @@ export type Database = {
           p_current_game_mode: string
           p_game_edition: number
           p_modes: Json
-          p_tarkov_uid: number
+          p_tarkov_uid: number | null
         }
         Returns: undefined
       }

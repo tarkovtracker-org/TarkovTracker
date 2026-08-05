@@ -15,6 +15,7 @@ const {
   channel,
   cleanupSync,
   createRemoteRow,
+  getModeProgressCallback,
   getRealtimeCallback,
   i18nTranslate,
   loggerMock,
@@ -22,6 +23,7 @@ const {
   modeProgressResult,
   pauseSync,
   resumeSync,
+  setModeProgressCallback,
   setRealtimeCallback,
   showApiUpdated,
   showLoadFailed,
@@ -30,7 +32,6 @@ const {
   single,
   supabaseContext,
   update,
-  updateQuery,
   rpc,
   useSupabaseSyncMock,
 } = vi.hoisted(() => {
@@ -74,6 +75,7 @@ const {
   });
   const realtimeState = {
     callback: null as ((payload: { new: unknown; old: unknown }) => void) | null,
+    modeProgressCallback: null as ((payload: { new: unknown; old: unknown }) => void) | null,
   };
   const showApiUpdated = vi.fn();
   const showLoadFailed = vi.fn();
@@ -201,6 +203,7 @@ const {
     channel,
     cleanupSync,
     createRemoteRow,
+    getModeProgressCallback: () => realtimeState.modeProgressCallback,
     getRealtimeCallback: () => realtimeState.callback,
     i18nTranslate,
     loggerMock,
@@ -211,6 +214,11 @@ const {
     setRealtimeCallback: (callback: ((payload: { new: unknown; old: unknown }) => void) | null) => {
       realtimeState.callback = callback;
     },
+    setModeProgressCallback: (
+      callback: ((payload: { new: unknown; old: unknown }) => void) | null
+    ) => {
+      realtimeState.modeProgressCallback = callback;
+    },
     showApiUpdated,
     showLoadFailed,
     showLocalIgnored,
@@ -218,7 +226,6 @@ const {
     single,
     supabaseContext,
     update,
-    updateQuery,
     rpc,
     useSupabaseSyncMock,
     get realtimeCallback() {
@@ -352,6 +359,7 @@ describe('useTarkov sync integration', () => {
     localStorage.clear();
     vi.clearAllMocks();
     setRealtimeCallback(null);
+    setModeProgressCallback(null);
     supabaseContext.user.id = 'user-1';
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.providers = [];
@@ -367,8 +375,13 @@ describe('useTarkov sync integration', () => {
     single.mockResolvedValue({ data: createRemoteRow(), error: null });
     rpc.mockResolvedValue({ error: null });
     update.mockResolvedValue({ error: null });
-    channel.on.mockImplementation((_: string, __: Record<string, unknown>, callback) => {
-      setRealtimeCallback(callback as (payload: { new: unknown; old: unknown }) => void);
+    channel.on.mockImplementation((_: string, config: Record<string, unknown>, callback) => {
+      const typedCallback = callback as (payload: { new: unknown; old: unknown }) => void;
+      if (config.table === 'user_game_mode_progress') {
+        setModeProgressCallback(typedCallback);
+      } else {
+        setRealtimeCallback(typedCallback);
+      }
       return channel;
     });
     channel.subscribe.mockImplementation(() => channel);
@@ -1161,17 +1174,15 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     showApiUpdated.mockClear();
     showProgressMerged.mockClear();
     callback?.({
       new: {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: progressWithTaskState('task-1', true),
-        pve_data: progressWithTaskState('task-2', false),
+        game_mode: 'pvp',
+        progress_data: progressWithTaskState('task-1', true),
+        season_number: 0,
         updated_at: '2026-02-22T12:00:00.000Z',
       },
       old: {},
@@ -1249,20 +1260,18 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     showProgressMerged.mockClear();
     callback?.({
       new: {
-        current_game_mode: store.currentGameMode,
-        game_edition: store.gameEdition,
-        tarkov_uid: store.tarkovUid,
-        pvp_data: {
+        game_mode: 'pvp',
+        progress_data: {
           ...cloneProgress(store.pvp),
           taskObjectives: { 'obj-1': { complete: false, count: 2 } },
           hideoutModules: { 'mod-1': { complete: true } },
           hideoutParts: { 'part-1': { complete: false, count: 2 } },
         },
-        pve_data: cloneProgress(store.pve),
+        season_number: 0,
         updated_at: '2000-01-01T00:00:00.000Z',
       },
       old: {},
@@ -1278,17 +1287,15 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     showApiUpdated.mockClear();
     showProgressMerged.mockClear();
     const now = Date.now();
     callback?.({
       new: {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: {
+        game_mode: 'pvp',
+        progress_data: {
           ...progressWithTaskState('task-1', true),
           lastApiUpdate: {
             id: `api-pvp-${now}`,
@@ -1297,7 +1304,15 @@ describe('useTarkov sync integration', () => {
             tasks: [{ id: 'task-1', state: 'completed' }],
           },
         },
-        pve_data: {
+        season_number: 0,
+        updated_at: new Date(now).toISOString(),
+      },
+      old: {},
+    });
+    callback?.({
+      new: {
+        game_mode: 'pve',
+        progress_data: {
           ...progressWithTaskState('task-2', true),
           lastApiUpdate: {
             id: `api-pve-${now}`,
@@ -1306,6 +1321,7 @@ describe('useTarkov sync integration', () => {
             tasks: [{ id: 'task-2', state: 'completed' }],
           },
         },
+        season_number: 0,
         updated_at: new Date(now).toISOString(),
       },
       old: {},
@@ -1333,13 +1349,11 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     const payload = {
-      current_game_mode: 'pvp',
-      game_edition: 1,
-      tarkov_uid: null,
-      pvp_data: {
+      game_mode: 'pvp',
+      progress_data: {
         ...progressWithTaskState('task-1', true),
         lastApiUpdate: {
           id: 'duplicate-api-id',
@@ -1348,7 +1362,7 @@ describe('useTarkov sync integration', () => {
           tasks: [{ id: 'task-1', state: 'completed' }],
         },
       },
-      pve_data: progressWithTaskState('task-2', false),
+      season_number: 0,
       updated_at: new Date(now).toISOString(),
     };
     showApiUpdated.mockClear();
@@ -1376,13 +1390,11 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    let callback = getRealtimeCallback();
+    let callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     const payload = {
-      current_game_mode: 'pvp',
-      game_edition: 1,
-      tarkov_uid: null,
-      pvp_data: {
+      game_mode: 'pvp',
+      progress_data: {
         ...progressWithTaskState('task-1', true),
         lastApiUpdate: {
           id: 'reset-dedupe-id',
@@ -1391,7 +1403,7 @@ describe('useTarkov sync integration', () => {
           tasks: [{ id: 'task-1', state: 'completed' }],
         },
       },
-      pve_data: progressWithTaskState('task-2', false),
+      season_number: 0,
       updated_at: new Date(now).toISOString(),
     };
     showApiUpdated.mockClear();
@@ -1402,7 +1414,7 @@ describe('useTarkov sync integration', () => {
     expect(showApiUpdated).toHaveBeenCalledTimes(1);
     resetTarkovSync('test api dedupe reset');
     await initializeTarkovSync();
-    callback = getRealtimeCallback();
+    callback = getModeProgressCallback();
     callback?.({
       new: {
         ...payload,
@@ -1412,119 +1424,7 @@ describe('useTarkov sync integration', () => {
     });
     expect(showApiUpdated).toHaveBeenCalledTimes(2);
   });
-  it('avoids overlapping deprecated remote cleanup writes during realtime sync', async () => {
-    single.mockResolvedValue({
-      data: createRemoteRow(),
-      error: null,
-    });
-    let pendingUpdateResolve: (value: { error: null }) => void = () => {};
-    const pendingUpdate = new Promise<{ error: null }>((resolve) => {
-      pendingUpdateResolve = resolve;
-    });
-    update.mockImplementationOnce(() => pendingUpdate);
-    await initializeTarkovSync();
-    const callback = getRealtimeCallback();
-    expect(callback).toBeTypeOf('function');
-    update.mockClear();
-    const payload = {
-      current_game_mode: 'pvp',
-      game_edition: 1,
-      tarkov_uid: null,
-      pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
-      pve_data: progressWithLevel(1),
-      updated_at: '2000-01-01T00:00:00.000Z',
-    };
-    callback?.({
-      new: payload,
-      old: {},
-    });
-    callback?.({
-      new: payload,
-      old: {},
-    });
-    expect(update).toHaveBeenCalledTimes(1);
-    pendingUpdateResolve({ error: null });
-    await waitForBackgroundTasks();
-  });
-  it('cleans deprecated remote progress when updated_at is null', async () => {
-    single.mockResolvedValue({
-      data: createRemoteRow({
-        pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
-        updated_at: null,
-      }),
-      error: null,
-    });
-    await initializeTarkovSync();
-    const callback = getRealtimeCallback();
-    expect(callback).toBeTypeOf('function');
-    update.mockClear();
-    callback?.({
-      new: {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: withLegacyTarkovDevProfile(progressWithLevel(3), 12345),
-        pve_data: progressWithLevel(1),
-        updated_at: null,
-      },
-      old: {},
-    });
-    await waitForBackgroundTasks();
-    expect(update).toHaveBeenCalledTimes(1);
-    expect(updateQuery.is).toHaveBeenCalledWith('updated_at', null);
-  });
-  it('backs off deprecated remote cleanup retries after repeated failures and retries again later', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-04-22T12:00:00.000Z'));
-      single.mockResolvedValue({
-        data: createRemoteRow(),
-        error: null,
-      });
-      await initializeTarkovSync();
-      const callback = getRealtimeCallback();
-      expect(callback).toBeTypeOf('function');
-      update.mockClear();
-      update
-        .mockResolvedValueOnce({ error: { message: 'cleanup failed 1' } })
-        .mockResolvedValueOnce({ error: { message: 'cleanup failed 2' } })
-        .mockResolvedValueOnce({ error: { message: 'cleanup failed 3' } })
-        .mockResolvedValueOnce({ error: null });
-      const payload = {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
-        pve_data: progressWithLevel(1),
-        updated_at: '2026-02-22T12:00:00.000Z',
-      };
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(update).toHaveBeenCalledTimes(1);
-      vi.setSystemTime(Date.now() + 3000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(update).toHaveBeenCalledTimes(2);
-      vi.setSystemTime(Date.now() + 3000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(update).toHaveBeenCalledTimes(3);
-      vi.setSystemTime(Date.now() + 3000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(update).toHaveBeenCalledTimes(3);
-      vi.setSystemTime(Date.now() + 30000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(update).toHaveBeenCalledTimes(4);
-      expect(loggerMock.debug).toHaveBeenCalledWith(
-        '[TarkovStore] Cleaned deprecated remote progress payload'
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('skips deprecated remote cleanup writes after session invalidation', async () => {
+  it('does not rewrite authoritative mode rows from deprecated legacy payloads', async () => {
     single.mockResolvedValue({
       data: createRemoteRow(),
       error: null,
@@ -1533,8 +1433,6 @@ describe('useTarkov sync integration', () => {
     const callback = getRealtimeCallback();
     expect(callback).toBeTypeOf('function');
     update.mockClear();
-    supabaseContext.user.loggedIn = false;
-    supabaseContext.user.id = null;
     callback?.({
       new: {
         current_game_mode: 'pvp',

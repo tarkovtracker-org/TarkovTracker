@@ -119,8 +119,9 @@ Deno.serve(async (req) => {
         userId: user.id,
         gameMode: game_mode,
       });
+      return createErrorResponse('Failed to check team leave cooldown', 500, req);
     }
-    if (!cooldownError && recentLeaves && recentLeaves.length > 0) {
+    if (recentLeaves && recentLeaves.length > 0) {
       const timeRemaining = Math.ceil(
         (new Date(recentLeaves[0].created_at).getTime() +
           LEAVE_COOLDOWN_MINUTES * 60 * 1000 -
