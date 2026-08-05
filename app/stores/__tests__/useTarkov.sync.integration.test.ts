@@ -1538,6 +1538,10 @@ describe('useTarkov sync integration', () => {
       complete: false,
       count: 0,
     });
+    expect(syncedSeasonal.taskCompletions['task-seasonal-failed']).toMatchObject({
+      failed: true,
+      manual: true,
+    });
   });
   it('preserves local progress when online profile reset fails', async () => {
     const store = useTarkovStore();
