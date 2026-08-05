@@ -92,6 +92,24 @@ product.
 8. For the tarkov.dev profile cleanup rollout, snapshot `public.user_progress` before applying the
    destructive cleanup migration.
 
+## Seasonal Rollover
+
+Seasonal progress is reset by advancing the active season number, not by deleting rows. The new
+number selects a fresh `(user_id, seasonal, season_number)` row for every account; historical rows
+remain available for rollback and audit but are excluded from active progress, teams, profiles,
+backups, prestige, realtime, and public API reads.
+
+Prepare each rollover before the announced cutoff:
+
+1. Update `ACTIVE_SEASON` in `app/utils/constants.ts` with the new number, start date, and exact UTC
+   end timestamp.
+2. Add a migration that replaces `private.active_season_number()`,
+   `private.active_season_starts_on()`, and `private.active_season_ends_at()` with matching values.
+3. Update the active-season metadata assertions and any displayed season copy, then run the normal
+   pre-deploy validation plus the Supabase DB and API gateway suites.
+4. Schedule the release for the season boundary. Verify the app countdown, database functions, and
+   `/progress` Seasonal row selection after deployment. Do not delete the previous season's rows.
+
 ## Deployment
 
 Merging to `main` deploys everything automatically. Three integrations do the work — none of them

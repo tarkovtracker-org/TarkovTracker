@@ -553,9 +553,12 @@ flowchart LR
    that locks the team while checking capacity and persists membership, user-system state, and the
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
    Seasonal team column.
-6. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
+6. The active season definition carries its number, start date, and exact end timestamp. The UI
+   counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
+   historical rows remain retained and cannot be merged into the new season.
+7. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
-7. Prestige archives include mode and season. Seasonal prestige accepts only the active season;
+8. Prestige archives include mode and season. Seasonal prestige accepts only the active season;
    the legacy PvP RPC overload preserves Seasonal data during rolling deployments.
 
 ### Files
@@ -576,7 +579,7 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
-- App `ACTIVE_SEASON_NUMBER` must match `private.active_season_number()` in the database;
+- App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
 - Historical Seasonal rows are retained but never merged into the active season.

@@ -3,7 +3,7 @@ import type { Env, ApiToken, Permission } from './types';
 const TOKEN_PREFIX_GAME_MODES: ReadonlyArray<readonly [string, ApiToken['game_mode']]> = [
   ['PVP_', 'pvp'],
   ['PVE_', 'pve'],
-  ['SEASONAL_', 'seasonal'],
+  ['SZN_', 'seasonal'],
 ];
 /**
  * Resolve the game mode a token's prefix claims, or null for unsupported prefixes.

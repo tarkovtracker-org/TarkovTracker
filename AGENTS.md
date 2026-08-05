@@ -175,8 +175,10 @@ Naming:
   upstream `pvp-season` slug. Active Seasonal progress is keyed by season number in
   `user_game_mode_progress`, while `user_progress` remains the account-metadata and rolling-deploy
   compatibility row for persistent PvP/PvE.
-- Keep `ACTIVE_SEASON_NUMBER` in the app and Worker synchronized with
-  `private.active_season_number()` in the database migration. Tarkov.dev profile and EFT-log
+- Keep the app's `ACTIVE_SEASON` number and dates synchronized with the database's
+  `private.active_season_*()` functions. The Worker resolves the number from the database.
+  Advancing the number starts a fresh empty Seasonal progress row without deleting history.
+  Tarkov.dev profile and EFT-log
   imports must remain unavailable for Seasonal until their Season profile data is verified.
 - Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
 - Mock Supabase/network calls in tests. Keep tests deterministic.

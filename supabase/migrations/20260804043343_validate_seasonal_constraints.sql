@@ -10,7 +10,11 @@ UPDATE public.api_tokens
 SET token_value = NULL,
     is_active = FALSE
 WHERE token_value IS NOT NULL
-  AND token_value NOT LIKE upper(game_mode) || '\_%' ESCAPE '\';
+  AND token_value NOT LIKE (CASE game_mode
+    WHEN 'pvp' THEN 'PVP\_%'
+    WHEN 'pve' THEN 'PVE\_%'
+    WHEN 'seasonal' THEN 'SZN\_%'
+  END) ESCAPE '\';
 ALTER TABLE public.api_tokens
   VALIDATE CONSTRAINT api_tokens_token_value_game_mode_match;
 ALTER TABLE public.user_system

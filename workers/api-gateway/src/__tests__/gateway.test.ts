@@ -973,7 +973,8 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
-  const bearerForMode = (mode: GameMode) => `Bearer ${mode.toUpperCase()}_abc123`;
+  const bearerForMode = (mode: GameMode) =>
+    `Bearer ${mode === 'seasonal' ? 'SZN' : mode.toUpperCase()}_abc123`;
   const progressRequest = (mode: GameMode = 'pvp', headers: Record<string, string> = {}) =>
     buildRequest('/progress', {
       method: 'GET',

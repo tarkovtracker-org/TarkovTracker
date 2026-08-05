@@ -23,7 +23,7 @@ describe('generateToken', () => {
   it('prefixes generated tokens with the requested game mode', () => {
     expect(generateToken('pvp')).toMatch(/^PVP_[0-9a-f]{18}$/);
     expect(generateToken('pve')).toMatch(/^PVE_[0-9a-f]{18}$/);
-    expect(generateToken('seasonal')).toMatch(/^SEASONAL_[0-9a-f]{18}$/);
+    expect(generateToken('seasonal')).toMatch(/^SZN_[0-9a-f]{18}$/);
   });
   it('produces values that pass its own consistency check', () => {
     expect(isTokenValueForGameMode(generateToken('pvp'), 'pvp')).toBe(true);

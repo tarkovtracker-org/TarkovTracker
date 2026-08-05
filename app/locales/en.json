@@ -2203,7 +2203,9 @@
   "game_settings": {
     "toggle_game_mode_label": "Toggle game mode",
     "select_game_mode_label": "Select game mode",
-    "select_faction_label": "Select faction"
+    "select_faction_label": "Select faction",
+    "season_ends_in": "Season {season} ends in {days}d {hours}h {minutes}m",
+    "season_ended": "Season {season} has ended"
   },
   "oauth": {
     "consent": {

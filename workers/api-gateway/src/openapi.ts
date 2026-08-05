@@ -6,7 +6,7 @@ export const OPENAPI_SPEC = {
     description:
       'Public API gateway for TarkovTracker progress, team progress, and token info.\n\n' +
       'Authentication: Send API tokens in the Authorization header as `Bearer <token>`.\n' +
-      "Tokens use prefixes `PVP_`, `PVE_`, or `SEASONAL_`, which must match the token's game mode; " +
+      "Tokens use prefixes `PVP_`, `PVE_`, or `SZN_`, which must match the token's game mode; " +
       'a mismatched token is rejected with 401. The token game mode alone decides which ' +
       'progress data is read or written. Legacy `tt_` tokens are no longer accepted.\n\n' +
       'Rate limits: tiered daily quotas keyed by user account (free: 1,000 reads/day and ' +
@@ -322,7 +322,7 @@ export const OPENAPI_SPEC = {
           {
             success: true,
             permissions: ['GP'],
-            token: 'SEASONAL_deadbeefcafefeed01',
+            token: 'SZN_deadbeefcafefeed01',
             owner: 'user-uuid',
             note: 'Season 1 overlay',
             calls: 4,

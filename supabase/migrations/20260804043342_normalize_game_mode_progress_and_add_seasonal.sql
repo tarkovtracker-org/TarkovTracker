@@ -14,6 +14,30 @@ $$;
 
 REVOKE ALL ON FUNCTION private.active_season_number() FROM PUBLIC;
 
+CREATE OR REPLACE FUNCTION private.active_season_starts_on()
+RETURNS DATE
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  SELECT DATE '2026-08-03';
+$$;
+
+REVOKE ALL ON FUNCTION private.active_season_starts_on() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION private.active_season_ends_at()
+RETURNS TIMESTAMPTZ
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  SELECT TIMESTAMPTZ '2026-12-07 10:00:00+00';
+$$;
+
+REVOKE ALL ON FUNCTION private.active_season_ends_at() FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION public.get_active_season_number()
 RETURNS SMALLINT
 LANGUAGE sql
@@ -715,7 +739,11 @@ ALTER TABLE public.api_tokens
   ADD CONSTRAINT api_tokens_token_value_game_mode_match
   CHECK (
     token_value IS NULL
-    OR token_value LIKE upper(game_mode) || '\_%' ESCAPE '\'
+    OR token_value LIKE (CASE game_mode
+      WHEN 'pvp' THEN 'PVP\_%'
+      WHEN 'pve' THEN 'PVE\_%'
+      WHEN 'seasonal' THEN 'SZN\_%'
+    END) ESCAPE '\'
   )
   NOT VALID;
 

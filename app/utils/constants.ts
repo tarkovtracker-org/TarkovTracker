@@ -41,7 +41,29 @@ export const GAME_MODE_UI = {
 export type ImportableGameMode = Exclude<GameMode, typeof GAME_MODES.SEASONAL>;
 export const GAME_MODE_VALUES = Object.values(GAME_MODES) as GameMode[];
 export const IMPORTABLE_GAME_MODES = [GAME_MODES.PVP, GAME_MODES.PVE] as const;
-export const ACTIVE_SEASON_NUMBER = 1 as const;
+export const ACTIVE_SEASON = {
+  number: 1,
+  startsOn: '2026-08-03',
+  endsAt: '2026-12-07T10:00:00.000Z',
+} as const;
+export const ACTIVE_SEASON_NUMBER = ACTIVE_SEASON.number;
+export interface SeasonTimeRemaining {
+  days: number;
+  hours: number;
+  minutes: number;
+  expired: boolean;
+}
+export const getActiveSeasonTimeRemaining = (currentTime = Date.now()): SeasonTimeRemaining => {
+  const remainingMs = Date.parse(ACTIVE_SEASON.endsAt) - currentTime;
+  if (remainingMs <= 0) return { days: 0, hours: 0, minutes: 0, expired: true };
+  const totalMinutes = Math.ceil(remainingMs / 60_000);
+  return {
+    days: Math.floor(totalMinutes / 1_440),
+    hours: Math.floor((totalMinutes % 1_440) / 60),
+    minutes: totalMinutes % 60,
+    expired: false,
+  };
+};
 export const API_GAME_MODES = {
   [GAME_MODES.PVP]: 'regular',
   [GAME_MODES.PVE]: 'pve',

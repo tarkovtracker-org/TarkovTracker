@@ -18,6 +18,14 @@
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
       {{ switchModeError }}
     </div>
+    <time
+      v-if="currentGameMode === GAME_MODES.SEASONAL"
+      :datetime="ACTIVE_SEASON.endsAt"
+      class="text-warning-300 text-xs"
+      :title="seasonEndDate"
+    >
+      {{ seasonCountdownLabel }}
+    </time>
     <div
       class="flex w-full overflow-hidden rounded-md border border-white/10"
       role="group"
@@ -49,12 +57,21 @@
   import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, PMC_FACTIONS, type GameMode, type PMCFaction } from '@/utils/constants';
+  import {
+    ACTIVE_SEASON,
+    GAME_MODES,
+    getActiveSeasonTimeRemaining,
+    PMC_FACTIONS,
+    type GameMode,
+    type PMCFaction,
+  } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
   const switchModeError = ref('');
+  const seasonCountdownNow = ref(Date.now());
+  let seasonCountdownTimer: ReturnType<typeof setInterval> | undefined;
   const factions = PMC_FACTIONS;
   const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
   function setFaction(faction: PMCFaction) {
@@ -63,6 +80,35 @@
     }
   }
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
+  const seasonEndDate = computed(() => new Date(ACTIVE_SEASON.endsAt).toLocaleString());
+  const seasonCountdownLabel = computed(() => {
+    const remaining = getActiveSeasonTimeRemaining(seasonCountdownNow.value);
+    if (remaining.expired) {
+      return t(
+        'game_settings.season_ended',
+        { season: ACTIVE_SEASON.number },
+        'Season {season} has ended'
+      );
+    }
+    return t(
+      'game_settings.season_ends_in',
+      {
+        days: remaining.days,
+        hours: remaining.hours,
+        minutes: remaining.minutes,
+        season: ACTIVE_SEASON.number,
+      },
+      'Season {season} ends in {days}d {hours}h {minutes}m'
+    );
+  });
+  onMounted(() => {
+    seasonCountdownTimer = setInterval(() => {
+      seasonCountdownNow.value = Date.now();
+    }, 60_000);
+  });
+  onUnmounted(() => {
+    if (seasonCountdownTimer) clearInterval(seasonCountdownTimer);
+  });
   const modeOptions = computed(() => [
     { icon: 'i-mdi-sword-cross', label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
     { icon: 'i-mdi-account-group', label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },

@@ -409,8 +409,8 @@ Each account may have at most **3 active API tokens**. This is enforced by a dat
 
 ### Token Prefixes
 
-Progress API tokens are prefixed `PVP_`, `PVE_`, or `SEASONAL_`. The prefix is cosmetic: the
-token's stored `game_mode` decides which exact normalized `(user_id, game_mode, season_number)`
+Progress API tokens are prefixed `PVP_`, `PVE_`, or `SZN_`. The prefix declares the token's mode,
+and the token's stored `game_mode` decides which exact normalized `(user_id, game_mode, season_number)`
 progress row every read and write touches, never the mode the owner is currently viewing on the
 site. Persistent PvP/PvE use season `0`; Seasonal tokens use the active season. The token prefix and
 stored mode are kept from diverging at three layers:
@@ -423,7 +423,7 @@ stored mode are kept from diverging at three layers:
   `401 Token game mode mismatch` instead of silently serving the stored mode.
 
 Legacy `tt_` tokens are no longer accepted; they fail with `401 Invalid token format`. Create a
-`PVP_`/`PVE_`/`SEASONAL_` token in Settings → API Tokens instead.
+`PVP_`/`PVE_`/`SZN_` token in Settings → API Tokens instead.
 
 ---
 
