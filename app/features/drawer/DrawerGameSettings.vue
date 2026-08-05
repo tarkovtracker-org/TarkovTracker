@@ -71,7 +71,6 @@
   const { t } = useI18n({ useScope: 'global' });
   const switchModeError = ref('');
   const seasonCountdownNow = ref(Date.now());
-  let seasonCountdownTimer: ReturnType<typeof setInterval> | undefined;
   const factions = PMC_FACTIONS;
   const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
   function setFaction(faction: PMCFaction) {
@@ -101,14 +100,18 @@
       'Season {season} ends in {days}d {hours}h {minutes}m'
     );
   });
-  onMounted(() => {
-    seasonCountdownTimer = setInterval(() => {
+  watch(
+    currentGameMode,
+    (mode, _, onCleanup) => {
+      if (mode !== GAME_MODES.SEASONAL) return;
       seasonCountdownNow.value = Date.now();
-    }, 60_000);
-  });
-  onUnmounted(() => {
-    if (seasonCountdownTimer) clearInterval(seasonCountdownTimer);
-  });
+      const timer = setInterval(() => {
+        seasonCountdownNow.value = Date.now();
+      }, 60_000);
+      onCleanup(() => clearInterval(timer));
+    },
+    { immediate: true }
+  );
   const modeOptions = computed(() => [
     { icon: 'i-mdi-sword-cross', label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
     { icon: 'i-mdi-account-group', label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },

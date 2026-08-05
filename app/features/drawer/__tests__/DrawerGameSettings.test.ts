@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
 import { ACTIVE_SEASON, GAME_MODES, type GameMode } from '@/utils/constants';
@@ -49,6 +49,9 @@ describe('DrawerGameSettings', () => {
     metadataLoading.value = false;
     vi.clearAllMocks();
   });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it('switches to pve mode and refreshes metadata', async () => {
     const wrapper = mount(DrawerGameSettings, {
       global: {
@@ -83,6 +86,24 @@ describe('DrawerGameSettings', () => {
     expect(countdown.text()).toBe('Season 1 ends in 123d 20h 16m');
     expect(countdown.attributes('datetime')).toBe(ACTIVE_SEASON.endsAt);
     wrapper.unmount();
-    vi.useRealTimers();
+  });
+  it('runs the countdown timer only while Seasonal mode is active', async () => {
+    vi.useFakeTimers();
+    const wrapper = mount(DrawerGameSettings, {
+      global: {
+        stubs: {
+          UIcon: true,
+          SelectMenuFixed: true,
+        },
+      },
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    currentGameMode.value = GAME_MODES.SEASONAL;
+    await wrapper.vm.$nextTick();
+    expect(vi.getTimerCount()).toBe(1);
+    currentGameMode.value = GAME_MODES.PVE;
+    await wrapper.vm.$nextTick();
+    expect(vi.getTimerCount()).toBe(0);
+    wrapper.unmount();
   });
 });

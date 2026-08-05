@@ -99,16 +99,19 @@ number selects a fresh `(user_id, seasonal, season_number)` row for every accoun
 remain available for rollback and audit but are excluded from active progress, teams, profiles,
 backups, prestige, realtime, and public API reads.
 
-Prepare each rollover before the announced cutoff:
+Prepare and deploy each rollover in two releases during the no-write gap between seasons:
 
-1. Update `ACTIVE_SEASON` in `app/utils/constants.ts` with the new number, start date, and exact UTC
-   end timestamp.
-2. Add a migration that replaces `private.active_season_number()`,
-   `private.active_season_starts_on()`, and `private.active_season_ends_at()` with matching values.
-3. Update the active-season metadata assertions and any displayed season copy, then run the normal
-   pre-deploy validation plus the Supabase DB and API gateway suites.
-4. Schedule the release for the season boundary. Verify the app countdown, database functions, and
-   `/progress` Seasonal row selection after deployment. Do not delete the previous season's rows.
+1. Prepare the next `ACTIVE_SEASON` values, matching database functions, metadata assertions, and
+   displayed season copy on separate application and database branches. Run the normal pre-deploy
+   validation plus the Supabase DB and API gateway suites for both final states.
+2. After the previous season's announced cutoff, deploy only the database migration that replaces
+   `private.active_season_number()`, `private.active_season_starts_on()`, and
+   `private.active_season_ends_at()`. Verify all three functions before continuing. Existing clients
+   fail closed on old-season writes during this gap instead of writing into the new season.
+3. Deploy the application release that updates `ACTIVE_SEASON` in `app/utils/constants.ts`. Verify
+   the app countdown and `/progress` Seasonal row selection before announcing the new season open.
+4. Do not combine the database flip and application constants in one merge because their production
+   deployment order is uncontrolled. Do not delete the previous season's rows.
 
 ## Deployment
 

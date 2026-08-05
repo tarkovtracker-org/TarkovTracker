@@ -555,7 +555,9 @@ flowchart LR
    Seasonal team column.
 6. The active season definition carries its number, start date, and exact end timestamp. The UI
    counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
-   historical rows remain retained and cannot be merged into the new season.
+   historical rows remain retained and cannot be merged into the new season. Rollover deploys the
+   database flip first during the between-season no-write gap, verifies it, and then deploys the
+   matching application constants before the new season opens.
 7. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
 8. Prestige archives include mode and season. Seasonal prestige accepts only the active season;

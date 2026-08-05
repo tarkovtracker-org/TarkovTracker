@@ -290,7 +290,13 @@
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
-  import { API_PERMISSIONS, GAME_MODE_OPTIONS, GAME_MODES, type GameMode } from '@/utils/constants';
+  import {
+    API_PERMISSIONS,
+    API_TOKEN_PREFIXES,
+    GAME_MODE_OPTIONS,
+    GAME_MODES,
+    type GameMode,
+  } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
   import type { RawTokenRow, TokenPermission, TokenRow } from '@/types/api';
@@ -501,8 +507,7 @@
   const generateToken = (gameMode: GameMode) => {
     const bytes = crypto.getRandomValues(new Uint8Array(9));
     const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    const prefix = gameMode.toUpperCase();
-    return `${prefix}_${hex}`;
+    return `${API_TOKEN_PREFIXES[gameMode]}${hex}`;
   };
   const hashToken = async (token: string) => {
     const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));

@@ -41,6 +41,11 @@ export const GAME_MODE_UI = {
 export type ImportableGameMode = Exclude<GameMode, typeof GAME_MODES.SEASONAL>;
 export const GAME_MODE_VALUES = Object.values(GAME_MODES) as GameMode[];
 export const IMPORTABLE_GAME_MODES = [GAME_MODES.PVP, GAME_MODES.PVE] as const;
+export const API_TOKEN_PREFIXES = {
+  [GAME_MODES.PVP]: 'PVP_',
+  [GAME_MODES.PVE]: 'PVE_',
+  [GAME_MODES.SEASONAL]: 'SZN_',
+} as const satisfies Record<GameMode, string>;
 export const ACTIVE_SEASON = {
   number: 1,
   startsOn: '2026-08-03',
