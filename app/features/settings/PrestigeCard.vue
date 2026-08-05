@@ -14,8 +14,15 @@
             icon="i-mdi-sword-cross"
             color="info"
             variant="soft"
-            :title="$t('settings.prestige.pvp_only_title')"
-            :description="$t('settings.prestige.pvp_only')"
+            :title="
+              $t('settings.prestige.persistent_mode_unsupported_title', 'Prestige Unavailable')
+            "
+            :description="
+              $t(
+                'settings.prestige.persistent_mode_unsupported',
+                'Prestige is unavailable for persistent PvE mode.'
+              )
+            "
           />
         </div>
         <div v-else class="space-y-6 px-4 py-4">
@@ -161,7 +168,13 @@
                   {{ $t('settings.prestige.archive_title') }}
                 </p>
                 <p class="text-surface-400 text-xs">
-                  {{ $t('settings.prestige.archive_description', { mode: currentModeLabel }) }}
+                  {{
+                    $t(
+                      'settings.prestige.archive_description_mode',
+                      { mode: currentModeLabel },
+                      'Use this only when you are actually prestiging now. Your current {mode} run will be archived and its progression will reset for the next prestige level.'
+                    )
+                  }}
                 </p>
               </div>
               <p v-if="archiveDisabledDescription" class="text-surface-500 text-xs">
@@ -296,7 +309,13 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-trophy" class="text-warning-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('settings.prestige.archive_dialog_title', { mode: currentModeLabel }) }}
+          {{
+            $t(
+              'settings.prestige.archive_dialog_title_mode',
+              { mode: currentModeLabel },
+              'Archive Current {mode} Run'
+            )
+          }}
         </h3>
       </div>
     </template>
@@ -306,7 +325,13 @@
           icon="i-mdi-alert"
           color="warning"
           variant="subtle"
-          :title="$t('settings.data_management.prestige_mode_warning', { mode: currentModeLabel })"
+          :title="
+            $t(
+              'settings.data_management.prestige_mode_warning',
+              { mode: currentModeLabel },
+              'Your current {mode} run will be archived, then its progression will reset for the next prestige level. Other modes are not affected.'
+            )
+          "
         />
         <UAlert
           v-if="requirementSummary.unmetTrackedCount > 0"
@@ -475,7 +500,9 @@
   const currentMode = computed(() => tarkovStore.currentGameMode);
   const isPrestigeMode = computed(() => currentMode.value !== GAME_MODES.PVE);
   const currentModeLabel = computed(() =>
-    currentMode.value === GAME_MODES.SEASONAL ? t('common.seasonal_pvp') : t('common.pvp')
+    currentMode.value === GAME_MODES.SEASONAL
+      ? t('common.seasonal_pvp', 'Seasonal PvP')
+      : t('common.pvp', 'PvP')
   );
   const currentModeProgress = computed(() => tarkovStore.getCurrentProgressData());
   const currentPrestigeLevel = computed(() => currentModeProgress.value.prestigeLevel ?? 0);
@@ -508,7 +535,7 @@
       edition: currentEdition.value,
       hideoutStations: metadataStore.hideoutStations,
       prestigeLevels: metadataStore.prestigeLevels,
-      pvpProgress: currentModeProgress.value,
+      modeProgress: currentModeProgress.value,
       storyChapters: metadataStore.storyChapters,
       tasks: metadataStore.tasks,
     })

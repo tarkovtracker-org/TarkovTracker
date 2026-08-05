@@ -65,13 +65,22 @@ const transformUserModeRow = async (
   userId: string,
   gameMode: GameMode
 ): Promise<ProgressResponseData> => {
-  const progressData = extractGameModeData(row);
-  const fallbackDisplayName =
-    progressData?.displayName?.trim() || (await getUserDisplayName(env, userId));
   const [tasks, hideoutStations] = await Promise.all([
     getTasks(gameMode),
     getHideoutStations(gameMode),
   ]);
+  return buildProgressData(env, row, userId, tasks, hideoutStations);
+};
+const buildProgressData = async (
+  env: Env,
+  row: UserProgressModeRow,
+  userId: string,
+  tasks: Awaited<ReturnType<typeof getTasks>>,
+  hideoutStations: Awaited<ReturnType<typeof getHideoutStations>>
+): Promise<ProgressResponseData> => {
+  const progressData = extractGameModeData(row);
+  const fallbackDisplayName =
+    progressData?.displayName?.trim() || (await getUserDisplayName(env, userId));
   return transformProgress(
     progressData,
     userId,
@@ -209,17 +218,7 @@ export async function handleGetTeamProgress(
         game_edition: editionRow?.game_edition ?? 1,
         progress_data: progressRow?.progress_data ?? null,
       };
-      const progressData = extractGameModeData(row);
-      const fallbackDisplayName =
-        progressData?.displayName?.trim() || (await getUserDisplayName(env, memberId));
-      return transformProgress(
-        progressData,
-        memberId,
-        row.game_edition ?? 1,
-        tasks,
-        hideoutStations,
-        fallbackDisplayName
-      );
+      return buildProgressData(env, row, memberId, tasks, hideoutStations);
     })
   );
   return {

@@ -59,7 +59,7 @@
                 @click="selectedMode = GAME_MODES.PVP"
               >
                 <UIcon name="i-mdi-sword-cross" class="h-3.5 w-3.5 shrink-0" />
-                <span class="leading-none">PvP</span>
+                <span class="leading-none">{{ t('common.pvp', 'PvP') }}</span>
               </button>
               <button
                 type="button"
@@ -69,7 +69,7 @@
                 @click="selectedMode = GAME_MODES.PVE"
               >
                 <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5 shrink-0" />
-                <span class="leading-none">PvE</span>
+                <span class="leading-none">{{ t('common.pve', 'PvE') }}</span>
               </button>
               <button
                 type="button"
@@ -79,7 +79,9 @@
                 @click="selectedMode = GAME_MODES.SEASONAL"
               >
                 <UIcon name="i-mdi-calendar-star" class="h-3.5 w-3.5 shrink-0" />
-                <span class="leading-none">S{{ ACTIVE_SEASON_NUMBER }}</span>
+                <span class="leading-none">
+                  {{ t('profile.season_short', { season: ACTIVE_SEASON_NUMBER }, 'S{season}') }}
+                </span>
               </button>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -326,7 +328,6 @@
     heroBackdrop: string;
     icon: string;
     iconTint: string;
-    label: string;
     modeBadgeClass: string;
     storyHighlight: 'info' | 'pve' | 'pvp';
     timelineHighlight: 'info' | 'pve' | 'pvp';
@@ -336,7 +337,6 @@
       heroBackdrop: 'bg-gradient-to-r from-pvp-900 via-primary-900/35 to-surface-900',
       icon: 'i-mdi-sword-cross',
       iconTint: 'text-pvp-300',
-      label: 'PvP',
       modeBadgeClass: 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
@@ -345,7 +345,6 @@
       heroBackdrop: 'bg-gradient-to-r from-pve-900 via-secondary-900/35 to-surface-900',
       icon: 'i-mdi-account-group',
       iconTint: 'text-pve-300',
-      label: 'PvE',
       modeBadgeClass: 'border border-pve-500/30 bg-pve-700/25 text-pve-200',
       storyHighlight: 'pve',
       timelineHighlight: 'pve',
@@ -354,7 +353,6 @@
       heroBackdrop: 'bg-gradient-to-r from-warning-950 via-warning-900/25 to-surface-900',
       icon: 'i-mdi-calendar-star',
       iconTint: 'text-warning-300',
-      label: 'Seasonal PvP',
       modeBadgeClass: 'border border-warning-500/30 bg-warning-700/20 text-warning-200',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
@@ -607,7 +605,13 @@
     return sharedProfileData.value !== null;
   });
   const modeTheme = computed(() => MODE_THEMES[selectedMode.value]);
-  const modeLabel = computed(() => modeTheme.value.label);
+  const modeLabel = computed(() => {
+    if (selectedMode.value === GAME_MODES.PVE) return t('common.pve', 'PvE');
+    if (selectedMode.value === GAME_MODES.SEASONAL) {
+      return t('common.seasonal_pvp', 'Seasonal PvP');
+    }
+    return t('common.pvp', 'PvP');
+  });
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
       ? 'bg-pvp-800 text-pvp-100 shadow-inner'

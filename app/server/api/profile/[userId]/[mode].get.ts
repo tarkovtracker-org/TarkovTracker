@@ -5,6 +5,7 @@ import {
   getRouterParam,
   setResponseHeader,
 } from 'h3';
+import { fetchWithTimeout, isAbortError } from '@/server/utils/fetchWithTimeout';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
@@ -404,15 +405,6 @@ const enrichProgressTaskFailures = async (
     taskCompletions: value,
   };
 };
-const isAbortError = (error: unknown): boolean => {
-  return (
-    (error instanceof Error && error.name === 'AbortError') ||
-    (typeof error === 'object' &&
-      error !== null &&
-      'name' in error &&
-      (error as { name?: unknown }).name === 'AbortError')
-  );
-};
 const toPositiveInteger = (value: unknown, fallback: number): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) {
@@ -491,25 +483,6 @@ const setCachedProfile = async (
       });
     }
   );
-};
-const fetchWithTimeout = async (
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<Response> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (isAbortError(error)) {
-      throw createError({ statusCode: 504, statusMessage: timeoutMessage });
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
 };
 const resolveRequesterUserId = async (
   authHeader: string | undefined,

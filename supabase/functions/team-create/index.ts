@@ -59,10 +59,11 @@ const validateMaxMembers = (req: Request, maxMembers: unknown): Response | null 
 };
 const getMaxMembers = (value: unknown): unknown =>
   value === undefined ? DEFAULT_MAX_TEAM_MEMBERS : value;
-const getRequestedGameMode = (value: unknown): TeamGameMode => {
-  if (typeof value !== 'string') return 'pvp';
+const getRequestedGameMode = (value: unknown): TeamGameMode | null => {
+  if (value === undefined) return 'pvp';
+  if (typeof value !== 'string') return null;
   const normalized = value.toLowerCase();
-  return isTeamGameMode(normalized) ? normalized : 'pvp';
+  return isTeamGameMode(normalized) ? normalized : null;
 };
 const parseCreateInput = async (
   req: Request,
@@ -82,8 +83,12 @@ const parseCreateInput = async (
     validateMaxMembers(req, maxMembers),
   ].find(Boolean);
   if (validationError) return rejectMutationStep(validationError);
+  const gameMode = getRequestedGameMode(body.game_mode);
+  if (!gameMode) {
+    return rejectMutationStep(createErrorResponse('Invalid game_mode', 400, req));
+  }
   return acceptMutationStep({
-    gameMode: getRequestedGameMode(body.game_mode),
+    gameMode,
     joinCode: joinCode as string,
     maxMembers: maxMembers as number,
     name: body.name as string,
@@ -141,6 +146,21 @@ const updateTeamSystemState = async (context: PersistedCreateContext): Promise<R
   });
   if (!error) return null;
   console.error('user_system upsert failed:', error);
+  const { error: membershipRollbackError } = await context.supabase
+    .from('team_memberships')
+    .delete()
+    .eq('team_id', context.team.id);
+  const { error: teamRollbackError } = await context.supabase
+    .from('teams')
+    .delete()
+    .eq('id', context.team.id);
+  if (membershipRollbackError || teamRollbackError) {
+    console.error('Failed to roll back team creation:', {
+      membershipRollbackError,
+      teamRollbackError,
+      teamId: context.team.id,
+    });
+  }
   return createErrorResponse('Failed to update user system state', 500, context.req);
 };
 const recordTeamCreated = (context: PersistedCreateContext) =>

@@ -2,6 +2,8 @@ import { strFromU8, unzipSync } from 'fflate';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
+  GAME_MODES,
+  getGameModeSeasonNumber,
   IMPORTABLE_GAME_MODES,
   isImportableGameMode,
   type GameMode,
@@ -261,12 +263,16 @@ const applyModeImports = async (
   tasksMap: Map<string, Task>,
   mode: ImportableGameMode,
   activeMode: GameMode,
-  taskSets: ImportTaskSets
+  taskSets: ImportTaskSets,
+  onModeSwitched: (mode: GameMode) => void
 ): Promise<GameMode> => {
   const completed = taskSets.completed[mode];
   const started = taskSets.started[mode];
   if (!completed.size && !started.size) return activeMode;
-  if (activeMode !== mode) await store.switchGameMode(mode);
+  if (activeMode !== mode) {
+    onModeSwitched(mode);
+    await store.switchGameMode(mode);
+  }
   applyCompletedImports(store, tasksMap, completed);
   applyStartedImports(store, completed, started);
   return mode;
@@ -293,9 +299,12 @@ const applyAllModeImports = async (
   taskSets: ImportTaskSets
 ): Promise<{ activeMode: GameMode; error: unknown }> => {
   let activeMode = originalMode;
+  const trackMode = (mode: GameMode) => {
+    activeMode = mode;
+  };
   try {
     for (const mode of IMPORTABLE_GAME_MODES) {
-      activeMode = await applyModeImports(store, tasksMap, mode, activeMode, taskSets);
+      activeMode = await applyModeImports(store, tasksMap, mode, activeMode, taskSets, trackMode);
     }
     return { activeMode, error: null };
   } catch (error) {
@@ -441,7 +450,13 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     if (!preview) return;
     if (!isImportableGameMode(targetMode)) {
       importState.value = 'error';
-      importError.value = t('settings.data_management.seasonal_import_locked');
+      importError.value = t(
+        'settings.data_management.seasonal_import_locked',
+        {
+          season: getGameModeSeasonNumber(GAME_MODES.SEASONAL),
+        },
+        'Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.'
+      );
       return;
     }
     const originalMode = tarkovStore.getCurrentGameMode();

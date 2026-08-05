@@ -85,6 +85,7 @@ import {
   serializeUserScopedStorage,
 } from '@/utils/userScopedStorage';
 import type { Task } from '@/types/tarkov';
+export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 // ============================================================================
 // Constants
 // ============================================================================
@@ -110,7 +111,6 @@ type UserProgressRow = {
   updated_at: string | null;
 };
 type UserProgressSyncPayload = {
-  user_id: string | null;
   current_game_mode: GameMode;
   game_edition: number;
   tarkov_uid: number | null;
@@ -118,8 +118,6 @@ type UserProgressSyncPayload = {
   pve_data: UserProgressData;
   seasonal_data: UserProgressData;
 };
-export type { PrestigeRunSummary, PrestigeRunRecord } from '@/stores/tarkov/prestige';
-export type { PersistedProgressSnapshot } from '@/stores/tarkov/localStorage';
 // Create a type that extends UserState with Pinia store methods
 type TarkovStoreInstance = UserState & {
   $state: UserState;
@@ -378,7 +376,7 @@ const tarkovActions = {
     logger.debug('[TarkovStore] Seasonal data reset complete');
   },
   async resetAllData(this: TarkovStoreInstance) {
-    logger.debug('[TarkovStore] Resetting all data (both PvP and PvE)...');
+    logger.debug('[TarkovStore] Resetting all data (PvP, PvE, and Seasonal)...');
     await executeWithSyncPause(() => performReset('all', this));
     logger.debug('[TarkovStore] All data reset complete');
   },
@@ -530,12 +528,12 @@ const tarkovActions = {
     }
     if (pvpRepaired > 0 || pveRepaired > 0 || seasonalRepaired > 0) {
       logger.debug(
-        `[TarkovStore] Repaired task failed flags - PvP: ${pvpRepaired}, PvE: ${pveRepaired}`
+        `[TarkovStore] Repaired task failed flags - PvP: ${pvpRepaired}, PvE: ${pveRepaired}, Seasonal: ${seasonalRepaired}`
       );
     }
     if (pvpCleared > 0 || pveCleared > 0 || seasonalCleared > 0) {
       logger.debug(
-        `[TarkovStore] Cleared objectives for failed tasks - PvP: ${pvpCleared}, PvE: ${pveCleared}`
+        `[TarkovStore] Cleared objectives for failed tasks - PvP: ${pvpCleared}, PvE: ${pveCleared}, Seasonal: ${seasonalCleared}`
       );
     }
     return { pvpRepaired, pveRepaired, seasonalRepaired };
@@ -567,7 +565,7 @@ const tarkovActions = {
     }
     if (pvpRepaired > 0 || pveRepaired > 0 || seasonalRepaired > 0) {
       logger.debug(
-        `[TarkovStore] Repaired completed task objectives - PvP: ${pvpRepaired}, PvE: ${pveRepaired}`
+        `[TarkovStore] Repaired completed task objectives - PvP: ${pvpRepaired}, PvE: ${pveRepaired}, Seasonal: ${seasonalRepaired}`
       );
     }
     return { pvpRepaired, pveRepaired, seasonalRepaired };
@@ -911,8 +909,6 @@ const tarkovActions = {
     tasksMap: Map<string, Task>
   ): number;
 };
-// Export type for external usage
-export type TarkovStoreActions = typeof tarkovActions;
 export const useTarkovStore = defineStore('swapTarkov', {
   state: () => structuredClone(defaultState),
   getters: tarkovGetters,
@@ -1038,7 +1034,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
   },
 });
 // Export type for future typing
-export type TarkovStore = ReturnType<typeof useTarkovStore>;
+type TarkovStore = ReturnType<typeof useTarkovStore>;
 // Store reference to sync controller for pause/resume during resets
 let syncController: SupabaseSyncReturn<UserState, UserProgressSyncPayload> | null = null;
 let syncUserId: string | null = null;
@@ -1049,9 +1045,6 @@ let pendingResetProgressSnapshot: {
 } | null = null;
 const shownLocalIgnoreReasons = new Set<LocalIgnoredReason>();
 const METADATA_REFRESH_FAILURE_EVENT = 'metadata.refresh.failure';
-export function getSyncController() {
-  return syncController;
-}
 registerSyncControllerGetter(() => syncController);
 registerTarkovMetadataHooks({
   getCurrentGameMode: () => useTarkovStore().getCurrentGameMode(),
@@ -1349,9 +1342,10 @@ export async function initializeTarkovSync() {
         logger.error('[TarkovStore] Error loading data from Supabase:', error);
         return { hadRemoteData, needsRemoteCleanup, ok: false };
       }
-      const modeProgressResult = data
-        ? await loadModeProgress($supabase.client as unknown as ModeProgressClient, currentUserId)
-        : { data: {}, error: null };
+      const modeProgressResult = await loadModeProgress(
+        $supabase.client as unknown as ModeProgressClient,
+        currentUserId
+      );
       if (modeProgressResult.error) {
         logger.error(
           '[TarkovStore] Could not load normalized mode progress',
@@ -1360,24 +1354,26 @@ export async function initializeTarkovSync() {
         return { hadRemoteData, needsRemoteCleanup, ok: false };
       }
       // Normalize Supabase data with defaults for safety
-      const normalizedRemote = data
-        ? sanitizeOwnedUserState({
-            currentGameMode: coerceGameMode(data.current_game_mode),
-            gameEdition: sanitizeGameEdition(data.game_edition),
-            tarkovUid: sanitizeTarkovUid(data.tarkov_uid),
-            pvp: modeProgressResult.data.pvp ?? data.pvp_data,
-            pve: modeProgressResult.data.pve ?? data.pve_data,
-            seasonal: modeProgressResult.data.seasonal,
-          })
-        : null;
+      const hasNormalizedProgress = Object.keys(modeProgressResult.data).length > 0;
+      const normalizedRemote =
+        data || hasNormalizedProgress
+          ? sanitizeOwnedUserState({
+              currentGameMode: coerceGameMode(data?.current_game_mode),
+              gameEdition: sanitizeGameEdition(data?.game_edition),
+              tarkovUid: sanitizeTarkovUid(data?.tarkov_uid),
+              pvp: modeProgressResult.data.pvp ?? data?.pvp_data,
+              pve: modeProgressResult.data.pve ?? data?.pve_data,
+              seasonal: modeProgressResult.data.seasonal,
+            })
+          : null;
       const remoteScore = normalizedRemote ? progressScore(normalizedRemote) : 0;
       const localScore = progressScore(localState);
-      if (data) {
-        const remoteUpdatedAt = data.updated_at ? Date.parse(data.updated_at) : null;
+      if (normalizedRemote) {
+        const remoteUpdatedAt = data?.updated_at ? Date.parse(data.updated_at) : null;
         const localOwnedByUser = storedUserId === currentUserId;
         const remoteHadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData({
-          pvp: data.pvp_data,
-          pve: data.pve_data,
+          pvp: modeProgressResult.data.pvp ?? data?.pvp_data,
+          pve: modeProgressResult.data.pve ?? data?.pve_data,
           seasonal: modeProgressResult.data.seasonal,
         });
         if (hasLocalProgress && !localOwnedByUser && storedUserId === null) {
@@ -1589,7 +1585,6 @@ export async function initializeTarkovSync() {
           recordLocalSyncTime();
           const sanitizedUserState = sanitizeOwnedUserState(userState);
           return {
-            user_id: $supabase.user.id,
             current_game_mode: sanitizedUserState.currentGameMode || GAME_MODES.PVP,
             game_edition:
               typeof sanitizedUserState.gameEdition === 'string'
@@ -1635,4 +1630,3 @@ export async function initializeTarkovSync() {
     setupRealtimeListener(tarkovStore);
   }
 }
-export { mergeProgressData } from '@/stores/tarkov/progressMerge';

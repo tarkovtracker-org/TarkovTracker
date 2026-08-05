@@ -24,6 +24,8 @@ export const hasProgress = (data: unknown): boolean => {
   const modeHasData = (mode: UserProgressData | undefined) =>
     mode &&
     (mode.level > 1 ||
+      (mode.prestigeLevel ?? 0) > 0 ||
+      (mode.progressEpoch ?? 0) > 0 ||
       Object.keys(mode.taskCompletions || {}).length > 0 ||
       Object.keys(mode.taskObjectives || {}).length > 0 ||
       Object.keys(mode.hideoutParts || {}).length > 0 ||

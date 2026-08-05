@@ -94,7 +94,7 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import { GAME_MODE_UI, GAME_MODES, type GameMode } from '@/utils/constants';
   import { LIMITS } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const DISPLAY_NAME_MODES = [
@@ -122,7 +122,7 @@
     if (mode === GAME_MODES.SEASONAL) return t('common.seasonal_pvp');
     return t('common.pvp');
   };
-  const getModeColor = (mode: DisplayNameMode) => (mode === GAME_MODES.SEASONAL ? 'warning' : mode);
+  const getModeColor = (mode: DisplayNameMode) => GAME_MODE_UI[mode].color;
   const getStoredDisplayName = (mode: DisplayNameMode) =>
     tarkovStore.getModeDisplayName(mode) || '';
   const getDisplayNameValidationError = (mode: DisplayNameMode) => {

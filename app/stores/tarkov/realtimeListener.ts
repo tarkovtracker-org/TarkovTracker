@@ -3,7 +3,6 @@ import { maybeNotifyApiUpdate, runApiUpdateHandlers } from '@/stores/tarkov/apiU
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { coerceGameMode, mergeProgressData } from '@/stores/tarkov/progressMerge';
-import { syncProgressState } from '@/stores/tarkov/progressPersistence';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
@@ -95,6 +94,19 @@ const notifyModeConflict = (
   if (conflicts.hasConflict && !apiUpdateHandled && !isLikelySelfOriginUpdate(updateTime)) {
     toastI18n.showProgressMerged(conflicts.conflictCount);
   }
+};
+const shouldIgnoreModeProgressUpdate = (
+  mode: GameMode,
+  updateTime: number,
+  nextProgress: UserProgressData,
+  localProgress: UserProgressData
+): boolean => {
+  if (!isLikelySelfOriginUpdate(updateTime)) return deepEqual(nextProgress, localProgress);
+  logger.debug('[TarkovStore] Ignoring mode realtime update - likely self-origin', {
+    mode,
+    threshold: SYNC_TIMELINE_SELF_ORIGIN_THRESHOLD_MS,
+  });
+  return true;
 };
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
@@ -191,7 +203,10 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       lastDeprecatedRemoteCleanupAttemptAt = now;
       recordLocalSyncTime();
       try {
-        const { error } = await syncProgressState($supabase.client, currentUserId, nextState);
+        const { error } = await $supabase.client
+          .from('user_progress')
+          .update({ pvp_data: nextState.pvp, pve_data: nextState.pve })
+          .eq('user_id', currentUserId);
         if (error) {
           deprecatedRemoteCleanupFailureCount += 1;
           logger.error(
@@ -271,7 +286,7 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
     const nextProgress = mergeProgressData(localState[mode], remoteProgress);
-    if (deepEqual(nextProgress, localState[mode])) return;
+    if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
     const apiUpdateHandled = maybeNotifyApiUpdate(
       mode,

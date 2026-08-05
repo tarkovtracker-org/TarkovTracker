@@ -10,9 +10,10 @@ import { getRegisteredSyncController } from '@/stores/tarkov/realtimeListener';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { clearProgressStorage } from '@/utils/clientStorage';
+import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 const RESET_SETTLE_DELAY_MS = 100;
-export type ResetMode = 'pvp' | 'pve' | 'seasonal' | 'all';
+export type ResetMode = GameMode | 'all';
 type ResetTargetStore = {
   $patch: (fn: (state: UserState) => void) => void;
   $state: UserState;
@@ -107,14 +108,9 @@ export const executeWithSyncPause = async <T>(operation: () => Promise<T>): Prom
 export const performReset = async (mode: ResetMode, store: ResetTargetStore): Promise<void> => {
   const { $supabase } = useNuxtApp();
   const freshState = structuredClone(defaultState);
-  if (mode === 'all' || mode === 'pvp') {
-    freshState.pvp.progressEpoch = getNextProgressEpoch(store.$state.pvp);
-  }
-  if (mode === 'all' || mode === 'pve') {
-    freshState.pve.progressEpoch = getNextProgressEpoch(store.$state.pve);
-  }
-  if (mode === 'all' || mode === 'seasonal') {
-    freshState.seasonal.progressEpoch = getNextProgressEpoch(store.$state.seasonal);
+  const resetModes = mode === 'all' ? GAME_MODE_VALUES : [mode];
+  for (const resetMode of resetModes) {
+    freshState[resetMode].progressEpoch = getNextProgressEpoch(store.$state[resetMode]);
   }
   if ($supabase.user.loggedIn && $supabase.user.id) {
     const nextRemoteState: UserState = {
@@ -122,9 +118,9 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
       currentGameMode: mode === 'all' ? freshState.currentGameMode : store.$state.currentGameMode,
       gameEdition: mode === 'all' ? freshState.gameEdition : store.$state.gameEdition,
       tarkovUid: mode === 'all' ? freshState.tarkovUid : store.$state.tarkovUid,
-      pvp: mode === 'all' || mode === 'pvp' ? freshState.pvp : store.$state.pvp,
-      pve: mode === 'all' || mode === 'pve' ? freshState.pve : store.$state.pve,
-      seasonal: mode === 'all' || mode === 'seasonal' ? freshState.seasonal : store.$state.seasonal,
+      pvp: resetModes.includes('pvp') ? freshState.pvp : store.$state.pvp,
+      pve: resetModes.includes('pve') ? freshState.pve : store.$state.pve,
+      seasonal: resetModes.includes('seasonal') ? freshState.seasonal : store.$state.seasonal,
     };
     const { error } = await syncProgressState($supabase.client, $supabase.user.id, nextRemoteState);
     if (error) {
@@ -133,9 +129,9 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
     recordLocalSyncTime();
   }
   store.$patch((state) => {
-    if (mode === 'all' || mode === 'pvp') state.pvp = freshState.pvp;
-    if (mode === 'all' || mode === 'pve') state.pve = freshState.pve;
-    if (mode === 'all' || mode === 'seasonal') state.seasonal = freshState.seasonal;
+    if (resetModes.includes('pvp')) state.pvp = freshState.pvp;
+    if (resetModes.includes('pve')) state.pve = freshState.pve;
+    if (resetModes.includes('seasonal')) state.seasonal = freshState.seasonal;
     if (mode === 'all') {
       state.currentGameMode = freshState.currentGameMode;
       state.gameEdition = freshState.gameEdition;

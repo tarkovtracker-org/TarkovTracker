@@ -71,8 +71,8 @@ describe('useTarkov deletePrestigeRun', () => {
   });
   it('surfaces remote delete failures', async () => {
     const store = useTarkovStore();
-    eqMock.mockReset();
-    maybeSingleMock.mockReset();
+    eqMock.mockClear();
+    maybeSingleMock.mockClear();
     maybeSingleMock.mockResolvedValue({
       data: null,
       error: { message: 'delete failed' },
@@ -85,8 +85,8 @@ describe('useTarkov deletePrestigeRun', () => {
   });
   it('fails when the delete matches no rows', async () => {
     const store = useTarkovStore();
-    eqMock.mockReset();
-    maybeSingleMock.mockReset();
+    eqMock.mockClear();
+    maybeSingleMock.mockClear();
     maybeSingleMock.mockResolvedValue({
       data: null,
       error: null,

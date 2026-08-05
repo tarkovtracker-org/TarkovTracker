@@ -33,6 +33,11 @@ export const GAME_MODES = {
   SEASONAL: 'seasonal',
 } as const;
 export type GameMode = (typeof GAME_MODES)[keyof typeof GAME_MODES];
+export const GAME_MODE_UI = {
+  [GAME_MODES.PVP]: { color: 'pvp' },
+  [GAME_MODES.PVE]: { color: 'pve' },
+  [GAME_MODES.SEASONAL]: { color: 'warning' },
+} as const satisfies Record<GameMode, { color: 'pvp' | 'pve' | 'warning' }>;
 export type ImportableGameMode = Exclude<GameMode, typeof GAME_MODES.SEASONAL>;
 export const GAME_MODE_VALUES = Object.values(GAME_MODES) as GameMode[];
 export const IMPORTABLE_GAME_MODES = [GAME_MODES.PVP, GAME_MODES.PVE] as const;
@@ -43,33 +48,33 @@ export const API_GAME_MODES = {
   [GAME_MODES.SEASONAL]: 'pvp-season',
 } as const;
 export interface GameModeOption {
-  label: string;
+  labelKey: string;
   value: GameMode;
   icon: string;
-  description: string;
+  descriptionKey: string;
 }
 export const GAME_MODE_OPTIONS: GameModeOption[] = [
   {
-    label: 'PvP',
+    labelKey: 'common.pvp',
     value: GAME_MODES.PVP,
     icon: 'mdi-sword-cross',
-    description: 'Player vs Player (Standard)',
+    descriptionKey: 'common.pvp_description',
   },
   {
-    label: 'PvE',
+    labelKey: 'common.pve',
     value: GAME_MODES.PVE,
     icon: 'mdi-account-group',
-    description: 'Player vs Environment (Co-op)',
+    descriptionKey: 'common.pve_description',
   },
   {
-    label: 'Seasonal PvP',
+    labelKey: 'common.seasonal_pvp',
     value: GAME_MODES.SEASONAL,
     icon: 'mdi-calendar-star',
-    description: `Season ${ACTIVE_SEASON_NUMBER}`,
+    descriptionKey: 'common.seasonal_pvp_description',
   },
 ];
 export const getGameModeLabel = (mode: GameMode): string =>
-  GAME_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? 'PvP';
+  GAME_MODE_OPTIONS.find((option) => option.value === mode)?.labelKey ?? 'common.pvp';
 export const getGameModeSeasonNumber = (mode: GameMode): number =>
   mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
 export const isGameMode = (value: unknown): value is GameMode =>

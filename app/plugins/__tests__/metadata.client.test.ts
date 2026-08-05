@@ -19,6 +19,11 @@ mockNuxtImport('useToast', () => () => ({
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => metadataStoreMock,
 }));
+vi.mock('@/stores/useTarkov', () => ({
+  useTarkovStore: () => ({
+    getCurrentGameMode: () => 'pvp',
+  }),
+}));
 vi.mock('@/utils/logger', () => ({
   logger: {
     debug: vi.fn(),

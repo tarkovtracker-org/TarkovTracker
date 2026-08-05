@@ -12,14 +12,18 @@ let tarkovHooks: TarkovMetadataHooks = {
   repairCompletedTaskObjectives: () => undefined,
   repairFailedTaskStates: () => undefined,
 };
-let progressHooks: ProgressMetadataHooks = {
-  migrateDuplicateObjectiveProgress: () => undefined,
-};
+let progressHooks: ProgressMetadataHooks | null = null;
+let pendingDuplicateObjectiveIds = new Map<string, string[]>();
 export const registerTarkovMetadataHooks = (hooks: TarkovMetadataHooks): void => {
   tarkovHooks = hooks;
 };
 export const registerProgressMetadataHooks = (hooks: ProgressMetadataHooks): void => {
   progressHooks = hooks;
+  if (pendingDuplicateObjectiveIds.size > 0) {
+    const pending = pendingDuplicateObjectiveIds;
+    pendingDuplicateObjectiveIds = new Map();
+    hooks.migrateDuplicateObjectiveProgress(pending);
+  }
 };
 export const getMetadataGameMode = (): GameMode => tarkovHooks.getCurrentGameMode();
 export const repairMetadataCompletedTaskObjectives = (): void =>
@@ -27,4 +31,13 @@ export const repairMetadataCompletedTaskObjectives = (): void =>
 export const repairMetadataFailedTaskStates = (): void => tarkovHooks.repairFailedTaskStates();
 export const migrateMetadataDuplicateObjectiveProgress = (
   duplicateObjectiveIds: Map<string, string[]>
-): void => progressHooks.migrateDuplicateObjectiveProgress(duplicateObjectiveIds);
+): void => {
+  if (progressHooks) {
+    progressHooks.migrateDuplicateObjectiveProgress(duplicateObjectiveIds);
+    return;
+  }
+  duplicateObjectiveIds.forEach((newIds, originalId) => {
+    const pendingIds = pendingDuplicateObjectiveIds.get(originalId) ?? [];
+    pendingDuplicateObjectiveIds.set(originalId, [...new Set([...pendingIds, ...newIds])]);
+  });
+};

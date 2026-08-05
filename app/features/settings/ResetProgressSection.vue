@@ -17,7 +17,7 @@
       block
       @click="showResetSeasonalDialog = true"
     >
-      {{ $t('common.reset_seasonal_data') }}
+      {{ $t('common.reset_seasonal_data', 'Reset Seasonal PvP Data') }}
     </UButton>
     <UButton
       icon="i-mdi-account-group"
@@ -88,7 +88,7 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-alert" class="text-warning-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('common.reset_seasonal_data') }}
+          {{ $t('common.reset_seasonal_data', 'Reset Seasonal PvP Data') }}
         </h3>
       </div>
     </template>
@@ -98,10 +98,20 @@
           icon="i-mdi-alert"
           color="warning"
           variant="subtle"
-          :title="$t('settings.data_management.reset_seasonal_confirmation')"
+          :title="
+            $t(
+              'settings.data_management.reset_seasonal_confirmation',
+              'Are you sure you want to reset your Seasonal PvP progress?'
+            )
+          "
         />
         <p class="text-surface-200 text-sm">
-          {{ $t('settings.data_management.reset_seasonal_warning') }}
+          {{
+            $t(
+              'settings.data_management.reset_seasonal_warning',
+              'This will permanently delete all your Seasonal PvP progress for the active season. Your persistent PvP and PvE data will not be affected.'
+            )
+          }}
         </p>
       </div>
     </template>
@@ -292,10 +302,16 @@
   });
   const resetSeasonalData = createResetHandler({
     resetFn: () => tarkovStore.resetSeasonalData(),
-    successTitle: t('settings.reset_seasonal.success_title'),
-    successDescription: t('settings.reset_seasonal.success_description'),
+    successTitle: t('settings.reset_seasonal.success_title', 'Seasonal PvP Data Reset'),
+    successDescription: t(
+      'settings.reset_seasonal.success_description',
+      'Your active-season progress has been reset successfully.'
+    ),
     errorLogContext: 'Seasonal PvP data',
-    errorDescription: t('settings.reset_seasonal.error_description'),
+    errorDescription: t(
+      'settings.reset_seasonal.error_description',
+      'Failed to reset Seasonal PvP data. Please try again.'
+    ),
     dialogRef: showResetSeasonalDialog,
   });
   const resetAllData = createResetHandler({

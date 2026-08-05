@@ -6,7 +6,7 @@ import { actions, defaultState, getters, type UserState } from '@/stores/progres
 import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
-import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
@@ -70,11 +70,15 @@ interface TeamStoreInstance {
   cleanup: () => void;
 }
 type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
+export type TeammateIdentity = {
+  currentGameMode: GameMode;
+  gameEdition: number;
+};
 export const resolveTeammateIdentity = (
   profile: MemberProfile | undefined,
   fallbackMode: GameMode
-) => {
-  const identity = {
+): TeammateIdentity => {
+  const identity: TeammateIdentity = {
     currentGameMode: fallbackMode,
     gameEdition: defaultState.gameEdition,
   };
@@ -83,6 +87,28 @@ export const resolveTeammateIdentity = (
   identity.gameEdition = profile.gameEdition ?? defaultState.gameEdition;
   return identity;
 };
+export type MemberProfileBroadcast = {
+  userId: string;
+  displayName?: string | null;
+  gameEdition?: number;
+  gameMode?: GameMode;
+  level?: number | null;
+  tasksCompleted?: number | null;
+};
+export const mergeMemberProfileBroadcast = (
+  profiles: Record<string, MemberProfile>,
+  data: MemberProfileBroadcast
+): Record<string, MemberProfile> => ({
+  ...profiles,
+  [data.userId]: {
+    ...profiles[data.userId],
+    displayName: data.displayName ?? null,
+    gameEdition: data.gameEdition ?? profiles[data.userId]?.gameEdition,
+    gameMode: data.gameMode ?? profiles[data.userId]?.gameMode,
+    level: data.level ?? null,
+    tasksCompleted: data.tasksCompleted ?? null,
+  },
+});
 function cloneTaskCompletions(
   taskCompletions: TaskCompletionSnapshot | undefined
 ): TaskCompletionSnapshot {
@@ -277,30 +303,14 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         }
       )
       .on('broadcast', { event: 'progress' }, (payload) => {
-        const data = (payload?.payload || {}) as {
-          userId?: string;
-          displayName?: string | null;
-          gameEdition?: number;
-          gameMode?: GameMode;
-          level?: number | null;
-          tasksCompleted?: number | null;
-        };
+        const data = (payload?.payload || {}) as Partial<MemberProfileBroadcast>;
         if (!data?.userId) return;
         // Update memberProfiles with the broadcasted snapshot
         teamStore.$patch((state) => {
-          state.memberProfiles = {
-            ...teamStore.memberProfiles,
-            [data.userId as string]: {
-              ...teamStore.memberProfiles?.[data.userId as string],
-              displayName: data.displayName ?? null,
-              gameEdition:
-                data.gameEdition ?? teamStore.memberProfiles?.[data.userId as string]?.gameEdition,
-              gameMode:
-                data.gameMode ?? teamStore.memberProfiles?.[data.userId as string]?.gameMode,
-              level: data.level ?? null,
-              tasksCompleted: data.tasksCompleted ?? null,
-            },
-          } as Record<string, MemberProfile>;
+          state.memberProfiles = mergeMemberProfileBroadcast(
+            state.memberProfiles || {},
+            data as MemberProfileBroadcast
+          );
         });
       })
       .on('broadcast', { event: 'task-update' }, (payload) => {
@@ -484,8 +494,8 @@ export function useTeammateStores() {
   const pendingRetryTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   // Watch team state changes to manage teammate stores
   watch(
-    () => teamStore.members,
-    async (members) => {
+    [() => teamStore.members, () => teamStore.memberProfiles],
+    async ([members]) => {
       await nextTick();
       const currentUID = $supabase.user?.id;
       const newTeammatesArray = members?.filter((member: string) => member !== currentUID) || [];
@@ -557,8 +567,8 @@ export function useTeammateStores() {
         Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
       });
       const applyModeProgress = (row: Record<string, unknown>) => {
-        const mode = row.game_mode as GameMode;
-        if (!Object.values(GAME_MODES).includes(mode)) return;
+        const mode = row.game_mode;
+        if (!isGameMode(mode)) return;
         const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
         if (row.season_number !== expectedSeason) return;
         storeInstance.$patch((state) => {
@@ -608,7 +618,7 @@ export function useTeammateStores() {
         if (data.userId !== teammateId) return;
         // Update the teammate store with the task change
         const modeKey = data.gameMode;
-        if (!Object.values(GAME_MODES).includes(modeKey)) return;
+        if (!isGameMode(modeKey)) return;
         const currentModeData = storeInstance.$state[modeKey] || {};
         const currentCompletions =
           (

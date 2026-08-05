@@ -341,7 +341,7 @@ describe('Team Members API', () => {
         expect(warnSpy).toHaveBeenCalledWith(
           '[TeamMembers]',
           'Team edition metadata fetch failed',
-          { status: 503 }
+          { status: 503, teamId: 'team-456' }
         );
       } finally {
         warnSpy.mockRestore();

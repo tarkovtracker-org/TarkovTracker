@@ -55,7 +55,15 @@
                       color="neutral"
                       variant="ghost"
                       size="xs"
-                      :aria-label="t('settings.profile_sharing.copy_link', { mode: option.label })"
+                      :aria-label="
+                        t(
+                          'settings.profile_sharing.copy_link',
+                          {
+                            mode: option.label,
+                          },
+                          'Copy {mode} profile link'
+                        )
+                      "
                       @click="copyShareUrl(option.url)"
                     />
                   </div>
@@ -64,7 +72,15 @@
                   :model-value="visibility[option.mode]"
                   :disabled="saving[option.mode]"
                   :loading="saving[option.mode]"
-                  :aria-label="t('settings.profile_sharing.toggle_label', { mode: option.label })"
+                  :aria-label="
+                    t(
+                      'settings.profile_sharing.toggle_label',
+                      {
+                        mode: option.label,
+                      },
+                      'Toggle {mode} profile sharing'
+                    )
+                  "
                   @update:model-value="setVisibility(option.mode, $event)"
                 />
               </div>
@@ -98,7 +114,13 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import {
+    GAME_MODE_VALUES,
+    GAME_MODE_UI,
+    GAME_MODES,
+    getGameModeSeasonNumber,
+    type GameMode,
+  } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   import {
     createProfileVisibility,
@@ -115,17 +137,14 @@
     const value = typedUser.value?.id;
     return typeof value === 'string' && value.trim().length > 0 ? value : null;
   });
+  const createModeFlags = (): Record<GameMode, boolean> =>
+    Object.fromEntries(GAME_MODE_VALUES.map((mode) => [mode, false])) as Record<GameMode, boolean>;
   const visibility = reactive(createProfileVisibility());
-  const saving = reactive<Record<GameMode, boolean>>({
-    pvp: false,
-    pve: false,
-    seasonal: false,
-  });
-  const visibilitySaveIds: Record<GameMode, number> = {
-    pvp: 0,
-    pve: 0,
-    seasonal: 0,
-  };
+  const saving = reactive(createModeFlags());
+  const visibilitySaveIds = Object.fromEntries(GAME_MODE_VALUES.map((mode) => [mode, 0])) as Record<
+    GameMode,
+    number
+  >;
   const loadError = ref('');
   let visibilityLoadId = 0;
   const buildShareUrl = (mode: GameMode): string => {
@@ -135,19 +154,19 @@
   };
   const sharingOptions = computed(() => [
     {
-      color: 'pvp' as const,
+      color: GAME_MODE_UI[GAME_MODES.PVP].color,
       label: t('common.pvp', 'PvP'),
       mode: GAME_MODES.PVP,
       url: buildShareUrl(GAME_MODES.PVP),
     },
     {
-      color: 'pve' as const,
+      color: GAME_MODE_UI[GAME_MODES.PVE].color,
       label: t('common.pve', 'PvE'),
       mode: GAME_MODES.PVE,
       url: buildShareUrl(GAME_MODES.PVE),
     },
     {
-      color: 'warning' as const,
+      color: GAME_MODE_UI[GAME_MODES.SEASONAL].color,
       label: t('common.seasonal_pvp', 'Seasonal PvP'),
       mode: GAME_MODES.SEASONAL,
       url: buildShareUrl(GAME_MODES.SEASONAL),

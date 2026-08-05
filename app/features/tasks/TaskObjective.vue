@@ -258,9 +258,11 @@
   );
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
   const currentModeBadgeLabel = computed(() => {
-    if (currentGameMode.value === GAME_MODES.PVE) return t('common.pve');
-    if (currentGameMode.value === GAME_MODES.SEASONAL) return t('common.seasonal_pvp');
-    return t('common.pvp');
+    if (currentGameMode.value === GAME_MODES.PVE) return t('common.pve', 'PvE');
+    if (currentGameMode.value === GAME_MODES.SEASONAL) {
+      return t('common.seasonal_pvp', 'Seasonal PvP');
+    }
+    return t('common.pvp', 'PvP');
   });
   const currentModeBadgeClass = computed(() => {
     if (currentGameMode.value === GAME_MODES.PVE) {

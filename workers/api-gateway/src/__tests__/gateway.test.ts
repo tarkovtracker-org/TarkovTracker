@@ -128,6 +128,9 @@ const createBaseFetchMock = ({
     if (url.includes('/rest/v1/rpc/increment_token_usage')) {
       return jsonResponse({ ok: true });
     }
+    if (url.includes('/rest/v1/rpc/get_active_season_number')) {
+      return jsonResponse(1);
+    }
     if (url.includes('/rest/v1/rpc/merge_progress_data')) {
       const payload = JSON.parse(String(init?.body || '{}')) as MergeRpcPayload;
       onMerge?.(payload);

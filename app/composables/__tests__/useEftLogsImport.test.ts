@@ -16,7 +16,7 @@ const tarkovStore = {
   setTaskObjectiveComplete: vi.fn(),
   setTaskObjectiveUncomplete: vi.fn(),
   setTaskUncompleted: vi.fn(),
-  switchGameMode: vi.fn(async () => undefined),
+  switchGameMode: vi.fn(async (_mode: GameMode) => undefined),
 };
 const mockLogger = {
   debug: vi.fn(),
@@ -117,6 +117,7 @@ describe('useEftLogsImport', () => {
     metadataStore.tasks = [{ id: '61604635c725987e815b1a46' }];
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    tarkovStore.switchGameMode.mockImplementation(async () => undefined);
   });
   it('parses a single log file and exposes preview data', async () => {
     const composable = await loadComposable();
@@ -185,6 +186,24 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
     expect(composable.importState.value).toBe('success');
+  });
+  it('restores the original mode when switching into an import mode throws after mutation', async () => {
+    let currentMode: GameMode = 'pvp';
+    tarkovStore.getCurrentGameMode.mockImplementation(() => currentMode);
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      currentMode = mode;
+      if (mode === 'pve') throw new Error('switch persistence failed');
+    });
+    const composable = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log', {
+      type: 'text/plain',
+    });
+    await composable.parseFile(file);
+    await composable.confirmImport('pve');
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(1, 'pve');
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
+    expect(currentMode).toBe('pvp');
+    expect(composable.importState.value).toBe('error');
   });
   it('rejects seasonal imports before mutating task progress', async () => {
     const composable = await loadComposable();

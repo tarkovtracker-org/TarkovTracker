@@ -1,7 +1,10 @@
 export const getUserMetadataString = (
   metadata: Record<string, unknown>,
   key: string
-): string | null => (typeof metadata[key] === 'string' ? metadata[key] : null);
+): string | null => {
+  const value = metadata[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+};
 export const extractUserMetadataUsername = (
   userMetadata: Record<string, unknown>,
   email: string | null,

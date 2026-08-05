@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery, setResponseHeaders } from 'h3';
 import { LRUCache } from 'lru-cache';
 import { createLogger } from '@/server/utils/logger';
+import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import {
   cleanText,
   extractReleaseBullets,
@@ -185,33 +186,9 @@ const setLocalResponseCacheEntry = (key: string, entry: ResponseCacheEntry): voi
   }
   changelogConfig.cache.responseCache.set(key, entry);
 };
-const getSharedCache = (): Cache | null => {
-  const cacheStorage = (
-    globalThis as typeof globalThis & { caches?: CacheStorage & { default?: Cache } }
-  ).caches;
-  return cacheStorage?.default ?? null;
-};
 const getSharedCacheOrigin = (): { host: string; protocol: string } => {
   const runtimeConfig = useRuntimeConfig();
-  const appUrl = runtimeConfig?.public?.appUrl;
-  if (!appUrl) {
-    return { host: 'tarkovtracker.org', protocol: 'https:' };
-  }
-  try {
-    const parsedAppUrl = new URL(appUrl);
-    const hostname = parsedAppUrl.hostname;
-    const isLocalhost =
-      hostname === 'localhost' ||
-      hostname === '0.0.0.0' ||
-      hostname === '::1' ||
-      /^127\./.test(hostname);
-    if (isLocalhost) {
-      return { host: 'tarkovtracker.org', protocol: 'https:' };
-    }
-    return { host: parsedAppUrl.host, protocol: parsedAppUrl.protocol || 'https:' };
-  } catch {
-    return { host: 'tarkovtracker.org', protocol: 'https:' };
-  }
+  return resolveSharedCacheOrigin(runtimeConfig?.public?.appUrl);
 };
 const buildSharedCacheRequest = (key: string): Request => {
   const { host, protocol } = getSharedCacheOrigin();

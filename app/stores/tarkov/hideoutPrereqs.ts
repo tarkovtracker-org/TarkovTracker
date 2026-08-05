@@ -1,5 +1,6 @@
 import { useToastI18n } from '@/composables/useToastI18n';
 import { actions, type UserProgressData, type UserState } from '@/stores/progressState';
+import { coerceGameMode } from '@/stores/tarkov/progressMerge';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { SPECIAL_STATIONS } from '@/utils/constants';
@@ -241,7 +242,7 @@ const uncompleteModules = (
 const resetHideoutPartItems = (store: TarkovStoreInstance, itemIds: Set<string>) => {
   if (!itemIds.size) return;
   store.$patch((state) => {
-    const currentData = state[state.currentGameMode];
+    const currentData = state[coerceGameMode(state.currentGameMode)];
     const hideoutParts =
       currentData.hideoutParts && typeof currentData.hideoutParts === 'object'
         ? currentData.hideoutParts
@@ -282,7 +283,7 @@ const buildProgressEnforcementContext = (
   stations: HideoutStation[],
   options: HideoutEnforcementContext['options']
 ): HideoutEnforcementContext | null => {
-  const currentData = store[store.currentGameMode];
+  const currentData = store[coerceGameMode(store.currentGameMode)];
   const completedModuleIds = collectCompletedModuleIds(currentData);
   if (!completedModuleIds.size) return null;
   const modules = buildHideoutModuleMeta(stations);

@@ -287,6 +287,7 @@ const sanitizeSeasonalBackupMode = (
   json: Record<string, unknown>
 ): SanitizedModeResult | { ok: true; data: null } => {
   if (json._version !== 2) return { ok: true, data: null };
+  if (json.seasonal === undefined || json.seasonal === null) return { ok: true, data: null };
   return sanitizeNamedBackupMode('Seasonal', json.seasonal);
 };
 const sanitizeBackupModes = (
@@ -840,8 +841,7 @@ export function useDataBackup(): UseDataBackupReturn {
         pve: importPve,
         seasonal: importSeasonal,
       };
-      const importAllAvailable =
-        importPvp && importPve && (parsedSeasonal === null || importSeasonal);
+      const importAllAvailable = importPvp && importPve;
       if (!importPvp && !importPve && !importSeasonal) {
         return;
       }

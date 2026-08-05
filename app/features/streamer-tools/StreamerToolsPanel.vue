@@ -68,6 +68,13 @@
             </div>
           </template>
         </UAlert>
+        <UAlert
+          v-if="visibilityError"
+          icon="i-mdi-alert-circle"
+          color="error"
+          variant="soft"
+          :title="visibilityError"
+        />
         <GenericCard
           icon="i-mdi-tune-variant"
           highlight-color="primary"
@@ -858,6 +865,7 @@
   const { t } = useI18n({ useScope: 'global' });
   const { copyToClipboard } = useCopyToClipboard();
   const toast = useToast();
+  const streamerTools = useStreamerToolsOverlay();
   const {
     selectedMode,
     selectedMetric,
@@ -876,6 +884,8 @@
     showPercent,
     showRemaining,
     customLabel,
+  } = streamerTools;
+  const {
     selectedFont,
     showTitle,
     textColor,
@@ -911,6 +921,9 @@
     isNonDefaultFont,
     isLoggedIn,
     isModePublic,
+    visibilityError,
+  } = streamerTools;
+  const {
     overlayUrl,
     apiUrl,
     recommendedWidth,
@@ -919,7 +932,7 @@
     selfContainedPreviewHeight,
     previewHelpText,
     resetSettings,
-  } = useStreamerToolsOverlay();
+  } = streamerTools;
   const modeGroupLabelId = useId();
   const metricGroupLabelId = useId();
   const customAccentColorId = useId();

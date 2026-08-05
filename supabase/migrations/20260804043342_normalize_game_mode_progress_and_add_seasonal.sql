@@ -14,6 +14,19 @@ $$;
 
 REVOKE ALL ON FUNCTION private.active_season_number() FROM PUBLIC;
 
+CREATE OR REPLACE FUNCTION public.get_active_season_number()
+RETURNS SMALLINT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT private.active_season_number();
+$$;
+
+REVOKE ALL ON FUNCTION public.get_active_season_number() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_active_season_number() TO service_role;
+
 ALTER TABLE public.user_progress
   DROP CONSTRAINT IF EXISTS user_progress_current_game_mode_check;
 ALTER TABLE public.user_progress
@@ -80,8 +93,8 @@ AS $$
         AND viewer.game_mode = p_game_mode
         AND teammate.user_id = p_user_id
         AND (
-          p_game_mode <> 'seasonal'
-          OR p_season_number = private.active_season_number()
+          (p_game_mode IN ('pvp', 'pve') AND p_season_number = 0)
+          OR (p_game_mode = 'seasonal' AND p_season_number = private.active_season_number())
         )
     );
 $$;
@@ -280,12 +293,31 @@ BEGIN
     RAISE EXCEPTION 'p_modes must be a JSON object';
   END IF;
 
+  INSERT INTO public.user_progress (
+    user_id,
+    current_game_mode,
+    game_edition,
+    tarkov_uid,
+    pvp_data,
+    pve_data
+  )
+  VALUES (
+    v_user_id,
+    p_current_game_mode,
+    COALESCE(p_game_edition, 1),
+    p_tarkov_uid,
+    public.sanitize_user_progress_mode_data(COALESCE(p_modes->'pvp', '{}'::jsonb)),
+    public.sanitize_user_progress_mode_data(COALESCE(p_modes->'pve', '{}'::jsonb))
+  )
+  ON CONFLICT (user_id) DO NOTHING;
+
   SELECT
     COALESCE(pvp_data, '{}'::jsonb),
     COALESCE(pve_data, '{}'::jsonb)
   INTO v_existing_pvp, v_existing_pve
   FROM public.user_progress
-  WHERE user_id = v_user_id;
+  WHERE user_id = v_user_id
+  FOR UPDATE;
 
   INSERT INTO public.user_progress (
     user_id,
@@ -350,9 +382,105 @@ ALTER TABLE public.team_memberships
   NOT VALID;
 ALTER TABLE public.user_system
   ADD COLUMN IF NOT EXISTS seasonal_team_id UUID
-  REFERENCES public.teams(id) ON DELETE SET NULL;
-CREATE INDEX IF NOT EXISTS idx_user_system_seasonal_team_id
-  ON public.user_system(seasonal_team_id);
+;
+ALTER TABLE public.user_system
+  ADD CONSTRAINT user_system_seasonal_team_id_fkey
+  FOREIGN KEY (seasonal_team_id) REFERENCES public.teams(id) ON DELETE SET NULL
+  NOT VALID;
+
+CREATE OR REPLACE FUNCTION public.join_team(p_team_id UUID, p_join_code TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id UUID := (SELECT auth.uid());
+  v_team public.teams%ROWTYPE;
+  v_member_count INTEGER;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT *
+  INTO v_team
+  FROM public.teams
+  WHERE id = p_team_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Team not found';
+  END IF;
+  IF v_team.join_code <> p_join_code THEN
+    RAISE EXCEPTION 'Invalid team join code';
+  END IF;
+  IF v_team.game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
+    RAISE EXCEPTION 'Team has invalid game mode';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public.team_memberships
+    WHERE user_id = v_user_id
+      AND game_mode = v_team.game_mode
+  ) THEN
+    RAISE EXCEPTION 'You are already a member of a team for this game mode';
+  END IF;
+
+  SELECT count(*)
+  INTO v_member_count
+  FROM public.team_memberships
+  WHERE team_id = v_team.id;
+  IF v_member_count >= v_team.max_members THEN
+    RAISE EXCEPTION 'Team is full';
+  END IF;
+
+  INSERT INTO public.team_memberships (
+    team_id,
+    user_id,
+    role,
+    game_mode,
+    joined_at
+  )
+  VALUES (v_team.id, v_user_id, 'member', v_team.game_mode, now());
+
+  IF v_team.game_mode = 'pvp' THEN
+    INSERT INTO public.user_system (user_id, pvp_team_id, updated_at)
+    VALUES (v_user_id, v_team.id, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET pvp_team_id = EXCLUDED.pvp_team_id, updated_at = EXCLUDED.updated_at;
+  ELSIF v_team.game_mode = 'pve' THEN
+    INSERT INTO public.user_system (user_id, pve_team_id, updated_at)
+    VALUES (v_user_id, v_team.id, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET pve_team_id = EXCLUDED.pve_team_id, updated_at = EXCLUDED.updated_at;
+  ELSE
+    INSERT INTO public.user_system (user_id, seasonal_team_id, updated_at)
+    VALUES (v_user_id, v_team.id, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET seasonal_team_id = EXCLUDED.seasonal_team_id, updated_at = EXCLUDED.updated_at;
+  END IF;
+
+  INSERT INTO public.team_events (
+    team_id,
+    event_type,
+    target_user,
+    initiated_by,
+    event_data,
+    created_at
+  )
+  VALUES (
+    v_team.id,
+    'member_joined',
+    v_user_id,
+    v_user_id,
+    jsonb_build_object('team_name', v_team.name),
+    now()
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.sync_user_system_team_memberships()
 RETURNS trigger
@@ -490,7 +618,6 @@ ALTER TABLE public.api_tokens
   ADD CONSTRAINT api_tokens_token_value_game_mode_match
   CHECK (
     token_value IS NULL
-    OR left(token_value, 3) = 'tt_'
     OR token_value LIKE upper(game_mode) || '\_%' ESCAPE '\'
   )
   NOT VALID;

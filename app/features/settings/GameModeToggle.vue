@@ -37,7 +37,7 @@
     { icon: 'i-mdi-account-group', label: t('common.pve'), value: GAME_MODES.PVE },
     {
       icon: 'i-mdi-calendar-star',
-      label: t('common.seasonal_pvp'),
+      label: t('common.seasonal_pvp', 'Seasonal PvP'),
       value: GAME_MODES.SEASONAL,
     },
   ]);

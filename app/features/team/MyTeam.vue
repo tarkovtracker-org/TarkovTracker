@@ -178,19 +178,22 @@
     if (!data?.team_id) return false;
     setLocalTeamId(mode, data.team_id);
     showNotification(
-      `You are already in a ${mode.toUpperCase()} team. Leave your current team first.`,
+      t('page.team.card.myteam.already_in_team', { mode: mode.toUpperCase() }),
       'error'
     );
     return true;
   };
   const applyCreatedTeam = (
-    result: CreateTeamResponse,
+    team: NonNullable<CreateTeamResponse['team']>,
     generatedJoinCode: string,
     mode: GameMode
   ) => {
-    if (!result.team) throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
-    const team = result.team as typeof result.team & { join_code?: string; joinCode?: string };
-    const joinCode = team.joinCode ?? team.join_code ?? generatedJoinCode;
+    const teamWithLegacyJoinCode = team as typeof team & {
+      join_code?: string;
+      joinCode?: string;
+    };
+    const joinCode =
+      teamWithLegacyJoinCode.joinCode ?? teamWithLegacyJoinCode.join_code ?? generatedJoinCode;
     setLocalTeamId(mode, team.id);
     teamStore.$patch({
       joinCode,
@@ -255,7 +258,7 @@
       currentGameMode
     )) as CreateTeamResponse;
     const team = requireCreatedTeam(result);
-    applyCreatedTeam(result, generatedJoinCode, currentGameMode);
+    applyCreatedTeam(team, generatedJoinCode, currentGameMode);
     await verifyCreatedMembership(team.id, currentGameMode);
     await ensureOwnerDisplayName(team.ownerId);
     showNotification(t('page.team.card.myteam.create_team_success'));
@@ -358,10 +361,13 @@
     if (teamUrl.value) {
       try {
         await navigator.clipboard.writeText(teamUrl.value);
-        showNotification('URL copied to clipboard');
+        showNotification(t('page.team.card.myteam.url_copied', 'URL copied to clipboard'));
       } catch (error) {
         logger.error('[MyTeam] Failed to copy URL to clipboard:', error);
-        showNotification('Failed to copy URL to clipboard', 'error');
+        showNotification(
+          t('page.team.card.myteam.copy_url_failed', 'Failed to copy URL to clipboard'),
+          'error'
+        );
       }
     }
   };

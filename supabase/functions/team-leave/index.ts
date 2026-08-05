@@ -29,7 +29,10 @@ Deno.serve(async (req) => {
       console.error('Team lookup failed:', teamError);
       return createErrorResponse('Team not found', 404, req);
     }
-    const game_mode: TeamGameMode = isTeamGameMode(team.game_mode) ? team.game_mode : 'pvp';
+    if (!isTeamGameMode(team.game_mode)) {
+      return createErrorResponse('Team has invalid game mode', 400, req);
+    }
+    const game_mode: TeamGameMode = team.game_mode;
     const teamIdColumn = teamIdColumnForMode(game_mode);
     // Get user's membership in the team
     const { data: membership, error: membershipError } = await supabase
@@ -69,7 +72,7 @@ Deno.serve(async (req) => {
       });
       if (systemError) {
         console.error('user_system upsert failed:', systemError);
-        if (systemError.code !== '42P01') {
+        if (systemError.code !== '42P01' && systemError.code !== '42703') {
           return createErrorResponse('Failed to update user system state', 500, req);
         }
         console.warn('user_system table missing, continuing without system state update');
@@ -104,11 +107,19 @@ Deno.serve(async (req) => {
     ).toISOString();
     const { data: recentLeaves, error: cooldownError } = await supabase
       .from('team_events')
-      .select('created_at')
+      .select('created_at, teams!inner(game_mode)')
       .eq('event_type', 'member_left')
       .eq('target_user', user.id)
+      .eq('teams.game_mode', game_mode)
       .gte('created_at', cooldownTimestamp)
       .limit(1);
+    if (cooldownError) {
+      console.error('Leave cooldown check failed:', cooldownError, {
+        teamId,
+        userId: user.id,
+        gameMode: game_mode,
+      });
+    }
     if (!cooldownError && recentLeaves && recentLeaves.length > 0) {
       const timeRemaining = Math.ceil(
         (new Date(recentLeaves[0].created_at).getTime() +
@@ -157,7 +168,7 @@ Deno.serve(async (req) => {
     });
     if (systemError) {
       console.error('user_system upsert failed:', systemError);
-      if (systemError.code !== '42P01') {
+      if (systemError.code !== '42P01' && systemError.code !== '42703') {
         return createErrorResponse('Failed to update user system state', 500, req);
       }
       console.warn('user_system table missing, continuing without system state update');

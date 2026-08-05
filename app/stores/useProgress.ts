@@ -573,13 +573,22 @@ export const useProgressStore = defineStore('progress', () => {
     Object.values(teamStores.value).forEach((store) => {
       const pvpObjectives = store?.$state?.pvp?.taskObjectives;
       const pveObjectives = store?.$state?.pve?.taskObjectives;
+      const seasonalObjectives = store?.$state?.seasonal?.taskObjectives;
       const nextPvpObjectives = migrateObjectiveMap(pvpObjectives);
       const nextPveObjectives = migrateObjectiveMap(pveObjectives);
+      const nextSeasonalObjectives = migrateObjectiveMap(seasonalObjectives);
       if (pvpObjectives && nextPvpObjectives && nextPvpObjectives !== pvpObjectives) {
         store.$state.pvp.taskObjectives = nextPvpObjectives;
       }
       if (pveObjectives && nextPveObjectives && nextPveObjectives !== pveObjectives) {
         store.$state.pve.taskObjectives = nextPveObjectives;
+      }
+      if (
+        seasonalObjectives &&
+        nextSeasonalObjectives &&
+        nextSeasonalObjectives !== seasonalObjectives
+      ) {
+        store.$state.seasonal.taskObjectives = nextSeasonalObjectives;
       }
     });
   };

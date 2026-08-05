@@ -72,8 +72,8 @@ export function hydrateUserFromSession(user: HydratableUser, sessionUser: User |
   let username: string | null;
   let displayName: string | null;
   try {
-    username = extractUserMetadataUsername(userMetadata, user.email, provider);
-    displayName = extractUserMetadataDisplayName(userMetadata, provider, username);
+    username = extractUserMetadataUsername(userMetadata, user.email, provider) || null;
+    displayName = extractUserMetadataDisplayName(userMetadata, provider, username) || null;
   } catch {
     username = null;
     displayName = null;

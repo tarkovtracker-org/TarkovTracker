@@ -290,13 +290,7 @@
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
-  import {
-    API_PERMISSIONS,
-    GAME_MODE_OPTIONS,
-    GAME_MODES,
-    getGameModeLabel,
-    type GameMode,
-  } from '@/utils/constants';
+  import { API_PERMISSIONS, GAME_MODE_OPTIONS, GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
   import type { RawTokenRow, TokenPermission, TokenRow } from '@/types/api';
@@ -352,7 +346,14 @@
   );
   const gameModes = computed(() =>
     GAME_MODE_OPTIONS.map((mode) => ({
-      label: mode.label,
+      label: t(
+        mode.labelKey,
+        mode.value === GAME_MODES.SEASONAL
+          ? 'Seasonal PvP'
+          : mode.value === GAME_MODES.PVE
+            ? 'PvE'
+            : 'PvP'
+      ),
       value: mode.value as GameMode,
     }))
   );
@@ -380,7 +381,13 @@
     return t('page.settings.card.apitokens.list.last_used_tooltip', { value });
   };
   const formatGameMode = (mode: GameMode) => {
-    return getGameModeLabel(mode);
+    const option = GAME_MODE_OPTIONS.find((entry) => entry.value === mode);
+    return option
+      ? t(
+          option.labelKey,
+          mode === GAME_MODES.SEASONAL ? 'Seasonal PvP' : mode === GAME_MODES.PVE ? 'PvE' : 'PvP'
+        )
+      : t('common.pvp', 'PvP');
   };
   const permissionLabel = (value: TokenPermission) => {
     return permissionOptions.value.find((perm) => perm.value === value)?.label || value;

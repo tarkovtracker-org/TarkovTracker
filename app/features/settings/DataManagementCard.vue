@@ -314,9 +314,11 @@
               />
               <p class="text-warning-300 text-xs">
                 {{
-                  $t('settings.data_management.seasonal_import_locked', {
-                    season: ACTIVE_SEASON_NUMBER,
-                  })
+                  $t(
+                    'settings.data_management.seasonal_import_locked',
+                    { season: ACTIVE_SEASON_NUMBER },
+                    'Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.'
+                  )
                 }}
               </p>
             </div>
@@ -862,7 +864,7 @@
                   :disabled="!backupPreview.seasonal"
                   @click="importTarget = GAME_MODES.SEASONAL"
                 >
-                  {{ $t('common.seasonal_pvp') }}
+                  {{ $t('common.seasonal_pvp', 'Seasonal PvP') }}
                 </UButton>
                 <UButton
                   :variant="importTarget === 'all' ? 'solid' : 'soft'"
@@ -871,7 +873,7 @@
                   block
                   @click="importTarget = 'all'"
                 >
-                  {{ $t('settings.data_management.import_target_all') }}
+                  {{ $t('settings.data_management.import_target_all', 'All Available') }}
                 </UButton>
               </div>
             </div>
@@ -1050,20 +1052,43 @@
     await parseBackupFile(file);
     input.value = '';
   }
-  const backupTargetIncludes = (mode: GameMode): boolean =>
-    importTarget.value === mode || importTarget.value === 'all';
-  async function handleBackupConfirm() {
-    const selection = {
-      pvp: backupTargetIncludes(GAME_MODES.PVP),
-      pve: backupTargetIncludes(GAME_MODES.PVE),
-      seasonal: backupPreview.value?.seasonal !== null && backupTargetIncludes(GAME_MODES.SEASONAL),
+  const buildBackupImportSelection = (
+    target: GameMode | 'all',
+    hasSeasonalData: boolean
+  ): BackupImportTargetModes => {
+    const targetIncludes = (mode: GameMode): boolean => target === 'all' || target === mode;
+    return {
+      pvp: targetIncludes(GAME_MODES.PVP),
+      pve: targetIncludes(GAME_MODES.PVE),
+      seasonal: hasSeasonalData && targetIncludes(GAME_MODES.SEASONAL),
     };
-    await confirmBackupImport(selection);
-    if (backupImportState.value === 'success') {
+  };
+  async function handleBackupConfirm() {
+    const selection = buildBackupImportSelection(
+      importTarget.value,
+      backupPreview.value?.seasonal !== null
+    );
+    try {
+      await confirmBackupImport(selection);
+      if (backupImportState.value === 'success') {
+        toast.add({
+          title: t('settings.data_management.import_success_title', 'Backup Imported'),
+          description: t(
+            'settings.data_management.import_success_description',
+            'Your progress data has been restored successfully.'
+          ),
+          color: 'success',
+        });
+      }
+    } catch (error) {
+      logger.error('[DataManagementCard] Backup import failed:', error);
       toast.add({
-        title: t('settings.data_management.import_success_title'),
-        description: t('settings.data_management.import_success_description'),
-        color: 'success',
+        title: t('settings.data_management.import_error_title', 'Backup Import Failed'),
+        description: t(
+          'settings.data_management.import_error_description',
+          'Your backup could not be imported. Please try again.'
+        ),
+        color: 'error',
       });
     }
   }

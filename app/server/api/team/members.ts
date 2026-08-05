@@ -1,4 +1,5 @@
 import { createError, defineEventHandler, getQuery, getRequestHeader, setResponseHeader } from 'h3';
+import { fetchWithTimeout } from '@/server/utils/fetchWithTimeout';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
@@ -163,31 +164,6 @@ const setCachedTeamMembers = async (
       });
     }
   );
-};
-const fetchWithTimeout = async (
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<Response> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (
-      (error instanceof Error && error.name === 'AbortError') ||
-      (typeof error === 'object' &&
-        error !== null &&
-        'name' in error &&
-        (error as { name?: unknown }).name === 'AbortError')
-    ) {
-      throw createError({ statusCode: 504, statusMessage: timeoutMessage });
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
 };
 export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0');
@@ -381,11 +357,15 @@ export default defineEventHandler(async (event) => {
       if (editionsResp?.ok) {
         editions = (await editionsResp.json()) as EditionRow[];
       } else {
-        logger.warn('Team edition metadata fetch failed', { status: editionsResp?.status });
+        logger.warn('Team edition metadata fetch failed', {
+          status: editionsResp?.status,
+          teamId,
+        });
       }
     } catch (error) {
       logger.warn('Team edition metadata fetch failed', {
         error: error instanceof Error ? error.message : String(error),
+        teamId,
       });
     }
     const editionsByUserId = new Map(editions.map((row) => [row.user_id, row.game_edition]));

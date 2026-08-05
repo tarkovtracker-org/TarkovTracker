@@ -5,7 +5,7 @@ Deno.test('maps every supported game mode to its user_system team column', () =>
   assertEquals(teamIdColumnForMode('pve'), 'pve_team_id');
   assertEquals(teamIdColumnForMode('seasonal'), 'seasonal_team_id');
 });
-Deno.test('rejects unsupported team game modes', () => {
+Deno.test('identifies supported game modes and rejects unsupported ones', () => {
   assertEquals(isTeamGameMode('seasonal'), true);
   assertEquals(isTeamGameMode('arena'), false);
   assertEquals(isTeamGameMode(null), false);

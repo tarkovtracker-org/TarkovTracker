@@ -144,6 +144,12 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Setup Deno
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
+        with:
+          deno-version: v2.0.3
+      - name: Run Deno tests
+        run: deno test supabase/functions/_shared/team-mode.deno.test.ts
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         run: pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/${{ matrix.total }}
       - name: Upload coverage to Codecov

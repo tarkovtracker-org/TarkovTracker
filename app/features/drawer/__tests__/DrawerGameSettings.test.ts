@@ -1,7 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
-import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
 import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
 import { GAME_MODES } from '@/utils/constants';
 const switchGameModeMock = vi.fn(async () => undefined);
@@ -38,15 +37,14 @@ describe('DrawerGameSettings', () => {
       global: {
         stubs: {
           UIcon: true,
-          USelectMenu: {
-            props: ['items'],
+          SelectMenuFixed: {
             template:
-              '<button @click="$emit(\'update:modelValue\', items[1].value)">select</button>',
+              '<button data-testid="mode-select" @click="$emit(\'update:modelValue\', \'pve\')">select</button>',
           },
         },
       },
     });
-    await wrapper.findComponent(SelectMenuFixed).find('button').trigger('click');
+    await wrapper.get('[data-testid="mode-select"]').trigger('click');
     await vi.waitFor(() => expect(switchGameModeMock).toHaveBeenCalled());
     expect(switchGameModeMock).toHaveBeenCalledWith(GAME_MODES.PVE);
     expect(fetchAllDataMock).toHaveBeenCalled();

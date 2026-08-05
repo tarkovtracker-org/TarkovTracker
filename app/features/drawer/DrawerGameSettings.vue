@@ -6,7 +6,7 @@
       value-key="value"
       label-key="label"
       :disabled="dataLoading"
-      :aria-label="t('game_settings.select_game_mode_label')"
+      :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
       class="w-full"
       :ui="{ base: 'min-h-9 w-full' }"
       @update:model-value="switchMode($event as GameMode)"
@@ -64,11 +64,11 @@
   }
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
   const modeOptions = computed(() => [
-    { icon: 'i-mdi-sword-cross', label: t('common.pvp'), value: GAME_MODES.PVP },
-    { icon: 'i-mdi-account-group', label: t('common.pve'), value: GAME_MODES.PVE },
+    { icon: 'i-mdi-sword-cross', label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
+    { icon: 'i-mdi-account-group', label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
     {
       icon: 'i-mdi-calendar-star',
-      label: t('common.seasonal_pvp'),
+      label: t('common.seasonal_pvp', 'Seasonal PvP'),
       value: GAME_MODES.SEASONAL,
     },
   ]);
@@ -76,7 +76,7 @@
     () =>
       modeOptions.value.find((option) => option.value === currentGameMode.value) ?? {
         icon: 'i-mdi-sword-cross',
-        label: t('common.pvp'),
+        label: t('common.pvp', 'PvP'),
         value: GAME_MODES.PVP,
       }
   );

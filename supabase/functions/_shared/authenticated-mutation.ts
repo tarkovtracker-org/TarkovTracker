@@ -27,8 +27,18 @@ export const rejectMutationStep = <T>(response: Response): MutationStep<T> => ({
 });
 const getEarlyMutationResponse = (req: Request): Response | null =>
   handleCorsPreflight(req) ?? validateMethod(req, ['POST']);
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  Object.prototype.toString.call(value) === '[object Object]';
+const readJsonObject = async (req: Request): Promise<Record<string, unknown>> => {
+  try {
+    const parsed = await req.json();
+    return isObjectRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
 export const readJoinCodeBody = async (req: Request) => {
-  const body = (await req.json()) as Record<string, unknown>;
+  const body = await readJsonObject(req);
   const joinCode = typeof body.join_code === 'string' ? body.join_code : body.password;
   return { body, joinCode: typeof joinCode === 'string' ? joinCode : undefined };
 };

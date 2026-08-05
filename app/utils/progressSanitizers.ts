@@ -1,4 +1,4 @@
-import { GAME_MODES, MAX_SKILL_LEVEL, type GameMode } from '@/utils/constants';
+import { GAME_MODE_VALUES, GAME_MODES, MAX_SKILL_LEVEL, type GameMode } from '@/utils/constants';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserState } from '@/stores/progressState';
 type UserProgressData = UserState['pvp'];
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -239,9 +239,7 @@ export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] => {
     .slice(0, API_UPDATE_HISTORY_LIMIT);
 };
 const sanitizeGameMode = (value: unknown): GameMode => {
-  return Object.values(GAME_MODES).includes(value as GameMode)
-    ? (value as GameMode)
-    : GAME_MODES.PVP;
+  return GAME_MODE_VALUES.includes(value as GameMode) ? (value as GameMode) : GAME_MODES.PVP;
 };
 export const sanitizeGameEdition = (value: unknown): number => {
   const edition =

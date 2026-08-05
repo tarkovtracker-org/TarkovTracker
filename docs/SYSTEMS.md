@@ -541,14 +541,18 @@ flowchart LR
 
 1. Startup reads account metadata and legacy PvP/PvE from `user_progress`, then reads normalized
    rows and prefers the normalized active row for each mode.
-2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, updates
-   account metadata, mirrors persistent PvP/PvE for older clients, and upserts each normalized row.
+2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, serializes
+   concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
+   clients, and upserts each normalized row. API gateway reads resolve the active Seasonal number
+   through the database before selecting a row.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
    routes select the exact mode and season; teammates receive same-mode progress through RLS.
-5. Team identity comes from `team_memberships` for all modes. `user_system` keeps only legacy
-   persistent PvP/PvE team columns; Seasonal team membership is hydrated from memberships.
+5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
+   that locks the team while checking capacity and persists membership, user-system state, and the
+   audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
+   Seasonal team column.
 6. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
 7. Prestige archives include mode and season. Seasonal prestige accepts only the active season;
@@ -572,8 +576,9 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
-- App and Worker `ACTIVE_SEASON_NUMBER` values must match
-  `private.active_season_number()` in the database.
+- App `ACTIVE_SEASON_NUMBER` must match `private.active_season_number()` in the database;
+  the Worker resolves the active Seasonal number through the database instead of carrying a
+  second runtime constant.
 - Historical Seasonal rows are retained but never merged into the active season.
 - Authenticated users can write only their own progress. Teammate reads require a shared team in
   the same game mode; cross-mode teammates and outsiders cannot read a row.

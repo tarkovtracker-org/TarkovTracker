@@ -13,6 +13,7 @@ import {
   type OverlayResolution,
   type OverlaySize,
 } from '@/features/streamer-tools/composables/useStreamerToolsSettings';
+import { logger } from '@/utils/logger';
 import {
   createProfileVisibility,
   isCurrentProfileVisibilityRequest,
@@ -225,10 +226,12 @@ export function useStreamerToolsOverlay() {
       : null
   );
   const modeVisibility = reactive(createProfileVisibility());
+  const visibilityError = ref('');
   let modeVisibilityLoadId = 0;
   const loadModeVisibility = async () => {
     const requestId = ++modeVisibilityLoadId;
     Object.assign(modeVisibility, createProfileVisibility());
+    visibilityError.value = '';
     const userId = currentUserId.value;
     if (!userId) return;
     const result = await loadCurrentProfileVisibility(
@@ -247,11 +250,16 @@ export function useStreamerToolsOverlay() {
     );
     if (!result.current) return;
     if (!result.error) Object.assign(modeVisibility, result.visibility);
-    else
-      logger.warn('[StreamerToolsOverlay] Failed to load profile visibility:', {
+    else {
+      visibilityError.value = t(
+        'streamer_tools.visibility_load_failed',
+        'Unable to load sharing settings.'
+      );
+      logger.error('[StreamerToolsOverlay] Failed to load profile visibility:', {
         error: result.error,
         userId,
       });
+    }
   };
   const isModePublic = computed(() => modeVisibility[selectedMode.value] === true);
   watch(currentUserId, () => void loadModeVisibility(), { immediate: true });
@@ -534,6 +542,7 @@ export function useStreamerToolsOverlay() {
     isNonDefaultFont,
     isLoggedIn,
     isModePublic,
+    visibilityError,
     overlayUrl,
     apiUrl,
     recommendedWidth,

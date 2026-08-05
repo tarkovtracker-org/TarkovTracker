@@ -433,10 +433,10 @@
     }
     const modeLabel =
       profileRouteMode.value === GAME_MODES.PVE
-        ? t('common.pve')
+        ? t('common.pve', 'PVE')
         : profileRouteMode.value === GAME_MODES.SEASONAL
-          ? t('common.seasonal_pvp')
-          : t('common.pvp');
+          ? t('common.seasonal_pvp', 'SEASONAL PVP')
+          : t('common.pvp', 'PVP');
     const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
     const routeUserId = normalizeRouteParam(routeParams.userId);
     const currentUserId = normalizeRouteParam($supabase.user?.id ?? null);

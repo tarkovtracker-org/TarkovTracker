@@ -2,6 +2,7 @@ import { defaultState, type UserProgressData } from '@/stores/progressState';
 import { getNextProgressEpoch } from '@/stores/tarkov/progressMerge';
 import { GAME_MODES, SPECIAL_STATIONS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
 import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
@@ -18,8 +19,6 @@ import type {
 } from '@/types/tarkov';
 const MAX_PRESTIGE_LEVEL = 6;
 const PRESTIGE_PLAYER_LEVEL_REQUIREMENT = 47;
-const NEW_BEGINNING_ID_PATTERN = /^new_beginning_prestige_(\d+)$/i;
-const NEW_BEGINNING_WIKI_PATTERN = /\/New_Beginning(?:_\(Prestige_(\d+)\))?(?:[?#].*)?$/i;
 const PRESTIGE_STORY_CHAPTER_RULES: Record<number, string[]> = {
   1: ['Tour'],
   2: ['Tour', 'Falling Skies'],
@@ -67,7 +66,7 @@ export type PrestigeRunRecord = {
 export type UserPrestigeRunRow = {
   created_at?: string | null;
   id?: string | null;
-  mode?: GameMode | null;
+  mode?: string | null;
   season_number?: number | null;
   prestige_from?: number | null;
   prestige_to?: number | null;
@@ -96,7 +95,7 @@ type BuildPrestigeRequirementRowsOptions = {
   edition?: Pick<GameEdition, 'defaultCultistCircleLevel' | 'defaultStashLevel'>;
   hideoutStations: HideoutStation[];
   prestigeLevels: PrestigeLevel[];
-  pvpProgress: UserProgressData;
+  modeProgress: UserProgressData;
   storyChapters: StoryChapter[];
   tasks: Task[];
 };
@@ -109,24 +108,10 @@ type PrestigeRequirementSummary = {
 };
 const isNewBeginningTask = (task: Pick<Task, 'id' | 'name' | 'wikiLink'>): boolean => {
   if (!task?.id) return false;
-  if (NEW_BEGINNING_ID_PATTERN.test(task.id)) return true;
-  if (typeof task.wikiLink === 'string' && NEW_BEGINNING_WIKI_PATTERN.test(task.wikiLink)) {
+  if (inferNewBeginningPrestigeLevel(task) !== null) {
     return true;
   }
   return task.name === 'New Beginning';
-};
-const inferNewBeginningPrestigeLevel = (task: Pick<Task, 'id' | 'wikiLink'>): number | null => {
-  if (typeof task.wikiLink === 'string') {
-    const wikiMatch = task.wikiLink.match(NEW_BEGINNING_WIKI_PATTERN);
-    if (wikiMatch?.[1]) {
-      const parsed = Number.parseInt(wikiMatch[1], 10);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
-    }
-  }
-  const idMatch = task.id.match(NEW_BEGINNING_ID_PATTERN);
-  if (!idMatch?.[1]) return null;
-  const parsed = Number.parseInt(idMatch[1], 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 const isTaskSuccessful = (modeData: UserProgressData, taskId: string): boolean => {
   const flags = getCompletionFlags(modeData.taskCompletions?.[taskId]);
@@ -359,13 +344,13 @@ export const buildPrestigeRequirementRows = (
   const prestige = options.prestigeLevels.find(
     (entry) => entry.prestigeLevel === targetPrestigeLevel
   );
-  const skillLevels = buildModeSkillLevels(options.pvpProgress, options.tasks);
+  const skillLevels = buildModeSkillLevels(options.modeProgress, options.tasks);
   const stationLevels = buildHideoutStationLevels(
     options.hideoutStations,
-    options.pvpProgress.hideoutModules,
+    options.modeProgress.hideoutModules,
     options.edition
   );
-  const currentPlayerLevel = options.pvpProgress.level ?? 1;
+  const currentPlayerLevel = options.modeProgress.level ?? 1;
   const rows: PrestigeRequirementRow[] = [];
   const rowIds = new Set<string>();
   let hasNewBeginningRequirement = false;
@@ -419,7 +404,7 @@ export const buildPrestigeRequirementRows = (
         hasNewBeginningRequirement = true;
       }
       pushRow({
-        currentValue: isTaskSuccessful(options.pvpProgress, condition.task.id)
+        currentValue: isTaskSuccessful(options.modeProgress, condition.task.id)
           ? 'complete'
           : 'incomplete',
         href: condition.task.wikiLink,
@@ -427,7 +412,7 @@ export const buildPrestigeRequirementRows = (
         kind: 'task',
         name: taskName,
         source: 'tarkov.dev',
-        status: isTaskSuccessful(options.pvpProgress, condition.task.id) ? 'met' : 'unmet',
+        status: isTaskSuccessful(options.modeProgress, condition.task.id) ? 'met' : 'unmet',
         targetPrestige: targetPrestigeLevel,
         taskRole,
         tracked: true,
@@ -509,7 +494,7 @@ export const buildPrestigeRequirementRows = (
     const newBeginningTask = findNewBeginningTaskForPrestige(options.tasks, targetPrestigeLevel);
     if (newBeginningTask) {
       pushRow({
-        currentValue: isTaskSuccessful(options.pvpProgress, newBeginningTask.id)
+        currentValue: isTaskSuccessful(options.modeProgress, newBeginningTask.id)
           ? 'complete'
           : 'incomplete',
         href: newBeginningTask.wikiLink,
@@ -517,7 +502,7 @@ export const buildPrestigeRequirementRows = (
         kind: 'task',
         name: newBeginningTask.name || 'New Beginning',
         source: 'overlay',
-        status: isTaskSuccessful(options.pvpProgress, newBeginningTask.id) ? 'met' : 'unmet',
+        status: isTaskSuccessful(options.modeProgress, newBeginningTask.id) ? 'met' : 'unmet',
         targetPrestige: targetPrestigeLevel,
         taskRole: 'newBeginning',
         tracked: true,
@@ -528,7 +513,7 @@ export const buildPrestigeRequirementRows = (
     const storyChapter = findStoryChapterByName(options.storyChapters, chapterName);
     const chapterId = storyChapter?.id || chapterName.toLowerCase().replace(/\s+/g, '-');
     const isComplete = storyChapter
-      ? options.pvpProgress.storyChapters?.[storyChapter.id]?.complete === true
+      ? options.modeProgress.storyChapters?.[storyChapter.id]?.complete === true
       : false;
     pushRow({
       currentValue: isComplete ? 'complete' : 'incomplete',
@@ -623,10 +608,7 @@ export const parsePrestigeRunRows = (
       createdAt,
       id: row.id,
       mode,
-      seasonNumber:
-        typeof row.season_number === 'number' && Number.isInteger(row.season_number)
-          ? row.season_number
-          : 0,
+      seasonNumber: Math.max(0, toSafeInteger(row.season_number, 0)),
       prestigeFrom,
       prestigeTo,
       summary: parsePrestigeSummary(row.summary),

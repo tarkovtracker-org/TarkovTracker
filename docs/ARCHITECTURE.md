@@ -167,8 +167,9 @@ Manages isolated progress for persistent PvP, persistent PvE, and numbered Seaso
   when it is importable. Seasonal is visible but locked until its profile route, parser, and field
   compatibility are verified for the active season.
 - The import UI accepts a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetches
-  `players.tarkov.dev/profile/{uid}.json` through the public `/api/tarkov-dev/profile` proxy, and
-  parses that JSON with the existing Tarkov.dev profile parser.
+  `players.tarkov.dev/profile/{uid}.json` for PvP or `players.tarkov.dev/pve/{uid}.json` for PvE
+  through the public `/api/tarkov-dev/profile` proxy, and parses that JSON with the existing
+  Tarkov.dev profile parser.
 - The import preview keeps parsed skill values collapsed by default, but exposes the exact
   skill-id and level pairs that will be applied.
 - Tarkov.dev only refreshes that public JSON after the user opens their profile page on tarkov.dev,

@@ -2,7 +2,12 @@ import { useSkillCalculation } from '@/composables/useSkillCalculation';
 import { useXpCalculation } from '@/composables/useXpCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { isImportableGameMode, type ImportableGameMode } from '@/utils/constants';
+import {
+  GAME_MODES,
+  getGameModeSeasonNumber,
+  isImportableGameMode,
+  type ImportableGameMode,
+} from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   getImportCooldownRemainingMs,
@@ -229,7 +234,17 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   ): Promise<void> {
     if (!previewData.value) return;
     if (!isImportableGameMode(targetMode)) {
-      setCodedError(t('settings.data_management.seasonal_import_locked'), null, null);
+      setCodedError(
+        t(
+          'settings.data_management.seasonal_import_locked',
+          {
+            season: getGameModeSeasonNumber(GAME_MODES.SEASONAL),
+          },
+          'Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.'
+        ),
+        null,
+        null
+      );
       return;
     }
     const data = previewData.value;

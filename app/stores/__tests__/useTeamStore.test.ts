@@ -1,6 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveTeammateIdentity, useTeamStore } from '@/stores/useTeamStore';
+import {
+  mergeMemberProfileBroadcast,
+  resolveTeammateIdentity,
+  useTeamStore,
+} from '@/stores/useTeamStore';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
 type TeamPatch = Omit<Partial<TeamState>, 'members'> & {
   join_code?: string | null;
@@ -508,15 +512,10 @@ describe('useTeamStore', () => {
         tasksCompleted: 10,
       };
       store.$patch((state) => {
-        state.memberProfiles = {
-          ...state.memberProfiles,
-          [broadcastData.userId]: {
-            ...state.memberProfiles?.[broadcastData.userId],
-            displayName: broadcastData.displayName ?? null,
-            level: broadcastData.level ?? null,
-            tasksCompleted: broadcastData.tasksCompleted ?? null,
-          },
-        } as Record<string, MemberProfile>;
+        state.memberProfiles = mergeMemberProfileBroadcast(
+          state.memberProfiles || {},
+          broadcastData
+        );
       });
       expect(store.memberProfiles?.['user-1']?.level).toBe(15);
       expect(store.memberProfiles?.['user-1']?.tasksCompleted).toBe(10);
