@@ -32,6 +32,7 @@ import {
 import {
   markProgressMetadataHydrated,
   registerTarkovMetadataHooks,
+  resetProgressMetadataHydration,
 } from '@/stores/tarkov/metadataStoreBridge';
 import {
   buildPrestigeResetData,
@@ -1153,6 +1154,7 @@ export function resetTarkovStoreForSessionTransition(
 ) {
   const preservedState = getPreservedProgressStorageValue(previousUserId);
   const currentUserId = getCurrentSupabaseUserId();
+  resetProgressMetadataHydration();
   resetTarkovSync(reason, {
     preservePersistedStateForUserId: previousUserId,
   });

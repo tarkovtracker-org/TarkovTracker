@@ -465,8 +465,6 @@ REVOKE ALL ON FUNCTION public.create_team_with_owner(TEXT, TEXT, INTEGER, UUID, 
 GRANT EXECUTE ON FUNCTION public.create_team_with_owner(TEXT, TEXT, INTEGER, UUID, TEXT)
   TO service_role;
 
-DROP FUNCTION IF EXISTS public.join_team(UUID, TEXT);
-
 CREATE OR REPLACE FUNCTION public.join_team(
   p_team_id UUID,
   p_join_code TEXT,
@@ -563,6 +561,23 @@ $$;
 
 REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT, UUID) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT, UUID) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.join_team(
+  p_team_id UUID,
+  p_join_code TEXT
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM public.join_team(p_team_id, p_join_code, (SELECT auth.uid()));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.join_team(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.join_team(UUID, TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.sync_user_system_team_memberships()
 RETURNS trigger

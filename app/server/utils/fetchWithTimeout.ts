@@ -2,6 +2,10 @@ import { createError } from 'h3';
 export const isAbortError = (error: unknown): boolean => {
   return (Object(error) as { name?: unknown }).name === 'AbortError';
 };
+const isNoBodyStatus = (status: number): boolean =>
+  status === 204 || status === 205 || status === 304;
+const readResponseBody = async (response: Response): Promise<ArrayBuffer | null> =>
+  isNoBodyStatus(response.status) ? null : response.arrayBuffer();
 const normalizeFetchError = (
   error: unknown,
   timeoutController: AbortController,
@@ -25,7 +29,7 @@ export const fetchWithTimeout = async (
   try {
     const response = await fetch(url, { ...init, signal });
     if (typeof response.arrayBuffer !== 'function') return response;
-    const body = await response.arrayBuffer();
+    const body = await readResponseBody(response);
     return new Response(body, {
       headers: response.headers,
       status: response.status,

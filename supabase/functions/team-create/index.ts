@@ -102,8 +102,31 @@ const prepareCreate = async (req: Request): Promise<MutationStep<CreateContext>>
   if (auth.response) return rejectMutationStep(auth.response);
   return parseCreateInput(req, auth.supabase, auth.user.id);
 };
-const createTeamInsertError = (req: Request, error: { code?: string } | null): Response => {
+const isMembershipConflict = (
+  error: {
+    code?: string;
+    details?: string | null;
+    message?: string;
+  } | null
+): boolean => {
+  if (error?.code !== '23505') return false;
+  return [error.message, error.details].some((value) =>
+    value?.includes('team_memberships_user_mode_unique')
+  );
+};
+const createTeamInsertError = (
+  req: Request,
+  error: { code?: string; details?: string | null; message?: string } | null,
+  gameMode: TeamGameMode
+): Response => {
   console.error('Team creation failed:', error);
+  if (isMembershipConflict(error)) {
+    return createErrorResponse(
+      `You are already a member of a ${gameMode.toUpperCase()} team. Leave your current team first.`,
+      400,
+      req
+    );
+  }
   if (error?.code === '23505') {
     return createErrorResponse('A team with this name or join code already exists', 409, req);
   }
@@ -117,7 +140,9 @@ const insertTeam = async (context: CreateContext): Promise<MutationStep<TeamRow>
     p_name: context.name.trim(),
     p_owner_id: context.userId,
   });
-  if (error || !data) return rejectMutationStep(createTeamInsertError(context.req, error));
+  if (error || !data) {
+    return rejectMutationStep(createTeamInsertError(context.req, error, context.gameMode));
+  }
   return acceptMutationStep(data as TeamRow);
 };
 const persistTeamCreate = async (

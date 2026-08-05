@@ -3,6 +3,7 @@ import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
 import { useSafeToast } from '@/composables/useSafeToast';
 import { actions, defaultState, getters, type UserState } from '@/stores/progressState';
+import { replayProgressMetadataMigration } from '@/stores/tarkov/metadataStoreBridge';
 import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
@@ -70,6 +71,7 @@ interface TeamStoreInstance {
   cleanup: () => void;
 }
 type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
+const TEAM_PROGRESS_REFRESH_DELAY_MS = 5500;
 export type TeammateIdentity = {
   currentGameMode: GameMode;
   gameEdition: number;
@@ -149,6 +151,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   } | null = null;
   let prevTaskCompletions: TaskCompletionSnapshot = {};
   let taskBroadcastInitialized = false;
+  let progressRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingTaskUpdates = new Map<
     string,
     { userId: string; gameMode: GameMode; taskId: string; complete: boolean; failed: boolean }
@@ -202,6 +205,10 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     if (taskBroadcastTimer) {
       clearTimeout(taskBroadcastTimer);
       taskBroadcastTimer = null;
+    }
+    if (progressRefreshTimer) {
+      clearTimeout(progressRefreshTimer);
+      progressRefreshTimer = null;
     }
     pendingTaskUpdates.clear();
     prevTaskCompletions = {};
@@ -304,8 +311,18 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           void refreshMembers();
         }
       )
-      .on('broadcast', { event: 'progress' }, () => {
-        void refreshMembers();
+      .on('broadcast', { event: 'progress' }, (payload) => {
+        const data = (payload?.payload || {}) as MemberProfileBroadcast;
+        if (data.userId) {
+          teamStore.$patch((state) => {
+            state.memberProfiles = mergeMemberProfileBroadcast(state.memberProfiles || {}, data);
+          });
+        }
+        if (progressRefreshTimer) clearTimeout(progressRefreshTimer);
+        progressRefreshTimer = setTimeout(() => {
+          progressRefreshTimer = null;
+          void refreshMembers(true);
+        }, TEAM_PROGRESS_REFRESH_DELAY_MS);
       })
       .on('broadcast', { event: 'task-update' }, (payload) => {
         const data = (payload?.payload || {}) as {
@@ -582,6 +599,7 @@ export function useTeammateStores() {
           return;
         }
         for (const row of data ?? []) applyModeProgress(row as Record<string, unknown>);
+        replayProgressMetadataMigration();
       };
       const modeChannel = $supabase.client
         .channel(`teammate-mode-progress-${teammateId}`)

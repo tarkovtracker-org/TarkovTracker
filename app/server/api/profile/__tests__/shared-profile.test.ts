@@ -73,6 +73,7 @@ describe('Shared Profile API', () => {
     siteConfigNitroOrigin: '',
   };
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
   beforeEach(() => {
@@ -172,7 +173,6 @@ describe('Shared Profile API', () => {
     });
     await vi.advanceTimersByTimeAsync(8000);
     await expectation;
-    vi.useRealTimers();
   });
   it('returns 504 when shared profile resource loading times out', async () => {
     mockFetch.mockRejectedValueOnce(createAbortError());

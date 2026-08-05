@@ -130,6 +130,7 @@ const {
   const update = vi.fn(async (): Promise<RpcResult> => ({ error: null }));
   const updateQuery = {
     eq: vi.fn(() => updateQuery),
+    is: vi.fn(() => updateQuery),
     select: vi.fn(async () => {
       const result = await update();
       return {
@@ -1442,6 +1443,32 @@ describe('useTarkov sync integration', () => {
     expect(update).toHaveBeenCalledTimes(1);
     pendingUpdateResolve({ error: null });
     await waitForBackgroundTasks();
+  });
+  it('cleans deprecated remote progress when updated_at is null', async () => {
+    single.mockResolvedValue({
+      data: createRemoteRow({
+        pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
+        updated_at: null,
+      }),
+      error: null,
+    });
+    await initializeTarkovSync();
+    const callback = getRealtimeCallback();
+    expect(callback).toBeTypeOf('function');
+    update.mockClear();
+    callback?.({
+      new: {
+        current_game_mode: 'pvp',
+        game_edition: 1,
+        tarkov_uid: null,
+        pvp_data: withLegacyTarkovDevProfile(progressWithLevel(3), 12345),
+        pve_data: progressWithLevel(1),
+        updated_at: null,
+      },
+      old: {},
+    });
+    await waitForBackgroundTasks();
+    expect(update).toHaveBeenCalledTimes(1);
   });
   it('backs off deprecated remote cleanup retries after repeated failures and retries again later', async () => {
     vi.useFakeTimers();

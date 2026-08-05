@@ -143,7 +143,7 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       tarkov_uid?: number | null;
       pvp_data?: UserProgressData;
       pve_data?: UserProgressData;
-      updated_at?: string;
+      updated_at?: string | null;
     };
     const parsedUpdateTime = remoteData.updated_at ? Date.parse(remoteData.updated_at) : NaN;
     const updateTime = Number.isNaN(parsedUpdateTime) ? Date.now() : parsedUpdateTime;
@@ -205,13 +205,13 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       lastDeprecatedRemoteCleanupAttemptAt = now;
       recordLocalSyncTime();
       try {
-        if (!remoteData.updated_at) return;
-        const { data, error } = await $supabase.client
+        const updateQuery = $supabase.client
           .from('user_progress')
           .update({ pvp_data: nextState.pvp, pve_data: nextState.pve })
-          .eq('user_id', currentUserId)
-          .eq('updated_at', remoteData.updated_at)
-          .select('user_id');
+          .eq('user_id', currentUserId);
+        const { data, error } = remoteData.updated_at
+          ? await updateQuery.eq('updated_at', remoteData.updated_at).select('user_id')
+          : await updateQuery.is('updated_at', null).select('user_id');
         if (error) {
           deprecatedRemoteCleanupFailureCount += 1;
           logger.error(

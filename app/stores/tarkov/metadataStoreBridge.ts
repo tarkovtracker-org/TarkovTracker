@@ -14,12 +14,22 @@ let tarkovHooks: TarkovMetadataHooks = {
 };
 let progressHooks: ProgressMetadataHooks | null = null;
 let pendingDuplicateObjectiveIds = new Map<string, string[]>();
+let knownDuplicateObjectiveIds = new Map<string, string[]>();
 let progressHydrated = false;
+const mergeDuplicateObjectiveIds = (
+  target: Map<string, string[]>,
+  source: Map<string, string[]>
+): void => {
+  source.forEach((newIds, originalId) => {
+    const existing = target.get(originalId) ?? [];
+    target.set(originalId, [...new Set([...existing, ...newIds])]);
+  });
+};
 const flushPendingDuplicateObjectiveProgress = (): void => {
   if (!progressHydrated || !progressHooks || pendingDuplicateObjectiveIds.size === 0) return;
-  const pending = pendingDuplicateObjectiveIds;
+  mergeDuplicateObjectiveIds(knownDuplicateObjectiveIds, pendingDuplicateObjectiveIds);
   pendingDuplicateObjectiveIds = new Map();
-  progressHooks.migrateDuplicateObjectiveProgress(pending);
+  progressHooks.migrateDuplicateObjectiveProgress(new Map(knownDuplicateObjectiveIds));
 };
 export const registerTarkovMetadataHooks = (hooks: TarkovMetadataHooks): void => {
   tarkovHooks = hooks;
@@ -32,6 +42,15 @@ export const markProgressMetadataHydrated = (): void => {
   progressHydrated = true;
   flushPendingDuplicateObjectiveProgress();
 };
+export const resetProgressMetadataHydration = (): void => {
+  progressHydrated = false;
+  pendingDuplicateObjectiveIds = new Map();
+  knownDuplicateObjectiveIds = new Map();
+};
+export const replayProgressMetadataMigration = (): void => {
+  if (!progressHydrated || !progressHooks || knownDuplicateObjectiveIds.size === 0) return;
+  progressHooks.migrateDuplicateObjectiveProgress(new Map(knownDuplicateObjectiveIds));
+};
 export const getMetadataGameMode = (): GameMode => tarkovHooks.getCurrentGameMode();
 export const repairMetadataCompletedTaskObjectives = (): void =>
   tarkovHooks.repairCompletedTaskObjectives();
@@ -39,8 +58,9 @@ export const repairMetadataFailedTaskStates = (): void => tarkovHooks.repairFail
 export const migrateMetadataDuplicateObjectiveProgress = (
   duplicateObjectiveIds: Map<string, string[]>
 ): void => {
+  mergeDuplicateObjectiveIds(knownDuplicateObjectiveIds, duplicateObjectiveIds);
   if (progressHooks && progressHydrated) {
-    progressHooks.migrateDuplicateObjectiveProgress(duplicateObjectiveIds);
+    progressHooks.migrateDuplicateObjectiveProgress(new Map(knownDuplicateObjectiveIds));
     return;
   }
   duplicateObjectiveIds.forEach((newIds, originalId) => {
