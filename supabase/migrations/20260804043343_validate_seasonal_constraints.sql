@@ -6,6 +6,11 @@ ALTER TABLE public.team_memberships
   VALIDATE CONSTRAINT team_memberships_game_mode_check;
 ALTER TABLE public.api_tokens
   VALIDATE CONSTRAINT api_tokens_game_mode_check;
+-- One-way cleanup of legacy pre-scheme tokens (e.g. tt_...) that predate the PVP_/PVE_/SZN_
+-- prefix convention, so api_tokens_token_value_game_mode_match can be validated. These tokens
+-- are already unusable: the API gateway rejects any token whose prefix is not PVP_/PVE_/SZN_
+-- (see workers/api-gateway/src/auth.ts), so this only reconciles stored state with the gateway's
+-- behavior. token_value is cleared irreversibly; affected users must re-issue tokens.
 UPDATE public.api_tokens
 SET token_value = NULL,
     is_active = FALSE

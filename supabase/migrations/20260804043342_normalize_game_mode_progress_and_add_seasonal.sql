@@ -163,7 +163,7 @@ CREATE OR REPLACE FUNCTION public.set_game_mode_profile_visibility(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   v_user_id UUID := (SELECT auth.uid());
