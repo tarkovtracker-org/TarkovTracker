@@ -1425,6 +1425,7 @@ describe('useTarkov sync integration', () => {
     expect(showApiUpdated).toHaveBeenCalledTimes(2);
   });
   it('does not rewrite authoritative mode rows from deprecated legacy payloads', async () => {
+    const store = useTarkovStore();
     single.mockResolvedValue({
       data: createRemoteRow(),
       error: null,
@@ -1432,6 +1433,7 @@ describe('useTarkov sync integration', () => {
     await initializeTarkovSync();
     const callback = getRealtimeCallback();
     expect(callback).toBeTypeOf('function');
+    const seasonalBefore = cloneProgress(store.seasonal);
     update.mockClear();
     callback?.({
       new: {
@@ -1446,6 +1448,7 @@ describe('useTarkov sync integration', () => {
     });
     await waitForBackgroundTasks();
     expect(update).not.toHaveBeenCalled();
+    expect(store.seasonal).toEqual(seasonalBefore);
   });
   it('aborts initialization when post-load cleanup persistence fails', async () => {
     single.mockResolvedValue({

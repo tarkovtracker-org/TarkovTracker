@@ -389,10 +389,12 @@ describe('ApiTokens', () => {
         tokenValue: expect.stringMatching(/^SZN_[0-9a-f]{18}$/),
       })
     );
+    const edgeTokenValue = mockCreateToken.mock.calls[0]?.[0].tokenValue;
+    expect(edgeTokenValue).toMatch(/^SZN_[0-9a-f]{18}$/);
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         game_mode: 'seasonal',
-        token_value: expect.stringMatching(/^SZN_[0-9a-f]{18}$/),
+        token_value: edgeTokenValue,
       })
     );
   });
