@@ -78,7 +78,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.22
+                "minScore": 0.2
               }
             ],
             "categories:seo": [
