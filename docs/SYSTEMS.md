@@ -602,6 +602,10 @@ flowchart LR
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
+- The persistent backfill applies one uuid key range per migration, so each range is recorded
+  separately and a failed run resumes at the first unapplied range rather than restarting. A
+  migration file is atomic even with `-- supabase:disable-transaction`, so staging a backfill inside
+  one file does not work.
 - A missing normalized row is never treated as absent progress: reads fall back to `user_progress`,
   and the backfill only fills rows whose `progress_data` carries no `level`, so it can never
   overwrite a write that landed first. The backfill never changes `profile_public` on an existing
