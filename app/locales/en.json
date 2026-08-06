@@ -1916,8 +1916,8 @@
       "sync_error": "Your account is linked, but we could not synchronize Discord roles. Please try again later."
     },
     "prestige": {
-      "pvp_only_title": "Prestige Is Unavailable in PvE",
-      "pvp_only": "Escape from Tarkov prestige is available for persistent and Seasonal PvP profiles. Switch your active tracker mode to either PvP mode to manage prestige and archived runs.",
+      "pvp_only_title": "Prestige Is PvP Only",
+      "pvp_only": "Escape from Tarkov prestige currently exists only for PvP profiles. Switch your active tracker mode to PvP to manage prestige and archived runs.",
       "persistent_mode_unsupported_title": "Prestige Unavailable",
       "persistent_mode_unsupported": "Prestige is unavailable for persistent PvE mode.",
       "seasonal_mode_unsupported": "Prestige is unavailable in Seasonal PvP.",
