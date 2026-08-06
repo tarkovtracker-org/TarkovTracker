@@ -540,7 +540,9 @@ flowchart LR
 ### Flow
 
 1. Startup reads account metadata and legacy PvP/PvE from `user_progress`, then reads normalized
-   rows and prefers the normalized active row for each mode.
+   rows and prefers the normalized active row for each mode. An account with no normalized row falls
+   back to the legacy PvP/PvE JSON, so the normalized table can be populated lazily or backfilled
+   after the schema ships.
 2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, serializes
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
    clients, and upserts each normalized row. The caller passes the season number its bundle was
@@ -579,7 +581,10 @@ flowchart LR
 ### Files
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
-  backfill, RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+  RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql`,
+  `supabase/migrations/20260806120100_backfill_normalized_game_mode_progress.sql` — the persistent
+  PvP/PvE backfill, deliberately separate from the schema and applied one key range per transaction
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -597,6 +602,10 @@ flowchart LR
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
+- A missing normalized row is never treated as absent progress: reads fall back to `user_progress`,
+  and the backfill only fills rows whose `progress_data` carries no `level`, so it can never
+  overwrite a write that landed first. The backfill never changes `profile_public` on an existing
+  row, because "never set" and "explicitly set to false" are indistinguishable.
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
