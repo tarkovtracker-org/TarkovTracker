@@ -39,7 +39,7 @@
     "audit_log_fetch_failed": "Impossible de récupérer les journaux d'audit",
     "no_actions_recorded": "Aucune action d'administration enregistrée pour le moment",
     "audit_log_by": "par",
-    "supporter_override_title": "Accès aux Supporter",
+    "supporter_override_title": "Accès Supporter",
     "supporter_override_description": "Définir le statut de supporter d'un utilisateur pour les tests de production sans créer de paiement Stripe.",
     "supporter_target_user_label": "ID utilisateur",
     "supporter_target_user_placeholder": "UUID de l'utilisateur Supabase Auth",
@@ -48,8 +48,8 @@
     "supporter_disabled_label": "Désactivé",
     "supporter_override_login_required": "Vous devez être connecté pour mettre à jour l'accès Supporter.",
     "supporter_override_saved_title": "Accès Supporter mis à jour",
-    "supporter_override_enabled_description": "Accès supporter {tier} activé.",
-    "supporter_override_disabled_description": "Accès du supporter actif désactivé.",
+    "supporter_override_enabled_description": "Accès Supporter {tier} activé.",
+    "supporter_override_disabled_description": "Accès du Supporter actif désactivé.",
     "supporter_override_failed_title": "Echec de la mise à jour",
     "supporter_override_failed_description": "Impossible de mettre à jour l'accès du supporteur."
   },
@@ -115,11 +115,11 @@
   "buttons": {},
   "errors": {
     "generic_fallback": "Erreur inattendue. Veuillez réessayer.",
-    "chunk_load_blocked": "Un fichier requis de l’application n’a pas pu être chargé. Veuillez réessayer. Si le problème persiste, votre FAI ou votre région bloque peut-être l’accès.",
-    "network_access_denied": "Une requête réseau requise a été bloquée. Veuillez réessayer. Si cela continue, utilisez un VPN ou Cloudflare WARP."
+    "chunk_load_blocked": "Un fichier requis n’a pas pu être chargé. Veuillez réessayer. Si le problème persiste, votre région bloque peut-être l’accès.",
+    "network_access_denied": "Une requête réseau a été bloquée. Veuillez réessayer. Si cela continue, utilisez un VPN."
   },
   "error": {
-    "return_home": "Retour à l'accueil",
+    "return_home": "Revenir à l'accueil",
     "show_details": "Afficher les détails",
     "hide_details": "Masquer les détails",
     "technical_details": "Détails techniques",
@@ -130,10 +130,10 @@
     "access_blocked": "Accès bloqué",
     "service_unavailable": "Service indisponible",
     "something_went_wrong": "Une erreur s'est produite",
-    "unexpected_description": "Une erreur inattendue s'est produite lors du traitement de votre demande.",
-    "invalid_host_hint": "Cet hôte de prévisualisation est bloqué par la validation des hôtes de l'API. Ajoutez le nom d'hôte de prévisualisation à API_ALLOWED_HOSTS ou dérivez-le de CF_PAGES_URL.",
-    "supabase_config_hint": "Cette mise en ligne n'a pas de configuration Supabase publique. Définissez NUXT_PUBLIC_SUPABASE_URL et NUXT_PUBLIC_SUPABASE_ANON_KEY pour les prévisualisations, ou autorisez les builds de prévisualisation à s'exécuter en mode hors ligne.",
-    "request_blocked_hint": "Une requête nécessaire pour afficher cette page a été bloquée. Ouvrez les détails techniques et incluez l'URL de la requête en échec lorsque vous signalez le problème."
+    "unexpected_description": "Une erreur inattendue s'est produite lors du traitement de votre requête.",
+    "invalid_host_hint": "Cet hôte de preview est bloqué par la validation des hôtes de l'API. Ajoutez le nom d'hôte de preview à API_ALLOWED_HOSTS ou dérivez-le de CF_PAGES_URL.",
+    "supabase_config_hint": "Ce deploy n'a pas de configuration Supabase publique. Mettez NUXT_PUBLIC_SUPABASE_URL et NUXT_PUBLIC_SUPABASE_ANON_KEY pour les preview, ou autorisez les builds de preview à s'exécuter en mode hors ligne.",
+    "request_blocked_hint": "Une requête pour afficher cette page a été bloquée. Ouvrez les détails techniques (Inspecteur) et ajouté l'URL de la requête en échec lorsque vous signalez le problème."
   },
   "loading_screen": {
     "title": "Chargement de Tarkov Tracker",
@@ -147,14 +147,14 @@
   "toast": {
     "hideout_updated": {
       "title": "Planque mise à jour",
-      "description": "{count} améliorations de station supprimées car elles ne remplissent plus les prérequis."
+      "description": "{count} améliorations de modules supprimées car elles ne remplissent plus les prérequis."
     },
     "api_updated": {
       "title": "Mise à jour depuis l'API",
       "description_fallback": "Votre progression a été mise à jour via l'API.",
       "label": {
-        "single": "Tâche mise à jour",
-        "plural": "Tâches mises à jour"
+        "single": "Quête mise à jour",
+        "plural": "Quêtes mises à jour"
       },
       "state": {
         "completed": "terminée",
@@ -165,17 +165,17 @@
     },
     "local_ignored": {
       "title": "Progression locale du navigateur ignorée",
-      "other_account": "Ce navigateur contenait une progression enregistrée d'un autre compte ; elle a été ignorée pour éviter d'écraser votre progression cloud.",
-      "unsaved": "Cet onglet avait une progression temporaire en mémoire mais aucune copie enregistrée dans le navigateur (souvent après actualisation/plantage) ; la progression cloud a été conservée.",
-      "guest": "Ce navigateur avait encore une progression invité datant d'avant la connexion ; votre progression cloud a été conservée."
+      "other_account": "Ce navigateur contenait une progression enregistrée d'un autre compte ; elle a été ignorée pour éviter d'écraser votre progression liée au compte.",
+      "unsaved": "Cet onglet avait une progression temporaire en mémoire mais aucune copie enregistrée dans le navigateur (souvent après actualisation/crash) ; la progression du compte a été conservée.",
+      "guest": "Ce navigateur avait encore une progression sans compte datant d'avant la connexion ; votre progression du compte a été conservée."
     },
     "progress_merged": {
-      "title": "Progression cloud synchronisée",
+      "title": "Progression du compte synchronisée",
       "description": "Progression synchronisée depuis un autre onglet/appareil et {count} différences locales fusionnées."
     },
     "load_failed": {
       "title": "Impossible de charger la progression",
-      "description": "Un problème a été détecté lors du chargement de vos données de compte. Veuillez actualiser la page ou contacter le support si le problème persiste."
+      "description": "Un problème a été détecté lors du chargement de vos données du compte. Veuillez actualiser la page ou contacter le support si le problème persiste."
     },
     "count_edit_updated": {
       "title": "Brouillon mis à jour",
@@ -193,7 +193,7 @@
       "title": "Action annulée : {description}"
     },
     "action_undo_failed": {
-      "title": "Impossible d'annuler l'action: {description}"
+      "title": "Impossible d'annuler l'action : {description}"
     }
   },
   "common": {
@@ -300,32 +300,32 @@
     "login": "Se connecter",
     "overview": "Aperçu",
     "api_documentation": "Documentation de l'API",
-    "tarkov_changes": "Changements de Tarkov",
+    "tarkov_changes": "Tarkov Changes",
     "api": "API",
-    "game_settings": "Paramètres de la partie",
+    "game_settings": "Paramètres du jeu",
     "custom_scale": "Échelle personnalisée",
     "self_contained": "Auto-contenu",
-    "progress_track": "Piste de progression",
-    "account": "Compte client",
+    "progress_track": "Suivi de progression",
+    "account": "Compte",
     "preferences": "Préférences",
-    "game_edition": "Édition de jeu",
+    "game_edition": "Édition du jeu",
     "reset_pvp_data": "Réinitialiser les données PvP",
     "reset_pve_data": "Réinitialiser les données PvE",
     "reset_seasonal_data": "Réinitialiser les données saisonnières PvP",
     "reset_all_data": "Réinitialiser toutes les données",
     "import_failed": "Importation échouée",
-    "delete_archived_run": "Supprimer les Exécution archivée",
+    "delete_archived_run": "Supprimer la partie archivée",
     "validation_error": "Erreur de validation"
   },
   "page_help": {
     "button": "Aide",
     "launcher": {
-      "title": "Aide et onboarding",
-      "summary": "Choisissez un guide rapide pour cette page ou le parcours complet de configuration.",
-      "page_guide": "Guider cette page",
-      "page_guide_unavailable": "Aucun guide n’est encore disponible pour cette page. Utilisez plutôt l’onboarding.",
-      "onboarding": "Onboarding pour nouveaux utilisateurs",
-      "onboarding_description": "Commencez par les imports, terminez les bases, puis vérifiez vos tâches.",
+      "title": "Aide et intégration",
+      "summary": "Choisissez un guide rapide pour cette page ou le setup complet de configuration.",
+      "page_guide": "Guide de cette page",
+      "page_guide_unavailable": "Aucun guide n’est encore disponible pour cette page. Utilisez l’intégration à la place.",
+      "onboarding": "Intégration pour les nouveaux utilisateurs",
+      "onboarding_description": "Commencez par les imports, terminez les bases, puis vérifiez vos quêtes.",
       "keyboard_shortcuts_error": "Impossible d'ouvrir les raccourcis clavier. Veuillez réessayer."
     },
     "onboarding": {
@@ -2110,7 +2110,7 @@
       "skills_count": "{count} compétences détectées",
       "last_refreshed": "Données Tarkov.dev mises à jour",
       "last_refreshed_unknown": "Inconnu",
-      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
+      "data_age_warning": "Cette version de Tarkov.dev est vieille de {days} jour(s). Si vous avez joué depuis, ouvrez votre profil sur Tarkov.dev pour le mettre à jour, puis récupérez à nouveau vos données avant de procéder à l'importation.",
       "cooldown_hint": "Importé récemment. Vous pouvez réimporter ce profil dans environ {minutes} min.",
       "turnstile_hint": "Complétez la vérification humaine ci-dessous pour récupérer votre profil.",
       "skills_details_toggle": "Voir les valeurs des compétences",
@@ -2130,7 +2130,7 @@
       "errors": {
         "unexpected_profile_flow": "Un problème est survenu pendant la récupération du profil Tarkov.dev. Réessayez.",
         "cooldown_active": "Vous avez importé ce profil récemment. Vous pouvez le réimporter dans environ {minutes} min.",
-        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
+        "profile_stale": "Cette version de Tarkov.dev est vieille de {days} jour(s), ce qui est trop vieux pour faire une imporation. Ouvrez votre profil sur Tarkov.dev, laissez le chargez, et récupérer les données à nouveau.",
         "profile_not_generated": "Tarkov.dev n'a pas encore d'instantané pour ce profil. Ouvrez une fois la page de profil sur Tarkov.dev, laissez-la charger, puis récupérez à nouveau.",
         "rate_limited": "Trop de tentatives d'importation. Attendez à propos de {minutes} min, puis réessayez.",
         "verification_failed": "Échec de la vérification humaine. Rechargez la page et réessayez.",
