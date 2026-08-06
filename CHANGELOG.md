@@ -1,3 +1,10 @@
+# [1.63.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.3...v1.63.0) (2026-08-06)
+
+
+### Features
+
+* add Seasonal PvP game mode ([#641](https://github.com/tarkovtracker-org/TarkovTracker/issues/641)) ([5eabd39](https://github.com/tarkovtracker-org/TarkovTracker/commit/5eabd39f518a98bc240659e6c9bc43b06da306ac)), closes [#643](https://github.com/tarkovtracker-org/TarkovTracker/issues/643) [#644](https://github.com/tarkovtracker-org/TarkovTracker/issues/644) [#645](https://github.com/tarkovtracker-org/TarkovTracker/issues/645) [#646](https://github.com/tarkovtracker-org/TarkovTracker/issues/646) [#647](https://github.com/tarkovtracker-org/TarkovTracker/issues/647) [#648](https://github.com/tarkovtracker-org/TarkovTracker/issues/648)
+
 ## [1.62.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.2...v1.62.3) (2026-08-03)
 
 ## [1.62.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.1...v1.62.2) (2026-08-03)
