@@ -256,10 +256,16 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 - **A backfill migration should be non-transactional, ranged, and idempotent.** Use
   `-- supabase:disable-transaction` with one statement per key range so each range commits on its
   own, keep the conflict rule a no-op for rows that already hold real data, and re-running must
-  change nothing. See `20260806120000_add_game_mode_progress_backfill_helper.sql` and
-  `20260806120100_backfill_normalized_game_mode_progress.sql` for the shape. A single statement
-  covering every row also holds conflict locks on everything it inserts until it commits, which
-  blocks concurrent user writes to the same rows.
+  change nothing. A single statement covering every row also holds conflict locks on everything it
+  inserts until it commits, which blocks concurrent user writes to the same rows.
+- **One key range per migration file is the only reliable way to commit a backfill in stages.** The
+  Supabase runner applies a migration file atomically even with `-- supabase:disable-transaction`
+  (verified: a multi-statement non-transactional file with a failing statement rolled back the
+  statements before it). A single statement covering every account died in production with
+  `conn closed`. Splitting by file gives each range its own transaction and its own recorded version,
+  so a failure leaves earlier ranges applied and the retry resumes where it stopped. See
+  `20260806120000_add_game_mode_progress_backfill_helper.sql` and the
+  `202608061300NN_backfill_game_mode_progress_range_*.sql` series for the shape.
 - **Raise `statement_timeout` explicitly when a migration scans or rewrites whole tables**, and pair
   the `SET` with a trailing `RESET statement_timeout;`.
 - **Nothing in CI runs a migration against production-sized data.** `supabase:check` resets an empty
