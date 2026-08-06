@@ -220,6 +220,10 @@
     "complete": "Complete",
     "pvp": "PvP",
     "pve": "PvE",
+    "seasonal_pvp": "PvP Stagionale",
+    "pvp_description": "Giocatore vs Giocatore (Standard)",
+    "pve_description": "Giocatore vs Ambiente (Co-op)",
+    "seasonal_pvp_description": "Stagione {season}",
     "retry": "Riprova",
     "open_tasks": "Apri attività",
     "view_on_tarkov_dev": "Vista su Tarkov.dev",
@@ -307,6 +311,7 @@
     "game_edition": "Edizione Di Gioco",
     "reset_pvp_data": "Ripristina Dati PvP",
     "reset_pve_data": "Ripristina Dati PvE",
+    "reset_seasonal_data": "Ripristina Dati Stagionali Pvp",
     "reset_all_data": "Reimposta Tutti I Dati",
     "import_failed": "Importazione Non Riuscita",
     "delete_archived_run": "Elimina Esecuzione Archiviata",
@@ -1180,6 +1185,9 @@
           "create_team_error_ui_update": "Lo stato del team non si è aggiornato. Ricarica per vedere il tuo team o riprova.",
           "leave_team_success": "Sei uscito dal team con successo.",
           "leave_team_error": "Impossibile lasciare il team.",
+          "already_in_team": "Sei già in una squadra {mode} . Lascia prima la tua squadra attuale.",
+          "url_copied": "URL copiato negli appunti",
+          "copy_url_failed": "Impossibile copiare l'URL negli appunti",
           "no_team": "Non fai parte di nessuna squadra.",
           "team_invite_url_label": "URL invito nel team",
           "copy_link": "Copia",
@@ -1526,13 +1534,18 @@
     "xp_settings_link": "Visualizza XP e impostazioni livello"
   },
   "profile": {
-    "title_with_mode": "Profilo {name} {mode}"
+    "title_with_mode": "Profilo {name} {mode}",
+    "mode_pvp": "PVP",
+    "mode_pve": "PVE",
+    "mode_seasonal_pvp": "PVP SEASONALE",
+    "season_short": "S{season}"
   },
   "streamer_tools": {
     "subtitle": "Genera collegamenti browser-source per OBS, Streamlabs Desktop, XSplit e vMix per mostrare i progressi Kappa in live.",
     "manage_sharing": "Gestisci condivisione",
     "login_required": "Accedi per generare link di sovrapposizione streamer personalizzati.",
     "mode_private": "Questa modalità di gioco è privata. La condivisione pubblica deve essere abilitata per il funzionamento dei collegamenti sorgente del browser.",
+    "visibility_load_failed": "Impossibile caricare le impostazioni di condivisione.",
     "open_account_settings": "Apri Impostazioni account",
     "content_title": "Contenuto",
     "mode_label": "Modalità di gioco",
@@ -1737,10 +1750,10 @@
       "description": "Controlla quali modalità di gioco possono essere visualizzate tramite il link condiviso.",
       "public": "Pubblico",
       "private": "Privato",
-      "toggle_pvp_label": "Attiva/Disattiva condivisione del profilo PvP",
-      "toggle_pve_label": "Attiva/Disattiva condivisione del profilo PvE",
-      "copy_pvp_link": "Copia link profilo PvP",
-      "copy_pve_link": "Copia link profilo PvE",
+      "toggle_label": "Attiva/Disattiva condivisione profilo {mode}",
+      "copy_link": "Copia il link del profilo {mode}",
+      "load_failed": "Impossibile caricare le impostazioni di condivisione.",
+      "save_failed": "Impossibile aggiornare le impostazioni di condivisione.",
       "login_required": "Accedi per gestire la visibilità della condivisione del profilo."
     },
     "game_settings": {
@@ -1752,9 +1765,11 @@
       "reset_pvp_warning": "Questo eliminerà definitivamente tutti i tuoi progressi PvP, inclusi missioni, rifugio e livello. I tuoi dati PvE non saranno influenzati.",
       "reset_pve_confirmation": "Sei sicuro di voler resettare i tuoi progressi PvE?",
       "reset_pve_warning": "Questo eliminerà definitivamente tutti i tuoi progressi PvE, inclusi missioni, rifugio e livello. I tuoi dati PvP non saranno influenzati.",
+      "reset_seasonal_confirmation": "Sei sicuro di voler resettare il tuo avanzamento stagionale PvP?",
+      "reset_seasonal_warning": "Questo eliminerà definitivamente tutti i tuoi progressi stagionali in PvP per la stagione attiva. I tuoi dati persistenti PvP e PvE non saranno influenzati.",
       "reset_all_confirmation": "Sei sicuro di voler resettare TUTTI i tuoi progressi?",
       "reset_all_warning": "Questo eliminerà definitivamente TUTTI i progressi per le modalità PvP e PvE. Questa azione non può essere annullata!",
-      "prestige_pvp_warning": "La tua attuale run PvP verrà archiviata, quindi la progressione PvP verrà ripristinata per il livello di prestigio successivo. I dati PvE non sono influenzati.",
+      "prestige_mode_warning": "La tua attuale esecuzione {mode} verrà archiviata, quindi la sua progressione verrà ripristinata per il prossimo livello di prestigio. Altre modalità non sono influenzate.",
       "reset_confirm": "Reimposta dati",
       "export_description": "Scarica un backup dei tuoi dati di avanzamento per le modalità PvP e PvE.",
       "export_button": "Esporta Backup",
@@ -1781,12 +1796,17 @@
       "import_preview_pvp_tasks": "Missioni PvP",
       "import_preview_pve_level": "Livello PvE",
       "import_preview_pve_tasks": "Missioni PvE",
+      "import_preview_seasonal_level": "Livello Stagionale Di Pvp",
+      "import_preview_seasonal_tasks": "Attività Stagionali PvP",
       "import_target_label": "Target importazione",
       "import_target_pvp": "Solo PvP",
       "import_target_pve": "Solo PvE",
-      "import_target_both": "PvP & PvE",
+      "import_target_all": "Tutti Disponibili",
+      "seasonal_import_locked": "Le importazioni stagionali di PvP sono temporaneamente bloccate fino a quando i dati di origine non saranno verificati per la Stagione {season}.",
       "import_success_title": "Backup importato",
       "import_success_description": "I tuoi dati di avanzamento sono stati ripristinati con successo.",
+      "import_error_title": "Importazione Backup Non Riuscita",
+      "import_error_description": "Il backup non può essere importato. Per favore riprova.",
       "export_error_title": "Esportazione fallita",
       "debug_export_error_title": "Esportazione Debug fallita",
       "reset_title": "Azzera progressi",
@@ -1822,6 +1842,11 @@
       "success_title": "Ripristino dati PvE",
       "success_description": "Il tuo progresso PvE è stato ripristinato con successo.",
       "error_description": "Impossibile reimpostare i dati PvE. Per favore riprova."
+    },
+    "reset_seasonal": {
+      "success_title": "Ripristino Dati Stagionali Pvp",
+      "success_description": "Il progresso della stagione attiva è stato ripristinato con successo.",
+      "error_description": "Impossibile ripristinare i dati stagionali PvP. Si prega di riprovare."
     },
     "reset_all": {
       "success_title": "Ripristina tutto",
@@ -1893,6 +1918,9 @@
     "prestige": {
       "pvp_only_title": "Prestigio è solo PvP",
       "pvp_only": "Prestigio in Escape from Tarkov attualmente esiste solo per i profili PvP. Passa la modalità attiva a PvP per gestire il prestigio e le run archiviate.",
+      "persistent_mode_unsupported_title": "Prestigio non disponibile",
+      "persistent_mode_unsupported": "Prestigio non è disponibile per la modalità PvE persistente.",
+      "seasonal_mode_unsupported": "Prestige non è disponibile in PvP stagionale.",
       "current_level": "Livello Prestigio attuale",
       "set_current": "Imposta Prestigio attuale",
       "set_current_hint": "Usa questo quando hai già effettuato il Prestigio in gioco e hai solo bisogno che il tracker combaci. Questo non reimposta i progressi.",
@@ -1905,10 +1933,10 @@
       "requirements_description": "Il tracker controlla per il tuo prossimo prestigio: Prestigio {level}.",
       "requirements_empty": "Per questo livello di prestigio non sono disponibili requisiti aggiuntivi per il tracker.",
       "archive_title": "Archivia questa run e avvia il prossimo Prestigio",
-      "archive_description": "Usalo solo quando si sta effettivamente prestigiando ora. La tua attuale run PvP verrà archiviata e la progressione PvP verrà ripristinata per il prossimo livello di prestigio.",
+      "archive_description_mode": "Usalo solo quando si sta effettivamente prestigiando ora. La tua attuale esecuzione {mode} verrà archiviata e la sua progressione verrà ripristinata per il prossimo livello di prestigio.",
       "archive_cta": "Archivia la run e comincia il Prestigio {level}",
       "archive_cta_disabled": "Prestigio non disponibile",
-      "archive_dialog_title": "Archivia la run PvP attuale",
+      "archive_dialog_title_mode": "Archivio Attuale {mode} Esegui",
       "archive_sync_hint": "Se hai solo bisogno che il tracker combaci un prestigio già in corso in-game, utilizza Imposta prestigio attuale qui in alto.",
       "archive_soft_gate_unmet": "{count} requisiti tracciati sembrano incompleti. Puoi continuare comunque.",
       "archive_soft_gate_manual": "{count} requisiti devo ancora essere completati manualmente in-game.",
@@ -2177,7 +2205,10 @@
   },
   "game_settings": {
     "toggle_game_mode_label": "Cambia modalità di gioco",
-    "select_faction_label": "Seleziona fazione"
+    "select_game_mode_label": "Seleziona modalità di gioco",
+    "select_faction_label": "Seleziona fazione",
+    "season_ends_in": "Stagione {season} termina in {days}d {hours}h {minutes}m",
+    "season_ended": "Stagione {season} è terminata"
   },
   "oauth": {
     "consent": {
