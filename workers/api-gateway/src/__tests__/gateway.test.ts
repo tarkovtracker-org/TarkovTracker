@@ -140,11 +140,14 @@ const createBaseFetchMock = ({
       onMerge?.(payload);
       const result = mergeResult ?? '1';
       if (mergeStore && Number(result) > 0) {
-        const legacyField = payload.p_field === 'pve_data' ? 'pve_data' : 'pvp_data';
+        const legacyField =
+          payload.p_field === 'pvp_data' || payload.p_field === 'pve_data' ? payload.p_field : null;
         mergeStore.data = applyMergeRpc(
           mergeStore.data,
           payload,
-          (userProgress[legacyField] as Record<string, unknown> | null) ?? null
+          legacyField
+            ? ((userProgress[legacyField] as Record<string, unknown> | null) ?? null)
+            : null
         );
       }
       return new Response(result, { status: 200 });
