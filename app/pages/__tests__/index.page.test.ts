@@ -170,6 +170,9 @@ const defaultGlobalStubs = {
   DashboardChangelog: {
     template: '<div data-testid="dashboard-changelog"></div>',
   },
+  DashboardMigrateBanner: {
+    template: '<div data-testid="dashboard-migrate-banner"></div>',
+  },
   DashboardTraderCard: {
     props: ['trader', 'completedTasks', 'totalTasks', 'percentage'],
     template: '<div data-testid="trader-card">{{ trader.name }}</div>',

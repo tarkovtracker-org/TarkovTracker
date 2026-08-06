@@ -661,6 +661,9 @@ export const usePreferencesStore = defineStore('preferences', {
     setStreamerMode(mode: boolean) {
       this.streamerMode = mode;
     },
+    setDashboardNoticeDismissed(dismissed: boolean) {
+      this.dashboardNoticeDismissed = dismissed;
+    },
     setProfileSharePvpPublic(value: boolean) {
       this.profileSharePvpPublic = value;
     },

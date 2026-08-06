@@ -4,6 +4,7 @@
       <div class="mx-auto max-w-350 xl:max-w-400 2xl:max-w-450">
         <h1 class="sr-only">Tarkov Tracker - Escape from Tarkov Progress Tracker</h1>
         <DashboardNextActions />
+        <DashboardMigrateBanner />
         <DashboardChangelog />
         <div class="mb-8">
           <button
