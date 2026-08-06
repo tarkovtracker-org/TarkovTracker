@@ -246,6 +246,25 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 
 ## Database Migrations
 
+- **Never put a bulk data rewrite in a schema migration.** Migrations run in a transaction, so a
+  statement that exceeds `statement_timeout` rolls the whole file back — schema included — while the
+  Cloudflare Pages deploy from the same merge still succeeds. That is what took production down on
+  2026-08-06: the seasonal backfill timed out, `user_game_mode_progress` and
+  `sync_user_game_mode_progress` never got created, and the new frontend shipped against the old
+  schema, so every signed-in client got `404`s. Ship the schema first, then backfill in a separate
+  migration, and make the app tolerate rows that do not exist yet.
+- **A backfill migration should be non-transactional, ranged, and idempotent.** Use
+  `-- supabase:disable-transaction` with one statement per key range so each range commits on its
+  own, keep the conflict rule a no-op for rows that already hold real data, and re-running must
+  change nothing. See `20260806120000_add_game_mode_progress_backfill_helper.sql` and
+  `20260806120100_backfill_normalized_game_mode_progress.sql` for the shape. A single statement
+  covering every row also holds conflict locks on everything it inserts until it commits, which
+  blocks concurrent user writes to the same rows.
+- **Raise `statement_timeout` explicitly when a migration scans or rewrites whole tables**, and pair
+  the `SET` with a trailing `RESET statement_timeout;`.
+- **Nothing in CI runs a migration against production-sized data.** `supabase:check` resets an empty
+  local database, so per-row cost is invisible. Before merging a migration that touches every row,
+  estimate the row count and the per-row work by hand.
 - **Migrations are the source of truth. Do not change the production schema directly** via the
   Supabase dashboard / SQL editor. Direct edits cause drift: a fresh environment built from
   migrations no longer matches production, and the next `db push` can fail or apply destructive
