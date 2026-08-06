@@ -209,35 +209,6 @@ REVOKE ALL ON FUNCTION public.set_game_mode_profile_visibility(TEXT, SMALLINT, B
 GRANT EXECUTE ON FUNCTION public.set_game_mode_profile_visibility(TEXT, SMALLINT, BOOLEAN)
   TO authenticated;
 
-INSERT INTO public.user_game_mode_progress (
-  user_id,
-  game_mode,
-  season_number,
-  progress_data,
-  profile_public,
-  created_at,
-  updated_at
-)
-SELECT
-  progress.user_id,
-  mode.game_mode,
-  0,
-  public.sanitize_user_progress_mode_data(mode.progress_data),
-  CASE mode.game_mode
-    WHEN 'pvp' THEN COALESCE(preferences.profile_share_pvp_public, false)
-    ELSE COALESCE(preferences.profile_share_pve_public, false)
-  END,
-  COALESCE(progress.created_at, now()),
-  COALESCE(progress.updated_at, now())
-FROM public.user_progress progress
-CROSS JOIN LATERAL (
-  VALUES
-    ('pvp'::TEXT, COALESCE(progress.pvp_data, '{}'::jsonb)),
-    ('pve'::TEXT, COALESCE(progress.pve_data, '{}'::jsonb))
-) AS mode(game_mode, progress_data)
-LEFT JOIN public.user_preferences preferences ON preferences.user_id = progress.user_id
-ON CONFLICT (user_id, game_mode, season_number) DO NOTHING;
-
 CREATE OR REPLACE FUNCTION public.prepare_user_game_mode_progress_row()
 RETURNS trigger
 LANGUAGE plpgsql

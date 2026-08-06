@@ -1,3 +1,7 @@
+-- Constraint validation scans whole tables and the api_tokens cleanup rewrites rows, both of which
+-- can exceed the default statement_timeout on production-sized tables.
+SET statement_timeout = '15min';
+
 ALTER TABLE public.user_progress
   VALIDATE CONSTRAINT user_progress_current_game_mode_check;
 ALTER TABLE public.teams
