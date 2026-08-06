@@ -571,8 +571,9 @@ flowchart LR
    deploys the matching application constants before the new season opens.
 7. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
-8. Prestige archives include mode and season. Seasonal prestige accepts only the active season;
-   the legacy PvP RPC overload preserves Seasonal data during rolling deployments.
+8. Prestige archives include mode and season. Seasonal prestige accepts only the active season and
+   resets the active Seasonal row in the same transaction; a PvP prestige never writes the Seasonal
+   row, so the legacy PvP RPC overload cannot clobber Seasonal progress during rolling deployments.
 
 ### Files
 

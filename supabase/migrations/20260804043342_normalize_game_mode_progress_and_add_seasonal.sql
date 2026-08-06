@@ -1009,6 +1009,7 @@ SET search_path = ''
 AS $$
 DECLARE
   v_user_id UUID := (SELECT auth.uid());
+  v_seasonal_season_number SMALLINT;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -1016,7 +1017,8 @@ BEGIN
   IF p_mode NOT IN ('pvp', 'seasonal') THEN
     RAISE EXCEPTION 'Prestige is only supported for PvP modes';
   END IF;
-  IF (p_mode = 'pvp' AND p_season_number <> 0)
+  IF p_season_number IS NULL
+    OR (p_mode = 'pvp' AND p_season_number <> 0)
     OR (
       p_mode = 'seasonal'
       AND p_season_number <> private.active_season_number()
@@ -1045,6 +1047,8 @@ BEGIN
     COALESCE(p_created_at, now())
   );
 
+  v_seasonal_season_number := CASE WHEN p_mode = 'seasonal' THEN p_season_number END;
+
   PERFORM public.sync_user_game_mode_progress(
     p_current_game_mode,
     p_game_edition,
@@ -1053,7 +1057,8 @@ BEGIN
       'pvp', COALESCE(p_pvp_data, '{}'::jsonb),
       'pve', COALESCE(p_pve_data, '{}'::jsonb),
       'seasonal', COALESCE(p_seasonal_data, '{}'::jsonb)
-    )
+    ),
+    v_seasonal_season_number
   );
 END;
 $$;
@@ -1109,19 +1114,13 @@ SET search_path = ''
 AS $$
 DECLARE
   v_user_id UUID := (SELECT auth.uid());
-  v_seasonal_data JSONB;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  SELECT progress_data
-  INTO v_seasonal_data
-  FROM public.user_game_mode_progress
-  WHERE user_id = v_user_id
-    AND game_mode = 'seasonal'
-    AND season_number = private.active_season_number();
-
+  -- Seasonal progress is never written through a PvP prestige, so the caller's missing Seasonal
+  -- payload cannot clobber the active-season row.
   PERFORM public.archive_prestige_run_and_reset_progress(
     p_mode,
     0::SMALLINT,
@@ -1135,7 +1134,7 @@ BEGIN
     p_tarkov_uid,
     p_pvp_data,
     p_pve_data,
-    COALESCE(v_seasonal_data, '{}'::jsonb)
+    '{}'::jsonb
   );
 END;
 $$;
