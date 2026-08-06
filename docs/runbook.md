@@ -246,13 +246,14 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 
 ## Database Migrations
 
-- **Never put a bulk data rewrite in a schema migration.** Migrations run in a transaction, so a
+- **Never put a bulk data rewrite in a migration.** Migrations run in a transaction, so a
   statement that exceeds `statement_timeout` rolls the whole file back — schema included — while the
   Cloudflare Pages deploy from the same merge still succeeds. That is what took production down on
   2026-08-06: the seasonal backfill timed out, `user_game_mode_progress` and
   `sync_user_game_mode_progress` never got created, and the new frontend shipped against the old
-  schema, so every signed-in client got `404`s. Ship the schema first, then backfill in a separate
-  migration, and make the app tolerate rows that do not exist yet.
+  schema, so every signed-in client got `404`s. Ship the schema first and make the app tolerate rows
+  that do not exist yet. If materialization is later required, use the approved operational process
+  below rather than another migration.
 - **Do not run a whole-table backfill through the migration runner on this project.** It was tried
   twice on 2026-08-06 and failed both times, the second time taking user-facing writes with it. The
   retry held an open transaction inserting into `user_game_mode_progress` for 30+ minutes, so every
@@ -262,9 +263,15 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   probe whose earlier statements were rolled back by a later failure), so a backfill cannot be staged
   inside one file; and the runner retries a failed migration on **every** later push to `main`,
   including `chore(release)` commits, so a failing backfill re-runs unattended.
-  Run a large backfill out-of-band from the SQL editor in small committed batches during low traffic,
-  watching `pg_stat_activity`, or avoid the data movement entirely by making the read path fall back
-  to the old source.
+  Prefer avoiding the data movement by making every read path fall back to the old source. If a
+  complete materialization later becomes a product requirement, treat it as approved operational
+  data maintenance rather than a schema migration: wait for a healthy Disk I/O Budget, invoke one
+  small key range per independently committed SQL Editor operation during low traffic, record
+  completed ranges in the incident/change log, and stop if database latency, CPU, memory, lock waits,
+  or I/O pressure rises.
+  This is a narrow exception for idempotent data maintenance; schema changes still require migration
+  files. Never put multiple range calls in one migration file because the deployment runner applies
+  the file atomically.
 - **Raise `statement_timeout` explicitly when a migration scans or rewrites whole tables**, and pair
   the `SET` with a trailing `RESET statement_timeout;`.
 - **Nothing in CI runs a migration against production-sized data.** `supabase:check` resets an empty

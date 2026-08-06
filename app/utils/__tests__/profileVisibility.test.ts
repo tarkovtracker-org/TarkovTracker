@@ -12,6 +12,14 @@ describe('profile visibility loading', () => {
       ])
     ).toEqual({ pvp: true, pve: true, seasonal: true });
   });
+  it('uses legacy persistent-mode visibility only when normalized rows are missing', () => {
+    expect(
+      collectProfileVisibility([{ game_mode: 'pvp', profile_public: false, season_number: 0 }], {
+        profile_share_pve_public: true,
+        profile_share_pvp_public: true,
+      })
+    ).toEqual({ pvp: false, pve: true, seasonal: false });
+  });
   it('discards a completed request when the user context changed', async () => {
     const result = await loadCurrentProfileVisibility(
       async () => ({

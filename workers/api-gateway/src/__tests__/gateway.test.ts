@@ -987,12 +987,12 @@ describe('api-gateway', () => {
     return requestUrl ? new URL(requestUrl) : undefined;
   };
   it.each([
-    ['pvp', 0],
-    ['pve', 0],
-    ['seasonal', 1],
+    ['pvp', 0, 'user_id,game_edition,pvp_data'],
+    ['pve', 0, 'user_id,game_edition,pve_data'],
+    ['seasonal', 1, 'user_id,game_edition'],
   ] as const)(
     'loads the normalized %s progress row for its season',
-    async (mode, expectedSeason) => {
+    async (mode, expectedSeason, expectedMetadataSelect) => {
       const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: mode });
       vi.stubGlobal('fetch', fetchMock);
       const res = await worker.fetch(progressRequest(mode), BASE_ENV);
@@ -1001,8 +1001,35 @@ describe('api-gateway', () => {
       expect(requestUrl?.searchParams.get('game_mode')).toBe(`eq.${mode}`);
       expect(requestUrl?.searchParams.get('season_number')).toBe(`eq.${expectedSeason}`);
       expect(requestUrl?.searchParams.get('select')).toBe('user_id,progress_data');
+      const metadataRequest = fetchMock.mock.calls
+        .map((call) => new URL(String(call[0])))
+        .find((url) => url.pathname.endsWith('/rest/v1/user_progress'));
+      expect(metadataRequest?.searchParams.get('select')).toBe(expectedMetadataSelect);
     }
   );
+  it('falls back to legacy persistent progress when the normalized row is missing', async () => {
+    const fetchMock = createBaseFetchMock({
+      gameMode: 'pvp',
+      missingProgressUserIds: ['user-1'],
+      permissions: ['GP'],
+      userProgress: {
+        game_edition: 3,
+        pvp_data: { displayName: 'Legacy Player', level: 37, taskCompletions: {} },
+        user_id: 'user-1',
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(progressRequest('pvp'), BASE_ENV);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { displayName: string; gameEdition: number; playerLevel: number };
+    };
+    expect(body.data).toMatchObject({
+      displayName: 'Legacy Player',
+      gameEdition: 3,
+      playerLevel: 37,
+    });
+  });
   it('retains account edition when a team member has no active mode progress row', async () => {
     const fetchMock = createBaseFetchMock({
       permissions: ['TP'],
@@ -1019,6 +1046,30 @@ describe('api-gateway', () => {
     const byUser = new Map(body.data.map((entry) => [entry.userId, entry.gameEdition]));
     expect(byUser.get('user-1')).toBe(4);
     expect(byUser.get('user-2')).toBe(4);
+  });
+  it('falls back to legacy persistent progress for team members missing normalized rows', async () => {
+    const fetchMock = createBaseFetchMock({
+      gameMode: 'pve',
+      missingProgressUserIds: ['user-2'],
+      permissions: ['TP'],
+      teamId: 'team-1',
+      teamMembers: ['user-1', 'user-2'],
+      userProgress: {
+        game_edition: 2,
+        pve_data: { displayName: 'Legacy Teammate', level: 31, taskCompletions: {} },
+        user_id: 'user-1',
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(teamProgressRequest('pve'), BASE_ENV);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ displayName: string; playerLevel: number; userId: string }>;
+    };
+    expect(body.data.find((entry) => entry.userId === 'user-2')).toMatchObject({
+      displayName: 'Legacy Teammate',
+      playerLevel: 31,
+    });
   });
   it('retains account edition in solo fallback without an active mode progress row', async () => {
     const fetchMock = createBaseFetchMock({

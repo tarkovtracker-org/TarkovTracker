@@ -23,6 +23,7 @@ import {
   isGameMode,
   type GameMode,
 } from '@/utils/constants';
+import { getLegacyModeProgressField, resolveModeProgressData } from '@/utils/modeProgressFallback';
 import {
   isRecord,
   sanitizeDisplayName,
@@ -56,10 +57,14 @@ type JsonTaskFailureMetadata = {
   failConditions?: JsonFailCondition[] | null;
 };
 type PreferencesRow = {
+  profile_share_pve_public?: boolean | null;
+  profile_share_pvp_public?: boolean | null;
   streamer_mode?: boolean | null;
 };
 type ProgressRow = {
   game_edition?: number | null;
+  pve_data?: unknown | null;
+  pvp_data?: unknown | null;
   user_id: string;
 };
 type ModeProgressRow = {
@@ -641,10 +646,12 @@ export default defineEventHandler(async (event) => {
   let progressResponse: Response;
   let modeProgressResponse: Response;
   let preferencesResponse: Response;
+  const legacyProgressField = getLegacyModeProgressField(mode);
+  const progressSelect = ['user_id', 'game_edition', legacyProgressField].filter(Boolean).join(',');
   try {
     [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
       restFetch(
-        `user_progress?select=user_id,game_edition&user_id=eq.${userId}&limit=1`,
+        `user_progress?select=${progressSelect}&user_id=eq.${userId}&limit=1`,
         progressController.signal
       ),
       restFetch(
@@ -652,7 +659,7 @@ export default defineEventHandler(async (event) => {
         modeProgressController.signal
       ),
       restFetch(
-        `user_preferences?select=streamer_mode&user_id=eq.${userId}&limit=1`,
+        `user_preferences?select=streamer_mode,profile_share_pvp_public,profile_share_pve_public&user_id=eq.${userId}&limit=1`,
         preferencesController.signal
       ),
     ]);
@@ -685,11 +692,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
   }
   const modeProgressRows = (await modeProgressResponse.json()) as ModeProgressRow[];
-  const modeProgressRow: ModeProgressRow = modeProgressRows[0] ?? {
-    user_id: userId,
-    progress_data: null,
-    profile_public: false,
-  };
+  const modeProgressRow = modeProgressRows[0] ?? null;
   let preferencesRow: PreferencesRow | null = null;
   if (preferencesResponse.ok) {
     const preferenceRows = (await preferencesResponse.json()) as PreferencesRow[];
@@ -701,11 +704,17 @@ export default defineEventHandler(async (event) => {
     });
   }
   const isOwner = requesterUserId === userId;
-  const isModePublic = modeProgressRow.profile_public === true;
+  const legacyModePublic =
+    mode === 'pvp'
+      ? preferencesRow?.profile_share_pvp_public === true
+      : mode === 'pve'
+        ? preferencesRow?.profile_share_pve_public === true
+        : false;
+  const isModePublic = modeProgressRow ? modeProgressRow.profile_public === true : legacyModePublic;
   if (!isOwner && !isModePublic) {
     throw createError({ statusCode: 403, statusMessage: 'Profile is private for this mode' });
   }
-  const profileData = modeProgressRow.progress_data ?? null;
+  const profileData = resolveModeProgressData(mode, modeProgressRow?.progress_data, progressRow);
   const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;
   const sanitizedData = sanitizeProgressPayload(profileData, {
     includeDisplayName: !hideDisplayName,

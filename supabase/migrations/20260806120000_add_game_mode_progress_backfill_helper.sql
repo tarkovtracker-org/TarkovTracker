@@ -1,9 +1,9 @@
 -- Helper for the normalized-progress backfill.
 --
--- Lives in its own transactional migration so the backfill migration can be non-transactional and
--- call it once per key range, giving each range its own committed transaction. A single statement
--- covering every account would hold conflict locks on the rows it inserts until it commits, which
--- would block a concurrent user sync writing the same (user_id, game_mode, season_number).
+-- Each invocation handles one key range. Call it only from a separately committed operational
+-- statement after checking production capacity; multiple calls in one migration file remain one
+-- atomic deployment transaction. A transaction spanning every account holds conflict locks on the
+-- rows it inserts until commit and blocks concurrent user syncs for the same keys.
 --
 -- The conflict rule only fills placeholder rows. A row created by the visibility RPC or the legacy
 -- sharing trigger carries no level, because the BEFORE trigger sanitizes '{}' into the empty shape

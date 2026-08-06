@@ -155,6 +155,10 @@ describe('Team Members API', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
         });
       const { default: handler } = await import('@/server/api/team/members');
       const result = await handler(mockEvent as H3Event);
@@ -292,6 +296,49 @@ describe('Team Members API', () => {
     });
   });
   describe('Profile fallback handling', () => {
+    it('summarizes legacy persistent progress when normalized team rows are missing', async () => {
+      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({ ok: true, json: async () => [] })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_edition: 3, user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              pve_data: {},
+              pvp_data: {
+                displayName: 'Legacy Teammate',
+                level: 34,
+                taskCompletions: {
+                  complete: { complete: true },
+                  pending: { complete: false },
+                },
+              },
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+          ],
+        });
+      const { default: handler } = await import('@/server/api/team/members');
+      const result = await handler(mockEvent as H3Event);
+      expect(result.profiles['11111111-1111-4111-8111-111111111111']).toEqual({
+        displayName: 'Legacy Teammate',
+        gameEdition: 3,
+        gameMode: 'pvp',
+        level: 34,
+        tasksCompleted: 1,
+      });
+    });
     it('reads the season-aware summary view instead of progress blobs', async () => {
       mockGetQuery.mockReturnValue({ teamId: 'team-456' });
       mockFetch
@@ -476,6 +523,14 @@ describe('Team Members API', () => {
           json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
         })
         // Mock profiles fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        })
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [],

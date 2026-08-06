@@ -116,10 +116,11 @@ When asked to "review for production readiness", "deep review", "is this safe to
 - **No runtime dependency additions** without explaining why existing deps are insufficient.
 - **Game data comes from `json.tarkov.dev` via the `/api/tarkov/*` server proxy.** Do not add usage of the `api.tarkov.dev` GraphQL API. Task objectives and prestige conditions are discriminated by the upstream `type` field; the synthetic `__typename` discriminator was removed — do not reintroduce it.
 - **Do not add new runtime dependencies on Tarkov task `alternatives`.** Upstream removed the field; branch relationships must be compiled from task-status failure conditions. Existing uses remain until the shared progress engine replaces them.
-- **Never put a bulk data rewrite in a schema migration.** Migrations are transactional, so a
-  timeout rolls the schema back while the frontend from the same merge still deploys. Ship the
-  schema, let the app tolerate missing rows, then backfill in a separate non-transactional, ranged,
-  idempotent migration. See the Database Migrations section of `docs/runbook.md`.
+- **Never put a bulk data rewrite in a migration.** The deployment runner applies each migration file
+  atomically even when `-- supabase:disable-transaction` is present, so a timeout rolls back the file
+  while other deploy targets can still succeed. Ship schema separately, make every read tolerate
+  missing rows, and use an approved operation with one independently committed range only when data
+  must be materialized. See the Database Migrations section of `docs/runbook.md`.
 - **Keep changes scoped** to the requested task. Prefer small, reviewable diffs.
 
 ## Coding Conventions

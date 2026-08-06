@@ -11,6 +11,12 @@ import {
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
+import {
+  getLegacyModeProgressField,
+  resolveModeProgressData,
+  summarizeModeProgressData,
+  type LegacyModeProgressRow,
+} from '@/utils/modeProgressFallback';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('TeamMembers');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -39,6 +45,9 @@ type ProfileRow = {
 };
 type EditionRow = {
   game_edition?: unknown;
+  user_id: string;
+};
+type LegacyProgressRow = LegacyModeProgressRow & {
   user_id: string;
 };
 type MemberProfile = {
@@ -379,6 +388,37 @@ export default defineEventHandler(async (event) => {
         const profiles = (await resp.json()) as ProfileRow[];
         for (const p of profiles) {
           profileMap[p.user_id] = mapProfile(p, gameMode, editionsByUserId.get(p.user_id));
+        }
+      }
+    }
+    if (gameMode !== 'seasonal') {
+      const missingProfileIds = validMemberIds.filter((id) => !profileMap[id]);
+      if (missingProfileIds.length > 0) {
+        const legacyProgressField = getLegacyModeProgressField(gameMode);
+        if (!legacyProgressField) {
+          throw new Error('Persistent mode requires a legacy progress field');
+        }
+        const missingIdsParam = `in.(${missingProfileIds.map((id) => `"${id}"`).join(',')})`;
+        const legacyPath = buildRestPath('user_progress', {
+          select: `user_id,${legacyProgressField}`,
+          user_id: missingIdsParam,
+        });
+        const legacyResp = (await serviceFetch(legacyPath)) ?? (await restFetch(legacyPath));
+        if (legacyResp.ok) {
+          const legacyRows = (await legacyResp.json()) as LegacyProgressRow[];
+          for (const row of legacyRows) {
+            const progress = resolveModeProgressData(gameMode, null, row);
+            profileMap[row.user_id] = mapProfile(
+              { user_id: row.user_id, ...summarizeModeProgressData(progress) },
+              gameMode,
+              editionsByUserId.get(row.user_id)
+            );
+          }
+        } else {
+          logger.warn('Team legacy progress fallback fetch failed', {
+            status: legacyResp.status,
+            teamId,
+          });
         }
       }
     }

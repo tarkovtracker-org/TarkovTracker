@@ -2,6 +2,10 @@ import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
 } from '../../../../app/utils/userMetadata';
+import {
+  getLegacyModeProgressField,
+  resolveModeProgressData,
+} from '../../../../app/utils/modeProgressFallback';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { logger } from '../utils/logger';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
@@ -107,8 +111,12 @@ async function fetchUserProgressMode(
   gameMode: GameMode
 ): Promise<UserProgressModeRow | null> {
   const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
+  const legacyProgressField = getLegacyModeProgressField(gameMode);
+  const metadataSelect = ['user_id', 'game_edition', legacyProgressField]
+    .filter(Boolean)
+    .join(',');
   const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
-  const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=user_id,game_edition&limit=1`;
+  const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${metadataSelect}&limit=1`;
   const [modeResponse, metadataResponse] = await Promise.all([
     fetch(modeUrl, { headers: getServiceHeaders(env) }),
     fetch(metadataUrl, { headers: getServiceHeaders(env) }),
@@ -122,14 +130,37 @@ async function fetchUserProgressMode(
   }>;
   const metadataRows = (await metadataResponse.json()) as Array<{
     game_edition: number | null;
+    pve_data: UserProgressModeRow['progress_data'];
+    pvp_data: UserProgressModeRow['progress_data'];
     user_id: string;
   }>;
   const modeRow = modeRows[0];
+  const metadataRow = metadataRows[0];
   return {
     user_id: modeRow?.user_id ?? userId,
-    game_edition: metadataRows[0]?.game_edition ?? 1,
-    progress_data: modeRow?.progress_data ?? null,
+    game_edition: metadataRow?.game_edition ?? 1,
+    progress_data: resolveModeProgressData(gameMode, modeRow?.progress_data, metadataRow),
   };
+}
+const asProgressRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+async function fetchLegacyProgressData(
+  env: Env,
+  userId: string,
+  gameMode: GameMode
+): Promise<Record<string, unknown>> {
+  const legacyProgressField = getLegacyModeProgressField(gameMode);
+  if (!legacyProgressField) return {};
+  const legacyUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${legacyProgressField}&limit=1`;
+  const legacyResponse = await fetch(legacyUrl, { headers: getServiceHeaders(env) });
+  if (!legacyResponse.ok) throw new Error('Failed to fetch user progress');
+  const legacyRows = (await legacyResponse.json()) as Array<{
+    pve_data: UserProgressModeRow['progress_data'];
+    pvp_data: UserProgressModeRow['progress_data'];
+  }>;
+  return asProgressRecord(resolveModeProgressData(gameMode, null, legacyRows[0]));
 }
 async function fetchCurrentProgressData(
   env: Env,
@@ -137,13 +168,14 @@ async function fetchCurrentProgressData(
   gameMode: GameMode
 ): Promise<Record<string, unknown>> {
   const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
-  const url = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=progress_data&limit=1`;
-  const response = await fetch(url, { headers: getServiceHeaders(env) });
-  if (!response.ok) throw new Error('Failed to fetch user progress');
-  const rows = (await response.json()) as Array<{
+  const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=progress_data&limit=1`;
+  const modeResponse = await fetch(modeUrl, { headers: getServiceHeaders(env) });
+  if (!modeResponse.ok) throw new Error('Failed to fetch user progress');
+  const modeRows = (await modeResponse.json()) as Array<{
     progress_data: Record<string, unknown> | null;
   }>;
-  return rows[0]?.progress_data ?? {};
+  if (modeRows[0]) return asProgressRecord(modeRows[0].progress_data);
+  return fetchLegacyProgressData(env, userId, gameMode);
 }
 async function getUserDisplayName(env: Env, userId: string): Promise<string | null> {
   const cacheKey = `user-display:${userId}`;
