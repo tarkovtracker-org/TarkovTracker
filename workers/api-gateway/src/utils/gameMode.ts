@@ -20,7 +20,10 @@ const getActiveSeasonNumber = async (env: Env): Promise<number> => {
   rpcUrl.hash = '';
   const response = await fetch(rpcUrl, {
     method: 'POST',
-    redirect: 'error',
+    // workerd only accepts 'follow' or 'manual'; 'error' throws at the fetch call. 'manual'
+    // surfaces a redirect as a non-ok status, which the check below rejects, so service
+    // credentials are still never replayed to another host.
+    redirect: 'manual',
     headers: { ...getServiceHeaders(env), 'Content-Type': 'application/json' },
     body: '{}',
     signal: AbortSignal.timeout(ACTIVE_SEASON_FETCH_TIMEOUT_MS),
