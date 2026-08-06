@@ -253,13 +253,18 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   `sync_user_game_mode_progress` never got created, and the new frontend shipped against the old
   schema, so every signed-in client got `404`s. Ship the schema first, then backfill in a separate
   migration, and make the app tolerate rows that do not exist yet.
-- **A backfill migration should be non-transactional, ranged, and idempotent.** Use
-  `-- supabase:disable-transaction` with one statement per key range so each range commits on its
-  own, keep the conflict rule a no-op for rows that already hold real data, and re-running must
-  change nothing. See `20260806120000_add_game_mode_progress_backfill_helper.sql` and
-  `20260806120100_backfill_normalized_game_mode_progress.sql` for the shape. A single statement
-  covering every row also holds conflict locks on everything it inserts until it commits, which
-  blocks concurrent user writes to the same rows.
+- **Do not run a whole-table backfill through the migration runner on this project.** It was tried
+  twice on 2026-08-06 and failed both times, the second time taking user-facing writes with it. The
+  retry held an open transaction inserting into `user_game_mode_progress` for 30+ minutes, so every
+  signed-in client blocked on conflicting inserts during its startup sync and the app looked like a
+  broken login while auth itself was healthy. Two properties make this worse than it sounds: a
+  migration file is applied atomically even with `-- supabase:disable-transaction` (verified with a
+  probe whose earlier statements were rolled back by a later failure), so a backfill cannot be staged
+  inside one file; and the runner retries a failed migration on **every** later push to `main`,
+  including `chore(release)` commits, so a failing backfill re-runs unattended.
+  Run a large backfill out-of-band from the SQL editor in small committed batches during low traffic,
+  watching `pg_stat_activity`, or avoid the data movement entirely by making the read path fall back
+  to the old source.
 - **Raise `statement_timeout` explicitly when a migration scans or rewrites whole tables**, and pair
   the `SET` with a trailing `RESET statement_timeout;`.
 - **Nothing in CI runs a migration against production-sized data.** `supabase:check` resets an empty
