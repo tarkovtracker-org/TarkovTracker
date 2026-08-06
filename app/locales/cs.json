@@ -220,6 +220,10 @@
     "complete": "Complete",
     "pvp": "PvP",
     "pve": "PvE",
+    "seasonal_pvp": "Sezónní PvP",
+    "pvp_description": "Hráč proti hráči (standardní)",
+    "pve_description": "Hráč proti prostředí (Co-op)",
+    "seasonal_pvp_description": "Sezóna {season}",
     "retry": "Opakovat",
     "open_tasks": "Otevřené úkoly",
     "view_on_tarkov_dev": "Zobrazit na Tarkov.dev",
@@ -307,6 +311,7 @@
     "game_edition": "Herní edice",
     "reset_pvp_data": "Resetovat PvP data",
     "reset_pve_data": "Resetovat PvE data",
+    "reset_seasonal_data": "Obnovit sezonní data PvP",
     "reset_all_data": "Resetovat všechna data",
     "import_failed": "Import se nezdařil",
     "delete_archived_run": "Odstranit archivovaný běh",
@@ -1180,6 +1185,9 @@
           "create_team_error_ui_update": "Stav týmu se neaktualizoval. Prosím obnovte a uvidíte váš tým nebo to zkuste znovu.",
           "leave_team_success": "Úspěšně opustil váš tým.",
           "leave_team_error": "Nepodařilo se opustit váš tým.",
+          "already_in_team": "Již jste v týmu {mode} . Nechte svůj aktuální tým.",
+          "url_copied": "URL zkopírováno do schránky",
+          "copy_url_failed": "Kopírování URL do schránky se nezdařilo",
           "no_team": "V současné době nejste v týmu.",
           "team_invite_url_label": "URL pozvánky do týmu",
           "copy_link": "Kopírovat",
@@ -1526,13 +1534,18 @@
     "xp_settings_link": "Zobrazit nastavení XP a úrovně"
   },
   "profile": {
-    "title_with_mode": "{name} Profil {mode}"
+    "title_with_mode": "{name} Profil {mode}",
+    "mode_pvp": "PVP",
+    "mode_pve": "PVE",
+    "mode_seasonal_pvp": "SEASONÁLNÍ PVP",
+    "season_short": "S{season}"
   },
   "streamer_tools": {
     "subtitle": "Generování odkazů v prohlížeči OBS, Streamlabs Desktop, XSplit a vMix pro zobrazení live Kappa pokroku.",
     "manage_sharing": "Spravovat sdílení",
     "login_required": "Přihlaste se pro generování osobních odkazů na překrytí streamu.",
     "mode_private": "Tento herní režim je soukromý. Veřejné sdílení musí být povoleno, aby odkazy prohlížeče fungovaly.",
+    "visibility_load_failed": "Nelze načíst nastavení sdílení.",
     "open_account_settings": "Otevřít nastavení účtu",
     "content_title": "Obsah",
     "mode_label": "Herní režim",
@@ -1737,10 +1750,10 @@
       "description": "Nastavte, který herní mód profil lze zobrazit ze sdíleného odkazu.",
       "public": "Veřejnost",
       "private": "Soukromé",
-      "toggle_pvp_label": "Toggle PvP profile sharing",
-      "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_pvp_link": "Copy PvP profile link",
-      "copy_pve_link": "Copy PvE profile link",
+      "toggle_label": "Přepnout sdílení profilu {mode}",
+      "copy_link": "Kopírovat odkaz na profil {mode}",
+      "load_failed": "Nelze načíst nastavení sdílení.",
+      "save_failed": "Nastavení sdílení nelze aktualizovat.",
       "login_required": "Přihlaste se pro správu viditelnosti sdílení profilu."
     },
     "game_settings": {
@@ -1752,9 +1765,11 @@
       "reset_pvp_warning": "Tímto trvale smažete veškerý váš PvP pokrok, včetně úkolů, skrytí a úrovně. Vaše PvE data nebudou ovlivněna.",
       "reset_pve_confirmation": "Jste si jisti, že chcete resetovat postup PvE?",
       "reset_pve_warning": "Tímto bude trvale odstraněn veškerý váš PvE pokrok, včetně úkolů, skrytí a úrovně. Vaše PvP data nebudou ovlivněna.",
+      "reset_seasonal_confirmation": "Jste si jisti, že chcete obnovit sezonní postup PvP?",
+      "reset_seasonal_warning": "Tímto trvale smažete veškerý průběh sezony pro aktivní sezónu. Vaše trvalé údaje PvP a PvE nebudou ovlivněny.",
       "reset_all_confirmation": "Jste si jisti, že chcete obnovit VŠECHNY váš pokrok?",
       "reset_all_warning": "Tímto trvale smažete VŠECHNY váš postup pro PvP a PvE režimy. Tuto akci nelze vrátit zpět!",
-      "prestige_pvp_warning": "Váš současný běh PvP bude archivován, pak se PvP postup resetuje pro další úroveň prestiže. Data PvE nejsou ovlivněna.",
+      "prestige_mode_warning": "Váš aktuální běh {mode} bude archivován a jeho postup se obnoví pro další úroveň prestiže. Ostatní režimy nejsou dotčeny.",
       "reset_confirm": "Resetovat data",
       "export_description": "Stáhněte si zálohu dat o průběhu jak pro PvP, tak pro PvE režimy.",
       "export_button": "Export zálohy průběhu exportu",
@@ -1781,12 +1796,17 @@
       "import_preview_pvp_tasks": "PvP úkoly",
       "import_preview_pve_level": "PvE úroveň",
       "import_preview_pve_tasks": "PvE úkoly",
+      "import_preview_seasonal_level": "Sezónní úroveň PvP",
+      "import_preview_seasonal_tasks": "Sezónní úkoly PvP",
       "import_target_label": "Import Target",
       "import_target_pvp": "Pouze PvP",
       "import_target_pve": "Pouze PvE",
-      "import_target_both": "PvP a PvE",
+      "import_target_all": "Vše k dispozici",
+      "seasonal_import_locked": "Sezónní PvP importy jsou dočasně uzamčeny, dokud nebudou zdrojová data ověřena pro sezónu {season}.",
       "import_success_title": "Záloha importována",
       "import_success_description": "Vaše data o pokroku byla úspěšně obnovena.",
+      "import_error_title": "Import zálohy se nezdařil",
+      "import_error_description": "Vaši zálohu nelze importovat. Zkuste to prosím znovu.",
       "export_error_title": "Export selhal",
       "debug_export_error_title": "Export ladění se nezdařil",
       "reset_title": "Obnovit průběh",
@@ -1822,6 +1842,11 @@
       "success_title": "PvE reset dat",
       "success_description": "Váš PvE postup byl úspěšně obnoven.",
       "error_description": "Obnovení PvE dat se nezdařilo. Zkuste to znovu."
+    },
+    "reset_seasonal": {
+      "success_title": "Sezónní reset dat PvP",
+      "success_description": "Váš aktivní sezóna byl úspěšně obnoven.",
+      "error_description": "Obnovení sezonních dat PvP se nezdařilo. Zkuste to znovu."
     },
     "reset_all": {
       "success_title": "Resetování všech dat",
@@ -1893,6 +1918,9 @@
     "prestige": {
       "pvp_only_title": "Prestige je pouze PvP",
       "pvp_only": "Úniky z Tarkov prestiž v současné době existují pouze pro PvP profily. Přepněte váš aktivní režim na PvP pro správu prestižů a archivovaných běhů.",
+      "persistent_mode_unsupported_title": "Prestige Unavailable",
+      "persistent_mode_unsupported": "Prestige není k dispozici pro trvalý PvE režim.",
+      "seasonal_mode_unsupported": "Prestige není k dispozici v Sezonním PvP.",
       "current_level": "Současná úroveň Prestige",
       "set_current": "Nastavit aktuální Prestige",
       "set_current_hint": "Použijte tuto možnost, pokud jste již prestiž ve hře a potřebujete pouze sledovač pro shodu. To neobnovuje průběh nebo nevytvoří historii.",
@@ -1905,10 +1933,10 @@
       "requirements_description": "Sledování zkontroluje vaši další skutečnou prestiž: Prestige {level}.",
       "requirements_empty": "Pro tuto prestiž nejsou k dispozici žádné další požadavky na sledování.",
       "archive_title": "Archivovat běh a začít další Prestige",
-      "archive_description": "Používejte to pouze tehdy, když jste nyní opravdu prestižní. Váš současný běh PvP bude archivován a PvP postup se resetuje pro další prestiž.",
+      "archive_description_mode": "Používejte to pouze tehdy, když jste nyní opravdu prestižní. Váš aktuální běh {mode} bude archivován a jeho postup bude obnoven pro další úroveň prestiže.",
       "archive_cta": "Spustit a spustit Prestige {level}",
       "archive_cta_disabled": "Prestige Unavailable",
-      "archive_dialog_title": "Archivovat aktuální běh PvP",
+      "archive_dialog_title_mode": "Archivovat aktuální spuštění {mode}",
       "archive_sync_hint": "Pokud stačí, aby tracker odpovídal existující prestiž ve hře, použijte set Current Prestige výše.",
       "archive_soft_gate_unmet": "Požadavky na sledování {count} stále vypadají neúplně. Přesto můžete pokračovat, pokud tracker chybí kontext.",
       "archive_soft_gate_manual": "Požadavky {count} musí být stále zkontrolovány ručně ve hře.",
@@ -2101,6 +2129,8 @@
       "unlink_profile": "Odpojit",
       "errors": {
         "unexpected_profile_flow": "Při načítání profilu Tarkov.dev nastala chyba. Zkuste to znovu.",
+        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
+        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev zatím nemá žádný snímek pro tento profil. Otevřete profilovou stránku na Tarkov.dev jednou, nechte ji načíst, poté znovu načtěte.",
         "rate_limited": "Příliš mnoho pokusů o import. Počkejte asi {minutes} min a zkuste to znovu.",
         "verification_failed": "Lidské ověření se nezdařilo. Znovu načtěte stránku a zkuste to znovu.",
@@ -2175,7 +2205,10 @@
   },
   "game_settings": {
     "toggle_game_mode_label": "Toggle game mode",
-    "select_faction_label": "Select faction"
+    "select_game_mode_label": "Vyberte herní režim",
+    "select_faction_label": "Select faction",
+    "season_ends_in": "Sezóna {season} končí v {days}d {hours}h {minutes}m",
+    "season_ended": "Sezóna {season} skončila"
   },
   "oauth": {
     "consent": {
