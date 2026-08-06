@@ -13,6 +13,7 @@ import {
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import {
   getLegacyModeProgressField,
+  hasMaterializedProgress,
   resolveModeProgressData,
   summarizeModeProgressData,
   type LegacyModeProgressRow,
@@ -61,6 +62,8 @@ type TeamMembersPayload = {
   members: string[];
   profiles: Record<string, MemberProfile>;
 };
+const toErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 const toFiniteProfileNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 const sanitizeProfileDisplayName = (value: unknown): string | null => {
@@ -160,6 +163,50 @@ const setCachedTeamMembers = async (
         key: failedKey,
       });
     }
+  );
+};
+type LegacyTeamFetchers = {
+  restFetch: (path: string) => Promise<Response>;
+  serviceFetch: (path: string) => Promise<Response | null>;
+};
+const legacyTeamProgressPath = (gameMode: GameMode, memberIds: string[]): string | null => {
+  const legacyProgressField = getLegacyModeProgressField(gameMode);
+  if (!legacyProgressField || memberIds.length === 0) return null;
+  return buildRestPath('user_progress', {
+    select: `user_id,${legacyProgressField}`,
+    user_id: `in.(${memberIds.map((id) => `"${id}"`).join(',')})`,
+  });
+};
+const fetchLegacyTeamProgressRows = async (
+  fetchers: LegacyTeamFetchers,
+  legacyPath: string,
+  teamId: string
+): Promise<LegacyProgressRow[]> => {
+  try {
+    const response =
+      (await fetchers.serviceFetch(legacyPath)) ?? (await fetchers.restFetch(legacyPath));
+    if (response.ok) return (await response.json()) as LegacyProgressRow[];
+    logger.warn('Team legacy progress fallback fetch failed', { status: response.status, teamId });
+  } catch (error) {
+    logger.warn('Team legacy progress fallback fetch failed', {
+      error: toErrorMessage(error),
+      teamId,
+    });
+  }
+  return [];
+};
+const applyLegacyTeamProfile = (
+  row: LegacyProgressRow,
+  gameMode: GameMode,
+  profileMap: Record<string, MemberProfile>,
+  gameEdition: unknown
+): void => {
+  const progress = resolveModeProgressData(gameMode, null, row);
+  if (profileMap[row.user_id] && !hasMaterializedProgress(progress)) return;
+  profileMap[row.user_id] = mapProfile(
+    { user_id: row.user_id, ...summarizeModeProgressData(progress) },
+    gameMode,
+    gameEdition
   );
 };
 export default defineEventHandler(async (event) => {
@@ -362,7 +409,7 @@ export default defineEventHandler(async (event) => {
       }
     } catch (error) {
       logger.warn('Team edition metadata fetch failed', {
-        error: error instanceof Error ? error.message : String(error),
+        error: toErrorMessage(error),
         teamId,
       });
     }
@@ -391,36 +438,15 @@ export default defineEventHandler(async (event) => {
         }
       }
     }
-    if (gameMode !== 'seasonal') {
-      const missingProfileIds = validMemberIds.filter((id) => !profileMap[id]);
-      if (missingProfileIds.length > 0) {
-        const legacyProgressField = getLegacyModeProgressField(gameMode);
-        if (!legacyProgressField) {
-          throw new Error('Persistent mode requires a legacy progress field');
-        }
-        const missingIdsParam = `in.(${missingProfileIds.map((id) => `"${id}"`).join(',')})`;
-        const legacyPath = buildRestPath('user_progress', {
-          select: `user_id,${legacyProgressField}`,
-          user_id: missingIdsParam,
-        });
-        const legacyResp = (await serviceFetch(legacyPath)) ?? (await restFetch(legacyPath));
-        if (legacyResp.ok) {
-          const legacyRows = (await legacyResp.json()) as LegacyProgressRow[];
-          for (const row of legacyRows) {
-            const progress = resolveModeProgressData(gameMode, null, row);
-            profileMap[row.user_id] = mapProfile(
-              { user_id: row.user_id, ...summarizeModeProgressData(progress) },
-              gameMode,
-              editionsByUserId.get(row.user_id)
-            );
-          }
-        } else {
-          logger.warn('Team legacy progress fallback fetch failed', {
-            status: legacyResp.status,
-            teamId,
-          });
-        }
-      }
+    const legacyPath = legacyTeamProgressPath(
+      gameMode,
+      validMemberIds.filter((id) => profileMap[id]?.level == null)
+    );
+    const legacyRows = legacyPath
+      ? await fetchLegacyTeamProgressRows({ restFetch, serviceFetch }, legacyPath, teamId)
+      : [];
+    for (const row of legacyRows) {
+      applyLegacyTeamProfile(row, gameMode, profileMap, editionsByUserId.get(row.user_id));
     }
   }
   const payload: TeamMembersPayload = { members: validMemberIds, profiles: profileMap };

@@ -4,6 +4,7 @@ import {
   isGameMode,
   type GameMode,
 } from '@/utils/constants';
+import { logger } from '@/utils/logger';
 import type { SupabaseClient } from '@supabase/supabase-js';
 export type ProfileVisibilityRow = {
   game_mode: unknown;
@@ -37,10 +38,16 @@ export const fetchProfileVisibilityRows = async (
       .eq('user_id', userId)
       .maybeSingle(),
   ]);
+  if (legacyRows.error) {
+    logger.error('Failed to load legacy profile sharing preferences', {
+      error: legacyRows.error,
+      userId,
+    });
+  }
   return {
     data: modeRows.data,
-    error: modeRows.error ?? legacyRows.error,
-    legacy: legacyRows.data,
+    error: modeRows.error,
+    legacy: legacyRows.error ? null : legacyRows.data,
   };
 };
 export type LoadedProfileVisibility =

@@ -10,7 +10,11 @@ import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
-import { getLegacyModeProgressField, resolveModeProgressData } from '@/utils/modeProgressFallback';
+import {
+  getLegacyModeProgressField,
+  hasMaterializedProgress,
+  resolveModeProgressData,
+} from '@/utils/modeProgressFallback';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
@@ -81,7 +85,7 @@ const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: str
 };
 const applyLegacyPersistentProgressResult = (
   result: { data: { pve_data?: unknown; pvp_data?: unknown } | null; error: unknown },
-  normalizedModes: Set<GameMode>,
+  appliedModes: Set<GameMode>,
   teammateId: string,
   mode: GameMode,
   applyProgress: (mode: GameMode, progress: unknown) => void
@@ -90,9 +94,9 @@ const applyLegacyPersistentProgressResult = (
     logTeammateModeProgressHydrationFailure(result.error, teammateId);
     return;
   }
-  if (mode !== GAME_MODES.SEASONAL && !normalizedModes.has(mode)) {
-    applyProgress(mode, resolveModeProgressData(mode, null, result.data));
-  }
+  if (appliedModes.has(mode)) return;
+  const legacyProgress = resolveModeProgressData(mode, null, result.data);
+  if (legacyProgress !== null) applyProgress(mode, legacyProgress);
 };
 const fetchLegacyTeammateProgress = async (
   client: Pick<SupabaseClient, 'from'>,
@@ -111,13 +115,6 @@ const resolveTeammateLegacyMode = (
   memberProfile: MemberProfile | undefined,
   currentMode: GameMode
 ): GameMode => memberProfile?.gameMode ?? currentMode;
-const collectAppliedModes = (
-  rows: unknown[] | null,
-  applyModeProgress: (row: Record<string, unknown>) => GameMode | null
-): Set<GameMode> =>
-  new Set(
-    (rows ?? []).map((row) => applyModeProgress(row as Record<string, unknown>)).filter(isGameMode)
-  );
 export type TeammateIdentity = {
   currentGameMode: GameMode;
   gameEdition: number;
@@ -617,7 +614,9 @@ export function useTeammateStores() {
       storeInstance.$patch((state) => {
         Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
       });
-      const applyProgressData = (mode: GameMode, progress: unknown) => {
+      const appliedModes = new Set<GameMode>();
+      const applyProgressData = (mode: GameMode, progress: unknown, authoritative = false) => {
+        if (authoritative || hasMaterializedProgress(progress)) appliedModes.add(mode);
         storeInstance.$patch((state) => {
           state[mode] = {
             ...defaultState[mode],
@@ -625,12 +624,15 @@ export function useTeammateStores() {
           };
         });
       };
-      const applyModeProgress = (row: Record<string, unknown>): GameMode | null => {
+      const applyModeProgress = (
+        row: Record<string, unknown>,
+        authoritative = false
+      ): GameMode | null => {
         const mode = row.game_mode;
         if (!isGameMode(mode)) return null;
         const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
         if (row.season_number !== expectedSeason) return null;
-        applyProgressData(mode, row.progress_data);
+        applyProgressData(mode, row.progress_data, authoritative);
         return mode;
       };
       const legacyMode = resolveTeammateLegacyMode(memberProfile, getCurrentGameMode());
@@ -647,10 +649,10 @@ export function useTeammateStores() {
             logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
           }
-          const normalizedModes = collectAppliedModes(modeRows.data, applyModeProgress);
+          modeRows.data?.forEach((row) => applyModeProgress(row as Record<string, unknown>));
           applyLegacyPersistentProgressResult(
             legacyRow,
-            normalizedModes,
+            appliedModes,
             teammateId,
             legacyMode,
             applyProgressData
@@ -670,7 +672,7 @@ export function useTeammateStores() {
             table: 'user_game_mode_progress',
             filter: `user_id=eq.${teammateId}`,
           },
-          (payload) => applyModeProgress(payload.new as Record<string, unknown>)
+          (payload) => applyModeProgress(payload.new as Record<string, unknown>, true)
         )
         .subscribe();
       void hydrateModeProgress();
@@ -691,6 +693,7 @@ export function useTeammateStores() {
         const modeKey = data.gameMode;
         if (!isGameMode(modeKey)) return;
         const currentModeData = storeInstance.$state[modeKey] || {};
+        appliedModes.add(modeKey);
         const currentCompletions =
           (
             currentModeData as {

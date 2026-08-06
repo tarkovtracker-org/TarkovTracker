@@ -9,29 +9,34 @@ export const getLegacyModeProgressField = (mode: GameMode): LegacyModeProgressFi
   if (mode === GAME_MODES.PVE) return 'pve_data';
   return null;
 };
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+const finiteNumberOrNull = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+export const hasMaterializedProgress = (progress: unknown): boolean =>
+  finiteNumberOrNull(asRecord(progress)?.level) !== null;
 export const resolveModeProgressData = <T>(
   mode: GameMode,
   normalizedProgress: T | null | undefined,
   legacyProgress: LegacyModeProgressRow<T> | null | undefined
 ): T | null => {
-  if (normalizedProgress !== null && normalizedProgress !== undefined) {
-    return normalizedProgress;
-  }
-  if (mode === GAME_MODES.PVP) return legacyProgress?.pvp_data ?? null;
-  if (mode === GAME_MODES.PVE) return legacyProgress?.pve_data ?? null;
-  return null;
+  const normalized = normalizedProgress ?? null;
+  const legacyField = getLegacyModeProgressField(mode);
+  if (!legacyField) return normalized;
+  if (hasMaterializedProgress(normalized)) return normalized;
+  const legacy = (legacyProgress?.[legacyField] as T | undefined) ?? null;
+  if (hasMaterializedProgress(legacy)) return legacy;
+  return normalized ?? legacy;
 };
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+const isCompletedTask = (task: unknown): boolean =>
+  task === true || asRecord(task)?.complete === true;
 const countCompletedTasks = (value: unknown): number => {
   const taskCompletions = asRecord(value);
   if (!taskCompletions) return 0;
-  return Object.values(taskCompletions).filter((task) => asRecord(task)?.complete === true).length;
+  return Object.values(taskCompletions).filter(isCompletedTask).length;
 };
-const finiteNumberOrNull = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isFinite(value) ? value : null;
 export const summarizeModeProgressData = (
   progress: unknown
 ): { display_name: string | null; level: number | null; tasks_completed: number } => {

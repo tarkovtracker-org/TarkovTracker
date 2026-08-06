@@ -268,6 +268,22 @@ describe('Shared Profile API', () => {
       visibility: 'public',
     });
   });
+  it('falls back to legacy progress when the normalized row carries no level', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
+      )
+      .mockResolvedValueOnce(modeProgressResponse({ taskCompletions: {} }, true))
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({
+      data: { displayName: 'LegacyPlayer', level: 39 },
+      gameEdition: 3,
+      mode: 'pvp',
+      visibility: 'public',
+    });
+  });
   it('loads Seasonal profiles from the active season row', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return '11111111-1111-4111-8111-111111111111';

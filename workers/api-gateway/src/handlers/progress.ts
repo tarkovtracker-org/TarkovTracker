@@ -4,7 +4,9 @@ import {
 } from '../../../../app/utils/userMetadata';
 import {
   getLegacyModeProgressField,
+  hasMaterializedProgress,
   resolveModeProgressData,
+  type LegacyModeProgressRow,
 } from '../../../../app/utils/modeProgressFallback';
 import { getTasks, getHideoutStations } from '../services/tarkov';
 import { logger } from '../utils/logger';
@@ -146,21 +148,20 @@ const asProgressRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-async function fetchLegacyProgressData(
+async function fetchLegacyProgressRow(
   env: Env,
   userId: string,
   gameMode: GameMode
-): Promise<Record<string, unknown>> {
+): Promise<LegacyModeProgressRow<UserProgressModeRow['progress_data']> | null> {
   const legacyProgressField = getLegacyModeProgressField(gameMode);
-  if (!legacyProgressField) return {};
+  if (!legacyProgressField) return null;
   const legacyUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${legacyProgressField}&limit=1`;
   const legacyResponse = await fetch(legacyUrl, { headers: getServiceHeaders(env) });
   if (!legacyResponse.ok) throw new Error('Failed to fetch user progress');
-  const legacyRows = (await legacyResponse.json()) as Array<{
-    pve_data: UserProgressModeRow['progress_data'];
-    pvp_data: UserProgressModeRow['progress_data'];
-  }>;
-  return asProgressRecord(resolveModeProgressData(gameMode, null, legacyRows[0]));
+  const legacyRows = (await legacyResponse.json()) as Array<
+    LegacyModeProgressRow<UserProgressModeRow['progress_data']>
+  >;
+  return legacyRows[0] ?? null;
 }
 async function fetchCurrentProgressData(
   env: Env,
@@ -174,8 +175,10 @@ async function fetchCurrentProgressData(
   const modeRows = (await modeResponse.json()) as Array<{
     progress_data: Record<string, unknown> | null;
   }>;
-  if (modeRows[0]) return asProgressRecord(modeRows[0].progress_data);
-  return fetchLegacyProgressData(env, userId, gameMode);
+  const modeProgress = modeRows[0]?.progress_data ?? null;
+  if (hasMaterializedProgress(modeProgress)) return asProgressRecord(modeProgress);
+  const legacyRow = await fetchLegacyProgressRow(env, userId, gameMode);
+  return asProgressRecord(resolveModeProgressData(gameMode, modeProgress, legacyRow));
 }
 async function getUserDisplayName(env: Env, userId: string): Promise<string | null> {
   const cacheKey = `user-display:${userId}`;

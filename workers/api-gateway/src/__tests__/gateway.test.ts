@@ -1030,6 +1030,62 @@ describe('api-gateway', () => {
       playerLevel: 37,
     });
   });
+  it('seeds the first write from legacy progress when the normalized row is unmaterialized', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    const fetchMock = createBaseFetchMock({
+      onMerge: (payload) => {
+        mergePayload = payload;
+      },
+      tasks: [
+        {
+          id: 'task-main',
+          name: 'Main Task',
+          factionName: 'Any',
+          objectives: [],
+          taskRequirements: [],
+        },
+      ],
+      userProgress: {
+        game_edition: 1,
+        progress_data: { taskCompletions: {} },
+        pve_data: null,
+        pvp_data: {
+          level: 37,
+          taskCompletions: { 'task-main': { complete: true, failed: false, timestamp: 1 } },
+        },
+        user_id: 'user-1',
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/task/task-main', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_set?.lastApiUpdate).toBeUndefined();
+  });
+  it('reads legacy progress for an unmaterialized normalized row', async () => {
+    const fetchMock = createBaseFetchMock({
+      gameMode: 'pvp',
+      permissions: ['GP'],
+      userProgress: {
+        game_edition: 3,
+        progress_data: { taskCompletions: {} },
+        pvp_data: { displayName: 'Legacy Player', level: 37, taskCompletions: {} },
+        user_id: 'user-1',
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(progressRequest('pvp'), BASE_ENV);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { playerLevel: number } };
+    expect(body.data.playerLevel).toBe(37);
+  });
   it('retains account edition when a team member has no active mode progress row', async () => {
     const fetchMock = createBaseFetchMock({
       permissions: ['TP'],
@@ -1070,7 +1126,32 @@ describe('api-gateway', () => {
       displayName: 'Legacy Teammate',
       playerLevel: 31,
     });
+    const editionRequest = fetchMock.mock.calls
+      .map((call) => new URL(String(call[0])))
+      .find((url) => url.pathname.endsWith('/rest/v1/user_progress'));
+    expect(editionRequest?.searchParams.get('select')).toBe('user_id,game_edition,pve_data');
   });
+  it.each([
+    ['pvp', 'user_id,game_edition,pvp_data'],
+    ['seasonal', 'user_id,game_edition'],
+  ] as const)(
+    'narrows the solo team-progress edition select for %s',
+    async (mode, expectedEditionSelect) => {
+      const fetchMock = createBaseFetchMock({
+        permissions: ['TP'],
+        gameMode: mode,
+        teamId: null,
+        userProgress: { user_id: 'user-1', game_edition: 5 },
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
+      expect(res.status).toBe(200);
+      const editionRequest = fetchMock.mock.calls
+        .map((call) => new URL(String(call[0])))
+        .find((url) => url.pathname.endsWith('/rest/v1/user_progress'));
+      expect(editionRequest?.searchParams.get('select')).toBe(expectedEditionSelect);
+    }
+  );
   it('retains account edition in solo fallback without an active mode progress row', async () => {
     const fetchMock = createBaseFetchMock({
       permissions: ['TP'],

@@ -28,6 +28,18 @@ describe('mode progress fallback', () => {
   it('never falls back Seasonal progress to persistent PvP', () => {
     expect(resolveModeProgressData('seasonal', null, legacy)).toBeNull();
   });
+  it('treats an unmaterialized normalized row as absent', () => {
+    const placeholder = { taskCompletions: {} };
+    expect(resolveModeProgressData('pvp', placeholder, legacy)).toBe(legacy.pvp_data);
+  });
+  it('keeps an unmaterialized normalized row when legacy is also unmaterialized', () => {
+    const placeholder: Record<string, unknown> = { taskCompletions: {} };
+    expect(resolveModeProgressData('pvp', placeholder, { pvp_data: {} })).toBe(placeholder);
+  });
+  it('keeps an unmaterialized Seasonal row instead of reading legacy', () => {
+    const placeholder = { taskCompletions: {} };
+    expect(resolveModeProgressData('seasonal', placeholder, legacy)).toBe(placeholder);
+  });
   it('selects only the legacy column for a persistent mode', () => {
     expect(getLegacyModeProgressField('pvp')).toBe('pvp_data');
     expect(getLegacyModeProgressField('pve')).toBe('pve_data');
@@ -39,5 +51,14 @@ describe('mode progress fallback', () => {
       level: 42,
       tasks_completed: 2,
     });
+  });
+  it('counts legacy boolean task completions', () => {
+    expect(
+      summarizeModeProgressData({
+        displayName: 'Boolean Legacy',
+        level: 12,
+        taskCompletions: { a: true, b: false, c: { complete: true }, d: 'nope' },
+      })
+    ).toEqual({ display_name: 'Boolean Legacy', level: 12, tasks_completed: 2 });
   });
 });

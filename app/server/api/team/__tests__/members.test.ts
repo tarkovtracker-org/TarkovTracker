@@ -296,6 +296,77 @@ describe('Team Members API', () => {
     });
   });
   describe('Profile fallback handling', () => {
+    it('returns a partial team response when the legacy fallback fetch throws', async () => {
+      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({ ok: true, json: async () => [] })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_edition: 3, user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockRejectedValueOnce(new Error('Timed out while loading team metadata'));
+      const { default: handler } = await import('@/server/api/team/members');
+      const result = await handler(mockEvent as H3Event);
+      expect(result.members).toEqual(['11111111-1111-4111-8111-111111111111']);
+      expect(result.profiles).toEqual({});
+    });
+    it('falls back to legacy progress when the summary row has no level', async () => {
+      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              display_name: null,
+              level: null,
+              tasks_completed: 0,
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_edition: 3, user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              pvp_data: {
+                displayName: 'Placeholder Recovered',
+                level: 21,
+                taskCompletions: { a: true },
+              },
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+          ],
+        });
+      const { default: handler } = await import('@/server/api/team/members');
+      const result = await handler(mockEvent as H3Event);
+      expect(result.profiles['11111111-1111-4111-8111-111111111111']).toEqual({
+        displayName: 'Placeholder Recovered',
+        gameEdition: 3,
+        gameMode: 'pvp',
+        level: 21,
+        tasksCompleted: 1,
+      });
+    });
     it('summarizes legacy persistent progress when normalized team rows are missing', async () => {
       mockGetQuery.mockReturnValue({ teamId: 'team-456' });
       mockFetch
