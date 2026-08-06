@@ -24,5 +24,3 @@ ALTER TABLE public.api_tokens
   VALIDATE CONSTRAINT api_tokens_token_value_game_mode_match;
 ALTER TABLE public.user_system
   VALIDATE CONSTRAINT user_system_seasonal_team_id_fkey;
-ALTER TABLE public.user_prestige_runs
-  VALIDATE CONSTRAINT user_prestige_runs_mode_check;

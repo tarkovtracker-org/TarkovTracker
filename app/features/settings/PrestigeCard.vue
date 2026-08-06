@@ -979,7 +979,7 @@
     () => [$supabase.user.loggedIn, $supabase.user.id, currentMode.value] as const,
     ([loggedIn, userId, mode], previous) => {
       const [prevLoggedIn, prevUserId, prevMode] = previous ?? [false, null, GAME_MODES.PVE];
-      if (!loggedIn || !userId || mode === GAME_MODES.PVE) {
+      if (!loggedIn || !userId || !isPrestigeMode.value) {
         showArchiveDialog.value = false;
         showDeleteHistoryDialog.value = false;
         archiveConfirmText.value = '';

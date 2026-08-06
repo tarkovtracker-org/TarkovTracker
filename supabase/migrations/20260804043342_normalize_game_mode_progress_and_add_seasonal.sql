@@ -822,12 +822,6 @@ ALTER TABLE public.api_tokens
   )
   NOT VALID;
 
-ALTER TABLE public.user_prestige_runs
-  DROP CONSTRAINT IF EXISTS user_prestige_runs_mode_check;
-ALTER TABLE public.user_prestige_runs
-  ADD CONSTRAINT user_prestige_runs_mode_check CHECK (mode IN ('pvp', 'pve'))
-  NOT VALID;
-
 GRANT SELECT, DELETE ON public.user_prestige_runs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_prestige_runs TO service_role;
 

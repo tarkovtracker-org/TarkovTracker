@@ -165,25 +165,31 @@ describe('useTarkov prestigeMode seasonal', () => {
     });
     return store;
   };
+  const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+  const snapshotModes = (store: ReturnType<typeof useTarkovStore>) =>
+    clone({ pve: store.pve, pvp: store.pvp, seasonal: store.seasonal });
   it('refuses to prestige Seasonal PvP and leaves every mode untouched', async () => {
     const store = seedModes();
+    const before = snapshotModes(store);
     await expect(store.prestigeMode('seasonal')).rejects.toThrow(
       'Prestige is not supported for Seasonal PvP.'
     );
     expect(rpc).not.toHaveBeenCalled();
-    expect(store.seasonal.level).toBe(30);
-    expect(store.seasonal.prestigeLevel).toBe(1);
-    expect(store.pvp.level).toBe(42);
+    expect(snapshotModes(store)).toEqual(before);
   });
-  it('refuses to sync a Seasonal prestige level', async () => {
+  it('refuses to sync a Seasonal prestige level and leaves every mode untouched', async () => {
     const store = seedModes();
+    const before = snapshotModes(store);
     await expect(store.syncPrestigeLevel('seasonal', 2)).rejects.toThrow(
       'Prestige is not supported for Seasonal PvP.'
     );
-    expect(store.seasonal.prestigeLevel).toBe(1);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(snapshotModes(store)).toEqual(before);
   });
   it('archives a PvP prestige without sending seasonal data', async () => {
     const store = seedModes();
+    const seasonalBefore = clone(store.seasonal);
+    const pveBefore = clone(store.pve);
     await store.prestigeMode('pvp');
     expect(rpc).toHaveBeenCalledWith(
       'archive_prestige_run_and_reset_progress',
@@ -192,8 +198,7 @@ describe('useTarkov prestigeMode seasonal', () => {
     const [, args] = rpc.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(args).not.toHaveProperty('p_seasonal_data');
     expect(args).not.toHaveProperty('p_season_number');
-    expect(store.seasonal.level).toBe(30);
-    expect(store.seasonal.prestigeLevel).toBe(1);
-    expect(store.pve.level).toBe(9);
+    expect(clone(store.seasonal)).toEqual(seasonalBefore);
+    expect(clone(store.pve)).toEqual(pveBefore);
   });
 });
