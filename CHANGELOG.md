@@ -1,3 +1,10 @@
+## [1.63.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.1...v1.63.2) (2026-08-06)
+
+
+### Bug Fixes
+
+* **workers:** use a redirect mode workerd accepts for the active-season lookup ([#653](https://github.com/tarkovtracker-org/TarkovTracker/issues/653)) ([911d27a](https://github.com/tarkovtracker-org/TarkovTracker/commit/911d27acdf78297d05e2eed5cec569468d6a3972))
+
 ## [1.63.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.0...v1.63.1) (2026-08-06)
 
 
