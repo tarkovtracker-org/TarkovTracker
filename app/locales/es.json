@@ -220,6 +220,10 @@
     "complete": "Complete",
     "pvp": "JcJ",
     "pve": "JcJ",
+    "seasonal_pvp": "JcJ estacional",
+    "pvp_description": "Jugador vs Jugador (Estándar)",
+    "pve_description": "Jugador vs entorno (Co-op)",
+    "seasonal_pvp_description": "Temporada {season}",
     "retry": "Reintentar",
     "open_tasks": "Abrir tareas",
     "view_on_tarkov_dev": "Ver en Tarkov.dev",
@@ -307,6 +311,7 @@
     "game_edition": "Edición de juego",
     "reset_pvp_data": "Restablecer datos PvP",
     "reset_pve_data": "Restablecer datos PvE",
+    "reset_seasonal_data": "Restablecer datos estacionales JcJ",
     "reset_all_data": "Restablecer todos los datos",
     "import_failed": "Error al importar",
     "delete_archived_run": "Eliminar Ejecuta Archivada",
@@ -1180,6 +1185,9 @@
           "create_team_error_ui_update": "El estado del equipo no se actualizó. Recarga o inténtalo de nuevo.",
           "leave_team_success": "Has dejado tu equipo correctamente.",
           "leave_team_error": "Error al dejar tu equipo.",
+          "already_in_team": "Ya estás en un equipo {mode} . Deja tu equipo actual primero.",
+          "url_copied": "URL copiada al portapapeles",
+          "copy_url_failed": "Error al copiar la URL al portapapeles",
           "no_team": "Actualmente no estás en un equipo.",
           "team_invite_url_label": "URL de Invitación al Equipo",
           "copy_link": "Copiar",
@@ -1526,13 +1534,18 @@
     "xp_settings_link": "View XP and level settings"
   },
   "profile": {
-    "title_with_mode": "Perfil {mode} de {name}"
+    "title_with_mode": "Perfil {mode} de {name}",
+    "mode_pvp": "JcJ",
+    "mode_pve": "JVE",
+    "mode_seasonal_pvp": "PVP DE TEMANO",
+    "season_short": "S{season}"
   },
   "streamer_tools": {
     "subtitle": "Genera enlaces de fuente de navegador para OBS, Streamlabs Desktop, XSplit y vMix para mostrar el progreso de Kappa en vivo.",
     "manage_sharing": "Gestionar compartir",
     "login_required": "Inicia sesión para generar enlaces personalizados de overlay para streamers.",
     "mode_private": "Este modo de juego es privado. El uso compartido público debe estar habilitado para que los enlaces de fuente de navegador funcionen.",
+    "visibility_load_failed": "No se puede cargar la configuración de compartir.",
     "open_account_settings": "Abrir configuración de cuenta",
     "content_title": "Contenido",
     "mode_label": "Modo de juego",
@@ -1737,10 +1750,10 @@
       "description": "Controla qué perfiles de modo de juego se pueden ver desde un enlace compartido.",
       "public": "Público",
       "private": "Privado",
-      "toggle_pvp_label": "Toggle PvP profile sharing",
-      "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_pvp_link": "Copy PvP profile link",
-      "copy_pve_link": "Copy PvE profile link",
+      "toggle_label": "Alternar compartir perfil {mode}",
+      "copy_link": "Copiar enlace de perfil {mode}",
+      "load_failed": "No se puede cargar la configuración de compartir.",
+      "save_failed": "No se puede actualizar la configuración de compartir.",
       "login_required": "Inicia sesión para gestionar la visibilidad del perfil compartido."
     },
     "game_settings": {
@@ -1752,9 +1765,11 @@
       "reset_pvp_warning": "Esto eliminará permanentemente todo tu progreso PvP incluyendo misiones, escondite y nivel. Tus datos PvE no se verán afectados.",
       "reset_pve_confirmation": "¿Estás seguro de que quieres restablecer tu progreso PvE?",
       "reset_pve_warning": "Esto eliminará permanentemente todo tu progreso PvE incluyendo misiones, escondite y nivel. Tus datos PvP no se verán afectados.",
+      "reset_seasonal_confirmation": "¿Está seguro de que desea restablecer su progreso estacional JcJ?",
+      "reset_seasonal_warning": "Esto eliminará permanentemente todo tu progreso JcJ estacional para la temporada activa. Tus datos persistentes JcJ y JcE no se verán afectados.",
       "reset_all_confirmation": "¿Estás seguro de que quieres restablecer todo tu progreso?",
       "reset_all_warning": "¡Esto eliminará permanentemente todo tu progreso para los modos PvP y PvE. Esta acción no se puede deshacer!",
-      "prestige_pvp_warning": "Tu run actual de PvP se archivará y luego se restablecerá la progresión PvP para el siguiente nivel de prestigio. Los datos de PvE no se ven afectados.",
+      "prestige_mode_warning": "Tu ejecución actual de {mode} será archivada, luego su progresión se restablecerá para el siguiente nivel de prestigio. Otros modos no se verán afectados.",
       "reset_confirm": "Restablecer",
       "export_description": "Descarga una copia de seguridad de tu progreso para los modos PvP y PvE.",
       "export_button": "Exportar copia de seguridad",
@@ -1781,12 +1796,17 @@
       "import_preview_pvp_tasks": "Misiones PvP",
       "import_preview_pve_level": "Nivel PvE",
       "import_preview_pve_tasks": "Misiones PvE",
+      "import_preview_seasonal_level": "Nivel estacional JcJ",
+      "import_preview_seasonal_tasks": "Tareas estacionales JcJ",
       "import_target_label": "Destino de importación",
       "import_target_pvp": "Solo PvP",
       "import_target_pve": "Solo PvE",
-      "import_target_both": "PvP y PvE",
+      "import_target_all": "Todo disponible",
+      "seasonal_import_locked": "Las importaciones estacionales JcJ están temporalmente bloqueadas hasta que los datos de origen sean verificados para la Temporada {season}.",
       "import_success_title": "Copia importada",
       "import_success_description": "Tu progreso se ha restaurado correctamente.",
+      "import_error_title": "Importación de copia de seguridad fallida",
+      "import_error_description": "Tu copia de seguridad no pudo ser importada. Por favor, inténtalo de nuevo.",
       "export_error_title": "Error de exportación",
       "debug_export_error_title": "Error al exportar la depuración",
       "reset_title": "Restablecer progreso",
@@ -1822,6 +1842,11 @@
       "success_title": "Restablecimiento de datos PvE",
       "success_description": "Su progreso de PvE se ha restablecido correctamente.",
       "error_description": "No se pudieron restablecer los datos del PvE. Por favor inténtalo de nuevo."
+    },
+    "reset_seasonal": {
+      "success_title": "Reinicio estacional de datos JcJ",
+      "success_description": "Su progreso de la temporada activa se ha reiniciado correctamente.",
+      "error_description": "Error al restablecer los datos estacionales de JcJ. Por favor, inténtalo de nuevo."
     },
     "reset_all": {
       "success_title": "Restablecer todos los datos",
@@ -1893,6 +1918,9 @@
     "prestige": {
       "pvp_only_title": "El prestigio es solo para PvP",
       "pvp_only": "Cambia al modo PvP para prestigiar tu perfil PvP.",
+      "persistent_mode_unsupported_title": "Prestigio no disponible",
+      "persistent_mode_unsupported": "Prestigio no está disponible para el modo JcE persistente.",
+      "seasonal_mode_unsupported": "Prestige no está disponible en JcJ Estacional.",
       "current_level": "Nivel de prestigio actual",
       "set_current": "Establecer prestigio actual",
       "set_current_hint": "Usa esto cuando ya hayas hecho prestigio en el juego y solo necesites que el tracker coincida. Esto no reinicia el progreso ni crea historial.",
@@ -1905,10 +1933,10 @@
       "requirements_description": "El tracker comprueba tu siguiente prestigio real: Prestigio {level}.",
       "requirements_empty": "No hay requisitos adicionales del tracker para este nivel de prestigio.",
       "archive_title": "Archivar partida e iniciar el siguiente prestigio",
-      "archive_description": "Usa esto solo si realmente vas a hacer prestigio ahora. Tu partida PvP actual se archivará y la progresión PvP se reiniciará para el siguiente nivel de prestigio.",
+      "archive_description_mode": "Usa esto sólo cuando estés ganando prestigio ahora. Tu ejecución actual de {mode} será archivada y su progresión se restablecerá para el siguiente nivel de prestigio.",
       "archive_cta": "Archivar partida e iniciar Prestigio {level}",
       "archive_cta_disabled": "Prestigio no disponible",
-      "archive_dialog_title": "Archivar la partida PvP actual",
+      "archive_dialog_title_mode": "Archivar Corrección Actual {mode}",
       "archive_sync_hint": "Si solo necesitas que el tracker coincida con un prestigio ya existente en el juego, usa antes \"Establecer prestigio actual\".",
       "archive_soft_gate_unmet": "Todavía parecen incompletos {count} requisito(s) seguidos. Puedes continuar igualmente si al tracker le falta contexto.",
       "archive_soft_gate_manual": "Todavía debes comprobar manualmente en el juego {count} requisito(s).",
@@ -2082,6 +2110,7 @@
       "skills_count": "{count} habilidades detectadas",
       "last_refreshed": "Datos Tarkov.dev actualizados",
       "last_refreshed_unknown": "Desconocido",
+      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Importado recientemente. Puedes volver a importar este perfil en aproximadamente {minutes} min.",
       "turnstile_hint": "Completa la verificación humana a continuación para obtener tu perfil.",
       "skills_details_toggle": "Ver valores de habilidades",
@@ -2101,6 +2130,7 @@
       "errors": {
         "unexpected_profile_flow": "Algo salió mal al obtener el perfil de Tarkov.dev. Inténtalo de nuevo.",
         "cooldown_active": "Has importado este perfil recientemente. Puedes volver a importarlo en aproximadamente {minutes} min.",
+        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev todavía no tiene una instantánea para este perfil. Abra la página de perfil en Tarkov.dev una vez, déjelo cargar, y vuelva a buscar.",
         "rate_limited": "Demasiados intentos de importación. Espera {minutes} min, luego vuelve a intentarlo.",
         "verification_failed": "Falló la verificación humana. Recarga la página e inténtalo de nuevo.",
@@ -2175,7 +2205,10 @@
   },
   "game_settings": {
     "toggle_game_mode_label": "Toggle game mode",
-    "select_faction_label": "Select faction"
+    "select_game_mode_label": "Seleccionar modo de juego",
+    "select_faction_label": "Select faction",
+    "season_ends_in": "La temporada {season} termina en {days}d {hours}h {minutes}m",
+    "season_ended": "La temporada {season} ha terminado"
   },
   "oauth": {
     "consent": {
