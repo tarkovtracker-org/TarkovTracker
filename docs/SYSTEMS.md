@@ -582,9 +582,9 @@ flowchart LR
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
-- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql`,
-  `supabase/migrations/20260806120100_backfill_normalized_game_mode_progress.sql` — the persistent
-  PvP/PvE backfill, deliberately separate from the schema and applied one key range per transaction
+- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — helper for the
+  persistent PvP/PvE backfill. The backfill itself is not applied by a migration; see the Database
+  Migrations section of `docs/runbook.md`
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
