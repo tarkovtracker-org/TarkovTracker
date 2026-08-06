@@ -543,8 +543,11 @@ flowchart LR
    rows and prefers the normalized active row for each mode.
 2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, serializes
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
-   clients, and upserts each normalized row. API gateway reads resolve the active Seasonal number
-   through the database before selecting a row.
+   clients, and upserts each normalized row. The caller passes the season number its bundle was
+   built for; the function writes the Seasonal row only when that number equals the database's
+   active season, so a cached client from a previous season cannot upload stale Seasonal state.
+   Persistent PvP and PvE still sync in that case. API gateway reads resolve the active Seasonal
+   number through the database before selecting a row.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
@@ -556,7 +559,9 @@ flowchart LR
 5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
    that locks the team while checking capacity and persists membership, user-system state, and the
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
-   Seasonal team column.
+   Seasonal team column. The team-members endpoint reads the `team_member_mode_summary` view, which
+   derives display name, level, and completed-task count inside the database so teammate progress
+   blobs never cross the wire.
 6. The active season definition carries its number, start date, and exact end timestamp. The UI
    counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
    historical rows remain retained and cannot be merged into the new season. Locally persisted
@@ -572,7 +577,7 @@ flowchart LR
 ### Files
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
-  backfill, RLS, compatibility triggers, sync/sharing/prestige RPCs
+  backfill, RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -592,7 +597,13 @@ flowchart LR
   second runtime constant.
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
-  match the active season; absent stamps are treated as the active season.
+  match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
+  independently rejects Seasonal writes whose caller-supplied season number is absent or does not
+  match `private.active_season_number()`, so the fresh-season guarantee does not depend on client
+  code alone.
+- Teammate summaries are computed in the database. `app/server/api/team/members.ts` selects only
+  `display_name`, `level`, and `tasks_completed` from `team_member_mode_summary`; it must not select
+  `progress_data` for team listings.
 - Authenticated users can write only their own progress. Teammate reads require a shared team in
   the same game mode; cross-mode teammates and outsiders cannot read a row.
 - New clients read teammate progress from mode rows. The legacy teammate policy on `user_progress`

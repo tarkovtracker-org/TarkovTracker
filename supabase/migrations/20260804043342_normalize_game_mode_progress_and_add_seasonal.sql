@@ -339,7 +339,8 @@ CREATE OR REPLACE FUNCTION public.sync_user_game_mode_progress(
   p_current_game_mode TEXT,
   p_game_edition INTEGER,
   p_tarkov_uid BIGINT,
-  p_modes JSONB
+  p_modes JSONB,
+  p_seasonal_season_number SMALLINT DEFAULT NULL
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -351,6 +352,7 @@ DECLARE
   v_mode TEXT;
   v_progress JSONB;
   v_season_number SMALLINT;
+  v_active_season SMALLINT := private.active_season_number();
   v_existing_pvp JSONB := '{}'::jsonb;
   v_existing_pve JSONB := '{}'::jsonb;
 BEGIN
@@ -421,8 +423,12 @@ BEGIN
     IF jsonb_typeof(v_progress) <> 'object' THEN
       RAISE EXCEPTION 'Progress for % must be a JSON object', v_mode;
     END IF;
+    IF v_mode = 'seasonal'
+      AND (p_seasonal_season_number IS NULL OR p_seasonal_season_number <> v_active_season) THEN
+      CONTINUE;
+    END IF;
     v_season_number := CASE
-      WHEN v_mode = 'seasonal' THEN private.active_season_number()
+      WHEN v_mode = 'seasonal' THEN v_active_season
       ELSE 0
     END;
     INSERT INTO public.user_game_mode_progress (
@@ -438,10 +444,32 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIGINT, JSONB)
+REVOKE ALL ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIGINT, JSONB, SMALLINT)
   FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIGINT, JSONB)
+GRANT EXECUTE ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIGINT, JSONB, SMALLINT)
   TO authenticated;
+
+CREATE OR REPLACE VIEW public.team_member_mode_summary
+WITH (security_invoker = true) AS
+SELECT
+  user_id,
+  game_mode,
+  season_number,
+  progress_data->>'displayName' AS display_name,
+  CASE
+    WHEN jsonb_typeof(progress_data->'level') = 'number'
+    THEN trunc((progress_data->>'level')::numeric)::int
+  END AS level,
+  (
+    SELECT count(*)::int
+    FROM jsonb_each(COALESCE(progress_data->'taskCompletions', '{}'::jsonb)) AS tc
+    WHERE tc.value->'complete' = 'true'::jsonb
+  ) AS tasks_completed
+FROM public.user_game_mode_progress;
+
+REVOKE ALL ON public.team_member_mode_summary FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.team_member_mode_summary TO authenticated;
+GRANT SELECT ON public.team_member_mode_summary TO service_role;
 
 ALTER TABLE public.teams DROP CONSTRAINT IF EXISTS teams_game_mode_check;
 ALTER TABLE public.teams

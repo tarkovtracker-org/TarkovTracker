@@ -848,6 +848,33 @@ export type Database = {
       }
     }
     Views: {
+      team_member_mode_summary: {
+        Row: {
+          display_name: string | null
+          game_mode: string | null
+          level: number | null
+          season_number: number | null
+          tasks_completed: number | null
+          user_id: string | null
+        }
+        Insert: {
+          display_name?: never
+          game_mode?: string | null
+          level?: never
+          season_number?: number | null
+          tasks_completed?: never
+          user_id?: string | null
+        }
+        Update: {
+          display_name?: never
+          game_mode?: string | null
+          level?: never
+          season_number?: number | null
+          tasks_completed?: never
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       team_member_summary: {
         Row: {
           current_game_mode: string | null
@@ -1009,6 +1036,7 @@ export type Database = {
           p_current_game_mode: string
           p_game_edition: number
           p_modes: Json
+          p_seasonal_season_number?: number | null
           p_tarkov_uid: number | null
         }
         Returns: undefined

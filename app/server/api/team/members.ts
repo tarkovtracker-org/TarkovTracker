@@ -33,7 +33,9 @@ const buildRestPath = (resource: string, params: Record<string, string | number>
 };
 type ProfileRow = {
   user_id: string;
-  progress_data?: unknown;
+  display_name?: unknown;
+  level?: unknown;
+  tasks_completed?: unknown;
 };
 type EditionRow = {
   game_edition?: unknown;
@@ -60,31 +62,17 @@ const sanitizeProfileDisplayName = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed.slice(0, 64) : null;
 };
 function mapProfile(p: ProfileRow, gameMode: GameMode, gameEdition: unknown): MemberProfile {
-  const progress =
-    p.progress_data && typeof p.progress_data === 'object'
-      ? (p.progress_data as Record<string, unknown>)
-      : {};
-  const level = toFiniteProfileNumber(progress.level);
-  const completions =
-    progress.taskCompletions && typeof progress.taskCompletions === 'object'
-      ? Object.values(progress.taskCompletions as Record<string, unknown>)
-      : null;
-  const tasksCompleted =
-    completions?.filter(
-      (completion) =>
-        completion &&
-        typeof completion === 'object' &&
-        (completion as { complete?: unknown }).complete === true
-    ).length ?? null;
+  const level = toFiniteProfileNumber(p.level);
+  const tasksCompleted = toFiniteProfileNumber(p.tasks_completed);
   return {
-    displayName: sanitizeProfileDisplayName(progress.displayName),
+    displayName: sanitizeProfileDisplayName(p.display_name),
     gameEdition:
       typeof gameEdition === 'number' && Number.isFinite(gameEdition)
         ? Math.max(1, Math.trunc(gameEdition))
         : 1,
     gameMode,
     level: level !== null ? Math.max(1, Math.trunc(level)) : null,
-    tasksCompleted,
+    tasksCompleted: tasksCompleted !== null ? Math.max(0, Math.trunc(tasksCompleted)) : null,
   };
 }
 const toPositiveInteger = (value: unknown, fallback: number): number => {
@@ -340,10 +328,10 @@ export default defineEventHandler(async (event) => {
   if (validMemberIds.length > 0) {
     const idsParam = `in.(${validMemberIds.map((id) => `"${id}"`).join(',')})`;
     const profilesResp = await restFetch(
-      buildRestPath('user_game_mode_progress', {
+      buildRestPath('team_member_mode_summary', {
         game_mode: `eq.${gameMode}`,
         season_number: `eq.${getGameModeSeasonNumber(gameMode)}`,
-        select: 'user_id,progress_data',
+        select: 'user_id,display_name,level,tasks_completed',
         user_id: idsParam,
       })
     );
@@ -380,10 +368,10 @@ export default defineEventHandler(async (event) => {
       logger.error(`Profiles fetch error (${profilesResp.status}):`, errorText);
       for (const id of validMemberIds) {
         const resp = await restFetch(
-          buildRestPath('user_game_mode_progress', {
+          buildRestPath('team_member_mode_summary', {
             game_mode: `eq.${gameMode}`,
             season_number: `eq.${getGameModeSeasonNumber(gameMode)}`,
-            select: 'user_id,progress_data',
+            select: 'user_id,display_name,level,tasks_completed',
             user_id: `eq.${id}`,
           })
         );

@@ -69,6 +69,7 @@ import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTime
 import { useMetadataStore } from '@/stores/useMetadata';
 import { delay } from '@/utils/async';
 import {
+  ACTIVE_SEASON_NUMBER,
   GAME_MODES,
   getGameModeSeasonNumber,
   MANUAL_FAIL_TASK_IDS,
@@ -1649,6 +1650,7 @@ export async function initializeTarkovSync() {
           await $supabase.client.rpc('sync_user_game_mode_progress', {
             p_current_game_mode: payload.current_game_mode,
             p_game_edition: payload.game_edition,
+            p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
             p_tarkov_uid: payload.tarkov_uid,
             p_modes: {
               [GAME_MODES.PVP]: payload.pvp_data,

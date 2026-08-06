@@ -97,13 +97,9 @@ describe('Team Members API', () => {
             json: async () => [
               {
                 user_id: '11111111-1111-4111-8111-111111111111',
-                progress_data: {
-                  displayName: 'Player1',
-                  level: 15,
-                  taskCompletions: Object.fromEntries(
-                    Array.from({ length: 10 }, (_, index) => [`task-${index}`, { complete: true }])
-                  ),
-                },
+                display_name: 'Player1',
+                level: 15,
+                tasks_completed: 10,
               },
             ],
           })
@@ -247,23 +243,15 @@ describe('Team Members API', () => {
           json: async () => [
             {
               user_id: '11111111-1111-4111-8111-111111111111',
-              progress_data: {
-                displayName: 'Player1',
-                level: 15,
-                taskCompletions: Object.fromEntries(
-                  Array.from({ length: 10 }, (_, index) => [`task-${index}`, { complete: true }])
-                ),
-              },
+              display_name: 'Player1',
+              level: 15,
+              tasks_completed: 10,
             },
             {
               user_id: '22222222-2222-4222-8222-222222222222',
-              progress_data: {
-                displayName: 'Player2',
-                level: 20,
-                taskCompletions: Object.fromEntries(
-                  Array.from({ length: 15 }, (_, index) => [`task-${index}`, { complete: true }])
-                ),
-              },
+              display_name: 'Player2',
+              level: 20,
+              tasks_completed: 15,
             },
           ],
         })
@@ -304,6 +292,44 @@ describe('Team Members API', () => {
     });
   });
   describe('Profile fallback handling', () => {
+    it('reads the season-aware summary view instead of progress blobs', async () => {
+      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            { game_mode: 'seasonal', user_id: '11111111-1111-4111-8111-111111111111' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              user_id: '11111111-1111-4111-8111-111111111111',
+              display_name: 'Seasonal Player',
+              level: 12,
+              tasks_completed: 3,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_edition: 1, user_id: '11111111-1111-4111-8111-111111111111' }],
+        });
+      const { default: handler } = await import('@/server/api/team/members');
+      await handler(mockEvent as H3Event);
+      const profileUrl = String(mockFetch.mock.calls[2]?.[0] ?? '');
+      expect(profileUrl).toContain('team_member_mode_summary');
+      expect(profileUrl).toContain('season_number=eq.1');
+      expect(profileUrl).not.toContain('progress_data');
+      expect(mockFetch.mock.calls.some((call) => String(call[0]).includes('progress_data'))).toBe(
+        false
+      );
+    });
     it('keeps profiles available when optional edition metadata fails', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
@@ -324,7 +350,9 @@ describe('Team Members API', () => {
             json: async () => [
               {
                 user_id: '11111111-1111-4111-8111-111111111111',
-                progress_data: { displayName: 'Seasonal Player', level: 12 },
+                display_name: 'Seasonal Player',
+                level: 12,
+                tasks_completed: null,
               },
             ],
           })
@@ -385,13 +413,9 @@ describe('Team Members API', () => {
             json: async () => [
               {
                 user_id: '11111111-1111-4111-8111-111111111111',
-                progress_data: {
-                  displayName: 'Player1',
-                  level: 10,
-                  taskCompletions: Object.fromEntries(
-                    Array.from({ length: 5 }, (_, index) => [`task-${index}`, { complete: true }])
-                  ),
-                },
+                display_name: 'Player1',
+                level: 10,
+                tasks_completed: 5,
               },
             ],
           });

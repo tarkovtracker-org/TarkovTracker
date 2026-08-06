@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const { rpc, supabaseContext } = vi.hoisted(() => {
   const rpc = vi.fn(async (): Promise<{ error: { message: string } | null }> => ({
     error: null,
@@ -64,6 +65,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
       expect.objectContaining({
         p_current_game_mode: 'pve',
         p_game_edition: 5,
+        p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
         p_modes: expect.objectContaining({
           pve: expect.objectContaining({
             displayName: 'Offline',

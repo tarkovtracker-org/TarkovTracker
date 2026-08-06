@@ -69,6 +69,7 @@ export const syncProgressState = async (
     return await client.rpc('sync_user_game_mode_progress', {
       p_current_game_mode: payload.current_game_mode,
       p_game_edition: payload.game_edition,
+      p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
       p_tarkov_uid: payload.tarkov_uid,
       p_modes: {
         [GAME_MODES.PVP]: payload.pvp_data,
