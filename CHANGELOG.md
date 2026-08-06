@@ -1,3 +1,10 @@
+## [1.63.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.2...v1.63.3) (2026-08-06)
+
+
+### Bug Fixes
+
+* **api:** backfill normalized progress for accounts that predate the seasonal deploy ([#655](https://github.com/tarkovtracker-org/TarkovTracker/issues/655)) ([23d7cd1](https://github.com/tarkovtracker-org/TarkovTracker/commit/23d7cd12ded42b64fef751a0b27fa227bf832feb)), closes [#650](https://github.com/tarkovtracker-org/TarkovTracker/issues/650)
+
 ## [1.63.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.1...v1.63.2) (2026-08-06)
 
 
