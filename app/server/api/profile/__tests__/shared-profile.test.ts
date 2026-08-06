@@ -24,11 +24,15 @@ const createAbortError = (): Error => {
   error.name = 'AbortError';
   return error;
 };
-const progressResponse = (gameEdition = 4) => ({
+const progressResponse = (
+  gameEdition = 4,
+  legacy: { pve_data?: unknown; pvp_data?: unknown } = {}
+) => ({
   ok: true,
   json: async () => [
     {
       game_edition: gameEdition,
+      ...legacy,
       user_id: '11111111-1111-4111-8111-111111111111',
     },
   ],
@@ -43,9 +47,18 @@ const modeProgressResponse = (progressData: Record<string, unknown>, profilePubl
     },
   ],
 });
-const preferencesResponse = (streamerMode = false) => ({
+const preferencesResponse = (
+  streamerMode = false,
+  legacyVisibility: { pve?: boolean; pvp?: boolean } = {}
+) => ({
   ok: true,
-  json: async () => [{ streamer_mode: streamerMode }],
+  json: async () => [
+    {
+      profile_share_pve_public: legacyVisibility.pve ?? false,
+      profile_share_pvp_public: legacyVisibility.pvp ?? false,
+      streamer_mode: streamerMode,
+    },
+  ],
 });
 vi.mock('h3', async () => {
   const actual = await vi.importActual('h3');
@@ -236,6 +249,38 @@ describe('Shared Profile API', () => {
       gameEdition: 4,
       mode: 'pvp',
       userId: '11111111-1111-4111-8111-111111111111',
+      visibility: 'public',
+    });
+  });
+  it('falls back to legacy persistent progress and visibility when the normalized row is missing', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
+      )
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({
+      data: { displayName: 'LegacyPlayer', level: 39 },
+      gameEdition: 3,
+      mode: 'pvp',
+      visibility: 'public',
+    });
+  });
+  it('falls back to legacy progress when the normalized row carries no level', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
+      )
+      .mockResolvedValueOnce(modeProgressResponse({ taskCompletions: {} }, true))
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({
+      data: { displayName: 'LegacyPlayer', level: 39 },
+      gameEdition: 3,
+      mode: 'pvp',
       visibility: 'public',
     });
   });

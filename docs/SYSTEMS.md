@@ -582,9 +582,11 @@ flowchart LR
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
-- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql`,
-  `supabase/migrations/20260806120100_backfill_normalized_game_mode_progress.sql` — the persistent
-  PvP/PvE backfill, deliberately separate from the schema and applied one key range per transaction
+- `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — retained,
+  revoked helper for optional one-range-at-a-time operational maintenance. Correctness does not
+  depend on running it; see the Database Migrations section of `docs/runbook.md`
+- `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — seeds an
+  unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -602,24 +604,42 @@ flowchart LR
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
-- A missing normalized row is never treated as absent progress: reads fall back to `user_progress`,
-  and the backfill only fills rows whose `progress_data` carries no `level`, so it can never
-  overwrite a write that landed first. The backfill never changes `profile_public` on an existing
-  row, because "never set" and "explicitly set to false" are indistinguishable.
+- A missing or unmaterialized normalized persistent-mode row is never treated as absent progress: own
+  and teammate hydration, shared profiles and overlays, team summaries, and public progress/team API
+  reads fall back to `user_progress`; sharing falls back to the legacy preference. A row counts as
+  unmaterialized when its `progress_data` carries no numeric `level`, which is the same test the
+  optional operational backfill uses. Seasonal never falls back to persistent PvP. A materialized
+  normalized row always wins, and writes populate it lazily. A failure reading the legacy sharing
+  preference is logged and treated as "not shared"; it never discards normalized visibility that
+  loaded successfully. Optional operational backfill only fills rows whose `progress_data` carries no
+  `level`, so it cannot overwrite a write that landed first and never changes `profile_public` on an
+  existing row.
+- `merge_progress_data` seeds an unmaterialized persistent row from its legacy column inside the same
+  `FOR UPDATE` lock before merging. Its original seed is an `INSERT ... ON CONFLICT DO NOTHING`, which
+  only fires when no row exists, so a placeholder row created by the visibility RPC or the legacy
+  sharing trigger used to become the merge base — and because the RPC mirrors the result back into
+  `user_progress.pvp_data` / `pve_data`, a single public-API write erased the account's level, display
+  name, and every task completion. The seed is a write-time repair, not a backfill: it touches only
+  the row the write already locks. Reader-side fallback alone cannot close this hole, because the
+  merge base comes from the row rather than from anything the caller sends.
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
   independently rejects Seasonal writes whose caller-supplied season number is absent or does not
   match `private.active_season_number()`, so the fresh-season guarantee does not depend on client
   code alone.
-- Teammate summaries are computed in the database. `app/server/api/team/members.ts` selects only
-  `display_name`, `level`, and `tasks_completed` from `team_member_mode_summary`; it must not select
-  `progress_data` for team listings.
+- Teammate summaries normally come from `team_member_mode_summary`. When a persistent normalized row
+  is missing or its summary has no level, `app/server/api/team/members.ts` loads that member's legacy
+  progress server-side and returns only the derived display name, level, and completed-task count;
+  progress blobs never reach the client in the team-members payload. That fallback is best-effort — a
+  failed or timed-out legacy read is logged and the endpoint still returns the members it resolved.
 - Authenticated users can write only their own progress. Teammate reads require a shared team in
   the same game mode; cross-mode teammates and outsiders cannot read a row.
-- New clients read teammate progress from mode rows. The legacy teammate policy on `user_progress`
-  remains during rolling deployment; account-wide metadata for new clients is exposed through the
-  authenticated team-members endpoint after explicit membership validation.
+- New clients read teammate progress from mode rows. The teammate policy on `user_progress` is a
+  permanent dependency, not a rolling-deploy leftover: `useTeamStore` reads a teammate's legacy
+  persistent column when their normalized row is missing or carries no `level`. Account-wide metadata
+  for new clients is exposed through the authenticated team-members endpoint after explicit
+  membership validation.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside

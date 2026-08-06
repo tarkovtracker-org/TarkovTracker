@@ -270,6 +270,7 @@
   import { logger } from '@/utils/logger';
   import {
     createProfileVisibility,
+    fetchProfileVisibilityRows,
     isCurrentProfileVisibilityRequest,
     loadCurrentProfileVisibility,
   } from '@/utils/profileVisibility';
@@ -450,11 +451,11 @@
     if (!userId) return;
     const result = await loadCurrentProfileVisibility(
       () =>
-        $supabase.client
-          .from('user_game_mode_progress')
-          .select('game_mode,season_number,profile_public')
-          .eq('user_id', userId)
-          .in('game_mode', [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]),
+        fetchProfileVisibilityRows($supabase.client, userId, [
+          GAME_MODES.PVP,
+          GAME_MODES.PVE,
+          GAME_MODES.SEASONAL,
+        ]),
       () =>
         isCurrentProfileVisibilityRequest(
           requestId,

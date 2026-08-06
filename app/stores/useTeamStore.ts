@@ -10,9 +10,14 @@ import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
+import {
+  getLegacyModeProgressField,
+  hasMaterializedProgress,
+  resolveModeProgressData,
+} from '@/utils/modeProgressFallback';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
 /**
  * Helper to extract team ID from system store for the current game mode
@@ -73,11 +78,43 @@ interface TeamStoreInstance {
 type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
 const TEAM_PROGRESS_REFRESH_DELAY_MS = 5500;
 const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: string): void => {
-  logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
+  logger.warn('[TeammateStore] Failed to hydrate mode progress:', {
     error,
     teammateId,
   });
 };
+const applyLegacyPersistentProgressResult = (
+  result: { data: { pve_data?: unknown; pvp_data?: unknown } | null; error: unknown },
+  appliedModes: Set<GameMode>,
+  teammateId: string,
+  mode: GameMode,
+  applyProgress: (mode: GameMode, progress: unknown) => void
+): void => {
+  if (result.error) {
+    logTeammateModeProgressHydrationFailure(result.error, teammateId);
+    return;
+  }
+  if (appliedModes.has(mode)) return;
+  const legacyProgress = resolveModeProgressData(mode, null, result.data);
+  if (legacyProgress !== null) applyProgress(mode, legacyProgress);
+};
+const fetchLegacyTeammateProgress = async (
+  client: Pick<SupabaseClient, 'from'>,
+  teammateId: string,
+  mode: GameMode
+) => {
+  const legacyProgressField = getLegacyModeProgressField(mode);
+  if (!legacyProgressField) return { data: null, error: null };
+  return client
+    .from('user_progress')
+    .select(legacyProgressField)
+    .eq('user_id', teammateId)
+    .maybeSingle();
+};
+const resolveTeammateLegacyMode = (
+  memberProfile: MemberProfile | undefined,
+  currentMode: GameMode
+): GameMode => memberProfile?.gameMode ?? currentMode;
 export type TeammateIdentity = {
   currentGameMode: GameMode;
   gameEdition: number;
@@ -577,29 +614,49 @@ export function useTeammateStores() {
       storeInstance.$patch((state) => {
         Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
       });
-      const applyModeProgress = (row: Record<string, unknown>) => {
-        const mode = row.game_mode;
-        if (!isGameMode(mode)) return;
-        const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
-        if (row.season_number !== expectedSeason) return;
+      const appliedModes = new Set<GameMode>();
+      const applyProgressData = (mode: GameMode, progress: unknown, authoritative = false) => {
+        if (authoritative || hasMaterializedProgress(progress)) appliedModes.add(mode);
         storeInstance.$patch((state) => {
           state[mode] = {
             ...defaultState[mode],
-            ...sanitizeTeammateProgressData(row.progress_data),
+            ...sanitizeTeammateProgressData(progress),
           };
         });
       };
+      const applyModeProgress = (
+        row: Record<string, unknown>,
+        authoritative = false
+      ): GameMode | null => {
+        const mode = row.game_mode;
+        if (!isGameMode(mode)) return null;
+        const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+        if (row.season_number !== expectedSeason) return null;
+        applyProgressData(mode, row.progress_data, authoritative);
+        return mode;
+      };
+      const legacyMode = resolveTeammateLegacyMode(memberProfile, getCurrentGameMode());
       const hydrateModeProgress = async () => {
         try {
-          const { data, error } = await $supabase.client
-            .from('user_game_mode_progress')
-            .select('game_mode,season_number,progress_data')
-            .eq('user_id', teammateId);
-          if (error) {
-            logTeammateModeProgressHydrationFailure(error, teammateId);
+          const [modeRows, legacyRow] = await Promise.all([
+            $supabase.client
+              .from('user_game_mode_progress')
+              .select('game_mode,season_number,progress_data')
+              .eq('user_id', teammateId),
+            fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode),
+          ]);
+          if (modeRows.error) {
+            logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
           }
-          data?.forEach((row) => applyModeProgress(row as Record<string, unknown>));
+          modeRows.data?.forEach((row) => applyModeProgress(row as Record<string, unknown>));
+          applyLegacyPersistentProgressResult(
+            legacyRow,
+            appliedModes,
+            teammateId,
+            legacyMode,
+            applyProgressData
+          );
           replayProgressMetadataMigration();
         } catch (error) {
           logTeammateModeProgressHydrationFailure(error, teammateId);
@@ -615,7 +672,7 @@ export function useTeammateStores() {
             table: 'user_game_mode_progress',
             filter: `user_id=eq.${teammateId}`,
           },
-          (payload) => applyModeProgress(payload.new as Record<string, unknown>)
+          (payload) => applyModeProgress(payload.new as Record<string, unknown>, true)
         )
         .subscribe();
       void hydrateModeProgress();
@@ -636,6 +693,7 @@ export function useTeammateStores() {
         const modeKey = data.gameMode;
         if (!isGameMode(modeKey)) return;
         const currentModeData = storeInstance.$state[modeKey] || {};
+        appliedModes.add(modeKey);
         const currentCompletions =
           (
             currentModeData as {

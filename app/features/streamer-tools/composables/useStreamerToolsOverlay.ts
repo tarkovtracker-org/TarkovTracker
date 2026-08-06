@@ -16,6 +16,7 @@ import {
 import { logger } from '@/utils/logger';
 import {
   createProfileVisibility,
+  fetchProfileVisibilityRows,
   isCurrentProfileVisibilityRequest,
   loadCurrentProfileVisibility,
 } from '@/utils/profileVisibility';
@@ -235,11 +236,7 @@ export function useStreamerToolsOverlay() {
     const userId = currentUserId.value;
     if (!userId) return;
     const result = await loadCurrentProfileVisibility(
-      () =>
-        $supabase.client
-          .from('user_game_mode_progress')
-          .select('game_mode,season_number,profile_public')
-          .eq('user_id', userId),
+      () => fetchProfileVisibilityRows($supabase.client, userId),
       () =>
         isCurrentProfileVisibilityRequest(
           requestId,
