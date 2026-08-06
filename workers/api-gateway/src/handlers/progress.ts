@@ -148,19 +148,18 @@ const asProgressRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+type LegacyProgressRecordRow = LegacyModeProgressRow<Record<string, unknown> | null>;
 async function fetchLegacyProgressRow(
   env: Env,
   userId: string,
   gameMode: GameMode
-): Promise<LegacyModeProgressRow<UserProgressModeRow['progress_data']> | null> {
+): Promise<LegacyProgressRecordRow | null> {
   const legacyProgressField = getLegacyModeProgressField(gameMode);
   if (!legacyProgressField) return null;
   const legacyUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${legacyProgressField}&limit=1`;
   const legacyResponse = await fetch(legacyUrl, { headers: getServiceHeaders(env) });
   if (!legacyResponse.ok) throw new Error('Failed to fetch user progress');
-  const legacyRows = (await legacyResponse.json()) as Array<
-    LegacyModeProgressRow<UserProgressModeRow['progress_data']>
-  >;
+  const legacyRows = (await legacyResponse.json()) as LegacyProgressRecordRow[];
   return legacyRows[0] ?? null;
 }
 async function fetchCurrentProgressData(
