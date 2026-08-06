@@ -132,6 +132,17 @@ describe('migrateToGameModeStructure', () => {
     expect(migrated.seasonal.level).toBe(20);
     expect(migrated.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
   });
+  it('does not reuse a seasonal legacy payload as PvP compatibility data', () => {
+    const migrated = migrateToGameModeStructure({
+      currentGameMode: 'seasonal',
+      level: 27,
+      taskCompletions: { 'task-1': { complete: true } },
+    });
+    expect(migrated.seasonal.level).toBe(27);
+    expect(migrated.pvp.level).toBe(1);
+    expect(migrated.pvp.taskCompletions).toEqual({});
+    expect(migrated.pve.level).toBe(1);
+  });
   it('discards seasonal progress carried over from a previous season', () => {
     const migrated = migrateToGameModeStructure({
       currentGameMode: 'seasonal',

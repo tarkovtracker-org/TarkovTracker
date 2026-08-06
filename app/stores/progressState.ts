@@ -15,7 +15,10 @@
  * @module stores/userProgressState
  */
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
-import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
+import {
+  reconcileSeasonalProgressSeason,
+  sanitizeOwnedProgressData,
+} from '@/utils/progressSanitizers';
 import {
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
@@ -59,19 +62,6 @@ export const defaultState: UserState = {
   seasonal: structuredClone(defaultProgressData),
   seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
 };
-function resolveSeasonalProgressForActiveSeason(
-  seasonal: UserProgressData,
-  storedSeasonNumber: unknown
-): { seasonal: UserProgressData; seasonalSeasonNumber: number } {
-  const isStaleSeason =
-    typeof storedSeasonNumber === 'number' &&
-    Number.isFinite(storedSeasonNumber) &&
-    storedSeasonNumber !== ACTIVE_SEASON_NUMBER;
-  return {
-    seasonal: isStaleSeason ? structuredClone(defaultProgressData) : seasonal,
-    seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
-  };
-}
 // Migration function to convert legacy data structure to new gamemode-aware structure
 export function migrateToGameModeStructure(legacyData: unknown): UserState {
   // If already in new format and properly structured, return as-is
@@ -89,7 +79,7 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
       tarkovUid: (data.tarkovUid as number | null) ?? null,
       pvp: sanitizeOwnedProgressData(data.pvp),
       pve: sanitizeOwnedProgressData(data.pve),
-      ...resolveSeasonalProgressForActiveSeason(
+      ...reconcileSeasonalProgressSeason(
         sanitizeOwnedProgressData(data.seasonal),
         data.seasonalSeasonNumber
       ),
@@ -114,9 +104,13 @@ export function migrateToGameModeStructure(legacyData: unknown): UserState {
       currentGameMode,
       gameEdition: (data.gameEdition as number) || defaultState.gameEdition,
       tarkovUid: (data.tarkovUid as number | null) ?? null,
-      pvp: hasPvp ? sanitizeOwnedProgressData(data.pvp) : migratedLegacy,
+      pvp: hasPvp
+        ? sanitizeOwnedProgressData(data.pvp)
+        : currentGameMode === GAME_MODES.SEASONAL
+          ? structuredClone(defaultProgressData)
+          : migratedLegacy,
       pve: hasPve ? sanitizeOwnedProgressData(data.pve) : structuredClone(defaultProgressData),
-      ...resolveSeasonalProgressForActiveSeason(
+      ...reconcileSeasonalProgressSeason(
         hasSeasonal
           ? sanitizeOwnedProgressData(data.seasonal)
           : currentGameMode === GAME_MODES.SEASONAL

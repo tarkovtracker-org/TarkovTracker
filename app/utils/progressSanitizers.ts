@@ -327,6 +327,13 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
 };
 const isStaleSeasonNumber = (value: unknown): boolean =>
   typeof value === 'number' && Number.isFinite(value) && value !== ACTIVE_SEASON_NUMBER;
+export const reconcileSeasonalProgressSeason = (
+  seasonal: UserProgressData,
+  storedSeasonNumber: unknown
+): { seasonal: UserProgressData; seasonalSeasonNumber: number } => ({
+  seasonal: isStaleSeasonNumber(storedSeasonNumber) ? createDefaultOwnedProgressData() : seasonal,
+  seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
+});
 export const sanitizeOwnedUserState = (value: unknown): UserState => {
   if (!isRecord(value)) {
     return {
@@ -345,10 +352,10 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
     tarkovUid: sanitizeTarkovUid(value.tarkovUid),
     pvp: sanitizeOwnedProgressData(value.pvp),
     pve: sanitizeOwnedProgressData(value.pve),
-    seasonal: isStaleSeasonNumber(value.seasonalSeasonNumber)
-      ? createDefaultOwnedProgressData()
-      : sanitizeOwnedProgressData(value.seasonal),
-    seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
+    ...reconcileSeasonalProgressSeason(
+      sanitizeOwnedProgressData(value.seasonal),
+      value.seasonalSeasonNumber
+    ),
   };
 };
 export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgressData> => {
