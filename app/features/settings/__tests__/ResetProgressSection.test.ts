@@ -2,10 +2,17 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResetProgressSection from '@/features/settings/ResetProgressSection.vue';
-const { resetAllDataMock, resetPvEDataMock, resetPvPDataMock, toastAddMock } = vi.hoisted(() => ({
+const {
+  resetAllDataMock,
+  resetPvEDataMock,
+  resetPvPDataMock,
+  resetSeasonalDataMock,
+  toastAddMock,
+} = vi.hoisted(() => ({
   resetAllDataMock: vi.fn(async () => undefined),
   resetPvEDataMock: vi.fn(async () => undefined),
   resetPvPDataMock: vi.fn(async () => undefined),
+  resetSeasonalDataMock: vi.fn(async () => undefined),
   toastAddMock: vi.fn(),
 }));
 mockNuxtImport('useToast', () => () => ({
@@ -16,6 +23,7 @@ vi.mock('@/stores/useTarkov', () => ({
     resetAllData: resetAllDataMock,
     resetPvEData: resetPvEDataMock,
     resetPvPData: resetPvPDataMock,
+    resetSeasonalData: resetSeasonalDataMock,
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -62,6 +70,8 @@ describe('ResetProgressSection', () => {
     resetPvEDataMock.mockResolvedValue(undefined);
     resetPvPDataMock.mockReset();
     resetPvPDataMock.mockResolvedValue(undefined);
+    resetSeasonalDataMock.mockReset();
+    resetSeasonalDataMock.mockResolvedValue(undefined);
     toastAddMock.mockClear();
   });
   const createWrapper = () =>
@@ -151,6 +161,40 @@ describe('ResetProgressSection', () => {
       expect.objectContaining({
         color: 'success',
         title: 'settings.reset_pve.success_title',
+      })
+    );
+  });
+  it('resets Seasonal data from the confirmation dialog', async () => {
+    const wrapper = createWrapper();
+    const openButton = findButtonByText(wrapper, 'common.reset_seasonal_data');
+    expect(openButton).toBeTruthy();
+    await openButton!.trigger('click');
+    const confirmButton = findButtonByText(wrapper, 'settings.data_management.reset_confirm');
+    expect(confirmButton).toBeTruthy();
+    await confirmButton!.trigger('click');
+    await flushPromises();
+    expect(resetSeasonalDataMock).toHaveBeenCalledTimes(1);
+    expect(resetPvPDataMock).not.toHaveBeenCalled();
+    expect(resetPvEDataMock).not.toHaveBeenCalled();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'success',
+        title: 'settings.reset_seasonal.success_title',
+      })
+    );
+  });
+  it('surfaces an error toast when the Seasonal reset fails', async () => {
+    resetSeasonalDataMock.mockRejectedValue(new Error('offline'));
+    const wrapper = createWrapper();
+    const openButton = findButtonByText(wrapper, 'common.reset_seasonal_data');
+    await openButton!.trigger('click');
+    const confirmButton = findButtonByText(wrapper, 'settings.data_management.reset_confirm');
+    await confirmButton!.trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        title: 'common.reset_failed',
       })
     );
   });
