@@ -10,7 +10,7 @@ import { getRegisteredSyncController } from '@/stores/tarkov/realtimeListener';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { clearProgressStorage } from '@/utils/clientStorage';
-import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 const RESET_SETTLE_DELAY_MS = 100;
 export type ResetMode = GameMode | 'all';
@@ -89,6 +89,7 @@ export const resolveInitialSyncState = (
     pvp: resolveModeData(localState.pvp, remoteState.pvp),
     pve: resolveModeData(localState.pve, remoteState.pve),
     seasonal: resolveModeData(localState.seasonal, remoteState.seasonal),
+    seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
   };
 };
 export const executeWithSyncPause = async <T>(operation: () => Promise<T>): Promise<T> => {

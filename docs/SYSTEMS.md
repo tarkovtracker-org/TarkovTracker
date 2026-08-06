@@ -548,16 +548,22 @@ flowchart LR
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
-   routes select the exact mode and season; teammates receive same-mode progress through RLS.
+   routes select the exact mode and season; teammates receive same-mode progress through RLS. The
+   sharing RPC also mirrors persistent PvP/PvE visibility back to the legacy
+   `user_preferences.profile_share_*` columns, and a trigger mirrors legacy writes forward into
+   `profile_public`, so a cached older client can still turn sharing off during a rolling deploy.
+   A missing normalized row is treated as private rather than missing.
 5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
    that locks the team while checking capacity and persists membership, user-system state, and the
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
    Seasonal team column.
 6. The active season definition carries its number, start date, and exact end timestamp. The UI
    counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
-   historical rows remain retained and cannot be merged into the new season. Rollover deploys the
-   database flip first during the between-season no-write gap, verifies it, and then deploys the
-   matching application constants before the new season opens.
+   historical rows remain retained and cannot be merged into the new season. Locally persisted
+   progress carries the season it belongs to, and Seasonal progress stamped with a different season
+   is discarded on load so stale browser state cannot be uploaded into the new season. Rollover
+   deploys the database flip first during the between-season no-write gap, verifies it, and then
+   deploys the matching application constants before the new season opens.
 7. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
 8. Prestige archives include mode and season. Seasonal prestige accepts only the active season;
@@ -584,7 +590,9 @@ flowchart LR
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
-- Historical Seasonal rows are retained but never merged into the active season.
+- Historical Seasonal rows are retained but never merged into the active season. Locally persisted
+  Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
+  match the active season; absent stamps are treated as the active season.
 - Authenticated users can write only their own progress. Teammate reads require a shared team in
   the same game mode; cross-mode teammates and outsiders cannot read a row.
 - New clients read teammate progress from mode rows. The legacy teammate policy on `user_progress`

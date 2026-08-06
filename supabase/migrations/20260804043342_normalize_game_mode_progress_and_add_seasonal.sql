@@ -162,7 +162,7 @@ CREATE OR REPLACE FUNCTION public.set_game_mode_profile_visibility(
 )
 RETURNS void
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
@@ -171,11 +171,12 @@ BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
-  IF p_game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
+  IF p_game_mode IS NULL OR p_game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
     RAISE EXCEPTION 'Unsupported game mode';
   END IF;
-  IF (p_game_mode IN ('pvp', 'pve') AND p_season_number <> 0)
-    OR (p_game_mode = 'seasonal' AND p_season_number <= 0) THEN
+  IF p_season_number IS NULL
+    OR (p_game_mode IN ('pvp', 'pve') AND p_season_number <> 0)
+    OR (p_game_mode = 'seasonal' AND p_season_number <> private.active_season_number()) THEN
     RAISE EXCEPTION 'Invalid season number for mode';
   END IF;
 
@@ -185,9 +186,21 @@ BEGIN
     season_number,
     profile_public
   )
-  VALUES (v_user_id, p_game_mode, p_season_number, p_profile_public)
+  VALUES (v_user_id, p_game_mode, p_season_number, COALESCE(p_profile_public, false))
   ON CONFLICT (user_id, game_mode, season_number) DO UPDATE
   SET profile_public = EXCLUDED.profile_public;
+
+  IF p_game_mode = 'pvp' THEN
+    INSERT INTO public.user_preferences (user_id, profile_share_pvp_public)
+    VALUES (v_user_id, COALESCE(p_profile_public, false))
+    ON CONFLICT (user_id) DO UPDATE
+    SET profile_share_pvp_public = EXCLUDED.profile_share_pvp_public;
+  ELSIF p_game_mode = 'pve' THEN
+    INSERT INTO public.user_preferences (user_id, profile_share_pve_public)
+    VALUES (v_user_id, COALESCE(p_profile_public, false))
+    ON CONFLICT (user_id) DO UPDATE
+    SET profile_share_pve_public = EXCLUDED.profile_share_pve_public;
+  END IF;
 END;
 $$;
 
@@ -277,6 +290,40 @@ EXECUTE FUNCTION public.sync_legacy_user_progress_modes();
 
 REVOKE ALL ON FUNCTION public.sync_legacy_user_progress_modes() FROM PUBLIC;
 
+CREATE OR REPLACE FUNCTION public.sync_legacy_profile_share_visibility()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  INSERT INTO public.user_game_mode_progress AS ugmp (
+    user_id,
+    game_mode,
+    season_number,
+    profile_public
+  )
+  VALUES
+    (NEW.user_id, 'pvp', 0, COALESCE(NEW.profile_share_pvp_public, false)),
+    (NEW.user_id, 'pve', 0, COALESCE(NEW.profile_share_pve_public, false))
+  ON CONFLICT (user_id, game_mode, season_number) DO UPDATE
+  SET profile_public = EXCLUDED.profile_public
+  WHERE ugmp.profile_public IS DISTINCT FROM EXCLUDED.profile_public;
+  RETURN NEW;
+END;
+$$;
+
+-- UPDATE only: turning sharing off from a cached older client is always an update on an existing
+-- preferences row, and skipping INSERT avoids materializing normalized rows for accounts that have
+-- no progress row yet.
+CREATE TRIGGER sync_legacy_profile_share_visibility
+AFTER UPDATE OF profile_share_pvp_public, profile_share_pve_public
+ON public.user_preferences
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_legacy_profile_share_visibility();
+
+REVOKE ALL ON FUNCTION public.sync_legacy_profile_share_visibility() FROM PUBLIC;
+
 DROP POLICY IF EXISTS "Users can update own progress" ON public.user_progress;
 CREATE POLICY "Users can update own progress"
   ON public.user_progress
@@ -310,7 +357,7 @@ BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
-  IF p_current_game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
+  IF p_current_game_mode IS NULL OR p_current_game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
     RAISE EXCEPTION 'Unsupported game mode';
   END IF;
   IF p_modes IS NULL OR jsonb_typeof(p_modes) <> 'object' THEN
@@ -534,7 +581,7 @@ BEGIN
   INTO v_member_count
   FROM public.team_memberships
   WHERE team_id = v_team.id;
-  IF v_team.max_members IS NULL OR v_member_count >= v_team.max_members THEN
+  IF v_member_count >= COALESCE(v_team.max_members, 5) THEN
     RAISE EXCEPTION 'Team is full';
   END IF;
 

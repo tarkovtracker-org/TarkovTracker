@@ -84,6 +84,7 @@ const buildLegacyMetadataState = (
   pvp: localState.pvp,
   pve: localState.pve,
   seasonal: localState.seasonal,
+  seasonalSeasonNumber: localState.seasonalSeasonNumber,
 });
 const pauseRegisteredSyncController = (): void => {
   const controller = getRegisteredSyncController();
@@ -165,6 +166,21 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     const remote = parseRealtimeModeProgress(value);
     return remote && acceptModeUpdate(remote.mode, remote.updateTime) ? remote : null;
   };
+  let latestLegacyMetadataUpdateTime: number | undefined;
+  const acceptLegacyMetadataUpdate = (updateTime: number): boolean => {
+    if (
+      latestLegacyMetadataUpdateTime !== undefined &&
+      updateTime < latestLegacyMetadataUpdateTime
+    ) {
+      logger.debug('[TarkovStore] Ignoring out-of-order legacy metadata update', {
+        latestUpdateTime: latestLegacyMetadataUpdateTime,
+        updateTime,
+      });
+      return false;
+    }
+    latestLegacyMetadataUpdateTime = updateTime;
+    return true;
+  };
   const isCurrentRealtimeUser = () =>
     $supabase.user.loggedIn && $supabase.user.id === currentUserId;
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
@@ -172,6 +188,7 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     if (!isCurrentRealtimeUser()) return;
     const remoteData = payload.new as LegacyProgressMetadata;
     const updateTime = parseRealtimeUpdateTime(remoteData.updated_at);
+    if (!acceptLegacyMetadataUpdate(updateTime)) return;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
     const nextState = buildLegacyMetadataState(remoteData, localState);
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;

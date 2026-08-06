@@ -7,6 +7,7 @@ const getSupabaseUrl = (env: Env): URL => {
   if (url.protocol !== 'https:') throw new Error('Supabase URL must use HTTPS');
   return url;
 };
+const ACTIVE_SEASON_FETCH_TIMEOUT_MS = 10_000;
 const getServiceHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -22,6 +23,7 @@ const getActiveSeasonNumber = async (env: Env): Promise<number> => {
     redirect: 'error',
     headers: { ...getServiceHeaders(env), 'Content-Type': 'application/json' },
     body: '{}',
+    signal: AbortSignal.timeout(ACTIVE_SEASON_FETCH_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error('Failed to fetch active season');
   const value = Number(await response.json());

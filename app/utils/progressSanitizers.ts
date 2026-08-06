@@ -1,4 +1,10 @@
-import { GAME_MODE_VALUES, GAME_MODES, MAX_SKILL_LEVEL, type GameMode } from '@/utils/constants';
+import {
+  ACTIVE_SEASON_NUMBER,
+  GAME_MODE_VALUES,
+  GAME_MODES,
+  MAX_SKILL_LEVEL,
+  type GameMode,
+} from '@/utils/constants';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserState } from '@/stores/progressState';
 type UserProgressData = UserState['pvp'];
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -319,6 +325,8 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   }
   return sanitized;
 };
+const isStaleSeasonNumber = (value: unknown): boolean =>
+  typeof value === 'number' && Number.isFinite(value) && value !== ACTIVE_SEASON_NUMBER;
 export const sanitizeOwnedUserState = (value: unknown): UserState => {
   if (!isRecord(value)) {
     return {
@@ -328,6 +336,7 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
       pvp: createDefaultOwnedProgressData(),
       pve: createDefaultOwnedProgressData(),
       seasonal: createDefaultOwnedProgressData(),
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
     };
   }
   return {
@@ -336,7 +345,10 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
     tarkovUid: sanitizeTarkovUid(value.tarkovUid),
     pvp: sanitizeOwnedProgressData(value.pvp),
     pve: sanitizeOwnedProgressData(value.pve),
-    seasonal: sanitizeOwnedProgressData(value.seasonal),
+    seasonal: isStaleSeasonNumber(value.seasonalSeasonNumber)
+      ? createDefaultOwnedProgressData()
+      : sanitizeOwnedProgressData(value.seasonal),
+    seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
   };
 };
 export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgressData> => {
