@@ -56,7 +56,7 @@ describe('useTarkov deletePrestigeRun', () => {
     expect(eqMock).toHaveBeenNthCalledWith(1, 'id', 'run-1');
     expect(eqMock).toHaveBeenNthCalledWith(2, 'user_id', 'user-1');
     expect(eqMock).toHaveBeenNthCalledWith(3, 'mode', 'pvp');
-    expect(eqMock).toHaveBeenNthCalledWith(4, 'season_number', 0);
+    expect(eqMock).toHaveBeenCalledTimes(3);
     expect(selectMock).toHaveBeenCalledWith('id');
     expect(maybeSingleMock).toHaveBeenCalledTimes(1);
   });
@@ -81,7 +81,7 @@ describe('useTarkov deletePrestigeRun', () => {
       'Failed to delete prestige history: delete failed'
     );
     expect(eqMock).toHaveBeenNthCalledWith(3, 'mode', 'pve');
-    expect(eqMock).toHaveBeenNthCalledWith(4, 'season_number', 0);
+    expect(eqMock).toHaveBeenCalledTimes(3);
   });
   it('fails when the delete matches no rows', async () => {
     const store = useTarkovStore();

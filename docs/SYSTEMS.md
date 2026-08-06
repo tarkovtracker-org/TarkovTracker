@@ -571,9 +571,10 @@ flowchart LR
    deploys the matching application constants before the new season opens.
 7. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
    may restore persistent modes but cannot write its Seasonal payload into the active season.
-8. Prestige archives include mode and season. Seasonal prestige accepts only the active season and
-   resets the active Seasonal row in the same transaction; a PvP prestige never writes the Seasonal
-   row, so the legacy PvP RPC overload cannot clobber Seasonal progress during rolling deployments.
+8. Prestige is a PvP-only concept and Seasonal PvP does not support it, so the archive RPC accepts
+   only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
+   rejects a Seasonal prestige before any request, and the settings card reports prestige as
+   unavailable in Seasonal PvP.
 
 ### Files
 
@@ -610,8 +611,11 @@ flowchart LR
 - New clients read teammate progress from mode rows. The legacy teammate policy on `user_progress`
   remains during rolling deployment; account-wide metadata for new clients is exposed through the
   authenticated team-members endpoint after explicit membership validation.
-- The public API, profile sharing, teams, prestige, backups, and streamer tools use the exact mode
-  and active season. No Seasonal operation may silently fall back to persistent PvP.
+- The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
+  season. No Seasonal operation may silently fall back to persistent PvP.
+- Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
+  `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
+  progress is written through a prestige.
 - Tarkov.dev profile and EFT-log imports cannot target Seasonal until their source data is verified.
 
 ---

@@ -1920,6 +1920,7 @@
       "pvp_only": "Escape from Tarkov prestige is available for persistent and Seasonal PvP profiles. Switch your active tracker mode to either PvP mode to manage prestige and archived runs.",
       "persistent_mode_unsupported_title": "Prestige Unavailable",
       "persistent_mode_unsupported": "Prestige is unavailable for persistent PvE mode.",
+      "seasonal_mode_unsupported": "Prestige is unavailable in Seasonal PvP.",
       "current_level": "Current Prestige Level",
       "set_current": "Set Current Prestige",
       "set_current_hint": "Use this when you already prestiged in-game and only need the tracker to match. This does not reset progress or create history.",

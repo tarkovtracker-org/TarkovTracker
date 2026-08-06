@@ -128,8 +128,8 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const UAlert = {
-  template: '<div><slot />{{ title }}</div>',
-  props: ['title'],
+  template: '<div><slot />{{ title }} {{ description }}</div>',
+  props: ['description', 'title'],
 };
 const UButton = {
   template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
@@ -168,7 +168,6 @@ const createPrestigeRun = (id: string): PrestigeRunRecord => ({
   createdAt: '2026-03-01T00:00:00.000Z',
   id,
   mode: 'pvp',
-  seasonNumber: 0,
   prestigeFrom: 3,
   prestigeTo: 4,
   summary: {
@@ -310,17 +309,16 @@ describe('PrestigeCard', () => {
     expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported');
     expect(wrapper.text()).not.toContain('settings.prestige.set_current');
   });
-  it('loads and updates Seasonal prestige independently', async () => {
+  it('reports prestige as unavailable in Seasonal PvP', async () => {
     mockState.currentGameMode = 'seasonal';
+    fetchPrestigeRunsMock.mockResolvedValue([createPrestigeRun('run-1')]);
     const wrapper = createWrapper();
     await flushPromises();
-    expect(fetchPrestigeRunsMock).toHaveBeenCalledWith('seasonal', 20);
-    await wrapper.find('select').setValue('2');
-    const syncButton = findButtonByText(wrapper, 'settings.prestige.set_current');
-    expect(syncButton).toBeTruthy();
-    await syncButton!.trigger('click');
-    await flushPromises();
-    expect(syncPrestigeLevelMock).toHaveBeenCalledWith('seasonal', 2);
+    expect(fetchPrestigeRunsMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported_title');
+    expect(wrapper.text()).toContain('settings.prestige.seasonal_mode_unsupported');
+    expect(wrapper.text()).not.toContain('settings.prestige.set_current');
+    expect(syncPrestigeLevelMock).not.toHaveBeenCalled();
   });
   it('archives a run only after explicit confirmation', async () => {
     const wrapper = createWrapper();

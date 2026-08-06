@@ -3,7 +3,6 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const { rpc, supabaseContext } = vi.hoisted(() => {
   const rpc = vi.fn(async (): Promise<{ data: null; error: { message: string } | null }> => ({
     data: null,
@@ -166,41 +165,33 @@ describe('useTarkov prestigeMode seasonal', () => {
     });
     return store;
   };
-  it('sends the active season so the archive RPC resets the seasonal row', async () => {
+  it('refuses to prestige Seasonal PvP and leaves every mode untouched', async () => {
     const store = seedModes();
-    await store.prestigeMode('seasonal');
-    expect(rpc).toHaveBeenCalledWith(
-      'archive_prestige_run_and_reset_progress',
-      expect.objectContaining({
-        p_mode: 'seasonal',
-        p_season_number: ACTIVE_SEASON_NUMBER,
-        p_prestige_from: 1,
-        p_prestige_to: 2,
-        p_archived_progress: expect.objectContaining({ level: 30, prestigeLevel: 1 }),
-        p_seasonal_data: expect.objectContaining({
-          level: 1,
-          prestigeLevel: 2,
-          progressEpoch: 3,
-        }),
-      })
+    await expect(store.prestigeMode('seasonal')).rejects.toThrow(
+      'Prestige is not supported for Seasonal PvP.'
     );
-    expect(store.seasonal.level).toBe(1);
-    expect(store.seasonal.prestigeLevel).toBe(2);
-    expect(store.seasonal.taskCompletions).toEqual({});
+    expect(rpc).not.toHaveBeenCalled();
+    expect(store.seasonal.level).toBe(30);
+    expect(store.seasonal.prestigeLevel).toBe(1);
     expect(store.pvp.level).toBe(42);
-    expect(store.pve.level).toBe(9);
   });
-  it('sends season 0 for a PvP prestige and leaves seasonal progress alone', async () => {
+  it('refuses to sync a Seasonal prestige level', async () => {
+    const store = seedModes();
+    await expect(store.syncPrestigeLevel('seasonal', 2)).rejects.toThrow(
+      'Prestige is not supported for Seasonal PvP.'
+    );
+    expect(store.seasonal.prestigeLevel).toBe(1);
+  });
+  it('archives a PvP prestige without sending seasonal data', async () => {
     const store = seedModes();
     await store.prestigeMode('pvp');
     expect(rpc).toHaveBeenCalledWith(
       'archive_prestige_run_and_reset_progress',
-      expect.objectContaining({
-        p_mode: 'pvp',
-        p_season_number: 0,
-        p_seasonal_data: expect.objectContaining({ level: 30, prestigeLevel: 1 }),
-      })
+      expect.objectContaining({ p_mode: 'pvp' })
     );
+    const [, args] = rpc.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(args).not.toHaveProperty('p_seasonal_data');
+    expect(args).not.toHaveProperty('p_season_number');
     expect(store.seasonal.level).toBe(30);
     expect(store.seasonal.prestigeLevel).toBe(1);
     expect(store.pve.level).toBe(9);

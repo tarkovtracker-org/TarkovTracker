@@ -823,22 +823,10 @@ ALTER TABLE public.api_tokens
   NOT VALID;
 
 ALTER TABLE public.user_prestige_runs
-  ADD COLUMN season_number SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE public.user_prestige_runs
   DROP CONSTRAINT IF EXISTS user_prestige_runs_mode_check;
 ALTER TABLE public.user_prestige_runs
-  ADD CONSTRAINT user_prestige_runs_mode_check CHECK (mode IN ('pvp', 'pve', 'seasonal'))
+  ADD CONSTRAINT user_prestige_runs_mode_check CHECK (mode IN ('pvp', 'pve'))
   NOT VALID;
-ALTER TABLE public.user_prestige_runs
-  ADD CONSTRAINT user_prestige_runs_season_check
-  CHECK (
-    (mode IN ('pvp', 'pve') AND season_number = 0)
-    OR (mode = 'seasonal' AND season_number > 0)
-  )
-  NOT VALID;
-DROP INDEX IF EXISTS public.idx_user_prestige_runs_user_mode_created;
-CREATE INDEX idx_user_prestige_runs_user_mode_season_created
-  ON public.user_prestige_runs(user_id, mode, season_number, created_at DESC);
 
 GRANT SELECT, DELETE ON public.user_prestige_runs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_prestige_runs TO service_role;
@@ -973,128 +961,7 @@ REVOKE ALL ON FUNCTION public.merge_progress_data(UUID, TEXT, JSONB, JSONB, JSON
 GRANT EXECUTE ON FUNCTION public.merge_progress_data(UUID, TEXT, JSONB, JSONB, JSONB)
   TO service_role;
 
-DROP FUNCTION IF EXISTS public.archive_prestige_run_and_reset_progress(
-  TEXT,
-  INTEGER,
-  INTEGER,
-  JSONB,
-  JSONB,
-  TIMESTAMPTZ,
-  TEXT,
-  INTEGER,
-  BIGINT,
-  JSONB,
-  JSONB
-);
-
-CREATE FUNCTION public.archive_prestige_run_and_reset_progress(
-  p_mode TEXT,
-  p_season_number SMALLINT,
-  p_prestige_from INTEGER,
-  p_prestige_to INTEGER,
-  p_archived_progress JSONB,
-  p_summary JSONB,
-  p_created_at TIMESTAMPTZ,
-  p_current_game_mode TEXT,
-  p_game_edition INTEGER,
-  p_tarkov_uid BIGINT,
-  p_pvp_data JSONB,
-  p_pve_data JSONB,
-  p_seasonal_data JSONB
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_user_id UUID := (SELECT auth.uid());
-  v_seasonal_season_number SMALLINT;
-BEGIN
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
-  IF p_mode NOT IN ('pvp', 'seasonal') THEN
-    RAISE EXCEPTION 'Prestige is only supported for PvP modes';
-  END IF;
-  IF p_season_number IS NULL
-    OR (p_mode = 'pvp' AND p_season_number <> 0)
-    OR (
-      p_mode = 'seasonal'
-      AND p_season_number <> private.active_season_number()
-    ) THEN
-    RAISE EXCEPTION 'Invalid season number for mode';
-  END IF;
-
-  INSERT INTO public.user_prestige_runs (
-    user_id,
-    mode,
-    season_number,
-    prestige_from,
-    prestige_to,
-    archived_progress,
-    summary,
-    created_at
-  )
-  VALUES (
-    v_user_id,
-    p_mode,
-    p_season_number,
-    p_prestige_from,
-    p_prestige_to,
-    public.sanitize_user_progress_mode_data(COALESCE(p_archived_progress, '{}'::jsonb)),
-    COALESCE(p_summary, '{}'::jsonb),
-    COALESCE(p_created_at, now())
-  );
-
-  v_seasonal_season_number := CASE WHEN p_mode = 'seasonal' THEN p_season_number END;
-
-  PERFORM public.sync_user_game_mode_progress(
-    p_current_game_mode,
-    p_game_edition,
-    p_tarkov_uid,
-    jsonb_build_object(
-      'pvp', COALESCE(p_pvp_data, '{}'::jsonb),
-      'pve', COALESCE(p_pve_data, '{}'::jsonb),
-      'seasonal', COALESCE(p_seasonal_data, '{}'::jsonb)
-    ),
-    v_seasonal_season_number
-  );
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.archive_prestige_run_and_reset_progress(
-  TEXT,
-  SMALLINT,
-  INTEGER,
-  INTEGER,
-  JSONB,
-  JSONB,
-  TIMESTAMPTZ,
-  TEXT,
-  INTEGER,
-  BIGINT,
-  JSONB,
-  JSONB,
-  JSONB
-) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.archive_prestige_run_and_reset_progress(
-  TEXT,
-  SMALLINT,
-  INTEGER,
-  INTEGER,
-  JSONB,
-  JSONB,
-  TIMESTAMPTZ,
-  TEXT,
-  INTEGER,
-  BIGINT,
-  JSONB,
-  JSONB,
-  JSONB
-) TO authenticated;
-
-CREATE FUNCTION public.archive_prestige_run_and_reset_progress(
+CREATE OR REPLACE FUNCTION public.archive_prestige_run_and_reset_progress(
   p_mode TEXT,
   p_prestige_from INTEGER,
   p_prestige_to INTEGER,
@@ -1118,23 +985,39 @@ BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
+  IF p_mode NOT IN ('pvp', 'pve') THEN
+    RAISE EXCEPTION 'Prestige is not supported for %', p_mode;
+  END IF;
 
-  -- Seasonal progress is never written through a PvP prestige, so the caller's missing Seasonal
-  -- payload cannot clobber the active-season row.
-  PERFORM public.archive_prestige_run_and_reset_progress(
+  INSERT INTO public.user_prestige_runs (
+    user_id,
+    mode,
+    prestige_from,
+    prestige_to,
+    archived_progress,
+    summary,
+    created_at
+  )
+  VALUES (
+    v_user_id,
     p_mode,
-    0::SMALLINT,
     p_prestige_from,
     p_prestige_to,
-    p_archived_progress,
-    p_summary,
-    p_created_at,
+    public.sanitize_user_progress_mode_data(COALESCE(p_archived_progress, '{}'::jsonb)),
+    COALESCE(p_summary, '{}'::jsonb),
+    COALESCE(p_created_at, now())
+  );
+
+  -- p_modes omits 'seasonal' so a prestige can never write the Seasonal row.
+  PERFORM public.sync_user_game_mode_progress(
     p_current_game_mode,
     p_game_edition,
     p_tarkov_uid,
-    p_pvp_data,
-    p_pve_data,
-    '{}'::jsonb
+    jsonb_build_object(
+      'pvp', COALESCE(p_pvp_data, '{}'::jsonb),
+      'pve', COALESCE(p_pve_data, '{}'::jsonb)
+    ),
+    NULL::SMALLINT
   );
 END;
 $$;

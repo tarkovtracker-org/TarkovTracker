@@ -17,12 +17,7 @@
             :title="
               $t('settings.prestige.persistent_mode_unsupported_title', 'Prestige Unavailable')
             "
-            :description="
-              $t(
-                'settings.prestige.persistent_mode_unsupported',
-                'Prestige is unavailable for persistent PvE mode.'
-              )
-            "
+            :description="unsupportedModeDescription"
           />
         </div>
         <div v-else class="space-y-6 px-4 py-4">
@@ -498,12 +493,16 @@
   const archiveConfirmText = ref('');
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn && $supabase?.user?.id));
   const currentMode = computed(() => tarkovStore.currentGameMode);
-  const isPrestigeMode = computed(() => currentMode.value !== GAME_MODES.PVE);
-  const currentModeLabel = computed(() =>
+  const isPrestigeMode = computed(() => currentMode.value === GAME_MODES.PVP);
+  const unsupportedModeDescription = computed(() =>
     currentMode.value === GAME_MODES.SEASONAL
-      ? t('common.seasonal_pvp', 'Seasonal PvP')
-      : t('common.pvp', 'PvP')
+      ? t('settings.prestige.seasonal_mode_unsupported', 'Prestige is unavailable in Seasonal PvP.')
+      : t(
+          'settings.prestige.persistent_mode_unsupported',
+          'Prestige is unavailable for persistent PvE mode.'
+        )
   );
+  const currentModeLabel = computed(() => t('common.pvp', 'PvP'));
   const currentModeProgress = computed(() => tarkovStore.getCurrentProgressData());
   const currentPrestigeLevel = computed(() => currentModeProgress.value.prestigeLevel ?? 0);
   const currentEdition = computed(() =>

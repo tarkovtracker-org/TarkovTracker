@@ -58,7 +58,6 @@ export type PrestigeRunRecord = {
   createdAt: string;
   id: string;
   mode: GameMode;
-  seasonNumber: number;
   prestigeFrom: number;
   prestigeTo: number;
   summary: PrestigeRunSummary;
@@ -67,7 +66,6 @@ export type UserPrestigeRunRow = {
   created_at?: string | null;
   id?: string | null;
   mode?: string | null;
-  season_number?: number | null;
   prestige_from?: number | null;
   prestige_to?: number | null;
   summary?: Record<string, unknown> | null;
@@ -608,7 +606,6 @@ export const parsePrestigeRunRows = (
       createdAt,
       id: row.id,
       mode,
-      seasonNumber: Math.max(0, toSafeInteger(row.season_number, 0)),
       prestigeFrom,
       prestigeTo,
       summary: parsePrestigeSummary(row.summary),

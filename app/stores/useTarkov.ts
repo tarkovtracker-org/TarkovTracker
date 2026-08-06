@@ -71,7 +71,6 @@ import { delay } from '@/utils/async';
 import {
   ACTIVE_SEASON_NUMBER,
   GAME_MODES,
-  getGameModeSeasonNumber,
   MANUAL_FAIL_TASK_IDS,
   type GameMode,
 } from '@/utils/constants';
@@ -150,6 +149,7 @@ type TarkovStoreInstance = UserState & {
   ): number;
 };
 const assertPrestigeMode = (mode: GameMode) => {
+  if (mode === GAME_MODES.SEASONAL) throw new Error('Prestige is not supported for Seasonal PvP.');
   if (mode === GAME_MODES.PVE) throw new Error('Prestige is not supported for PvE.');
 };
 const requirePrestigeSession = () => {
@@ -234,12 +234,10 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
     p_current_game_mode: currentGameMode,
     p_game_edition: gameEdition,
     p_mode: mode,
-    p_season_number: getGameModeSeasonNumber(mode),
     p_prestige_from: currentPrestige,
     p_prestige_to: nextPrestige,
     p_pve_data: nextState.pve,
     p_pvp_data: nextState.pvp,
-    p_seasonal_data: nextState.seasonal,
     p_summary: buildPrestigeRunSummary(archivedProgress),
     p_tarkov_uid: tarkovUid,
   });
@@ -437,10 +435,9 @@ const tarkovActions = {
     const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
     const { data, error } = await $supabase.client
       .from('user_prestige_runs')
-      .select('id, mode, season_number, prestige_from, prestige_to, summary, created_at')
+      .select('id, mode, prestige_from, prestige_to, summary, created_at')
       .eq('user_id', $supabase.user.id)
       .eq('mode', mode)
-      .eq('season_number', getGameModeSeasonNumber(mode))
       .order('created_at', { ascending: false })
       .limit(safeLimit);
     if (error) {
@@ -468,7 +465,6 @@ const tarkovActions = {
       .eq('id', normalizedRunId)
       .eq('user_id', userId)
       .eq('mode', mode)
-      .eq('season_number', getGameModeSeasonNumber(mode))
       .select('id')
       .maybeSingle();
     if (error) {
