@@ -24,6 +24,23 @@ describe('getGameModeSeasonNumber', () => {
     await expect(getGameModeSeasonNumber(env, 'seasonal')).resolves.toBe(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+  it('requests the active season with a redirect mode workerd accepts', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(1)));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getGameModeSeasonNumber(env, 'seasonal')).resolves.toBe(1);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.redirect).toBe('manual');
+    expect(init.redirect).not.toBe('error');
+  });
+  it('rejects a redirected active-season response', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 301, headers: { location: '/elsewhere' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getGameModeSeasonNumber(env, 'seasonal')).rejects.toThrow(
+      'Failed to fetch active season'
+    );
+  });
   it('resolves non-seasonal modes to 0 without a network call', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
