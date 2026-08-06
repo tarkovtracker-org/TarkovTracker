@@ -52,12 +52,16 @@ type MergeRpcPayload = {
   p_set: Record<string, unknown> | null;
 };
 // Mirrors the merge semantics of the merge_progress_data SQL function:
-// taskCompletions shallow-merge, taskObjectives per-key deep-merge, set top-level merge.
+// an unmaterialized persistent row is seeded from its legacy column, then taskCompletions
+// shallow-merge, taskObjectives per-key deep-merge, set top-level merge.
 const applyMergeRpc = (
   current: Record<string, unknown>,
-  payload: MergeRpcPayload
+  payload: MergeRpcPayload,
+  legacy?: Record<string, unknown> | null
 ): Record<string, unknown> => {
-  const data = { ...current };
+  const seeded =
+    typeof current.level !== 'number' && typeof legacy?.level === 'number' ? legacy : current;
+  const data = { ...seeded };
   if (payload.p_task_completions) {
     data.taskCompletions = {
       ...((data.taskCompletions as Record<string, unknown>) ?? {}),
@@ -136,7 +140,12 @@ const createBaseFetchMock = ({
       onMerge?.(payload);
       const result = mergeResult ?? '1';
       if (mergeStore && Number(result) > 0) {
-        mergeStore.data = applyMergeRpc(mergeStore.data, payload);
+        const legacyField = payload.p_field === 'pve_data' ? 'pve_data' : 'pvp_data';
+        mergeStore.data = applyMergeRpc(
+          mergeStore.data,
+          payload,
+          (userProgress[legacyField] as Record<string, unknown> | null) ?? null
+        );
       }
       return new Response(result, { status: 200 });
     }
@@ -1032,7 +1041,9 @@ describe('api-gateway', () => {
   });
   it('seeds the first write from legacy progress when the normalized row is unmaterialized', async () => {
     let mergePayload: MergeRpcPayload | null = null;
+    const mergeStore: { data: Record<string, unknown> } = { data: { taskCompletions: {} } };
     const fetchMock = createBaseFetchMock({
+      mergeStore,
       onMerge: (payload) => {
         mergePayload = payload;
       },
@@ -1044,14 +1055,25 @@ describe('api-gateway', () => {
           objectives: [],
           taskRequirements: [],
         },
+        {
+          id: 'task-other',
+          name: 'Other Task',
+          factionName: 'Any',
+          objectives: [],
+          taskRequirements: [],
+        },
       ],
       userProgress: {
         game_edition: 1,
         progress_data: { taskCompletions: {} },
         pve_data: null,
         pvp_data: {
+          displayName: 'Legacy Player',
           level: 37,
-          taskCompletions: { 'task-main': { complete: true, failed: false, timestamp: 1 } },
+          taskCompletions: {
+            'task-main': { complete: true, failed: false, timestamp: 1 },
+            'task-other': { complete: true, failed: false, timestamp: 2 },
+          },
         },
         user_id: 'user-1',
       },
@@ -1067,7 +1089,19 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(200);
     const payload = mergePayload as unknown as MergeRpcPayload;
+    // The legacy snapshot is the diff base, so an already-complete task is a no-op.
     expect(payload.p_set?.lastApiUpdate).toBeUndefined();
+    // The RPC seeds the unmaterialized row from the legacy column, so nothing is lost.
+    expect(mergeStore.data).toMatchObject({
+      displayName: 'Legacy Player',
+      level: 37,
+    });
+    const storedCompletions = mergeStore.data.taskCompletions as Record<
+      string,
+      { complete?: boolean }
+    >;
+    expect(storedCompletions['task-main']?.complete).toBe(true);
+    expect(storedCompletions['task-other']?.complete).toBe(true);
   });
   it('reads legacy progress for an unmaterialized normalized row', async () => {
     const fetchMock = createBaseFetchMock({
@@ -1133,6 +1167,7 @@ describe('api-gateway', () => {
   });
   it.each([
     ['pvp', 'user_id,game_edition,pvp_data'],
+    ['pve', 'user_id,game_edition,pve_data'],
     ['seasonal', 'user_id,game_edition'],
   ] as const)(
     'narrows the solo team-progress edition select for %s',
