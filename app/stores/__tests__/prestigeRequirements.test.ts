@@ -57,7 +57,7 @@ describe('buildPrestigeRequirementRows', () => {
           },
         ]),
       ],
-      pvpProgress: createProgressData(),
+      modeProgress: createProgressData(),
       storyChapters: [],
       tasks: [],
     });
@@ -74,7 +74,7 @@ describe('buildPrestigeRequirementRows', () => {
       edition,
       hideoutStations,
       prestigeLevels: [createPrestigeLevel(1, [])],
-      pvpProgress: createProgressData(),
+      modeProgress: createProgressData(),
       storyChapters: [],
       tasks: [],
     });
@@ -143,7 +143,7 @@ describe('buildPrestigeRequirementRows', () => {
       edition,
       hideoutStations,
       prestigeLevels,
-      pvpProgress,
+      modeProgress: pvpProgress,
       storyChapters,
       tasks,
     });
@@ -217,7 +217,7 @@ describe('buildPrestigeRequirementRows', () => {
       edition,
       hideoutStations,
       prestigeLevels,
-      pvpProgress,
+      modeProgress: pvpProgress,
       storyChapters,
       tasks,
     });
@@ -257,7 +257,7 @@ describe('buildPrestigeRequirementRows', () => {
           },
         ]),
       ],
-      pvpProgress: createProgressData(),
+      modeProgress: createProgressData(),
       storyChapters: [],
       tasks: [],
     });
@@ -317,7 +317,7 @@ describe('buildPrestigeRequirementRows', () => {
           },
         ]),
       ],
-      pvpProgress,
+      modeProgress: pvpProgress,
       storyChapters: [],
       tasks: [],
     });
@@ -365,7 +365,7 @@ describe('buildPrestigeRequirementRows', () => {
           } as TaskObjective,
         ]),
       ],
-      pvpProgress: createProgressData(),
+      modeProgress: createProgressData(),
       storyChapters: [],
       tasks: [],
     });
@@ -391,7 +391,7 @@ describe('buildPrestigeRequirementRows', () => {
             },
           ]),
         ],
-        pvpProgress: createProgressData(),
+        modeProgress: createProgressData(),
         storyChapters: [],
         tasks: [],
       });

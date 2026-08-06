@@ -46,6 +46,7 @@ const routeState = reactive({
 const mockTarkovStore = {
   getCurrentGameMode: vi.fn(() => 'pvp'),
   getDisplayName: vi.fn(() => ''),
+  getModeDisplayName: vi.fn((): string | null => null),
   getPvEProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
   getPvPProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
 };
@@ -56,17 +57,20 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     locale: localeRef,
     setLocale,
     t: (key: string, params?: Record<string, unknown> | string) => {
+      const templates: Record<string, string> = {
+        'common.pve': 'PVE',
+        'common.pvp': 'PVP',
+        'common.seasonal_pvp': 'SEASONAL PVP',
+        'profile.title_with_mode': '{name} Profile {mode}',
+      };
       if (params && typeof params === 'object' && !Array.isArray(params)) {
-        const templates: Record<string, string> = {
-          'profile.title_with_mode': '{name} Profile {mode}',
-        };
         const template = templates[key] ?? key;
         return Object.entries(params).reduce(
           (result, [k, v]) => result.replaceAll(`{${k}}`, String(v)),
           template
         );
       }
-      return key;
+      return templates[key] ?? key;
     },
     te: () => false,
   }),
@@ -387,6 +391,7 @@ describe('AppBar page title', () => {
     mockSupabase.user.username = '';
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockReturnValue('');
+    mockTarkovStore.getModeDisplayName.mockReturnValue(null);
     mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
     mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
   });
@@ -443,6 +448,7 @@ describe('AppBar page title', () => {
     mockSupabase.user.id = 'user-1';
     mockSupabase.user.username = 'AccountUsername';
     mockTarkovStore.getDisplayName.mockReturnValue('OwnDisplayName');
+    mockTarkovStore.getModeDisplayName.mockReturnValue('OwnProgressName');
     mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: 'OwnProgressName' });
     const wrapper = await mountAppBar();
     expect(wrapper.text()).toContain('app_bar.hidden_label Profile PVP');

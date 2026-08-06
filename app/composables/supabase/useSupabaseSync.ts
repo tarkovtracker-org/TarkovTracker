@@ -20,6 +20,7 @@ export interface SupabaseSyncConfig<
   store: Store<string, TState>;
   table: string;
   transform?: (state: TState) => TPayload | null;
+  sync?: (payload: TPayload) => Promise<{ error: SupabaseErrorLike | null }>;
   debounceMs?: number;
   onSynced?: () => void;
 }
@@ -114,6 +115,7 @@ export function useSupabaseSync<
   store,
   table,
   transform,
+  sync,
   debounceMs = 1000,
   onSynced,
 }: SupabaseSyncConfig<TState, TPayload>): SupabaseSyncReturn<TState, TPayload> {
@@ -174,7 +176,7 @@ export function useSupabaseSync<
         }
       }
       const upsert = async (payload: Record<string, unknown>) =>
-        $supabase.client.from(table).upsert(payload);
+        sync ? sync(payload as TPayload) : $supabase.client.from(table).upsert(payload);
       const upsertWithFallback = async (payload: Record<string, unknown>) => {
         let payloadToSync: Record<string, unknown> | null = payload;
         let error: SupabaseErrorLike | null = null;

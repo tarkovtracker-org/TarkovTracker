@@ -20,7 +20,9 @@ and have an agent verify the answer against the code.
 4. [Overlay corrections](#4-overlay-corrections) — fixing wrong upstream data
 5. [Precompute workflow](#5-precompute-workflow) — warming KV off the request path
 6. [Progress API data flow](#6-progress-api-data-flow) — how an external `GET /progress` is served
-7. [Tarkov.dev profile import](#7-tarkovdev-profile-import) — player profile fetch, caching,
+7. [Game-mode and Seasonal progress storage](#7-game-mode-and-seasonal-progress-storage) —
+   normalized persistence, compatibility, sharing, and teams
+8. [Tarkov.dev profile import](#8-tarkovdev-profile-import) — player profile fetch, caching,
    freshness gate, abuse controls
 
 ---
@@ -102,6 +104,8 @@ flowchart LR
 - Overlay is applied only by endpoints that call `applyOverlay()` in their handler. Adding a new
   endpoint does not imply adding overlay — only add it when the upstream data needs corrections.
 - Game mode is validated with `validateGameMode()` and defaults to `regular` on any invalid input.
+- Internal `pvp`, `pve`, and `seasonal` modes map to upstream `regular`, `pve`, and `pvp-season`
+  respectively. The upstream endpoint catalog is the authority for supported slugs.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
 ---
@@ -433,7 +437,8 @@ sequenceDiagram
   else daily quota denied
     W-->>C: 429 + Retry-After + X-RateLimit-*
   end
-  W->>SB: user_progress select (only the token's game-mode column)
+  W->>SB: user_game_mode_progress select (token mode + active season)
+  W->>SB: user_progress select (account game edition)
   W->>TD: tasks + hideout metadata (cached)
   W->>W: transform + invalidation + hideout auto-complete
   alt If-None-Match matches payload ETag
@@ -459,10 +464,11 @@ sequenceDiagram
    `ApiGatewayRateLimiter` Durable Object call (`daily-{kind}:{user_id}`, UTC-day anchor, retained)
    admits or denies the request. The quota counts admitted requests — downstream Supabase failures
    do not trigger refunds. The daily quota fails open on DO unavailability.
-5. **Data fetch.** `workers/api-gateway/src/handlers/progress.ts` selects only
-   `user_id,game_edition,<mode>_data` from `user_progress` (never both game modes), resolves a
-   display-name fallback from Supabase Auth (24h cache), and loads tasks/hideout metadata from
-   `json.tarkov.dev` via `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
+5. **Data fetch.** `workers/api-gateway/src/handlers/progress.ts` selects the token mode's
+   `progress_data` from `user_game_mode_progress` using the mode's season number, selects only
+   account-wide `game_edition` from `user_progress`, resolves a display-name fallback from Supabase
+   Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
+   `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
    game-edition hideout auto-completes.
@@ -495,7 +501,8 @@ sequenceDiagram
   throttle in `api_usage_daily`.
 - The daily quota counts admitted requests, not successful responses. A Supabase 500 after
   admission consumes one slot — no refund system exists or is needed.
-- Progress reads select only the requested game mode's JSONB column, never `select=*`.
+- Progress reads select one exact `(user_id, game_mode, season_number)` row and account metadata;
+  they never read another mode's progress or use `select=*`.
 - Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
   never hide a change that came from task metadata or invalidation rather than the user's row.
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
@@ -510,12 +517,117 @@ sequenceDiagram
 
 ---
 
-## 7. Tarkov.dev profile import
+## 7. Game-mode and Seasonal progress storage
+
+**Summary.** Persistent PvP, PvE, and numbered Seasonal PvP progress share one normalized table.
+`user_game_mode_progress` has primary key `(user_id, game_mode, season_number)`; PvP and PvE use
+season `0`, while Seasonal uses the active positive season number. Season 1 is active. The legacy
+`user_progress` row retains account-wide metadata and mirrored PvP/PvE JSON during the rolling
+deployment window, but Seasonal progress is never stored in that combined row.
+
+### Diagram
+
+```mermaid
+flowchart LR
+    Store["useTarkovStore<br/>pvp | pve | seasonal"] --> Sync["sync_user_game_mode_progress()"]
+    Sync --> Meta["user_progress<br/>edition, UID, selected mode<br/>legacy PvP/PvE mirrors"]
+    Sync --> Modes["user_game_mode_progress<br/>(user, mode, season)<br/>progress + visibility"]
+    Modes --> RT["Realtime<br/>multi-device + teammates"]
+    Modes --> Share["Shared profiles<br/>streamer overlays"]
+    Membership["team_memberships<br/>(user, game mode)"] --> RT
+```
+
+### Flow
+
+1. Startup reads account metadata and legacy PvP/PvE from `user_progress`, then reads normalized
+   rows and prefers the normalized active row for each mode.
+2. Debounced writes call `sync_user_game_mode_progress`, which validates the caller, serializes
+   concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
+   clients, and upserts each normalized row. The caller passes the season number its bundle was
+   built for; the function writes the Seasonal row only when that number equals the database's
+   active season, so a cached client from a previous season cannot upload stale Seasonal state.
+   Persistent PvP and PvE still sync in that case. API gateway reads resolve the active Seasonal
+   number through the database before selecting a row.
+3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
+   when its mode is supported and its season equals the active season.
+4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
+   routes select the exact mode and season; teammates receive same-mode progress through RLS. The
+   sharing RPC also mirrors persistent PvP/PvE visibility back to the legacy
+   `user_preferences.profile_share_*` columns, and a trigger mirrors legacy writes forward into
+   `profile_public`, so a cached older client can still turn sharing off during a rolling deploy.
+   A missing normalized row is treated as private rather than missing.
+5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
+   that locks the team while checking capacity and persists membership, user-system state, and the
+   audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
+   Seasonal team column. The team-members endpoint reads the `team_member_mode_summary` view, which
+   derives display name, level, and completed-task count inside the database so teammate progress
+   blobs never cross the wire.
+6. The active season definition carries its number, start date, and exact end timestamp. The UI
+   counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
+   historical rows remain retained and cannot be merged into the new season. Locally persisted
+   progress carries the season it belongs to, and Seasonal progress stamped with a different season
+   is discarded on load so stale browser state cannot be uploaded into the new season. Rollover
+   deploys the database flip first during the between-season no-write gap, verifies it, and then
+   deploys the matching application constants before the new season opens.
+7. Native backup v2 includes `seasonNumber` and Seasonal progress. A backup from another season
+   may restore persistent modes but cannot write its Seasonal payload into the active season.
+8. Prestige is a PvP-only concept and Seasonal PvP does not support it, so the archive RPC accepts
+   only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
+   rejects a Seasonal prestige before any request, and the settings card reports prestige as
+   unavailable in Seasonal PvP.
+
+### Files
+
+- `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
+  backfill, RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+- `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
+  `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
+- `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
+  hydration
+- `app/composables/useDataBackup.ts` — season-aware native backups
+- `app/server/api/profile/[userId]/[mode].get.ts`,
+  `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
+  mode-aware sharing and team routes
+- `app/utils/constants.ts`, `workers/api-gateway/src/utils/gameMode.ts` — runtime active-season
+  constants and upstream mode mapping
+
+### Invariants
+
+- `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
+  the Worker resolves the active Seasonal number through the database instead of carrying a
+  second runtime constant.
+- Historical Seasonal rows are retained but never merged into the active season. Locally persisted
+  Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
+  match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
+  independently rejects Seasonal writes whose caller-supplied season number is absent or does not
+  match `private.active_season_number()`, so the fresh-season guarantee does not depend on client
+  code alone.
+- Teammate summaries are computed in the database. `app/server/api/team/members.ts` selects only
+  `display_name`, `level`, and `tasks_completed` from `team_member_mode_summary`; it must not select
+  `progress_data` for team listings.
+- Authenticated users can write only their own progress. Teammate reads require a shared team in
+  the same game mode; cross-mode teammates and outsiders cannot read a row.
+- New clients read teammate progress from mode rows. The legacy teammate policy on `user_progress`
+  remains during rolling deployment; account-wide metadata for new clients is exposed through the
+  authenticated team-members endpoint after explicit membership validation.
+- The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
+  season. No Seasonal operation may silently fall back to persistent PvP.
+- Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
+  `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
+  progress is written through a prestige.
+- Tarkov.dev profile and EFT-log imports cannot target Seasonal until their source data is verified.
+
+---
+
+## 8. Tarkov.dev profile import
 
 **Summary.** Settings → Data Management lets a user import their in-game profile (level/XP,
 skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots on the
 players.tarkov.dev host (the `profile/{aid}` path for PvP and `pve/{aid}` for PvE, each with a
-JSON suffix). The upstream JSON only refreshes when a human views the player page on tarkov.dev
+JSON suffix). Imports can target persistent PvP or PvE. Seasonal is visible but locked until its
+profile source and mapping are verified, preventing persistent PvP data from being written into
+Season 1. The upstream JSON only refreshes when a human views the player page on tarkov.dev
 (Turnstile-guarded
 there); tarkov.dev purges its CDN copy on refresh, so a new snapshot is visible to us immediately.
 The upstream sends no CORS headers, so the browser cannot fetch it directly — everything goes
@@ -588,6 +700,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
 - Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
   error responses never are.
+- The client rejects a Seasonal target before mutating progress. Adding a Seasonal player-profile
+  route alone is not enough to unlock it; parser and field compatibility must be verified first.
 
 ---
 

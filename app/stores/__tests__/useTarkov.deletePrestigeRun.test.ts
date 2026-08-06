@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
 const { deleteMock, eqMock, from, maybeSingleMock, selectMock, supabaseContext } = vi.hoisted(
   () => {
-    const eqMock = vi.fn();
+    const eqMock = vi.fn(() => queryBuilder);
     const maybeSingleMock = vi.fn();
     const selectMock = vi.fn(() => ({
       maybeSingle: maybeSingleMock,
@@ -46,10 +46,6 @@ describe('useTarkov deletePrestigeRun', () => {
     vi.clearAllMocks();
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.id = 'user-1';
-    eqMock
-      .mockImplementationOnce(() => ({ eq: eqMock }))
-      .mockImplementationOnce(() => ({ eq: eqMock }))
-      .mockImplementationOnce(() => ({ select: selectMock }));
     maybeSingleMock.mockResolvedValue({ data: { id: 'run-1' }, error: null });
   });
   it('deletes the selected archived run for the signed-in user', async () => {
@@ -60,6 +56,7 @@ describe('useTarkov deletePrestigeRun', () => {
     expect(eqMock).toHaveBeenNthCalledWith(1, 'id', 'run-1');
     expect(eqMock).toHaveBeenNthCalledWith(2, 'user_id', 'user-1');
     expect(eqMock).toHaveBeenNthCalledWith(3, 'mode', 'pvp');
+    expect(eqMock).toHaveBeenCalledTimes(3);
     expect(selectMock).toHaveBeenCalledWith('id');
     expect(maybeSingleMock).toHaveBeenCalledTimes(1);
   });
@@ -74,12 +71,8 @@ describe('useTarkov deletePrestigeRun', () => {
   });
   it('surfaces remote delete failures', async () => {
     const store = useTarkovStore();
-    eqMock.mockReset();
-    maybeSingleMock.mockReset();
-    eqMock
-      .mockImplementationOnce(() => ({ eq: eqMock }))
-      .mockImplementationOnce(() => ({ eq: eqMock }))
-      .mockImplementationOnce(() => ({ select: selectMock }));
+    eqMock.mockClear();
+    maybeSingleMock.mockClear();
     maybeSingleMock.mockResolvedValue({
       data: null,
       error: { message: 'delete failed' },
@@ -88,15 +81,12 @@ describe('useTarkov deletePrestigeRun', () => {
       'Failed to delete prestige history: delete failed'
     );
     expect(eqMock).toHaveBeenNthCalledWith(3, 'mode', 'pve');
+    expect(eqMock).toHaveBeenCalledTimes(3);
   });
   it('fails when the delete matches no rows', async () => {
     const store = useTarkovStore();
-    eqMock.mockReset();
-    maybeSingleMock.mockReset();
-    eqMock
-      .mockImplementationOnce(() => ({ eq: eqMock }))
-      .mockImplementationOnce(() => ({ eq: eqMock }))
-      .mockImplementationOnce(() => ({ select: selectMock }));
+    eqMock.mockClear();
+    maybeSingleMock.mockClear();
     maybeSingleMock.mockResolvedValue({
       data: null,
       error: null,

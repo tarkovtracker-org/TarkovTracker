@@ -82,19 +82,23 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
-  import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import {
+    getTeamIdFromState,
+    getTeamIdStateKey,
+    useSystemStoreWithSupabase,
+  } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useTeamStoreWithSupabase } from '@/stores/useTeamStore';
   import { delay } from '@/utils/async';
-  import { GAME_MODES, LIMITS } from '@/utils/constants';
+  import { GAME_MODES, LIMITS, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
-  import type { SystemState, TeamState } from '@/types/tarkov';
+  import type { TeamState } from '@/types/tarkov';
   import type { CreateTeamResponse, LeaveTeamResponse } from '@/types/team';
   const { t } = useI18n({ useScope: 'global' });
   const { teamStore } = useTeamStoreWithSupabase();
   const { systemStore, hasInitiallyLoaded } = useSystemStoreWithSupabase();
-  function getCurrentGameMode(): 'pvp' | 'pve' {
-    return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
+  function getCurrentGameMode(): GameMode {
+    return tarkovStore.getCurrentGameMode?.() || GAME_MODES.PVP;
   }
   function getTeamId(): string | null {
     return getTeamIdFromState(systemStore.$state, getCurrentGameMode());
@@ -103,6 +107,26 @@
   const { $supabase } = useNuxtApp();
   const toast = useToast();
   const { createTeam, leaveTeam } = useEdgeFunctions();
+  const clearRemovedLegacyTeamId = (state: typeof systemStore.$state, removedTeamId: string) => {
+    if (state.team === removedTeamId) state.team = null;
+    if (state.team_id === removedTeamId) state.team_id = null;
+  };
+  const setLocalTeamId = (
+    mode: GameMode,
+    teamId: string | null,
+    removedTeamId: string | null = null
+  ) => {
+    const key = getTeamIdStateKey(mode);
+    systemStore.$patch((state) => {
+      state[key] = teamId;
+      if (mode === GAME_MODES.PVP) {
+        state.team = teamId;
+        state.team_id = teamId;
+      } else if (teamId === null && removedTeamId) {
+        clearRemovedLegacyTeamId(state, removedTeamId);
+      }
+    });
+  };
   const isLoggedIn = computed(() => $supabase.user.loggedIn);
   const linkVisible = ref(false);
   const generateRandomName = (length: number = LIMITS.RANDOM_NAME_LENGTH) =>
@@ -143,105 +167,116 @@
   const showNotification = (message: string, color: 'primary' | 'error' = 'primary') => {
     toast.add({ title: message, color: color === 'error' ? 'error' : 'primary' });
   };
+  const restoreExistingMembership = async (mode: GameMode): Promise<boolean> => {
+    const { data, error } = await $supabase.client
+      .from('team_memberships')
+      .select('team_id')
+      .eq('user_id', $supabase.user.id)
+      .eq('game_mode', mode)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data?.team_id) return false;
+    setLocalTeamId(mode, data.team_id);
+    showNotification(
+      t('page.team.card.myteam.already_in_team', { mode: mode.toUpperCase() }),
+      'error'
+    );
+    return true;
+  };
+  const applyCreatedTeam = (
+    team: NonNullable<CreateTeamResponse['team']>,
+    generatedJoinCode: string,
+    mode: GameMode
+  ) => {
+    const teamWithLegacyJoinCode = team as typeof team & {
+      join_code?: string;
+      joinCode?: string;
+    };
+    const joinCode =
+      teamWithLegacyJoinCode.joinCode ?? teamWithLegacyJoinCode.join_code ?? generatedJoinCode;
+    setLocalTeamId(mode, team.id);
+    teamStore.$patch({
+      joinCode,
+      join_code: joinCode,
+      owner: team.ownerId,
+      owner_id: team.ownerId,
+      members: [team.ownerId],
+    } as Partial<TeamState>);
+  };
+  const verifyCreatedMembership = async (teamId: string, mode: GameMode) => {
+    await delay(500);
+    const { data, error } = await $supabase.client
+      .from('team_memberships')
+      .select('team_id')
+      .eq('user_id', $supabase.user.id)
+      .eq('team_id', teamId)
+      .eq('game_mode', mode)
+      .maybeSingle();
+    if (error) logger.error('[MyTeam] Verification query error:', error);
+    if (!data) throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
+  };
+  const ensureOwnerDisplayName = async (ownerId: string) => {
+    await nextTick();
+    if (ownerId !== $supabase.user.id || tarkovStore.getDisplayName()) return;
+    tarkovStore.setDisplayName(`${tarkovStore.getCurrentGameMode().toUpperCase()}-PMC`);
+  };
+  const getTeamErrorDetailMessage = (details: unknown): string | null => {
+    if (!details) return null;
+    if (typeof details !== 'object') return null;
+    if (!('error' in details)) return null;
+    return String(details.error);
+  };
+  const getDetailedTeamError = (error: object): string | null => {
+    if (!('details' in error)) return null;
+    return getTeamErrorDetailMessage(error.details);
+  };
+  const toErrorObject = (error: unknown): object | null => {
+    if (!error) return null;
+    if (typeof error !== 'object') return null;
+    return error;
+  };
+  const getCreateTeamErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) return error.message;
+    const errorObject = toErrorObject(error);
+    const detailed = errorObject ? getDetailedTeamError(errorObject) : null;
+    if (detailed) return detailed;
+    return t('page.team.card.myteam.create_team_error');
+  };
+  const requireCreatedTeam = (result: CreateTeamResponse) => {
+    if (!result.team) throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
+    return result.team;
+  };
+  const createTeamWorkflow = async () => {
+    validateAuth();
+    const currentGameMode = getCurrentGameMode();
+    if (await restoreExistingMembership(currentGameMode)) return;
+    const generatedJoinCode = buildJoinCode();
+    const result = (await createTeam(
+      buildTeamName(),
+      generatedJoinCode,
+      5,
+      currentGameMode
+    )) as CreateTeamResponse;
+    const team = requireCreatedTeam(result);
+    applyCreatedTeam(team, generatedJoinCode, currentGameMode);
+    await verifyCreatedMembership(team.id, currentGameMode);
+    await ensureOwnerDisplayName(team.ownerId);
+    showNotification(t('page.team.card.myteam.create_team_success'));
+  };
   const handleCreateTeam = async () => {
     loading.value.createTeam = true;
-    const generatedJoinCode = buildJoinCode();
-    const generatedTeamName = buildTeamName();
-    const currentGameMode = getCurrentGameMode();
     try {
-      validateAuth();
-      const { data: membership, error: membershipError } = await $supabase.client
-        .from('team_memberships')
-        .select('team_id, game_mode')
-        .eq('user_id', $supabase.user.id)
-        .eq('game_mode', currentGameMode)
-        .maybeSingle();
-      if (membershipError) {
-        logger.error('[MyTeam] Error checking membership:', membershipError);
-        throw membershipError;
-      }
-      if (membership?.team_id) {
-        const teamIdColumn = currentGameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-        systemStore.$patch({
-          [teamIdColumn]: membership.team_id,
-        } as Partial<SystemState>);
-        showNotification(
-          `You are already in a ${currentGameMode.toUpperCase()} team. Leave your current team first.`,
-          'error'
-        );
-        loading.value.createTeam = false;
-        return;
-      }
-      const result = (await createTeam(
-        generatedTeamName,
-        generatedJoinCode,
-        5,
-        currentGameMode
-      )) as CreateTeamResponse;
-      if (!result?.team) {
-        logger.error('[MyTeam] Invalid response structure - missing team object');
-        throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
-      }
-      const teamIdColumn = currentGameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-      systemStore.$patch({ [teamIdColumn]: result.team.id } as Partial<SystemState>);
-      const teamResponse = result.team as unknown as {
-        id: string;
-        ownerId: string;
-        joinCode?: string;
-        join_code?: string;
-      };
-      const joinCode = teamResponse.joinCode ?? teamResponse.join_code ?? generatedJoinCode;
-      teamStore.$patch({
-        joinCode: joinCode,
-        join_code: joinCode,
-        owner: result.team.ownerId,
-        owner_id: result.team.ownerId,
-        members: [result.team.ownerId],
-      } as Partial<TeamState>);
-      await delay(500);
-      const { data: verification, error: verificationError } = await $supabase.client
-        .from('team_memberships')
-        .select('team_id, game_mode')
-        .eq('user_id', $supabase.user.id)
-        .eq('team_id', result.team.id)
-        .eq('game_mode', currentGameMode)
-        .maybeSingle();
-      if (verificationError) {
-        logger.error('[MyTeam] Verification query error:', verificationError);
-      }
-      if (!verification) {
-        logger.error('[MyTeam] Team membership not found in database after creation');
-        throw new Error(t('page.team.card.myteam.create_team_error_ui_update'));
-      }
-      await nextTick();
-      if (result.team.ownerId === $supabase.user.id) {
-        if (!tarkovStore.getDisplayName()) {
-          const defaultName = `${tarkovStore.getCurrentGameMode().toUpperCase()}-PMC`;
-          tarkovStore.setDisplayName(defaultName);
-        }
-      }
-      showNotification(t('page.team.card.myteam.create_team_success'));
+      await createTeamWorkflow();
     } catch (error: unknown) {
       logger.error('[MyTeam] Error creating team:', error);
-      const message =
-        error &&
-        typeof error === 'object' &&
-        'details' in error &&
-        error.details &&
-        typeof error.details === 'object' &&
-        'error' in error.details
-          ? String(error.details.error)
-          : error instanceof Error
-            ? error.message
-            : t('page.team.card.myteam.create_team_error');
-      showNotification(message, 'error');
+      showNotification(getCreateTeamErrorMessage(error), 'error');
+    } finally {
+      loading.value.createTeam = false;
     }
-    loading.value.createTeam = false;
   };
   const handleLeaveTeam = async () => {
     loading.value.leaveTeam = true;
     const currentGameMode = getCurrentGameMode();
-    const teamIdColumn = currentGameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
     try {
       validateAuth();
       const currentTeamId = getTeamId();
@@ -253,11 +288,7 @@
         .eq('game_mode', currentGameMode)
         .maybeSingle();
       if (!membershipData && !membershipError) {
-        systemStore.$patch({
-          [teamIdColumn]: null,
-          team: null,
-          team_id: null,
-        } as Partial<SystemState>);
+        setLocalTeamId(currentGameMode, null, currentTeamId);
         const { data: allMembers } = await $supabase.client
           .from('team_memberships')
           .select('user_id')
@@ -303,11 +334,7 @@
       if (!result.success) {
         throw new Error(t('page.team.card.myteam.leave_team_error'));
       }
-      systemStore.$patch({
-        [teamIdColumn]: null,
-        team: null,
-        team_id: null,
-      } as Partial<SystemState>);
+      setLocalTeamId(currentGameMode, null, currentTeamIdForLeave);
       teamStore.$reset();
       await delay(500);
       await nextTick();
@@ -334,10 +361,13 @@
     if (teamUrl.value) {
       try {
         await navigator.clipboard.writeText(teamUrl.value);
-        showNotification('URL copied to clipboard');
+        showNotification(t('page.team.card.myteam.url_copied', 'URL copied to clipboard'));
       } catch (error) {
         logger.error('[MyTeam] Failed to copy URL to clipboard:', error);
-        showNotification('Failed to copy URL to clipboard', 'error');
+        showNotification(
+          t('page.team.card.myteam.copy_url_failed', 'Failed to copy URL to clipboard'),
+          'error'
+        );
       }
     }
   };

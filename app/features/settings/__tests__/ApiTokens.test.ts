@@ -24,7 +24,7 @@ const pendingLoads = new Map<
   (value: {
     data: Array<{
       created_at: string;
-      game_mode: 'pvp' | 'pve';
+      game_mode: 'pvp' | 'pve' | 'seasonal';
       is_active: boolean;
       last_used_at: string | null;
       note: string;
@@ -155,7 +155,7 @@ const makeTokenRow = (
   note: string,
   overrides: Partial<{
     created_at: string;
-    game_mode: 'pvp' | 'pve';
+    game_mode: 'pvp' | 'pve' | 'seasonal';
     is_active: boolean;
     last_used_at: string | null;
     permissions: string[];
@@ -369,6 +369,34 @@ describe('ApiTokens', () => {
       )
     ).toHaveLength(1);
     expect(wrapper.text()).toContain('Fallback Token');
+  });
+  it('uses the SZN prefix for Seasonal token creation and direct fallback', async () => {
+    runtimeConfig.public.allowDirectTokenCreateFallback = true;
+    mockCreateToken.mockRejectedValueOnce({ status: 404, data: { message: 'Not found' } });
+    mockInsertSingle.mockResolvedValueOnce({
+      data: { token_id: 'user-a-seasonal-token' },
+      error: null,
+    });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    await clickButton(wrapper, 'page.settings.card.apitokens.new_token_expand');
+    await wrapper.findAll('input[type="radio"]')[2]!.setValue();
+    await clickButton(wrapper, 'page.settings.card.apitokens.submit_new_token');
+    await flushPromises();
+    expect(mockCreateToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gameMode: 'seasonal',
+        tokenValue: expect.stringMatching(/^SZN_[0-9a-f]{18}$/),
+      })
+    );
+    const edgeTokenValue = mockCreateToken.mock.calls[0]?.[0].tokenValue;
+    expect(edgeTokenValue).toMatch(/^SZN_[0-9a-f]{18}$/);
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        game_mode: 'seasonal',
+        token_value: edgeTokenValue,
+      })
+    );
   });
   it('disables create and shows the token cap alert when the account has 3 active tokens', async () => {
     const wrapper = await createWrapper();

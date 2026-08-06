@@ -1,3 +1,4 @@
+import type { GameMode } from '@/utils/constants';
 /**
  * Team API response types
  */
@@ -7,6 +8,7 @@ export interface TeamData {
   maxMembers: number;
   ownerId: string;
   createdAt: string;
+  gameMode?: GameMode;
   joinCode?: string;
 }
 export interface CreateTeamResponse {

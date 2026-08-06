@@ -17,7 +17,7 @@
   <nav
     :aria-label="t('navigation_drawer.main_navigation')"
     class="bg-sidebar shadow-nav-drawer fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
-    :class="[sidebarWidth, currentMode === 'pve' ? 'border-pve-700/50' : 'border-pvp-700/50']"
+    :class="[sidebarWidth, modeBorderClass]"
   >
     <div
       class="relative z-10 flex h-full scrollbar-thin flex-col overflow-x-hidden overflow-y-auto"
@@ -85,6 +85,11 @@
   const appStore = useAppStore();
   const tarkovStore = useTarkovStore();
   const currentMode = computed(() => tarkovStore.getCurrentGameMode());
+  const modeBorderClass = computed(() => {
+    if (currentMode.value === 'pve') return 'border-pve-700/50';
+    if (currentMode.value === 'seasonal') return 'border-warning-700/50';
+    return 'border-pvp-700/50';
+  });
   const mobileExpanded = computed(() => appStore.mobileDrawerExpanded);
   watch(belowMd, (isMobile) => {
     if (!isMobile) {

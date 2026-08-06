@@ -6,7 +6,7 @@ import {
   setHeader,
   setResponseHeader,
 } from 'h3';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { isGameMode, type GameMode } from '@/utils/constants';
 import { buildOverlayContentSecurityPolicy } from '@/utils/csp';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type OverlayMetric = 'items' | 'summary' | 'tasks';
@@ -28,13 +28,7 @@ type OverlayResolution = '1080p' | '1440p' | 'custom';
 type OverlaySize = 'lg' | 'md' | 'sm';
 type OverlayFont = 'inter' | 'oswald' | 'outfit' | 'poppins' | 'rajdhani' | 'roboto-mono';
 const normalizeMode = (value: string | undefined): GameMode | null => {
-  if (value === GAME_MODES.PVE) {
-    return GAME_MODES.PVE;
-  }
-  if (value === GAME_MODES.PVP) {
-    return GAME_MODES.PVP;
-  }
-  return null;
+  return isGameMode(value) ? value : null;
 };
 const readScalarQueryValue = (value: unknown): string => {
   if (Array.isArray(value)) {

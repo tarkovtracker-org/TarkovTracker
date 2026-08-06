@@ -13,8 +13,13 @@ import {
   type OverlayResolution,
   type OverlaySize,
 } from '@/features/streamer-tools/composables/useStreamerToolsSettings';
-import { usePreferencesStore } from '@/stores/usePreferences';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { logger } from '@/utils/logger';
+import {
+  createProfileVisibility,
+  isCurrentProfileVisibilityRequest,
+  loadCurrentProfileVisibility,
+} from '@/utils/profileVisibility';
+import type { GameMode } from '@/utils/constants';
 interface IntervalOption {
   label: string;
   value: number;
@@ -31,7 +36,6 @@ interface SelectOption<T extends string> {
 export function useStreamerToolsOverlay() {
   const persistedSettings = usePersistedStreamerToolsSettings();
   const { t } = useI18n({ useScope: 'global' });
-  const preferencesStore = usePreferencesStore();
   const { $supabase } = useNuxtApp();
   const runtimeConfig = useRuntimeConfig();
   const selectedMode = ref<GameMode>(persistedSettings.value.mode);
@@ -221,11 +225,44 @@ export function useStreamerToolsOverlay() {
       ? $supabase.user.id
       : null
   );
-  const isModePublic = computed(() => {
-    return selectedMode.value === GAME_MODES.PVE
-      ? preferencesStore.getProfileSharePvePublic
-      : preferencesStore.getProfileSharePvpPublic;
-  });
+  const modeVisibility = reactive(createProfileVisibility());
+  const visibilityError = ref('');
+  let modeVisibilityLoadId = 0;
+  const loadModeVisibility = async () => {
+    const requestId = ++modeVisibilityLoadId;
+    Object.assign(modeVisibility, createProfileVisibility());
+    visibilityError.value = '';
+    const userId = currentUserId.value;
+    if (!userId) return;
+    const result = await loadCurrentProfileVisibility(
+      () =>
+        $supabase.client
+          .from('user_game_mode_progress')
+          .select('game_mode,season_number,profile_public')
+          .eq('user_id', userId),
+      () =>
+        isCurrentProfileVisibilityRequest(
+          requestId,
+          modeVisibilityLoadId,
+          userId,
+          currentUserId.value
+        )
+    );
+    if (!result.current) return;
+    if (!result.error) Object.assign(modeVisibility, result.visibility);
+    else {
+      visibilityError.value = t(
+        'streamer_tools.visibility_load_failed',
+        'Unable to load sharing settings.'
+      );
+      logger.error('[StreamerToolsOverlay] Failed to load profile visibility:', {
+        error: result.error,
+        userId,
+      });
+    }
+  };
+  const isModePublic = computed(() => modeVisibility[selectedMode.value] === true);
+  watch(currentUserId, () => void loadModeVisibility(), { immediate: true });
   const appOrigin = computed(() => {
     if (import.meta.client && typeof window !== 'undefined') return window.location.origin;
     const configured = runtimeConfig.public.appUrl;
@@ -505,6 +542,7 @@ export function useStreamerToolsOverlay() {
     isNonDefaultFont,
     isLoggedIn,
     isModePublic,
+    visibilityError,
     overlayUrl,
     apiUrl,
     recommendedWidth,

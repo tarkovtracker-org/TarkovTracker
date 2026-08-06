@@ -350,7 +350,11 @@ describe('DataManagementCard', () => {
     });
     const wrapper = createWrapper();
     await asVm<{ handleBackupConfirm: () => Promise<void> }>(wrapper.vm).handleBackupConfirm();
-    expect(backupFns.confirmBackupImport).toHaveBeenCalledWith({ pve: true, pvp: true });
+    expect(backupFns.confirmBackupImport).toHaveBeenCalledWith({
+      pve: true,
+      pvp: true,
+      seasonal: true,
+    });
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'success',

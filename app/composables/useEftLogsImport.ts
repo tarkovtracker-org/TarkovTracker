@@ -1,7 +1,14 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import {
+  GAME_MODES,
+  getGameModeSeasonNumber,
+  IMPORTABLE_GAME_MODES,
+  isImportableGameMode,
+  type GameMode,
+  type ImportableGameMode,
+} from '@/utils/constants';
 import {
   isEftBackendLogFileName,
   isEftNotificationLogFileName,
@@ -34,7 +41,7 @@ export interface UseEftLogsImportReturn {
   parseFiles: (files: File[]) => Promise<void>;
   previewData: Ref<EftLogsImportPreviewData | null>;
   setIncludedVersions: (versions: string[]) => void;
-  confirmImport: (targetMode: GameMode) => Promise<void>;
+  confirmImport: (targetMode: ImportableGameMode) => Promise<void>;
   reset: () => void;
 }
 interface EftLogsImportErrorValues {
@@ -182,6 +189,128 @@ async function readZipLogs(file: File): Promise<{ files: EftLogInputFile[]; scan
     scanned: scannedEntries,
   };
 }
+type ImportTaskIds = Record<ImportableGameMode, Set<string>>;
+type ImportTaskSets = {
+  completed: ImportTaskIds;
+  started: ImportTaskIds;
+};
+const buildImportTaskSets = (
+  preview: EftLogsImportPreviewData,
+  targetMode: ImportableGameMode
+): ImportTaskSets => {
+  const completed: ImportTaskIds = {
+    pvp: new Set(preview.matchedTaskIdsByMode.pvp),
+    pve: new Set(preview.matchedTaskIdsByMode.pve),
+  };
+  const started: ImportTaskIds = {
+    pvp: new Set(preview.matchedStartedTaskIdsByMode.pvp),
+    pve: new Set(preview.matchedStartedTaskIdsByMode.pve),
+  };
+  for (const taskId of preview.matchedTaskIdsByMode[UNKNOWN_MODE])
+    completed[targetMode].add(taskId);
+  for (const taskId of preview.matchedStartedTaskIdsByMode[UNKNOWN_MODE]) {
+    started[targetMode].add(taskId);
+  }
+  return { completed, started };
+};
+const applyCompletedImports = (
+  store: ReturnType<typeof useTarkovStore>,
+  tasksMap: Map<string, Task>,
+  completedTaskIds: Set<string>
+) => {
+  const processedCompleted = new Set<string>();
+  const processedFailed = new Set<string>();
+  const completeTask = (taskId: string) => {
+    if (processedCompleted.has(taskId)) return;
+    completeTaskForProgress({ store, taskId, tasksMap });
+    processedCompleted.add(taskId);
+  };
+  const failTask = (taskId: string) => {
+    if (completedTaskIds.has(taskId) || processedFailed.has(taskId)) return;
+    failTaskForProgress({ store, taskId, tasksMap });
+    processedFailed.add(taskId);
+  };
+  for (const taskId of completedTaskIds) {
+    const task = tasksMap.get(taskId);
+    if (task) {
+      applyTaskAvailabilityRequirements({
+        onCompleteRequirement: completeTask,
+        onFailRequirement: failTask,
+        task,
+      });
+    }
+    completeTask(taskId);
+  }
+};
+const shouldStartImportedTask = (
+  alreadyCompleted: boolean,
+  flags: ReturnType<typeof getCompletionFlags>
+) => !alreadyCompleted && !flags.complete && !flags.failed;
+const applyStartedImports = (
+  store: ReturnType<typeof useTarkovStore>,
+  completedTaskIds: Set<string>,
+  startedTaskIds: Set<string>
+) => {
+  const completions = store.getCurrentProgressData().taskCompletions ?? {};
+  for (const taskId of startedTaskIds) {
+    const flags = getCompletionFlags(completions[taskId]);
+    const shouldStart = shouldStartImportedTask(completedTaskIds.has(taskId), flags);
+    if (shouldStart) store.setTaskUncompleted(taskId);
+  }
+};
+const applyModeImports = async (
+  store: ReturnType<typeof useTarkovStore>,
+  tasksMap: Map<string, Task>,
+  mode: ImportableGameMode,
+  activeMode: GameMode,
+  taskSets: ImportTaskSets,
+  onModeSwitched: (mode: GameMode) => void
+): Promise<GameMode> => {
+  const completed = taskSets.completed[mode];
+  const started = taskSets.started[mode];
+  if (!completed.size && !started.size) return activeMode;
+  if (activeMode !== mode) {
+    onModeSwitched(mode);
+    await store.switchGameMode(mode);
+  }
+  applyCompletedImports(store, tasksMap, completed);
+  applyStartedImports(store, completed, started);
+  return mode;
+};
+const restoreImportMode = async (
+  store: ReturnType<typeof useTarkovStore>,
+  activeMode: GameMode,
+  originalMode: GameMode,
+  importFailure: unknown
+): Promise<unknown> => {
+  if (activeMode === originalMode) return importFailure;
+  try {
+    await store.switchGameMode(originalMode);
+    return importFailure;
+  } catch (error) {
+    logger.error('[EftLogsImport] Failed restoring game mode:', error);
+    return importFailure ?? error;
+  }
+};
+const applyAllModeImports = async (
+  store: ReturnType<typeof useTarkovStore>,
+  tasksMap: Map<string, Task>,
+  originalMode: GameMode,
+  taskSets: ImportTaskSets
+): Promise<{ activeMode: GameMode; error: unknown }> => {
+  let activeMode = originalMode;
+  const trackMode = (mode: GameMode) => {
+    activeMode = mode;
+  };
+  try {
+    for (const mode of IMPORTABLE_GAME_MODES) {
+      activeMode = await applyModeImports(store, tasksMap, mode, activeMode, taskSets, trackMode);
+    }
+    return { activeMode, error: null };
+  } catch (error) {
+    return { activeMode, error };
+  }
+};
 export function useEftLogsImport(): UseEftLogsImportReturn {
   const { t } = useI18n({ useScope: 'global' });
   const metadataStore = useMetadataStore();
@@ -316,92 +445,33 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   async function parseFile(file: File): Promise<void> {
     await parseFiles([file]);
   }
-  async function confirmImport(targetMode: GameMode): Promise<void> {
-    if (!previewData.value) return;
+  async function confirmImport(targetMode: ImportableGameMode): Promise<void> {
+    const preview = previewData.value;
+    if (!preview) return;
+    if (!isImportableGameMode(targetMode)) {
+      importState.value = 'error';
+      importError.value = t(
+        'settings.data_management.seasonal_import_locked',
+        {
+          season: getGameModeSeasonNumber(GAME_MODES.SEASONAL),
+        },
+        'Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.'
+      );
+      return;
+    }
     const originalMode = tarkovStore.getCurrentGameMode();
-    let activeMode = originalMode;
     const tasksMap = new Map<string, Task>();
     metadataStore.tasks.forEach((task) => {
       tasksMap.set(task.id, task);
     });
-    const completedTaskIdsByMode: Record<GameMode, Set<string>> = {
-      [GAME_MODES.PVP]: new Set(previewData.value.matchedTaskIdsByMode[GAME_MODES.PVP]),
-      [GAME_MODES.PVE]: new Set(previewData.value.matchedTaskIdsByMode[GAME_MODES.PVE]),
-    };
-    const startedTaskIdsByMode: Record<GameMode, Set<string>> = {
-      [GAME_MODES.PVP]: new Set(previewData.value.matchedStartedTaskIdsByMode[GAME_MODES.PVP]),
-      [GAME_MODES.PVE]: new Set(previewData.value.matchedStartedTaskIdsByMode[GAME_MODES.PVE]),
-    };
-    for (const taskId of previewData.value.matchedTaskIdsByMode[UNKNOWN_MODE]) {
-      completedTaskIdsByMode[targetMode].add(taskId);
-    }
-    for (const taskId of previewData.value.matchedStartedTaskIdsByMode[UNKNOWN_MODE]) {
-      startedTaskIdsByMode[targetMode].add(taskId);
-    }
-    let importFailure: unknown = null;
-    try {
-      for (const mode of [GAME_MODES.PVP, GAME_MODES.PVE] as const) {
-        const completedTaskIds = completedTaskIdsByMode[mode];
-        const startedTaskIds = startedTaskIdsByMode[mode];
-        const processedCompletedTaskIds = new Set<string>();
-        const processedFailedTaskIds = new Set<string>();
-        const completeTaskForImport = (taskId: string) => {
-          if (processedCompletedTaskIds.has(taskId)) return;
-          completeTaskForProgress({
-            store: tarkovStore,
-            taskId,
-            tasksMap,
-          });
-          processedCompletedTaskIds.add(taskId);
-        };
-        const failTaskForImport = (taskId: string) => {
-          if (completedTaskIds.has(taskId)) return;
-          if (processedFailedTaskIds.has(taskId)) return;
-          failTaskForProgress({
-            store: tarkovStore,
-            taskId,
-            tasksMap,
-          });
-          processedFailedTaskIds.add(taskId);
-        };
-        if (completedTaskIds.size === 0 && startedTaskIds.size === 0) continue;
-        if (activeMode !== mode) {
-          await tarkovStore.switchGameMode(mode);
-          activeMode = mode;
-        }
-        for (const taskId of completedTaskIds) {
-          const completedTask = tasksMap.get(taskId);
-          if (completedTask) {
-            applyTaskAvailabilityRequirements({
-              onCompleteRequirement: completeTaskForImport,
-              onFailRequirement: failTaskForImport,
-              task: completedTask,
-            });
-          }
-          completeTaskForImport(taskId);
-        }
-        const taskCompletions = tarkovStore.getCurrentProgressData().taskCompletions ?? {};
-        for (const taskId of startedTaskIds) {
-          if (completedTaskIds.has(taskId)) continue;
-          const flags = getCompletionFlags(taskCompletions[taskId]);
-          if (flags.complete || flags.failed) continue;
-          tarkovStore.setTaskUncompleted(taskId);
-        }
-      }
-    } catch (error) {
-      importFailure = error;
-    }
-    if (activeMode !== originalMode) {
-      try {
-        await tarkovStore.switchGameMode(originalMode);
-        activeMode = originalMode;
-      } catch (error) {
-        if (!importFailure) {
-          importFailure = error;
-        }
-        logger.error('[EftLogsImport] Failed restoring game mode:', error);
-      }
-    }
+    const taskSets = buildImportTaskSets(preview, targetMode);
+    const applied = await applyAllModeImports(tarkovStore, tasksMap, originalMode, taskSets);
+    const importFailure = await restoreImportMode(
+      tarkovStore,
+      applied.activeMode,
+      originalMode,
+      applied.error
+    );
     if (importFailure) {
       importState.value = 'error';
       importError.value = t('settings.log_import.errors.apply_import_failed');

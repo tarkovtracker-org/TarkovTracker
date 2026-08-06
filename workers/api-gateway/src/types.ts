@@ -13,13 +13,15 @@ export interface Env {
   IP_HASH_SECRET?: string;
 }
 // API Token from database
+export type GameMode = 'pvp' | 'pve' | 'seasonal';
+export type ProgressDataField = 'pvp_data' | 'pve_data' | 'seasonal_data';
 export interface ApiToken {
   token_id: string;
   user_id: string;
   token_hash: string;
   token_value?: string | null;
   permissions: string[];
-  game_mode: 'pvp' | 'pve';
+  game_mode: GameMode;
   note?: string | null;
   is_active: boolean;
   usage_count: number;
@@ -83,24 +85,14 @@ export interface TraderProgress {
   level?: number;
   reputation?: number;
 }
-// User progress row from Supabase
-export interface UserProgressRow {
-  user_id: string;
-  current_game_mode: 'pvp' | 'pve' | null;
-  game_edition: number | null;
-  pvp_data: UserProgressData | null;
-  pve_data: UserProgressData | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-}
 /**
- * Read-path projection of `user_progress`. Reads select only the requested
- * game mode's blob, so the other mode's column and every unselected field are
- * genuinely absent. Typing the projection separately keeps the compiler from
- * treating unselected columns as present.
+ * Read-path projection composed from normalized mode progress and account metadata.
  */
-export type UserProgressModeRow = Pick<UserProgressRow, 'user_id' | 'game_edition'> &
-  Partial<Pick<UserProgressRow, 'pvp_data' | 'pve_data'>>;
+export interface UserProgressModeRow {
+  user_id: string;
+  game_edition: number | null;
+  progress_data: UserProgressData | null;
+}
 // Legacy token response format (matching old API)
 export interface LegacyTokenResponse {
   permissions: string[];
@@ -108,7 +100,7 @@ export interface LegacyTokenResponse {
   owner: string;
   note: string;
   calls: number;
-  gameMode: 'pvp' | 'pve';
+  gameMode: GameMode;
 }
 export interface ProgressResponseTask {
   id: string;

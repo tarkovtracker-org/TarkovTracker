@@ -84,10 +84,10 @@ Fetches core task data (tasks, maps, traders) without objectives or rewards.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description                    |
-| ---------- | ------ | --------- | ------------------------------ |
-| `lang`     | string | `en`      | Language code                  |
-| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Response:**
 
@@ -120,10 +120,10 @@ Fetches task objectives and fail conditions.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description   |
-| ---------- | ------ | --------- | ------------- |
-| `lang`     | string | `en`      | Language code |
-| `gameMode` | string | `regular` | Game mode     |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Cache TTL:** 12 hours
 
@@ -135,10 +135,10 @@ Fetches task rewards (start, finish, failure).
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description   |
-| ---------- | ------ | --------- | ------------- |
-| `lang`     | string | `en`      | Language code |
-| `gameMode` | string | `regular` | Game mode     |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Cache TTL:** 12 hours
 
@@ -150,10 +150,10 @@ Fetches hideout stations with levels, requirements, and crafts.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description   |
-| ---------- | ------ | --------- | ------------- |
-| `lang`     | string | `en`      | Language code |
-| `gameMode` | string | `regular` | Game mode     |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Cache TTL:** 12 hours
 
@@ -165,10 +165,10 @@ Fetches lightweight item data (id, name, shortName, image).
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description                    |
-| ---------- | ------ | --------- | ------------------------------ |
-| `lang`     | string | `en`      | Language code                  |
-| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Cache TTL:** 24 hours
 
@@ -180,10 +180,10 @@ Fetches full item data including properties.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description                    |
-| ---------- | ------ | --------- | ------------------------------ |
-| `lang`     | string | `en`      | Language code                  |
-| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Cache TTL:** 24 hours
 
@@ -212,10 +212,10 @@ Fetches map spawn point data.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description                    |
-| ---------- | ------ | --------- | ------------------------------ |
-| `lang`     | string | `en`      | Language code                  |
-| `gameMode` | string | `regular` | Game mode (`regular` or `pve`) |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Cache TTL:** 12 hours
 
@@ -266,7 +266,9 @@ Authorization: Bearer <supabase_jwt_token>
     "user-uuid-1": {
       "displayName": "Player1",
       "level": 45,
-      "tasksCompleted": 120
+      "tasksCompleted": 120,
+      "gameEdition": 4,
+      "gameMode": "seasonal"
     }
   }
 }
@@ -407,11 +409,13 @@ Each account may have at most **3 active API tokens**. This is enforced by a dat
 
 ### Token Prefixes
 
-Progress API tokens are prefixed `PVP_` or `PVE_`. The prefix is cosmetic: the token's stored
-`game_mode` decides which progress blob every read and write touches, never the game mode the owner
-is currently viewing on the site. The two are kept from diverging at three layers:
+Progress API tokens are prefixed `PVP_`, `PVE_`, or `SZN_`. The prefix declares the token's mode,
+and the token's stored `game_mode` decides which exact normalized `(user_id, game_mode, season_number)`
+progress row every read and write touches, never the mode the owner is currently viewing on the
+site. Persistent PvP/PvE use season `0`; Seasonal tokens use the active season. The token prefix and
+stored mode are kept from diverging at three layers:
 
-- `token-create` rejects a `gameMode` outside `pvp`/`pve` with `400`, and rejects a supplied
+- `token-create` rejects a `gameMode` outside `pvp`/`pve`/`seasonal` with `400`, and rejects a supplied
   `tokenValue` whose prefix contradicts `gameMode` with `400 tokenValue prefix must match gameMode`.
 - A `NOT VALID` check constraint on `api_tokens` requires `token_value` to carry the prefix matching
   `game_mode`.
@@ -419,7 +423,7 @@ is currently viewing on the site. The two are kept from diverging at three layer
   `401 Token game mode mismatch` instead of silently serving the stored mode.
 
 Legacy `tt_` tokens are no longer accepted; they fail with `401 Invalid token format`. Create a
-`PVP_`/`PVE_` token in Settings → API Tokens instead.
+`PVP_`/`PVE_`/`SZN_` token in Settings → API Tokens instead.
 
 ---
 
@@ -443,10 +447,11 @@ All endpoints return errors in this format:
 
 The client caches API responses in IndexedDB with keys like:
 
-- `tasks-core-json-v2-regular-en`
-- `hideout-json-v1-pve-de`
-- `items-lite-json-v1-regular-en`
-- `prestige-all-json-v1-en`
+- `tarkov-tasks-core-regular-en`
+- `tarkov-hideout-pve-de`
+- `tarkov-tasks-core-pvp-season-en`
+- `tarkov-items-lite-regular-en`
+- `tarkov-prestige-all-regular-en`
 
 ### Server-Side (Edge)
 
@@ -507,10 +512,15 @@ This allowlist is a subset of what upstream serves. `json.tarkov.dev` additional
 
 ## Game Modes
 
-| Mode      | Description       |
-| --------- | ----------------- |
-| `regular` | Standard PvP mode |
-| `pve`     | PvE (Co-op) mode  |
+| Mode         | Description                          |
+| ------------ | ------------------------------------ |
+| `regular`    | Persistent standard PvP mode         |
+| `pve`        | Persistent PvE (Co-op) mode          |
+| `pvp-season` | Numbered Seasonal PvP game-data mode |
+
+The application keeps the stable internal mode name `seasonal` and maps it to the upstream
+`pvp-season` endpoint. The active season number is stored separately from the mode so future
+seasons create new progress rows without overwriting earlier Seasonal history.
 
 ---
 

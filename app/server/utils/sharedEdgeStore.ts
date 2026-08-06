@@ -40,13 +40,13 @@ const DEFAULT_ORIGIN: SharedCacheOrigin = {
   host: 'tarkovtracker.org',
   protocol: 'https:',
 };
-const getSharedCache = (): Cache | null => {
+export const getSharedCache = (): Cache | null => {
   const cacheStorage = (
     globalThis as typeof globalThis & { caches?: CacheStorage & { default?: Cache } }
   ).caches;
   return cacheStorage?.default ?? null;
 };
-const resolveSharedCacheOrigin = (appUrl: unknown): SharedCacheOrigin => {
+export const resolveSharedCacheOrigin = (appUrl: unknown): SharedCacheOrigin => {
   if (typeof appUrl !== 'string' || appUrl.trim().length === 0) {
     return DEFAULT_ORIGIN;
   }
@@ -200,9 +200,7 @@ const isRateLimitNamespace = (value: unknown): value is SharedRateLimitNamespace
   const candidate = value as Partial<SharedRateLimitNamespace>;
   return typeof candidate.idFromName === 'function' && typeof candidate.get === 'function';
 };
-export const resolveSharedRateLimitNamespace = (
-  binding: unknown
-): SharedRateLimitNamespace | null => {
+const resolveSharedRateLimitNamespace = (binding: unknown): SharedRateLimitNamespace | null => {
   return isRateLimitNamespace(binding) ? binding : null;
 };
 const RATE_LIMITER_BINDING_NAME = 'API_GATEWAY_LIMITER';

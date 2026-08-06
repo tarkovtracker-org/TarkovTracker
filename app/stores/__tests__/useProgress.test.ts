@@ -24,17 +24,20 @@ const createStoreState = ({
   currentGameMode = 'pvp',
   pvpCompletions = {},
   pveCompletions = {},
+  seasonalCompletions = {},
   pvpTraders = {},
 }: {
-  currentGameMode?: 'pvp' | 'pve';
+  currentGameMode?: 'pvp' | 'pve' | 'seasonal';
   pvpCompletions?: Record<string, unknown>;
   pveCompletions?: Record<string, unknown>;
+  seasonalCompletions?: Record<string, unknown>;
   pvpTraders?: TraderProgress;
 }) => ({
   currentGameMode,
   gameEdition: 1,
   pvp: createProgressData(pvpCompletions, pvpTraders),
   pve: createProgressData(pveCompletions),
+  seasonal: createProgressData(seasonalCompletions),
 });
 const setupMocks = ({
   selfCompletions = {},
@@ -148,6 +151,31 @@ describe('useProgressStore', () => {
         pveCompletions: { [TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVE]: true },
       }),
       tasks: [refTask, easyMoneyPveTask],
+      traders: [{ id: 'fence', normalizedName: 'fence', name: 'Fence' }],
+    });
+    const { useProgressStore } = await import('@/stores/useProgress');
+    const store = useProgressStore();
+    expect(store.unlockedTasks['ref-task']?.self).toBe(true);
+  });
+  it('unlocks Ref tasks in Seasonal using the Seasonal PvP task mapping', async () => {
+    const refTask = {
+      id: 'ref-task',
+      name: 'Ref Task',
+      factionName: 'Any',
+      trader: { id: 'ref', name: 'Ref', normalizedName: 'ref' },
+    };
+    const easyMoneySeasonalTask = {
+      id: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP,
+      name: 'Easy Money - Part 1',
+      factionName: 'Any',
+      trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
+    };
+    setupMocks({
+      selfState: createStoreState({
+        currentGameMode: 'seasonal',
+        seasonalCompletions: { [TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP]: true },
+      }),
+      tasks: [refTask, easyMoneySeasonalTask],
       traders: [{ id: 'fence', normalizedName: 'fence', name: 'Fence' }],
     });
     const { useProgressStore } = await import('@/stores/useProgress');

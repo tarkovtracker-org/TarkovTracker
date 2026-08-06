@@ -135,8 +135,6 @@ const buildPreferencesSyncPayload = (
   return {
     user_id: userId,
     streamer_mode: preferencesState.streamerMode,
-    profile_share_pvp_public: preferencesState.profileSharePvpPublic,
-    profile_share_pve_public: preferencesState.profileSharePvePublic,
     team_hide: preferencesState.teamHide,
     task_team_hide_all: preferencesState.taskTeamHideAll,
     items_team_hide_all: preferencesState.itemsTeamHideAll,

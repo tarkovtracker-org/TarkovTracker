@@ -9,18 +9,23 @@ import {
   resetTarkovSync,
   useTarkovStore,
 } from '@/stores/useTarkov';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { UserProgressData } from '@/stores/progressState';
+import type { Task } from '@/types/tarkov';
 const {
   channel,
   cleanupSync,
   createRemoteRow,
+  getModeProgressCallback,
   getRealtimeCallback,
   i18nTranslate,
   loggerMock,
   metadataStoreMock,
+  modeProgressResult,
   pauseSync,
   resumeSync,
+  setModeProgressCallback,
   setRealtimeCallback,
   showApiUpdated,
   showLoadFailed,
@@ -28,7 +33,8 @@ const {
   showProgressMerged,
   single,
   supabaseContext,
-  upsert,
+  update,
+  rpc,
   useSupabaseSyncMock,
 } = vi.hoisted(() => {
   const createProgressData = (overrides: Partial<UserProgressData> = {}): UserProgressData => ({
@@ -71,6 +77,7 @@ const {
   });
   const realtimeState = {
     callback: null as ((payload: { new: unknown; old: unknown }) => void) | null,
+    modeProgressCallback: null as ((payload: { new: unknown; old: unknown }) => void) | null,
   };
   const showApiUpdated = vi.fn();
   const showLoadFailed = vi.fn();
@@ -92,25 +99,77 @@ const {
     }),
     initialize: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
-    tasks: [] as Array<{ id: string; name: string }>,
+    tasks: [] as Task[],
   };
   type RemoteRow = ReturnType<typeof createRemoteRow>;
   type SupabaseErrorLike = { code?: string; message: string } | null;
   type SingleResult = { data: RemoteRow | null; error: SupabaseErrorLike };
-  type UpsertResult = { error: SupabaseErrorLike };
+  type RpcResult = { error: SupabaseErrorLike };
+  type SyncRpcArgs = {
+    p_current_game_mode: string;
+    p_game_edition: number;
+    p_tarkov_uid: number | null;
+    p_modes: Record<string, UserProgressData>;
+  };
   const single = vi.fn(async (): Promise<SingleResult> => ({
     data: createRemoteRow(),
     error: null,
   }));
+  const modeProgressResult: {
+    data: Array<{ game_mode: string; progress_data: unknown; season_number: number }>;
+    error: SupabaseErrorLike;
+    errorSequence?: SupabaseErrorLike[];
+  } = { data: [], error: null };
+  const modeProgressQuery = {
+    in: vi.fn(),
+    then: <TResult1 = typeof modeProgressResult, TResult2 = never>(
+      onfulfilled?: ((value: typeof modeProgressResult) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+    ) => {
+      const queued = modeProgressResult.errorSequence;
+      const value =
+        queued && queued.length > 0
+          ? { ...modeProgressResult, data: [], error: queued.shift() ?? null }
+          : modeProgressResult;
+      return Promise.resolve(value).then(onfulfilled, onrejected);
+    },
+  };
+  modeProgressQuery.in.mockImplementation(() => modeProgressQuery);
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
-  const upsert = vi.fn(async (): Promise<UpsertResult> => ({ error: null }));
-  const from = vi.fn(() => ({
-    eq,
-    select,
-    single,
-    upsert,
+  const rpc = vi.fn(async (_name?: string, _args?: SyncRpcArgs): Promise<RpcResult> => ({
+    error: null,
   }));
+  const update = vi.fn(async (): Promise<RpcResult> => ({ error: null }));
+  const updateQuery = {
+    eq: vi.fn(() => updateQuery),
+    is: vi.fn(() => updateQuery),
+    select: vi.fn(async () => {
+      const result = await update();
+      return {
+        data: result.error ? null : [{ user_id: 'user-1' }],
+        error: result.error,
+      };
+    }),
+    then: <TResult1 = RpcResult, TResult2 = never>(
+      onfulfilled?: ((value: RpcResult) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+    ) => update().then(onfulfilled, onrejected),
+  };
+  const from = vi.fn((table: string) => {
+    if (table === 'user_game_mode_progress') {
+      return {
+        select: vi.fn(() => ({ eq: vi.fn(() => modeProgressQuery) })),
+      };
+    }
+    return {
+      eq,
+      select,
+      single,
+      update: vi.fn(() => updateQuery),
+      upsert: rpc,
+    };
+  });
   const channel = {
     on: vi.fn((_: string, __: Record<string, unknown>, callback: typeof realtimeState.callback) => {
       realtimeState.callback = callback;
@@ -142,6 +201,7 @@ const {
       channel: vi.fn(() => channel),
       from,
       removeChannel: vi.fn(),
+      rpc,
     },
   };
   const loggerMock = {
@@ -153,14 +213,21 @@ const {
     channel,
     cleanupSync,
     createRemoteRow,
+    getModeProgressCallback: () => realtimeState.modeProgressCallback,
     getRealtimeCallback: () => realtimeState.callback,
     i18nTranslate,
     loggerMock,
     metadataStoreMock,
+    modeProgressResult,
     pauseSync,
     resumeSync,
     setRealtimeCallback: (callback: ((payload: { new: unknown; old: unknown }) => void) | null) => {
       realtimeState.callback = callback;
+    },
+    setModeProgressCallback: (
+      callback: ((payload: { new: unknown; old: unknown }) => void) | null
+    ) => {
+      realtimeState.modeProgressCallback = callback;
     },
     showApiUpdated,
     showLoadFailed,
@@ -168,7 +235,8 @@ const {
     showProgressMerged,
     single,
     supabaseContext,
-    upsert,
+    update,
+    rpc,
     useSupabaseSyncMock,
     get realtimeCallback() {
       return realtimeState.callback;
@@ -282,6 +350,12 @@ const waitForBackgroundTasks = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
+const getLastSyncPayload = () => {
+  const call = rpc.mock.calls.at(-1);
+  expect(call?.[0]).toBe('sync_user_game_mode_progress');
+  if (!call?.[1]) throw new Error('Expected a sync RPC payload');
+  return call[1];
+};
 const setLocalProgress = (level = 5) => {
   const store = useTarkovStore();
   store.$patch((state) => {
@@ -295,6 +369,7 @@ describe('useTarkov sync integration', () => {
     localStorage.clear();
     vi.clearAllMocks();
     setRealtimeCallback(null);
+    setModeProgressCallback(null);
     supabaseContext.user.id = 'user-1';
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.providers = [];
@@ -305,10 +380,19 @@ describe('useTarkov sync integration', () => {
     metadataStoreMock.refresh.mockClear();
     metadataStoreMock.refresh.mockResolvedValue(undefined);
     metadataStoreMock.tasks = [];
+    modeProgressResult.data = [];
+    modeProgressResult.error = null;
+    modeProgressResult.errorSequence = [];
     single.mockResolvedValue({ data: createRemoteRow(), error: null });
-    upsert.mockResolvedValue({ error: null });
-    channel.on.mockImplementation((_: string, __: Record<string, unknown>, callback) => {
-      setRealtimeCallback(callback as (payload: { new: unknown; old: unknown }) => void);
+    rpc.mockResolvedValue({ error: null });
+    update.mockResolvedValue({ error: null });
+    channel.on.mockImplementation((_: string, config: Record<string, unknown>, callback) => {
+      const typedCallback = callback as (payload: { new: unknown; old: unknown }) => void;
+      if (config.table === 'user_game_mode_progress') {
+        setModeProgressCallback(typedCallback);
+      } else {
+        setRealtimeCallback(typedCallback);
+      }
       return channel;
     });
     channel.subscribe.mockImplementation(() => channel);
@@ -377,12 +461,7 @@ describe('useTarkov sync integration', () => {
     });
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(7);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 7 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 7 }));
   });
   it('refreshes metadata after restoring scoped progress with a different game mode', async () => {
     localStorage.setItem(
@@ -469,12 +548,7 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(1);
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(9);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 9 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
   it('restores guest-scoped wrapped local progress for authenticated users before migration', async () => {
     localStorage.setItem(
@@ -496,12 +570,7 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(1);
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(9);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 9 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
   it('uses the preserved scoped snapshot after auth reset overwrites localStorage', async () => {
     const store = useTarkovStore();
@@ -545,12 +614,7 @@ describe('useTarkov sync integration', () => {
     expect(overwrittenSnapshot.data?.pvp?.level).toBe(1);
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(9);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-2',
-        pvp_data: expect.objectContaining({ level: 9 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
   it('restores the previous user snapshot after logout resets the store', async () => {
     const store = useTarkovStore();
@@ -648,12 +712,7 @@ describe('useTarkov sync integration', () => {
     });
     await initializeTarkovSync();
     expect(store.pvp.level).toBe(11);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 11 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 11 }));
   });
   it('restores a legacy unscoped snapshot after logout resets the store', async () => {
     const store = useTarkovStore();
@@ -767,12 +826,7 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({ level: 10 }),
-      })
-    );
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 10 }));
   });
   it('preserves item-only local progress over older remote data on refresh', async () => {
     localStorage.setItem(
@@ -803,23 +857,20 @@ describe('useTarkov sync integration', () => {
       complete: false,
       count: 1,
     });
-    expect(upsert).toHaveBeenCalledWith(
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(
       expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({
-          taskObjectives: {
-            'objective-1': {
-              complete: false,
-              count: 2,
-            },
+        taskObjectives: {
+          'objective-1': {
+            complete: false,
+            count: 2,
           },
-          hideoutParts: {
-            'part-1': {
-              complete: false,
-              count: 1,
-            },
+        },
+        hideoutParts: {
+          'part-1': {
+            complete: false,
+            count: 1,
           },
-        }),
+        },
       })
     );
   });
@@ -878,18 +929,22 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    expect(upsert).toHaveBeenCalledWith(
+    expect(getLastSyncPayload()).toEqual(
       expect.objectContaining({
-        current_game_mode: 'pve',
-        pvp_data: expect.objectContaining({
-          level: 1,
-          progressEpoch: 3,
+        p_current_game_mode: 'pve',
+        p_modes: expect.objectContaining({
+          pvp: expect.objectContaining({
+            level: 1,
+            progressEpoch: 3,
+          }),
+          pve: expect.objectContaining({
+            level: 8,
+            progressEpoch: 0,
+          }),
+          seasonal: expect.objectContaining({
+            level: 1,
+          }),
         }),
-        pve_data: expect.objectContaining({
-          level: 8,
-          progressEpoch: 0,
-        }),
-        user_id: 'user-1',
       })
     );
     expect(store.pvp.level).toBe(1);
@@ -935,7 +990,7 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    expect(upsert).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
     expect(store.pvp.taskObjectives['objective-1']).toEqual({
       complete: false,
     });
@@ -958,7 +1013,7 @@ describe('useTarkov sync integration', () => {
     });
     const store = useTarkovStore();
     await initializeTarkovSync();
-    expect(upsert).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
     expect(store.pvp.storyChapters['chapter-1']?.objectives?.['objective-1']).toEqual({
       complete: true,
       timestamp: 2000,
@@ -982,7 +1037,7 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    expect(upsert).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
   it('rewrites sanitized progress locally and remotely when deprecated tarkov.dev payloads remain', async () => {
     const legacyPersistedState = {
@@ -1010,17 +1065,10 @@ describe('useTarkov sync integration', () => {
     const persistedSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) || '{}') as {
       data?: typeof defaultState;
     };
-    expect(upsert).toHaveBeenCalled();
-    const lastUpsertCall = upsert.mock.calls.at(-1);
-    if (!lastUpsertCall) {
-      throw new Error('Expected an upsert payload');
-    }
-    const lastUpsertPayload = lastUpsertCall.at(0) as unknown as {
-      pve_data?: Record<string, unknown>;
-      pvp_data?: Record<string, unknown>;
-    };
-    expect(lastUpsertPayload.pvp_data).not.toHaveProperty('tarkovDevProfile');
-    expect(lastUpsertPayload.pve_data).not.toHaveProperty('tarkovDevProfile');
+    expect(rpc).toHaveBeenCalled();
+    const lastSyncPayload = getLastSyncPayload();
+    expect(lastSyncPayload.p_modes.pvp).not.toHaveProperty('tarkovDevProfile');
+    expect(lastSyncPayload.p_modes.pve).not.toHaveProperty('tarkovDevProfile');
     expect(persistedSnapshot.data?.pvp).not.toHaveProperty('tarkovDevProfile');
     expect(persistedSnapshot.data?.pve).not.toHaveProperty('tarkovDevProfile');
     expect(store.pvp).not.toHaveProperty('tarkovDevProfile');
@@ -1045,7 +1093,7 @@ describe('useTarkov sync integration', () => {
       }),
       error: null,
     });
-    upsert.mockResolvedValueOnce({
+    rpc.mockResolvedValueOnce({
       error: { message: 'upsert failed' },
     });
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
@@ -1065,7 +1113,7 @@ describe('useTarkov sync integration', () => {
       error: { code: 'PGRST116', message: 'No rows found' },
     });
     await initializeTarkovSync();
-    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledTimes(1);
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
     expect(showLoadFailed).not.toHaveBeenCalled();
   });
@@ -1095,24 +1143,21 @@ describe('useTarkov sync integration', () => {
       complete: false,
       count: 1,
     });
-    expect(upsert).toHaveBeenCalledTimes(1);
-    expect(upsert).toHaveBeenCalledWith(
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(
       expect.objectContaining({
-        user_id: 'user-1',
-        pvp_data: expect.objectContaining({
-          taskObjectives: {
-            'objective-1': {
-              complete: false,
-              count: 2,
-            },
+        taskObjectives: {
+          'objective-1': {
+            complete: false,
+            count: 2,
           },
-          hideoutParts: {
-            'part-1': {
-              complete: false,
-              count: 1,
-            },
+        },
+        hideoutParts: {
+          'part-1': {
+            complete: false,
+            count: 1,
           },
-        }),
+        },
       })
     );
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
@@ -1140,18 +1185,16 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     showApiUpdated.mockClear();
     showProgressMerged.mockClear();
     callback?.({
       new: {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: progressWithTaskState('task-1', true),
-        pve_data: progressWithTaskState('task-2', false),
-        updated_at: '2000-01-01T00:00:00.000Z',
+        game_mode: 'pvp',
+        progress_data: progressWithTaskState('task-1', true),
+        season_number: 0,
+        updated_at: '2026-02-22T12:00:00.000Z',
       },
       old: {},
     });
@@ -1228,20 +1271,18 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     showProgressMerged.mockClear();
     callback?.({
       new: {
-        current_game_mode: store.currentGameMode,
-        game_edition: store.gameEdition,
-        tarkov_uid: store.tarkovUid,
-        pvp_data: {
+        game_mode: 'pvp',
+        progress_data: {
           ...cloneProgress(store.pvp),
           taskObjectives: { 'obj-1': { complete: false, count: 2 } },
           hideoutModules: { 'mod-1': { complete: true } },
           hideoutParts: { 'part-1': { complete: false, count: 2 } },
         },
-        pve_data: cloneProgress(store.pve),
+        season_number: 0,
         updated_at: '2000-01-01T00:00:00.000Z',
       },
       old: {},
@@ -1257,17 +1298,15 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     showApiUpdated.mockClear();
     showProgressMerged.mockClear();
     const now = Date.now();
     callback?.({
       new: {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: {
+        game_mode: 'pvp',
+        progress_data: {
           ...progressWithTaskState('task-1', true),
           lastApiUpdate: {
             id: `api-pvp-${now}`,
@@ -1276,7 +1315,15 @@ describe('useTarkov sync integration', () => {
             tasks: [{ id: 'task-1', state: 'completed' }],
           },
         },
-        pve_data: {
+        season_number: 0,
+        updated_at: new Date(now).toISOString(),
+      },
+      old: {},
+    });
+    callback?.({
+      new: {
+        game_mode: 'pve',
+        progress_data: {
           ...progressWithTaskState('task-2', true),
           lastApiUpdate: {
             id: `api-pve-${now}`,
@@ -1285,6 +1332,7 @@ describe('useTarkov sync integration', () => {
             tasks: [{ id: 'task-2', state: 'completed' }],
           },
         },
+        season_number: 0,
         updated_at: new Date(now).toISOString(),
       },
       old: {},
@@ -1312,13 +1360,11 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    const callback = getRealtimeCallback();
+    const callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     const payload = {
-      current_game_mode: 'pvp',
-      game_edition: 1,
-      tarkov_uid: null,
-      pvp_data: {
+      game_mode: 'pvp',
+      progress_data: {
         ...progressWithTaskState('task-1', true),
         lastApiUpdate: {
           id: 'duplicate-api-id',
@@ -1327,7 +1373,7 @@ describe('useTarkov sync integration', () => {
           tasks: [{ id: 'task-1', state: 'completed' }],
         },
       },
-      pve_data: progressWithTaskState('task-2', false),
+      season_number: 0,
       updated_at: new Date(now).toISOString(),
     };
     showApiUpdated.mockClear();
@@ -1355,13 +1401,11 @@ describe('useTarkov sync integration', () => {
       error: null,
     });
     await initializeTarkovSync();
-    let callback = getRealtimeCallback();
+    let callback = getModeProgressCallback();
     expect(callback).toBeTypeOf('function');
     const payload = {
-      current_game_mode: 'pvp',
-      game_edition: 1,
-      tarkov_uid: null,
-      pvp_data: {
+      game_mode: 'pvp',
+      progress_data: {
         ...progressWithTaskState('task-1', true),
         lastApiUpdate: {
           id: 'reset-dedupe-id',
@@ -1370,7 +1414,7 @@ describe('useTarkov sync integration', () => {
           tasks: [{ id: 'task-1', state: 'completed' }],
         },
       },
-      pve_data: progressWithTaskState('task-2', false),
+      season_number: 0,
       updated_at: new Date(now).toISOString(),
     };
     showApiUpdated.mockClear();
@@ -1381,7 +1425,7 @@ describe('useTarkov sync integration', () => {
     expect(showApiUpdated).toHaveBeenCalledTimes(1);
     resetTarkovSync('test api dedupe reset');
     await initializeTarkovSync();
-    callback = getRealtimeCallback();
+    callback = getModeProgressCallback();
     callback?.({
       new: {
         ...payload,
@@ -1391,92 +1435,8 @@ describe('useTarkov sync integration', () => {
     });
     expect(showApiUpdated).toHaveBeenCalledTimes(2);
   });
-  it('avoids overlapping deprecated remote cleanup writes during realtime sync', async () => {
-    single.mockResolvedValue({
-      data: createRemoteRow(),
-      error: null,
-    });
-    let pendingUpsertResolve: (value: { error: null }) => void = () => {};
-    const pendingUpsert = new Promise<{ error: null }>((resolve) => {
-      pendingUpsertResolve = resolve;
-    });
-    upsert.mockImplementationOnce(() => pendingUpsert);
-    await initializeTarkovSync();
-    const callback = getRealtimeCallback();
-    expect(callback).toBeTypeOf('function');
-    upsert.mockClear();
-    const payload = {
-      current_game_mode: 'pvp',
-      game_edition: 1,
-      tarkov_uid: null,
-      pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
-      pve_data: progressWithLevel(1),
-      updated_at: '2000-01-01T00:00:00.000Z',
-    };
-    callback?.({
-      new: payload,
-      old: {},
-    });
-    callback?.({
-      new: payload,
-      old: {},
-    });
-    expect(upsert).toHaveBeenCalledTimes(1);
-    pendingUpsertResolve({ error: null });
-    await waitForBackgroundTasks();
-  });
-  it('backs off deprecated remote cleanup retries after repeated failures and retries again later', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-04-22T12:00:00.000Z'));
-      single.mockResolvedValue({
-        data: createRemoteRow(),
-        error: null,
-      });
-      await initializeTarkovSync();
-      const callback = getRealtimeCallback();
-      expect(callback).toBeTypeOf('function');
-      upsert.mockClear();
-      upsert
-        .mockResolvedValueOnce({ error: { message: 'cleanup failed 1' } })
-        .mockResolvedValueOnce({ error: { message: 'cleanup failed 2' } })
-        .mockResolvedValueOnce({ error: { message: 'cleanup failed 3' } })
-        .mockResolvedValueOnce({ error: null });
-      const payload = {
-        current_game_mode: 'pvp',
-        game_edition: 1,
-        tarkov_uid: null,
-        pvp_data: withLegacyTarkovDevProfile(progressWithLevel(2), 12345),
-        pve_data: progressWithLevel(1),
-        updated_at: '2000-01-01T00:00:00.000Z',
-      };
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(upsert).toHaveBeenCalledTimes(1);
-      vi.setSystemTime(Date.now() + 3000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(upsert).toHaveBeenCalledTimes(2);
-      vi.setSystemTime(Date.now() + 3000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(upsert).toHaveBeenCalledTimes(3);
-      vi.setSystemTime(Date.now() + 3000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(upsert).toHaveBeenCalledTimes(3);
-      vi.setSystemTime(Date.now() + 30000);
-      callback?.({ new: payload, old: {} });
-      await waitForBackgroundTasks();
-      expect(upsert).toHaveBeenCalledTimes(4);
-      expect(loggerMock.debug).toHaveBeenCalledWith(
-        '[TarkovStore] Cleaned deprecated remote progress payload'
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('skips deprecated remote cleanup writes after session invalidation', async () => {
+  it('does not rewrite authoritative mode rows from deprecated legacy payloads', async () => {
+    const store = useTarkovStore();
     single.mockResolvedValue({
       data: createRemoteRow(),
       error: null,
@@ -1484,9 +1444,8 @@ describe('useTarkov sync integration', () => {
     await initializeTarkovSync();
     const callback = getRealtimeCallback();
     expect(callback).toBeTypeOf('function');
-    upsert.mockClear();
-    supabaseContext.user.loggedIn = false;
-    supabaseContext.user.id = null;
+    const seasonalBefore = cloneProgress(store.seasonal);
+    update.mockClear();
     callback?.({
       new: {
         current_game_mode: 'pvp',
@@ -1499,7 +1458,8 @@ describe('useTarkov sync integration', () => {
       old: {},
     });
     await waitForBackgroundTasks();
-    expect(upsert).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(store.seasonal).toEqual(seasonalBefore);
   });
   it('aborts initialization when post-load cleanup persistence fails', async () => {
     single.mockResolvedValue({
@@ -1508,7 +1468,7 @@ describe('useTarkov sync integration', () => {
       }),
       error: null,
     });
-    upsert.mockResolvedValueOnce({
+    rpc.mockResolvedValueOnce({
       error: { message: 'post-load cleanup failed' },
     });
     await expect(initializeTarkovSync()).rejects.toThrow('post-load cleanup failed');
@@ -1516,6 +1476,84 @@ describe('useTarkov sync integration', () => {
     expect(loggerMock.error).toHaveBeenCalledWith(
       '[TarkovStore] Failed to persist post-load data migration/repair:',
       expect.objectContaining({ message: 'post-load cleanup failed' })
+    );
+  });
+  it('aborts initialization when normalized mode progress cannot be loaded', async () => {
+    modeProgressResult.error = { message: 'mode progress unavailable' };
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[TarkovStore] Could not load normalized mode progress',
+      expect.objectContaining({ message: 'mode progress unavailable' })
+    );
+  });
+  it('retries and recovers when normalized mode progress fails transiently', async () => {
+    modeProgressResult.errorSequence = [{ message: 'transient mode progress error' }];
+    await initializeTarkovSync();
+    expect(modeProgressResult.errorSequence).toHaveLength(0);
+    expect(loggerMock.debug).toHaveBeenCalledWith(
+      expect.stringContaining('Retrying normalized mode progress load')
+    );
+    expect(loggerMock.error).not.toHaveBeenCalledWith(
+      '[TarkovStore] Could not load normalized mode progress',
+      expect.anything()
+    );
+    expect(useSupabaseSyncMock).toHaveBeenCalled();
+  });
+  it('persists Seasonal objective-only failed-task repairs during startup', async () => {
+    metadataStoreMock.tasks = [
+      {
+        id: 'task-seasonal-failed',
+        alternatives: [],
+        failConditions: [],
+        objectives: [{ id: 'objective-1', count: 3 }],
+      },
+    ];
+    const seasonalProgress: UserProgressData = {
+      ...progressWithLevel(1),
+      taskCompletions: {
+        'task-seasonal-failed': { complete: false, failed: true, manual: true },
+      },
+      taskObjectives: { 'objective-1': { complete: true, count: 3 } },
+    };
+    modeProgressResult.data = [
+      {
+        game_mode: 'seasonal',
+        season_number: ACTIVE_SEASON_NUMBER,
+        progress_data: seasonalProgress,
+      },
+    ];
+    const store = useTarkovStore();
+    await initializeTarkovSync();
+    expect(store.seasonal.taskObjectives['objective-1']).toMatchObject({
+      complete: false,
+      count: 0,
+    });
+    expect(store.seasonal.taskCompletions['task-seasonal-failed']).toMatchObject({
+      failed: true,
+      manual: true,
+    });
+    const syncedSeasonal = getLastSyncPayload().p_modes.seasonal as UserProgressData;
+    expect(syncedSeasonal.taskObjectives['objective-1']).toMatchObject({
+      complete: false,
+      count: 0,
+    });
+    expect(syncedSeasonal.taskCompletions['task-seasonal-failed']).toMatchObject({
+      failed: true,
+      manual: true,
+    });
+  });
+  it('preserves local progress when online profile reset fails', async () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.pvp.level = 42;
+    });
+    rpc.mockResolvedValueOnce({ error: { message: 'reset failed' } });
+    await store.resetOnlineProfile();
+    expect(store.pvp.level).toBe(42);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      'Error resetting online profile:',
+      expect.objectContaining({ message: 'Failed to reset online profile: reset failed' })
     );
   });
   it('shows load_failed and aborts sync for multi-provider account with no progress row', async () => {

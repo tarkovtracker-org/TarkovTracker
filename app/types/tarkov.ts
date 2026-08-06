@@ -384,9 +384,10 @@ export interface StoryChapter {
 }
 export interface MemberProfile {
   displayName: string | null;
+  gameEdition?: number;
+  gameMode?: import('@/utils/constants').GameMode;
   level: number | null;
   tasksCompleted: number | null;
-  gameMode?: 'pvp' | 'pve';
 }
 // Query Result Types
 export interface TarkovDataQueryResult {
@@ -511,6 +512,7 @@ export interface SystemState extends StateTree {
   // Game-mode-specific team IDs
   pvp_team_id?: string | null;
   pve_team_id?: string | null;
+  seasonal_team_id?: string | null;
   // Admin status
   is_admin?: boolean;
 }

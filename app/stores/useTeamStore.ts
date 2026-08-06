@@ -3,10 +3,11 @@ import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
 import { useSafeToast } from '@/composables/useSafeToast';
 import { actions, defaultState, getters, type UserState } from '@/stores/progressState';
-import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+import { replayProgressMetadataMigration } from '@/stores/tarkov/metadataStoreBridge';
+import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
-import { GAME_MODES } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
@@ -20,17 +21,7 @@ import type { Store } from 'pinia';
 function getTeamIdFromSystemStore(
   systemStore: ReturnType<typeof useSystemStoreWithSupabase>['systemStore']
 ): string | null {
-  const state = systemStore.$state as {
-    team?: string | null;
-    team_id?: string | null;
-    pvp_team_id?: string | null;
-    pve_team_id?: string | null;
-  };
-  const mode = getCurrentGameMode();
-  if (mode === 'pve') {
-    return state.pve_team_id ?? state.team ?? state.team_id ?? null;
-  }
-  return state.pvp_team_id ?? state.team ?? state.team_id ?? null;
+  return getTeamIdFromState(systemStore.$state, getCurrentGameMode());
 }
 /**
  * Team store definition with getters for team info and members
@@ -80,6 +71,54 @@ interface TeamStoreInstance {
   cleanup: () => void;
 }
 type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
+const TEAM_PROGRESS_REFRESH_DELAY_MS = 5500;
+const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: string): void => {
+  logger.warn('[TeammateStore] Failed to hydrate normalized mode progress:', {
+    error,
+    teammateId,
+  });
+};
+export type TeammateIdentity = {
+  currentGameMode: GameMode;
+  gameEdition: number;
+};
+export const resolveTeammateIdentity = (
+  profile: MemberProfile | undefined,
+  fallbackMode: GameMode
+): TeammateIdentity => {
+  const identity: TeammateIdentity = {
+    currentGameMode: fallbackMode,
+    gameEdition: defaultState.gameEdition,
+  };
+  if (!profile) return identity;
+  identity.currentGameMode = profile.gameMode ?? fallbackMode;
+  identity.gameEdition = profile.gameEdition ?? defaultState.gameEdition;
+  return identity;
+};
+export type MemberProfileBroadcast = {
+  userId: string;
+  displayName?: string | null;
+  gameEdition?: number;
+  gameMode?: GameMode;
+  level?: number | null;
+  tasksCompleted?: number | null;
+};
+export const mergeMemberProfileBroadcast = (
+  profiles: Record<string, MemberProfile>,
+  data: MemberProfileBroadcast
+): Record<string, MemberProfile> => {
+  const existingProfile = profiles[data.userId];
+  const { displayName = null, level = null, tasksCompleted = null } = data;
+  return {
+    ...profiles,
+    [data.userId]: {
+      ...existingProfile,
+      displayName,
+      level,
+      tasksCompleted,
+    },
+  };
+};
 function cloneTaskCompletions(
   taskCompletions: TaskCompletionSnapshot | undefined
 ): TaskCompletionSnapshot {
@@ -110,16 +149,18 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let refreshInFlightTeamId: string | null = null;
   let latestMembersRequestVersion = 0;
   let lastProgressSnapshot: {
-    mode: 'pvp' | 'pve';
+    mode: GameMode;
     displayName: string | null;
+    gameEdition: number;
     level: number | null;
     tasksCompleted: number;
   } | null = null;
   let prevTaskCompletions: TaskCompletionSnapshot = {};
   let taskBroadcastInitialized = false;
+  let progressRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingTaskUpdates = new Map<
     string,
-    { userId: string; gameMode: 'pvp' | 'pve'; taskId: string; complete: boolean; failed: boolean }
+    { userId: string; gameMode: GameMode; taskId: string; complete: boolean; failed: boolean }
   >();
   let taskBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   // Computed reference to the team document based on system store
@@ -171,6 +212,10 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       clearTimeout(taskBroadcastTimer);
       taskBroadcastTimer = null;
     }
+    if (progressRefreshTimer) {
+      clearTimeout(progressRefreshTimer);
+      progressRefreshTimer = null;
+    }
     pendingTaskUpdates.clear();
     prevTaskCompletions = {};
     taskBroadcastInitialized = false;
@@ -221,7 +266,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     const requestVersion = ++latestMembersRequestVersion;
     const inFlightRequest = (async () => {
       const { getTeamMembers } = useEdgeFunctions();
-      const result = await getTeamMembers(currentTeamId);
+      const result = await getTeamMembers(currentTeamId, force);
       if (requestVersion !== latestMembersRequestVersion) {
         return;
       }
@@ -272,30 +317,17 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           void refreshMembers();
         }
       )
-      .on('broadcast', { event: 'progress' }, (payload) => {
-        const data = (payload?.payload || {}) as {
-          userId?: string;
-          displayName?: string | null;
-          level?: number | null;
-          tasksCompleted?: number | null;
-        };
-        if (!data?.userId) return;
-        // Update memberProfiles with the broadcasted snapshot
-        teamStore.$patch((state) => {
-          state.memberProfiles = {
-            ...teamStore.memberProfiles,
-            [data.userId as string]: {
-              displayName: data.displayName ?? null,
-              level: data.level ?? null,
-              tasksCompleted: data.tasksCompleted ?? null,
-            },
-          } as Record<string, MemberProfile>;
-        });
+      .on('broadcast', { event: 'progress' }, () => {
+        if (progressRefreshTimer) clearTimeout(progressRefreshTimer);
+        progressRefreshTimer = setTimeout(() => {
+          progressRefreshTimer = null;
+          void refreshMembers(true);
+        }, TEAM_PROGRESS_REFRESH_DELAY_MS);
       })
       .on('broadcast', { event: 'task-update' }, (payload) => {
         const data = (payload?.payload || {}) as {
           userId?: string;
-          gameMode?: 'pvp' | 'pve';
+          gameMode?: GameMode;
           taskId?: string;
           complete?: boolean;
           failed?: boolean;
@@ -330,8 +362,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     { immediate: true }
   );
   const localProgressSnapshot = computed(() => {
-    const mode =
-      (tarkovStore.$state.currentGameMode as 'pvp' | 'pve' | undefined) || GAME_MODES.PVP;
+    const mode = tarkovStore.$state.currentGameMode || GAME_MODES.PVP;
     const modeState = (tarkovStore.$state as unknown as Record<string, unknown>)[mode] as {
       displayName?: string | null;
       level?: number | null;
@@ -343,6 +374,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     return {
       mode,
       displayName: modeState?.displayName ?? null,
+      gameEdition: tarkovStore.$state.gameEdition,
       level: modeState?.level ?? null,
       tasksCompleted: completed,
     };
@@ -359,6 +391,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         lastProgressSnapshot &&
         lastProgressSnapshot.mode === snapshot.mode &&
         lastProgressSnapshot.displayName === snapshot.displayName &&
+        lastProgressSnapshot.gameEdition === snapshot.gameEdition &&
         lastProgressSnapshot.level === snapshot.level &&
         lastProgressSnapshot.tasksCompleted === snapshot.tasksCompleted;
       const profileMatches =
@@ -374,6 +407,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       void teamChannel.value.httpSend('progress', {
         userId: $supabase.user.id,
         displayName: snapshot.displayName,
+        gameEdition: snapshot.gameEdition,
         level: snapshot.level,
         tasksCompleted: snapshot.tasksCompleted,
         gameMode: snapshot.mode,
@@ -383,6 +417,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           ...teamStore.memberProfiles,
           [$supabase.user.id as string]: {
             displayName: snapshot.displayName,
+            gameEdition: snapshot.gameEdition,
             level: snapshot.level,
             tasksCompleted: snapshot.tasksCompleted,
             gameMode: snapshot.mode,
@@ -393,8 +428,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   );
   watch(
     () => {
-      const mode =
-        (tarkovStore.$state.currentGameMode as 'pvp' | 'pve' | undefined) || GAME_MODES.PVP;
+      const mode = tarkovStore.$state.currentGameMode || GAME_MODES.PVP;
       const modeState = (tarkovStore.$state as unknown as Record<string, unknown>)[mode] as {
         taskCompletions?: Record<string, { complete?: boolean; failed?: boolean }>;
       } | null;
@@ -463,6 +497,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
  */
 export function useTeammateStores() {
   const { teamStore } = useTeamStoreWithSupabase();
+  const { $supabase } = useNuxtApp();
   const teammateStores = ref<Record<string, Store<string, UserState>>>({});
   const teammateUnsubscribes = ref<Record<string, () => void>>({});
   const toast = useSafeToast();
@@ -470,10 +505,9 @@ export function useTeammateStores() {
   const pendingRetryTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   // Watch team state changes to manage teammate stores
   watch(
-    () => teamStore.members,
-    async (members) => {
+    [() => teamStore.members, () => teamStore.memberProfiles],
+    async ([members]) => {
       await nextTick();
-      const { $supabase } = useNuxtApp();
       const currentUID = $supabase.user?.id;
       const newTeammatesArray = members?.filter((member: string) => member !== currentUID) || [];
       // Remove stores for teammates no longer in the team
@@ -493,6 +527,11 @@ export function useTeammateStores() {
         for (const teammate of newTeammatesArray) {
           if (!teammateStores.value[teammate]) {
             createTeammateStore(teammate);
+          } else {
+            const memberProfile = teamStore.memberProfiles?.[teammate];
+            teammateStores.value[teammate].$patch((state) => {
+              Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
+            });
           }
         }
       } catch (error) {
@@ -534,54 +573,68 @@ export function useTeammateStores() {
       });
       const storeInstance = storeDefinition();
       teammateStores.value[teammateId] = storeInstance;
-      // Setup Supabase listener for this teammate with data transformation
-      // Transform Supabase field names to match store structure
-      const handleTeammateData = (data: Record<string, unknown> | null) => {
-        if (!data) {
-          storeInstance.$reset();
-          return;
-        }
-        const gameMode =
-          data.current_game_mode === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
-        const gameEdition =
-          typeof data.game_edition === 'number' && Number.isFinite(data.game_edition)
-            ? Math.max(1, Math.trunc(data.game_edition))
-            : defaultState.gameEdition;
-        const tarkovUid =
-          typeof data.tarkov_uid === 'number' && Number.isFinite(data.tarkov_uid)
-            ? Math.trunc(data.tarkov_uid)
-            : null;
-        const pvpData = sanitizeTeammateProgressData(data.pvp_data);
-        const pveData = sanitizeTeammateProgressData(data.pve_data);
+      const memberProfile = teamStore.memberProfiles?.[teammateId];
+      storeInstance.$patch((state) => {
+        Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
+      });
+      const applyModeProgress = (row: Record<string, unknown>) => {
+        const mode = row.game_mode;
+        if (!isGameMode(mode)) return;
+        const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+        if (row.season_number !== expectedSeason) return;
         storeInstance.$patch((state) => {
-          state.currentGameMode = gameMode;
-          state.gameEdition = gameEdition;
-          state.tarkovUid = tarkovUid;
-          state.pvp = { ...defaultState.pvp, ...pvpData };
-          state.pve = { ...defaultState.pve, ...pveData };
+          state[mode] = {
+            ...defaultState[mode],
+            ...sanitizeTeammateProgressData(row.progress_data),
+          };
         });
       };
-      const { cleanup } = useSupabaseListener({
-        store: storeInstance,
-        table: 'user_progress',
-        filter: `user_id=eq.${teammateId}`,
-        storeId: `teammate-${teammateId}`,
-        onData: handleTeammateData,
-        patchStore: false,
-      });
-      teammateUnsubscribes.value[teammateId] = cleanup;
+      const hydrateModeProgress = async () => {
+        try {
+          const { data, error } = await $supabase.client
+            .from('user_game_mode_progress')
+            .select('game_mode,season_number,progress_data')
+            .eq('user_id', teammateId);
+          if (error) {
+            logTeammateModeProgressHydrationFailure(error, teammateId);
+            return;
+          }
+          data?.forEach((row) => applyModeProgress(row as Record<string, unknown>));
+          replayProgressMetadataMigration();
+        } catch (error) {
+          logTeammateModeProgressHydrationFailure(error, teammateId);
+        }
+      };
+      const modeChannel = $supabase.client
+        .channel(`teammate-mode-progress-${teammateId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_game_mode_progress',
+            filter: `user_id=eq.${teammateId}`,
+          },
+          (payload) => applyModeProgress(payload.new as Record<string, unknown>)
+        )
+        .subscribe();
+      void hydrateModeProgress();
+      teammateUnsubscribes.value[teammateId] = () => {
+        void $supabase.client.removeChannel(modeChannel);
+      };
       // Listen for task-update broadcasts for this teammate
       const handleTaskUpdate = (event: Event) => {
         const data = (event as CustomEvent).detail as {
           userId: string;
-          gameMode: 'pvp' | 'pve';
+          gameMode: GameMode;
           taskId: string;
           complete: boolean;
           failed: boolean;
         };
         if (data.userId !== teammateId) return;
         // Update the teammate store with the task change
-        const modeKey = data.gameMode === 'pve' ? 'pve' : 'pvp';
+        const modeKey = data.gameMode;
+        if (!isGameMode(modeKey)) return;
         const currentModeData = storeInstance.$state[modeKey] || {};
         const currentCompletions =
           (

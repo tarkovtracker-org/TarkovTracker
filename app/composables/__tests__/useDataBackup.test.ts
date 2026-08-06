@@ -72,6 +72,22 @@ const tarkovStore = {
       xpOffset: 0,
       level: 1,
     },
+    seasonal: {
+      displayName: null,
+      hideoutModules: {},
+      hideoutParts: {},
+      pmcFaction: 'USEC',
+      prestigeLevel: 0,
+      progressEpoch: 0,
+      skillOffsets: {},
+      skills: {},
+      storyChapters: {},
+      taskCompletions: {},
+      taskObjectives: {},
+      traders: {},
+      xpOffset: 0,
+      level: 1,
+    },
     tarkovUid: 987654,
   } as UserState,
   getCurrentGameMode: vi.fn(() => 'pvp'),
@@ -96,6 +112,22 @@ const tarkovStore = {
   getPvEProgressData: vi.fn<() => UserProgressData>(() => ({
     level: 1,
     pmcFaction: 'BEAR',
+    displayName: null,
+    xpOffset: 0,
+    taskCompletions: {},
+    taskObjectives: {},
+    hideoutParts: {},
+    hideoutModules: {},
+    traders: {},
+    skills: {},
+    prestigeLevel: 0,
+    progressEpoch: 0,
+    skillOffsets: {},
+    storyChapters: {},
+  })),
+  getSeasonalProgressData: vi.fn<() => UserProgressData>(() => ({
+    level: 1,
+    pmcFaction: 'USEC',
     displayName: null,
     xpOffset: 0,
     taskCompletions: {},
@@ -243,6 +275,22 @@ describe('useDataBackup', () => {
         xpOffset: 0,
         level: 1,
       },
+      seasonal: {
+        displayName: null,
+        hideoutModules: {},
+        hideoutParts: {},
+        pmcFaction: 'USEC',
+        prestigeLevel: 0,
+        progressEpoch: 0,
+        skillOffsets: {},
+        skills: {},
+        storyChapters: {},
+        taskCompletions: {},
+        taskObjectives: {},
+        traders: {},
+        xpOffset: 0,
+        level: 1,
+      },
       tarkovUid: 987654,
     };
     preferencesStore.$state = {
@@ -313,7 +361,7 @@ describe('useDataBackup', () => {
         expect(backupJson).toEqual(
           expect.objectContaining({
             _format: 'tarkovtracker-backup',
-            _version: 1,
+            _version: 2,
             currentGameMode: 'pvp',
             gameEdition: 1,
             tarkovUid: null,
@@ -327,6 +375,12 @@ describe('useDataBackup', () => {
               displayName: null,
               level: 1,
               pmcFaction: 'BEAR',
+            }),
+            seasonNumber: 1,
+            seasonal: expect.objectContaining({
+              displayName: null,
+              level: 1,
+              pmcFaction: 'USEC',
             }),
           })
         );
@@ -1002,6 +1056,40 @@ describe('useDataBackup', () => {
       expect(importPreview.value!.pve.level).toBe(1);
       expect(importPreview.value!.gameEdition).toBe(3);
     });
+    it('only exposes Seasonal backup data for the active season', async () => {
+      const progress = {
+        displayName: 'SeasonalPlayer',
+        hideoutModules: {},
+        hideoutParts: {},
+        level: 12,
+        pmcFaction: 'USEC',
+        prestigeLevel: 0,
+        skillOffsets: {},
+        skills: {},
+        storyChapters: {},
+        taskCompletions: {},
+        taskObjectives: {},
+        traders: {},
+        xpOffset: 0,
+      };
+      const backup = {
+        _format: 'tarkovtracker-backup',
+        _version: 2,
+        appVersion: '1.8.2',
+        currentGameMode: 'seasonal',
+        exportedAt: Date.now(),
+        gameEdition: 3,
+        pve: progress,
+        pvp: progress,
+        seasonNumber: 2,
+        seasonal: progress,
+        tarkovUid: null,
+      };
+      const { importPreview, importState, parseBackupFile } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(backup)));
+      expect(importState.value).toBe('preview');
+      expect(importPreview.value?.seasonal).toBeNull();
+    });
     it('clamps out-of-range values during sanitization', async () => {
       const backup = {
         _format: 'tarkovtracker-backup',
@@ -1217,6 +1305,60 @@ describe('useDataBackup', () => {
       expect(mockState.gameEdition).toBe(3);
       expect(mockState.tarkovUid).toBe(12345);
       expect(mockState.currentGameMode).toBe('pve');
+    });
+    it('does not activate Seasonal when its historical progress was not imported', async () => {
+      const historicalSeasonBackup = {
+        ...validBackup,
+        _version: 2,
+        currentGameMode: 'seasonal',
+        seasonNumber: 2,
+        seasonal: validBackup.pvp,
+      };
+      const { parseBackupFile, confirmBackupImport } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(historicalSeasonBackup)));
+      await confirmBackupImport({ pvp: true, pve: true, seasonal: true });
+      const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+        state: Record<string, unknown>
+      ) => void;
+      const mockState = {
+        currentGameMode: 'pve',
+        gameEdition: 1,
+        pvp: { level: 1, progressEpoch: 5 },
+        pve: { level: 1, progressEpoch: 7 },
+        seasonal: { level: 30, progressEpoch: 2 },
+        tarkovUid: null,
+      };
+      patchFn(mockState);
+      expect(mockState.currentGameMode).toBe('pvp');
+      expect(mockState.seasonal).toEqual({ level: 30, progressEpoch: 2 });
+    });
+    it('falls back to PvP when a stale Seasonal backup is selected without PvE', async () => {
+      const historicalSeasonBackup = {
+        ...validBackup,
+        _version: 2,
+        currentGameMode: 'seasonal',
+        seasonNumber: 2,
+        seasonal: validBackup.pvp,
+      };
+      const { parseBackupFile, confirmBackupImport } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(historicalSeasonBackup)));
+      await confirmBackupImport({ pvp: true, pve: false, seasonal: true });
+      const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+        state: Record<string, unknown>
+      ) => void;
+      const mockState = {
+        currentGameMode: 'pve',
+        gameEdition: 1,
+        pvp: { level: 1, progressEpoch: 5 },
+        pve: { level: 7 },
+        seasonal: { level: 30 },
+        tarkovUid: 67890,
+      };
+      patchFn(mockState);
+      expect(mockState.currentGameMode).toBe('pvp');
+      expect(mockState.gameEdition).toBe(1);
+      expect(mockState.tarkovUid).toBe(67890);
+      expect(mockState.seasonal).toEqual({ level: 30 });
     });
     it.each(['pvp', 'pve'] as const)(
       'ignores legacy tarkovUidMode=%s metadata in backup payloads',

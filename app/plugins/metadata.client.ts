@@ -1,4 +1,5 @@
 import { useMetadataStore } from '@/stores/useMetadata';
+import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 /**
  * Plugin to initialize the metadata store
@@ -7,6 +8,7 @@ import { logger } from '@/utils/logger';
  */
 export default defineNuxtPlugin((nuxtApp) => {
   const metadataStore = useMetadataStore();
+  const tarkovStore = useTarkovStore();
   if (import.meta.env.MODE === 'test') {
     return {
       provide: {
@@ -39,7 +41,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   let initPromise: Promise<void> | null = null;
   async function initializeWithRetry(attempt = 1): Promise<void> {
     try {
-      await metadataStore.initialize();
+      await metadataStore.initialize({ gameMode: tarkovStore.getCurrentGameMode() });
     } catch (err) {
       // Safety catch for any unhandled rejections; internal errors are already handled/logged
       if (attempt < MAX_ATTEMPTS) {

@@ -26,37 +26,88 @@ export const GAME_EDITION_STRING_VALUES = [
   'unheard',
 ] as const;
 // Map internal game modes to API game modes
-// Internal: "pvp" | "pve"
-// API: "regular" | "pve"
+// Internal modes remain stable even when upstream endpoint slugs change.
 export const GAME_MODES = {
   PVP: 'pvp',
   PVE: 'pve',
+  SEASONAL: 'seasonal',
 } as const;
 export type GameMode = (typeof GAME_MODES)[keyof typeof GAME_MODES];
+export const GAME_MODE_UI = {
+  [GAME_MODES.PVP]: { color: 'pvp' },
+  [GAME_MODES.PVE]: { color: 'pve' },
+  [GAME_MODES.SEASONAL]: { color: 'warning' },
+} as const satisfies Record<GameMode, { color: 'pvp' | 'pve' | 'warning' }>;
+export type ImportableGameMode = Exclude<GameMode, typeof GAME_MODES.SEASONAL>;
+export const GAME_MODE_VALUES = Object.values(GAME_MODES) as GameMode[];
+export const IMPORTABLE_GAME_MODES = [GAME_MODES.PVP, GAME_MODES.PVE] as const;
+export const API_TOKEN_PREFIXES = {
+  [GAME_MODES.PVP]: 'PVP_',
+  [GAME_MODES.PVE]: 'PVE_',
+  [GAME_MODES.SEASONAL]: 'SZN_',
+} as const satisfies Record<GameMode, string>;
+export const ACTIVE_SEASON = {
+  number: 1,
+  startsOn: '2026-08-03',
+  endsAt: '2026-12-07T10:00:00.000Z',
+} as const;
+export const ACTIVE_SEASON_NUMBER = ACTIVE_SEASON.number;
+export interface SeasonTimeRemaining {
+  days: number;
+  hours: number;
+  minutes: number;
+  expired: boolean;
+}
+export const getActiveSeasonTimeRemaining = (currentTime = Date.now()): SeasonTimeRemaining => {
+  const remainingMs = Date.parse(ACTIVE_SEASON.endsAt) - currentTime;
+  if (remainingMs <= 0) return { days: 0, hours: 0, minutes: 0, expired: true };
+  const totalMinutes = Math.ceil(remainingMs / 60_000);
+  return {
+    days: Math.floor(totalMinutes / 1_440),
+    hours: Math.floor((totalMinutes % 1_440) / 60),
+    minutes: totalMinutes % 60,
+    expired: false,
+  };
+};
 export const API_GAME_MODES = {
   [GAME_MODES.PVP]: 'regular',
   [GAME_MODES.PVE]: 'pve',
+  [GAME_MODES.SEASONAL]: 'pvp-season',
 } as const;
 export interface GameModeOption {
-  label: string;
+  labelKey: string;
   value: GameMode;
   icon: string;
-  description: string;
+  descriptionKey: string;
 }
 export const GAME_MODE_OPTIONS: GameModeOption[] = [
   {
-    label: 'PvP',
+    labelKey: 'common.pvp',
     value: GAME_MODES.PVP,
     icon: 'mdi-sword-cross',
-    description: 'Player vs Player (Standard)',
+    descriptionKey: 'common.pvp_description',
   },
   {
-    label: 'PvE',
+    labelKey: 'common.pve',
     value: GAME_MODES.PVE,
     icon: 'mdi-account-group',
-    description: 'Player vs Environment (Co-op)',
+    descriptionKey: 'common.pve_description',
+  },
+  {
+    labelKey: 'common.seasonal_pvp',
+    value: GAME_MODES.SEASONAL,
+    icon: 'mdi-calendar-star',
+    descriptionKey: 'common.seasonal_pvp_description',
   },
 ];
+export const getGameModeLabel = (mode: GameMode): string =>
+  GAME_MODE_OPTIONS.find((option) => option.value === mode)?.labelKey ?? 'common.pvp';
+export const getGameModeSeasonNumber = (mode: GameMode): number =>
+  mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+export const isGameMode = (value: unknown): value is GameMode =>
+  typeof value === 'string' && GAME_MODE_VALUES.includes(value as GameMode);
+export const isImportableGameMode = (value: unknown): value is ImportableGameMode =>
+  value === GAME_MODES.PVP || value === GAME_MODES.PVE;
 export const TASK_STATE = {
   LOCKED: 'LOCKED',
   AVAILABLE: 'AVAILABLE',
@@ -122,20 +173,20 @@ export const API_PERMISSIONS: Record<string, { title: string; description: strin
     description:
       'Allows access to read your progression information, ' +
       'including your TarkovTracker display name, quest progress, hideout progress. ' +
-      "Data access is restricted by the token's game mode (PvP or PvE).",
+      "Data access is restricted by the token's game mode.",
   },
   TP: {
     title: 'Get Team Progression',
     description:
       "Allows access to read a virtual copy of your team's progress, " +
       'including display names, quest, and hideout progress. ' +
-      "Data access is restricted by the token's game mode (PvP or PvE).",
+      "Data access is restricted by the token's game mode.",
   },
   WP: {
     title: 'Write Progression',
     description:
       'Allows access to update your TarkovTracker progress data on your behalf. ' +
-      "Updates are restricted by the token's game mode (PvP or PvE).",
+      "Updates are restricted by the token's game mode.",
   },
 };
 // Limits and configuration constants
@@ -193,6 +244,7 @@ export const TRADER_UNLOCK_TASKS: Record<string, TraderUnlockTaskConfig> = {
   ref: {
     [GAME_MODES.PVP]: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP,
     [GAME_MODES.PVE]: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVE,
+    [GAME_MODES.SEASONAL]: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP,
   },
 } as const;
 export function resolveTraderUnlockTaskIds(

@@ -1,8 +1,9 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it } from 'vitest';
+import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { UserProgressData } from '@/stores/progressState';
-import type { Task } from '@/types/tarkov';
+import type { Task, TaskObjective } from '@/types/tarkov';
 const createProgressData = (
   taskCompletions: UserProgressData['taskCompletions']
 ): UserProgressData => ({
@@ -248,6 +249,28 @@ describe('useTarkovStore failed-state repair', () => {
     expect(gameModeData.taskCompletions['task-b']).toMatchObject({
       complete: true,
       failed: false,
+    });
+  });
+  it('reports Seasonal objective-only clears so the repair is persisted', () => {
+    setActivePinia(createPinia());
+    const store = useTarkovStore();
+    const metadataStore = useMetadataStore();
+    const task = createTask('task-seasonal-failed', {
+      objectives: [{ id: 'objective-1', count: 3 } as TaskObjective],
+    });
+    metadataStore.tasks = [task];
+    store.seasonal = {
+      ...createProgressData({
+        'task-seasonal-failed': { complete: false, failed: true, manual: true },
+      }),
+      taskObjectives: { 'objective-1': { complete: true, count: 3 } },
+    };
+    const result = store.repairFailedTaskStates();
+    expect(result.seasonalRepaired).toBe(0);
+    expect(result.seasonalCleared).toBe(1);
+    expect(store.seasonal.taskObjectives['objective-1']).toMatchObject({
+      complete: false,
+      count: 0,
     });
   });
 });

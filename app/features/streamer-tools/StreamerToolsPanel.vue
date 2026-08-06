@@ -68,6 +68,13 @@
             </div>
           </template>
         </UAlert>
+        <UAlert
+          v-if="visibilityError"
+          icon="i-mdi-alert-circle"
+          color="error"
+          variant="soft"
+          :title="visibilityError"
+        />
         <GenericCard
           icon="i-mdi-tune-variant"
           highlight-color="primary"
@@ -116,6 +123,20 @@
                     @click="selectedMode = GAME_MODES.PVE"
                   >
                     {{ t('common.pve', 'PvE') }}
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    :aria-checked="selectedMode === GAME_MODES.SEASONAL"
+                    class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
+                    :class="
+                      selectedMode === GAME_MODES.SEASONAL
+                        ? 'bg-warning-700 text-warning-50'
+                        : 'text-warning-300 hover:bg-warning-950/60'
+                    "
+                    @click="selectedMode = GAME_MODES.SEASONAL"
+                  >
+                    {{ t('common.seasonal_pvp', 'Seasonal PvP') }}
                   </button>
                 </div>
               </article>
@@ -844,6 +865,7 @@
   const { t } = useI18n({ useScope: 'global' });
   const { copyToClipboard } = useCopyToClipboard();
   const toast = useToast();
+  const streamerTools = useStreamerToolsOverlay();
   const {
     selectedMode,
     selectedMetric,
@@ -862,6 +884,8 @@
     showPercent,
     showRemaining,
     customLabel,
+  } = streamerTools;
+  const {
     selectedFont,
     showTitle,
     textColor,
@@ -897,6 +921,9 @@
     isNonDefaultFont,
     isLoggedIn,
     isModePublic,
+    visibilityError,
+  } = streamerTools;
+  const {
     overlayUrl,
     apiUrl,
     recommendedWidth,
@@ -905,7 +932,7 @@
     selfContainedPreviewHeight,
     previewHelpText,
     resetSettings,
-  } = useStreamerToolsOverlay();
+  } = streamerTools;
   const modeGroupLabelId = useId();
   const metricGroupLabelId = useId();
   const customAccentColorId = useId();

@@ -31,29 +31,34 @@
 </template>
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
-  import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import {
+    getTeamIdFromState,
+    getTeamIdStateKey,
+    useSystemStoreWithSupabase,
+  } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES } from '@/utils/constants';
+  import { GAME_MODE_VALUES, GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
-  import type { SystemState } from '@/types/tarkov';
   const { systemStore } = useSystemStoreWithSupabase();
   const tarkovStore = useTarkovStore();
   const route = useRoute();
   const toast = useToast();
   const { t } = useI18n({ useScope: 'global' });
   const { joinTeam } = useEdgeFunctions();
-  function getCurrentGameMode(): 'pvp' | 'pve' {
-    return (tarkovStore.getCurrentGameMode?.() as 'pvp' | 'pve') || GAME_MODES.PVP;
+  function getCurrentGameMode(): GameMode {
+    return tarkovStore.getCurrentGameMode?.() || GAME_MODES.PVP;
   }
   const hasInviteInUrl = computed(() => {
     return !!(route.query.team && route.query.code);
   });
   const inInviteTeam = computed(() => {
-    const currentTeamId = getTeamIdFromState(systemStore.$state, getCurrentGameMode());
     const queryTeam = route.query.team;
     const inviteTeamId = Array.isArray(queryTeam) ? queryTeam[0] : queryTeam;
-    if (!inviteTeamId || !currentTeamId) return false;
-    return String(currentTeamId) === String(inviteTeamId);
+    if (!inviteTeamId) return false;
+    return GAME_MODE_VALUES.some((mode) => {
+      const currentTeamId = getTeamIdFromState(systemStore.$state, mode);
+      return currentTeamId !== null && String(currentTeamId) === String(inviteTeamId);
+    });
   });
   const declined = ref(false);
   const accepting = ref(false);
@@ -69,9 +74,17 @@
           title: t('page.team.card.teaminvite.join_success', 'Joined team successfully!'),
           color: 'success',
         });
-        const gameMode = getCurrentGameMode();
-        const teamIdColumn = gameMode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-        systemStore.$patch({ [teamIdColumn]: teamId } as Partial<SystemState>);
+        const gameMode = Object.values(GAME_MODES).includes(result.team.gameMode as GameMode)
+          ? (result.team.gameMode as GameMode)
+          : getCurrentGameMode();
+        const teamIdColumn = getTeamIdStateKey(gameMode);
+        systemStore.$patch((state) => {
+          state[teamIdColumn] = teamId;
+          if (gameMode === GAME_MODES.PVP) {
+            state.team = teamId;
+            state.team_id = teamId;
+          }
+        });
         declined.value = false;
       } else {
         throw new Error(

@@ -1,4 +1,4 @@
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { GAME_MODES, type ImportableGameMode } from '@/utils/constants';
 const CHAT_MESSAGE_MARKER = 'Got notification | ChatMessageReceived';
 const QUEST_COMPLETION_TEMPLATE_SUFFIX = 'successMessageText';
 const QUEST_STARTED_TEMPLATE_SUFFIX = 'description';
@@ -8,7 +8,7 @@ const LOG_LINE_TIMESTAMP_PATTERN = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}
 const SESSION_VERSION_PATTERN = /(?:^|[_\s-])(\d+\.\d+\.\d+\.\d+\.\d+)(?=$|[_\s-])/;
 const UNKNOWN_MODE = 'unknown' as const;
 export const UNKNOWN_LOG_VERSION = 'unknown';
-export type EftQuestEventMode = GameMode | typeof UNKNOWN_MODE;
+export type EftQuestEventMode = ImportableGameMode | typeof UNKNOWN_MODE;
 export interface EftLogInputFile {
   name: string;
   text: string;
@@ -62,7 +62,7 @@ interface JsonBlock {
   text: string;
 }
 interface BackendModeSignal {
-  mode: GameMode;
+  mode: ImportableGameMode;
   timestamp: string;
 }
 interface BackendModeSignals {

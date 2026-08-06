@@ -6,13 +6,14 @@ import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
 import type { PurgeCacheResponse } from '@/types/edge';
+import type { MemberProfile } from '@/types/tarkov';
 import type {
   CreateTeamResponse,
   JoinTeamResponse,
   KickMemberResponse,
   LeaveTeamResponse,
 } from '@/types/team';
-type GameMode = 'pvp' | 'pve';
+import type { GameMode } from '@/utils/constants';
 const TEAM_ID_REGEX = /^[a-zA-Z0-9-]{1,64}$/;
 const isAuthOrMembershipStatus = (status: number | null): boolean =>
   status === 401 || status === 403;
@@ -127,25 +128,20 @@ export const useEdgeFunctions = () => {
     return await invokeSupabaseFunction<T>(fnName, body, method);
   };
   const getTeamMembers = async (
-    teamId: string
+    teamId: string,
+    forceRefresh = false
   ): Promise<{
     members: string[];
-    profiles?: Record<
-      string,
-      { displayName: string | null; level: number | null; tasksCompleted: number | null }
-    >;
+    profiles?: Record<string, MemberProfile>;
   }> => {
     assertValidTeamId(teamId);
     const callTeamMembersApi = async (token: string) => {
       return await $fetch<{
         members: string[];
-        profiles?: Record<
-          string,
-          { displayName: string | null; level: number | null; tasksCompleted: number | null }
-        >;
+        profiles?: Record<string, MemberProfile>;
       }>(`/api/team/members`, {
         method: 'GET',
-        query: { teamId },
+        query: forceRefresh ? { refresh: '1', teamId } : { teamId },
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -200,7 +196,7 @@ export const useEdgeFunctions = () => {
    * @param name Team name
    * @param joinCode Team join/invite code
    * @param maxMembers Maximum number of team members (2-10)
-   * @param gameMode Game mode for the team ('pvp' or 'pve')
+   * @param gameMode Game mode for the team
    */
   const createTeam = async (
     name: string,

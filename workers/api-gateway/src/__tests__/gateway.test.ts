@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker, { ApiGatewayRateLimiter } from '../index';
 import { deleteMemoryCache } from '../utils/memory-cache';
-import type { Env } from '../types';
+import type { Env, GameMode } from '../types';
 const makeLimiter = (
   payload: { allowed: boolean; remaining: number; resetAt?: number } = {
     allowed: true,
@@ -46,7 +46,7 @@ const jsonResponse = (payload: unknown, status = 200) =>
   });
 type MergeRpcPayload = {
   p_user_id: string;
-  p_field: 'pvp_data' | 'pve_data';
+  p_field: 'pvp_data' | 'pve_data' | 'seasonal_data';
   p_task_completions: Record<string, Record<string, unknown>> | null;
   p_task_objectives: Record<string, Record<string, unknown>> | null;
   p_set: Record<string, unknown> | null;
@@ -85,9 +85,10 @@ type BaseFetchMockOptions = {
   tasks?: Array<Record<string, unknown>>;
   userProgress?: Record<string, unknown>;
   permissions?: string[];
-  gameMode?: 'pvp' | 'pve';
+  gameMode?: GameMode;
   teamId?: string | null;
   teamMembers?: string[];
+  missingProgressUserIds?: string[];
 };
 const createBaseFetchMock = ({
   onMerge,
@@ -104,6 +105,7 @@ const createBaseFetchMock = ({
   gameMode = 'pvp',
   teamId = null,
   teamMembers = ['user-1', 'user-2'],
+  missingProgressUserIds = [],
 }: BaseFetchMockOptions = {}) =>
   vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
@@ -126,6 +128,9 @@ const createBaseFetchMock = ({
     if (url.includes('/rest/v1/rpc/increment_token_usage')) {
       return jsonResponse({ ok: true });
     }
+    if (url.includes('/rest/v1/rpc/get_active_season_number')) {
+      return jsonResponse(1);
+    }
     if (url.includes('/rest/v1/rpc/merge_progress_data')) {
       const payload = JSON.parse(String(init?.body || '{}')) as MergeRpcPayload;
       onMerge?.(payload);
@@ -139,7 +144,43 @@ const createBaseFetchMock = ({
       return jsonResponse([{ user_id: 'user-1', pvp_team_id: teamId, pve_team_id: teamId }]);
     }
     if (url.includes('/rest/v1/team_memberships')) {
+      const select = new URL(url).searchParams.get('select');
+      if (select === 'team_id') {
+        return jsonResponse(teamId ? [{ team_id: teamId }] : []);
+      }
       return jsonResponse(teamMembers.map((id) => ({ user_id: id })));
+    }
+    if (url.includes('/rest/v1/user_game_mode_progress')) {
+      const parsedUrl = new URL(url);
+      const userIdParam = parsedUrl.searchParams.get('user_id') ?? '';
+      let requestedUserIds: string[];
+      if (userIdParam.startsWith('eq.')) {
+        requestedUserIds = [userIdParam.slice(3)];
+      } else if (userIdParam.startsWith('in.(') && userIdParam.endsWith(')')) {
+        requestedUserIds = userIdParam
+          .slice(4, -1)
+          .split(',')
+          .map((value) => value.trim());
+      } else {
+        requestedUserIds = [String(userProgress.user_id)];
+      }
+      const modeField =
+        gameMode === 'pve' ? 'pve_data' : gameMode === 'seasonal' ? 'seasonal_data' : 'pvp_data';
+      const sourceProgress = userProgress.progress_data ??
+        userProgress[modeField] ?? { taskCompletions: {} };
+      return jsonResponse(
+        requestedUserIds
+          .filter((userId) => !missingProgressUserIds.includes(userId))
+          .map((userId) => ({
+            progress_data: {
+              ...(typeof sourceProgress === 'object' && sourceProgress !== null
+                ? sourceProgress
+                : {}),
+              displayName: `Member-${userId}`,
+            },
+            user_id: userId,
+          }))
+      );
     }
     if (url.includes('/rest/v1/user_progress')) {
       const parsedUrl = new URL(url);
@@ -157,16 +198,8 @@ const createBaseFetchMock = ({
       } else {
         requestedUserIds = [String(userProgress.user_id)];
       }
-      const activeModeField = selectedColumns?.includes('pve_data') ? 'pve_data' : 'pvp_data';
       const buildRow = (userId: string): Record<string, unknown> => {
         const base: Record<string, unknown> = { ...userProgress, user_id: userId };
-        // Give each member a distinct displayName in the active mode's data so
-        // per-member mapping regressions are detectable in team tests.
-        const modeData = base[activeModeField];
-        base[activeModeField] = {
-          ...(typeof modeData === 'object' && modeData !== null ? modeData : {}),
-          displayName: `Member-${userId}`,
-        };
         if (!selectedColumns) return base;
         const row: Record<string, unknown> = {};
         for (const col of selectedColumns) {
@@ -176,7 +209,8 @@ const createBaseFetchMock = ({
       };
       return jsonResponse(requestedUserIds.map(buildRow));
     }
-    const apiGameMode = gameMode === 'pve' ? 'pve' : 'regular';
+    const apiGameMode =
+      gameMode === 'pve' ? 'pve' : gameMode === 'seasonal' ? 'pvp-season' : 'regular';
     if (url === `https://json.tarkov.dev/${apiGameMode}/tasks`) {
       return jsonResponse({
         data: {
@@ -192,8 +226,10 @@ const createBaseFetchMock = ({
 beforeEach(() => {
   deleteMemoryCache('tarkov:tasks:regular');
   deleteMemoryCache('tarkov:tasks:pve');
+  deleteMemoryCache('tarkov:tasks:pvp-season');
   deleteMemoryCache('tarkov:hideout:regular');
   deleteMemoryCache('tarkov:hideout:pve');
+  deleteMemoryCache('tarkov:hideout:pvp-season');
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('Unmocked fetch: missing test handler', { status: 500 }))
@@ -692,13 +728,11 @@ describe('api-gateway', () => {
       if (url.includes('/rest/v1/rpc/increment_token_usage')) {
         return jsonResponse({ ok: true });
       }
-      if (url.includes('/rest/v1/user_progress')) {
+      if (url.includes('/rest/v1/user_game_mode_progress')) {
         return jsonResponse([
           {
             user_id: 'user-1',
-            current_game_mode: 'pvp',
-            game_edition: 1,
-            pvp_data: {
+            progress_data: {
               level: 10,
               pmcFaction: 'USEC',
               displayName: 'Tester',
@@ -712,9 +746,11 @@ describe('api-gateway', () => {
               prestigeLevel: 0,
               skillOffsets: {},
             },
-            pve_data: null,
           },
         ]);
+      }
+      if (url.includes('/rest/v1/user_progress')) {
+        return jsonResponse([{ user_id: 'user-1', game_edition: 1 }]);
       }
       if (url === 'https://json.tarkov.dev/regular/tasks') {
         return jsonResponse({
@@ -937,44 +973,79 @@ describe('api-gateway', () => {
     expect(objectives?.['obj-1']?.count).toBe(5);
     expect('complete' in (objectives?.['obj-1'] ?? {})).toBe(false);
   });
-  const bearerForMode = (mode: 'pvp' | 'pve') => `Bearer ${mode === 'pve' ? 'PVE' : 'PVP'}_abc123`;
-  const progressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
+  const bearerForMode = (mode: GameMode) =>
+    `Bearer ${mode === 'seasonal' ? 'SZN' : mode.toUpperCase()}_abc123`;
+  const progressRequest = (mode: GameMode = 'pvp', headers: Record<string, string> = {}) =>
     buildRequest('/progress', {
       method: 'GET',
       headers: { Authorization: bearerForMode(mode), ...headers },
     });
-  const findProgressSelect = (fetchMock: ReturnType<typeof vi.fn>): string | undefined =>
-    fetchMock.mock.calls
+  const findModeProgressRequest = (fetchMock: ReturnType<typeof vi.fn>): URL | undefined => {
+    const requestUrl = fetchMock.mock.calls
       .map((call) => String(call[0]))
-      .filter((url) => url.includes('/rest/v1/user_progress'))
-      .map((url) => new URL(url).searchParams.get('select') ?? undefined)
-      .find((select) => select !== undefined);
+      .find((url) => url.includes('/rest/v1/user_game_mode_progress'));
+    return requestUrl ? new URL(requestUrl) : undefined;
+  };
   it.each([
-    ['pvp', 'user_id,game_edition,pvp_data'],
-    ['pve', 'user_id,game_edition,pve_data'],
+    ['pvp', 0],
+    ['pve', 0],
+    ['seasonal', 1],
   ] as const)(
-    'narrows the user_progress select to the %s token game mode',
-    async (mode, expected) => {
+    'loads the normalized %s progress row for its season',
+    async (mode, expectedSeason) => {
       const fetchMock = createBaseFetchMock({ permissions: ['GP'], gameMode: mode });
       vi.stubGlobal('fetch', fetchMock);
       const res = await worker.fetch(progressRequest(mode), BASE_ENV);
       expect(res.status).toBe(200);
-      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
-      expect(select).toBe(expected);
-      expect(select).not.toContain('*');
+      const requestUrl = findModeProgressRequest(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(requestUrl?.searchParams.get('game_mode')).toBe(`eq.${mode}`);
+      expect(requestUrl?.searchParams.get('season_number')).toBe(`eq.${expectedSeason}`);
+      expect(requestUrl?.searchParams.get('select')).toBe('user_id,progress_data');
     }
   );
-  const teamProgressRequest = (mode: 'pvp' | 'pve' = 'pvp', headers: Record<string, string> = {}) =>
+  it('retains account edition when a team member has no active mode progress row', async () => {
+    const fetchMock = createBaseFetchMock({
+      permissions: ['TP'],
+      gameMode: 'seasonal',
+      teamId: 'team-1',
+      teamMembers: ['user-1', 'user-2'],
+      missingProgressUserIds: ['user-2'],
+      userProgress: { user_id: 'user-1', game_edition: 4 },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(teamProgressRequest('seasonal'), BASE_ENV);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ gameEdition: number; userId: string }> };
+    const byUser = new Map(body.data.map((entry) => [entry.userId, entry.gameEdition]));
+    expect(byUser.get('user-1')).toBe(4);
+    expect(byUser.get('user-2')).toBe(4);
+  });
+  it('retains account edition in solo fallback without an active mode progress row', async () => {
+    const fetchMock = createBaseFetchMock({
+      permissions: ['TP'],
+      gameMode: 'seasonal',
+      teamId: null,
+      missingProgressUserIds: ['user-1'],
+      userProgress: { user_id: 'user-1', game_edition: 5 },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(teamProgressRequest('seasonal'), BASE_ENV);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ gameEdition: number; userId: string }> };
+    expect(body.data).toEqual([expect.objectContaining({ gameEdition: 5, userId: 'user-1' })]);
+  });
+  const teamProgressRequest = (mode: GameMode = 'pvp', headers: Record<string, string> = {}) =>
     buildRequest('/team/progress', {
       method: 'GET',
       headers: { Authorization: bearerForMode(mode), ...headers },
     });
   it.each([
-    ['pvp', 'user_id,game_edition,pvp_data'],
-    ['pve', 'user_id,game_edition,pve_data'],
+    ['pvp', 0],
+    ['pve', 0],
+    ['seasonal', 1],
   ] as const)(
-    'narrows the team batch user_progress select to the %s token game mode',
-    async (mode, expected) => {
+    'loads normalized team progress for %s and its season',
+    async (mode, expectedSeason) => {
       const fetchMock = createBaseFetchMock({
         permissions: ['TP'],
         gameMode: mode,
@@ -984,9 +1055,9 @@ describe('api-gateway', () => {
       vi.stubGlobal('fetch', fetchMock);
       const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
       expect(res.status).toBe(200);
-      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
-      expect(select).toBe(expected);
-      expect(select).not.toContain('*');
+      const requestUrl = findModeProgressRequest(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(requestUrl?.searchParams.get('game_mode')).toBe(`eq.${mode}`);
+      expect(requestUrl?.searchParams.get('season_number')).toBe(`eq.${expectedSeason}`);
       // Verify per-member mapping: each member gets their own row's displayName.
       const body = (await res.json()) as {
         data: Array<{ userId: string; displayName: string }>;
@@ -997,11 +1068,12 @@ describe('api-gateway', () => {
     }
   );
   it.each([
-    ['pvp', 'user_id,game_edition,pvp_data'],
-    ['pve', 'user_id,game_edition,pve_data'],
+    ['pvp', 0],
+    ['pve', 0],
+    ['seasonal', 1],
   ] as const)(
-    'narrows the solo-fallback user_progress select to the %s token game mode',
-    async (mode, expected) => {
+    'loads normalized solo fallback progress for %s and its season',
+    async (mode, expectedSeason) => {
       const fetchMock = createBaseFetchMock({
         permissions: ['TP'],
         gameMode: mode,
@@ -1010,9 +1082,9 @@ describe('api-gateway', () => {
       vi.stubGlobal('fetch', fetchMock);
       const res = await worker.fetch(teamProgressRequest(mode), BASE_ENV);
       expect(res.status).toBe(200);
-      const select = findProgressSelect(fetchMock as unknown as ReturnType<typeof vi.fn>);
-      expect(select).toBe(expected);
-      expect(select).not.toContain('*');
+      const requestUrl = findModeProgressRequest(fetchMock as unknown as ReturnType<typeof vi.fn>);
+      expect(requestUrl?.searchParams.get('game_mode')).toBe(`eq.${mode}`);
+      expect(requestUrl?.searchParams.get('season_number')).toBe(`eq.${expectedSeason}`);
     }
   );
   const manyCompletions = Object.fromEntries(

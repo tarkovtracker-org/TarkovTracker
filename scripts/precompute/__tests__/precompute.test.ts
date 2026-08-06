@@ -29,6 +29,7 @@ describe('validatePrecomputeFilter', () => {
     expect(validatePrecomputeFilter({})).toBeNull();
     expect(validatePrecomputeFilter({ lang: 'en' })).toBeNull();
     expect(validatePrecomputeFilter({ gameMode: 'pve' })).toBeNull();
+    expect(validatePrecomputeFilter({ gameMode: 'pvp-season' })).toBeNull();
     expect(validatePrecomputeFilter({ gameMode: 'regular', lang: 'de' })).toBeNull();
   });
   it('rejects unsupported lang and gameMode values', () => {
@@ -48,11 +49,15 @@ describe('runPrecompute', () => {
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([]);
-    expect(result.successes).toHaveLength(2);
+    expect(result.successes).toHaveLength(3);
     expect(result.successes).toEqual(
-      expect.arrayContaining(['tasks-core-json-v2-en-regular', 'tasks-core-json-v2-en-pve'])
+      expect.arrayContaining([
+        'tasks-core-json-v2-en-regular',
+        'tasks-core-json-v2-en-pve',
+        'tasks-core-json-v2-en-pvp-season',
+      ])
     );
-    expect(kv.put).toHaveBeenCalledTimes(2);
+    expect(kv.put).toHaveBeenCalledTimes(3);
     const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v2-en-regular');
     expect(putCall).toBeDefined();
     const [, value, options] = putCall!;
@@ -89,8 +94,11 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([
       { error: 'upstream 502', key: 'tasks-core-json-v2-en-regular' },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
-    expect(kv.put).toHaveBeenCalledTimes(1);
+    expect(result.successes).toEqual([
+      'tasks-core-json-v2-en-pve',
+      'tasks-core-json-v2-en-pvp-season',
+    ]);
+    expect(kv.put).toHaveBeenCalledTimes(2);
   });
   it('records a KV write failure without aborting the run', async () => {
     const kv = createKvMock();
@@ -99,7 +107,10 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([
       { error: 'KV write failed', key: 'tasks-core-json-v2-en-regular' },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
+    expect(result.successes).toEqual([
+      'tasks-core-json-v2-en-pve',
+      'tasks-core-json-v2-en-pvp-season',
+    ]);
   });
   it('refuses to write a structurally empty payload to KV', async () => {
     applyOverlayMock
@@ -113,8 +124,11 @@ describe('runPrecompute', () => {
         key: 'tasks-core-json-v2-en-regular',
       },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
-    expect(kv.put).toHaveBeenCalledTimes(1);
+    expect(result.successes).toEqual([
+      'tasks-core-json-v2-en-pve',
+      'tasks-core-json-v2-en-pvp-season',
+    ]);
+    expect(kv.put).toHaveBeenCalledTimes(2);
   });
   it('refuses to publish malformed task entries', async () => {
     applyOverlayMock
@@ -128,8 +142,11 @@ describe('runPrecompute', () => {
         key: 'tasks-core-json-v2-en-regular',
       },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
-    expect(kv.put).toHaveBeenCalledTimes(1);
+    expect(result.successes).toEqual([
+      'tasks-core-json-v2-en-pve',
+      'tasks-core-json-v2-en-pvp-season',
+    ]);
+    expect(kv.put).toHaveBeenCalledTimes(2);
   });
   it('refuses to publish overlay objective patches as objects', async () => {
     applyOverlayMock
@@ -146,7 +163,10 @@ describe('runPrecompute', () => {
         key: 'tasks-core-json-v2-en-regular',
       },
     ]);
-    expect(result.successes).toEqual(['tasks-core-json-v2-en-pve']);
-    expect(kv.put).toHaveBeenCalledTimes(1);
+    expect(result.successes).toEqual([
+      'tasks-core-json-v2-en-pve',
+      'tasks-core-json-v2-en-pvp-season',
+    ]);
+    expect(kv.put).toHaveBeenCalledTimes(2);
   });
 });

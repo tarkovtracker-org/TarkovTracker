@@ -9,13 +9,15 @@
       title-classes="text-lg font-semibold"
     >
       <template #content>
-        <div v-if="!isPvpMode" class="space-y-4 px-4 py-4">
+        <div v-if="!isPrestigeMode" class="space-y-4 px-4 py-4">
           <UAlert
             icon="i-mdi-sword-cross"
             color="info"
             variant="soft"
-            :title="$t('settings.prestige.pvp_only_title')"
-            :description="$t('settings.prestige.pvp_only')"
+            :title="
+              $t('settings.prestige.persistent_mode_unsupported_title', 'Prestige Unavailable')
+            "
+            :description="unsupportedModeDescription"
           />
         </div>
         <div v-else class="space-y-6 px-4 py-4">
@@ -161,7 +163,13 @@
                   {{ $t('settings.prestige.archive_title') }}
                 </p>
                 <p class="text-surface-400 text-xs">
-                  {{ $t('settings.prestige.archive_description') }}
+                  {{
+                    $t(
+                      'settings.prestige.archive_description_mode',
+                      { mode: currentModeLabel },
+                      'Use this only when you are actually prestiging now. Your current {mode} run will be archived and its progression will reset for the next prestige level.'
+                    )
+                  }}
                 </p>
               </div>
               <p v-if="archiveDisabledDescription" class="text-surface-500 text-xs">
@@ -186,7 +194,11 @@
                 {{ $t('settings.data_management.prestige_history_title') }}
               </p>
               <p class="text-surface-400 text-xs">
-                {{ $t('settings.prestige.archived_runs_description') }}
+                {{
+                  $t('settings.prestige.archived_runs_description', {
+                    mode: currentModeLabel,
+                  })
+                }}
               </p>
             </div>
             <div class="bg-surface-900/80 space-y-3 rounded-xl border border-white/8 p-4">
@@ -292,7 +304,13 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-trophy" class="text-warning-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
-          {{ $t('settings.prestige.archive_dialog_title') }}
+          {{
+            $t(
+              'settings.prestige.archive_dialog_title_mode',
+              { mode: currentModeLabel },
+              'Archive Current {mode} Run'
+            )
+          }}
         </h3>
       </div>
     </template>
@@ -302,7 +320,13 @@
           icon="i-mdi-alert"
           color="warning"
           variant="subtle"
-          :title="$t('settings.data_management.prestige_pvp_warning')"
+          :title="
+            $t(
+              'settings.data_management.prestige_mode_warning',
+              { mode: currentModeLabel },
+              'Your current {mode} run will be archived, then its progression will reset for the next prestige level. Other modes are not affected.'
+            )
+          "
         />
         <UAlert
           v-if="requirementSummary.unmetTrackedCount > 0"
@@ -385,7 +409,7 @@
           icon="i-mdi-information"
           color="warning"
           variant="soft"
-          :title="$t('settings.prestige.delete_history_warning')"
+          :title="$t('settings.prestige.delete_history_warning', { mode: currentModeLabel })"
         />
         <div
           v-if="selectedPrestigeRun"
@@ -449,7 +473,7 @@
     value: string;
   };
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const currentPrestigeInputId = 'settings-pvp-prestige-input';
+  const currentPrestigeInputId = 'settings-prestige-input';
   const { locale, t } = useI18n({ useScope: 'global' });
   const { toWikiUrl } = useWikiLink();
   const toast = useToast();
@@ -468,8 +492,19 @@
   const showDeleteHistoryDialog = ref(false);
   const archiveConfirmText = ref('');
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn && $supabase?.user?.id));
-  const isPvpMode = computed(() => tarkovStore.currentGameMode === GAME_MODES.PVP);
-  const currentPrestigeLevel = computed(() => tarkovStore.getPvPProgressData().prestigeLevel ?? 0);
+  const currentMode = computed(() => tarkovStore.currentGameMode);
+  const isPrestigeMode = computed(() => currentMode.value === GAME_MODES.PVP);
+  const unsupportedModeDescription = computed(() =>
+    currentMode.value === GAME_MODES.SEASONAL
+      ? t('settings.prestige.seasonal_mode_unsupported', 'Prestige is unavailable in Seasonal PvP.')
+      : t(
+          'settings.prestige.persistent_mode_unsupported',
+          'Prestige is unavailable for persistent PvE mode.'
+        )
+  );
+  const currentModeLabel = computed(() => t('common.pvp', 'PvP'));
+  const currentModeProgress = computed(() => tarkovStore.getCurrentProgressData());
+  const currentPrestigeLevel = computed(() => currentModeProgress.value.prestigeLevel ?? 0);
   const currentEdition = computed(() =>
     metadataStore.getEditionByValue(tarkovStore.getGameEdition())
   );
@@ -499,7 +534,7 @@
       edition: currentEdition.value,
       hideoutStations: metadataStore.hideoutStations,
       prestigeLevels: metadataStore.prestigeLevels,
-      pvpProgress: tarkovStore.getPvPProgressData(),
+      modeProgress: currentModeProgress.value,
       storyChapters: metadataStore.storyChapters,
       tasks: metadataStore.tasks,
     })
@@ -556,7 +591,7 @@
   const canArchiveRun = computed(() => isLoggedIn.value && nextPrestigeLevel.value !== null);
   const archiveDisabledDescription = computed(() => {
     if (!isLoggedIn.value) {
-      return t('settings.prestige.login_required');
+      return t('settings.prestige.login_required', { mode: currentModeLabel.value });
     }
     if (nextPrestigeLevel.value === null) {
       return t('settings.prestige.max_reached');
@@ -579,7 +614,7 @@
   );
   const prestigeHistoryEmptyDescription = computed(() => {
     if (!isLoggedIn.value) {
-      return t('settings.prestige.login_required');
+      return t('settings.prestige.login_required', { mode: currentModeLabel.value });
     }
     return t('settings.data_management.prestige_history_empty');
   });
@@ -801,7 +836,7 @@
   };
   const loadPrestigeHistory = async () => {
     const userId = $supabase?.user?.id;
-    if (!isPvpMode.value || !$supabase?.user?.loggedIn || !userId) {
+    if (!isPrestigeMode.value || !$supabase?.user?.loggedIn || !userId) {
       clearPrestigeHistory();
       return;
     }
@@ -809,7 +844,7 @@
     historyError.value = '';
     historyLoading.value = true;
     try {
-      const runs = await tarkovStore.fetchPrestigeRuns('pvp', 20);
+      const runs = await tarkovStore.fetchPrestigeRuns(currentMode.value, 20);
       if (
         requestId !== prestigeHistoryRequestId ||
         !$supabase?.user?.loggedIn ||
@@ -843,13 +878,13 @@
     }
   };
   const syncCurrentPrestige = async () => {
-    if (!isPvpMode.value || !hasSelectedPrestigeChange.value) {
+    if (!isPrestigeMode.value || !hasSelectedPrestigeChange.value) {
       return;
     }
     syncingCurrentPrestige.value = true;
     try {
       const targetPrestigeLevel = selectedPrestigeLevel.value;
-      await tarkovStore.syncPvpPrestigeLevel(targetPrestigeLevel);
+      await tarkovStore.syncPrestigeLevel(currentMode.value, targetPrestigeLevel);
       toast.add({
         title: t('settings.prestige.sync_success_title'),
         description: t('settings.prestige.sync_success_description', {
@@ -858,7 +893,7 @@
         color: 'success',
       });
     } catch (error) {
-      logger.error('[PrestigeCard] Failed to sync PvP prestige level:', error);
+      logger.error('[PrestigeCard] Failed to sync prestige level:', error);
       toast.add({
         title: t('settings.prestige.sync_error_title', 'Prestige Update Failed'),
         description: t('settings.prestige.sync_error_description'),
@@ -869,7 +904,7 @@
     }
   };
   const deleteSelectedPrestigeRun = async () => {
-    if (!isPvpMode.value) {
+    if (!isPrestigeMode.value) {
       return;
     }
     const run = selectedPrestigeRun.value;
@@ -905,7 +940,7 @@
     }
   };
   const archivePrestigeRun = async () => {
-    if (!isPvpMode.value || !canArchiveRun.value) {
+    if (!isPrestigeMode.value || !canArchiveRun.value) {
       return;
     }
     if (archiveConfirmText.value !== t('settings.prestige.confirm_word')) {
@@ -917,11 +952,12 @@
     }
     archivingPrestige.value = true;
     try {
-      await tarkovStore.prestigePvP();
+      await tarkovStore.prestigeMode(currentMode.value);
       toast.add({
-        title: t('settings.prestige_pvp.success_title'),
+        title: t('settings.prestige_pvp.success_title', { mode: currentModeLabel.value }),
         description: t('settings.prestige_pvp.success_description', {
           level: targetPrestigeLevel,
+          mode: currentModeLabel.value,
         }),
         color: 'success',
       });
@@ -929,10 +965,10 @@
       archiveConfirmText.value = '';
       await loadPrestigeHistory();
     } catch (error) {
-      logger.error('[PrestigeCard] Failed to prestige PvP data:', error);
+      logger.error('[PrestigeCard] Failed to prestige mode data:', error);
       toast.add({
         title: t('settings.prestige_pvp.error_title', 'Prestige Failed'),
-        description: t('settings.prestige_pvp.error_description'),
+        description: t('settings.prestige_pvp.error_description', { mode: currentModeLabel.value }),
         color: 'error',
       });
     } finally {
@@ -940,17 +976,17 @@
     }
   };
   watch(
-    () => [$supabase.user.loggedIn, $supabase.user.id, isPvpMode.value] as const,
-    ([loggedIn, userId, pvpMode], previous) => {
-      const [prevLoggedIn, prevUserId, prevPvpMode] = previous ?? [false, null, true];
-      if (!loggedIn || !userId || !pvpMode) {
+    () => [$supabase.user.loggedIn, $supabase.user.id, currentMode.value] as const,
+    ([loggedIn, userId, mode], previous) => {
+      const [prevLoggedIn, prevUserId, prevMode] = previous ?? [false, null, GAME_MODES.PVE];
+      if (!loggedIn || !userId || !isPrestigeMode.value) {
         showArchiveDialog.value = false;
         showDeleteHistoryDialog.value = false;
         archiveConfirmText.value = '';
         clearPrestigeHistory();
         return;
       }
-      if (!prevLoggedIn || prevUserId !== userId || prevPvpMode !== pvpMode) {
+      if (!prevLoggedIn || prevUserId !== userId || prevMode !== mode) {
         clearPrestigeHistory();
         void loadPrestigeHistory();
       }

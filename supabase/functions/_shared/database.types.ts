@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -108,6 +103,33 @@ export type Database = {
         }
         Relationships: []
       }
+      account_ip_audit: {
+        Row: {
+          first_seen_at: string
+          ip_hash: string
+          last_seen_at: string
+          last_user_agent: string | null
+          seen_count: number
+          user_id: string
+        }
+        Insert: {
+          first_seen_at?: string
+          ip_hash: string
+          last_seen_at?: string
+          last_user_agent?: string | null
+          seen_count?: number
+          user_id: string
+        }
+        Update: {
+          first_seen_at?: string
+          ip_hash?: string
+          last_seen_at?: string
+          last_user_agent?: string | null
+          seen_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -179,6 +201,156 @@ export type Database = {
           token_id?: string
           token_value?: string | null
           usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      api_usage_daily: {
+        Row: {
+          day: string
+          reads: number
+          throttled: number
+          tier: string
+          token_id: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+          writes: number
+        }
+        Insert: {
+          day: string
+          reads?: number
+          throttled?: number
+          tier?: string
+          token_id: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+          writes?: number
+        }
+        Update: {
+          day?: string
+          reads?: number
+          throttled?: number
+          tier?: string
+          token_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+          writes?: number
+        }
+        Relationships: []
+      }
+      discord_account_links: {
+        Row: {
+          discord_display_name: string | null
+          discord_user_id: string
+          discord_username: string
+          linked_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          discord_display_name?: string | null
+          discord_user_id: string
+          discord_username: string
+          linked_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          discord_display_name?: string | null
+          discord_user_id?: string
+          discord_username?: string
+          linked_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mutation_rate_limits: {
+        Row: {
+          count: number
+          reset_at: string
+          scope: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          count?: number
+          reset_at: string
+          scope: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          count?: number
+          reset_at?: string
+          scope?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stripe_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          received_at: string
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          received_at?: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          received_at?: string
+        }
+        Relationships: []
+      }
+      supporters: {
+        Row: {
+          amount_total: number
+          discord_user_id: string | null
+          expires_at: string | null
+          has_ever_supported: boolean
+          started_at: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_total?: number
+          discord_user_id?: string | null
+          expires_at?: string | null
+          has_ever_supported?: boolean
+          started_at?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_total?: number
+          discord_user_id?: string | null
+          expires_at?: string | null
+          has_ever_supported?: boolean
+          started_at?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: string
+          type?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -289,6 +461,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_game_mode_progress: {
+        Row: {
+          created_at: string
+          game_mode: string
+          profile_public: boolean
+          progress_data: Json
+          season_number: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_mode: string
+          profile_public?: boolean
+          progress_data?: Json
+          season_number?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          game_mode?: string
+          profile_public?: boolean
+          progress_data?: Json
+          season_number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string | null
@@ -313,6 +515,7 @@ export type Database = {
           map_marker_colors: Json
           map_pan_speed: number | null
           map_team_hide_all: boolean | null
+          map_zone_opacity: number
           map_zoom_speed: number | null
           needed_items_card_style: string | null
           needed_items_fir_filter: string | null
@@ -327,6 +530,8 @@ export type Database = {
           neededitems_style: string | null
           only_tasks_with_required_keys: boolean
           pinned_task_ids: Json | null
+          profile_share_pve_public: boolean
+          profile_share_pvp_public: boolean
           respect_task_filters_for_impact: boolean
           show_all_filter: boolean | null
           show_available_filter: boolean | null
@@ -386,6 +591,7 @@ export type Database = {
           map_marker_colors?: Json
           map_pan_speed?: number | null
           map_team_hide_all?: boolean | null
+          map_zone_opacity?: number
           map_zoom_speed?: number | null
           needed_items_card_style?: string | null
           needed_items_fir_filter?: string | null
@@ -400,6 +606,8 @@ export type Database = {
           neededitems_style?: string | null
           only_tasks_with_required_keys?: boolean
           pinned_task_ids?: Json | null
+          profile_share_pve_public?: boolean
+          profile_share_pvp_public?: boolean
           respect_task_filters_for_impact?: boolean
           show_all_filter?: boolean | null
           show_available_filter?: boolean | null
@@ -459,6 +667,7 @@ export type Database = {
           map_marker_colors?: Json
           map_pan_speed?: number | null
           map_team_hide_all?: boolean | null
+          map_zone_opacity?: number
           map_zoom_speed?: number | null
           needed_items_card_style?: string | null
           needed_items_fir_filter?: string | null
@@ -473,6 +682,8 @@ export type Database = {
           neededitems_style?: string | null
           only_tasks_with_required_keys?: boolean
           pinned_task_ids?: Json | null
+          profile_share_pve_public?: boolean
+          profile_share_pvp_public?: boolean
           respect_task_filters_for_impact?: boolean
           show_all_filter?: boolean | null
           show_available_filter?: boolean | null
@@ -511,14 +722,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_prestige_runs: {
+        Row: {
+          archived_progress: Json
+          created_at: string
+          id: string
+          mode: string
+          prestige_from: number
+          prestige_to: number
+          summary: Json
+          user_id: string
+        }
+        Insert: {
+          archived_progress?: Json
+          created_at?: string
+          id?: string
+          mode: string
+          prestige_from: number
+          prestige_to: number
+          summary?: Json
+          user_id: string
+        }
+        Update: {
+          archived_progress?: Json
+          created_at?: string
+          id?: string
+          mode?: string
+          prestige_from?: number
+          prestige_to?: number
+          summary?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_progress: {
         Row: {
           created_at: string | null
           current_game_mode: string | null
           game_edition: number | null
-          tarkov_uid: number | null
           pve_data: Json | null
           pvp_data: Json | null
+          tarkov_uid: number | null
           updated_at: string | null
           user_id: string
         }
@@ -526,9 +770,9 @@ export type Database = {
           created_at?: string | null
           current_game_mode?: string | null
           game_edition?: number | null
-          tarkov_uid?: number | null
           pve_data?: Json | null
           pvp_data?: Json | null
+          tarkov_uid?: number | null
           updated_at?: string | null
           user_id: string
         }
@@ -536,9 +780,9 @@ export type Database = {
           created_at?: string | null
           current_game_mode?: string | null
           game_edition?: number | null
-          tarkov_uid?: number | null
           pve_data?: Json | null
           pvp_data?: Json | null
+          tarkov_uid?: number | null
           updated_at?: string | null
           user_id?: string
         }
@@ -551,6 +795,7 @@ export type Database = {
           is_admin: boolean
           pve_team_id: string | null
           pvp_team_id: string | null
+          seasonal_team_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -560,6 +805,7 @@ export type Database = {
           is_admin?: boolean
           pve_team_id?: string | null
           pvp_team_id?: string | null
+          seasonal_team_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -569,6 +815,7 @@ export type Database = {
           is_admin?: boolean
           pve_team_id?: string | null
           pvp_team_id?: string | null
+          seasonal_team_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -587,10 +834,44 @@ export type Database = {
             referencedRelation: "teams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_system_seasonal_team_id_fkey"
+            columns: ["seasonal_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
+      team_member_mode_summary: {
+        Row: {
+          display_name: string | null
+          game_mode: string | null
+          level: number | null
+          season_number: number | null
+          tasks_completed: number | null
+          user_id: string | null
+        }
+        Insert: {
+          display_name?: never
+          game_mode?: string | null
+          level?: never
+          season_number?: number | null
+          tasks_completed?: never
+          user_id?: string | null
+        }
+        Update: {
+          display_name?: never
+          game_mode?: string | null
+          level?: never
+          season_number?: number | null
+          tasks_completed?: never
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       team_member_summary: {
         Row: {
           current_game_mode: string | null
@@ -649,8 +930,93 @@ export type Database = {
           oldest_remaining: string
         }[]
       }
+      consume_mutation_rate_limit: {
+        Args: {
+          p_limit: number
+          p_scope: string
+          p_subject: string
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
+        }[]
+      }
+      get_api_usage_summary: {
+        Args: { p_limit?: number; p_since: string }
+        Returns: {
+          reads: number
+          throttled: number
+          tier: string
+          token_id: string
+          user_agent: string
+          user_id: string
+          writes: number
+        }[]
+      }
       increment_token_usage: {
         Args: { p_token_id: string }
+        Returns: undefined
+      }
+      merge_api_update_history: {
+        Args: { max_entries?: number; payload: Json; previous_payload: Json }
+        Returns: Json
+      }
+      merge_progress_data: {
+        Args: {
+          p_field: string
+          p_set?: Json
+          p_task_completions?: Json
+          p_task_objectives?: Json
+          p_user_id: string
+        }
+        Returns: number
+      }
+      record_api_usage: {
+        Args: {
+          p_reads: number
+          p_throttled: number
+          p_tier: string
+          p_token_id: string
+          p_user_agent?: string
+          p_user_id: string
+          p_writes: number
+        }
+        Returns: undefined
+      }
+      sanitize_user_progress_api_task_updates: {
+        Args: { payload: Json }
+        Returns: Json
+      }
+      sanitize_user_progress_api_update_history: {
+        Args: { payload: Json }
+        Returns: Json
+      }
+      sanitize_user_progress_api_update_meta: {
+        Args: { payload: Json }
+        Returns: Json
+      }
+      sanitize_user_progress_mode_data: {
+        Args: { payload: Json }
+        Returns: Json
+      }
+      set_game_mode_profile_visibility: {
+        Args: {
+          p_game_mode: string
+          p_profile_public: boolean
+          p_season_number: number
+        }
+        Returns: undefined
+      }
+      sync_user_game_mode_progress: {
+        Args: {
+          p_current_game_mode: string
+          p_game_edition: number
+          p_modes: Json
+          p_seasonal_season_number?: number | null
+          p_tarkov_uid: number | null
+        }
         Returns: undefined
       }
       transfer_team_ownership: {

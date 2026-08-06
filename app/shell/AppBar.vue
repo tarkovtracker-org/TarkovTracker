@@ -1,11 +1,7 @@
 <template>
   <header
     class="fixed top-0 right-0 z-40 h-11 border-b shadow-[0_1px_0_rgba(0,0,0,0.4)]"
-    :class="
-      currentMode === 'pve'
-        ? 'border-pve-700/60 bg-surface-900'
-        : 'border-pvp-700/60 bg-surface-900'
-    "
+    :class="modeHeaderClass"
   >
     <div class="flex h-full items-center gap-1 px-2 sm:gap-2 sm:px-3">
       <!-- Left: Toggle Button -->
@@ -199,6 +195,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { GAME_MODES, isGameMode } from '@/utils/constants';
   import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
   import { logger } from '@/utils/logger';
   import type { DropdownMenuItem } from '@nuxt/ui';
@@ -251,6 +248,13 @@
       .join('+')
   );
   const currentMode = computed(() => tarkovStore.getCurrentGameMode());
+  const modeHeaderClass = computed(() => {
+    if (currentMode.value === GAME_MODES.PVE) return 'border-pve-700/60 bg-surface-900';
+    if (currentMode.value === GAME_MODES.SEASONAL) {
+      return 'border-warning-700/60 bg-surface-900';
+    }
+    return 'border-pvp-700/60 bg-surface-900';
+  });
   const { activeTier: supporterTier } = useSupporter();
   const supporterBadgeLabel = computed(() => {
     const tier = supporterTier.value;
@@ -420,19 +424,19 @@
   const profileRouteMode = computed(() => {
     const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
     const mode = normalizeRouteParam(routeParams.mode)?.toLowerCase();
-    if (mode === 'pve') {
-      return 'pve';
-    }
-    if (mode === 'pvp') {
-      return 'pvp';
-    }
+    if (isGameMode(mode)) return mode;
     return tarkovStore.getCurrentGameMode();
   });
   const profileRouteTitle = computed(() => {
     if (profileRouteName.value !== 'profile_userId_mode') {
       return null;
     }
-    const modeLabel = profileRouteMode.value === 'pve' ? 'PVE' : 'PVP';
+    const modeLabel =
+      profileRouteMode.value === GAME_MODES.PVE
+        ? t('common.pve', 'PVE')
+        : profileRouteMode.value === GAME_MODES.SEASONAL
+          ? t('common.seasonal_pvp', 'SEASONAL PVP')
+          : t('common.pvp', 'PVP');
     const routeParams = (route.params as Record<string, unknown> | undefined) ?? {};
     const routeUserId = normalizeRouteParam(routeParams.userId);
     const currentUserId = normalizeRouteParam($supabase.user?.id ?? null);
@@ -444,12 +448,7 @@
       if (preferencesStore.getStreamerMode) {
         return t('profile.title_with_mode', { name: t('app_bar.hidden_label'), mode: modeLabel });
       }
-      const modeData =
-        profileRouteMode.value === 'pve'
-          ? tarkovStore.getPvEProgressData()
-          : tarkovStore.getPvPProgressData();
-      const modeDisplayName =
-        typeof modeData.displayName === 'string' ? modeData.displayName.trim() : '';
+      const modeDisplayName = tarkovStore.getModeDisplayName(profileRouteMode.value)?.trim() ?? '';
       if (modeDisplayName) {
         return t('profile.title_with_mode', { name: modeDisplayName, mode: modeLabel });
       }
@@ -553,7 +552,7 @@
   const localeSelectUi = {
     base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800/30 border-surface-700/40 hover:bg-surface-800/60 hover:border-surface-600/60 flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1 ring-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2',
     content:
-      'max-h-80 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-[var(--reka-combobox-trigger-width)]',
+      'max-h-80 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-(--reka-combobox-trigger-width)',
     item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
     itemLabel: 'whitespace-nowrap uppercase',
     itemTrailingIcon: 'text-surface-400 shrink-0 size-4',

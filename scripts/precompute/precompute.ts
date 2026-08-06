@@ -10,7 +10,7 @@
  *
  * Executed from GitHub Actions (.github/workflows/precompute-tarkov-data.yml)
  * because the Workers Free tier's 10ms CPU budget cannot fit even a single
- * lang x gameMode transform, let alone the full 32-combination run.
+ * lang x gameMode transform, let alone the full language-by-mode run.
  */
 import { applyOverlay } from '@/server/utils/overlay';
 import {

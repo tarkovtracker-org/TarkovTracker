@@ -5,6 +5,7 @@ import {
   migrateToGameModeStructure,
   type UserState,
 } from '@/stores/progressState';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const createBaseState = (): UserState =>
   ({
     currentGameMode: 'pvp',
@@ -109,5 +110,51 @@ describe('migrateToGameModeStructure', () => {
     expect(migrated.tarkovUid).toBe(67890);
     expect(migrated.pvp).not.toHaveProperty('tarkovDevProfile');
     expect(migrated.pve).not.toHaveProperty('tarkovDevProfile');
+  });
+  it('keeps seasonal progress when the stored season matches the active season', () => {
+    const migrated = migrateToGameModeStructure({
+      currentGameMode: 'seasonal',
+      pvp: { level: 5 },
+      pve: { level: 3 },
+      seasonal: { level: 20 },
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
+    });
+    expect(migrated.seasonal.level).toBe(20);
+    expect(migrated.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+  });
+  it('keeps seasonal progress when no stored season number is present', () => {
+    const migrated = migrateToGameModeStructure({
+      currentGameMode: 'seasonal',
+      pvp: { level: 5 },
+      pve: { level: 3 },
+      seasonal: { level: 20 },
+    });
+    expect(migrated.seasonal.level).toBe(20);
+    expect(migrated.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+  });
+  it('does not reuse a seasonal legacy payload as PvP compatibility data', () => {
+    const migrated = migrateToGameModeStructure({
+      currentGameMode: 'seasonal',
+      level: 27,
+      taskCompletions: { 'task-1': { complete: true } },
+    });
+    expect(migrated.seasonal.level).toBe(27);
+    expect(migrated.pvp.level).toBe(1);
+    expect(migrated.pvp.taskCompletions).toEqual({});
+    expect(migrated.pve.level).toBe(1);
+  });
+  it('discards seasonal progress carried over from a previous season', () => {
+    const migrated = migrateToGameModeStructure({
+      currentGameMode: 'seasonal',
+      pvp: { level: 5 },
+      pve: { level: 3 },
+      seasonal: { level: 20, taskCompletions: { 'task-1': { complete: true } } },
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER - 1,
+    });
+    expect(migrated.seasonal.level).toBe(1);
+    expect(migrated.seasonal.taskCompletions).toEqual({});
+    expect(migrated.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+    expect(migrated.pvp.level).toBe(5);
+    expect(migrated.pve.level).toBe(3);
   });
 });

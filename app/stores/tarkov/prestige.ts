@@ -1,7 +1,8 @@
 import { defaultState, type UserProgressData } from '@/stores/progressState';
 import { getNextProgressEpoch } from '@/stores/tarkov/progressMerge';
-import { SPECIAL_STATIONS } from '@/utils/constants';
+import { GAME_MODES, SPECIAL_STATIONS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
 import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
@@ -18,8 +19,6 @@ import type {
 } from '@/types/tarkov';
 const MAX_PRESTIGE_LEVEL = 6;
 const PRESTIGE_PLAYER_LEVEL_REQUIREMENT = 47;
-const NEW_BEGINNING_ID_PATTERN = /^new_beginning_prestige_(\d+)$/i;
-const NEW_BEGINNING_WIKI_PATTERN = /\/New_Beginning(?:_\(Prestige_(\d+)\))?(?:[?#].*)?$/i;
 const PRESTIGE_STORY_CHAPTER_RULES: Record<number, string[]> = {
   1: ['Tour'],
   2: ['Tour', 'Falling Skies'],
@@ -58,7 +57,7 @@ export type PrestigeRunSummary = {
 export type PrestigeRunRecord = {
   createdAt: string;
   id: string;
-  mode: 'pvp' | 'pve';
+  mode: GameMode;
   prestigeFrom: number;
   prestigeTo: number;
   summary: PrestigeRunSummary;
@@ -66,7 +65,7 @@ export type PrestigeRunRecord = {
 export type UserPrestigeRunRow = {
   created_at?: string | null;
   id?: string | null;
-  mode?: 'pvp' | 'pve' | null;
+  mode?: string | null;
   prestige_from?: number | null;
   prestige_to?: number | null;
   summary?: Record<string, unknown> | null;
@@ -94,7 +93,7 @@ type BuildPrestigeRequirementRowsOptions = {
   edition?: Pick<GameEdition, 'defaultCultistCircleLevel' | 'defaultStashLevel'>;
   hideoutStations: HideoutStation[];
   prestigeLevels: PrestigeLevel[];
-  pvpProgress: UserProgressData;
+  modeProgress: UserProgressData;
   storyChapters: StoryChapter[];
   tasks: Task[];
 };
@@ -107,24 +106,10 @@ type PrestigeRequirementSummary = {
 };
 const isNewBeginningTask = (task: Pick<Task, 'id' | 'name' | 'wikiLink'>): boolean => {
   if (!task?.id) return false;
-  if (NEW_BEGINNING_ID_PATTERN.test(task.id)) return true;
-  if (typeof task.wikiLink === 'string' && NEW_BEGINNING_WIKI_PATTERN.test(task.wikiLink)) {
+  if (inferNewBeginningPrestigeLevel(task) !== null) {
     return true;
   }
   return task.name === 'New Beginning';
-};
-const inferNewBeginningPrestigeLevel = (task: Pick<Task, 'id' | 'wikiLink'>): number | null => {
-  if (typeof task.wikiLink === 'string') {
-    const wikiMatch = task.wikiLink.match(NEW_BEGINNING_WIKI_PATTERN);
-    if (wikiMatch?.[1]) {
-      const parsed = Number.parseInt(wikiMatch[1], 10);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
-    }
-  }
-  const idMatch = task.id.match(NEW_BEGINNING_ID_PATTERN);
-  if (!idMatch?.[1]) return null;
-  const parsed = Number.parseInt(idMatch[1], 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 const isTaskSuccessful = (modeData: UserProgressData, taskId: string): boolean => {
   const flags = getCompletionFlags(modeData.taskCompletions?.[taskId]);
@@ -250,13 +235,13 @@ export const getNextPrestigeLevel = (level: number): number | null => {
   if (currentLevel >= MAX_PRESTIGE_LEVEL) return null;
   return currentLevel + 1;
 };
-export const toSafeInteger = (value: unknown, fallback = 0): number => {
+const toSafeInteger = (value: unknown, fallback = 0): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return fallback;
   }
   return Math.trunc(value);
 };
-export const collectTimestamp = (timestamps: number[], value: number | undefined) => {
+const collectTimestamp = (timestamps: number[], value: number | undefined) => {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
     timestamps.push(Math.trunc(value));
   }
@@ -357,13 +342,13 @@ export const buildPrestigeRequirementRows = (
   const prestige = options.prestigeLevels.find(
     (entry) => entry.prestigeLevel === targetPrestigeLevel
   );
-  const skillLevels = buildModeSkillLevels(options.pvpProgress, options.tasks);
+  const skillLevels = buildModeSkillLevels(options.modeProgress, options.tasks);
   const stationLevels = buildHideoutStationLevels(
     options.hideoutStations,
-    options.pvpProgress.hideoutModules,
+    options.modeProgress.hideoutModules,
     options.edition
   );
-  const currentPlayerLevel = options.pvpProgress.level ?? 1;
+  const currentPlayerLevel = options.modeProgress.level ?? 1;
   const rows: PrestigeRequirementRow[] = [];
   const rowIds = new Set<string>();
   let hasNewBeginningRequirement = false;
@@ -417,7 +402,7 @@ export const buildPrestigeRequirementRows = (
         hasNewBeginningRequirement = true;
       }
       pushRow({
-        currentValue: isTaskSuccessful(options.pvpProgress, condition.task.id)
+        currentValue: isTaskSuccessful(options.modeProgress, condition.task.id)
           ? 'complete'
           : 'incomplete',
         href: condition.task.wikiLink,
@@ -425,7 +410,7 @@ export const buildPrestigeRequirementRows = (
         kind: 'task',
         name: taskName,
         source: 'tarkov.dev',
-        status: isTaskSuccessful(options.pvpProgress, condition.task.id) ? 'met' : 'unmet',
+        status: isTaskSuccessful(options.modeProgress, condition.task.id) ? 'met' : 'unmet',
         targetPrestige: targetPrestigeLevel,
         taskRole,
         tracked: true,
@@ -507,7 +492,7 @@ export const buildPrestigeRequirementRows = (
     const newBeginningTask = findNewBeginningTaskForPrestige(options.tasks, targetPrestigeLevel);
     if (newBeginningTask) {
       pushRow({
-        currentValue: isTaskSuccessful(options.pvpProgress, newBeginningTask.id)
+        currentValue: isTaskSuccessful(options.modeProgress, newBeginningTask.id)
           ? 'complete'
           : 'incomplete',
         href: newBeginningTask.wikiLink,
@@ -515,7 +500,7 @@ export const buildPrestigeRequirementRows = (
         kind: 'task',
         name: newBeginningTask.name || 'New Beginning',
         source: 'overlay',
-        status: isTaskSuccessful(options.pvpProgress, newBeginningTask.id) ? 'met' : 'unmet',
+        status: isTaskSuccessful(options.modeProgress, newBeginningTask.id) ? 'met' : 'unmet',
         targetPrestige: targetPrestigeLevel,
         taskRole: 'newBeginning',
         tracked: true,
@@ -526,7 +511,7 @@ export const buildPrestigeRequirementRows = (
     const storyChapter = findStoryChapterByName(options.storyChapters, chapterName);
     const chapterId = storyChapter?.id || chapterName.toLowerCase().replace(/\s+/g, '-');
     const isComplete = storyChapter
-      ? options.pvpProgress.storyChapters?.[storyChapter.id]?.complete === true
+      ? options.modeProgress.storyChapters?.[storyChapter.id]?.complete === true
       : false;
     pushRow({
       currentValue: isComplete ? 'complete' : 'incomplete',
@@ -579,7 +564,7 @@ export const summarizePrestigeRequirementRows = (
     unmetTrackedCount,
   };
 };
-export const parsePrestigeSummary = (value: unknown): PrestigeRunSummary => {
+const parsePrestigeSummary = (value: unknown): PrestigeRunSummary => {
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const toCount = (input: unknown): number => Math.max(0, toSafeInteger(input, 0));
   const toNullableTimestamp = (input: unknown): number | null => {
@@ -607,7 +592,9 @@ export const parsePrestigeRunRows = (
   const parsed: PrestigeRunRecord[] = [];
   for (const row of rows) {
     if (!row || typeof row.id !== 'string' || !row.id) continue;
-    const mode = row.mode === 'pve' ? 'pve' : 'pvp';
+    const mode = Object.values(GAME_MODES).includes(row.mode as GameMode)
+      ? (row.mode as GameMode)
+      : GAME_MODES.PVP;
     const createdAt =
       typeof row.created_at === 'string' ? row.created_at : new Date().toISOString();
     const prestigeFrom = clampPrestigeLevel(toSafeInteger(row.prestige_from, 0));
