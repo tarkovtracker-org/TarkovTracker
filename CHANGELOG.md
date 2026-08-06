@@ -1,3 +1,10 @@
+## [1.63.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.0...v1.63.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **api:** move the seasonal progress backfill out of the schema migration ([#649](https://github.com/tarkovtracker-org/TarkovTracker/issues/649)) ([02e019a](https://github.com/tarkovtracker-org/TarkovTracker/commit/02e019ae055a9bc397df3efc7292ba1a65045ded)), closes [#641](https://github.com/tarkovtracker-org/TarkovTracker/issues/641)
+
 # [1.63.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.3...v1.63.0) (2026-08-06)
 
 
