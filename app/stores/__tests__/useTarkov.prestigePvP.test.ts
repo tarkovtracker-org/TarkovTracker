@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const { rpc, supabaseContext } = vi.hoisted(() => {
   const rpc = vi.fn(async (): Promise<{ data: null; error: { message: string } | null }> => ({
     data: null,
@@ -140,5 +141,68 @@ describe('useTarkov prestigePvP', () => {
     expect(store.pvp.prestigeLevel).toBe(2);
     expect(store.pve.level).toBe(27);
     expect(store.pve.progressEpoch).toBe(8);
+  });
+});
+describe('useTarkov prestigeMode seasonal', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    rpc.mockResolvedValue({ data: null, error: null });
+  });
+  const seedModes = () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.currentGameMode = 'seasonal';
+      state.gameEdition = 3;
+      state.pvp = { ...state.pvp, level: 42, progressEpoch: 7 };
+      state.pve = { ...state.pve, level: 9, progressEpoch: 4 };
+      state.seasonal = {
+        ...state.seasonal,
+        level: 30,
+        prestigeLevel: 1,
+        progressEpoch: 2,
+        taskCompletions: { 'task-s': { complete: true, failed: false, timestamp: 1000 } },
+      };
+    });
+    return store;
+  };
+  it('sends the active season so the archive RPC resets the seasonal row', async () => {
+    const store = seedModes();
+    await store.prestigeMode('seasonal');
+    expect(rpc).toHaveBeenCalledWith(
+      'archive_prestige_run_and_reset_progress',
+      expect.objectContaining({
+        p_mode: 'seasonal',
+        p_season_number: ACTIVE_SEASON_NUMBER,
+        p_prestige_from: 1,
+        p_prestige_to: 2,
+        p_archived_progress: expect.objectContaining({ level: 30, prestigeLevel: 1 }),
+        p_seasonal_data: expect.objectContaining({
+          level: 1,
+          prestigeLevel: 2,
+          progressEpoch: 3,
+        }),
+      })
+    );
+    expect(store.seasonal.level).toBe(1);
+    expect(store.seasonal.prestigeLevel).toBe(2);
+    expect(store.seasonal.taskCompletions).toEqual({});
+    expect(store.pvp.level).toBe(42);
+    expect(store.pve.level).toBe(9);
+  });
+  it('sends season 0 for a PvP prestige and leaves seasonal progress alone', async () => {
+    const store = seedModes();
+    await store.prestigeMode('pvp');
+    expect(rpc).toHaveBeenCalledWith(
+      'archive_prestige_run_and_reset_progress',
+      expect.objectContaining({
+        p_mode: 'pvp',
+        p_season_number: 0,
+        p_seasonal_data: expect.objectContaining({ level: 30, prestigeLevel: 1 }),
+      })
+    );
+    expect(store.seasonal.level).toBe(30);
+    expect(store.seasonal.prestigeLevel).toBe(1);
+    expect(store.pve.level).toBe(9);
   });
 });

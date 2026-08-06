@@ -176,6 +176,7 @@ describe('ResetProgressSection', () => {
     expect(resetSeasonalDataMock).toHaveBeenCalledTimes(1);
     expect(resetPvPDataMock).not.toHaveBeenCalled();
     expect(resetPvEDataMock).not.toHaveBeenCalled();
+    expect(resetAllDataMock).not.toHaveBeenCalled();
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'success',
