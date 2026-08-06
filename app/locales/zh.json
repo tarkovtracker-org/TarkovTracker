@@ -220,6 +220,10 @@
     "complete": "Complete",
     "pvp": "PvP",
     "pve": "PvE",
+    "seasonal_pvp": "季节性PvP",
+    "pvp_description": "玩家对玩家(Standard)",
+    "pve_description": "玩家与环境(合作)",
+    "seasonal_pvp_description": "Season {season}",
     "retry": "重试",
     "open_tasks": "打开的任务",
     "view_on_tarkov_dev": "在 Tarkov.dev 上查看",
@@ -307,6 +311,7 @@
     "game_edition": "游戏版",
     "reset_pvp_data": "重置 PvP 数据",
     "reset_pve_data": "重置PvE数据",
+    "reset_seasonal_data": "重置季节性PvP数据",
     "reset_all_data": "重置所有数据",
     "import_failed": "导入失败",
     "delete_archived_run": "删除已存档的运行",
@@ -1180,6 +1185,9 @@
           "create_team_error_ui_update": "队伍状态未刷新，可刷新页面重试",
           "leave_team_success": "已成功退出队伍",
           "leave_team_error": "退出队伍失败",
+          "already_in_team": "You are already in a {mode} team. Leave your current team first.",
+          "url_copied": "URL 已复制到剪贴板",
+          "copy_url_failed": "复制URL到剪贴板失败",
           "no_team": "你当前未加入任何队伍",
           "team_invite_url_label": "队伍邀请链接",
           "copy_link": "复制",
@@ -1526,13 +1534,18 @@
     "xp_settings_link": "View XP and level settings"
   },
   "profile": {
-    "title_with_mode": "{name} 个人资料 {mode}"
+    "title_with_mode": "{name} 个人资料 {mode}",
+    "mode_pvp": "PVP",
+    "mode_pve": "PVE",
+    "mode_seasonal_pvp": "SEASONAL PVP",
+    "season_short": "S{season}"
   },
   "streamer_tools": {
     "subtitle": "为 OBS、Streamlabs Desktop、XSplit 和 vMix 生成浏览器源链接，实时显示 Kappa 进度。",
     "manage_sharing": "管理共享",
     "login_required": "登录以生成个性化的主播叠加层链接。",
     "mode_private": "此游戏模式为私密。需启用公开共享才能使浏览器源链接正常工作。",
+    "visibility_load_failed": "无法加载共享设置。",
     "open_account_settings": "打开账户设置",
     "content_title": "内容",
     "mode_label": "游戏模式",
@@ -1737,10 +1750,10 @@
       "description": "控制哪些游戏模式的个人资料可以通过分享链接查看。",
       "public": "公开",
       "private": "私密",
-      "toggle_pvp_label": "Toggle PvP profile sharing",
-      "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_pvp_link": "Copy PvP profile link",
-      "copy_pve_link": "Copy PvE profile link",
+      "toggle_label": "Toggle {mode} profile sharing",
+      "copy_link": "Copy {mode} profile link",
+      "load_failed": "无法加载共享设置。",
+      "save_failed": "无法更新共享设置。",
       "login_required": "登录以管理个人资料分享的可见性。"
     },
     "game_settings": {
@@ -1752,9 +1765,11 @@
       "reset_pvp_warning": "这将永久删除你的 PvP 进度，包括任务、藏身处和等级。你的 PvE 数据不会受到影响。",
       "reset_pve_confirmation": "确定要重置你的 PvE 进度吗？",
       "reset_pve_warning": "这将永久删除你的 PvE 进度，包括任务、藏身处和等级。你的 PvP 数据不会受到影响。",
+      "reset_seasonal_confirmation": "您确定要重置您的季节性PvP进度吗？",
+      "reset_seasonal_warning": "这将永久删除活动季节的所有季节性PvP进度。您的持续PvP和PvE数据不会受到影响。",
       "reset_all_confirmation": "确定要重置你的全部进度吗？",
       "reset_all_warning": "这将永久删除 PvP 和 PvE 模式的全部进度。此操作无法撤销！",
-      "prestige_pvp_warning": "当前 PvP 周目将先归档，然后重置 PvP 进度并进入下一声望等级。PvE 数据不受影响。",
+      "prestige_mode_warning": "Your current {mode} run will be archived, then its progression will reset for the next prestige level. Other modes are not affected.",
       "reset_confirm": "重置数据",
       "export_description": "下载 PvP 和 PvE 模式的进度备份。",
       "export_button": "导出进度备份",
@@ -1781,12 +1796,17 @@
       "import_preview_pvp_tasks": "PvP 任务",
       "import_preview_pve_level": "PvE 等级",
       "import_preview_pve_tasks": "PvE 任务",
+      "import_preview_seasonal_level": "季节性PvP级别",
+      "import_preview_seasonal_tasks": "季节性PvP任务",
       "import_target_label": "导入目标",
       "import_target_pvp": "仅 PvP",
       "import_target_pve": "仅 PvE",
-      "import_target_both": "PvP 和 PvE",
+      "import_target_all": "所有可用",
+      "seasonal_import_locked": "Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.",
       "import_success_title": "备份已导入",
       "import_success_description": "您的进度数据已成功恢复。",
+      "import_error_title": "备份导入失败",
+      "import_error_description": "无法导入您的备份。请重试。",
       "export_error_title": "导出失败",
       "debug_export_error_title": "调试导出失败",
       "reset_title": "重置进度",
@@ -1822,6 +1842,11 @@
       "success_title": "PvE 数据复位",
       "success_description": "您的 PvE 进度已成功重置。",
       "error_description": "无法重置 PvE 数据。请再试一次。"
+    },
+    "reset_seasonal": {
+      "success_title": "季节性PvP数据重置",
+      "success_description": "您的活动季节进度已成功重置。",
+      "error_description": "重置季节性PvP数据失败。请重试。"
     },
     "reset_all": {
       "success_title": "所有数据重置",
@@ -1893,6 +1918,9 @@
     "prestige": {
       "pvp_only_title": "声望仅适用于 PvP",
       "pvp_only": "请切换到 PvP 模式后再进行 PvP 声望。",
+      "persistent_mode_unsupported_title": "当前无法声望",
+      "persistent_mode_unsupported": "Prestige在持久性PvE模式下不可用。",
+      "seasonal_mode_unsupported": "Prestige在季节性PvP中不可用。",
       "current_level": "当前声望等级",
       "set_current": "设置当前声望",
       "set_current_hint": "如果你已经在游戏内完成声望，只需要让追踪器与之同步，请使用此项。此操作不会重置进度，也不会创建历史记录。",
@@ -1905,10 +1933,10 @@
       "requirements_description": "追踪器正在检查你下一次真正的声望：声望 {level}。",
       "requirements_empty": "该声望等级没有额外的追踪器要求。",
       "archive_title": "归档本轮并开始下一声望",
-      "archive_description": "仅当你现在确实要进行声望时才使用此项。你当前的 PvP 周目将被归档，PvP 进度也会为下一个声望等级重置。",
+      "archive_description_mode": "Use this only when you are actually prestiging now. Your current {mode} run will be archived and its progression will reset for the next prestige level.",
       "archive_cta": "归档本轮并开始声望 {level}",
       "archive_cta_disabled": "当前无法声望",
-      "archive_dialog_title": "归档当前 PvP 周目",
+      "archive_dialog_title_mode": "Archive Current {mode} Run",
       "archive_sync_hint": "如果你只需要让追踪器匹配游戏内已有的声望，请改用上方的“设置当前声望”。",
       "archive_soft_gate_unmet": "仍有 {count} 项已跟踪要求看起来尚未完成。如果只是追踪器缺少上下文，你仍可继续。",
       "archive_soft_gate_manual": "仍有 {count} 项要求需要在游戏内手动确认。",
@@ -2082,6 +2110,8 @@
       "skills_count": "检测到 {count} 个技能",
       "last_refreshed": "Tarkov.dev 数据已更新",
       "last_refreshed_unknown": "未知的",
+      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
+      "cooldown_hint": "Imported recently. You can re-import this profile in about {minutes} min.",
       "turnstile_hint": "完成下面的人类验证以获取您的个人资料。",
       "skills_details_toggle": "查看技能数值",
       "skills_details_skill": "技能",
@@ -2099,7 +2129,10 @@
       "unlink_profile": "取消关联",
       "errors": {
         "unexpected_profile_flow": "获取 Tarkov.dev 资料时出错。请重试。",
+        "cooldown_active": "You imported this profile recently. You can re-import it in about {minutes} min.",
+        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev尚无此个人资料的快照。打开Tarkov.dev上的个人资料页面一次，让它加载，然后再次获取。",
+        "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
         "verification_failed": "人类验证失败。重新加载页面然后重试。",
         "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。"
       }
@@ -2172,7 +2205,10 @@
   },
   "game_settings": {
     "toggle_game_mode_label": "Toggle game mode",
-    "select_faction_label": "Select faction"
+    "select_game_mode_label": "选择游戏模式",
+    "select_faction_label": "Select faction",
+    "season_ends_in": "Season {season} ends in {days}d {hours}h {minutes}m",
+    "season_ended": "Season {season} has ended"
   },
   "oauth": {
     "consent": {
