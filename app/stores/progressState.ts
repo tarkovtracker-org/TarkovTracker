@@ -59,7 +59,7 @@ export const defaultState: UserState = {
   seasonal: structuredClone(defaultProgressData),
   seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
 };
-export function resolveSeasonalProgressForActiveSeason(
+function resolveSeasonalProgressForActiveSeason(
   seasonal: UserProgressData,
   storedSeasonNumber: unknown
 ): { seasonal: UserProgressData; seasonalSeasonNumber: number } {
