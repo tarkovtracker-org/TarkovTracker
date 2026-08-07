@@ -1,10 +1,12 @@
 <template>
-  <UContainer class="px-4 py-8">
-    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header class="flex items-center justify-between">
+  <div class="px-4 py-8">
+    <div class="mx-auto flex w-full max-w-350 flex-col gap-6">
+      <header class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <UIcon name="i-mdi-archive-arrow-up" class="text-primary-400 h-6 w-6" />
-          <h1 class="text-surface-100 text-2xl font-bold">{{ t('page.migrate.title') }}</h1>
+          <UIcon name="i-mdi-archive-arrow-up" class="text-primary-400 h-7 w-7" />
+          <h1 class="text-surface-100 text-2xl font-bold sm:text-3xl">
+            {{ t('page.migrate.title') }}
+          </h1>
         </div>
         <NuxtLink to="/" class="text-surface-400 hover:text-primary-400 transition-colors">
           <UIcon name="i-mdi-arrow-left" class="mr-1 inline h-4 w-4" />
@@ -12,7 +14,7 @@
         </NuxtLink>
       </header>
       <div
-        class="bg-warning-500/10 border-warning-400/20 text-surface-200 flex items-start gap-3 rounded-xl border px-4 py-3 text-base leading-relaxed"
+        class="bg-warning-500/10 border-warning-400/20 text-surface-200 flex items-start gap-3 rounded-xl border px-5 py-4 text-base leading-relaxed"
       >
         <UIcon name="i-mdi-alert-circle-outline" class="text-warning-400 mt-0.5 h-5 w-5 shrink-0" />
         <p>
@@ -26,60 +28,15 @@
         <h2 class="text-primary-300/90 mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
           {{ t('page.migrate.steps_title') }}
         </h2>
-        <ol class="space-y-5">
-          <li
-            v-for="step in steps"
-            :key="step.number"
-            class="bg-surface-900/60 flex items-start gap-4 rounded-2xl border border-white/10 p-5"
-          >
-            <span
-              class="bg-primary-500/20 text-primary-300 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-            >
-              {{ step.number }}
-            </span>
-            <div class="min-w-0 flex-1 space-y-2.5">
-              <div>
-                <h3 class="text-surface-100 text-base font-semibold sm:text-lg">
-                  {{ t(step.titleKey) }}
-                </h3>
-                <p class="text-surface-300 mt-1 text-sm leading-relaxed sm:text-base">
-                  {{ t(step.descriptionKey) }}
-                </p>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <UButton
-                  v-if="step.ctaKey"
-                  size="sm"
-                  :color="step.primary ? 'primary' : 'neutral'"
-                  :variant="step.primary ? 'solid' : 'soft'"
-                  :icon="step.icon"
-                  :to="step.to"
-                  :href="step.href"
-                  :target="step.external ? '_blank' : undefined"
-                  :rel="step.external ? 'noopener noreferrer' : undefined"
-                  trailing-icon="i-mdi-arrow-right"
-                >
-                  {{ t(step.ctaKey) }}
-                </UButton>
-                <UButton
-                  v-if="step.secondaryCtaKey"
-                  size="sm"
-                  color="neutral"
-                  variant="soft"
-                  icon="i-mdi-book-open-variant"
-                  :to="step.secondaryTo"
-                >
-                  {{ t(step.secondaryCtaKey) }}
-                </UButton>
-              </div>
-            </div>
-          </li>
+        <ol class="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+          <MigrateStepCard v-for="step in steps" :key="step.number" :step="step" />
         </ol>
       </section>
     </div>
-  </UContainer>
+  </div>
 </template>
 <script setup lang="ts">
+  import MigrateStepCard from '@/features/migrate/MigrateStepCard.vue';
   definePageMeta({ layout: 'default' });
   const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
