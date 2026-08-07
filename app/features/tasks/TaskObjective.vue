@@ -5,7 +5,7 @@
     :tabindex="isRowInteractive ? 0 : undefined"
     :aria-label="isRowInteractive ? objectiveAriaLabel : undefined"
     :aria-disabled="isRowInteractive ? undefined : true"
-    class="group flex w-full items-start gap-4 rounded-md px-2 py-2 transition-colors"
+    class="group w-full rounded-md px-2 py-2 transition-colors"
     :class="[
       isComplete ? 'bg-success-500/10' : '',
       isRowInteractive
@@ -18,28 +18,22 @@
     @mouseenter="objectiveMouseEnter()"
     @mouseleave="objectiveMouseLeave()"
   >
-    <UIcon
-      :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
-      aria-hidden="true"
-      class="mt-1.5 h-4 w-4 shrink-0"
-      :class="
-        isComplete
-          ? 'text-success-300'
-          : isParentTaskLocked
-            ? 'text-surface-400'
-            : 'text-surface-300 group-hover:text-surface-200'
-      "
-    />
-    <div
-      class="min-w-0 flex-1"
-      :class="hasBuildWeaponItemRows ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'"
-    >
-      <div
-        class="flex flex-wrap items-center gap-2"
-        :class="hasBuildWeaponItemRows ? 'w-full' : 'contents'"
-      >
-        <div class="min-w-0">
-          <div class="text-surface-100 text-sm leading-5">
+    <div v-if="hasBuildWeaponItemRows" class="space-y-2">
+      <div class="grid grid-cols-[16px_1fr] items-start gap-2">
+        <UIcon
+          :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
+          aria-hidden="true"
+          class="mt-0.5 h-4 w-4 shrink-0"
+          :class="
+            isComplete
+              ? 'text-success-300'
+              : isParentTaskLocked
+                ? 'text-surface-400'
+                : 'text-surface-300 group-hover:text-surface-200'
+          "
+        />
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <div class="text-surface-100 min-w-0 text-sm leading-5">
             {{ props.objective?.description }}
             <AppTooltip
               v-if="objectiveModeCountDifference"
@@ -61,82 +55,57 @@
               ({{ t('common.optional') }})
             </span>
           </div>
-          <template v-if="!hasBuildWeaponItemRows">
-            <ObjectiveRequiredItems
-              v-if="objectiveRequiredKeys.length"
-              variant="keys"
-              :required-keys="objectiveRequiredKeys"
-            />
-            <ObjectiveRequiredItems
-              v-if="objectiveEquipment.length"
-              variant="equipment"
-              :equipment="objectiveEquipment"
+          <div class="flex shrink-0 items-center gap-2" @click.stop>
+            <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
+              <button
+                type="button"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
+                :aria-label="t('page.tasks.questcard.jump_to_map')"
+                :disabled="isJumpToMapDisabled"
+                @click.stop="onJumpToMapClick"
+              >
+                <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
+              </button>
+            </AppTooltip>
+            <ObjectiveCountControls
+              v-if="neededCount > 1"
+              :current-count="currentObjectiveCount"
+              :needed-count="neededCount"
+              :disabled="isParentTaskLocked"
+              @decrease="decreaseCount"
+              @increase="increaseCount"
+              @toggle="toggleCount"
+              @set-count="setCount"
             />
             <AppTooltip
-              v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
-              :text="userNeedsTitle"
+              v-else
+              :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
             >
-              <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
+              <button
+                type="button"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+                :aria-label="toggleObjectiveLabel"
+                :aria-pressed="isComplete"
+                :disabled="isParentTaskLocked"
+                :class="
+                  isComplete
+                    ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
+                    : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
+                "
+                @click="toggleObjectiveCompletion()"
+              >
                 <UIcon
-                  name="i-mdi-account-multiple-outline"
+                  :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
                   aria-hidden="true"
-                  class="h-3.5 w-3.5"
+                  class="h-4 w-4"
                 />
-                <span>{{ userNeeds.length }}</span>
-              </div>
+              </button>
             </AppTooltip>
-          </template>
-        </div>
-        <div class="flex shrink-0 items-center gap-2" @click.stop>
-          <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
-            <button
-              type="button"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
-              :aria-label="t('page.tasks.questcard.jump_to_map')"
-              :disabled="isJumpToMapDisabled"
-              @click.stop="onJumpToMapClick"
-            >
-              <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
-            </button>
-          </AppTooltip>
-          <ObjectiveCountControls
-            v-if="neededCount > 1"
-            :current-count="currentObjectiveCount"
-            :needed-count="neededCount"
-            :disabled="isParentTaskLocked"
-            @decrease="decreaseCount"
-            @increase="increaseCount"
-            @toggle="toggleCount"
-            @set-count="setCount"
-          />
-          <AppTooltip
-            v-else
-            :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
-          >
-            <button
-              type="button"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-              :aria-label="toggleObjectiveLabel"
-              :aria-pressed="isComplete"
-              :disabled="isParentTaskLocked"
-              :class="
-                isComplete
-                  ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
-                  : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
-              "
-              @click="toggleObjectiveCompletion()"
-            >
-              <UIcon
-                :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
-                aria-hidden="true"
-                class="h-4 w-4"
-              />
-            </button>
-          </AppTooltip>
+          </div>
         </div>
       </div>
-      <div v-if="hasBuildWeaponItemRows" class="space-y-1.5 pl-6">
+      <div class="space-y-1.5 pl-6">
         <div
           v-for="row in buildWeaponRequiredItems"
           :key="row.progressId"
@@ -168,29 +137,140 @@
           </div>
         </div>
       </div>
-      <template v-if="hasBuildWeaponItemRows">
-        <ObjectiveRequiredItems
-          v-if="objectiveRequiredKeys.length"
-          variant="keys"
-          :required-keys="objectiveRequiredKeys"
-          class="ml-6"
-        />
-        <ObjectiveRequiredItems
-          v-if="objectiveEquipment.length"
-          variant="equipment"
-          :equipment="objectiveEquipment"
-          class="ml-6"
-        />
-        <AppTooltip
-          v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
-          :text="userNeedsTitle"
-        >
-          <div class="text-surface-500 ml-6 inline-flex items-center gap-1 text-[11px]">
-            <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
-            <span>{{ userNeeds.length }}</span>
+      <ObjectiveRequiredItems
+        v-if="objectiveRequiredKeys.length"
+        variant="keys"
+        :required-keys="objectiveRequiredKeys"
+        class="ml-6"
+      />
+      <ObjectiveRequiredItems
+        v-if="objectiveEquipment.length"
+        variant="equipment"
+        :equipment="objectiveEquipment"
+        class="ml-6"
+      />
+      <AppTooltip
+        v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
+        :text="userNeedsTitle"
+      >
+        <div class="text-surface-500 ml-6 inline-flex items-center gap-1 text-[11px]">
+          <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
+          <span>{{ userNeeds.length }}</span>
+        </div>
+      </AppTooltip>
+    </div>
+    <div v-else class="flex w-full items-start gap-4">
+      <UIcon
+        :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
+        aria-hidden="true"
+        class="mt-1.5 h-4 w-4 shrink-0"
+        :class="
+          isComplete
+            ? 'text-success-300'
+            : isParentTaskLocked
+              ? 'text-surface-400'
+              : 'text-surface-300 group-hover:text-surface-200'
+        "
+      />
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div class="contents">
+          <div class="min-w-0">
+            <div class="text-surface-100 text-sm leading-5">
+              {{ props.objective?.description }}
+              <AppTooltip
+                v-if="objectiveModeCountDifference"
+                :text="objectiveModeCountDifferenceText"
+              >
+                <UBadge
+                  variant="soft"
+                  size="xs"
+                  class="ml-1 text-[10px] font-semibold uppercase"
+                  :class="currentModeBadgeClass"
+                >
+                  {{ currentModeBadgeLabel }}
+                </UBadge>
+              </AppTooltip>
+              <span
+                v-if="props.objective.optional"
+                class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
+              >
+                ({{ t('common.optional') }})
+              </span>
+            </div>
+            <ObjectiveRequiredItems
+              v-if="objectiveRequiredKeys.length"
+              variant="keys"
+              :required-keys="objectiveRequiredKeys"
+            />
+            <ObjectiveRequiredItems
+              v-if="objectiveEquipment.length"
+              variant="equipment"
+              :equipment="objectiveEquipment"
+            />
+            <AppTooltip
+              v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
+              :text="userNeedsTitle"
+            >
+              <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
+                <UIcon
+                  name="i-mdi-account-multiple-outline"
+                  aria-hidden="true"
+                  class="h-3.5 w-3.5"
+                />
+                <span>{{ userNeeds.length }}</span>
+              </div>
+            </AppTooltip>
           </div>
-        </AppTooltip>
-      </template>
+          <div class="flex shrink-0 items-center gap-2" @click.stop>
+            <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
+              <button
+                type="button"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
+                :aria-label="t('page.tasks.questcard.jump_to_map')"
+                :disabled="isJumpToMapDisabled"
+                @click.stop="onJumpToMapClick"
+              >
+                <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
+              </button>
+            </AppTooltip>
+            <ObjectiveCountControls
+              v-if="neededCount > 1"
+              :current-count="currentObjectiveCount"
+              :needed-count="neededCount"
+              :disabled="isParentTaskLocked"
+              @decrease="decreaseCount"
+              @increase="increaseCount"
+              @toggle="toggleCount"
+              @set-count="setCount"
+            />
+            <AppTooltip
+              v-else
+              :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
+            >
+              <button
+                type="button"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+                :aria-label="toggleObjectiveLabel"
+                :aria-pressed="isComplete"
+                :disabled="isParentTaskLocked"
+                :class="
+                  isComplete
+                    ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
+                    : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
+                "
+                @click="toggleObjectiveCompletion()"
+              >
+                <UIcon
+                  :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
+                  aria-hidden="true"
+                  class="h-4 w-4"
+                />
+              </button>
+            </AppTooltip>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
