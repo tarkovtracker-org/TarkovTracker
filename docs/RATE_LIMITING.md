@@ -161,7 +161,9 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
 
 **Hygiene**
 
-Expired rows are harmless but accumulate. Safe cleanup:
+Expired rows are harmless but accumulate. The `mutation-rate-limits-cleanup` pg_cron job
+(`supabase/migrations/20260807130000_add_usage_and_rate_limit_retention.sql`) runs this nightly at
+03:30 UTC; run it manually only when investigating an incident:
 
 ```sql
 DELETE FROM public.mutation_rate_limits
@@ -408,8 +410,8 @@ Treat these deliberately; do not “make everything fail open” without underst
 
 | Store                       | Retention guidance                                                                                                                                                                                                                                                          |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mutation_rate_limits`      | Delete rows with `reset_at` older than 1 day periodically                                                                                                                                                                                                                   |
-| `api_usage_daily`           | Keep finite retention (e.g. 90–180 days) for observability                                                                                                                                                                                                                  |
+| `mutation_rate_limits`      | 1 day past `reset_at`, enforced nightly at 03:30 UTC by the `mutation-rate-limits-cleanup` pg_cron job                                                                                                                                                                      |
+| `api_usage_daily`           | 180 days, enforced nightly at 03:15 UTC by the `api-usage-daily-cleanup` pg_cron job                                                                                                                                                                                        |
 | Worker DO state             | Ephemeral keys self-clean via alarms; retained authenticated keys expire by window logic                                                                                                                                                                                    |
 | Legacy burst/IP DO keys     | Removed in the single daily-quota refactor and never re-addressed; gateway-created retained keys did not schedule cleanup alarms, so their finite orphaned state persists until the staged cleanup in [#594](https://github.com/tarkovtracker-org/TarkovTracker/issues/594) |
 | `account_deletion_attempts` | Existing cleanup function / retention policy                                                                                                                                                                                                                                |
