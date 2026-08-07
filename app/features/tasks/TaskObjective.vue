@@ -51,6 +51,38 @@
             ({{ t('common.optional') }})
           </span>
         </div>
+        <div v-if="buildWeaponRequiredItems.length" class="mt-1.5 w-full space-y-1.5">
+          <div
+            v-for="row in buildWeaponRequiredItems"
+            :key="row.progressId"
+            class="flex w-full max-w-full items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
+            :class="[
+              isBuildWeaponRowComplete(row)
+                ? 'border-success-500/50 bg-success-500/10'
+                : 'border-white/10 bg-white/5',
+              isParentTaskLocked ? 'opacity-70' : '',
+            ]"
+            @click.stop
+          >
+            <ObjectiveItemDisplay
+              :primary-item="row.item"
+              :fallback-name="row.item.name || row.item.shortName || t('common.item')"
+              :paused="isParentTaskLocked"
+            />
+            <div class="ml-auto">
+              <ObjectiveCountControls
+                :current-count="getBuildWeaponRowCount(row)"
+                :needed-count="row.neededCount"
+                :is-complete="isBuildWeaponRowComplete(row)"
+                :disabled="isParentTaskLocked"
+                @decrease="decreaseBuildWeaponRowCount(row)"
+                @increase="increaseBuildWeaponRowCount(row)"
+                @toggle="toggleBuildWeaponRowCount(row)"
+                @set-count="(value) => setBuildWeaponRowCount(row, value)"
+              />
+            </div>
+          </div>
+        </div>
         <ObjectiveRequiredItems
           v-if="objectiveRequiredKeys.length"
           variant="keys"
@@ -124,6 +156,7 @@
 </template>
 <script setup lang="ts">
   import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
+  import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import {
     isMapViewKey,
@@ -131,7 +164,11 @@
     trackTaskProgressInteractionKey,
   } from '@/features/tasks/task-context';
   import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
-  import { getObjectiveEquipmentItems } from '@/features/tasks/task-objective-equipment';
+  import {
+    getBuildWeaponRequiredItems,
+    getObjectiveEquipmentItems,
+    type BuildWeaponRequiredItem,
+  } from '@/features/tasks/task-objective-equipment';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -192,6 +229,10 @@
   const objectiveEquipment = computed(() => {
     const obj = fullObjective.value ?? props.objective;
     return getObjectiveEquipmentItems(obj);
+  });
+  const buildWeaponRequiredItems = computed(() => {
+    const obj = fullObjective.value ?? props.objective;
+    return getBuildWeaponRequiredItems(obj);
   });
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
@@ -387,6 +428,61 @@
       tarkovStore.setTaskObjectiveComplete(props.objective.id);
     } else if (clampedCount < requiredCount && isComplete.value) {
       tarkovStore.setTaskObjectiveUncomplete(props.objective.id);
+    }
+    trackDashboardFocusProgress();
+  };
+  const getBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
+    return tarkovStore.getObjectiveCount(row.progressId);
+  };
+  const isBuildWeaponRowComplete = (row: BuildWeaponRequiredItem) => {
+    return tarkovStore.isTaskObjectiveComplete(row.progressId);
+  };
+  const decreaseBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
+    if (isParentTaskLocked.value) return;
+    const currentCount = getBuildWeaponRowCount(row);
+    if (currentCount <= 0) return;
+    const newCount = currentCount - 1;
+    tarkovStore.setObjectiveCount(row.progressId, newCount);
+    if (newCount < row.neededCount && isBuildWeaponRowComplete(row)) {
+      tarkovStore.setTaskObjectiveUncomplete(row.progressId);
+    }
+    trackDashboardFocusProgress();
+  };
+  const increaseBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
+    if (isParentTaskLocked.value) return;
+    const currentCount = getBuildWeaponRowCount(row);
+    if (currentCount >= row.neededCount) return;
+    const newCount = currentCount + 1;
+    tarkovStore.setObjectiveCount(row.progressId, newCount);
+    if (newCount >= row.neededCount && !isBuildWeaponRowComplete(row)) {
+      tarkovStore.setTaskObjectiveComplete(row.progressId);
+    }
+    trackDashboardFocusProgress();
+  };
+  const toggleBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
+    if (isParentTaskLocked.value) return;
+    const currentCount = getBuildWeaponRowCount(row);
+    if (currentCount >= row.neededCount) {
+      tarkovStore.setObjectiveCount(row.progressId, Math.max(0, row.neededCount - 1));
+      if (isBuildWeaponRowComplete(row)) {
+        tarkovStore.setTaskObjectiveUncomplete(row.progressId);
+      }
+    } else {
+      tarkovStore.setObjectiveCount(row.progressId, row.neededCount);
+      if (!isBuildWeaponRowComplete(row)) {
+        tarkovStore.setTaskObjectiveComplete(row.progressId);
+      }
+    }
+    trackDashboardFocusProgress();
+  };
+  const setBuildWeaponRowCount = (row: BuildWeaponRequiredItem, newCount: number) => {
+    if (isParentTaskLocked.value) return;
+    const clampedCount = Math.max(0, Math.min(row.neededCount, newCount));
+    tarkovStore.setObjectiveCount(row.progressId, clampedCount);
+    if (clampedCount >= row.neededCount && !isBuildWeaponRowComplete(row)) {
+      tarkovStore.setTaskObjectiveComplete(row.progressId);
+    } else if (clampedCount < row.neededCount && isBuildWeaponRowComplete(row)) {
+      tarkovStore.setTaskObjectiveUncomplete(row.progressId);
     }
     trackDashboardFocusProgress();
   };

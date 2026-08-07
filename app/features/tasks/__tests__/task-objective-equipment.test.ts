@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getBuildWeaponRequiredItems,
   getObjectiveEquipmentItems,
   MAX_RENDERED_OBJECTIVE_ITEMS,
 } from '@/features/tasks/task-objective-equipment';
@@ -128,28 +129,45 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([]);
   });
-  it('includes buildWeapon base item and containsAll mods in all mode', () => {
+  it('includes buildWeapon base item and containsAll mods as required rows', () => {
     const base = createItem('vector-base');
     const rail = createItem('vector-rail');
     const grip = createItem('vector-grip');
-    const equipment = getObjectiveEquipmentItems(
-      createObjective({
-        type: 'buildWeapon',
-        item: base,
-        containsAll: [rail, grip],
-      })
-    );
-    expect(equipment.map((item) => item.id)).toEqual(['vector-base', 'vector-rail', 'vector-grip']);
+    const objective = createObjective({
+      id: 'obj-build',
+      type: 'buildWeapon',
+      item: base,
+      containsAll: [rail, grip],
+    });
+    const rows = getBuildWeaponRequiredItems(objective);
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.progressId)).toEqual([
+      'obj-build',
+      'obj-build:containsAll:vector-rail',
+      'obj-build:containsAll:vector-grip',
+    ]);
+    expect(rows.map((row) => row.item.id)).toEqual(['vector-base', 'vector-rail', 'vector-grip']);
+    expect(rows.every((row) => row.neededCount === 1 || row.progressId === 'obj-build')).toBe(true);
   });
   it('deduplicates buildWeapon base item when it also appears in containsAll', () => {
     const shared = createItem('shared-mod');
-    const equipment = getObjectiveEquipmentItems(
+    const rows = getBuildWeaponRequiredItems(
       createObjective({
         type: 'buildWeapon',
         item: shared,
         containsAll: [shared, createItem('other-mod')],
       })
     );
-    expect(equipment.map((item) => item.id)).toEqual(['shared-mod', 'other-mod']);
+    expect(rows.map((row) => row.item.id)).toEqual(['shared-mod', 'other-mod']);
+  });
+  it('returns an empty list for non-buildWeapon objectives', () => {
+    expect(
+      getBuildWeaponRequiredItems(
+        createObjective({
+          type: 'giveItem',
+          items: [createItem('item-1')],
+        })
+      )
+    ).toEqual([]);
   });
 });
