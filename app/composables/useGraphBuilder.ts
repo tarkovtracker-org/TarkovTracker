@@ -160,10 +160,13 @@ export function useGraphBuilder() {
         // Item requirements
         // Exclude "findItem" and "findQuestItem" objectives as they are passive checks that auto-complete
         // when the player acquires the items for the corresponding "giveItem"/"giveQuestItem" objective
+        if (!objective) return;
+        const isPassiveFindObjective =
+          objective.type === 'findItem' || objective.type === 'findQuestItem';
+        const emittedNeededItemIds = new Set<string>();
         if (
           (objective?.item?.id || objective?.items?.[0]?.id || objective?.markerItem?.id) &&
-          objective.type !== 'findItem' &&
-          objective.type !== 'findQuestItem'
+          !isPassiveFindObjective
         ) {
           // When an objective accepts more than one item (e.g. "hand over any
           // found-in-raid medicine item"), keep the full list so the UI can show
@@ -179,17 +182,38 @@ export function useGraphBuilder() {
           // item; never a sparse/id-less array entry that would break grouping.
           const primaryItem = objective.item ?? validItems[0];
           const acceptedItems = validItems.length > 1 ? validItems : undefined;
+          const neededItem = primaryItem ?? objective.markerItem!;
+          if (neededItem?.id) {
+            emittedNeededItemIds.add(neededItem.id);
+          }
           tempNeededObjectives.push({
             id: objective.id,
             needType: 'taskObjective',
             taskId: task.id,
             type: objective.type,
-            item: primaryItem ?? objective.markerItem!,
+            item: neededItem,
             markerItem: objective.markerItem,
             count: objective.count ?? 1,
             foundInRaid: objective.foundInRaid ?? false,
             ...(acceptedItems ? { acceptedItems } : {}),
           });
+        }
+        if (!isPassiveFindObjective && Array.isArray(objective.containsAll)) {
+          for (const containedItem of objective.containsAll) {
+            if (!containedItem?.id || emittedNeededItemIds.has(containedItem.id)) {
+              continue;
+            }
+            emittedNeededItemIds.add(containedItem.id);
+            tempNeededObjectives.push({
+              id: `${objective.id}:containsAll:${containedItem.id}`,
+              needType: 'taskObjective',
+              taskId: task.id,
+              type: objective.type,
+              item: containedItem,
+              count: 1,
+              foundInRaid: objective.foundInRaid ?? false,
+            });
+          }
         }
       });
       // Process fail conditions for alternative tasks (complete-status triggers)

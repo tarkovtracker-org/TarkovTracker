@@ -17,6 +17,12 @@ export const getObjectiveEquipmentItems = (
     items.push(objective.questItem);
   }
   if (mode === 'all') {
+    if (objective.type === 'buildWeapon' && objective.item?.id) {
+      items.push(objective.item);
+    }
+    if (objective.containsAll?.length) {
+      items.push(...objective.containsAll);
+    }
     if (objective.useAny?.length) {
       items.push(...objective.useAny.slice(0, MAX_RENDERED_OBJECTIVE_ITEMS));
     }

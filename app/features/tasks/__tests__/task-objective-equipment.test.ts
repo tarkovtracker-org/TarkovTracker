@@ -128,4 +128,28 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([]);
   });
+  it('includes buildWeapon base item and containsAll mods in all mode', () => {
+    const base = createItem('vector-base');
+    const rail = createItem('vector-rail');
+    const grip = createItem('vector-grip');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'buildWeapon',
+        item: base,
+        containsAll: [rail, grip],
+      })
+    );
+    expect(equipment.map((item) => item.id)).toEqual(['vector-base', 'vector-rail', 'vector-grip']);
+  });
+  it('deduplicates buildWeapon base item when it also appears in containsAll', () => {
+    const shared = createItem('shared-mod');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'buildWeapon',
+        item: shared,
+        containsAll: [shared, createItem('other-mod')],
+      })
+    );
+    expect(equipment.map((item) => item.id)).toEqual(['shared-mod', 'other-mod']);
+  });
 });

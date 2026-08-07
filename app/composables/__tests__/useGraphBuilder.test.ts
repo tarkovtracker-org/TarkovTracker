@@ -231,3 +231,80 @@ describe('useGraphBuilder needed item accepted items', () => {
     expect(need?.acceptedItems).toBeUndefined();
   });
 });
+describe('useGraphBuilder buildWeapon containsAll', () => {
+  it('emits needed items for each containsAll mod on buildWeapon objectives', () => {
+    const task: Task = {
+      id: 'gunsmith-part-11',
+      name: 'Gunsmith - Part 11',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-build',
+          type: 'buildWeapon',
+          count: 1,
+          item: { id: 'vector-base', name: 'KRISS Vector 9x19' },
+          containsAll: [
+            { id: 'vector-rail', name: 'KRISS Vector Mk.5 modular rail' },
+            { id: 'vector-grip', name: 'Tactical Dynamics Skeletonized Foregrip' },
+          ],
+        },
+      ],
+      taskRequirements: [],
+    };
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const needs = result.neededItemTaskObjectives;
+    expect(needs).toHaveLength(3);
+    expect(needs.find((need) => need.id === 'obj-build')?.item?.id).toBe('vector-base');
+    expect(needs.find((need) => need.id === 'obj-build:containsAll:vector-rail')?.item?.id).toBe(
+      'vector-rail'
+    );
+    expect(needs.find((need) => need.id === 'obj-build:containsAll:vector-grip')?.item?.id).toBe(
+      'vector-grip'
+    );
+    expect(needs.find((need) => need.id === 'obj-build:containsAll:vector-rail')?.count).toBe(1);
+  });
+  it('skips containsAll entries that duplicate the primary needed item', () => {
+    const shared = { id: 'shared-mod', name: 'Shared mod' };
+    const task: Task = {
+      id: 'gunsmith-dedup',
+      name: 'Gunsmith Dedup',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-build',
+          type: 'buildWeapon',
+          item: shared,
+          containsAll: [shared, { id: 'other-mod', name: 'Other mod' }],
+        },
+      ],
+      taskRequirements: [],
+    };
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const needs = result.neededItemTaskObjectives;
+    expect(needs).toHaveLength(2);
+    expect(needs.map((need) => need.item.id)).toEqual(['shared-mod', 'other-mod']);
+  });
+  it('filters invalid containsAll entries', () => {
+    const task: Task = {
+      id: 'gunsmith-sparse',
+      name: 'Gunsmith Sparse',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-build',
+          type: 'buildWeapon',
+          containsAll: [null, { name: 'Missing id mod' }, { id: 'valid-mod', name: 'Valid mod' }],
+        },
+      ],
+      taskRequirements: [],
+    } as unknown as Task;
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const needs = result.neededItemTaskObjectives;
+    expect(needs).toHaveLength(1);
+    expect(needs[0]?.id).toBe('obj-build:containsAll:valid-mod');
+    expect(needs[0]?.item?.id).toBe('valid-mod');
+  });
+});
