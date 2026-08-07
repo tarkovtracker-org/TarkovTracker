@@ -5,6 +5,8 @@ export type BuildWeaponRequiredItem = {
   item: TarkovItem;
   neededCount: number;
 };
+export const getBuildWeaponItemProgressId = (objectiveId: string, itemId: string): string =>
+  `${objectiveId}:item:${itemId}`;
 export const getBuildWeaponRequiredItems = (
   objective: TaskObjective
 ): BuildWeaponRequiredItem[] => {
@@ -14,7 +16,7 @@ export const getBuildWeaponRequiredItems = (
   if (objective.item?.id) {
     seenItemIds.add(objective.item.id);
     rows.push({
-      progressId: objective.id,
+      progressId: getBuildWeaponItemProgressId(objective.id, objective.item.id),
       item: objective.item,
       neededCount: objective.count ?? 1,
     });

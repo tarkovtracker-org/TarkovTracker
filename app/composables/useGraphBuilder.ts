@@ -1,3 +1,4 @@
+import { getBuildWeaponItemProgressId } from '@/features/tasks/task-objective-equipment';
 import {
   createGraph,
   type TaskGraph,
@@ -186,8 +187,12 @@ export function useGraphBuilder() {
           if (neededItem?.id) {
             emittedNeededItemIds.add(neededItem.id);
           }
+          const neededItemProgressId =
+            objective.type === 'buildWeapon' && neededItem?.id
+              ? getBuildWeaponItemProgressId(objective.id, neededItem.id)
+              : objective.id;
           tempNeededObjectives.push({
-            id: objective.id,
+            id: neededItemProgressId,
             needType: 'taskObjective',
             taskId: task.id,
             type: objective.type,

@@ -34,8 +34,11 @@
       class="min-w-0 flex-1"
       :class="hasBuildWeaponItemRows ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'"
     >
-      <div class="flex gap-2" :class="hasBuildWeaponItemRows ? 'w-full items-start' : 'contents'">
-        <div class="min-w-0" :class="hasBuildWeaponItemRows ? 'flex-1' : ''">
+      <div
+        class="flex flex-wrap items-center gap-2"
+        :class="hasBuildWeaponItemRows ? 'w-full' : 'contents'"
+      >
+        <div class="min-w-0">
           <div class="text-surface-100 text-sm leading-5">
             {{ props.objective?.description }}
             <AppTooltip

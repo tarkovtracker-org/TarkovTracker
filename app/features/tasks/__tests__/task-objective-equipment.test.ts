@@ -142,12 +142,14 @@ describe('task-objective-equipment', () => {
     const rows = getBuildWeaponRequiredItems(objective);
     expect(rows).toHaveLength(3);
     expect(rows.map((row) => row.progressId)).toEqual([
-      'obj-build',
+      'obj-build:item:vector-base',
       'obj-build:containsAll:vector-rail',
       'obj-build:containsAll:vector-grip',
     ]);
     expect(rows.map((row) => row.item.id)).toEqual(['vector-base', 'vector-rail', 'vector-grip']);
-    expect(rows.every((row) => row.neededCount === 1 || row.progressId === 'obj-build')).toBe(true);
+    expect(rows.find((row) => row.progressId === 'obj-build:item:vector-base')?.neededCount).toBe(
+      1
+    );
   });
   it('deduplicates buildWeapon base item when it also appears in containsAll', () => {
     const shared = createItem('shared-mod');

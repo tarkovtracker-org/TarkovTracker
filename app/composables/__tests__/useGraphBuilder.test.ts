@@ -255,7 +255,9 @@ describe('useGraphBuilder buildWeapon containsAll', () => {
     const result = processTaskData([task]);
     const needs = result.neededItemTaskObjectives;
     expect(needs).toHaveLength(3);
-    expect(needs.find((need) => need.id === 'obj-build')?.item?.id).toBe('vector-base');
+    expect(needs.find((need) => need.id === 'obj-build:item:vector-base')?.item?.id).toBe(
+      'vector-base'
+    );
     expect(needs.find((need) => need.id === 'obj-build:containsAll:vector-rail')?.item?.id).toBe(
       'vector-rail'
     );
