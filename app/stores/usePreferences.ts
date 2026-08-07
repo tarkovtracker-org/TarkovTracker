@@ -416,12 +416,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getStreamerMode(state) {
       return state.streamerMode ?? false;
     },
-    getProfileSharePvpPublic: (state) => {
-      return state.profileSharePvpPublic ?? false;
-    },
-    getProfileSharePvePublic: (state) => {
-      return state.profileSharePvePublic ?? false;
-    },
     teamIsHidden: (state) => {
       return (teamId: string): boolean => {
         // Always show self unless explicitly hidden (though self shouldn't be hidden usually)
@@ -1057,5 +1051,4 @@ export const resetPreferencesStoreForSessionTransition = (
   }
   clearPreferencesStorage();
 };
-export type PreferencesStore = ReturnType<typeof usePreferencesStore>;
 export type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';

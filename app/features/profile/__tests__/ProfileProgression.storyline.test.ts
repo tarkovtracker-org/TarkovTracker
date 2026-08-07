@@ -88,8 +88,6 @@ vi.mock('@/stores/useMetadata', () => ({
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
     getUseAutomaticLevelCalculation: false,
-    getProfileSharePvpPublic: false,
-    getProfileSharePvePublic: false,
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({

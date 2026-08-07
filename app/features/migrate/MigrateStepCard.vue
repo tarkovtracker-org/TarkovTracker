@@ -20,13 +20,13 @@
         <UButton
           v-if="step.ctaKey"
           size="sm"
-          :color="step.primary ? 'primary' : 'neutral'"
-          :variant="step.primary ? 'solid' : 'soft'"
+          :color="buttonColor"
+          :variant="buttonVariant"
           :icon="step.icon"
           :to="step.to"
           :href="step.href"
-          :target="step.external ? '_blank' : undefined"
-          :rel="step.external ? 'noopener noreferrer' : undefined"
+          :target="buttonTarget"
+          :rel="buttonRel"
           trailing-icon="i-mdi-arrow-right"
         >
           {{ t(step.ctaKey) }}
@@ -59,6 +59,10 @@
     secondaryCtaKey?: string;
     secondaryTo?: string;
   }
-  defineProps<{ step: MigrateStep }>();
+  const props = defineProps<{ step: MigrateStep }>();
   const { t } = useI18n({ useScope: 'global' });
+  const buttonColor = computed(() => (props.step.primary ? 'primary' : 'neutral'));
+  const buttonVariant = computed(() => (props.step.primary ? 'solid' : 'soft'));
+  const buttonTarget = computed(() => (props.step.external ? '_blank' : undefined));
+  const buttonRel = computed(() => (props.step.external ? 'noopener noreferrer' : undefined));
 </script>
