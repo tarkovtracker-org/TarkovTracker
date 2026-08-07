@@ -309,4 +309,26 @@ describe('useGraphBuilder buildWeapon containsAll', () => {
     expect(needs[0]?.id).toBe('obj-build:containsAll:valid-mod');
     expect(needs[0]?.item?.id).toBe('valid-mod');
   });
+  it('does not emit containsAll needed items for non-buildWeapon objectives', () => {
+    const task: Task = {
+      id: 'give-item-contains-all',
+      name: 'Give Item Contains All',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-give',
+          type: 'giveItem',
+          item: { id: 'primary-item', name: 'Primary item' },
+          containsAll: [{ id: 'extra-mod', name: 'Extra mod' }],
+        },
+      ],
+      taskRequirements: [],
+    };
+    const { processTaskData } = useGraphBuilder();
+    const result = processTaskData([task]);
+    const needs = result.neededItemTaskObjectives;
+    expect(needs).toHaveLength(1);
+    expect(needs[0]?.id).toBe('obj-give');
+    expect(needs[0]?.item?.id).toBe('primary-item');
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { getBuildWeaponRequiredItems } from '@/features/tasks/task-objective-build-weapon';
 import {
-  getBuildWeaponRequiredItems,
   getObjectiveEquipmentItems,
   MAX_RENDERED_OBJECTIVE_ITEMS,
 } from '@/features/tasks/task-objective-equipment';
@@ -150,6 +150,30 @@ describe('task-objective-equipment', () => {
     expect(rows.find((row) => row.progressId === 'obj-build:item:vector-base')?.neededCount).toBe(
       1
     );
+  });
+  it('uses objective count for the base buildWeapon row', () => {
+    const rows = getBuildWeaponRequiredItems(
+      createObjective({
+        id: 'obj-build',
+        type: 'buildWeapon',
+        count: 2,
+        item: createItem('vector-base'),
+      })
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.neededCount).toBe(2);
+  });
+  it('uses the first valid items entry when objective.item is missing', () => {
+    const base = createItem('vector-base');
+    const rows = getBuildWeaponRequiredItems(
+      createObjective({
+        id: 'obj-build',
+        type: 'buildWeapon',
+        items: [{ name: 'Missing id' } as TarkovItem, base],
+      })
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.progressId).toBe('obj-build:item:vector-base');
   });
   it('deduplicates buildWeapon base item when it also appears in containsAll', () => {
     const shared = createItem('shared-mod');

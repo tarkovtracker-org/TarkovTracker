@@ -18,165 +18,25 @@
     @mouseenter="objectiveMouseEnter()"
     @mouseleave="objectiveMouseLeave()"
   >
-    <div v-if="hasBuildWeaponItemRows" class="space-y-2">
-      <div class="grid grid-cols-[16px_1fr] items-start gap-2">
+    <div :class="hasBuildWeaponItemRows ? 'space-y-2' : undefined">
+      <div class="flex w-full items-start" :class="hasBuildWeaponItemRows ? 'gap-2' : 'gap-4'">
         <UIcon
           :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
           aria-hidden="true"
-          class="mt-0.5 h-4 w-4 shrink-0"
-          :class="
+          class="h-4 w-4 shrink-0"
+          :class="[
+            hasBuildWeaponItemRows ? 'mt-0.5' : 'mt-1.5',
             isComplete
               ? 'text-success-300'
               : isParentTaskLocked
                 ? 'text-surface-400'
-                : 'text-surface-300 group-hover:text-surface-200'
-          "
-        />
-        <div class="flex min-w-0 flex-wrap items-center gap-2">
-          <div class="text-surface-100 min-w-0 text-sm leading-5">
-            {{ props.objective?.description }}
-            <AppTooltip
-              v-if="objectiveModeCountDifference"
-              :text="objectiveModeCountDifferenceText"
-            >
-              <UBadge
-                variant="soft"
-                size="xs"
-                class="ml-1 text-[10px] font-semibold uppercase"
-                :class="currentModeBadgeClass"
-              >
-                {{ currentModeBadgeLabel }}
-              </UBadge>
-            </AppTooltip>
-            <span
-              v-if="props.objective.optional"
-              class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
-            >
-              ({{ t('common.optional') }})
-            </span>
-          </div>
-          <div class="flex shrink-0 items-center gap-2" @click.stop>
-            <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
-              <button
-                type="button"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
-                :aria-label="t('page.tasks.questcard.jump_to_map')"
-                :disabled="isJumpToMapDisabled"
-                @click.stop="onJumpToMapClick"
-              >
-                <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
-              </button>
-            </AppTooltip>
-            <ObjectiveCountControls
-              v-if="neededCount > 1"
-              :current-count="currentObjectiveCount"
-              :needed-count="neededCount"
-              :disabled="isParentTaskLocked"
-              @decrease="decreaseCount"
-              @increase="increaseCount"
-              @toggle="toggleCount"
-              @set-count="setCount"
-            />
-            <AppTooltip
-              v-else
-              :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
-            >
-              <button
-                type="button"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-                :aria-label="toggleObjectiveLabel"
-                :aria-pressed="isComplete"
-                :disabled="isParentTaskLocked"
-                :class="
-                  isComplete
-                    ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
-                    : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
-                "
-                @click="toggleObjectiveCompletion()"
-              >
-                <UIcon
-                  :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
-                  aria-hidden="true"
-                  class="h-4 w-4"
-                />
-              </button>
-            </AppTooltip>
-          </div>
-        </div>
-      </div>
-      <div class="space-y-1.5 pl-6">
-        <div
-          v-for="row in buildWeaponRequiredItems"
-          :key="row.progressId"
-          class="flex w-full max-w-full items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
-          :class="[
-            isBuildWeaponRowComplete(row)
-              ? 'border-success-500/50 bg-success-500/10'
-              : 'border-white/10 bg-white/5',
-            isParentTaskLocked ? 'opacity-70' : '',
+                : 'text-surface-300 group-hover:text-surface-200',
           ]"
-          @click.stop
-        >
-          <ObjectiveItemDisplay
-            :primary-item="row.item"
-            :fallback-name="row.item.name || row.item.shortName || t('common.item')"
-            :paused="isParentTaskLocked"
-          />
-          <div class="ml-auto">
-            <ObjectiveCountControls
-              :current-count="getBuildWeaponRowCount(row)"
-              :needed-count="row.neededCount"
-              :is-complete="isBuildWeaponRowComplete(row)"
-              :disabled="isParentTaskLocked"
-              @decrease="decreaseBuildWeaponRowCount(row)"
-              @increase="increaseBuildWeaponRowCount(row)"
-              @toggle="toggleBuildWeaponRowCount(row)"
-              @set-count="(value) => setBuildWeaponRowCount(row, value)"
-            />
-          </div>
-        </div>
-      </div>
-      <ObjectiveRequiredItems
-        v-if="objectiveRequiredKeys.length"
-        variant="keys"
-        :required-keys="objectiveRequiredKeys"
-        class="ml-6"
-      />
-      <ObjectiveRequiredItems
-        v-if="objectiveEquipment.length"
-        variant="equipment"
-        :equipment="objectiveEquipment"
-        class="ml-6"
-      />
-      <AppTooltip
-        v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
-        :text="userNeedsTitle"
-      >
-        <div class="text-surface-500 ml-6 inline-flex items-center gap-1 text-[11px]">
-          <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
-          <span>{{ userNeeds.length }}</span>
-        </div>
-      </AppTooltip>
-    </div>
-    <div v-else class="flex w-full items-start gap-4">
-      <UIcon
-        :name="objectiveIcon.startsWith('mdi-') ? `i-${objectiveIcon}` : objectiveIcon"
-        aria-hidden="true"
-        class="mt-1.5 h-4 w-4 shrink-0"
-        :class="
-          isComplete
-            ? 'text-success-300'
-            : isParentTaskLocked
-              ? 'text-surface-400'
-              : 'text-surface-300 group-hover:text-surface-200'
-        "
-      />
-      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <div class="contents">
-          <div class="min-w-0">
-            <div class="text-surface-100 text-sm leading-5">
-              {{ props.objective?.description }}
+        />
+        <div class="flex min-w-0 flex-1 flex-col gap-2">
+          <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <div class="text-surface-100 min-w-0 text-sm leading-5">
+              {{ props.objective.description }}
               <AppTooltip
                 v-if="objectiveModeCountDifference"
                 :text="objectiveModeCountDifferenceText"
@@ -197,6 +57,58 @@
                 ({{ t('common.optional') }})
               </span>
             </div>
+            <div class="flex shrink-0 items-center gap-2" @click.stop>
+              <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
+                <button
+                  type="button"
+                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  :class="
+                    isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'
+                  "
+                  :aria-label="t('page.tasks.questcard.jump_to_map')"
+                  :disabled="isJumpToMapDisabled"
+                  @click.stop="onJumpToMapClick"
+                >
+                  <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
+                </button>
+              </AppTooltip>
+              <ObjectiveCountControls
+                v-if="neededCount > 1"
+                :current-count="currentObjectiveCount"
+                :needed-count="neededCount"
+                :disabled="isParentTaskLocked"
+                @decrease="decreaseCount"
+                @increase="increaseCount"
+                @toggle="toggleCount"
+                @set-count="setCount"
+              />
+              <AppTooltip
+                v-else
+                :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
+              >
+                <button
+                  type="button"
+                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+                  :aria-label="toggleObjectiveLabel"
+                  :aria-pressed="isComplete"
+                  :disabled="isParentTaskLocked"
+                  :class="
+                    isComplete
+                      ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
+                      : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
+                  "
+                  @click="toggleObjectiveCompletion()"
+                >
+                  <UIcon
+                    :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
+                    aria-hidden="true"
+                    class="h-4 w-4"
+                  />
+                </button>
+              </AppTooltip>
+            </div>
+          </div>
+          <template v-if="!hasBuildWeaponItemRows">
             <ObjectiveRequiredItems
               v-if="objectiveRequiredKeys.length"
               variant="keys"
@@ -211,7 +123,7 @@
               v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
               :text="userNeedsTitle"
             >
-              <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
+              <div class="text-surface-500 inline-flex items-center gap-1 text-[11px]">
                 <UIcon
                   name="i-mdi-account-multiple-outline"
                   aria-hidden="true"
@@ -220,57 +132,64 @@
                 <span>{{ userNeeds.length }}</span>
               </div>
             </AppTooltip>
-          </div>
-          <div class="flex shrink-0 items-center gap-2" @click.stop>
-            <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
-              <button
-                type="button"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                :class="isJumpToMapDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/10'"
-                :aria-label="t('page.tasks.questcard.jump_to_map')"
-                :disabled="isJumpToMapDisabled"
-                @click.stop="onJumpToMapClick"
-              >
-                <UIcon name="i-mdi-map-marker" aria-hidden="true" class="h-4 w-4" />
-              </button>
-            </AppTooltip>
+          </template>
+        </div>
+      </div>
+      <div v-if="hasBuildWeaponItemRows" class="space-y-1.5 pl-6">
+        <div
+          v-for="row in buildWeaponRequiredItems"
+          :key="row.progressId"
+          class="flex w-full max-w-full items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
+          :class="[
+            isBuildWeaponRowComplete(row)
+              ? 'border-success-500/50 bg-success-500/10'
+              : 'border-white/10 bg-white/5',
+            isParentTaskLocked ? 'opacity-70' : '',
+          ]"
+          @click.stop
+        >
+          <ObjectiveItemDisplay
+            :primary-item="row.item"
+            :fallback-name="row.item.name || row.item.shortName || t('common.item', 'Item')"
+            :paused="isParentTaskLocked"
+          />
+          <div class="ml-auto">
             <ObjectiveCountControls
-              v-if="neededCount > 1"
-              :current-count="currentObjectiveCount"
-              :needed-count="neededCount"
+              :current-count="getBuildWeaponRowCount(row)"
+              :needed-count="row.neededCount"
+              :is-complete="isBuildWeaponRowComplete(row)"
               :disabled="isParentTaskLocked"
-              @decrease="decreaseCount"
-              @increase="increaseCount"
-              @toggle="toggleCount"
-              @set-count="setCount"
+              @decrease="decreaseBuildWeaponRowCount(row)"
+              @increase="increaseBuildWeaponRowCount(row)"
+              @toggle="toggleBuildWeaponRowCount(row)"
+              @set-count="(value) => setBuildWeaponRowCount(row, value)"
             />
-            <AppTooltip
-              v-else
-              :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
-            >
-              <button
-                type="button"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-                :aria-label="toggleObjectiveLabel"
-                :aria-pressed="isComplete"
-                :disabled="isParentTaskLocked"
-                :class="
-                  isComplete
-                    ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white disabled:opacity-60'
-                    : 'text-surface-300 border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60'
-                "
-                @click="toggleObjectiveCompletion()"
-              >
-                <UIcon
-                  :name="isComplete ? 'i-mdi-check' : 'i-mdi-circle-outline'"
-                  aria-hidden="true"
-                  class="h-4 w-4"
-                />
-              </button>
-            </AppTooltip>
           </div>
         </div>
       </div>
+      <template v-if="hasBuildWeaponItemRows">
+        <ObjectiveRequiredItems
+          v-if="objectiveRequiredKeys.length"
+          variant="keys"
+          :required-keys="objectiveRequiredKeys"
+          class="ml-6"
+        />
+        <ObjectiveRequiredItems
+          v-if="objectiveEquipment.length"
+          variant="equipment"
+          :equipment="objectiveEquipment"
+          class="ml-6"
+        />
+        <AppTooltip
+          v-if="userHasTeam && activeUserView === 'all' && userNeeds.length > 0"
+          :text="userNeedsTitle"
+        >
+          <div class="text-surface-500 ml-6 inline-flex items-center gap-1 text-[11px]">
+            <UIcon name="i-mdi-account-multiple-outline" aria-hidden="true" class="h-3.5 w-3.5" />
+            <span>{{ userNeeds.length }}</span>
+          </div>
+        </AppTooltip>
+      </template>
     </div>
   </div>
 </template>
@@ -283,12 +202,12 @@
     jumpToMapObjectiveKey,
     trackTaskProgressInteractionKey,
   } from '@/features/tasks/task-context';
-  import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
   import {
     getBuildWeaponRequiredItems,
-    getObjectiveEquipmentItems,
     type BuildWeaponRequiredItem,
-  } from '@/features/tasks/task-objective-equipment';
+  } from '@/features/tasks/task-objective-build-weapon';
+  import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
+  import { getObjectiveEquipmentItems } from '@/features/tasks/task-objective-equipment';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -303,7 +222,6 @@
   const isMapView = inject(isMapViewKey, FALLBACK_IS_MAP_VIEW_REF);
   const trackTaskProgressInteraction = inject(trackTaskProgressInteractionKey, null);
   const { systemStore } = useSystemStoreWithSupabase();
-  // Define the props for the component
   const props = defineProps<{
     objective: TaskObjective;
   }>();
@@ -313,16 +231,9 @@
   const progressStore = useProgressStore();
   const preferencesStore = usePreferencesStore();
   const activeUserView = computed(() => preferencesStore.getTaskUserView);
-  // Computed property to check if user has a team (for reactivity)
-  const userHasTeam = computed(() => {
-    return !!systemStore.userTeam;
-  });
-  const isComplete = computed(() => {
-    return tarkovStore.isTaskObjectiveComplete(props.objective.id);
-  });
-  const objectiveLabel = computed(() => {
-    return props.objective.description || t('common.objective');
-  });
+  const userHasTeam = computed(() => !!systemStore.userTeam);
+  const isComplete = computed(() => tarkovStore.isTaskObjectiveComplete(props.objective.id));
+  const objectiveLabel = computed(() => props.objective.description || t('common.objective'));
   const toggleObjectiveLabel = computed(() => {
     const actionLabel = isComplete.value
       ? t('page.tasks.questcard.uncomplete')
@@ -339,25 +250,19 @@
       : t('common.complete');
     return `${optionalPrefix}${objectiveLabel.value}. ${status}. ${toggleAction}.`;
   });
-  const fullObjective = computed(() => {
-    return objectives.value.find((o) => o.id == props.objective.id);
-  });
+  const fullObjective = computed(() => objectives.value.find((o) => o.id == props.objective.id));
   const objectiveRequiredKeys = computed(() => {
     const keys = fullObjective.value?.requiredKeys ?? props.objective.requiredKeys;
     return (keys ?? []).filter((group) => group.length > 0);
   });
-  const objectiveEquipment = computed(() => {
-    const obj = fullObjective.value ?? props.objective;
-    return getObjectiveEquipmentItems(obj);
-  });
-  const buildWeaponRequiredItems = computed(() => {
-    const obj = fullObjective.value ?? props.objective;
-    return getBuildWeaponRequiredItems(obj);
-  });
+  const objectiveEquipment = computed(() =>
+    getObjectiveEquipmentItems(fullObjective.value ?? props.objective)
+  );
+  const buildWeaponRequiredItems = computed(() =>
+    getBuildWeaponRequiredItems(fullObjective.value ?? props.objective)
+  );
   const hasBuildWeaponItemRows = computed(() => buildWeaponRequiredItems.value.length > 0);
-  const parentTaskId = computed(() => {
-    return fullObjective.value?.taskId ?? props.objective.taskId;
-  });
+  const parentTaskId = computed(() => fullObjective.value?.taskId ?? props.objective.taskId);
   const isParentTaskComplete = computed(() => {
     const taskId = parentTaskId.value;
     if (!taskId) return false;
@@ -368,17 +273,13 @@
     if (!taskId) return false;
     return tarkovStore.isTaskFailed(taskId);
   });
-  const isParentTaskLocked = computed(() => {
-    return isParentTaskComplete.value || isParentTaskFailed.value;
-  });
+  const isParentTaskLocked = computed(() => isParentTaskComplete.value || isParentTaskFailed.value);
   const isRowInteractive = computed(
     () => !isParentTaskLocked.value && !hasBuildWeaponItemRows.value
   );
   const userNeeds = computed(() => {
     const needingUsers: string[] = [];
-    if (fullObjective.value == undefined) {
-      return needingUsers;
-    }
+    if (!fullObjective.value) return needingUsers;
     const taskId = fullObjective.value.taskId;
     if (!taskId) return needingUsers;
     const unlocked = progressStore.unlockedTasks[taskId];
@@ -393,16 +294,15 @@
     });
     return needingUsers;
   });
-  const userNeedsTitle = computed(() => {
-    return userNeeds.value
+  const userNeedsTitle = computed(() =>
+    userNeeds.value
       .map((id) => progressStore.getDisplayName(id))
       .filter((name): name is string => typeof name === 'string' && name.length > 0)
-      .join(', ');
-  });
+      .join(', ')
+  );
   const isHovered = ref(false);
   const objectiveMouseEnter = () => {
-    if (isParentTaskLocked.value) return;
-    isHovered.value = true;
+    if (!isParentTaskLocked.value) isHovered.value = true;
   };
   const objectiveMouseLeave = () => {
     isHovered.value = false;
@@ -481,132 +381,77 @@
     tarkovStore.toggleTaskObjectiveComplete(props.objective.id);
     trackDashboardFocusProgress();
   };
-  const currentObjectiveCount = computed(() => {
-    return tarkovStore.getObjectiveCount(props.objective.id);
-  });
-  // Watch for objective completion to auto-complete item collection
+  const currentObjectiveCount = computed(() => tarkovStore.getObjectiveCount(props.objective.id));
   watch(isComplete, (newVal) => {
-    if (newVal) {
-      const requiredCount = neededCount.value;
-      if (requiredCount > 1) {
-        tarkovStore.setObjectiveCount(props.objective.id, requiredCount);
-      }
+    if (newVal && neededCount.value > 1) {
+      tarkovStore.setObjectiveCount(props.objective.id, neededCount.value);
     }
   });
-  const decreaseCount = () => {
+  // fallow-ignore-next-line complexity
+  const applyObjectiveCount = (progressId: string, requiredCount: number, newCount: number) => {
     if (isParentTaskLocked.value) return;
+    const clampedCount = Math.max(0, Math.min(requiredCount, newCount));
+    tarkovStore.setObjectiveCount(progressId, clampedCount);
+    const complete = tarkovStore.isTaskObjectiveComplete(progressId);
+    if (clampedCount >= requiredCount && !complete) {
+      tarkovStore.setTaskObjectiveComplete(progressId);
+    } else if (clampedCount < requiredCount && complete) {
+      tarkovStore.setTaskObjectiveUncomplete(progressId);
+    }
+    trackDashboardFocusProgress();
+  };
+  const decreaseCount = () => {
     const currentCount = currentObjectiveCount.value;
     if (currentCount > 0) {
-      const newCount = currentCount - 1;
-      tarkovStore.setObjectiveCount(props.objective.id, newCount);
-      // If we drop below needed count and objective was complete, uncomplete it
-      const requiredCount = neededCount.value;
-      if (newCount < requiredCount && isComplete.value) {
-        tarkovStore.setTaskObjectiveUncomplete(props.objective.id);
-      }
-      trackDashboardFocusProgress();
+      applyObjectiveCount(props.objective.id, neededCount.value, currentCount - 1);
     }
   };
   const increaseCount = () => {
-    if (isParentTaskLocked.value) return;
     const currentCount = currentObjectiveCount.value;
-    const requiredCount = neededCount.value;
-    if (currentCount < requiredCount) {
-      const newCount = currentCount + 1;
-      tarkovStore.setObjectiveCount(props.objective.id, newCount);
-      if (newCount >= requiredCount && !isComplete.value) {
-        tarkovStore.setTaskObjectiveComplete(props.objective.id);
-      }
-      trackDashboardFocusProgress();
+    if (currentCount < neededCount.value) {
+      applyObjectiveCount(props.objective.id, neededCount.value, currentCount + 1);
     }
   };
   const toggleCount = () => {
-    if (isParentTaskLocked.value) return;
     const currentCount = currentObjectiveCount.value;
     const requiredCount = neededCount.value;
     if (currentCount >= requiredCount) {
-      tarkovStore.setObjectiveCount(props.objective.id, Math.max(0, requiredCount - 1));
-      if (isComplete.value) {
-        tarkovStore.setTaskObjectiveUncomplete(props.objective.id);
-      }
-    } else {
-      tarkovStore.setObjectiveCount(props.objective.id, requiredCount);
-      if (!isComplete.value) {
-        tarkovStore.setTaskObjectiveComplete(props.objective.id);
-      }
+      applyObjectiveCount(props.objective.id, requiredCount, Math.max(0, requiredCount - 1));
+      return;
     }
-    trackDashboardFocusProgress();
+    applyObjectiveCount(props.objective.id, requiredCount, requiredCount);
   };
-  /**
-   * Set count to a specific value (from direct input)
-   */
   const setCount = (newCount: number) => {
-    if (isParentTaskLocked.value) return;
-    const requiredCount = neededCount.value;
-    // Value is already clamped by the component, but ensure it's valid
-    const clampedCount = Math.max(0, Math.min(requiredCount, newCount));
-    tarkovStore.setObjectiveCount(props.objective.id, clampedCount);
-    // Update completion status based on new count
-    if (clampedCount >= requiredCount && !isComplete.value) {
-      tarkovStore.setTaskObjectiveComplete(props.objective.id);
-    } else if (clampedCount < requiredCount && isComplete.value) {
-      tarkovStore.setTaskObjectiveUncomplete(props.objective.id);
-    }
-    trackDashboardFocusProgress();
+    applyObjectiveCount(props.objective.id, neededCount.value, newCount);
   };
-  const getBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
-    return tarkovStore.getObjectiveCount(row.progressId);
-  };
-  const isBuildWeaponRowComplete = (row: BuildWeaponRequiredItem) => {
-    return tarkovStore.isTaskObjectiveComplete(row.progressId);
+  const getBuildWeaponRowCount = (row: BuildWeaponRequiredItem) =>
+    tarkovStore.getObjectiveCount(row.progressId);
+  const isBuildWeaponRowComplete = (row: BuildWeaponRequiredItem) =>
+    tarkovStore.isTaskObjectiveComplete(row.progressId);
+  const applyBuildWeaponRowCount = (row: BuildWeaponRequiredItem, newCount: number) => {
+    applyObjectiveCount(row.progressId, row.neededCount, newCount);
   };
   const decreaseBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
-    if (isParentTaskLocked.value) return;
     const currentCount = getBuildWeaponRowCount(row);
-    if (currentCount <= 0) return;
-    const newCount = currentCount - 1;
-    tarkovStore.setObjectiveCount(row.progressId, newCount);
-    if (newCount < row.neededCount && isBuildWeaponRowComplete(row)) {
-      tarkovStore.setTaskObjectiveUncomplete(row.progressId);
+    if (currentCount > 0) {
+      applyBuildWeaponRowCount(row, currentCount - 1);
     }
-    trackDashboardFocusProgress();
   };
   const increaseBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
-    if (isParentTaskLocked.value) return;
     const currentCount = getBuildWeaponRowCount(row);
-    if (currentCount >= row.neededCount) return;
-    const newCount = currentCount + 1;
-    tarkovStore.setObjectiveCount(row.progressId, newCount);
-    if (newCount >= row.neededCount && !isBuildWeaponRowComplete(row)) {
-      tarkovStore.setTaskObjectiveComplete(row.progressId);
+    if (currentCount < row.neededCount) {
+      applyBuildWeaponRowCount(row, currentCount + 1);
     }
-    trackDashboardFocusProgress();
   };
   const toggleBuildWeaponRowCount = (row: BuildWeaponRequiredItem) => {
-    if (isParentTaskLocked.value) return;
     const currentCount = getBuildWeaponRowCount(row);
     if (currentCount >= row.neededCount) {
-      tarkovStore.setObjectiveCount(row.progressId, Math.max(0, row.neededCount - 1));
-      if (isBuildWeaponRowComplete(row)) {
-        tarkovStore.setTaskObjectiveUncomplete(row.progressId);
-      }
-    } else {
-      tarkovStore.setObjectiveCount(row.progressId, row.neededCount);
-      if (!isBuildWeaponRowComplete(row)) {
-        tarkovStore.setTaskObjectiveComplete(row.progressId);
-      }
+      applyBuildWeaponRowCount(row, Math.max(0, row.neededCount - 1));
+      return;
     }
-    trackDashboardFocusProgress();
+    applyBuildWeaponRowCount(row, row.neededCount);
   };
   const setBuildWeaponRowCount = (row: BuildWeaponRequiredItem, newCount: number) => {
-    if (isParentTaskLocked.value) return;
-    const clampedCount = Math.max(0, Math.min(row.neededCount, newCount));
-    tarkovStore.setObjectiveCount(row.progressId, clampedCount);
-    if (clampedCount >= row.neededCount && !isBuildWeaponRowComplete(row)) {
-      tarkovStore.setTaskObjectiveComplete(row.progressId);
-    } else if (clampedCount < row.neededCount && isBuildWeaponRowComplete(row)) {
-      tarkovStore.setTaskObjectiveUncomplete(row.progressId);
-    }
-    trackDashboardFocusProgress();
+    applyBuildWeaponRowCount(row, newCount);
   };
 </script>
