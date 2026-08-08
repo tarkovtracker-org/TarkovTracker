@@ -116,6 +116,12 @@ When asked to "review for production readiness", "deep review", "is this safe to
 - **No runtime dependency additions** without explaining why existing deps are insufficient.
 - **Game data comes from `json.tarkov.dev` via the `/api/tarkov/*` server proxy.** Do not add usage of the `api.tarkov.dev` GraphQL API. Task objectives and prestige conditions are discriminated by the upstream `type` field; the synthetic `__typename` discriminator was removed — do not reintroduce it.
 - **Do not add new runtime dependencies on Tarkov task `alternatives`.** Upstream removed the field; branch relationships must be compiled from task-status failure conditions. Existing uses remain until the shared progress engine replaces them.
+- **Revoke function EXECUTE from `PUBLIC, anon, authenticated`, never `PUBLIC` alone.** Supabase
+  ships `ALTER DEFAULT PRIVILEGES` on schema `public` that grants `EXECUTE` on every new function to
+  `anon`, `authenticated`, and `service_role`. `REVOKE ALL ON FUNCTION ... FROM PUBLIC` only drops
+  the implicit `PUBLIC` grant and leaves those explicit role grants in place, which trips advisor
+  lint 0028 on `SECURITY DEFINER` functions. Trigger functions and service-role-only helpers must
+  name all three roles. Grant back to `service_role` explicitly when the service role needs it.
 - **Never put a bulk data rewrite in a migration.** The deployment runner applies each migration file
   atomically even when `-- supabase:disable-transaction` is present, so a timeout rolls back the file
   while other deploy targets can still succeed. Ship schema separately, make every read tolerate
