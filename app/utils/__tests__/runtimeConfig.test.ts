@@ -60,6 +60,15 @@ describe('resolveSupabaseRuntimeConfig', () => {
       })
     ).toThrow('[Config] Incomplete Supabase credentials: SUPABASE_*');
   });
+  it('rejects a partial canonical pair before using legacy credentials', () => {
+    expect(() =>
+      resolveSupabaseRuntimeConfig({
+        NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
+        NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+        SUPABASE_URL: 'https://shared.supabase.co',
+      })
+    ).toThrow('[Config] Incomplete Supabase credentials: SUPABASE_*');
+  });
   it('prefers a complete canonical pair over stray legacy values', () => {
     const config = resolveSupabaseRuntimeConfig({
       NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',

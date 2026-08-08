@@ -52,11 +52,13 @@ const buildSupabaseCredentialCandidates = (
 const resolveSupabaseCredentialPair = (
   candidates: SupabaseCredentialCandidate[]
 ): SupabaseCredentialCandidate => {
-  const selected = candidates.find(({ anonKey, url }) => anonKey && url);
-  if (selected) return selected;
-  const partial = candidates.find(({ anonKey, url }) => Boolean(anonKey) !== Boolean(url));
+  const selectedIndex = candidates.findIndex(({ anonKey, url }) => anonKey && url);
+  const selected = candidates[selectedIndex];
+  const partial = candidates
+    .slice(0, selectedIndex === -1 ? candidates.length : selectedIndex)
+    .find(({ anonKey, url }) => Boolean(anonKey) !== Boolean(url));
   if (partial) throw new Error(`[Config] Incomplete Supabase credentials: ${partial.source}`);
-  return { anonKey: '', source: '', url: '' };
+  return selected ?? { anonKey: '', source: '', url: '' };
 };
 export const resolveSupabaseRuntimeConfig = (env: NodeJS.ProcessEnv) => {
   const selected = resolveSupabaseCredentialPair(buildSupabaseCredentialCandidates(env));
