@@ -134,6 +134,7 @@ When asked to "review for production readiness", "deep review", "is this safe to
 Formatting is enforced by Prettier + ESLint (see `.prettierrc`, `eslint.config.mjs`). Key rules:
 
 - 2-space indent, 100-char lines, single quotes, semicolons, trailing commas (es5).
+- `.env.example` files use one-line `# === TITLE` section headers, not full-width `# ===...===` separator blocks. Tokenizers compress runs of repeated characters, so a long separator costs ~2–3 tokens — the same as a short one — and only adds agent token cost. These files are read often by agents; keep headers single-line and token-efficient.
 - Imports: alphabetically sorted, no blank lines between groups, group order: builtin → external → internal → parent → sibling → index → object → type.
 - Avoid unused imports/exports.
 - Keep functions small; prefer early returns. Avoid inline comments unless explaining a non-obvious decision.
@@ -243,13 +244,16 @@ Naming:
 
 ## Environment Variables
 
-- Use one canonical env var name per concept.
-- Use `NUXT_PUBLIC_*` for browser-exposed Nuxt runtime config.
+- Use one canonical env var name per concept. Shared Supabase project settings use `SUPABASE_URL`
+  and `SUPABASE_ANON_KEY` across Nuxt, Pages, Workers, and Edge Functions; do not duplicate them
+  as `NUXT_PUBLIC_SUPABASE_*` values.
+- Use `NUXT_PUBLIC_*` for browser-exposed Nuxt-only runtime config.
 - Use `NUXT_*` for private Nuxt runtime config (server-only).
 - Browser log forwarding is opt-in: keep `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` empty unless the sink is
   external or `/api/logs/client` is protected by an edge rate-limit rule.
 - Use platform-native names for Supabase Edge Functions (`SUPABASE_*`, `STRIPE_*`, `DISCORD_*`).
-- Do not add legacy aliases or fallback chains without explicit approval.
+- Do not add legacy aliases or fallback chains without explicit approval. Existing
+  `NUXT_PUBLIC_SUPABASE_*` and `VITE_SUPABASE_*` fallbacks are migration compatibility only.
 - If an env var is renamed, update source, docs, examples, CI/deploy references, and tests in the same change.
 - See `docs/ARCHITECTURE.md` for the canonical env var map.
 

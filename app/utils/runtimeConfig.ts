@@ -24,32 +24,49 @@ const normalizePublicAppUrl = (value: string): string => {
   }
   return `https://${trimmed}`;
 };
+type SupabaseCredentialCandidate = { anonKey: string; source: string; url: string };
+const buildSupabaseCredentialCandidate = (
+  anonKey: string | undefined,
+  source: string,
+  url: string | undefined
+): SupabaseCredentialCandidate => ({
+  anonKey: anonKey?.trim() || '',
+  source,
+  url: url?.trim() || '',
+});
+const buildSupabaseCredentialCandidates = (
+  env: NodeJS.ProcessEnv
+): SupabaseCredentialCandidate[] => [
+  buildSupabaseCredentialCandidate(env.SUPABASE_ANON_KEY, 'SUPABASE_*', env.SUPABASE_URL),
+  buildSupabaseCredentialCandidate(
+    env.NUXT_PUBLIC_SUPABASE_ANON_KEY,
+    'NUXT_PUBLIC_SUPABASE_*',
+    env.NUXT_PUBLIC_SUPABASE_URL
+  ),
+  buildSupabaseCredentialCandidate(
+    env.VITE_SUPABASE_ANON_KEY,
+    'VITE_SUPABASE_*',
+    env.VITE_SUPABASE_URL
+  ),
+];
+const resolveSupabaseCredentialPair = (
+  candidates: SupabaseCredentialCandidate[]
+): SupabaseCredentialCandidate => {
+  const selectedIndex = candidates.findIndex(({ anonKey, url }) => anonKey && url);
+  const selected = candidates[selectedIndex];
+  const partial = candidates
+    .slice(0, selectedIndex === -1 ? candidates.length : selectedIndex)
+    .find(({ anonKey, url }) => Boolean(anonKey) !== Boolean(url));
+  if (partial) throw new Error(`[Config] Incomplete Supabase credentials: ${partial.source}`);
+  return selected ?? { anonKey: '', source: '', url: '' };
+};
 export const resolveSupabaseRuntimeConfig = (env: NodeJS.ProcessEnv) => {
+  const selected = resolveSupabaseCredentialPair(buildSupabaseCredentialCandidates(env));
   return {
-    privateAnonKey: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_ANON_KEY,
-      env.SUPABASE_ANON_KEY,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_ANON_KEY
-    ),
-    privateUrl: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_URL,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_URL
-    ),
-    publicAnonKey: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_ANON_KEY,
-      env.SUPABASE_ANON_KEY,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_ANON_KEY
-    ),
-    publicUrl: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_URL,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_URL
-    ),
+    privateAnonKey: selected.anonKey,
+    privateUrl: selected.url,
+    publicAnonKey: selected.anonKey,
+    publicUrl: selected.url,
   };
 };
 export const resolvePublicAppUrl = (env: NodeJS.ProcessEnv): string => {

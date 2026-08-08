@@ -11,47 +11,82 @@ import {
   TARKOV_IMAGE_DOMAINS,
 } from '@/utils/runtimeConfig';
 describe('resolveSupabaseRuntimeConfig', () => {
-  it('resolves Supabase env values', () => {
+  it('resolves shared Supabase env values', () => {
     const config = resolveSupabaseRuntimeConfig({
-      SUPABASE_ANON_KEY: 'public-anon-key',
-      SUPABASE_URL: 'https://public.supabase.co',
+      SUPABASE_ANON_KEY: 'shared-anon-key',
+      SUPABASE_URL: 'https://shared.supabase.co',
     });
-    expect(config.privateUrl).toBe('https://public.supabase.co');
-    expect(config.privateAnonKey).toBe('public-anon-key');
-    expect(config.publicUrl).toBe('https://public.supabase.co');
-    expect(config.publicAnonKey).toBe('public-anon-key');
+    expect(config.privateUrl).toBe('https://shared.supabase.co');
+    expect(config.privateAnonKey).toBe('shared-anon-key');
+    expect(config.publicUrl).toBe('https://shared.supabase.co');
+    expect(config.publicAnonKey).toBe('shared-anon-key');
   });
-  it('resolves Supabase env values from canonical names', () => {
+  it('supports legacy Nuxt public names during migration', () => {
     const config = resolveSupabaseRuntimeConfig({
-      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'nuxt-public-anon-key',
-      NUXT_PUBLIC_SUPABASE_URL: 'https://nuxt-public.supabase.co',
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
     });
-    expect(config.privateUrl).toBe('https://nuxt-public.supabase.co');
-    expect(config.privateAnonKey).toBe('nuxt-public-anon-key');
-    expect(config.publicUrl).toBe('https://nuxt-public.supabase.co');
-    expect(config.publicAnonKey).toBe('nuxt-public-anon-key');
+    expect(config.privateUrl).toBe('https://legacy-nuxt.supabase.co');
+    expect(config.privateAnonKey).toBe('legacy-nuxt-anon-key');
+    expect(config.publicUrl).toBe('https://legacy-nuxt.supabase.co');
+    expect(config.publicAnonKey).toBe('legacy-nuxt-anon-key');
   });
-  it('falls back to SUPABASE_URL / SUPABASE_ANON_KEY as platform convenience', () => {
+  it('supports legacy Vite names during migration', () => {
     const config = resolveSupabaseRuntimeConfig({
-      SUPABASE_ANON_KEY: 'platform-anon-key',
-      SUPABASE_URL: 'https://platform.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'legacy-vite-anon-key',
+      VITE_SUPABASE_URL: 'https://legacy-vite.supabase.co',
     });
-    expect(config.privateUrl).toBe('https://platform.supabase.co');
-    expect(config.privateAnonKey).toBe('platform-anon-key');
-    expect(config.publicUrl).toBe('https://platform.supabase.co');
-    expect(config.publicAnonKey).toBe('platform-anon-key');
+    expect(config.privateUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.privateAnonKey).toBe('legacy-vite-anon-key');
+    expect(config.publicUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.publicAnonKey).toBe('legacy-vite-anon-key');
   });
-  it('prefers NUXT_PUBLIC_* over SUPABASE_* for Nuxt runtime config', () => {
+  it('ignores blank higher-priority values when a complete fallback exists', () => {
     const config = resolveSupabaseRuntimeConfig({
-      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'nuxt-anon-key',
-      NUXT_PUBLIC_SUPABASE_URL: 'https://nuxt.supabase.co',
-      SUPABASE_ANON_KEY: 'platform-anon-key',
-      SUPABASE_URL: 'https://platform.supabase.co',
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: ' ',
+      NUXT_PUBLIC_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: 'legacy-vite-anon-key',
+      VITE_SUPABASE_URL: 'https://legacy-vite.supabase.co',
     });
-    expect(config.privateUrl).toBe('https://nuxt.supabase.co');
-    expect(config.privateAnonKey).toBe('nuxt-anon-key');
-    expect(config.publicUrl).toBe('https://nuxt.supabase.co');
-    expect(config.publicAnonKey).toBe('nuxt-anon-key');
+    expect(config.privateUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.privateAnonKey).toBe('legacy-vite-anon-key');
+    expect(config.publicUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.publicAnonKey).toBe('legacy-vite-anon-key');
+  });
+  it('rejects partial credentials when no complete pair exists', () => {
+    expect(() =>
+      resolveSupabaseRuntimeConfig({
+        SUPABASE_ANON_KEY: 'shared-anon-key',
+      })
+    ).toThrow('[Config] Incomplete Supabase credentials: SUPABASE_*');
+  });
+  it('rejects a partial canonical pair before using legacy credentials', () => {
+    expect(() =>
+      resolveSupabaseRuntimeConfig({
+        NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
+        NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+        SUPABASE_URL: 'https://shared.supabase.co',
+      })
+    ).toThrow('[Config] Incomplete Supabase credentials: SUPABASE_*');
+  });
+  it('prefers a complete canonical pair over stray legacy values', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+      SUPABASE_ANON_KEY: 'shared-anon-key',
+      SUPABASE_URL: 'https://shared.supabase.co',
+    });
+    expect(config.publicUrl).toBe('https://shared.supabase.co');
+    expect(config.publicAnonKey).toBe('shared-anon-key');
+  });
+  it('prefers canonical credentials when complete legacy pairs differ', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+      SUPABASE_ANON_KEY: 'shared-anon-key',
+      SUPABASE_URL: 'https://shared.supabase.co',
+    });
+    expect(config.publicUrl).toBe('https://shared.supabase.co');
+    expect(config.publicAnonKey).toBe('shared-anon-key');
   });
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
     expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
@@ -72,8 +107,8 @@ describe('resolvePublicAppUrl', () => {
   it('prefers NUXT_PUBLIC_APP_URL as canonical', () => {
     expect(
       resolvePublicAppUrl({
-        NUXT_PUBLIC_APP_URL: 'https://canonical.example.com',
         APP_URL: 'https://platform.example.com',
+        NUXT_PUBLIC_APP_URL: 'https://canonical.example.com',
       })
     ).toBe('https://canonical.example.com');
   });
