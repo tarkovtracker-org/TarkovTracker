@@ -68,12 +68,13 @@ pnpm install
 pnpm run dev           # http://localhost:3000
 ```
 
-Copy `.env.example` to `.env` and fill in your Supabase values. Without Supabase configured, the
-app runs in offline mode with localStorage only — auth, sync, realtime, and team features are
-unavailable.
+Copy `.env.example` to `.env` and fill in `SUPABASE_URL` and `SUPABASE_ANON_KEY`. These shared
+names are used by Nuxt, Cloudflare Pages/Workers, and Supabase Edge Functions, so the same values do
+not need to be duplicated under `NUXT_PUBLIC_*`. Without Supabase configured, the app runs in
+offline mode with localStorage only — auth, sync, realtime, and team features are unavailable.
 
-> Only `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_ANON_KEY` are required for login/sync.
-> Everything else is optional and documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> `SUPABASE_URL` and `SUPABASE_ANON_KEY` are required for login/sync. Everything else is optional and
+> documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **Tech stack:** Nuxt 4 (SPA, `ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia,
 Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.

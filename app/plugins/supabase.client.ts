@@ -145,13 +145,13 @@ export default defineNuxtPlugin({
         isProduction: import.meta.env.PROD,
       });
       if (!allowOfflineFallback) {
-        logger.error(`${missingConfigMessage}. Set SUPABASE_URL and SUPABASE_ANON_KEY.`);
+        logger.error(`${missingConfigMessage}. Set shared SUPABASE_URL and SUPABASE_ANON_KEY.`);
         throw new Error(missingConfigMessage);
       }
       logger.warn(
         `${missingConfigMessage}. Running in offline mode${
           import.meta.env.PROD ? ' for this preview deployment' : ' for development'
-        }. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable auth and sync.`
+        }. Set shared SUPABASE_URL and SUPABASE_ANON_KEY to enable auth and sync.`
       );
       const stub = buildStub();
       return { provide: { supabase: stub } };
