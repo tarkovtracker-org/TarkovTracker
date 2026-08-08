@@ -1,3 +1,5 @@
+## [1.64.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.0...v1.64.1) (2026-08-08)
+
 # [1.64.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.3...v1.64.0) (2026-08-08)
 
 
