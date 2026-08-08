@@ -101,6 +101,7 @@
     "lint:unused": "knip --reporter compact",
     "postinstall": "nuxt prepare",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
+    "prod-db:test": "vitest run scripts/prod-db.test.mjs",
     "prepare": "husky || true",
     "preview": "nuxt preview",
     "setup": "bash scripts/setup-dev-environment.sh",
@@ -183,6 +184,13 @@
     ],
     "scripts/**/*.json": [
       "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "scripts/**/*.mjs": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "scripts/prod-db": [
       "node scripts/lint-blank-lines.mjs --fix"
     ],
     "supabase/**/*.json": [
