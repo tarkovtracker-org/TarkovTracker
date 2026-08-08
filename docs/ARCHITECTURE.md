@@ -505,14 +505,14 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
 **Build-time / platform:**
 
-| Variable             | Description                                 |
-| -------------------- | ------------------------------------------- |
-| `APP_URL`            | App URL (CF Pages / CI)                     |
-| `CF_PAGES_URL`       | Cloudflare Pages deploy URL                 |
-| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID             |
-| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID                |
-| `GITHUB_TOKEN`       | Deprecated fallback for `NUXT_GITHUB_TOKEN` |
-| `VITE_PERF_DEBUG`    | Client performance timing logs              |
+| Variable             | Description                                  |
+| -------------------- | -------------------------------------------- |
+| `APP_URL`            | Platform/build-time application URL fallback |
+| `CF_PAGES_URL`       | Cloudflare Pages deployment URL fallback     |
+| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID              |
+| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID                 |
+| `GITHUB_TOKEN`       | Deprecated fallback for `NUXT_GITHUB_TOKEN`  |
+| `VITE_PERF_DEBUG`    | Client performance timing logs               |
 
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 

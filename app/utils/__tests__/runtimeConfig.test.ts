@@ -31,17 +31,56 @@ describe('resolveSupabaseRuntimeConfig', () => {
     expect(config.publicUrl).toBe('https://legacy-nuxt.supabase.co');
     expect(config.publicAnonKey).toBe('legacy-nuxt-anon-key');
   });
-  it('prefers shared names over legacy Nuxt public names', () => {
+  it('supports legacy Vite names during migration', () => {
     const config = resolveSupabaseRuntimeConfig({
-      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
-      NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
-      SUPABASE_ANON_KEY: 'shared-anon-key',
-      SUPABASE_URL: 'https://shared.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'legacy-vite-anon-key',
+      VITE_SUPABASE_URL: 'https://legacy-vite.supabase.co',
     });
-    expect(config.privateUrl).toBe('https://shared.supabase.co');
-    expect(config.privateAnonKey).toBe('shared-anon-key');
-    expect(config.publicUrl).toBe('https://shared.supabase.co');
-    expect(config.publicAnonKey).toBe('shared-anon-key');
+    expect(config.privateUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.privateAnonKey).toBe('legacy-vite-anon-key');
+    expect(config.publicUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.publicAnonKey).toBe('legacy-vite-anon-key');
+  });
+  it('ignores blank higher-priority values when a complete fallback exists', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: ' ',
+      NUXT_PUBLIC_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: 'legacy-vite-anon-key',
+      VITE_SUPABASE_URL: 'https://legacy-vite.supabase.co',
+    });
+    expect(config.privateUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.privateAnonKey).toBe('legacy-vite-anon-key');
+    expect(config.publicUrl).toBe('https://legacy-vite.supabase.co');
+    expect(config.publicAnonKey).toBe('legacy-vite-anon-key');
+  });
+  it('rejects partial credential pairs instead of mixing sources', () => {
+    expect(() =>
+      resolveSupabaseRuntimeConfig({
+        SUPABASE_ANON_KEY: 'shared-anon-key',
+        VITE_SUPABASE_ANON_KEY: 'legacy-vite-anon-key',
+        VITE_SUPABASE_URL: 'https://legacy-vite.supabase.co',
+      })
+    ).toThrow('[Config] Incomplete Supabase credentials: SUPABASE_*');
+  });
+  it('accepts matching canonical and legacy credential pairs', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'same-anon-key',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://same.supabase.co',
+      SUPABASE_ANON_KEY: 'same-anon-key',
+      SUPABASE_URL: 'https://same.supabase.co',
+    });
+    expect(config.publicUrl).toBe('https://same.supabase.co');
+    expect(config.publicAnonKey).toBe('same-anon-key');
+  });
+  it('rejects conflicting canonical and legacy credential pairs', () => {
+    expect(() =>
+      resolveSupabaseRuntimeConfig({
+        NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
+        NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+        SUPABASE_ANON_KEY: 'shared-anon-key',
+        SUPABASE_URL: 'https://shared.supabase.co',
+      })
+    ).toThrow('[Config] Conflicting Supabase credentials');
   });
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
     expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
@@ -62,8 +101,8 @@ describe('resolvePublicAppUrl', () => {
   it('prefers NUXT_PUBLIC_APP_URL as canonical', () => {
     expect(
       resolvePublicAppUrl({
-        NUXT_PUBLIC_APP_URL: 'https://canonical.example.com',
         APP_URL: 'https://platform.example.com',
+        NUXT_PUBLIC_APP_URL: 'https://canonical.example.com',
       })
     ).toBe('https://canonical.example.com');
   });

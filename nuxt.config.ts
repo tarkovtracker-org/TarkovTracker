@@ -123,11 +123,7 @@ export default defineNuxtConfig({
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       '',
     supabaseAnonKey: PRIVATE_SUPABASE_ANON_KEY,
-    githubToken:
-      process.env.NUXT_GITHUB_TOKEN ||
-      // deprecated — remove after 2026-09-30
-      process.env.GITHUB_TOKEN ||
-      '',
+    githubToken: process.env.NUXT_GITHUB_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim() || '',
     githubContributorsExclude:
       process.env.NUXT_GITHUB_CONTRIBUTORS_EXCLUDE ||
       // deprecated — remove after 2026-07-31

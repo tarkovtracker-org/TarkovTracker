@@ -24,8 +24,7 @@ export default defineNuxtPlugin({
     const runtimeConfig = useRuntimeConfig();
     const supabaseUrl = String(runtimeConfig.public.supabaseUrl || '').trim();
     const supabaseKey = String(runtimeConfig.public.supabaseAnonKey || '').trim();
-    const missingConfigMessage =
-      '[Supabase] Missing runtimeConfig.public.supabaseUrl or runtimeConfig.public.supabaseAnonKey';
+    const missingConfigMessage = '[Supabase] Missing SUPABASE_URL or SUPABASE_ANON_KEY';
     const buildStubBuilder = () => {
       const result = Promise.resolve({ data: null, error: null });
       const proxy = new Proxy(
@@ -145,13 +144,13 @@ export default defineNuxtPlugin({
         isProduction: import.meta.env.PROD,
       });
       if (!allowOfflineFallback) {
-        logger.error(`${missingConfigMessage}. Set shared SUPABASE_URL and SUPABASE_ANON_KEY.`);
+        logger.error(missingConfigMessage);
         throw new Error(missingConfigMessage);
       }
       logger.warn(
         `${missingConfigMessage}. Running in offline mode${
           import.meta.env.PROD ? ' for this preview deployment' : ' for development'
-        }. Set shared SUPABASE_URL and SUPABASE_ANON_KEY to enable auth and sync.`
+        }. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable auth and sync.`
       );
       const stub = buildStub();
       return { provide: { supabase: stub } };
