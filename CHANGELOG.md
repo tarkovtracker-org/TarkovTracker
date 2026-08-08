@@ -1,3 +1,16 @@
+# [1.64.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.3...v1.64.0) (2026-08-08)
+
+
+### Bug Fixes
+
+* **api:** revoke anon and authenticated EXECUTE on legacy share trigger ([#659](https://github.com/tarkovtracker-org/TarkovTracker/issues/659)) ([4db5e76](https://github.com/tarkovtracker-org/TarkovTracker/commit/4db5e76b1bb75723a4dce64b7cc4d252feeb0235))
+* **api:** stop blocking backfill and support missing mode rows ([a02f81c](https://github.com/tarkovtracker-org/TarkovTracker/commit/a02f81c197c55ce66ea1e9667b148b6221383675))
+
+
+### Features
+
+* **ui:** add GitHub avatar and profile link for Giribaldi_TTV ([ec72b83](https://github.com/tarkovtracker-org/TarkovTracker/commit/ec72b83d2b99d8299a3520564e7619b0151927d0))
+
 ## [1.63.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.2...v1.63.3) (2026-08-06)
 
 
