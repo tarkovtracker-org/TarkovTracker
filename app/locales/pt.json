@@ -132,7 +132,7 @@
     "something_went_wrong": "Something Went Wrong",
     "unexpected_description": "An unexpected error occurred while processing your request.",
     "invalid_host_hint": "This preview host is blocked by API host validation. Add the preview hostname to API_ALLOWED_HOSTS or derive it from CF_PAGES_URL.",
-    "supabase_config_hint": "This deployment is missing public Supabase configuration. Set NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.",
+    "supabase_config_hint": "This deployment is missing public Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.",
     "request_blocked_hint": "A request required to render this page was blocked. Open the technical details and include the failing request URL when reporting the issue."
   },
   "loading_screen": {
