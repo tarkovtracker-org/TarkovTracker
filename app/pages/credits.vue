@@ -218,7 +218,11 @@
         { name: 'Adealia', avatar: githubAvatar('adealia'), link: githubProfile('adealia') },
         { name: 'Dio' },
         { name: 'GanjaManNL' },
-        { name: 'Giribaldi_TTV' },
+        {
+          name: 'Giribaldi_TTV',
+          avatar: githubAvatar('giribaldittv'),
+          link: githubProfile('giribaldittv'),
+        },
         { name: 'LS4Tonio' },
         { name: 'Medivha' },
         { name: 'MrBreachie' },
