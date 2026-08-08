@@ -53,34 +53,31 @@ describe('resolveSupabaseRuntimeConfig', () => {
     expect(config.publicUrl).toBe('https://legacy-vite.supabase.co');
     expect(config.publicAnonKey).toBe('legacy-vite-anon-key');
   });
-  it('rejects partial credential pairs instead of mixing sources', () => {
+  it('rejects partial credentials when no complete pair exists', () => {
     expect(() =>
       resolveSupabaseRuntimeConfig({
         SUPABASE_ANON_KEY: 'shared-anon-key',
-        VITE_SUPABASE_ANON_KEY: 'legacy-vite-anon-key',
-        VITE_SUPABASE_URL: 'https://legacy-vite.supabase.co',
       })
     ).toThrow('[Config] Incomplete Supabase credentials: SUPABASE_*');
   });
-  it('accepts matching canonical and legacy credential pairs', () => {
+  it('prefers a complete canonical pair over stray legacy values', () => {
     const config = resolveSupabaseRuntimeConfig({
-      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'same-anon-key',
-      NUXT_PUBLIC_SUPABASE_URL: 'https://same.supabase.co',
-      SUPABASE_ANON_KEY: 'same-anon-key',
-      SUPABASE_URL: 'https://same.supabase.co',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+      SUPABASE_ANON_KEY: 'shared-anon-key',
+      SUPABASE_URL: 'https://shared.supabase.co',
     });
-    expect(config.publicUrl).toBe('https://same.supabase.co');
-    expect(config.publicAnonKey).toBe('same-anon-key');
+    expect(config.publicUrl).toBe('https://shared.supabase.co');
+    expect(config.publicAnonKey).toBe('shared-anon-key');
   });
-  it('rejects conflicting canonical and legacy credential pairs', () => {
-    expect(() =>
-      resolveSupabaseRuntimeConfig({
-        NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
-        NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
-        SUPABASE_ANON_KEY: 'shared-anon-key',
-        SUPABASE_URL: 'https://shared.supabase.co',
-      })
-    ).toThrow('[Config] Conflicting Supabase credentials');
+  it('prefers canonical credentials when complete legacy pairs differ', () => {
+    const config = resolveSupabaseRuntimeConfig({
+      NUXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-nuxt-anon-key',
+      NUXT_PUBLIC_SUPABASE_URL: 'https://legacy-nuxt.supabase.co',
+      SUPABASE_ANON_KEY: 'shared-anon-key',
+      SUPABASE_URL: 'https://shared.supabase.co',
+    });
+    expect(config.publicUrl).toBe('https://shared.supabase.co');
+    expect(config.publicAnonKey).toBe('shared-anon-key');
   });
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
     expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
