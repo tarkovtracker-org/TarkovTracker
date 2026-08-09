@@ -24,53 +24,21 @@ const normalizePublicAppUrl = (value: string): string => {
   }
   return `https://${trimmed}`;
 };
-type SupabaseCredentialCandidate = { anonKey: string; source: string; url: string };
-const buildSupabaseCredentialCandidate = (
-  anonKey: string | undefined,
-  source: string,
-  url: string | undefined
-): SupabaseCredentialCandidate => ({
-  anonKey: anonKey?.trim() || '',
-  source,
-  url: url?.trim() || '',
-});
-const buildSupabaseCredentialCandidates = (
-  env: NodeJS.ProcessEnv
-): SupabaseCredentialCandidate[] => [
-  buildSupabaseCredentialCandidate(env.SUPABASE_ANON_KEY, 'SUPABASE_*', env.SUPABASE_URL),
-  buildSupabaseCredentialCandidate(
-    env.NUXT_PUBLIC_SUPABASE_ANON_KEY,
-    'NUXT_PUBLIC_SUPABASE_*',
-    env.NUXT_PUBLIC_SUPABASE_URL
-  ),
-  buildSupabaseCredentialCandidate(
-    env.VITE_SUPABASE_ANON_KEY,
-    'VITE_SUPABASE_*',
-    env.VITE_SUPABASE_URL
-  ),
-];
-const resolveSupabaseCredentialPair = (
-  candidates: SupabaseCredentialCandidate[]
-): SupabaseCredentialCandidate => {
-  const selectedIndex = candidates.findIndex(({ anonKey, url }) => anonKey && url);
-  const selected = candidates[selectedIndex];
-  const partial = candidates
-    .slice(0, selectedIndex === -1 ? candidates.length : selectedIndex)
-    .find(({ anonKey, url }) => Boolean(anonKey) !== Boolean(url));
-  if (partial) throw new Error(`[Config] Incomplete Supabase credentials: ${partial.source}`);
-  return selected ?? { anonKey: '', source: '', url: '' };
-};
 export const resolveSupabaseRuntimeConfig = (env: NodeJS.ProcessEnv) => {
-  const selected = resolveSupabaseCredentialPair(buildSupabaseCredentialCandidates(env));
+  const anonKey = env.SUPABASE_ANON_KEY?.trim() || '';
+  const url = env.SUPABASE_URL?.trim() || '';
+  if (Boolean(anonKey) !== Boolean(url)) {
+    throw new Error('[Config] Incomplete Supabase credentials: SUPABASE_*');
+  }
   return {
-    privateAnonKey: selected.anonKey,
-    privateUrl: selected.url,
-    publicAnonKey: selected.anonKey,
-    publicUrl: selected.url,
+    privateAnonKey: anonKey,
+    privateUrl: url,
+    publicAnonKey: anonKey,
+    publicUrl: url,
   };
 };
 export const resolvePublicAppUrl = (env: NodeJS.ProcessEnv): string => {
-  const configuredUrl = resolveEnvValue(env.NUXT_PUBLIC_APP_URL, env.APP_URL, env.CF_PAGES_URL);
+  const configuredUrl = resolveEnvValue(env.APP_URL, env.CF_PAGES_URL);
   if (!configuredUrl) {
     return 'http://localhost:3000';
   }

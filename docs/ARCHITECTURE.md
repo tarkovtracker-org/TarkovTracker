@@ -440,9 +440,8 @@ runtime config (server-only), `NUXT_PUBLIC_*` for Nuxt public runtime config (br
 plain names for platform/build-time or Supabase Edge Function settings.
 
 `SUPABASE_URL` and `SUPABASE_ANON_KEY` are the canonical shared Supabase values. Nuxt, Cloudflare
-Pages/Workers, and Supabase Edge Functions can all consume them, so they should not be duplicated as
-`NUXT_PUBLIC_*` values. The legacy `NUXT_PUBLIC_SUPABASE_*` and `VITE_SUPABASE_*` names remain
-accepted temporarily for migration compatibility.
+Pages/Workers, and Supabase Edge Functions can all consume them, so they must not be duplicated as
+`NUXT_PUBLIC_*` or `VITE_*` values.
 
 Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
@@ -481,14 +480,13 @@ Placement is enabled for both environments through the top-level `[placement]` b
 
 **Client-side (browser) — Nuxt public runtime config:**
 
-| Variable                                         | Description                                              | Required   |
-| ------------------------------------------------ | -------------------------------------------------------- | ---------- |
-| `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹       |
-| `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹       |
-| `NUXT_PUBLIC_APP_URL`                            | Application URL                                          | Yes (prod) |
-| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No         |
-| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²        |
-| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No         |
+| Variable                                         | Description                                              | Required |
+| ------------------------------------------------ | -------------------------------------------------------- | -------- |
+| `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹     |
+| `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹     |
+| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No       |
+| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²      |
+| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No       |
 
 > **¹ Required in production.** These shared names are consumed by Nuxt, Pages, Workers, and Edge
 > Functions. Without Supabase configuration, auth, sync, realtime, and team features are unavailable;
@@ -538,25 +536,23 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
 **Build-time / platform:**
 
-| Variable             | Description                                  |
-| -------------------- | -------------------------------------------- |
-| `APP_URL`            | Platform/build-time application URL fallback |
-| `CF_PAGES_URL`       | Cloudflare Pages deployment URL fallback     |
-| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID              |
-| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID                 |
-| `GITHUB_TOKEN`       | Deprecated fallback for `NUXT_GITHUB_TOKEN`  |
-| `VITE_PERF_DEBUG`    | Client performance timing logs               |
+| Variable             | Description                            |
+| -------------------- | -------------------------------------- |
+| `APP_URL`            | Canonical production application URL   |
+| `CF_PAGES_URL`       | Automatic Cloudflare Pages preview URL |
+| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID        |
+| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
+| `VITE_PERF_DEBUG`    | Client performance timing logs         |
 
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — all canonical for Edge
-Functions. (`SUPABASE_SERVICE_ROLE_KEY` is deprecated only as a Nuxt app fallback; use
-`NUXT_SUPABASE_SERVICE_KEY` for Nuxt.) The URL and anon key are shared with Nuxt and Workers, so
-configure them once per deployment platform instead of duplicating them under `NUXT_PUBLIC_*`.
-`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared
-canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`,
-`DISCORD_SUPPORTER_ROLE_ID`, `DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`,
-`CLOUDFLARE_API_TOKEN` are Edge-only. See `supabase/functions/.env.example`.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are platform-managed canonical
+Edge Function values. Nuxt uses `NUXT_SUPABASE_SERVICE_KEY` for the privileged key. `APP_URL` is the
+canonical application URL used by `admin-cache-purge`; it has no alias fallback.
+`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared canonical names used by both Nuxt and
+Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID`,
+`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only. See
+`supabase/functions/.env.example`.
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
 
