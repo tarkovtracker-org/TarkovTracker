@@ -4,6 +4,9 @@ compatibility_date = "2026-01-09"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
 
+[placement]
+mode = "smart"
+
 # Atomic, globally-consistent rate limiter shared with the api-gateway Worker.
 # The ApiGatewayRateLimiter Durable Object class is owned and deployed by
 # workers/api-gateway; Pages binds to it by script_name (Pages cannot define a

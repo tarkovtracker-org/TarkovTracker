@@ -446,6 +446,39 @@ accepted temporarily for migration compatibility.
 
 Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
+### Environment value entry standard
+
+Quote syntax depends on where a value is entered:
+
+- In `wrangler.toml`, write string values as TOML strings, for example
+  `APP_URL = "https://tarkovtracker.org"`. The TOML parser treats the quotation marks as syntax;
+  they are not part of the resulting value.
+- In `.env`, `.env.*`, and `.dev.vars*` files, use unquoted values by default, for example
+  `APP_URL=https://tarkovtracker.org`. Dotenv permits both quoted and unquoted values, but matching
+  dashboard entry style reduces copy/paste mistakes. Add quotes only when they are semantically
+  required, such as preserving leading or trailing whitespace, including `#` as data, or expressing
+  a supported multiline value.
+- In a Cloudflare Pages or Workers dashboard **Value** field, enter only the raw value, for example
+  `https://tarkovtracker.org`. Cloudflare stores and passes dashboard values as entered; quotation
+  marks typed into the field become part of the value.
+- At an interactive `wrangler secret put` value prompt, enter only the raw secret. Shell quotes used
+  around command arguments are shell syntax, but quotation marks pasted or piped as secret content
+  are data and are preserved.
+- Never place private credentials in `[vars]` or commit them to `wrangler.toml`. Store them as
+  encrypted Cloudflare secrets. It is safe for intentionally public identifiers such as the
+  Supabase anon key and Turnstile sitekey to remain plaintext configuration.
+
+Therefore, TOML strings stay quoted because TOML requires a string delimiter. Dotenv and dashboard
+values stay unquoted unless the dotenv value specifically requires quoting. Interactive secret
+fields never include decorative wrapping quotes.
+
+References: Cloudflare's Pages bindings and Workers secrets documentation, Cloudflare's Pages API
+(`env_vars.*.value` is the stored string), Node.js's dotenv specification, and TOML v1.0.
+
+Cloudflare Pages production and preview configuration is sourced from `wrangler.toml`. Dashboard
+entries are reserved for encrypted secrets; do not duplicate plaintext `[vars]` there. Smart
+Placement is enabled for both environments through the top-level `[placement]` block.
+
 **Client-side (browser) — Nuxt public runtime config:**
 
 | Variable                                         | Description                                              | Required   |
