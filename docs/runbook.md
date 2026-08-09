@@ -4,12 +4,12 @@
 
 Naming: `NUXT_*` = Nuxt private (server-only), `NUXT_PUBLIC_*` = Nuxt public (browser-exposed).
 
-**Nuxt app (set in Cloudflare Pages):**
+**Nuxt app (Cloudflare Pages):**
 
-- `NUXT_PUBLIC_SUPABASE_URL` — Supabase project URL (`SUPABASE_URL` also works as fallback)
-- `NUXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key (`SUPABASE_ANON_KEY` also works)
-- `NUXT_SUPABASE_SERVICE_KEY` — Supabase service role key
-- `NUXT_PUBLIC_APP_URL` — Application URL (`APP_URL` / `CF_PAGES_URL` also work)
+- `SUPABASE_URL` — Supabase project URL, managed as plaintext in `wrangler.toml`
+- `SUPABASE_ANON_KEY` — Supabase anon key, managed as plaintext in `wrangler.toml`
+- `NUXT_SUPABASE_SERVICE_KEY` — encrypted Supabase service role key in the Pages dashboard
+- `APP_URL` — production application URL in `wrangler.toml`; previews use `CF_PAGES_URL`
 - `API_ALLOWED_HOSTS` — production host allowlist
 - `API_TRUST_PROXY` — only when overriding proxy auto-detection (forwarded headers are trusted
   only when `API_TRUST_PROXY=true` or `NITRO_PRESET` is explicitly set to a `cloudflare*`
@@ -39,6 +39,7 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
   (per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID`
   are optional)
 - `DISCORD_LINKED_ROLE_ID` for the role applied after a user links Discord from Settings.
+- `APP_URL` for `admin-cache-purge` cache-key construction.
 
 Configure the Stripe webhook endpoint to send:
 

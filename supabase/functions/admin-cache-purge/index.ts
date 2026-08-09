@@ -322,11 +322,11 @@ Deno.serve(async (req) => {
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
     // Get base URL for cache key construction
-    const baseUrl =
-      Deno.env.get('APP_URL') ||
-      Deno.env.get('APP_BASE_URL') ||
-      Deno.env.get('SITE_URL') ||
-      'https://tarkovtracker.org';
+    const baseUrl = Deno.env.get('APP_URL');
+    if (!baseUrl) {
+      console.error('[admin-cache-purge] Missing APP_URL');
+      return createErrorResponse('Application URL not configured', 500, req);
+    }
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;
     if (purgeType === 'all') {

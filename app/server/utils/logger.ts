@@ -75,10 +75,7 @@ function resolveLogSinkUrl(): string {
     }
   } catch {
     cachedLogSinkUrl = '';
-    return cachedLogSinkUrl;
   }
-  const envSink = process.env.LOG_SINK_URL;
-  cachedLogSinkUrl = typeof envSink === 'string' ? normalizeFetchTargetUrl(envSink.trim()) : '';
   return cachedLogSinkUrl;
 }
 function normalizeFetchTargetUrl(value: string): string {

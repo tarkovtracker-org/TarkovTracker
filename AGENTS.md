@@ -256,8 +256,9 @@ Naming:
 - Treat `wrangler.toml` as the source of truth for Cloudflare Pages plaintext variables, bindings,
   and placement in production and preview. Keep only encrypted secrets in the Pages dashboard; do
   not duplicate `[vars]` there.
-- Do not add legacy aliases or fallback chains without explicit approval. Existing
-  `NUXT_PUBLIC_SUPABASE_*` and `VITE_SUPABASE_*` fallbacks are migration compatibility only.
+- Do not add legacy aliases or fallback chains without explicit approval. The environment map uses
+  one canonical name per concept; deprecated Supabase, Nuxt, Vite, and Edge Function aliases have
+  been removed.
 - If an env var is renamed, update source, docs, examples, CI/deploy references, and tests in the same change.
 - See `docs/ARCHITECTURE.md` for the canonical env var map.
 
