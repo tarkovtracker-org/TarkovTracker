@@ -135,6 +135,7 @@ Formatting is enforced by Prettier + ESLint (see `.prettierrc`, `eslint.config.m
 
 - 2-space indent, 100-char lines, single quotes, semicolons, trailing commas (es5).
 - `.env.example` files use one-line `# === TITLE` section headers, not full-width `# ===...===` separator blocks. Tokenizers compress runs of repeated characters, so a long separator costs ~2–3 tokens — the same as a short one — and only adds agent token cost. These files are read often by agents; keep headers single-line and token-efficient.
+- Quote string values in `wrangler.toml`, where TOML requires string delimiters. Keep `.env`, `.env.*`, and `.dev.vars*` values unquoted by default to match dashboard entry style; quote only when dotenv semantics require it, such as preserving surrounding whitespace, `#`, or multiline content. Enter raw values without decorative quotes in Cloudflare dashboard value fields and interactive `wrangler secret put` prompts because Cloudflare preserves the submitted string. See `docs/ARCHITECTURE.md`.
 - Imports: alphabetically sorted, no blank lines between groups, group order: builtin → external → internal → parent → sibling → index → object → type.
 - Avoid unused imports/exports.
 - Keep functions small; prefer early returns. Avoid inline comments unless explaining a non-obvious decision.
@@ -252,6 +253,9 @@ Naming:
 - Browser log forwarding is opt-in: keep `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` empty unless the sink is
   external or `/api/logs/client` is protected by an edge rate-limit rule.
 - Use platform-native names for Supabase Edge Functions (`SUPABASE_*`, `STRIPE_*`, `DISCORD_*`).
+- Treat `wrangler.toml` as the source of truth for Cloudflare Pages plaintext variables, bindings,
+  and placement in production and preview. Keep only encrypted secrets in the Pages dashboard; do
+  not duplicate `[vars]` there.
 - Do not add legacy aliases or fallback chains without explicit approval. Existing
   `NUXT_PUBLIC_SUPABASE_*` and `VITE_SUPABASE_*` fallbacks are migration compatibility only.
 - If an env var is renamed, update source, docs, examples, CI/deploy references, and tests in the same change.
