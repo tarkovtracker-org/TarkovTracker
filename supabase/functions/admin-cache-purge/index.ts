@@ -159,24 +159,17 @@ async function purgeTarkovDataCache(
   apiToken: string,
   baseUrl: string
 ): Promise<CloudflarePurgeResponse> {
-  const normalizedBaseUrl = baseUrl.trim();
-  const baseUrls = (() => {
-    try {
-      const parsed = new URL(normalizedBaseUrl);
-      const origins = new Set<string>();
-      origins.add(parsed.origin);
-      const host = parsed.hostname;
-      const portSuffix = parsed.port ? `:${parsed.port}` : '';
-      if (host.startsWith('www.')) {
-        origins.add(`${parsed.protocol}//${host.replace(/^www\./, '')}${portSuffix}`);
-      } else {
-        origins.add(`${parsed.protocol}//www.${host}${portSuffix}`);
-      }
-      return Array.from(origins);
-    } catch {
-      return ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
-    }
-  })();
+  const parsed = new URL(baseUrl);
+  const origins = new Set<string>();
+  origins.add(parsed.origin);
+  const host = parsed.hostname;
+  const portSuffix = parsed.port ? `:${parsed.port}` : '';
+  if (host.startsWith('www.')) {
+    origins.add(`${parsed.protocol}//${host.replace(/^www\./, '')}${portSuffix}`);
+  } else {
+    origins.add(`${parsed.protocol}//www.${host}${portSuffix}`);
+  }
+  const baseUrls = Array.from(origins);
   const urlsToPurge: string[] = [];
   for (const base of baseUrls) {
     const cacheBase = `${base}${EDGE_CACHE_PATH}`;
@@ -322,10 +315,19 @@ Deno.serve(async (req) => {
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
     // Get base URL for cache key construction
-    const baseUrl = Deno.env.get('APP_URL');
+    const baseUrl = Deno.env.get('APP_URL')?.trim();
     if (!baseUrl) {
       console.error('[admin-cache-purge] Missing APP_URL');
       return createErrorResponse('Application URL not configured', 500, req);
+    }
+    try {
+      const protocol = new URL(baseUrl).protocol;
+      if (protocol !== 'http:' && protocol !== 'https:') {
+        throw new Error('Unsupported APP_URL protocol');
+      }
+    } catch {
+      console.error('[admin-cache-purge] Invalid APP_URL');
+      return createErrorResponse('Application URL invalid', 500, req);
     }
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;
