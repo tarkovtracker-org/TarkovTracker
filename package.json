@@ -67,7 +67,7 @@
     "tailwindcss": "^4.2.2",
     "taze": "^19.14.1",
     "tsx": "^4.22.4",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.4",
     "vue-tsc": "^3.2.7",
     "wait-on": "^9.0.4",
