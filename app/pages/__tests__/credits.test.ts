@@ -35,5 +35,10 @@ describe('credits page', () => {
         title: expect.any(Object),
       })
     );
+    const metadata = seoMeta.mock.calls[0]?.[0];
+    expect(metadata.title.value).toBe('common.credits');
+    expect(metadata.description.value).toBe(
+      'Meet the team, testers, and open source contributors behind Tarkov Tracker.'
+    );
   });
 });

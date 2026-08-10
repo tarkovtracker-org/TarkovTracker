@@ -97,7 +97,8 @@ describe('credits member presentation', () => {
     expect(creditMemberAvatarClasses('row')).toContain('h-9 w-9');
     expect(creditMemberAvatarClasses('grid')).toContain('h-7 w-7');
     expect(creditMemberClasses('row', true).join(' ')).toContain('hover:bg-white/10');
-    expect(creditMemberClasses('grid', false)).toContain('');
+    expect(creditMemberClasses('grid', false).join(' ')).not.toContain('hover:');
+    expect(creditMemberClasses('grid', false).join(' ')).not.toContain('focus-visible:');
   });
   it('keeps the static credit groups ordered and uniquely keyed', () => {
     expect(staticCreditSections.map((section) => section.key)).toEqual([
