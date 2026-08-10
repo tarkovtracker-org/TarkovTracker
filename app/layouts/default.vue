@@ -54,10 +54,13 @@
   import AppFooter from '@/shell/AppFooter.vue';
   import NavDrawer from '@/shell/NavDrawer.vue';
   import { useAppStore } from '@/stores/useApp';
+  import { logger } from '@/utils/logger';
   const consentBannerImport = () => import('@/components/analytics/AnalyticsConsentBanner.vue');
   const AnalyticsConsentBanner = defineAsyncComponent(consentBannerImport);
   if (import.meta.client) {
-    consentBannerImport();
+    consentBannerImport().catch((error) => {
+      logger.error('[AnalyticsConsentBanner] Failed to preload chunk:', error);
+    });
   }
   const DRAWER_EXPANDED_WIDTH = '224px';
   const DRAWER_COLLAPSED_WIDTH = '64px';
