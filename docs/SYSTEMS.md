@@ -800,7 +800,8 @@ flowchart LR
 - Production inspection must use a dedicated database observer identity with no write or DDL
   privileges. Service-role, postgres-admin, migration, and Management API credentials are never
   accepted as observer credentials.
-- `PROD_DB_URL` uses a direct connection or session-mode pooler; the transaction pooler is
+- `PROD_DB_URL` uses a TLS-protected direct connection or session-mode pooler with
+  `sslmode=require`, `verify-ca`, or `verify-full`; the transaction pooler is
   unsupported because session-level settings are not safe as a security boundary there. The
   wrapper rejects the documented default transaction-pooler port `6543`.
 - Observer passwords must not appear in child-process arguments, inherited `PROD_DB_URL` values,

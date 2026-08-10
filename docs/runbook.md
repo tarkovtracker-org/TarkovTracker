@@ -333,10 +333,11 @@ interface for agents and developers. It uses the Supabase CLI for the built-in i
 and a restricted SQL library for schema and bounded data-shape reports. It always emits normalized
 JSON and never applies migrations.
 
-Use a direct database connection for `PROD_DB_URL` (`:5432`, or session-mode Supavisor when direct
+Use a TLS-protected direct database connection for `PROD_DB_URL` (`:5432`, or session-mode Supavisor when direct
 IPv6 connectivity is unavailable). The transaction pooler is unsupported; the wrapper rejects a
 `:6543` URL because that is the documented default transaction-pooler endpoint, even though Supavisor
-can be configured differently. The credential must belong to a dedicated observer role with no
+can be configured differently. The URL must set `sslmode=require`, `verify-ca`, or `verify-full`.
+The credential must belong to a dedicated observer role with no
 data-write or DDL privileges; the environment must not contain `service_role`, `postgres`, migration,
 or Management API credentials. The wrapper removes the URL password before invoking the Supabase
 CLI, supplies it through a temporary mode-`0600` `PGPASSFILE`, removes the file after each command,
@@ -344,11 +345,18 @@ and redacts the password from command failures.
 
 ```bash
 PROD_DB_TARGET=local scripts/prod-db health
-PROD_DB_URL='postgresql://pi_prod_observer:...@...:5432/postgres' scripts/prod-db canary
-PROD_DB_URL='postgresql://pi_prod_observer:...@...:5432/postgres' scripts/prod-db table-stats
-PROD_DB_URL='postgresql://pi_prod_observer:...@...:5432/postgres' scripts/prod-db preflight \
-  --migration supabase/migrations/20260807_example.sql
+chmod 600 .prod-db.env
+set -a
+. ./.prod-db.env
+set +a
+scripts/prod-db canary
+scripts/prod-db table-stats
+scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql
 ```
+
+Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=require` in the
+mode-`0600` `.prod-db.env` file so the password does not enter shell history. An inline environment
+assignment remains supported for non-interactive automation whose secret store masks command input.
 
 Available reports include `health`, `schema`, `db-stats`, `table-stats`, `index-stats`, `traffic`,
 `outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`, `bloat`, `role-stats`, bounded

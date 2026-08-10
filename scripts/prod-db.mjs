@@ -156,7 +156,7 @@ function getPrimaryTarget() {
     connection: {
       host: parsed.hostname,
       port: parsed.port || '5432',
-      database: decodeURIComponent(parsed.pathname.slice(1)) || 'postgres',
+      database: decodeURIComponent(parsed.pathname.slice(1)) || username,
       username,
     },
   };
@@ -172,12 +172,18 @@ function validateConnectionUrl(parsed) {
   validateConnectionProtocol(parsed);
   validateConnectionPort(parsed);
   validateCredentialParameters(parsed);
+  validateConnectionSecurity(parsed);
   const username = decodeURIComponent(parsed.username);
   const password = decodeURIComponent(parsed.password);
   validateCredentialPresence(username, password);
   validateObserverUsername(username);
   validateObserverPassword(password);
   return { username, password };
+}
+function validateConnectionSecurity(parsed) {
+  const sslMode = parsed.searchParams.get('sslmode');
+  if (!['require', 'verify-ca', 'verify-full'].includes(sslMode))
+    throw new Error('PROD_DB_URL must set sslmode=require, verify-ca, or verify-full');
 }
 function validateConnectionProtocol(parsed) {
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol))
@@ -298,11 +304,12 @@ async function getCommandContext(target) {
   };
 }
 function sanitizeCommandError(error, target) {
-  let detail = error instanceof Error ? error.message : String(error);
+  let detail = String(error);
   const secrets = [
     process.env.PROD_DB_URL,
     target.password,
     encodeURIComponent(target.password ?? ''),
+    target.password ? escapePgpass(target.password) : undefined,
   ]
     .filter((value) => typeof value === 'string' && value.length > 0)
     .sort((left, right) => right.length - left.length);
@@ -375,7 +382,7 @@ async function getObservation() {
   delete observation.has_statement_stats;
   return redactValue('', { ...observation, statement_stats_reset: statementStatsReset });
 }
-async function runSupabase(args, label) {
+async function runSupabase(args, label, sharedObservation) {
   if (args.length > MAX_COMMAND_ARGS)
     throw new Error(`internal command exceeded ${MAX_COMMAND_ARGS} arguments`);
   const target = getTarget();
@@ -385,7 +392,7 @@ async function runSupabase(args, label) {
   commandArgs.push('--output-format', 'json');
   const command = await getCommandContext(target);
   try {
-    const observation = await getObservation();
+    const observation = await resolveObservation(sharedObservation);
     const { stdout } = await execFileAsync(SUPABASE_BIN, commandArgs, {
       cwd: fileURLToPath(ROOT),
       env: command.environment,
@@ -407,6 +414,9 @@ async function runSupabase(args, label) {
   } finally {
     await command.cleanup();
   }
+}
+async function resolveObservation(observation) {
+  return observation ?? getObservation();
 }
 async function runQuery(sql, label) {
   const normalizedSql = normalizeMigrationSql(sql);
@@ -437,6 +447,21 @@ function isUnsafeSql(sql) {
 }
 function validateCanaryHealth(report) {
   const health = firstRow(report.data);
+  const requiredFields = [
+    'is_superuser',
+    'can_create_database',
+    'can_create_role',
+    'can_replicate',
+    'can_bypass_rls',
+    'is_write_role',
+    'has_table_write',
+    'can_create_in_public',
+    'can_create_in_database',
+    'default_transaction_read_only',
+    'statement_timeout',
+    'lock_timeout',
+  ];
+  assertCompleteHealth(health, requiredFields);
   const checks = [
     [health.is_superuser, 'observer role is a superuser'],
     [health.can_create_database, 'observer role can create databases'],
@@ -453,6 +478,11 @@ function validateCanaryHealth(report) {
   ];
   const failures = checks.filter(([failed]) => failed).map(([, message]) => message);
   if (failures.length > 0) throw new Error(`unsafe observer configuration: ${failures.join('; ')}`);
+}
+function assertCompleteHealth(health, requiredFields) {
+  const missingFields = requiredFields.filter((field) => health[field] == null);
+  if (missingFields.length > 0)
+    throw new Error(`incomplete observer health report; missing: ${missingFields.join(', ')}`);
 }
 function quoteLiteral(value) {
   return `'${value.replaceAll("'", "''")}'`;
@@ -729,9 +759,9 @@ async function runPreflight(migrationPath) {
   const source = readFileSync(path, 'utf8');
   const relations = extractMigrationRelations(source);
   const classification = classifyMigration(source);
-  const reports = await runPreflightReports();
+  const observation = await getObservation();
+  const reports = await runPreflightReports(observation);
   const reportData = Object.fromEntries(reports.map((report) => [report.operation, report.data]));
-  const observation = await getReportObservation(reports);
   const affectedRelations = getAffectedRelations(relations, reportData);
   const risks = getMigrationRisks(classification, affectedRelations);
   const assessment = getPreflightAssessment(classification, risks);
@@ -755,7 +785,7 @@ async function runPreflight(migrationPath) {
     ],
   };
 }
-async function runPreflightReports() {
+async function runPreflightReports(observation) {
   const operations = [
     ['table-stats', 'table-stats'],
     ['index-stats', 'index-stats'],
@@ -766,12 +796,9 @@ async function runPreflightReports() {
     ['blocking', 'blocking'],
   ];
   const reports = [];
-  for (const [command, label] of operations) reports.push(await runSupabase([command], label));
+  for (const [command, label] of operations)
+    reports.push(await runSupabase([command], label, observation));
   return reports;
-}
-async function getReportObservation(reports) {
-  const observation = reports.map((report) => report.observation).find(Boolean);
-  return observation ?? getObservation();
 }
 function getPreflightAssessment(classification, risks) {
   if (classification.assessment === 'incomplete') return { status: 'incomplete', risk: 'unknown' };
@@ -929,7 +956,8 @@ async function main() {
   const handler = COMMAND_HANDLERS.get(operation);
   if (!handler) return usage(`unknown operation: ${operation}`);
   const result = await handler(parseArgs(rest));
-  console.log(JSON.stringify(result));
+  const output = JSON.stringify(result);
+  if (typeof output === 'string') console.log(output);
 }
 function isHelpOperation(operation) {
   return operation === undefined || ['--help', '-h'].includes(operation);
