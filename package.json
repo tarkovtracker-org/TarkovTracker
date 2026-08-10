@@ -37,7 +37,7 @@
     "@codecov/nuxt-plugin": "^2.0.1",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.1.0",
-    "@google/design.md": "^0.3.0",
+    "@google/design.md": "^0.4.0",
     "@nuxt/eslint": "^1.15.2",
     "@nuxt/test-utils": "^4.1.0",
     "@semantic-release/changelog": "^6.0.3",
