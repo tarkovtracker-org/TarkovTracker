@@ -259,6 +259,7 @@
   };
   const openContextMenu = (event: MouseEvent): void => {
     editValue.value = currentCount.value;
+    event.stopPropagation();
     if (contextMenu.value) {
       contextMenu.value.open(event);
     } else {
