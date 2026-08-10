@@ -71,8 +71,8 @@ Enhanced PR validation:
 - `labeler` - Auto-label based on file changes
 - `size` - PR size classification (S/M/L/XL/XXL)
 - `conventional-commits` - Commit message validation
-- `lighthouse` - Performance checks (runs when the PR touches `app/components/` or `app/features/`,
-  or carries the `performance` or `ui` label)
+- `lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
+  `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
 **Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per PR. Repeated
 runs are reserved for investigating a failure or for dedicated performance analysis; running each of

@@ -121,7 +121,8 @@ full job. This was the dominant PR wall-clock bottleneck.
 ### Implemented improvement
 
 `lighthouserc.json` now sets `numberOfRuns` to `1`. Each selected route is audited once, reducing a
-selected PR from nine audits to three.
+selected PR from nine audits to three. Changes to `lighthouserc.json` or the PR Checks workflow also
+trigger Lighthouse so the gate validates its own configuration before merge.
 
 A single CI run is sufficient as the normal regression gate. The `/hideout` performance floor is
 0.15, below its previously observed 0.18–0.25 CI range, so removing optimistic multi-run aggregation
