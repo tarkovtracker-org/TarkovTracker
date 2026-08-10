@@ -1111,6 +1111,12 @@
           "load_tokens_error": "Failed to load API tokens.",
           "copy_failed": "Failed to copy token.",
           "copy_token": "Copy token",
+          "edit_name": "Edit token name",
+          "edit_name_aria": "Edit token name for {name}",
+          "save_name": "Save token name",
+          "cancel_name_edit": "Cancel token name edit",
+          "name_updated": "Token name updated",
+          "name_update_error": "Failed to update token name. Please try again.",
           "token_created": "Token created",
           "token_created_description": "Copy and store this token now. You will not be able to view it again.",
           "token_created_close": "Done",
@@ -1132,6 +1138,7 @@
           "report": {
             "load_failed": "API token load failed",
             "create_failed": "API token creation failed",
+            "rename_failed": "API token rename failed",
             "revoke_failed": "API token revoke failed"
           },
           "list": {

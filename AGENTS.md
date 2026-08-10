@@ -195,6 +195,9 @@ Naming:
   Tarkov.dev profile and EFT-log
   imports must remain unavailable for Seasonal until their Season profile data is verified.
 - Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
+- API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
+  must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
+  or usage data.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling

@@ -407,6 +407,10 @@ Polling integrators (TarkovMonitor, tarkov.dev, RatScanner) should poll read end
 
 Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account.
 
+Token names can be changed from Settings → API Tokens without rotating the token. Renaming updates
+only the token's optional `note`: authenticated users receive column-level `UPDATE (note)` permission,
+and row-level security requires the token owner for both the existing and resulting row.
+
 ### Token Prefixes
 
 Progress API tokens are prefixed `PVP_`, `PVE_`, or `SZN_`. The prefix declares the token's mode,
