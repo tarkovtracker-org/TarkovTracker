@@ -135,15 +135,6 @@
     "supabase_config_hint": "This deployment is missing public Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.",
     "request_blocked_hint": "A request required to render this page was blocked. Open the technical details and include the failing request URL when reporting the issue."
   },
-  "loading_screen": {
-    "title": "Loading Tarkov Tracker",
-    "title_error": "Loading Issue",
-    "subtitle": "Downloading required game data...",
-    "subtitle_error": "Some data failed to load",
-    "first_load_info": "This may take a moment on first load. Data will be cached for future visits.",
-    "partial_data_info": "The app can still work with partial data. You can retry or continue anyway.",
-    "continue_anyway": "Continue Anyway"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Hideout updated",
