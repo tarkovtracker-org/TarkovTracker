@@ -22,11 +22,15 @@
   import ResourceGuideTips from '@/features/resources/ResourceGuideTips.vue';
   import ResourceGuideTroubleshooting from '@/features/resources/ResourceGuideTroubleshooting.vue';
   import ResourceGuideVideo from '@/features/resources/ResourceGuideVideo.vue';
-  import type { Resource } from '@/features/resources/resourceData';
-  const props = defineProps<{ resource: Resource; guideTitle: string; overview: string }>();
+  import type { ResourceWithGuide } from '@/features/resources/resourceData';
+  const props = defineProps<{
+    resource: ResourceWithGuide;
+    guideTitle: string;
+    overview: string;
+  }>();
   const { t } = useI18n({ useScope: 'global' });
   const enabledSections = computed(() => {
-    const guide = props.resource.guide!;
+    const guide = props.resource.guide;
     return [
       {
         id: 'video',

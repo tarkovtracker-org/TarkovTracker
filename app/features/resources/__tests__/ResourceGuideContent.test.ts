@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { RESOURCES } from '@/features/resources/resourceData';
 import ResourceGuideArticle from '@/features/resources/ResourceGuideArticle.vue';
 import ResourceGuideHeader from '@/features/resources/ResourceGuideHeader.vue';
-const getResource = (slug: string) => {
+import type { ResourceWithGuide } from '@/features/resources/resourceData';
+const getResource = (slug: string): ResourceWithGuide => {
   const resource = RESOURCES.find((entry) => entry.slug === slug);
-  if (!resource) throw new Error(`${slug} missing`);
+  if (!resource?.hasGuide) throw new Error(`${slug} guide missing`);
   return resource;
 };
 const globalStubs = {

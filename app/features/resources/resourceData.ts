@@ -1,8 +1,8 @@
-export type ResourceLinkType = 'website' | 'github' | 'discord' | 'api' | 'download';
+type ResourceLinkType = 'website' | 'github' | 'discord' | 'api' | 'download';
 export type ResourceCategory =
   'tarkovtracker_guides' | 'companion_apps' | 'data_and_apis' | 'calculators_and_reference';
-export type ResourcePrimaryAction = 'guide' | 'website' | 'api';
-export interface ResourceLink {
+type ResourcePrimaryAction = 'guide' | 'website' | 'api';
+interface ResourceLink {
   type: ResourceLinkType;
   url: string;
 }
@@ -13,17 +13,24 @@ export interface ResourceGuideConfig {
   troubleshooting?: number;
   compatibility?: boolean;
 }
-export interface Resource {
+interface ResourceBase {
   slug: string;
   logo: string | null;
   category: ResourceCategory;
-  hasGuide: boolean;
-  guide?: ResourceGuideConfig;
   videoId?: string;
   links: ResourceLink[];
   primaryAction: ResourcePrimaryAction;
   keywords: string[];
 }
+export interface ResourceWithGuide extends ResourceBase {
+  hasGuide: true;
+  guide: ResourceGuideConfig;
+}
+export interface ResourceWithoutGuide extends ResourceBase {
+  hasGuide: false;
+  guide?: never;
+}
+export type Resource = ResourceWithGuide | ResourceWithoutGuide;
 export interface ResourceAction {
   kind: 'internal' | 'external';
   href: string;
