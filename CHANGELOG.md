@@ -1,3 +1,10 @@
+## [1.68.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.2...v1.68.3) (2026-08-10)
+
+
+### Bug Fixes
+
+* **hideout:** stop context menu event propagation before async queue ([#696](https://github.com/tarkovtracker-org/TarkovTracker/issues/696)) ([a4654a8](https://github.com/tarkovtracker-org/TarkovTracker/commit/a4654a80c8bb02f507d176a6afe0502d25842cf5))
+
 ## [1.68.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.1...v1.68.2) (2026-08-10)
 
 
