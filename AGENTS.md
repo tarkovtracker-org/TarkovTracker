@@ -13,6 +13,7 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - required validation steps, PR/release workflow, or commit scopes
 - localization workflow, Crowdin behavior, or locale file ownership
 - analytics tooling, MCP access, or external data integrations
+- production database observer commands, credentials, or migration preflight behavior
 - deprecated patterns that agents must avoid
 - behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
   pipeline, multi-layer caching, overlay corrections, precompute workflow, Tarkov.dev profile
@@ -74,7 +75,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 
 Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test`
 
 Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
@@ -210,6 +211,7 @@ Naming:
 - When using Tarkov API or MCP tools, state only what the API returned. Missing API data is not proof the content doesn't exist in-game.
 - The root `socket.yml` limits Socket PR alerts to dependency manifest changes; CodeAnt locale filters live in `.codeant/configuration.json`. Kilo, Snyk, and Supabase PR integrations remain vendor-dashboard settings.
 - Use browser-based dashboard inspection only as a fallback when MCP/API access is missing or insufficient.
+- Production database inspection uses `scripts/prod-db`; it is read-only, emits normalized JSON with statistics-reset metadata, and must use a dedicated observer role over a direct or session-mode connection. Run the telemetry-only `canary` before enabling Pi access. Never provide Pi or another agent with service-role, postgres-admin, migration, or Management API credentials.
 
 ## Git Workflow
 
