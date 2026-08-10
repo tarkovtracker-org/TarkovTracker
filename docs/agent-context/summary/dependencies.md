@@ -14,9 +14,8 @@
 | `vue`, `vue-router`                              | Vue 3 runtime + routing.                                                           |
 | `@nuxt/ui`                                       | Primary component library.                                                         |
 | `@nuxt/image`                                    | Image optimization.                                                                |
+| `@vueuse/core`                                   | Composition utility library (sensors, state, browser APIs).                        |
 | `reka-ui`, `tailwind-merge`, `tailwind-variants` | UI primitives + class composition (transitive via `@nuxt/ui`, used in components). |
-| `motion-v` / `framer-motion`                     | Animations.                                                                        |
-| `embla-carousel*`                                | Carousels.                                                                         |
 
 ### Styling
 

@@ -1,5 +1,12 @@
 # TarkovTracker Architecture Documentation
 
+<!-- AGENT QUICK REFERENCE
+Canonical env var map: §Environment Variables (~40 vars with descriptions).
+Naming: SUPABASE_* shared, NUXT_* private server, NUXT_PUBLIC_* browser-exposed.
+wrangler.toml is source of truth for Cloudflare Pages vars/bindings.
+Quoting: quote in TOML, unquoted in .env/.dev.vars unless dotenv requires it.
+-->
+
 ## Overview
 
 TarkovTracker is a sophisticated single-page application (SPA) for tracking progress in Escape from Tarkov. Built with Nuxt 4, Vue 3, and Supabase, it provides real-time multi-device synchronization, team collaboration, and comprehensive task/hideout tracking.

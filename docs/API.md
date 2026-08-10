@@ -1,5 +1,14 @@
 # TarkovTracker API Documentation
 
+<!-- AGENT QUICK REFERENCE
+Progress API host: api.tarkovtracker.org (Bearer api_token auth).
+Internal routes: /api/tarkov/* (cached game-data proxy, NOT a public integration surface).
+Team routes: /api/team/* (Supabase JWT auth).
+Profile routes: /api/profile/* (public, rate-limited — no auth for shared profiles).
+Game modes in API: regular (pvp), pve, pvp-season (seasonal).
+Rate limits: §Rate Limits. OpenAPI spec: workers/api-gateway/src/openapi.ts.
+-->
+
 ## Overview
 
 TarkovTracker provides internal API routes for fetching game data and team information. Game data is proxied through Nuxt server routes to `json.tarkov.dev` with caching and overlay corrections applied.

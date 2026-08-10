@@ -5,30 +5,39 @@
 
 ## Pinia Stores (`app/stores/`)
 
-| Component             | File                | Responsibility                                                                                                                                                                         |
-| --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useTarkovStore`      | `useTarkov.ts`      | Owns user progress (tasks, objectives, hideout, level, skills, prestige). Coordinates localStorage persistence, Supabase sync init/reset, migrations, and task repair.                 |
-| `useMetadataStore`    | `useMetadata.ts`    | Loads + caches static game data (tasks, items, maps, traders, hideout, prestige). Two-phase loading, IndexedDB caching, item hydration, dependency graph building, cache-purge checks. |
-| `usePreferencesStore` | `usePreferences.ts` | UI settings and filter state (task/needed-items/hideout/map view options, streamer mode, profile sharing). Persisted and synced to `user_preferences`.                                 |
-| `useProgressStore`    | `useProgress.ts`    | Computed facade: per-team task completions, unlocked tasks (prereq-aware), hideout levels, objective completions, invalid-task detection.                                              |
-| `useTeamStore`        | `useTeamStore.ts`   | Team membership, teammate stores, invite codes, teammate progress aggregation.                                                                                                         |
-| `useSystemStore`      | `useSystemStore.ts` | Session/system state: `user_id`, tokens, team ids (pvp/pve), admin flag.                                                                                                               |
-| `useApp`              | `useApp.ts`         | UI chrome state (drawer rail/show, mobile drawer).                                                                                                                                     |
-| `progressState`       | `progressState.ts`  | Low-level progress mutation primitives (set/toggle task, objective, hideout, skill, trader, story, prestige, game-mode switch/migration).                                              |
+| Component               | File                       | Responsibility                                                                                                                                                                         |
+| ----------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useTarkovStore`        | `useTarkov.ts`             | Owns user progress (tasks, objectives, hideout, level, skills, prestige). Coordinates localStorage persistence, Supabase sync init/reset, migrations, and task repair.                 |
+| `useMetadataStore`      | `useMetadata.ts`           | Loads + caches static game data (tasks, items, maps, traders, hideout, prestige). Two-phase loading, IndexedDB caching, item hydration, dependency graph building, cache-purge checks. |
+| `usePreferencesStore`   | `usePreferences.ts`        | UI settings and filter state (task/needed-items/hideout/map view options, streamer mode, profile sharing). Persisted and synced to `user_preferences`.                                 |
+| `useProgressStore`      | `useProgress.ts`           | Computed facade: per-team task completions, unlocked tasks (prereq-aware), hideout levels, objective completions, invalid-task detection.                                              |
+| `useTeamStore`          | `useTeamStore.ts`          | Team membership, teammate stores, invite codes, teammate progress aggregation.                                                                                                         |
+| `useSystemStore`        | `useSystemStore.ts`        | Session/system state: `user_id`, tokens, team ids (pvp/pve/seasonal), admin flag.                                                                                                      |
+| `useApp`                | `useApp.ts`                | UI chrome state (drawer rail/show, mobile drawer).                                                                                                                                     |
+| `progressState`         | `progressState.ts`         | Low-level progress mutation primitives (set/toggle task, objective, hideout, skill, trader, story, prestige, game-mode switch/migration).                                              |
+| `taskAvailability`      | `taskAvailability.ts`      | Task prerequisite-aware availability state.                                                                                                                                            |
+| `useActionHistoryStore` | `useActionHistoryStore.ts` | Undo/redo action history tracking.                                                                                                                                                     |
+| `useActivityLogStore`   | `useActivityLogStore.ts`   | User activity log entries.                                                                                                                                                             |
 
 ### Tarkov store internals (`app/stores/tarkov/`)
 
-| File                   | Responsibility                                         |
-| ---------------------- | ------------------------------------------------------ |
-| `realtimeListener.ts`  | Supabase realtime subscription lifecycle for progress. |
-| `progressMerge.ts`     | Merge remote/local progress with conflict rules.       |
-| `conflictDetection.ts` | Detect divergence between local and remote state.      |
-| `prestige.ts`          | Prestige run logic and prestige-level handling.        |
-| `hideoutPrereqs.ts`    | Enforce hideout prerequisite completion.               |
-| `resetEngine.ts`       | Reset progress (all / per-mode / current mode).        |
-| `localStorage.ts`      | User-scoped persistence helpers.                       |
-| `promiseStore.ts`      | In-flight request de-duplication.                      |
-| `apiUpdateNotifier.ts` | Surface API-driven task update notifications.          |
+| File                     | Responsibility                                           |
+| ------------------------ | -------------------------------------------------------- |
+| `realtimeListener.ts`    | Supabase realtime subscription lifecycle for progress.   |
+| `progressMerge.ts`       | Merge remote/local progress with conflict rules.         |
+| `conflictDetection.ts`   | Detect divergence between local and remote state.        |
+| `prestige.ts`            | Prestige run logic and prestige-level handling.          |
+| `hideoutPrereqs.ts`      | Enforce hideout prerequisite completion.                 |
+| `resetEngine.ts`         | Reset progress (all / per-mode / current mode).          |
+| `localStorage.ts`        | User-scoped persistence helpers.                         |
+| `promiseStore.ts`        | In-flight request de-duplication.                        |
+| `apiUpdateNotifier.ts`   | Surface API-driven task update notifications.            |
+| `progressPersistence.ts` | Supabase persistence layer for progress sync.            |
+| `metadataStoreBridge.ts` | Bridge between metadata store and tarkov store.          |
+| `syncTimeline.ts`        | Ordered timeline of sync events for conflict resolution. |
+| `deepEqual.ts`           | Deep equality comparison for progress diffing.           |
+| `itemPicker.ts`          | Item selection logic for hideout/task item picking.      |
+| `fetchResponse.ts`       | Typed fetch response handling for store operations.      |
 
 ## Composables (`app/composables/`)
 
@@ -83,19 +92,25 @@ Client-only plugins, **numbered to control load order**:
 
 Each slice contains its Vue components and slice-local helpers/composables. High-traffic examples:
 
-| Slice            | Key components                                                                                                 |
-| ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| `tasks`          | `TaskCard.vue`, `TaskFilterBar.vue`, `TaskObjective.vue`, `TaskGraphView.vue`, `composables/useTaskFilters.ts` |
-| `hideout`        | `HideoutCard.vue`, `HideoutRequirement.vue`, `HideoutSettingsDrawer.vue`                                       |
-| `maps`           | `LeafletMap.vue`, `LeafletObjectiveTooltip.vue`, `composables/useLeafletMapControls.ts`                        |
-| `neededitems`    | `NeededItem*.vue` (row/card/grouped/modal), filter bar + settings drawer                                       |
-| `dashboard`      | `DashboardNextActions.vue`, `DashboardTraderCard.vue`, `DashboardChangelog.vue`                                |
-| `settings`       | `DataManagementCard.vue`, `ApiTokens.vue`, `PrestigeCard.vue`, `SkillsCard.vue`, `AccountDeletionCard.vue`     |
-| `team`           | `MyTeam.vue`, `TeamInvite.vue`, `TeamMemberCard.vue`                                                           |
-| `profile`        | `ProfileProgression.vue`, `Profile*Tab.vue`                                                                    |
-| `supporter`      | `SupporterTierCard.vue`, `SupporterOneTime.vue`, `SupporterStatusBanner.vue`                                   |
-| `streamer-tools` | `StreamerToolsPanel.vue`, `composables/useStreamerToolsOverlay.ts`                                             |
-| `kappa`          | `KappaTaskRow.vue`, `useKappaOverview.ts`                                                                      |
+| Slice            | Key components                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `tasks`          | `TaskCard.vue`, `TaskFilterBar.vue`, `TaskObjective.vue`, `TaskGraphView.vue`, `composables/useTaskFilters.ts`  |
+| `hideout`        | `HideoutCard.vue`, `HideoutRequirement.vue`, `HideoutSettingsDrawer.vue`                                        |
+| `maps`           | `LeafletMap.vue`, `LeafletObjectiveTooltip.vue`, `composables/useLeafletMapControls.ts`                         |
+| `neededitems`    | `NeededItem*.vue` (row/card/grouped/modal), filter bar + settings drawer                                        |
+| `dashboard`      | `DashboardNextActions.vue`, `DashboardTraderCard.vue`, `DashboardChangelog.vue`, `DashboardMigrationBanner.vue` |
+| `settings`       | `DataManagementCard.vue`, `ApiTokens.vue`, `PrestigeCard.vue`, `SkillsCard.vue`, `AccountDeletionCard.vue`      |
+| `team`           | `MyTeam.vue`, `TeamInvite.vue`, `TeamMemberCard.vue`                                                            |
+| `profile`        | `ProfileProgression.vue`, `Profile*Tab.vue`                                                                     |
+| `supporter`      | `SupporterTierCard.vue`, `SupporterOneTime.vue`, `SupporterStatusBanner.vue`                                    |
+| `streamer-tools` | `StreamerToolsPanel.vue`, `composables/useStreamerToolsOverlay.ts`                                              |
+| `kappa`          | `KappaTaskRow.vue`, `useKappaOverview.ts`                                                                       |
+| `resources`      | `ResourceGuideHeader.vue`, `ResourceGuideArticle.vue`, `ResourceVideoEmbed.vue`, `resourceData.ts`              |
+| `omnibar`        | `Omnibar.vue`, `useOmnibarSearch.ts`                                                                            |
+| `credits`        | `ContributorsList.vue`, `CreditMember.vue`, `CreditMemberList.vue`, `useContributors.ts`                        |
+| `admin`          | `AdminSupporterAccessCard.vue`, `AdminAuditLog.vue`, `AdminCacheCard.vue`                                       |
+| `drawer`         | `DrawerGameSettings.vue`, `DrawerItem.vue`, `DrawerLinks.vue`, `DrawerLevel.vue`, `navigation.ts`               |
+| `storyline`      | Storyline chapter progression components                                                                        |
 
 ## Server Components (`app/server/`)
 
