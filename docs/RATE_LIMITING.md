@@ -1,5 +1,13 @@
 # Rate Limiting & Abuse Controls
 
+<!-- AGENT QUICK REFERENCE
+Design: ONE primary enforcer per traffic class at the closest trusted edge.
+Check §Traffic classes before adding a new limiter — someone may already own it.
+Layers: Cloudflare WAF → Pages Function → Worker DO → Edge Function RPC → Postgres.
+API gateway: Durable Object token-bucket (workers/api-gateway).
+App routes: Nitro middleware + Supabase RPC per-user limits.
+-->
+
 This document is the **ownership map** for every rate-limit / abuse system in TarkovTracker.
 
 If you are about to add a new limiter, read this first. Most confusion in this repo comes from

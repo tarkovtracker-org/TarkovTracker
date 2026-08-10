@@ -1,5 +1,12 @@
 # TarkovTracker Systems Spec
 
+<!-- AGENT QUICK REFERENCE
+Endpoint table with cache TTLs: §1 (Tarkov.dev data integration)
+Each section ends with code-binding INVARIANTS — check these when modifying a system.
+Game-mode + seasonal progress storage: §7
+Key implementing files per system are listed in each section header.
+-->
+
 This document explains **how the non-obvious systems in TarkovTracker actually work**, in plain
 language with diagrams. It is the spec you point at when you want to ask "why does the app do X?"
 and have an agent verify the answer against the code.
