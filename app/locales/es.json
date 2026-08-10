@@ -220,6 +220,10 @@
     "complete": "Complete",
     "pvp": "JcJ",
     "pve": "JcJ",
+    "seasonal_pvp": "JcJ estacional",
+    "pvp_description": "Jugador vs Jugador (Estándar)",
+    "pve_description": "Jugador vs entorno (Co-op)",
+    "seasonal_pvp_description": "Temporada {season}",
     "retry": "Reintentar",
     "open_tasks": "Abrir tareas",
     "view_on_tarkov_dev": "Ver en Tarkov.dev",
@@ -307,6 +311,7 @@
     "game_edition": "Edición de juego",
     "reset_pvp_data": "Restablecer datos PvP",
     "reset_pve_data": "Restablecer datos PvE",
+    "reset_seasonal_data": "Restablecer datos estacionales JcJ",
     "reset_all_data": "Restablecer todos los datos",
     "import_failed": "Error al importar",
     "delete_archived_run": "Eliminar Ejecuta Archivada",
@@ -1106,6 +1111,12 @@
           "load_tokens_error": "Error al cargar los tokens de API.",
           "copy_failed": "Error al copiar el token.",
           "copy_token": "Copiar token",
+          "edit_name": "Editar nombre de token",
+          "edit_name_aria": "Editar nombre de token para {name}",
+          "save_name": "Guardar nombre de token",
+          "cancel_name_edit": "Cancelar edición de nombre de token",
+          "name_updated": "Nombre del token actualizado",
+          "name_update_error": "Error al actualizar el nombre del token. Por favor, inténtelo de nuevo.",
           "token_created": "Token creado",
           "token_created_description": "Copia y guarda este token ahora. No podrás verlo nuevamente.",
           "token_created_close": "Listo",
@@ -1127,6 +1138,7 @@
           "report": {
             "load_failed": "Error al cargar los tokens de API",
             "create_failed": "Error al crear el token de API",
+            "rename_failed": "Fallo al renombrar token API",
             "revoke_failed": "Error al revocar el token de API"
           },
           "list": {
@@ -1180,6 +1192,9 @@
           "create_team_error_ui_update": "El estado del equipo no se actualizó. Recarga o inténtalo de nuevo.",
           "leave_team_success": "Has dejado tu equipo correctamente.",
           "leave_team_error": "Error al dejar tu equipo.",
+          "already_in_team": "Ya estás en un equipo {mode} . Deja tu equipo actual primero.",
+          "url_copied": "URL copiada al portapapeles",
+          "copy_url_failed": "Error al copiar la URL al portapapeles",
           "no_team": "Actualmente no estás en un equipo.",
           "team_invite_url_label": "URL de Invitación al Equipo",
           "copy_link": "Copiar",
@@ -1201,12 +1216,6 @@
         "beta_testers": "Nuxt - Probadores de beta cerrada:",
         "contributors": "Colaboradores de código abierto:"
       },
-      "labels": {
-        "creators": "Creadores",
-        "staff": "Equipo principal",
-        "testers": "Probadores beta",
-        "contributors": "Colaboradores"
-      },
       "notes": {
         "alphabetical": "Listado alfabéticamente; el orden no refleja la contribución.",
         "contributors": "Los colaboradores de GitHub se ordenan por número de contribuciones; las cuentas bot se excluyen."
@@ -1215,8 +1224,10 @@
         "loading": "Cargando colaboradores...",
         "error": "No se pueden cargar los colaboradores ahora mismo.",
         "empty": "Aún no se encontraron colaboradores.",
-        "contributions": "{count} contribuciones"
-      }
+        "contributions": "{count} contribuciones",
+        "total": "Colaborador {count} | Contribuyentes {count}"
+      },
+      "description": "Conozca a los creadores, empleados, miembros de apoyo, beta testers y colaboradores de código abierto detrás de Tarkov Tracker."
     },
     "login": {
       "subtitle": "Inicia sesión para acceder a tu cuenta",
@@ -1340,12 +1351,18 @@
       "suggest_title": "Know a useful Tarkov resource?",
       "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
       "suggest_cta": "Suggest a resource",
+      "migration_banner": {
+        "title": "¿Mover de TarkovTracker.io?",
+        "cta": "Leer la guía de migración"
+      },
       "categories": {
+        "tarkovtracker_guides": "Guías TarkovTracker.org",
         "companion_apps": "Companion Apps",
         "data_and_apis": "Data & Developer Tools",
         "calculators_and_reference": "Calculators & Reference"
       },
       "category_badges": {
+        "tarkovtracker_guides": "Guía Oficial",
         "companion_apps": "Desktop App",
         "data_and_apis": "Data Platform",
         "calculators_and_reference": "Reference"
@@ -1366,6 +1383,8 @@
       "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
       "guide_title_template": "{name} Guide",
       "meta": {
+        "official_guide": "Guía oficial",
+        "maintained_by_team": "Mantenido por el equipo TarkovTracker.org",
         "windows": "Windows",
         "setup_time": "5-minute setup",
         "community_data": "Community maintained",
@@ -1380,11 +1399,16 @@
         "download": "Download"
       },
       "guide_sections": {
+        "video_walkthrough": "Vídeo",
         "troubleshooting": "Troubleshooting",
         "tips": "Tips & Tricks",
         "faq": "Common Questions"
       },
       "items": {
+        "tarkovtracker_org_vs_io": {
+          "name": "TarkovTracker.org vs TarkovTracker.io",
+          "description": "¿Cómo se relaciona TarkovTracker.org con el sitio .io original y cómo mover su progreso?"
+        },
         "tarkovdev": {
           "name": "Tarkov.dev",
           "description": "Community-maintained item, quest, trader, and market data for players and developers."
@@ -1407,6 +1431,27 @@
         }
       },
       "guides": {
+        "tarkovtracker_org_vs_io": {
+          "overview": "TarkovTracker existe en dos dominios. TarkovTracker.io es el sitio original creado por el fundador del proyecto TarkovTracker y alberga el código base original. TarkovTracker. rg es la continuación activamente mantenida por un colaborador y antiguo mantenedor del proyecto original, como un fork libre y de código abierto bajo la misma licencia GNU GPLv3. Esta guía explica las diferencias y las formas apoyadas para reconstruir su progreso en TarkovTracker.org.",
+          "step_1_title": "Crea o inicia sesión en tu cuenta TarkovTracker.org",
+          "step_1_desc": "Crea una cuenta TarkovTracker.org o inicia sesión en la cuenta donde quieras rastrear tu progreso de borrado actual.",
+          "step_2_title": "Importa tus metadatos de perfil Tarkov.dev",
+          "step_2_desc": "Abre Configuración, elige Importaciones, y utiliza la importación de perfiles Tarkov.dev para restaurar los detalles del perfil soportado, como nivel, facción y habilidades.",
+          "step_3_title": "Importa tus registros de juego EFT",
+          "step_3_desc": "En la misma pestaña Importaciones, selecciona tu carpeta de registros EFT para recuperar eventos de inicio de misiones y finalización que aún están presentes en tus registros locales.",
+          "step_4_title": "Verificar tareas y ocultar el progreso",
+          "step_4_desc": "Revisa tu lista de tareas y escondite y restaura manualmente el progreso que Tarkov.dev y tus registros de juegos disponibles no pudieron recuperar.",
+          "step_5_title": "Conectar herramientas de acompañamiento soportadas",
+          "step_5_desc": "Configure TarkovMonitor con un nuevo token de API de lectura y escritura TarkovTracker.org para que futuras actualizaciones de progreso soportadas vayan a su cuenta .org.",
+          "faq_1_q": "¿Cuál es la diferencia entre TarkovTracker.io y TarkovTracker.org?",
+          "faq_1_a": "TarkovTracker.io es el sitio original. Es relativamente estable, pero tiene problemas conocidos y ya no se mantiene: su último despliegue tuvo lugar en agosto de 2024 y no hay desarrollo ni apoyo activo. TarkovTracker. rg es la bifurcación mantenida activamente: recibe actualizaciones regulares, soporta cambios de juego después de EFT 0.15, y añade nuevas características. Debido a que está en desarrollo activo puede ocasionalmente tener errores o tiempos de inactividad, y mientras trabajamos duro para prevenirlo, la pérdida de datos no se puede descartar por completo.",
+          "faq_2_q": "¿Qué sitio debería usar?",
+          "faq_2_a": "Utilice TarkovTracker.org. Es la única versión que recibe actualizaciones, correcciones de errores y soporte para Escape actual del contenido Tarkov. Las nuevas cuentas siempre deben ser creadas en TarkovTracker.org.",
+          "faq_3_q": "¿Cómo migro mi progreso de .io a .org?",
+          "faq_3_a": "TarkovTracker.org no proporciona actualmente una importación directa de tokens .io. Crea o inicia sesión en tu . rg account then use the supported Tarkov.dev profile and EFT game-log import in Settings. Verificar tareas y ocultar el progreso manualmente porque esas fuentes pueden no contener todo lo registrado en .io. El progreso no se sincroniza entre los dos sitios.",
+          "faq_4_q": "¿El equipo TarkovTracker.org ejecuta TarkovTracker.io?",
+          "faq_4_a": "No. El dominio .io y el despliegue son propiedad y controlados por el fundador del proyecto original. No tenemos acceso a él y no podemos corregir, actualizar o proporcionar soporte para nada en .io."
+        },
         "tarkovdev": {
           "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through free static JSON endpoints at json.tarkov.dev. TarkovTracker itself uses these endpoints to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
           "step_1_title": "Browse the website",
@@ -1474,7 +1519,9 @@
           "faq_2_q": "Does RatScanner work with the flea market?",
           "faq_2_a": "Yes. It shows current flea-market prices and can help compare flea versus trader value.",
           "faq_3_q": "Can RatScanner show items needed for TarkovTracker?",
-          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page."
+          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page.",
+          "faq_4_q": "¿Funciona RatScanner con TarkovTracker.org?",
+          "faq_4_a": "Sí. Instale RatScanner, abra la sección TarkovTracker en su configuración y cambie el backend de TarkovTracker de .io a .org antes de entrar en su tarkovtracker. token rg API. El equipo TarkovTracker.org ahora ayuda a mantener RatScanner, así que la integración de .org y los valores predeterminados seguirán mejorando en futuras versiones."
         },
         "cultistcircle": {
           "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
@@ -1489,7 +1536,13 @@
           "faq_2_q": "Is CultistCircle affiliated with TarkovTracker?",
           "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
         }
-      }
+      },
+      "video": {
+        "walkthrough_title": "Examen en vídeo {name}",
+        "caption": "Los pasos pueden diferir ligeramente de la guía escrita.",
+        "play": "Reproducir vídeo: {title}"
+      },
+      "official_guide_label": "Guía TarkovTracker.org"
     }
   },
   "footer": {
@@ -1498,7 +1551,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Preferencias de analítica",
-    "game_attribution": "Escape from Tarkov y el contenido y materiales relacionados del juego son marcas comerciales y obras protegidas por derechos de autor de Battlestate Games Limited y sus licenciantes. Todos los derechos reservados. TarkovTracker es un proyecto de fans no oficial y no está afiliado ni respaldado por Battlestate Games."
+    "game_attribution": "Escape from Tarkov y el contenido y materiales relacionados del juego son marcas comerciales y obras protegidas por derechos de autor de Battlestate Games Limited y sus licenciantes. Todos los derechos reservados. TarkovTracker es un proyecto de fans no oficial y no está afiliado ni respaldado por Battlestate Games.",
+    "tagline": "Registra tu huida desde misiones Tarkov, mejoras de escondite y requisitos de objetos en un solo lugar.",
+    "sections": {
+      "explore": "Explorar",
+      "project": "Projekt",
+      "legal": "Legal"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Navegación principal",
@@ -1526,13 +1585,18 @@
     "xp_settings_link": "View XP and level settings"
   },
   "profile": {
-    "title_with_mode": "Perfil {mode} de {name}"
+    "title_with_mode": "Perfil {mode} de {name}",
+    "mode_pvp": "JcJ",
+    "mode_pve": "JVE",
+    "mode_seasonal_pvp": "PVP DE TEMANO",
+    "season_short": "S{season}"
   },
   "streamer_tools": {
     "subtitle": "Genera enlaces de fuente de navegador para OBS, Streamlabs Desktop, XSplit y vMix para mostrar el progreso de Kappa en vivo.",
     "manage_sharing": "Gestionar compartir",
     "login_required": "Inicia sesión para generar enlaces personalizados de overlay para streamers.",
     "mode_private": "Este modo de juego es privado. El uso compartido público debe estar habilitado para que los enlaces de fuente de navegador funcionen.",
+    "visibility_load_failed": "No se puede cargar la configuración de compartir.",
     "open_account_settings": "Abrir configuración de cuenta",
     "content_title": "Contenido",
     "mode_label": "Modo de juego",
@@ -1737,10 +1801,10 @@
       "description": "Controla qué perfiles de modo de juego se pueden ver desde un enlace compartido.",
       "public": "Público",
       "private": "Privado",
-      "toggle_pvp_label": "Toggle PvP profile sharing",
-      "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_pvp_link": "Copy PvP profile link",
-      "copy_pve_link": "Copy PvE profile link",
+      "toggle_label": "Alternar compartir perfil {mode}",
+      "copy_link": "Copiar enlace de perfil {mode}",
+      "load_failed": "No se puede cargar la configuración de compartir.",
+      "save_failed": "No se puede actualizar la configuración de compartir.",
       "login_required": "Inicia sesión para gestionar la visibilidad del perfil compartido."
     },
     "game_settings": {
@@ -1752,9 +1816,11 @@
       "reset_pvp_warning": "Esto eliminará permanentemente todo tu progreso PvP incluyendo misiones, escondite y nivel. Tus datos PvE no se verán afectados.",
       "reset_pve_confirmation": "¿Estás seguro de que quieres restablecer tu progreso PvE?",
       "reset_pve_warning": "Esto eliminará permanentemente todo tu progreso PvE incluyendo misiones, escondite y nivel. Tus datos PvP no se verán afectados.",
+      "reset_seasonal_confirmation": "¿Está seguro de que desea restablecer su progreso estacional JcJ?",
+      "reset_seasonal_warning": "Esto eliminará permanentemente todo tu progreso JcJ estacional para la temporada activa. Tus datos persistentes JcJ y JcE no se verán afectados.",
       "reset_all_confirmation": "¿Estás seguro de que quieres restablecer todo tu progreso?",
       "reset_all_warning": "¡Esto eliminará permanentemente todo tu progreso para los modos PvP y PvE. Esta acción no se puede deshacer!",
-      "prestige_pvp_warning": "Tu run actual de PvP se archivará y luego se restablecerá la progresión PvP para el siguiente nivel de prestigio. Los datos de PvE no se ven afectados.",
+      "prestige_mode_warning": "Tu ejecución actual de {mode} será archivada, luego su progresión se restablecerá para el siguiente nivel de prestigio. Otros modos no se verán afectados.",
       "reset_confirm": "Restablecer",
       "export_description": "Descarga una copia de seguridad de tu progreso para los modos PvP y PvE.",
       "export_button": "Exportar copia de seguridad",
@@ -1781,12 +1847,17 @@
       "import_preview_pvp_tasks": "Misiones PvP",
       "import_preview_pve_level": "Nivel PvE",
       "import_preview_pve_tasks": "Misiones PvE",
+      "import_preview_seasonal_level": "Nivel estacional JcJ",
+      "import_preview_seasonal_tasks": "Tareas estacionales JcJ",
       "import_target_label": "Destino de importación",
       "import_target_pvp": "Solo PvP",
       "import_target_pve": "Solo PvE",
-      "import_target_both": "PvP y PvE",
+      "import_target_all": "Todo disponible",
+      "seasonal_import_locked": "Las importaciones estacionales JcJ están temporalmente bloqueadas hasta que los datos de origen sean verificados para la Temporada {season}.",
       "import_success_title": "Copia importada",
       "import_success_description": "Tu progreso se ha restaurado correctamente.",
+      "import_error_title": "Importación de copia de seguridad fallida",
+      "import_error_description": "Tu copia de seguridad no pudo ser importada. Por favor, inténtalo de nuevo.",
       "export_error_title": "Error de exportación",
       "debug_export_error_title": "Error al exportar la depuración",
       "reset_title": "Restablecer progreso",
@@ -1822,6 +1893,11 @@
       "success_title": "Restablecimiento de datos PvE",
       "success_description": "Su progreso de PvE se ha restablecido correctamente.",
       "error_description": "No se pudieron restablecer los datos del PvE. Por favor inténtalo de nuevo."
+    },
+    "reset_seasonal": {
+      "success_title": "Reinicio estacional de datos JcJ",
+      "success_description": "Su progreso de la temporada activa se ha reiniciado correctamente.",
+      "error_description": "Error al restablecer los datos estacionales de JcJ. Por favor, inténtalo de nuevo."
     },
     "reset_all": {
       "success_title": "Restablecer todos los datos",
@@ -1893,6 +1969,9 @@
     "prestige": {
       "pvp_only_title": "El prestigio es solo para PvP",
       "pvp_only": "Cambia al modo PvP para prestigiar tu perfil PvP.",
+      "persistent_mode_unsupported_title": "Prestigio no disponible",
+      "persistent_mode_unsupported": "Prestigio no está disponible para el modo JcE persistente.",
+      "seasonal_mode_unsupported": "Prestige no está disponible en JcJ Estacional.",
       "current_level": "Nivel de prestigio actual",
       "set_current": "Establecer prestigio actual",
       "set_current_hint": "Usa esto cuando ya hayas hecho prestigio en el juego y solo necesites que el tracker coincida. Esto no reinicia el progreso ni crea historial.",
@@ -1905,10 +1984,10 @@
       "requirements_description": "El tracker comprueba tu siguiente prestigio real: Prestigio {level}.",
       "requirements_empty": "No hay requisitos adicionales del tracker para este nivel de prestigio.",
       "archive_title": "Archivar partida e iniciar el siguiente prestigio",
-      "archive_description": "Usa esto solo si realmente vas a hacer prestigio ahora. Tu partida PvP actual se archivará y la progresión PvP se reiniciará para el siguiente nivel de prestigio.",
+      "archive_description_mode": "Usa esto sólo cuando estés ganando prestigio ahora. Tu ejecución actual de {mode} será archivada y su progresión se restablecerá para el siguiente nivel de prestigio.",
       "archive_cta": "Archivar partida e iniciar Prestigio {level}",
       "archive_cta_disabled": "Prestigio no disponible",
-      "archive_dialog_title": "Archivar la partida PvP actual",
+      "archive_dialog_title_mode": "Archivar Corrección Actual {mode}",
       "archive_sync_hint": "Si solo necesitas que el tracker coincida con un prestigio ya existente en el juego, usa antes \"Establecer prestigio actual\".",
       "archive_soft_gate_unmet": "Todavía parecen incompletos {count} requisito(s) seguidos. Puedes continuar igualmente si al tracker le falta contexto.",
       "archive_soft_gate_manual": "Todavía debes comprobar manualmente en el juego {count} requisito(s).",
@@ -2082,6 +2161,7 @@
       "skills_count": "{count} habilidades detectadas",
       "last_refreshed": "Datos Tarkov.dev actualizados",
       "last_refreshed_unknown": "Desconocido",
+      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Importado recientemente. Puedes volver a importar este perfil en aproximadamente {minutes} min.",
       "turnstile_hint": "Completa la verificación humana a continuación para obtener tu perfil.",
       "skills_details_toggle": "Ver valores de habilidades",
@@ -2101,6 +2181,7 @@
       "errors": {
         "unexpected_profile_flow": "Algo salió mal al obtener el perfil de Tarkov.dev. Inténtalo de nuevo.",
         "cooldown_active": "Has importado este perfil recientemente. Puedes volver a importarlo en aproximadamente {minutes} min.",
+        "profile_stale": "Tarkov.dev last refreshed this profile {days} days ago, which is too old to import. Open the profile page on Tarkov.dev, let it load, then fetch again.",
         "profile_not_generated": "Tarkov.dev todavía no tiene una instantánea para este perfil. Abra la página de perfil en Tarkov.dev una vez, déjelo cargar, y vuelva a buscar.",
         "rate_limited": "Demasiados intentos de importación. Espera {minutes} min, luego vuelve a intentarlo.",
         "verification_failed": "Falló la verificación humana. Recarga la página e inténtalo de nuevo.",
@@ -2175,7 +2256,10 @@
   },
   "game_settings": {
     "toggle_game_mode_label": "Toggle game mode",
-    "select_faction_label": "Select faction"
+    "select_game_mode_label": "Seleccionar modo de juego",
+    "select_faction_label": "Select faction",
+    "season_ends_in": "La temporada {season} termina en {days}d {hours}h {minutes}m",
+    "season_ended": "La temporada {season} ha terminado"
   },
   "oauth": {
     "consent": {
