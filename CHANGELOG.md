@@ -1,3 +1,10 @@
+## [1.68.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.1...v1.68.2) (2026-08-10)
+
+
+### Performance Improvements
+
+* **hideout:** eliminate async component waterfalls and reduce initial render cost ([#695](https://github.com/tarkovtracker-org/TarkovTracker/issues/695)) ([b2299a9](https://github.com/tarkovtracker-org/TarkovTracker/commit/b2299a9913276d0e2beb7455c358632b1d17602d))
+
 ## [1.68.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.0...v1.68.1) (2026-08-10)
 
 
