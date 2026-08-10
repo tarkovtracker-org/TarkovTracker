@@ -3,7 +3,7 @@
     <div class="prose prose-gray dark:prose-invert mx-auto max-w-4xl">
       <h1 class="mb-2 text-4xl font-bold">Privacy Policy</h1>
       <p class="text-surface-500 dark:text-surface-400 mb-12 text-sm">
-        Last Updated: June 30, 2026
+        Last Updated: August 10, 2026
       </p>
       <div class="space-y-12">
         <!-- INTRODUCTION -->
@@ -48,7 +48,7 @@
             <li class="leading-relaxed">
               <strong>Game Progress Data:</strong>
               Quest completions, hideout upgrade status, player level information, faction progress,
-              and game mode selections (PvP/PvE)
+              and game mode selections (PvP/PvE/Seasonal)
             </li>
             <li class="leading-relaxed">
               <strong>Team Collaboration Data:</strong>
@@ -65,6 +65,12 @@
               handles your payment. We do not store your full card number; we retain limited records
               such as your supporter status, tier, contribution history, and a processor customer or
               transaction identifier needed to manage perks, renewals, refunds, and disputes
+            </li>
+            <li class="leading-relaxed">
+              <strong>Imported Game Log Files:</strong>
+              If you use the EFT log import feature, your game log files are processed entirely
+              locally in your browser. They are never uploaded to or stored on our servers; only the
+              extracted progress data you choose to save is sent to us
             </li>
           </ul>
           <h3 class="mt-6 mb-3 text-xl font-semibold">2.2 Information Collected Automatically</h3>
@@ -84,11 +90,16 @@
             </li>
             <li class="leading-relaxed">
               <strong>Log Data:</strong>
-              IP address, access times, referring/exit pages, and error logs
+              Access times, referring/exit pages, and error logs. Your IP address appears only in
+              transient access logs maintained by our hosting providers (Cloudflare) under their own
+              privacy policies. Where we retain account-linked IP records for abuse prevention, we
+              store a one-way keyed hash (HMAC-SHA256) of the IP address along with your browser
+              User-Agent string — never the raw IP address itself
             </li>
             <li class="leading-relaxed">
               <strong>API Access Data:</strong>
-              API tokens, request timestamps, endpoints accessed, and rate limit information
+              API tokens, request timestamps, endpoints accessed, client User-Agent strings, and
+              rate limit information
             </li>
             <li class="leading-relaxed">
               <strong>Cookies and Similar Technologies:</strong>
@@ -117,7 +128,9 @@
             <li class="leading-relaxed">
               <strong>OAuth Providers:</strong>
               Profile information, email addresses, and authentication tokens from Twitch, Discord,
-              Google, GitHub, or other supported providers
+              Google, GitHub, or other supported providers. Some providers (such as Discord) require
+              us to request your email address to uniquely identify your account — we use it solely
+              for authentication and account recovery, and we do not send marketing email
             </li>
             <li class="leading-relaxed">
               <strong>Game Data Sources:</strong>
@@ -185,8 +198,9 @@
               AWS infrastructure in multiple regions)
             </li>
             <li class="leading-relaxed">
-              <strong>Cloudflare Pages:</strong>
-              Web hosting, content delivery network (CDN), and static asset serving
+              <strong>Cloudflare Pages & Workers:</strong>
+              Web hosting, content delivery network (CDN), static asset serving, API request
+              handling, and edge key-value caching
             </li>
             <li class="leading-relaxed">
               <strong>OAuth Providers:</strong>
@@ -277,7 +291,8 @@
             </li>
             <li class="leading-relaxed">
               <strong>Cloudflare:</strong>
-              Web hosting, CDN, DDoS protection, and performance optimization
+              Web hosting, CDN, DDoS protection, API request handling, edge caching, and performance
+              optimization
             </li>
             <li class="leading-relaxed">
               <strong>Google Analytics and Microsoft Clarity:</strong>
@@ -369,6 +384,10 @@
           <ul class="mb-4 ml-6 list-disc space-y-2">
             <li class="leading-relaxed">
               Remove your personal information and progress data from active systems within 30 days
+            </li>
+            <li class="leading-relaxed">
+              Permanently remove account-linked security audit records (such as hashed IP addresses
+              and User-Agent strings), which are deleted automatically when your account is removed
             </li>
             <li class="leading-relaxed">
               Anonymize or delete your data from team records (team names and shared data may
