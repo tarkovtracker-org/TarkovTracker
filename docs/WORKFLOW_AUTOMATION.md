@@ -74,15 +74,15 @@ Enhanced PR validation:
 - `lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
   `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
-**Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per PR. Repeated
-runs are reserved for investigating a failure or for dedicated performance analysis; running each of
-three routes three times made the Lighthouse job the dominant PR bottleneck.
+**Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per Lighthouse
+job. Repeated runs are reserved for investigating a failure or for dedicated performance analysis;
+running each of three routes three times made the Lighthouse job the dominant PR bottleneck.
 
 **Lighthouse floors:** accessibility, best-practices and SEO are held at 0.90. Performance floors
 are per route and are set from measured CI values, not aspiration, because GitHub runners are noisy.
-The `/hideout` floor is `0.15`, below its observed single-run CI range of 0.18–0.25; raising it
-requires fixing the underlying `/hideout` LCP regression first (about 5.1s before the Nuxt 4.5 /
-Vite 8 migration versus about 11.7s after — see issue #647), not re-tightening the gate.
+The `/hideout` floor remains `0.20`; raising it requires fixing the underlying `/hideout` LCP
+regression first (about 5.1s before the Nuxt 4.5 / Vite 8 migration versus about 11.7s after — see
+issue #647), not re-tightening the gate.
 
 ### 5. Dependabot Auto Merge (`.github/workflows/dependabot-auto-merge.yml`)
 

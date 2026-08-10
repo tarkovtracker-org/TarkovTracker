@@ -47,16 +47,16 @@ so `/api/*` routes are available during audits. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
 promoted Twitch embed, whose heavy third-party iframe (script eval, layout shift, third-party
 cookies) loads only when the streamer is live and previously made scores non-deterministic.
-**Lighthouse collection:** Each selected URL is audited once per PR. A single run keeps the UI
-regression gate useful without making nine full audits block each update. Investigate failures with
-local repeated runs when runner variance is suspected.
+**Lighthouse collection:** Each selected URL is audited once per Lighthouse job. A single run keeps
+the UI regression gate useful without making nine full audits block each update. Investigate
+failures with local repeated runs when runner variance is suspected.
 **Lighthouse thresholds:** Calibrated to the real full-data Pages preview baseline with the
 promoted Twitch embed disabled (see above). Best-practices, SEO, and accessibility floors are
 `error`-level at 0.9 since the embed-free audits clear them comfortably (best-practices and SEO
 1.0, accessibility 0.92-0.96). Performance floors stay conservative: `/hideout` has little margin
-and `/` can dip on cold starts. The `/hideout` performance floor is 0.15 so the single-run gate
-stays below its observed 0.18–0.25 runner range. These routes need real layout-shift (CLS ~1.38) and
-main-thread (TBT ~2.3s) work before raising. Raise `lighthouserc.json` score floors after
+and `/` can dip on cold starts. The `/hideout` performance floor remains 0.2 so the job continues
+to detect regressions despite occasional runner variance. These routes need real layout-shift
+(CLS ~1.38) and main-thread (TBT ~2.3s) work before raising. Raise `lighthouserc.json` score floors after
 performance/accessibility work instead of treating the current floors as long-term targets.
 
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)

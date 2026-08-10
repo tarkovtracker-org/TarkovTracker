@@ -14,10 +14,10 @@ The core `CI` workflow usually completes in about 3.3 minutes of wall time, but 
 18 runner-minutes because many jobs run in parallel. The largest visible PR delay is Lighthouse,
 which previously ran three audits for each of three routes and commonly took 8–9 minutes.
 
-The other major source of friction is integration volume. A normal PR can expose 25–30 checks and
-statuses from repository workflows, security scanners, coverage services, deployments, and several
-AI reviewers. The resulting review noise and reconciliation work can feel slower than GitHub Actions
-itself.
+The other major source of friction is integration volume. Repository-owned workflows expose about 15
+PR checks, while external security scanners, coverage services, deployments, and AI reviewers can
+raise the combined total to 25–30 checks and statuses. The resulting review noise and reconciliation
+work can feel slower than GitHub Actions itself.
 
 The recommended strategy is not to remove every overlapping tool immediately. Keep the reviewers
 that currently provide the best practical signal, reduce obvious duplication, and measure whether
@@ -113,20 +113,19 @@ The previous configuration used:
 
 - three routes: `/`, `/tasks`, and `/hideout`
 - three runs per route
-- nine complete Lighthouse audits per selected PR
+- nine complete Lighthouse audits per selected job
 
 A sampled run spent over six minutes in Lighthouse collection and approximately eight minutes in the
 full job. This was the dominant PR wall-clock bottleneck.
 
 ### Implemented improvement
 
-`lighthouserc.json` now sets `numberOfRuns` to `1`. Each selected route is audited once, reducing a
-selected PR from nine audits to three. Changes to `lighthouserc.json` or the PR Checks workflow also
-trigger Lighthouse so the gate validates its own configuration before merge.
+`lighthouserc.json` now sets `numberOfRuns` to `1`. Each selected route is audited once per
+Lighthouse job, reducing that job from nine audits to three. Changes to `lighthouserc.json` or the PR
+Checks workflow also trigger Lighthouse so the gate validates its own configuration before merge.
 
-A single CI run is sufficient as the normal regression gate. The `/hideout` performance floor is
-0.15, below its previously observed 0.18–0.25 CI range, so removing optimistic multi-run aggregation
-does not turn known runner variance into expected failures. When a failure appears close to another
+A single collection is sufficient as the normal regression gate. The `/hideout` performance floor
+remains 0.20 so the job retains meaningful regression coverage. When a failure appears close to a
 threshold, repeated local or manually dispatched runs should determine whether it is a real
 regression or runner variance.
 

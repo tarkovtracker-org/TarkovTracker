@@ -93,7 +93,7 @@ Before finishing any agent task:
 - Formatting is handled by the pre-commit hook. Do not run `pnpm run format` manually unless the hook is bypassed. CI `format:check` is the gate.
 - Coverage, bundle analysis, JUnit test results, and shard configuration are handled by CI — see
   `docs/WORKFLOW_AUTOMATION.md`. Local `pnpm run test` / `pnpm run test:coverage` remain unsharded.
-- Lighthouse runs once per selected route on UI/performance PRs. Use repeated local or manual runs to investigate a borderline failure instead of increasing every PR's collection count.
+- Lighthouse runs once per selected route per Lighthouse job on UI/performance PRs. Use repeated local or manual runs to investigate a borderline failure instead of increasing every job's collection count.
 
 ## Production Readiness Review
 
