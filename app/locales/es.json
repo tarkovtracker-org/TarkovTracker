@@ -1209,12 +1209,6 @@
         "beta_testers": "Nuxt - Probadores de beta cerrada:",
         "contributors": "Colaboradores de código abierto:"
       },
-      "labels": {
-        "creators": "Creadores",
-        "staff": "Equipo principal",
-        "testers": "Probadores beta",
-        "contributors": "Colaboradores"
-      },
       "notes": {
         "alphabetical": "Listado alfabéticamente; el orden no refleja la contribución.",
         "contributors": "Los colaboradores de GitHub se ordenan por número de contribuciones; las cuentas bot se excluyen."
@@ -1223,8 +1217,10 @@
         "loading": "Cargando colaboradores...",
         "error": "No se pueden cargar los colaboradores ahora mismo.",
         "empty": "Aún no se encontraron colaboradores.",
-        "contributions": "{count} contribuciones"
-      }
+        "contributions": "{count} contribuciones",
+        "total": "Colaborador {count} | Contribuyentes {count}"
+      },
+      "description": "Conozca a los creadores, empleados, miembros de apoyo, beta testers y colaboradores de código abierto detrás de Tarkov Tracker."
     },
     "login": {
       "subtitle": "Inicia sesión para acceder a tu cuenta",
@@ -1506,7 +1502,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Preferencias de analítica",
-    "game_attribution": "Escape from Tarkov y el contenido y materiales relacionados del juego son marcas comerciales y obras protegidas por derechos de autor de Battlestate Games Limited y sus licenciantes. Todos los derechos reservados. TarkovTracker es un proyecto de fans no oficial y no está afiliado ni respaldado por Battlestate Games."
+    "game_attribution": "Escape from Tarkov y el contenido y materiales relacionados del juego son marcas comerciales y obras protegidas por derechos de autor de Battlestate Games Limited y sus licenciantes. Todos los derechos reservados. TarkovTracker es un proyecto de fans no oficial y no está afiliado ni respaldado por Battlestate Games.",
+    "tagline": "Registra tu huida desde misiones Tarkov, mejoras de escondite y requisitos de objetos en un solo lugar.",
+    "sections": {
+      "explore": "Explorar",
+      "project": "Projekt",
+      "legal": "Legal"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Navegación principal",
