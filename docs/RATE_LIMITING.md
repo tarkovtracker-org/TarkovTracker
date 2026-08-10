@@ -2,7 +2,7 @@
 
 <!-- AGENT QUICK REFERENCE
 Design: ONE primary enforcer per traffic class at the closest trusted edge.
-Check §Traffic classes before adding a new limiter — someone may already own it.
+Check §Traffic classes and owners before adding a new limiter — someone may already own it.
 Layers: Cloudflare WAF → Pages Function → Worker DO → Edge Function RPC → Postgres.
 API gateway: Durable Object token-bucket (workers/api-gateway).
 App routes: Nitro middleware + Supabase RPC per-user limits.

@@ -31,8 +31,9 @@ graph LR
 
 ## Endpoint Summary
 
-- **`/api/tarkov/*`** — public cached proxies to `json.tarkov.dev` with overlay corrections. 12h–24h edge TTLs. See `docs/API.md` §Game Data for the full table.
-- **`/api/team/*`, `/api/profile/*`, `/api/stripe/*`** — authenticated app routes (Supabase JWT). See `docs/API.md` §Application Endpoints.
+- **`/api/tarkov/*`** — public cached proxies to `json.tarkov.dev` with overlay corrections. Most use 12h–24h edge TTLs (cache-meta: 5m). See `docs/API.md` §Tarkov Data Endpoints for the full table.
+- **`/api/team/*`, `/api/stripe/*`** — authenticated app routes (Supabase JWT). See `docs/API.md` §Team Endpoints / §Supporter / Stripe Endpoints.
+- **`/api/profile/*`** — public shared profiles (rate-limited, no auth required).
 - **`/overlay/*`** — server-rendered streamer overlays (Nitro route, not Page Function).
 
 ### Stripe Request Bodies

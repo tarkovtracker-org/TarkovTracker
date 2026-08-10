@@ -4,7 +4,7 @@
 Endpoint table with cache TTLs: §1 (Tarkov.dev data integration)
 Each section ends with code-binding INVARIANTS — check these when modifying a system.
 Game-mode + seasonal progress storage: §7
-Key implementing files per system are listed in each section header.
+Implementing files are listed within each section body.
 -->
 
 This document explains **how the non-obvious systems in TarkovTracker actually work**, in plain
