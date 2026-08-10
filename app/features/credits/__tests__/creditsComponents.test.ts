@@ -100,12 +100,13 @@ describe('credits member presentation', () => {
   });
   it('selects ordered and unordered list semantics and variant classes', () => {
     const members = [{ name: 'One' }, { name: 'Two' }];
+    const gridMembers = [members[0], { ...members[1], link: 'https://example.com/two' }];
     const ordered = mount(CreditMemberList, {
       props: { members, ordered: true, variant: 'grid' },
       global,
     });
     const unorderedGrid = mount(CreditMemberList, {
-      props: { members, variant: 'grid' },
+      props: { members: gridMembers, variant: 'grid' },
       global,
     });
     const unordered = mount(CreditMemberList, { props: { members }, global });
@@ -118,10 +119,13 @@ describe('credits member presentation', () => {
     expect(unorderedGrid.classes()).toContain('gap-x-6');
     expect(unorderedGrid.classes()).toContain('gap-y-1');
     expect(unorderedGrid.classes()).not.toContain('gap-x-2');
+    const unorderedGridItems = unorderedGrid.findAll('li');
+    expect(unorderedGridItems.map((item) => item.get('a, div').element.tagName)).toEqual([
+      'DIV',
+      'A',
+    ]);
     expect(
-      unorderedGrid
-        .findAll('li')
-        .every((item) => item.get('div').classes().includes('border-white/5'))
+      unorderedGridItems.every((item) => item.get('a, div').classes().includes('border-white/5'))
     ).toBe(true);
     expect(ordered.findAll('li').map((item) => item.get('span').text())).toEqual(['1.', '2.']);
     expect(unordered.element.tagName).toBe('UL');
@@ -137,6 +141,7 @@ describe('credits member presentation', () => {
     expect(creditMemberClasses('grid', false).join(' ')).not.toContain('focus-visible:');
     expect(creditMemberClasses('grid', false).join(' ')).toContain('min-h-10');
     expect(creditMemberClasses('grid', true).join(' ')).toContain('bg-white/[0.02]');
+    expect(creditMemberClasses('grid', false).join(' ')).toContain('bg-white/[0.02]');
     expect(creditMemberClasses('grid', false).join(' ')).toContain('border-white/5');
     expect(creditMemberClasses('row', false).join(' ')).not.toContain('border-white/5');
   });
