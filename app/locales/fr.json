@@ -1111,6 +1111,12 @@
           "load_tokens_error": "Échec du chargement des tokens API.",
           "copy_failed": "Échec de la copie du token.",
           "copy_token": "Copier le token",
+          "edit_name": "Modifier le nom du jeton",
+          "edit_name_aria": "Modifier le nom du jeton pour {name}",
+          "save_name": "Enregistrer le nom du jeton",
+          "cancel_name_edit": "Annuler la modification du nom du jeton",
+          "name_updated": "Nom du jeton mis à jour",
+          "name_update_error": "Impossible de mettre à jour le nom du jeton. Veuillez réessayer.",
           "token_created": "Token créé",
           "token_created_description": "Copiez et conservez ce token maintenant. Vous ne pourrez plus le consulter ensuite.",
           "token_created_close": "Terminé",
@@ -1132,6 +1138,7 @@
           "report": {
             "load_failed": "Échec du chargement des tokens API",
             "create_failed": "Échec de la création du token API",
+            "rename_failed": "Échec du renommage du jeton API",
             "revoke_failed": "Échec de la révocation du token API"
           },
           "list": {
