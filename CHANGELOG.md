@@ -1,3 +1,10 @@
+## [1.68.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.0...v1.68.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ui:** align contributor leaderboard rows ([#694](https://github.com/tarkovtracker-org/TarkovTracker/issues/694)) ([841210c](https://github.com/tarkovtracker-org/TarkovTracker/commit/841210cffb375694bef1fee3b48105dec602b24a))
+
 # [1.68.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.67.0...v1.68.0) (2026-08-10)
 
 
