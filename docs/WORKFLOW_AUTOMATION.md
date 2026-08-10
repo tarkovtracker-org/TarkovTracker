@@ -80,9 +80,9 @@ three routes three times made the Lighthouse job the dominant PR bottleneck.
 
 **Lighthouse floors:** accessibility, best-practices and SEO are held at 0.90. Performance floors
 are per route and are set from measured CI values, not aspiration, because GitHub runners are noisy.
-The `/hideout` floor is `0.20`; raising it requires fixing the underlying `/hideout` LCP regression
-first (about 5.1s before the Nuxt 4.5 / Vite 8 migration versus about 11.7s after — see issue #647),
-not re-tightening the gate.
+The `/hideout` floor is `0.15`, below its observed single-run CI range of 0.18–0.25; raising it
+requires fixing the underlying `/hideout` LCP regression first (about 5.1s before the Nuxt 4.5 /
+Vite 8 migration versus about 11.7s after — see issue #647), not re-tightening the gate.
 
 ### 5. Dependabot Auto Merge (`.github/workflows/dependabot-auto-merge.yml`)
 

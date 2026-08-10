@@ -54,8 +54,9 @@ local repeated runs when runner variance is suspected.
 promoted Twitch embed disabled (see above). Best-practices, SEO, and accessibility floors are
 `error`-level at 0.9 since the embed-free audits clear them comfortably (best-practices and SEO
 1.0, accessibility 0.92-0.96). Performance floors stay conservative: `/hideout` has little margin
-and `/` can dip on cold starts, so those need real layout-shift (CLS ~1.38) and main-thread
-(TBT ~2.3s) work before raising. Raise `lighthouserc.json` score floors after
+and `/` can dip on cold starts. The `/hideout` performance floor is 0.15 so the single-run gate
+stays below its observed 0.18–0.25 runner range. These routes need real layout-shift (CLS ~1.38) and
+main-thread (TBT ~2.3s) work before raising. Raise `lighthouserc.json` score floors after
 performance/accessibility work instead of treating the current floors as long-term targets.
 
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
@@ -88,16 +89,16 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-CodeRabbit skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`; normal automatic reviews
-remain enabled. CodeAnt excludes the non-English locale exports via `.codeant/configuration.json`,
-but its GitHub App can still post PR metadata. Kilo Code reviews are controlled by its GitHub App
-dashboard and have no repository workflow switch. GitHub-managed Copilot review and the duplicate
-CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also controlled outside this repository;
-the checked-in `Security` workflow already runs CodeQL for normal code PRs. To stop those apps and
-workflows from consuming usage on the automated `locales` PR, remove this repository from their
-automatic review selection or disable the duplicate integration in each vendor/GitHub dashboard.
-Socket PR alerts are limited to dependency manifest changes by the root `socket.yml`; Snyk and
-Supabase preview behavior is controlled by their integration settings.
+Cubic is the primary automatic reviewer, with Greptile retained as a useful secondary reviewer.
+CodeRabbit remains enabled and skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`, but
+its frequent rate limits make it best-effort rather than a required review dependency. Kilo Code is
+disabled because its signal was low. CodeAnt is a removal candidate because its AI, quality,
+security, and coverage checks overlap with retained integrations; its locale exclusions live in
+`.codeant/configuration.json` while its activation remains dashboard-controlled. GitHub-managed
+Copilot review and the duplicate CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also
+controlled outside this repository; the checked-in `Security` workflow already runs CodeQL for
+normal code PRs. Socket PR alerts are limited to dependency manifest changes by the root
+`socket.yml`; Snyk and Supabase preview behavior are controlled by their integration settings.
 
 ## Commands
 
