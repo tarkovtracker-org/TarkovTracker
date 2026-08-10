@@ -1111,6 +1111,12 @@
           "load_tokens_error": "Nepodařilo se načíst API tokeny.",
           "copy_failed": "Kopírování tokenu se nezdařilo.",
           "copy_token": "Kopírovat token",
+          "edit_name": "Upravit název tokenu",
+          "edit_name_aria": "Upravit název tokenu pro {name}",
+          "save_name": "Uložit název tokenu",
+          "cancel_name_edit": "Zrušit úpravu názvu tokenu",
+          "name_updated": "Název tokenu byl aktualizován",
+          "name_update_error": "Aktualizace názvu tokenu se nezdařila. Zkuste to prosím znovu.",
           "token_created": "Token vytvořen",
           "token_created_description": "Zkopírujte a uložte tento token nyní. Nebudete jej moci znovu zobrazit.",
           "token_created_close": "Hotovo",
@@ -1132,6 +1138,7 @@
           "report": {
             "load_failed": "Načtení API tokenu se nezdařilo",
             "create_failed": "Vytvoření API tokenu se nezdařilo",
+            "rename_failed": "Přejmenování tokenu API se nezdařilo",
             "revoke_failed": "Zrušení API tokenu selhalo"
           },
           "list": {
