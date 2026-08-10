@@ -135,15 +135,6 @@
     "supabase_config_hint": "Questa distribuzione manca della configurazione pubblica di Supabase. Imposta NUXT_PUBLIC_SUPABASE_URL e NUXT_PUBLIC_SUPABASE_ANON_KEY per le anteprime, o consente alle build di anteprima di funzionare in modalità offline.",
     "request_blocked_hint": "Una richiesta necessaria per visualizzare questa pagina è stata bloccata. Aprire i dettagli tecnici e includere l'URL della richiesta fallita quando si segnala il problema."
   },
-  "loading_screen": {
-    "title": "Caricamento Tarkov Tracker",
-    "title_error": "Problema di caricamento",
-    "subtitle": "Download dei dati necessari...",
-    "subtitle_error": "Caricamento di alcuni dati non riuscito",
-    "first_load_info": "Questo potrebbe richiedere un momento la prima volta. I dati saranno memorizzati nella cache per le visite future.",
-    "partial_data_info": "L'applicazione può ancora funzionare con dati parziali. È possibile riprovare o continuare comunque.",
-    "continue_anyway": "Continua comunque"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Rifugio aggiornato",
