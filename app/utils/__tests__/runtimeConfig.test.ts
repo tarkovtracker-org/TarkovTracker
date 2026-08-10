@@ -4,6 +4,7 @@ import {
   isPrimaryAppHostname,
   isPagesPreviewHostname,
   resolveClientLogSinkUrl,
+  resolveCanonicalSiteUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   shouldEnableAnalyticsIntegrations,
@@ -74,6 +75,14 @@ describe('resolvePublicAppUrl', () => {
   });
   it('falls back to localhost when no deployment url exists', () => {
     expect(resolvePublicAppUrl({})).toBe('http://localhost:3000');
+  });
+});
+describe('resolveCanonicalSiteUrl', () => {
+  it('uses the production origin when a production build has only the local fallback', () => {
+    expect(resolveCanonicalSiteUrl('http://localhost:3000')).toBe('https://tarkovtracker.org');
+  });
+  it('preserves deployed origins and removes trailing slashes', () => {
+    expect(resolveCanonicalSiteUrl('https://preview.pages.dev/')).toBe('https://preview.pages.dev');
   });
 });
 describe('shouldUseOfflineSupabaseFallback', () => {

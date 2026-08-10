@@ -50,9 +50,11 @@
   import ResourceGuideToc, {
     type ResourceGuideTocItem,
   } from '@/features/resources/ResourceGuideToc.vue';
+  import { resolveCanonicalSiteUrl } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const runtimeConfig = useRuntimeConfig();
+  const siteUrl = resolveCanonicalSiteUrl(runtimeConfig.public.appUrl);
   const slug = computed(() => {
     const param = route.params.slug;
     return (Array.isArray(param) ? param[0] : param) ?? '';
@@ -162,9 +164,7 @@
         )
       : t('page.resources.title', 'Resources & Guides')
   );
-  const canonicalUrl = computed(
-    () => `${String(runtimeConfig.public.appUrl).replace(/\/$/, '')}/resources/${slug.value}`
-  );
+  const canonicalUrl = computed(() => `${siteUrl}/resources/${slug.value}`);
   const shouldIndexGuide = computed(() => resource.value?.hasGuide === true);
   useSeoMeta({
     title: seoTitle,
