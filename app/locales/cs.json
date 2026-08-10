@@ -135,15 +135,6 @@
     "supabase_config_hint": "V tomto nasazení chybí veřejná konfigurace Supabas. Nastavte NUXT_PUBLIC_SUPABASE_URL a NUXT_PUBLIC_SUPABASE_ANON_KEY pro náhledy nebo povolte náhled sestavení v offline režimu.",
     "request_blocked_hint": "Požadavek vyžadovaný k vykreslení této stránky byl zablokován. Otevřete technické detaily a vložte URL neúspěšného požadavku při hlášení problému."
   },
-  "loading_screen": {
-    "title": "Načítání Tarkov Trackeru",
-    "title_error": "Načítání problému",
-    "subtitle": "Stahování požadovaných údajů o hře...",
-    "subtitle_error": "Některá data se nepodařilo načíst",
-    "first_load_info": "Toto může chvíli trvat při prvním načtení. Data budou uložena do mezipaměti pro budoucí návštěvy.",
-    "partial_data_info": "Aplikace může stále pracovat s částečnými daty. Můžete to přesto zkusit nebo pokračovat.",
-    "continue_anyway": "Přesto pokračovat"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Skrývat byl aktualizován",
