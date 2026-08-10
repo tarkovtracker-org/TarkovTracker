@@ -1209,12 +1209,6 @@
         "beta_testers": "Nuxt封闭测试人员：",
         "contributors": "开源贡献者："
       },
-      "labels": {
-        "creators": "开发者",
-        "staff": "核心团队",
-        "testers": "测试人员",
-        "contributors": "贡献者"
-      },
       "notes": {
         "alphabetical": "按字母顺序排列，排名不代表贡献度",
         "contributors": "GitHub 贡献者按贡献次数排序，机器人账号已排除。"
@@ -1223,8 +1217,10 @@
         "loading": "正在加载贡献者...",
         "error": "当前无法加载贡献者。",
         "empty": "暂未找到贡献者。",
-        "contributions": "{count} 次贡献"
-      }
+        "contributions": "{count} 次贡献",
+        "total": "{count} contributor | {count} contributors"
+      },
+      "description": "会见TarkovTracker后面的创建者、工作人员、支持成员、beta测试人员和开源贡献者。"
     },
     "login": {
       "subtitle": "登录账号以访问全部功能",
@@ -1506,7 +1502,13 @@
       "github": "GitHub 仓库"
     },
     "analytics_preferences": "分析偏好",
-    "game_attribution": "Escape from Tarkov 及相关游戏内容和素材是 Battlestate Games Limited 及其授权方的商标和版权作品。保留所有权利。TarkovTracker 是非官方粉丝项目，与 Battlestate Games 无关联且未获其认可。"
+    "game_attribution": "Escape from Tarkov 及相关游戏内容和素材是 Battlestate Games Limited 及其授权方的商标和版权作品。保留所有权利。TarkovTracker 是非官方粉丝项目，与 Battlestate Games 无关联且未获其认可。",
+    "tagline": "跟踪您从Tarkov的追求、隐藏升级和物品需求在一个地方。",
+    "sections": {
+      "explore": "浏览",
+      "project": "项目",
+      "legal": "法律"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "主导航",
