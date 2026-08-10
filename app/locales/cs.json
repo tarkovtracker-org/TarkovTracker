@@ -1209,12 +1209,6 @@
         "beta_testers": "Nuxt - Uzavřené Beta Testery:",
         "contributors": "Open source přispěvatelé:"
       },
-      "labels": {
-        "creators": "Tvůrci",
-        "staff": "Hlavní tým",
-        "testers": "Beta testery",
-        "contributors": "Přispěvatelé"
-      },
       "notes": {
         "alphabetical": "Uvádí se abecedně; pořadí neodráží příspěvek.",
         "contributors": "Přispěvatelé GitHub jsou seřazeni podle počtu příspěvků; účty botů jsou vyloučeny."
@@ -1223,8 +1217,10 @@
         "loading": "Načítání přispěvatelů...",
         "error": "Momentálně nelze načíst přispěvatele.",
         "empty": "Zatím nebyli nalezeni žádní přispěvatelé.",
-        "contributions": "{count} příspěvky"
-      }
+        "contributions": "{count} příspěvky",
+        "total": "{count} přispěvatel | {count} přispěvatelé"
+      },
+      "description": "Seznamte se s tvůrci, zaměstnanci, podporovanými členy, beta testery a open source přispěvateli za Tarkov Trackerem."
     },
     "login": {
       "subtitle": "Pro přístup k vašemu účtu se přihlaste",
@@ -1506,7 +1502,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Nastavení analytiky",
-    "game_attribution": "Úniky z Tarkov a související herní obsah a materiály jsou ochranné známky a autorská práva díla Battlestate Games Limited a jejích poskytovatelů. Všechna práva vyhrazena. TarkovTracker je neoficiální projekt fanoušků a není spojen s Battlestate nebo potvrzen."
+    "game_attribution": "Úniky z Tarkov a související herní obsah a materiály jsou ochranné známky a autorská práva díla Battlestate Games Limited a jejích poskytovatelů. Všechna práva vyhrazena. TarkovTracker je neoficiální projekt fanoušků a není spojen s Battlestate nebo potvrzen.",
+    "tagline": "Sledujte svůj útěk od Tarkov úkolů, skryjte vylepšení a požadavky na předměty na jednom místě.",
+    "sections": {
+      "explore": "Prozkoumat",
+      "project": "Projekt",
+      "legal": "Právní předpisy"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Hlavní navigace",
