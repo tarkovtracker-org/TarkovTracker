@@ -240,23 +240,20 @@
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { usePrereqModal, type PrereqType } from '@/composables/usePrereqModal';
+  import HideoutCard from '@/features/hideout/HideoutCard.vue';
+  import HideoutSettingsDrawer from '@/features/hideout/HideoutSettingsDrawer.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import type { HideoutStation } from '@/types/tarkov';
-  // Page metadata
   useSeoMeta({
     title: 'Hideout',
     description:
       'Track your hideout module upgrades and requirements. See what items you need to complete each station upgrade.',
   });
-  const HideoutCard = defineAsyncComponent(() => import('@/features/hideout/HideoutCard.vue'));
   const HideoutHelpDemoCard = defineAsyncComponent(
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
-  );
-  const HideoutSettingsDrawer = defineAsyncComponent(
-    () => import('@/features/hideout/HideoutSettingsDrawer.vue')
   );
   const RefreshButton = defineAsyncComponent(() => import('@/components/ui/RefreshButton.vue'));
   const route = useRoute();
@@ -297,6 +294,7 @@
     return value === key ? fallback : value;
   };
   const hideoutHelpSteps = computed(() => {
+    if (!isHelpOpen.value) return [];
     return [
       {
         advanceOnSelector: '[data-help-target="hideout-filter-available"]',
@@ -522,7 +520,7 @@
     }
     activePrimaryView.value = view;
   };
-  const BATCH_SIZE = 4;
+  const BATCH_SIZE = 6;
   const visibleStationCount = ref(BATCH_SIZE);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const visibleStationsSlice = computed(() =>
@@ -541,8 +539,8 @@
   const { checkAndLoadMore } = useInfiniteScroll(loadMoreSentinel, loadMoreStations, {
     autoLoadOnReady: true,
     enabled: hasMoreStations,
-    maxAutoLoads: 4,
-    rootMargin: '300px',
+    maxAutoLoads: 3,
+    rootMargin: '150px',
   });
   const debouncedCheckAndLoadMore = useDebounceFn(() => {
     void nextTick(() => {

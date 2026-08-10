@@ -152,13 +152,14 @@
   </ContextMenu>
 </template>
 <script setup lang="ts">
-  import ContextMenu from '@/components/ui/ContextMenu.vue';
-  import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import GameItem from '@/components/ui/GameItem.vue';
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { openExternalUrl } from '@/utils/redirect';
+  import type ContextMenuType from '@/components/ui/ContextMenu.vue';
+  const ContextMenu = defineAsyncComponent(() => import('@/components/ui/ContextMenu.vue'));
+  const ContextMenuItem = defineAsyncComponent(() => import('@/components/ui/ContextMenuItem.vue'));
   interface Props {
     requirement: {
       id: string;
@@ -185,7 +186,7 @@
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
   // Context menu
-  const contextMenu = ref<InstanceType<typeof ContextMenu>>();
+  const contextMenu = ref<InstanceType<typeof ContextMenuType>>();
   const editValue = ref(0);
   // Check if item requires Found in Raid status
   const isFoundInRaid = computed(() => {
