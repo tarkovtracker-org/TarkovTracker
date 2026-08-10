@@ -442,6 +442,11 @@ export default defineNuxtConfig({
   image: {
     domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS],
   },
+  icon: {
+    clientBundle: {
+      scan: true,
+    },
+  },
   ui: {
     theme: {
       colors: [

@@ -17,6 +17,8 @@
     "scripts/**/*.test.mjs"
   ],
   "ignoreDependencies": [
+    "@iconify-json/heroicons",
+    "@iconify-json/lucide",
     "@nuxt/image",
     "@nuxtjs/i18n",
     "@nuxtjs/sitemap",
