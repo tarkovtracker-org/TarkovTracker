@@ -115,8 +115,14 @@ describe('credits member presentation', () => {
     expect(ordered.classes()).toContain('gap-x-6');
     expect(ordered.classes()).toContain('gap-y-1');
     expect(ordered.classes()).not.toContain('gap-x-2');
-    expect(unorderedGrid.classes()).toContain('gap-x-2');
-    expect(unorderedGrid.classes()).not.toContain('gap-x-6');
+    expect(unorderedGrid.classes()).toContain('gap-x-6');
+    expect(unorderedGrid.classes()).toContain('gap-y-1');
+    expect(unorderedGrid.classes()).not.toContain('gap-x-2');
+    expect(
+      unorderedGrid
+        .findAll('li')
+        .every((item) => item.get('div').classes().includes('border-white/5'))
+    ).toBe(true);
     expect(ordered.findAll('li').map((item) => item.get('span').text())).toEqual(['1.', '2.']);
     expect(unordered.element.tagName).toBe('UL');
     expect(unordered.classes()).toContain('flex');
@@ -129,8 +135,10 @@ describe('credits member presentation', () => {
     expect(creditMemberClasses('row', true).join(' ')).toContain('hover:bg-white/10');
     expect(creditMemberClasses('grid', false).join(' ')).not.toContain('hover:');
     expect(creditMemberClasses('grid', false).join(' ')).not.toContain('focus-visible:');
-    expect(creditMemberClasses('grid', true, true).join(' ')).toContain('bg-white/[0.02]');
-    expect(creditMemberClasses('grid', true, false).join(' ')).not.toContain('border-white/5');
+    expect(creditMemberClasses('grid', false).join(' ')).toContain('min-h-10');
+    expect(creditMemberClasses('grid', true).join(' ')).toContain('bg-white/[0.02]');
+    expect(creditMemberClasses('grid', false).join(' ')).toContain('border-white/5');
+    expect(creditMemberClasses('row', false).join(' ')).not.toContain('border-white/5');
   });
   it('keeps the static credit groups ordered and uniquely keyed', () => {
     expect(staticCreditSections.map((section) => section.key)).toEqual([
