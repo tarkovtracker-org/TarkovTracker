@@ -4,11 +4,13 @@ import {
   isPrimaryAppHostname,
   isPagesPreviewHostname,
   resolveClientLogSinkUrl,
+  resolveCanonicalSiteUrl,
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   shouldEnableAnalyticsIntegrations,
   shouldUseOfflineSupabaseFallback,
   TARKOV_IMAGE_DOMAINS,
+  YOUTUBE_IMAGE_DOMAINS,
 } from '@/utils/runtimeConfig';
 describe('resolveSupabaseRuntimeConfig', () => {
   it('resolves shared Supabase env values', () => {
@@ -37,8 +39,13 @@ describe('resolveSupabaseRuntimeConfig', () => {
     });
   });
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
-    expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
-      expect.arrayContaining(['assets.tarkov.dev', 'avatars.githubusercontent.com', 'github.com'])
+    expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS]).toEqual(
+      expect.arrayContaining([
+        'assets.tarkov.dev',
+        'avatars.githubusercontent.com',
+        'github.com',
+        'i.ytimg.com',
+      ])
     );
   });
 });
@@ -68,6 +75,14 @@ describe('resolvePublicAppUrl', () => {
   });
   it('falls back to localhost when no deployment url exists', () => {
     expect(resolvePublicAppUrl({})).toBe('http://localhost:3000');
+  });
+});
+describe('resolveCanonicalSiteUrl', () => {
+  it('uses the production origin when a production build has only the local fallback', () => {
+    expect(resolveCanonicalSiteUrl('http://localhost:3000')).toBe('https://tarkovtracker.org');
+  });
+  it('preserves deployed origins and removes trailing slashes', () => {
+    expect(resolveCanonicalSiteUrl('https://preview.pages.dev/')).toBe('https://preview.pages.dev');
   });
 });
 describe('shouldUseOfflineSupabaseFallback', () => {

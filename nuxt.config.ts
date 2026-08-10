@@ -16,6 +16,7 @@ import {
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
+  YOUTUBE_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
@@ -439,7 +440,7 @@ export default defineNuxtConfig({
     },
   },
   image: {
-    domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS],
+    domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS],
   },
   ui: {
     theme: {

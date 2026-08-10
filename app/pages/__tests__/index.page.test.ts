@@ -159,6 +159,9 @@ const defaultGlobalStubs = {
   DashboardNextActions: {
     template: '<div data-testid="dashboard-focus-card"></div>',
   },
+  DashboardMigrationBanner: {
+    template: '<div data-testid="dashboard-migration-banner"></div>',
+  },
   DashboardProgressCard: {
     props: ['completed', 'total', 'percentage', 'label', 'icon', 'color'],
     template: `<div data-testid="progress-card" :data-completed="completed" :data-total="total" :data-percentage="percentage" :data-label="label"><slot /></div>`,
@@ -189,6 +192,13 @@ describe('dashboard page', () => {
       global: { stubs: defaultGlobalStubs },
     });
     expect(wrapper.find('[data-testid="dashboard-focus-card"]').exists()).toBe(true);
+  });
+  it('renders the migration guide banner', async () => {
+    const { DashboardPage } = await setup();
+    const wrapper = await mountSuspended(DashboardPage, {
+      global: { stubs: defaultGlobalStubs },
+    });
+    expect(wrapper.find('[data-testid="dashboard-migration-banner"]').exists()).toBe(true);
   });
   it('renders dashboard progress cards', async () => {
     const { DashboardPage } = await setup();

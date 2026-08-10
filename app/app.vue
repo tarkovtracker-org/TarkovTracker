@@ -27,6 +27,7 @@
   import { useAppInitialization } from '@/composables/useAppInitialization';
   import { SETTINGS_ROUTE_PATHS } from '@/features/drawer/navigation';
   import { logger } from '@/utils/logger';
+  import { resolveCanonicalSiteUrl } from '@/utils/runtimeConfig';
   const CHUNK_ERROR_PATTERNS = [
     /ChunkLoadError/i,
     /Failed to fetch dynamically imported module/i,
@@ -47,7 +48,7 @@
   const route = useRoute();
   const { locale, t } = useI18n();
   const { public: publicConfig } = useRuntimeConfig();
-  const siteUrl = (publicConfig.appUrl || 'https://tarkovtracker.org').replace(/\/$/, '');
+  const siteUrl = resolveCanonicalSiteUrl(publicConfig.appUrl);
   const settingsHashCanonicalPaths: Record<string, string> = {
     '#progression': '/progression',
     '#settings-progression': '/progression',
@@ -73,6 +74,9 @@
     }
     return route.path;
   });
+  const pageOwnsCanonical = computed(
+    () => route.path.startsWith('/resources/') && route.path !== '/resources/'
+  );
   useHead(() => ({
     htmlAttrs: {
       lang: locale.value,
@@ -87,10 +91,14 @@
         rel: 'dns-prefetch',
         href: 'https://api.iconify.design',
       },
-      {
-        rel: 'canonical',
-        href: `${siteUrl}${canonicalPath.value}`,
-      },
+      ...(pageOwnsCanonical.value
+        ? []
+        : [
+            {
+              rel: 'canonical' as const,
+              href: `${siteUrl}${canonicalPath.value}`,
+            },
+          ]),
     ],
   }));
   useSeoMeta({

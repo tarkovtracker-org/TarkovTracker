@@ -106,6 +106,10 @@ describe('nuxt.config CSP', () => {
       'https://challenges.cloudflare.com'
     );
   });
+  it('allows privacy-enhanced YouTube walkthrough frames', () => {
+    const csp = buildContentSecurityPolicy();
+    expect(getDirectiveSources(csp, 'frame-src')).toContain('https://www.youtube-nocookie.com');
+  });
   it('builds a stricter overlay policy and requires explicit inline bootstrap opt-in', () => {
     const csp = buildOverlayContentSecurityPolicy();
     expect(getDirectiveSources(csp, 'default-src')).toEqual(["'none'"]);

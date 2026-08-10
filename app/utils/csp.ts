@@ -7,6 +7,7 @@ export type ContentSecurityPolicyOptions = {
   turnstileSiteKey?: string;
 };
 const TURNSTILE_CSP_ORIGIN = 'https://challenges.cloudflare.com';
+const YOUTUBE_EMBED_ORIGIN = 'https://www.youtube-nocookie.com';
 const GITHUB_IMAGE_ORIGINS = ['https://avatars.githubusercontent.com', 'https://github.com'];
 const hasConfiguredValue = (value: string | undefined): boolean => Boolean(value?.trim());
 const isLocalHttpHost = (hostname: string): boolean => {
@@ -116,6 +117,7 @@ export const getFrameSrcSources = (options: ContentSecurityPolicyOptions = {}): 
   return getUniqueSources([
     "'self'",
     'https://player.twitch.tv',
+    YOUTUBE_EMBED_ORIGIN,
     hasConfiguredValue(options.turnstileSiteKey) ? TURNSTILE_CSP_ORIGIN : null,
   ]);
 };
