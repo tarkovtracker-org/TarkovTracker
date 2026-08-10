@@ -165,15 +165,18 @@
   const canonicalUrl = computed(
     () => `${String(runtimeConfig.public.appUrl).replace(/\/$/, '')}/resources/${slug.value}`
   );
+  const shouldIndexGuide = computed(() => resource.value?.hasGuide === true);
   useSeoMeta({
     title: seoTitle,
     description: overviewText,
     ogTitle: seoTitle,
     ogDescription: overviewText,
-    ogUrl: canonicalUrl,
+    ogUrl: computed(() => (shouldIndexGuide.value ? canonicalUrl.value : undefined)),
     twitterTitle: seoTitle,
     twitterDescription: overviewText,
-    robots: 'index, follow',
+    robots: computed(() => (shouldIndexGuide.value ? 'index, follow' : 'noindex, nofollow')),
   });
-  useHead({ link: [{ rel: 'canonical', href: canonicalUrl }] });
+  useHead(() => ({
+    link: shouldIndexGuide.value ? [{ rel: 'canonical', href: canonicalUrl.value }] : [],
+  }));
 </script>

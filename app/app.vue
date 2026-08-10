@@ -73,6 +73,7 @@
     }
     return route.path;
   });
+  const pageOwnsCanonical = computed(() => route.path.startsWith('/resources/'));
   useHead(() => ({
     htmlAttrs: {
       lang: locale.value,
@@ -87,10 +88,14 @@
         rel: 'dns-prefetch',
         href: 'https://api.iconify.design',
       },
-      {
-        rel: 'canonical',
-        href: `${siteUrl}${canonicalPath.value}`,
-      },
+      ...(pageOwnsCanonical.value
+        ? []
+        : [
+            {
+              rel: 'canonical' as const,
+              href: `${siteUrl}${canonicalPath.value}`,
+            },
+          ]),
     ],
   }));
   useSeoMeta({

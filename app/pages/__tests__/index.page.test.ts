@@ -193,6 +193,13 @@ describe('dashboard page', () => {
     });
     expect(wrapper.find('[data-testid="dashboard-focus-card"]').exists()).toBe(true);
   });
+  it('renders the migration guide banner', async () => {
+    const { DashboardPage } = await setup();
+    const wrapper = await mountSuspended(DashboardPage, {
+      global: { stubs: defaultGlobalStubs },
+    });
+    expect(wrapper.find('[data-testid="dashboard-migration-banner"]').exists()).toBe(true);
+  });
   it('renders dashboard progress cards', async () => {
     const { DashboardPage } = await setup();
     const wrapper = await mountSuspended(DashboardPage, {
