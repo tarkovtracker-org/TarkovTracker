@@ -100,7 +100,7 @@ describe('credits member presentation', () => {
   });
   it('selects ordered and unordered list semantics and variant classes', () => {
     const members = [{ name: 'One' }, { name: 'Two' }];
-    const gridMembers = [members[0], { ...members[1], link: 'https://example.com/two' }];
+    const gridMembers = [{ name: 'One' }, { name: 'Two', link: 'https://example.com/two' }];
     const ordered = mount(CreditMemberList, {
       props: { members, ordered: true, variant: 'grid' },
       global,
