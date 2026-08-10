@@ -9,6 +9,7 @@ import {
   shouldEnableAnalyticsIntegrations,
   shouldUseOfflineSupabaseFallback,
   TARKOV_IMAGE_DOMAINS,
+  YOUTUBE_IMAGE_DOMAINS,
 } from '@/utils/runtimeConfig';
 describe('resolveSupabaseRuntimeConfig', () => {
   it('resolves shared Supabase env values', () => {
@@ -37,8 +38,13 @@ describe('resolveSupabaseRuntimeConfig', () => {
     });
   });
   it('includes Tarkov asset hosts alongside GitHub image hosts', () => {
-    expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS]).toEqual(
-      expect.arrayContaining(['assets.tarkov.dev', 'avatars.githubusercontent.com', 'github.com'])
+    expect([...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS]).toEqual(
+      expect.arrayContaining([
+        'assets.tarkov.dev',
+        'avatars.githubusercontent.com',
+        'github.com',
+        'i.ytimg.com',
+      ])
     );
   });
 });

@@ -1344,6 +1344,10 @@
       "suggest_title": "Know a useful Tarkov resource?",
       "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
       "suggest_cta": "Suggest a resource",
+      "migration_banner": {
+        "title": "Moving from TarkovTracker.io?",
+        "cta": "Read the migration guide"
+      },
       "categories": {
         "tarkovtracker_guides": "TarkovTracker.org Guides",
         "companion_apps": "Companion Apps",
@@ -1421,13 +1425,23 @@
       },
       "guides": {
         "tarkovtracker_org_vs_io": {
-          "overview": "TarkovTracker exists on two domains. TarkovTracker.io is the original site created by the TarkovTracker project founder and hosts the original codebase. TarkovTracker.org is the actively maintained continuation run by a long-time contributor and former maintainer of the original project, as a free and open-source fork under the same GNU GPLv3 license. This guide explains the differences and how to move your progress to TarkovTracker.org.",
+          "overview": "TarkovTracker exists on two domains. TarkovTracker.io is the original site created by the TarkovTracker project founder and hosts the original codebase. TarkovTracker.org is the actively maintained continuation run by a long-time contributor and former maintainer of the original project, as a free and open-source fork under the same GNU GPLv3 license. This guide explains the differences and the supported ways to rebuild your progress on TarkovTracker.org.",
+          "step_1_title": "Create or sign in to your TarkovTracker.org account",
+          "step_1_desc": "Create a TarkovTracker.org account or sign in to the account where you want to track your current wipe progress.",
+          "step_2_title": "Import your Tarkov.dev profile metadata",
+          "step_2_desc": "Open Settings, choose Imports, and use the Tarkov.dev profile import to restore supported profile details such as level, faction, and skills.",
+          "step_3_title": "Import your EFT game logs",
+          "step_3_desc": "In the same Imports tab, select your EFT logs folder to recover quest start and completion events that are still present in your local logs.",
+          "step_4_title": "Verify tasks and hideout progress",
+          "step_4_desc": "Check your task list and hideout, then manually restore progress that Tarkov.dev and your available game logs could not recover.",
+          "step_5_title": "Connect supported companion tools",
+          "step_5_desc": "Set up TarkovMonitor with a new TarkovTracker.org read-write API token so future supported progress updates go to your .org account.",
           "faq_1_q": "What is the difference between TarkovTracker.io and TarkovTracker.org?",
           "faq_1_a": "TarkovTracker.io is the original site. It is relatively stable but has known issues and is no longer maintained - its last deployment was in August 2024 and there is no active development or support. TarkovTracker.org is the actively maintained fork: it receives regular updates, supports game changes after EFT 0.15, and adds new features. Because it is under active development it can occasionally have bugs or downtime, and while we work hard to prevent it, data loss cannot be ruled out entirely.",
           "faq_2_q": "Which site should I use?",
           "faq_2_a": "Use TarkovTracker.org. It is the only version that receives updates, bug fixes, and support for current Escape from Tarkov content. New accounts should always be created on TarkovTracker.org.",
           "faq_3_q": "How do I migrate my progress from .io to .org?",
-          "faq_3_a": "Sign in to TarkovTracker.io, copy your API token (found in your profile settings), then on TarkovTracker.org go to Settings and use the .io import option with that token. Your task and hideout progress will be copied to your .org account. The import is a one-time copy - progress made afterwards on one site does not sync to the other.",
+          "faq_3_a": "TarkovTracker.org does not currently provide a direct .io token import. Create or sign in to your .org account, then use the supported Tarkov.dev profile and EFT game-log imports in Settings. Verify tasks and hideout progress manually because those sources may not contain everything recorded on .io. Progress does not sync between the two sites.",
           "faq_4_q": "Does the TarkovTracker.org team run TarkovTracker.io?",
           "faq_4_a": "No. The .io domain and deployment are owned and controlled by the original project founder. We have no access to it and cannot fix, update, or provide support for anything on .io."
         },

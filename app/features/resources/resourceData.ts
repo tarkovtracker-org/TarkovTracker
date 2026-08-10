@@ -32,6 +32,11 @@ export interface ResourceAction {
   icon: string;
   external: boolean;
 }
+export interface ResourceMetaItem {
+  labelKey?: string;
+  labelFallback?: string;
+  useCategoryLabel?: boolean;
+}
 export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   'tarkovtracker_guides',
   'companion_apps',
@@ -50,13 +55,35 @@ export const CATEGORY_BADGE_FALLBACKS: Record<ResourceCategory, string> = {
   data_and_apis: 'Data Platform',
   calculators_and_reference: 'Reference',
 };
+export const RESOURCE_META_ITEMS: Record<ResourceCategory, ResourceMetaItem[]> = {
+  tarkovtracker_guides: [
+    { labelKey: 'page.resources.meta.official_guide', labelFallback: 'Official guide' },
+    {
+      labelKey: 'page.resources.meta.maintained_by_team',
+      labelFallback: 'Maintained by the TarkovTracker.org team',
+    },
+  ],
+  companion_apps: [
+    { labelKey: 'page.resources.meta.windows', labelFallback: 'Windows' },
+    { labelKey: 'page.resources.meta.companion_app', labelFallback: 'Companion App' },
+    { labelKey: 'page.resources.meta.setup_time', labelFallback: '5-minute setup' },
+  ],
+  data_and_apis: [
+    { useCategoryLabel: true },
+    { labelKey: 'page.resources.meta.community_data', labelFallback: 'Community maintained' },
+  ],
+  calculators_and_reference: [
+    { useCategoryLabel: true },
+    { labelKey: 'page.resources.meta.web_tool', labelFallback: 'Web tool' },
+  ],
+};
 export const RESOURCES: Resource[] = [
   {
     slug: 'tarkovtracker_org_vs_io',
     logo: '/img/logos/tarkovtrackerlogo-mini.webp',
     category: 'tarkovtracker_guides',
     hasGuide: true,
-    guide: { steps: 0, tips: 0, faq: 4 },
+    guide: { steps: 5, tips: 0, faq: 4 },
     primaryAction: 'guide',
     keywords: ['io', 'org', 'difference', 'domain', 'migration', 'official', 'faq'],
     links: [],
@@ -212,51 +239,38 @@ const defaultAction = (resource: Resource): ResourceAction | null => {
   }
   return websiteAction(resource);
 };
+const guideAction = (resource: Resource, useSetupLabel = true): ResourceAction => {
+  const setupGuide = useSetupLabel && resource.category !== 'tarkovtracker_guides';
+  return {
+    kind: 'internal',
+    href: `/resources/${resource.slug}`,
+    labelKey: setupGuide
+      ? 'page.resources.actions.setup_guide'
+      : 'page.resources.actions.read_guide',
+    labelFallback: setupGuide ? 'Setup guide' : 'Read guide',
+    icon: 'i-mdi-book-open-page-variant',
+    external: false,
+  };
+};
 export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
   if (resource.primaryAction === 'guide' && resource.hasGuide) {
-    const official = resource.category === 'tarkovtracker_guides';
-    return {
-      kind: 'internal',
-      href: `/resources/${resource.slug}`,
-      labelKey: official
-        ? 'page.resources.actions.read_guide'
-        : 'page.resources.actions.setup_guide',
-      labelFallback: official ? 'Read guide' : 'Setup guide',
-      icon: 'i-mdi-book-open-page-variant',
-      external: false,
-    };
+    return guideAction(resource);
   }
   return defaultAction(resource);
 };
 export const getSecondaryActions = (resource: Resource): ResourceAction[] => {
   const primary = getPrimaryAction(resource);
-  const secondary: ResourceAction[] = [];
-  if (resource.hasGuide && resource.primaryAction !== 'guide') {
-    secondary.push({
-      kind: 'internal',
-      href: `/resources/${resource.slug}`,
-      labelKey: 'page.resources.actions.read_guide',
-      labelFallback: 'Read guide',
-      icon: 'i-mdi-book-open-page-variant',
-      external: false,
-    });
-  }
-  for (const link of resource.links) {
-    if (primary?.external && primary.href === link.url) continue;
-    secondary.push(linkAction(link));
-  }
-  return secondary;
+  const guideActions =
+    resource.hasGuide && resource.primaryAction !== 'guide' ? [guideAction(resource, false)] : [];
+  const linkActions = resource.links
+    .filter((link) => !(primary?.external && primary.href === link.url))
+    .map((link) => linkAction(link));
+  return [...guideActions, ...linkActions];
 };
 export const splitSecondaryActions = (
   resource: Resource
 ): { highlighted: ResourceAction | null; more: ResourceAction[] } => {
   const secondary = getSecondaryActions(resource);
-  if (secondary.length === 0) {
-    return { highlighted: null, more: [] };
-  }
-  if (secondary.length === 1) {
-    return { highlighted: secondary[0] ?? null, more: [] };
-  }
   return {
     highlighted: secondary[0] ?? null,
     more: secondary.slice(1),

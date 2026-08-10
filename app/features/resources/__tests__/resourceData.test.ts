@@ -154,11 +154,11 @@ describe('resourceData locale parity', () => {
     }
   });
   it('every guide with a videoId has a valid YouTube video id format', () => {
-    for (const resource of RESOURCES.filter((entry) => entry.videoId)) {
+    const videoGuides = RESOURCES.filter((entry) => entry.videoId);
+    expect(videoGuides.length).toBeGreaterThan(0);
+    for (const resource of videoGuides) {
       expect(resource.videoId, `${resource.slug} videoId`).toMatch(/^[\w-]{11}$/);
     }
-    const orgGuide = RESOURCES.find((resource) => resource.videoId);
-    expect(orgGuide).toBeDefined();
   });
   it('matches search queries against name, purpose, and keywords', () => {
     const ratScanner = RESOURCES.find((resource) => resource.slug === 'ratscanner');
