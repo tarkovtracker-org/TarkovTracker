@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
@@ -13,7 +16,7 @@ const MAX_SAMPLE_LIMIT = 20;
 const MAX_DISTRIBUTION_LIMIT = 50;
 const MAX_COMMAND_ARGS = 8;
 const SENSITIVE_COLUMN_PATTERN =
-  /^(?:email|phone|full_name|address|token|secret|password|metadata|payload|content|ip|user_agent|token_value|token_hash|progress|data|state|settings|preferences|config)$/i;
+  /^(?:email|phone|full_name|address|token|secret|password|metadata|payload|content|ip|user_agent|token_value|token_hash|progress|data|state|settings|preferences|config|custom_config)$/i;
 const SAFE_SAMPLE_COLUMN_PATTERN =
   /^(?:id|created_at|updated_at|status|type|kind|account_type|game_mode|season_number|count)$/i;
 const SAFE_DISTRIBUTION_COLUMN_PATTERN =
@@ -33,6 +36,32 @@ const INSPECTION_COMMANDS = new Map([
   ['bloat', 'bloat'],
   ['role-stats', 'role-stats'],
 ]);
+const HEALTH_SQL = `select
+  current_database() as database,
+  current_user as role,
+  inet_server_addr()::text as server_address,
+  inet_server_port() as server_port,
+  current_setting('default_transaction_read_only') as default_transaction_read_only,
+  current_setting('statement_timeout') as statement_timeout,
+  current_setting('lock_timeout') as lock_timeout,
+  r.rolsuper as is_superuser,
+  r.rolcreatedb as can_create_database,
+  r.rolcreaterole as can_create_role,
+  r.rolreplication as can_replicate,
+  r.rolbypassrls as can_bypass_rls,
+  pg_has_role(current_user, 'pg_write_all_data', 'member') as is_write_role,
+  has_schema_privilege(current_user, 'public', 'create') as can_create_in_public,
+  has_database_privilege(current_user, current_database(), 'create') as can_create_in_database,
+  exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname in ('public', 'private')
+      and c.relkind in ('r', 'p')
+      and has_table_privilege(current_user, c.oid, 'insert,update,delete,truncate,references,trigger')
+  ) as has_table_write
+from pg_catalog.pg_roles r
+where r.rolname = current_user`;
 const RESERVED_SQL_WORDS =
   /\b(?:insert|update|delete|merge|alter|drop|create|grant|revoke|truncate|comment|copy|call|do|refresh|vacuum|analyze|cluster|reindex|set\s+role|security\s+definer)\b/i;
 const UNSAFE_SQL_PATTERNS = [
@@ -70,56 +99,92 @@ function fail(message) {
 }
 function parseArgs(args) {
   const values = new Map();
-  const positionals = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (!arg.startsWith('--')) {
-      positionals.push(arg);
-      continue;
-    }
+    if (!arg.startsWith('--')) continue;
     const key = arg.slice(2);
-    const value = args[index + 1];
-    if (!value || value.startsWith('--')) {
-      values.set(key, true);
-      continue;
-    }
+    const value = getOptionValue(args[index + 1]);
+    const hasValue = value !== true;
     values.set(key, value);
-    index += 1;
+    index += Number(hasValue);
   }
-  return { positionals, values };
+  return values;
+}
+function getOptionValue(value) {
+  if (typeof value !== 'string') return true;
+  return value.startsWith('--') ? true : value;
 }
 function getTarget() {
   const target = process.env.PROD_DB_TARGET ?? 'primary';
   if (target === 'local') return { flag: '--local', label: 'local' };
-  if (target === 'primary') {
-    const connectionString = process.env.PROD_DB_URL;
-    if (!connectionString) {
-      throw new Error(
-        'PROD_DB_URL is required for the primary target; use PROD_DB_TARGET=local for local inspection'
-      );
-    }
-    let parsed;
-    try {
-      parsed = new URL(connectionString);
-    } catch {
-      throw new Error('PROD_DB_URL must be a valid PostgreSQL connection URL');
-    }
-    if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
-      throw new Error('PROD_DB_URL must use the postgres:// or postgresql:// scheme');
-    }
-    if (parsed.port === '6543') {
-      throw new Error(
-        'PROD_DB_URL must not use the transaction pooler; use a direct or session-mode connection'
-      );
-    }
-    if (
-      /^(?:postgres|supabase_admin|service_role|admin)$/i.test(decodeURIComponent(parsed.username))
-    ) {
-      throw new Error('PROD_DB_URL must use a dedicated non-admin observer role');
-    }
-    return { flag: '--db-url', value: connectionString, label: 'primary' };
-  }
+  if (target === 'primary') return getPrimaryTarget();
   throw new Error(`unsupported PROD_DB_TARGET: ${target}`);
+}
+function getPrimaryTarget() {
+  const connectionString = process.env.PROD_DB_URL;
+  if (!connectionString)
+    throw new Error(
+      'PROD_DB_URL is required for the primary target; use PROD_DB_TARGET=local for local inspection'
+    );
+  const parsed = parseConnectionUrl(connectionString);
+  const { username, password } = validateConnectionUrl(parsed);
+  parsed.password = '';
+  return {
+    flag: '--db-url',
+    value: parsed.toString(),
+    label: 'primary',
+    password,
+    connection: {
+      host: parsed.hostname,
+      port: parsed.port || '5432',
+      database: decodeURIComponent(parsed.pathname.slice(1)) || 'postgres',
+      username,
+    },
+  };
+}
+function parseConnectionUrl(connectionString) {
+  try {
+    return new URL(connectionString);
+  } catch {
+    throw new Error('PROD_DB_URL must be a valid PostgreSQL connection URL');
+  }
+}
+function validateConnectionUrl(parsed) {
+  validateConnectionProtocol(parsed);
+  validateConnectionPort(parsed);
+  validateCredentialParameters(parsed);
+  const username = decodeURIComponent(parsed.username);
+  const password = decodeURIComponent(parsed.password);
+  validateCredentialPresence(username, password);
+  validateObserverUsername(username);
+  validateObserverPassword(password);
+  return { username, password };
+}
+function validateConnectionProtocol(parsed) {
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol))
+    throw new Error('PROD_DB_URL must use the postgres:// or postgresql:// scheme');
+}
+function validateConnectionPort(parsed) {
+  if (parsed.port === '6543')
+    throw new Error(
+      'PROD_DB_URL must not use the transaction pooler; use a direct or session-mode connection'
+    );
+}
+function validateCredentialPresence(username, password) {
+  if (!username || !password)
+    throw new Error('PROD_DB_URL must include the dedicated observer username and password');
+}
+function validateObserverPassword(password) {
+  if (/\r|\n/.test(password)) throw new Error('PROD_DB_URL password must not contain line breaks');
+}
+function validateCredentialParameters(parsed) {
+  const sensitiveParameters = ['password', 'passfile', 'sslpassword', 'servicefile'];
+  if (sensitiveParameters.some((parameter) => parsed.searchParams.has(parameter)))
+    throw new Error('PROD_DB_URL credentials must use URL userinfo, not query parameters');
+}
+function validateObserverUsername(username) {
+  if (/^(?:postgres|supabase_admin|service_role|admin)$/i.test(username))
+    throw new Error('PROD_DB_URL must use a dedicated non-admin observer role');
 }
 function validateIdentifier(value, name) {
   if (!/^[a-zA-Z_][a-zA-Z0-9_$]*(?:\.[a-zA-Z_][a-zA-Z0-9_$]*)?$/.test(value)) {
@@ -137,31 +202,46 @@ function parsePositiveInteger(value, name, maximum) {
 function parseJsonOutput(stdout, command) {
   const output = stdout.trim();
   if (!output) return { rows: [], message: command };
-  const lines = output.split('\n');
-  const jsonStart = lines.findIndex(
-    (line) => line.trim().startsWith('{') || line.trim().startsWith('[')
-  );
-  if (jsonStart === -1) throw new Error(`Supabase CLI returned non-JSON output for ${command}`);
   try {
-    return JSON.parse(lines.slice(jsonStart).join('\n'));
+    return JSON.parse(output);
   } catch {
-    throw new Error(`Supabase CLI returned invalid JSON for ${command}`);
+    return parseJsonAfterCliNoise(output, command);
+  }
+}
+function parseJsonAfterCliNoise(output, command) {
+  const lines = output.split('\n');
+  const candidates = lines
+    .map((line, index) => ({ index, line: line.trim() }))
+    .filter(({ line }) => ['{', '['].includes(line[0]))
+    .reverse()
+    .map(({ index }) => tryParseJson(lines.slice(index).join('\n')));
+  const parsed = candidates.find((candidate) => candidate !== undefined);
+  if (parsed !== undefined) return parsed;
+  throw new Error(`Supabase CLI returned invalid JSON for ${command}`);
+}
+function tryParseJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
   }
 }
 function redactValue(key, value) {
-  if (typeof key === 'string' && SENSITIVE_COLUMN_PATTERN.test(key)) {
-    return '[REDACTED]';
-  }
+  if (isSensitiveKey(key)) return '[REDACTED]';
   if (Array.isArray(value)) return value.map((item) => redactValue('', item));
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([childKey, childValue]) => [
-        childKey,
-        redactValue(childKey, childValue),
-      ])
-    );
-  }
+  if (isObject(value)) return redactObject(value);
   return value;
+}
+function isSensitiveKey(key) {
+  return typeof key === 'string' && SENSITIVE_COLUMN_PATTERN.test(key);
+}
+function isObject(value) {
+  return value !== null && typeof value === 'object';
+}
+function redactObject(value) {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, childValue]) => [key, redactValue(key, childValue)])
+  );
 }
 function getCommandEnvironment() {
   if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,62}$/.test(OBSERVER_APPLICATION_NAME)) {
@@ -169,18 +249,63 @@ function getCommandEnvironment() {
       'PROD_DB_APPLICATION_NAME must be 1-63 characters using letters, digits, _, ., or -'
     );
   }
-  return { ...process.env, PGAPPNAME: OBSERVER_APPLICATION_NAME, SUPABASE_DB_PASSWORD: undefined };
+  const environment = { ...process.env };
+  delete environment.PROD_DB_URL;
+  delete environment.PGPASSWORD;
+  delete environment.PGPASSFILE;
+  delete environment.SUPABASE_DB_PASSWORD;
+  return { ...environment, PGAPPNAME: OBSERVER_APPLICATION_NAME };
+}
+function escapePgpass(value) {
+  return value.replaceAll('\\', '\\\\').replaceAll(':', '\\:');
+}
+async function getCommandContext(target) {
+  const environment = getCommandEnvironment();
+  if (!target.password) return { environment, cleanup: async () => {} };
+  const directory = await mkdtemp(join(tmpdir(), 'prod-db-credential-'));
+  const pgpassFile = join(directory, 'pgpass');
+  const fields = [
+    target.connection.host,
+    target.connection.port,
+    target.connection.database,
+    target.connection.username,
+    target.password,
+  ];
+  await writeFile(pgpassFile, `${fields.map(escapePgpass).join(':')}\n`, { mode: 0o600 });
+  environment.PGPASSFILE = pgpassFile;
+  return {
+    environment,
+    cleanup: () => rm(directory, { recursive: true, force: true }),
+  };
+}
+function sanitizeCommandError(error, target) {
+  let detail = error instanceof Error ? error.message : String(error);
+  const secrets = [
+    process.env.PROD_DB_URL,
+    target.password,
+    encodeURIComponent(target.password ?? ''),
+  ]
+    .filter((value) => typeof value === 'string' && value.length > 0)
+    .sort((left, right) => right.length - left.length);
+  for (const secret of secrets) detail = detail.replaceAll(secret, '[REDACTED]');
+  return detail;
 }
 function getCommandLimits() {
-  const timeout = Number(process.env.PROD_DB_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
-  if (!Number.isInteger(timeout) || timeout < 1_000 || timeout > 120_000) {
-    throw new Error('PROD_DB_TIMEOUT_MS must be an integer between 1000 and 120000');
-  }
-  const maxOutputBytes = Number(process.env.PROD_DB_MAX_OUTPUT_BYTES ?? DEFAULT_MAX_OUTPUT_BYTES);
-  if (!Number.isInteger(maxOutputBytes) || maxOutputBytes < 1_024 || maxOutputBytes > 10_000_000) {
-    throw new Error('PROD_DB_MAX_OUTPUT_BYTES must be an integer between 1024 and 10000000');
-  }
-  return { timeout, maxOutputBytes };
+  return {
+    timeout: parseBoundedInteger('PROD_DB_TIMEOUT_MS', DEFAULT_TIMEOUT_MS, 1_000, 120_000),
+    maxOutputBytes: parseBoundedInteger(
+      'PROD_DB_MAX_OUTPUT_BYTES',
+      DEFAULT_MAX_OUTPUT_BYTES,
+      1_024,
+      10_000_000
+    ),
+  };
+}
+function parseBoundedInteger(name, fallback, minimum, maximum) {
+  const value = Number(process.env[name] ?? fallback);
+  const invalid = [!Number.isInteger(value), value < minimum, value > maximum].some(Boolean);
+  if (invalid) throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
+  return value;
 }
 async function runRawQuery(sql, label) {
   const target = getTarget();
@@ -188,23 +313,24 @@ async function runRawQuery(sql, label) {
   const args = ['db', 'query', target.flag];
   if (target.value) args.push(target.value);
   args.push('--output', 'json', sql);
+  const command = await getCommandContext(target);
   try {
     const { stdout } = await execFileAsync(SUPABASE_BIN, args, {
       cwd: fileURLToPath(ROOT),
-      env: getCommandEnvironment(),
+      env: command.environment,
       timeout,
       maxBuffer: maxOutputBytes,
     });
     return parseJsonOutput(stdout, label);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = sanitizeCommandError(error, target);
     throw new Error(`${label} failed: ${detail}`);
+  } finally {
+    await command.cleanup();
   }
 }
 function firstRow(data) {
-  if (Array.isArray(data)) return data[0] ?? {};
-  if (data && Array.isArray(data.rows)) return data.rows[0] ?? {};
-  return {};
+  return rowsOf(data)[0] ?? {};
 }
 async function getObservation() {
   const data = await runRawQuery(
@@ -214,11 +340,21 @@ async function getObservation() {
   current_user as observer_role,
   current_setting('application_name', true) as observer_application_name,
   (select stats_reset from pg_stat_database where datname = current_database()) as database_stats_reset,
-  (select stats_reset from pg_stat_statements_info) as statement_stats_reset,
+  to_regclass('pg_stat_statements_info') is not null as has_statement_stats,
   (select stats_reset from pg_stat_bgwriter) as io_stats_reset`,
     'observation'
   );
-  return redactValue('', firstRow(data));
+  const observation = firstRow(data);
+  let statementStatsReset = null;
+  if (observation.has_statement_stats) {
+    const statementData = await runRawQuery(
+      'select stats_reset as statement_stats_reset from pg_stat_statements_info',
+      'statement-observation'
+    );
+    statementStatsReset = firstRow(statementData).statement_stats_reset ?? null;
+  }
+  delete observation.has_statement_stats;
+  return redactValue('', { ...observation, statement_stats_reset: statementStatsReset });
 }
 async function runSupabase(args, label) {
   if (args.length > MAX_COMMAND_ARGS)
@@ -228,11 +364,12 @@ async function runSupabase(args, label) {
   const commandArgs = ['inspect', 'db', ...args, target.flag];
   if (target.value) commandArgs.push(target.value);
   commandArgs.push('--output-format', 'json');
+  const command = await getCommandContext(target);
   try {
     const observation = await getObservation();
     const { stdout } = await execFileAsync(SUPABASE_BIN, commandArgs, {
       cwd: fileURLToPath(ROOT),
-      env: getCommandEnvironment(),
+      env: command.environment,
       timeout,
       maxBuffer: maxOutputBytes,
     });
@@ -246,14 +383,15 @@ async function runSupabase(args, label) {
       data,
     };
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = sanitizeCommandError(error, target);
     throw new Error(`${label} failed: ${detail}`);
+  } finally {
+    await command.cleanup();
   }
 }
 async function runQuery(sql, label) {
-  if (RESERVED_SQL_WORDS.test(sql) || UNSAFE_SQL_PATTERNS.some((pattern) => pattern.test(sql))) {
-    throw new Error(`${label} rejected unsafe SQL`);
-  }
+  const normalizedSql = normalizeMigrationSql(sql);
+  if (isUnsafeSql(normalizedSql)) throw new Error(`${label} rejected unsafe SQL`);
   const target = getTarget();
   try {
     const [data, observation] = await Promise.all([runRawQuery(sql, label), getObservation()]);
@@ -269,6 +407,28 @@ async function runQuery(sql, label) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`${label} failed: ${detail}`);
   }
+}
+function isUnsafeSql(sql) {
+  return RESERVED_SQL_WORDS.test(sql) || UNSAFE_SQL_PATTERNS.some((pattern) => pattern.test(sql));
+}
+function validateCanaryHealth(report) {
+  const health = firstRow(report.data);
+  const checks = [
+    [health.is_superuser, 'observer role is a superuser'],
+    [health.can_create_database, 'observer role can create databases'],
+    [health.can_create_role, 'observer role can create roles'],
+    [health.can_replicate, 'observer role can replicate'],
+    [health.can_bypass_rls, 'observer role can bypass RLS'],
+    [health.is_write_role, 'observer role inherits pg_write_all_data'],
+    [health.has_table_write, 'observer role can write application tables'],
+    [health.can_create_in_public, 'observer role can create objects in public'],
+    [health.can_create_in_database, 'observer role can create schemas'],
+    [health.default_transaction_read_only !== 'on', 'default_transaction_read_only is not on'],
+    [/^0(?:ms|s|min)?$/.test(health.statement_timeout ?? ''), 'statement_timeout is not bounded'],
+    [/^0(?:ms|s|min)?$/.test(health.lock_timeout ?? ''), 'lock_timeout is not bounded'],
+  ];
+  const failures = checks.filter(([failed]) => failed).map(([, message]) => message);
+  if (failures.length > 0) throw new Error(`unsafe observer configuration: ${failures.join('; ')}`);
 }
 function quoteLiteral(value) {
   return `'${value.replaceAll("'", "''")}'`;
@@ -301,9 +461,13 @@ async function runTableData(operation, table, column, limit) {
   const qualified = validateIdentifier(table, 'table');
   const [schema, relation] = qualified.includes('.') ? qualified.split('.') : ['public', qualified];
   const safeTable = `${schema}.${relation}`;
-  if (operation === 'count') {
-    return runQuery(
-      `select
+  if (operation === 'count') return runCount(schema, relation);
+  if (operation === 'sample') return runSample(schema, relation, safeTable, limit);
+  return runDistribution(safeTable, column, limit);
+}
+function runCount(schema, relation) {
+  return runQuery(
+    `select
   n.nspname as schema,
   c.relname as relation,
   greatest(c.reltuples, 0)::bigint as estimated_row_count
@@ -312,12 +476,12 @@ join pg_catalog.pg_namespace n on n.oid = c.relnamespace
 where n.nspname = ${quoteLiteral(schema)}
   and c.relname = ${quoteLiteral(relation)}
   and c.relkind in ('r', 'p')`,
-      'count'
-    );
-  }
-  if (operation === 'sample') {
-    const columns = await runQuery(
-      `select a.attname as column_name
+    'count'
+  );
+}
+async function runSample(schema, relation, safeTable, limit) {
+  const columns = await runQuery(
+    `select a.attname as column_name
 from pg_catalog.pg_attribute a
 join pg_catalog.pg_class c on c.oid = a.attrelid
 join pg_catalog.pg_namespace n on n.oid = c.relnamespace
@@ -327,26 +491,25 @@ where n.nspname = ${quoteLiteral(schema)}
   and not a.attisdropped
 order by a.attnum
 limit 100`,
-      'sample-columns'
-    );
-    const rows = Array.isArray(columns.data) ? columns.data : columns.data?.rows;
-    if (!Array.isArray(rows) || rows.length === 0)
-      throw new Error(`table not found or has no visible columns: ${safeTable}`);
-    const selectedColumns = rows
-      .map((row) => row.column_name)
-      .filter((name) => typeof name === 'string' && SAFE_SAMPLE_COLUMN_PATTERN.test(name))
-      .map((name) => `\"${name.replaceAll('"', '""')}\"`);
-    if (selectedColumns.length === 0)
-      throw new Error(`no non-sensitive sample columns available for ${safeTable}`);
-    return runQuery(
-      `select ${selectedColumns.join(', ')} from ${safeTable} limit ${limit}`,
-      'sample'
-    );
-  }
+    'sample-columns'
+  );
+  const rows = rowsOf(columns.data);
+  if (rows.length === 0) throw new Error(`table not found or has no visible columns: ${safeTable}`);
+  const selectedColumns = rows
+    .map((row) => row.column_name)
+    .filter((name) => typeof name === 'string' && SAFE_SAMPLE_COLUMN_PATTERN.test(name))
+    .map((name) => `\"${name.replaceAll('"', '""')}\"`);
+  if (selectedColumns.length === 0)
+    throw new Error(`no non-sensitive sample columns available for ${safeTable}`);
+  return runQuery(
+    `select ${selectedColumns.join(', ')} from ${safeTable} limit ${limit}`,
+    'sample'
+  );
+}
+function runDistribution(safeTable, column, limit) {
   const safeColumn = validateIdentifier(column, 'column').split('.').at(-1);
-  if (!SAFE_DISTRIBUTION_COLUMN_PATTERN.test(safeColumn)) {
+  if (!SAFE_DISTRIBUTION_COLUMN_PATTERN.test(safeColumn))
     throw new Error(`distribution is not available for column: ${safeColumn}`);
-  }
   return runQuery(
     `select ${safeColumn} as value, count(*)::bigint as count
 from ${safeTable}
@@ -370,28 +533,29 @@ function parseSizeBytes(value) {
   const multipliers = { bytes: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3, tb: 1024 ** 4 };
   return Number(match[1]) * multipliers[match[2].toLowerCase()];
 }
+function normalizeMigrationSql(source) {
+  const tokens = /--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'/g;
+  return source.replace(tokens, (token) => token.replace(/[^\n]/g, ' '));
+}
 function extractMigrationRelations(source) {
-  const relations = new Set();
-  const normalizedSource = source.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const normalizedSource = normalizeMigrationSql(source);
   const patterns = [
     /\b(?:alter\s+table|create\s+(?:unique\s+)?index\s+\S+\s+on|drop\s+table|truncate\s+table|update|delete\s+from|insert\s+into)\s+(?:if\s+(?:not\s+)?exists\s+)?([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi,
     /\bfrom\s+([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi,
     /\bjoin\s+([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi,
   ];
-  for (const pattern of patterns) {
-    for (const match of normalizedSource.matchAll(pattern)) {
-      const relation = match[1].replace(/^public\./i, 'public.');
-      if (!['select', 'where', 'set', 'values', 'using', 'on'].includes(relation.toLowerCase()))
-        relations.add(relation.includes('.') ? relation : `public.${relation}`);
-    }
-  }
-  return [...relations].sort();
+  const matches = patterns.flatMap((pattern) => [...normalizedSource.matchAll(pattern)]);
+  const relations = matches.map((match) => normalizeRelation(match[1])).filter(Boolean);
+  return [...new Set(relations)].sort();
+}
+function normalizeRelation(value) {
+  const relation = value.replace(/^public\./i, 'public.');
+  const ignored = ['select', 'where', 'set', 'values', 'using', 'on'];
+  if (ignored.includes(relation.toLowerCase())) return undefined;
+  return relation.includes('.') ? relation : `public.${relation}`;
 }
 function classifyMigration(source) {
-  const normalized = source
-    .replace(/--.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .toLowerCase();
+  const normalized = normalizeMigrationSql(source).toLowerCase();
   const statementTexts = normalized
     .split(';')
     .map((statement) => statement.trim())
@@ -417,6 +581,7 @@ function classifyMigration(source) {
     .filter((pattern) => pattern.test(normalized))
     .map((pattern) => pattern.source);
   const hasQuotedIdentifier = /["`]/.test(normalized);
+  const hasMalformedLiteral = normalized.includes("'");
   const hasDynamicSql = /\b(?:execute|format)\b/.test(normalized);
   const hasUnclassifiedStatement = statementTexts.some(
     (statement) =>
@@ -424,13 +589,26 @@ function classifyMigration(source) {
         statement
       )
   );
-  const incomplete =
-    unsupported_constructs.length > 0 ||
-    hasQuotedIdentifier ||
-    hasDynamicSql ||
-    hasUnclassifiedStatement ||
-    statementTexts.length > 1;
-  const classification = {
+  const incomplete = [
+    unsupported_constructs.length > 0,
+    hasQuotedIdentifier,
+    hasMalformedLiteral,
+    hasDynamicSql,
+    hasUnclassifiedStatement,
+    statementTexts.length > 1,
+  ].some(Boolean);
+  const classification = getMigrationClassification(normalized, {
+    unsupported_constructs,
+    hasQuotedIdentifier,
+    hasMalformedLiteral,
+    hasDynamicSql,
+    hasUnclassifiedStatement,
+    statementCount: statementTexts.length,
+  });
+  return formatMigrationClassification(classification, incomplete);
+}
+function getMigrationClassification(normalized, details) {
+  return {
     contains_ddl: /\b(alter|create|drop|truncate|rename)\b/.test(normalized),
     contains_data_change: /\b(insert|update|delete|merge)\b/.test(normalized),
     contains_index_build: /\bcreate\s+(?:unique\s+)?index\b/.test(normalized),
@@ -441,12 +619,15 @@ function classifyMigration(source) {
       ),
     contains_transaction_control: /\b(begin|commit|rollback)\b/.test(normalized),
     contains_timeout: /\bstatement_timeout\b/.test(normalized),
-    unsupported_constructs,
-    has_quoted_identifier: hasQuotedIdentifier,
-    has_dynamic_sql: hasDynamicSql,
-    has_unclassified_statement: hasUnclassifiedStatement,
-    statement_count: statementTexts.length,
+    unsupported_constructs: details.unsupported_constructs,
+    has_quoted_identifier: details.hasQuotedIdentifier,
+    has_malformed_literal: details.hasMalformedLiteral,
+    has_dynamic_sql: details.hasDynamicSql,
+    has_unclassified_statement: details.hasUnclassifiedStatement,
+    statement_count: details.statementCount,
   };
+}
+function formatMigrationClassification(classification, incomplete) {
   return {
     ...classification,
     assessment: incomplete ? 'incomplete' : 'classified',
@@ -465,77 +646,12 @@ async function runPreflight(migrationPath) {
   const source = readFileSync(path, 'utf8');
   const relations = extractMigrationRelations(source);
   const classification = classifyMigration(source);
-  const reports = await Promise.all([
-    runSupabase(['table-stats'], 'table-stats'),
-    runSupabase(['index-stats'], 'index-stats'),
-    runSupabase(['traffic-profile'], 'traffic'),
-    runSupabase(['vacuum-stats'], 'vacuum'),
-    runSupabase(['outliers'], 'outliers'),
-    runSupabase(['locks'], 'locks'),
-    runSupabase(['blocking'], 'blocking'),
-  ]);
+  const reports = await runPreflightReports();
   const reportData = Object.fromEntries(reports.map((report) => [report.operation, report.data]));
-  const observations = reports.map((report) => report.observation).filter(Boolean);
-  const observation = observations[0] ?? (await getObservation());
-  const tableRows = rowsOf(reportData['table-stats']);
-  const indexRows = rowsOf(reportData['index-stats']);
-  const trafficRows = rowsOf(reportData.traffic);
-  const vacuumRows = rowsOf(reportData.vacuum);
-  const affectedRelations = relations.map((relation) => {
-    const table = tableRows.find(
-      (row) => row.name === relation || row.name === relation.replace(/^public\./, '')
-    );
-    const indexes = indexRows.filter(
-      (row) => row.table === relation || row.table === relation.replace(/^public\./, '')
-    );
-    const traffic = trafficRows.filter((row) => row.table === relation || row.name === relation);
-    const vacuum = vacuumRows.find((row) => row.name === relation);
-    return {
-      relation,
-      table_stats: table ?? null,
-      index_stats: indexes,
-      traffic,
-      vacuum_stats: vacuum ?? null,
-      estimated_table_size_bytes: parseSizeBytes(table?.table_size),
-      estimated_index_size_bytes: parseSizeBytes(table?.index_size),
-    };
-  });
-  const risks = [];
-  if (classification.assessment === 'incomplete')
-    risks.push(
-      'Static migration classification is incomplete; treat operational risk as unknown and require manual review.'
-    );
-  if (classification.contains_data_change)
-    risks.push(
-      'Migration changes existing data and requires an independently reviewed operational strategy.'
-    );
-  if (classification.contains_table_rewrite_risk)
-    risks.push(
-      'ALTER TABLE may rewrite or lock an existing relation; verify PostgreSQL version-specific behavior.'
-    );
-  if (classification.contains_index_build && !classification.contains_concurrent_index)
-    risks.push('A non-concurrent index build can block writes on an active table.');
-  if (classification.contains_index_build && classification.contains_concurrent_index)
-    risks.push(
-      'Concurrent index creation avoids the main write lock but requires extra time, I/O, and disk space.'
-    );
-  if (
-    (classification.contains_data_change ||
-      classification.contains_table_rewrite_risk ||
-      classification.contains_index_build) &&
-    !classification.contains_timeout
-  )
-    risks.push(
-      'No statement_timeout was detected; add an explicit timeout for expensive operations where appropriate.'
-    );
-  if (classification.contains_transaction_control)
-    risks.push(
-      'Transaction-control statements need explicit review because the deployment runner controls migration transactions.'
-    );
-  if (affectedRelations.some((item) => item.table_stats === null))
-    risks.push(
-      'At least one referenced relation was not found in the observer table report; confirm whether it is new, renamed, or inaccessible.'
-    );
+  const observation = await getReportObservation(reports);
+  const affectedRelations = getAffectedRelations(relations, reportData);
+  const risks = getMigrationRisks(classification, affectedRelations);
+  const assessment = getPreflightAssessment(classification, risks);
   return {
     ok: true,
     operation: 'preflight',
@@ -544,13 +660,8 @@ async function runPreflight(migrationPath) {
     observation,
     migration: { path: migrationPath, bytes: Buffer.byteLength(source), relations, classification },
     affected_relations: affectedRelations,
-    assessment: classification.assessment === 'incomplete' ? 'incomplete' : 'evidence_only',
-    risk:
-      classification.assessment === 'incomplete'
-        ? 'unknown'
-        : risks.length > 0
-          ? 'high'
-          : 'requires_review',
+    assessment: assessment.status,
+    risk: assessment.risk,
     requires_manual_review: true,
     risks,
     reports: reportData,
@@ -561,83 +672,183 @@ async function runPreflight(migrationPath) {
     ],
   };
 }
+async function runPreflightReports() {
+  const operations = [
+    ['table-stats', 'table-stats'],
+    ['index-stats', 'index-stats'],
+    ['traffic-profile', 'traffic'],
+    ['vacuum-stats', 'vacuum'],
+    ['outliers', 'outliers'],
+    ['locks', 'locks'],
+    ['blocking', 'blocking'],
+  ];
+  const reports = [];
+  for (const [command, label] of operations) reports.push(await runSupabase([command], label));
+  return reports;
+}
+async function getReportObservation(reports) {
+  const observation = reports.map((report) => report.observation).find(Boolean);
+  return observation ?? getObservation();
+}
+function getPreflightAssessment(classification, risks) {
+  if (classification.assessment === 'incomplete') return { status: 'incomplete', risk: 'unknown' };
+  if (risks.length > 0) return { status: 'evidence_only', risk: 'high' };
+  return { status: 'evidence_only', risk: 'requires_review' };
+}
+function getAffectedRelations(relations, reports) {
+  const rows = {
+    tables: rowsOf(reports['table-stats']),
+    indexes: rowsOf(reports['index-stats']),
+    traffic: rowsOf(reports.traffic),
+    vacuum: rowsOf(reports.vacuum),
+  };
+  return relations.map((relation) => getAffectedRelation(relation, rows));
+}
+function matchesRelation(value, relation) {
+  return value === relation || value === relation.replace(/^public\./, '');
+}
+function getAffectedRelation(relation, rows) {
+  const table = rows.tables.find((row) => matchesRelation(row.name, relation));
+  const indexes = rows.indexes.filter((row) => matchesRelation(row.table, relation));
+  const traffic = rows.traffic.filter((row) => matchesTrafficRelation(row, relation));
+  const vacuum = rows.vacuum.find((row) => matchesRelation(row.name, relation));
+  return {
+    relation,
+    table_stats: nullable(table),
+    index_stats: indexes,
+    traffic,
+    vacuum_stats: nullable(vacuum),
+    estimated_table_size_bytes: parseRelationSize(table, 'table_size'),
+    estimated_index_size_bytes: parseRelationSize(table, 'index_size'),
+  };
+}
+function matchesTrafficRelation(row, relation) {
+  return matchesRelation(row.table, relation) || matchesRelation(row.name, relation);
+}
+function nullable(value) {
+  return value ?? null;
+}
+function parseRelationSize(table, key) {
+  return parseSizeBytes(table ? table[key] : undefined);
+}
+function getMigrationRisks(classification, affectedRelations) {
+  const expensiveOperation = [
+    classification.contains_data_change,
+    classification.contains_table_rewrite_risk,
+    classification.contains_index_build,
+  ].some(Boolean);
+  const rules = [
+    [
+      classification.assessment === 'incomplete',
+      'Static migration classification is incomplete; treat operational risk as unknown and require manual review.',
+    ],
+    [
+      classification.contains_data_change,
+      'Migration changes existing data and requires an independently reviewed operational strategy.',
+    ],
+    [
+      classification.contains_table_rewrite_risk,
+      'ALTER TABLE may rewrite or lock an existing relation; verify PostgreSQL version-specific behavior.',
+    ],
+    [
+      classification.contains_index_build && !classification.contains_concurrent_index,
+      'A non-concurrent index build can block writes on an active table.',
+    ],
+    [
+      classification.contains_index_build && classification.contains_concurrent_index,
+      'Concurrent index creation avoids the main write lock but requires extra time, I/O, and disk space.',
+    ],
+    [
+      expensiveOperation && !classification.contains_timeout,
+      'No statement_timeout was detected; add an explicit timeout for expensive operations where appropriate.',
+    ],
+    [
+      classification.contains_transaction_control,
+      'Transaction-control statements need explicit review because the deployment runner controls migration transactions.',
+    ],
+    [
+      affectedRelations.some((item) => item.table_stats === null),
+      'At least one referenced relation was not found in the observer table report; confirm whether it is new, renamed, or inaccessible.',
+    ],
+  ];
+  return rules.filter(([applies]) => applies).map(([, message]) => message);
+}
+async function runCanaryCommand() {
+  const results = [await runQuery(HEALTH_SQL, 'health')];
+  validateCanaryHealth(results[0]);
+  for (const operation of CANARY_OPERATIONS)
+    results.push(await runSupabase([INSPECTION_COMMANDS.get(operation)], operation));
+  return {
+    ok: true,
+    operation: 'canary',
+    target: getTarget().label,
+    generated_at: new Date().toISOString(),
+    observation: results[0]?.observation ?? (await getObservation()),
+    checks: results.map(({ operation, observation, data }) => ({ operation, observation, data })),
+    notes: [
+      'Telemetry-only canary; no application rows, samples, distributions, or migration preflight were executed.',
+    ],
+  };
+}
+async function runPreflightCommand(values) {
+  const migration = values.get('migration');
+  if (typeof migration !== 'string') return usage('preflight requires --migration <path>');
+  return runPreflight(migration);
+}
+function getTableArgument(operation, values) {
+  const table = values.get('table');
+  if (typeof table !== 'string') return usage(`${operation} requires --table <table>`);
+  return table;
+}
+async function runSampleCommand(values) {
+  const table = getTableArgument('sample', values);
+  if (!table) return undefined;
+  const limit = parsePositiveInteger(
+    String(values.get('limit') ?? MAX_SAMPLE_LIMIT),
+    'limit',
+    MAX_SAMPLE_LIMIT
+  );
+  return runTableData('sample', table, undefined, limit);
+}
+async function runDistributionCommand(values) {
+  const table = getTableArgument('distribution', values);
+  if (!table) return undefined;
+  const column = values.get('column');
+  if (typeof column !== 'string') return usage('distribution requires --column <column>');
+  const limit = parsePositiveInteger(
+    String(values.get('limit') ?? MAX_DISTRIBUTION_LIMIT),
+    'limit',
+    MAX_DISTRIBUTION_LIMIT
+  );
+  return runTableData('distribution', table, column, limit);
+}
+async function runCountCommand(values) {
+  const table = getTableArgument('count', values);
+  if (!table) return undefined;
+  return runTableData('count', table, undefined, MAX_SAMPLE_LIMIT);
+}
+const COMMAND_HANDLERS = new Map([
+  ['canary', runCanaryCommand],
+  ['health', () => runQuery(HEALTH_SQL, 'health')],
+  ['schema', runSchema],
+  ['preflight', runPreflightCommand],
+  ['sample', runSampleCommand],
+  ['distribution', runDistributionCommand],
+  ['count', runCountCommand],
+  ...[...INSPECTION_COMMANDS].map(([operation, command]) => [
+    operation,
+    () => runSupabase([command], operation),
+  ]),
+]);
 async function main() {
   const [operation, ...rest] = process.argv.slice(2);
-  if (!operation || operation === '--help' || operation === '-h') return usage();
-  const { values } = parseArgs(rest);
-  if (operation === 'canary') {
-    const results = [
-      await runQuery(
-        `select
-  current_database() as database,
-  current_user as role,
-  inet_server_addr()::text as server_address,
-  inet_server_port() as server_port,
-  current_setting('default_transaction_read_only') as default_transaction_read_only,
-  current_setting('statement_timeout') as statement_timeout,
-  current_setting('lock_timeout') as lock_timeout`,
-        'health'
-      ),
-    ];
-    for (const canaryOperation of CANARY_OPERATIONS) {
-      results.push(await runSupabase([INSPECTION_COMMANDS.get(canaryOperation)], canaryOperation));
-    }
-    return console.log(
-      JSON.stringify({
-        ok: true,
-        operation: 'canary',
-        target: getTarget().label,
-        generated_at: new Date().toISOString(),
-        observation: results[0]?.observation ?? (await getObservation()),
-        checks: results.map(({ operation, observation, data }) => ({
-          operation,
-          observation,
-          data,
-        })),
-        notes: [
-          'Telemetry-only canary; no application rows, samples, distributions, or migration preflight were executed.',
-        ],
-      })
-    );
-  }
-  if (operation === 'health') {
-    const result = await runQuery(
-      `select
-  current_database() as database,
-  current_user as role,
-  inet_server_addr()::text as server_address,
-  inet_server_port() as server_port,
-  current_setting('default_transaction_read_only') as default_transaction_read_only,
-  current_setting('statement_timeout') as statement_timeout,
-  current_setting('lock_timeout') as lock_timeout`,
-      'health'
-    );
-    return console.log(JSON.stringify(result));
-  }
-  if (operation === 'schema') return console.log(JSON.stringify(await runSchema()));
-  if (operation === 'preflight') {
-    const migration = values.get('migration');
-    if (typeof migration !== 'string') return usage('preflight requires --migration <path>');
-    return console.log(JSON.stringify(await runPreflight(migration)));
-  }
-  if (operation === 'sample' || operation === 'distribution' || operation === 'count') {
-    const table = values.get('table');
-    if (typeof table !== 'string') return usage(`${operation} requires --table <table>`);
-    const column = values.get('column');
-    if (operation === 'distribution' && typeof column !== 'string')
-      return usage('distribution requires --column <column>');
-    const defaultLimit = operation === 'distribution' ? MAX_DISTRIBUTION_LIMIT : MAX_SAMPLE_LIMIT;
-    const limit =
-      operation === 'count'
-        ? defaultLimit
-        : parsePositiveInteger(String(values.get('limit') ?? defaultLimit), 'limit', defaultLimit);
-    return console.log(JSON.stringify(await runTableData(operation, table, column, limit)));
-  }
-  if (INSPECTION_COMMANDS.has(operation)) {
-    return console.log(
-      JSON.stringify(await runSupabase([INSPECTION_COMMANDS.get(operation)], operation))
-    );
-  }
-  return usage(`unknown operation: ${operation}`);
+  if (isHelpOperation(operation)) return usage();
+  const handler = COMMAND_HANDLERS.get(operation);
+  if (!handler) return usage(`unknown operation: ${operation}`);
+  const result = await handler(parseArgs(rest));
+  if (result !== undefined) console.log(JSON.stringify(result));
+}
+function isHelpOperation(operation) {
+  return operation === undefined || ['--help', '-h'].includes(operation);
 }
 main().catch(fail);

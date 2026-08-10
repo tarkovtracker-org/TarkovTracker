@@ -4,12 +4,12 @@
 
 Naming: `NUXT_*` = Nuxt private (server-only), `NUXT_PUBLIC_*` = Nuxt public (browser-exposed).
 
-**Nuxt app (set in Cloudflare Pages):**
+**Nuxt app (Cloudflare Pages):**
 
-- `NUXT_PUBLIC_SUPABASE_URL` — Supabase project URL (`SUPABASE_URL` also works as fallback)
-- `NUXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key (`SUPABASE_ANON_KEY` also works)
-- `NUXT_SUPABASE_SERVICE_KEY` — Supabase service role key
-- `NUXT_PUBLIC_APP_URL` — Application URL (`APP_URL` / `CF_PAGES_URL` also work)
+- `SUPABASE_URL` — Supabase project URL, managed as plaintext in `wrangler.toml`
+- `SUPABASE_ANON_KEY` — Supabase anon key, managed as plaintext in `wrangler.toml`
+- `NUXT_SUPABASE_SERVICE_KEY` — encrypted Supabase service role key in the Pages dashboard
+- `APP_URL` — production application URL in `wrangler.toml`; previews use `CF_PAGES_URL`
 - `API_ALLOWED_HOSTS` — production host allowlist
 - `API_TRUST_PROXY` — only when overriding proxy auto-detection (forwarded headers are trusted
   only when `API_TRUST_PROXY=true` or `NITRO_PRESET` is explicitly set to a `cloudflare*`
@@ -39,6 +39,7 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
   (per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID`
   are optional)
 - `DISCORD_LINKED_ROLE_ID` for the role applied after a user links Discord from Settings.
+- `APP_URL` for `admin-cache-purge` cache-key construction.
 
 Configure the Stripe webhook endpoint to send:
 
@@ -337,7 +338,9 @@ IPv6 connectivity is unavailable). The transaction pooler is unsupported; the wr
 `:6543` URL because that is the documented default transaction-pooler endpoint, even though Supavisor
 can be configured differently. The credential must belong to a dedicated observer role with no
 data-write or DDL privileges; the environment must not contain `service_role`, `postgres`, migration,
-or Management API credentials.
+or Management API credentials. The wrapper removes the URL password before invoking the Supabase
+CLI, supplies it through a temporary mode-`0600` `PGPASSFILE`, removes the file after each command,
+and redacts the password from command failures.
 
 ```bash
 PROD_DB_TARGET=local scripts/prod-db health
@@ -355,10 +358,12 @@ SQL, writes, DDL, migration commands, and unbounded row access are not supported
 
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
-run distributions, or execute migration preflight. Every report includes an `observation` object
-with capture time, observer application name, database statistics reset time, statement statistics
-reset time, and I/O statistics reset time. These reset times are required to interpret cumulative
-counters.
+run distributions, or execute migration preflight. Before collecting telemetry it rejects
+privileged or write-capable roles, persistent-object creation privileges, disabled default
+read-only transactions, and unbounded statement or lock timeouts. Every report includes an
+`observation` object with capture time, observer application name, database statistics reset time,
+statement statistics reset time, and I/O statistics reset time. These reset times are required to
+interpret cumulative counters.
 
 `preflight` parses the proposed migration to identify referenced relations and operation classes,
 then combines that information with production table/index, traffic, vacuum, query, lock, and
@@ -369,10 +374,12 @@ quoted identifiers, multiple statements, or any unclassified syntax, it returns
 unrecognized migration as safe.
 
 Provision the observer role out of band through the Supabase SQL editor or approved database
-operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_read_all_stats` as
-needed. Set conservative connection defaults such as `statement_timeout`, `lock_timeout`, and
-`application_name`; database privileges, not `default_transaction_read_only`, are the hard safety
-boundary.
+operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI
+inspection reports such as `db-stats` call monitoring functions that `pg_read_all_stats` alone does
+not permit. Grant `USAGE` on `extensions` and only explicit low-risk column-level `SELECT` when
+bounded samples or distributions are required. Set conservative connection defaults for
+`statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
+database privileges, not `default_transaction_read_only`, are the hard safety boundary.
 
 The production canary should be run manually after provisioning, using only the telemetry commands
 above. Confirm the role, reset timestamps, timeouts, and negligible observer impact before enabling

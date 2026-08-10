@@ -717,8 +717,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   the public sitekey and private secret together, so the client cannot submit before its widget is
   ready. Without the pair the route behaves as before (no token required). Siteverify availability
   failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
-- Siteverify responses are pinned to the `NUXT_PUBLIC_APP_URL` hostname, so a token minted on
-  another origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
+- Siteverify responses are pinned to the canonical `APP_URL` hostname, so a token minted on another
+  origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
   reports `example.com` for every origin; it only validates test-key tokens, never production ones.
 - Cached and upstream `200` payloads must pass the import profile schema before use. Invalid cached
   entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
@@ -773,16 +773,19 @@ flowchart LR
 5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
    SQL, unbounded samples, and non-allowlisted distributions.
 6. `canary` runs only health and telemetry reports and is the first production validation path.
-   It never reads application rows or runs migration preflight.
+   It rejects privileged/write-capable roles and unbounded transaction or lock timeouts before it
+   runs the telemetry reports. It never reads application rows or runs migration preflight.
 7. `preflight --migration <path>` parses the migration to identify referenced relations and
-   operation classes, collects table/index, traffic, vacuum, query, lock, and blocking reports,
-   and returns an evidence-only JSON report. Unsupported or ambiguous syntax fails closed with
-   `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`. It does not
-   execute the migration.
+   operation classes, then collects table/index, traffic, vacuum, query, lock, and blocking reports
+   sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
+   report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
+   `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
 8. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
-   observer role. The role's actual database privileges are the hard safety boundary; connection
-   defaults such as `statement_timeout`, `lock_timeout`, and `default_transaction_read_only` are
-   additional defenses.
+   observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
+   the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
+   arguments and command errors. The credential file is removed after each CLI invocation.
+   The role's actual database privileges are the hard safety boundary; connection defaults such as
+   `statement_timeout`, `lock_timeout`, and `default_transaction_read_only` are additional defenses.
 
 ### Files
 
@@ -800,6 +803,8 @@ flowchart LR
 - `PROD_DB_URL` uses a direct connection or session-mode pooler; the transaction pooler is
   unsupported because session-level settings are not safe as a security boundary there. The
   wrapper rejects the documented default transaction-pooler port `6543`.
+- Observer passwords must not appear in child-process arguments, inherited `PROD_DB_URL` values,
+  normalized output, or command errors.
 - Every successful operation returns JSON with `ok`, `operation`, `target`, `generated_at`, an
   `observation` object, and `data` or report fields.
 - Built-in telemetry is allowlisted and does not depend on Supabase CLI text formatting.
@@ -808,8 +813,12 @@ flowchart LR
 - The observer never executes migrations, arbitrary SQL, writes, DDL, `EXPLAIN ANALYZE`, or
   transaction-control statements.
 - `canary` is telemetry-only and excludes samples, distributions, and preflight.
+- `canary` must fail before telemetry collection when the observer is privileged, can write
+  application tables or create persistent objects, lacks default read-only transactions, or has
+  unbounded statement or lock timeouts.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
-  production migration execution remains in the reviewed merge and Supabase deployment workflow.
+  production reports run sequentially, and migration execution remains in the reviewed merge and
+  Supabase deployment workflow.
 
 ## When this doc is wrong
 

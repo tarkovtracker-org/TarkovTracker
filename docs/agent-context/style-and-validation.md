@@ -22,6 +22,7 @@ Deeper conventions for agents. Root `AGENTS.md` links here for reference; these 
 
 ## Styling Details
 
+- `.env.example` files use one-line `# === TITLE` section headers (not full-width `# =====` separator blocks). Full-width separators tokenize to ~2–3 tokens each — the same cost as a short marker — so they only add agent token cost without readability gain. Agents read these files frequently; keep headers single-line and token-aware.
 - Tailwind classes are auto-sorted by Prettier via `prettier-plugin-tailwindcss`. Keep class lists tidy.
 - Use Tailwind theme layer for colors — no hex values in templates.
 - For complex animations or utilities not available in Tailwind, define them in `app/assets/css/tailwind.css` using `@theme` or `@keyframes`.

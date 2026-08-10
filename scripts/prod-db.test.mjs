@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -8,23 +8,76 @@ const script = join(root, 'scripts/prod-db');
 const directory = mkdtempSync(join(tmpdir(), 'prod-db-'));
 const migration = join(directory, 'migration.sql');
 const unsafeMigration = join(directory, 'unsafe-migration.sql');
+const literalMigration = join(directory, 'literal-migration.sql');
+const malformedMigration = join(directory, 'malformed-migration.sql');
+const fakeSupabase = join(directory, 'supabase');
 writeFileSync(
   migration,
   `-- comments should not affect classification\nalter table public.events add column created_at timestamptz;\ncreate index concurrently idx_events_created_at on public.events(created_at);\n`
 );
 writeFileSync(unsafeMigration, "DO $$ BEGIN EXECUTE format('select %s', '1'); END $$;");
+writeFileSync(
+  literalMigration,
+  "update public.events set status = 'ready--still-literal;drop table ignored';"
+);
+writeFileSync(malformedMigration, "update public.events set status = 'unterminated;");
+writeFileSync(
+  fakeSupabase,
+  `#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+const args = process.argv.slice(2);
+const sql = args.at(-1) ?? '';
+const password = process.env.PGPASSFILE ? readFileSync(process.env.PGPASSFILE, 'utf8') : '';
+if (process.env.FAKE_SUPABASE_FAIL === 'true') {
+  console.error(\`failure password=\${password} url=\${process.env.PROD_DB_URL}\`);
+  process.exit(1);
+}
+let data = [{
+  database: 'postgres',
+  observer_role: 'pi_prod_observer',
+  observer_application_name: process.env.PGAPPNAME,
+  statement_stats_reset: null,
+  io_stats_reset: null,
+  default_transaction_read_only: 'on',
+  statement_timeout: '15s',
+  lock_timeout: '1s',
+  is_superuser: process.env.FAKE_SUPABASE_UNSAFE === 'true',
+  can_create_database: false,
+  can_create_role: false,
+  can_replicate: false,
+  can_bypass_rls: false,
+  is_write_role: false,
+  has_table_write: false,
+  can_create_in_public: false,
+  can_create_in_database: false,
+  custom_config: 'secret-setting',
+  arguments: args,
+  password_received: password.includes('observer-secret'),
+  pgpass_file_received: Boolean(process.env.PGPASSFILE),
+  pgpass_path: process.env.PGPASSFILE,
+  prod_db_url_received: Boolean(process.env.PROD_DB_URL),
+}];
+if (sql.includes('pg_catalog.pg_attribute')) {
+  data = [{ column_name: 'id' }, { column_name: 'email' }];
+}
+if (process.env.FAKE_SUPABASE_NOISE === 'true') process.stdout.write('[warn] diagnostic\\n');
+process.stdout.write(JSON.stringify({ rows: data }));
+`
+);
+chmodSync(fakeSupabase, 0o755);
 chmodSync(script, 0o755);
 afterAll(() => {
-  try {
-    execFileSync('rm', ['-rf', directory]);
-  } catch {
-    return;
-  }
+  rmSync(directory, { recursive: true, force: true });
 });
 function run(args, extraEnv = {}) {
   return execFileSync(script, args, {
     cwd: root,
-    env: { ...process.env, PROD_DB_TARGET: 'local', ...extraEnv },
+    env: {
+      ...process.env,
+      PROD_DB_SUPABASE_BIN: fakeSupabase,
+      PROD_DB_TARGET: 'local',
+      ...extraEnv,
+    },
     encoding: 'utf8',
   });
 }
@@ -38,6 +91,7 @@ describe('prod-db observer', () => {
     expect(result.observation.observer_application_name).toBe('pi-prod-observer');
     expect(result.observation).toHaveProperty('statement_stats_reset');
     expect(result.observation).toHaveProperty('io_stats_reset');
+    expect(result.data.rows[0].custom_config).toBe('[REDACTED]');
   });
   it('keeps samples bounded and excludes sensitive columns', () => {
     const result = JSON.parse(run(['sample', '--table', 'user_progress', '--limit', '20']));
@@ -54,6 +108,8 @@ describe('prod-db observer', () => {
       run(['distribution', '--table', 'user_progress', '--column', 'user_id;drop'])
     ).toThrow('invalid column');
   });
+});
+describe('prod-db migration preflight', () => {
   it('builds a migration-aware preflight report without executing the migration', () => {
     const result = JSON.parse(run(['preflight', '--migration', migration]));
     expect(result.operation).toBe('preflight');
@@ -76,6 +132,21 @@ describe('prod-db observer', () => {
     expect(result.migration.classification.has_dynamic_sql).toBe(true);
     expect(result.migration.classification.unsupported_constructs.length).toBeGreaterThan(0);
   });
+  it('does not split comments or semicolons inside SQL string literals', () => {
+    const result = JSON.parse(run(['preflight', '--migration', literalMigration]));
+    expect(result.migration.classification.statement_count).toBe(1);
+    expect(result.migration.classification.contains_data_change).toBe(true);
+    expect(result.migration.classification.contains_ddl).toBe(false);
+    expect(result.migration.classification.has_unclassified_statement).toBe(false);
+  });
+  it('fails closed for malformed SQL string literals', () => {
+    const result = JSON.parse(run(['preflight', '--migration', malformedMigration]));
+    expect(result.migration.classification.has_malformed_literal).toBe(true);
+    expect(result.assessment).toBe('incomplete');
+    expect(result.risk).toBe('unknown');
+  });
+});
+describe('prod-db command boundary', () => {
   it('rejects transaction-pooler connection URLs', () => {
     expect(() =>
       run(['health'], {
@@ -84,6 +155,39 @@ describe('prod-db observer', () => {
       })
     ).toThrow('transaction pooler');
   });
+  it('rejects credentials supplied through URL query parameters', () => {
+    expect(() =>
+      run(['health'], {
+        PROD_DB_TARGET: 'primary',
+        PROD_DB_URL:
+          'postgresql://pi_prod_observer:secret@example.test:5432/postgres?password=leaked',
+      })
+    ).toThrow('credentials must use URL userinfo');
+  });
+  it('keeps credentials out of child arguments and redacts command failures', () => {
+    const connection = 'postgresql://pi_prod_observer:observer-secret@example.test:5432/postgres';
+    const result = JSON.parse(
+      run(['health'], { PROD_DB_TARGET: 'primary', PROD_DB_URL: connection })
+    );
+    expect(result.data.rows[0].arguments.join(' ')).not.toContain('observer-secret');
+    expect(result.data.rows[0].password_received).toBe(true);
+    expect(result.data.rows[0].pgpass_file_received).toBe(true);
+    expect(existsSync(result.data.rows[0].pgpass_path)).toBe(false);
+    expect(result.data.rows[0].prod_db_url_received).toBe(false);
+    expect(() =>
+      run(['health'], {
+        FAKE_SUPABASE_FAIL: 'true',
+        PROD_DB_TARGET: 'primary',
+        PROD_DB_URL: connection,
+      })
+    ).toThrowError(expect.not.stringContaining('observer-secret'));
+  });
+  it('ignores bracket-prefixed CLI noise before JSON output', () => {
+    const result = JSON.parse(run(['health'], { FAKE_SUPABASE_NOISE: 'true' }));
+    expect(result.ok).toBe(true);
+  });
+});
+describe('prod-db canary', () => {
   it('runs a telemetry-only canary without data-shape operations', () => {
     const result = JSON.parse(run(['canary']));
     expect(result.operation).toBe('canary');
@@ -96,5 +200,10 @@ describe('prod-db observer', () => {
       'outliers',
     ]);
     expect(result.notes[0]).toContain('Telemetry-only canary');
+  });
+  it('rejects an unsafe observer role before running the canary reports', () => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_UNSAFE: 'true' })).toThrow(
+      'unsafe observer configuration: observer role is a superuser'
+    );
   });
 });

@@ -25,35 +25,20 @@ const normalizePublicAppUrl = (value: string): string => {
   return `https://${trimmed}`;
 };
 export const resolveSupabaseRuntimeConfig = (env: NodeJS.ProcessEnv) => {
+  const anonKey = env.SUPABASE_ANON_KEY?.trim() || '';
+  const url = env.SUPABASE_URL?.trim() || '';
+  if (Boolean(anonKey) !== Boolean(url)) {
+    throw new Error('[Config] Incomplete Supabase credentials: SUPABASE_*');
+  }
   return {
-    privateAnonKey: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_ANON_KEY,
-      env.SUPABASE_ANON_KEY,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_ANON_KEY
-    ),
-    privateUrl: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_URL,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_URL
-    ),
-    publicAnonKey: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_ANON_KEY,
-      env.SUPABASE_ANON_KEY,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_ANON_KEY
-    ),
-    publicUrl: resolveEnvValue(
-      env.NUXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_URL,
-      // deprecated — remove after 2026-07-31
-      env.VITE_SUPABASE_URL
-    ),
+    privateAnonKey: anonKey,
+    privateUrl: url,
+    publicAnonKey: anonKey,
+    publicUrl: url,
   };
 };
 export const resolvePublicAppUrl = (env: NodeJS.ProcessEnv): string => {
-  const configuredUrl = resolveEnvValue(env.NUXT_PUBLIC_APP_URL, env.APP_URL, env.CF_PAGES_URL);
+  const configuredUrl = resolveEnvValue(env.APP_URL, env.CF_PAGES_URL);
   if (!configuredUrl) {
     return 'http://localhost:3000';
   }
