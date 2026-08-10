@@ -155,6 +155,8 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
   `ApiTokens.vue`). Keep that flag off in production so create stays on the Edge limiter.
 - **Token revoke** has an automatic unavailable-function fallback to direct delete in
   `useEdgeFunctions.revokeToken`. That path **skips** the Edge limiter; DB/RLS still apply.
+- **Token rename** is a direct PostgREST update and is not Edge-rate-limited. Database grants restrict
+  authenticated updates to the `note` column, and RLS restricts the row to its owner.
 - The DB still enforces the **max 3 active tokens** trigger even if rate limiting is skipped.
 - Prefer keeping create/revoke behind Edge Functions in production and avoid enabling create
   fallbacks.
