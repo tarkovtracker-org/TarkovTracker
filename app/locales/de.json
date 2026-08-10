@@ -135,15 +135,6 @@
     "supabase_config_hint": "Für diese Bereitstellung fehlt die öffentliche Supabase-Konfiguration. Setze NUXT_PUBLIC_SUPABASE_URL und NUXT_PUBLIC_SUPABASE_ANON_KEY für Previews oder erlaube Preview-Builds den Offline-Modus.",
     "request_blocked_hint": "Eine zum Rendern dieser Seite erforderliche Anfrage wurde blockiert. Öffne die technischen Details und gib die fehlerhafte Anfrage-URL beim Melden des Problems an."
   },
-  "loading_screen": {
-    "title": "TarkovTracker wird geladen",
-    "title_error": "Ladeproblem",
-    "subtitle": "Erforderliche Spieldaten werden heruntergeladen...",
-    "subtitle_error": "Einige Daten konnten nicht geladen werden",
-    "first_load_info": "Dies kann beim ersten Laden einen Moment dauern. Die Daten werden für zukünftige Besuche zwischengespeichert.",
-    "partial_data_info": "Die App funktioniert auch mit unvollständigen Daten. Du kannst erneut versuchen oder trotzdem fortfahren.",
-    "continue_anyway": "Trotzdem fortfahren"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Versteck aktualisiert",
