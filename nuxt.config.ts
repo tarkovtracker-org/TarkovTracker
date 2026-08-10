@@ -279,13 +279,14 @@ export default defineNuxtConfig({
       style: [
         {
           textContent: [
+            ':root{--shell-w:224px}',
             'body{background:hsl(0 0% 4%)}',
             '#__nuxt:empty::before{',
             'content:"";',
             'display:block;',
             'position:fixed;',
             'inset:0;',
-            'width:224px;',
+            'width:var(--shell-w);',
             'background:hsl(0 0% 9%);',
             'border-right:1px solid hsl(0 0% 25%);',
             'z-index:50',
@@ -295,7 +296,7 @@ export default defineNuxtConfig({
             'display:block;',
             'position:fixed;',
             'top:0;',
-            'left:224px;',
+            'left:var(--shell-w);',
             'right:0;',
             'height:44px;',
             'background:hsl(0 0% 9%);',
@@ -303,13 +304,21 @@ export default defineNuxtConfig({
             'z-index:40',
             '}',
             '@media(max-width:959px){',
-            '#__nuxt:empty::before{width:64px}',
-            '#__nuxt:empty::after{left:64px}',
+            ':root{--shell-w:64px}',
             '}',
           ].join(''),
         },
       ],
       script: [
+        {
+          innerHTML: [
+            'try{',
+            'if(window.localStorage.getItem("app_drawerRail")==="true"',
+            '&&window.matchMedia("(min-width:960px)").matches)',
+            '{document.documentElement.style.setProperty("--shell-w","64px")}',
+            '}catch(e){}',
+          ].join(''),
+        },
         {
           type: 'application/ld+json',
           textContent: JSON.stringify(webApplicationSchema),

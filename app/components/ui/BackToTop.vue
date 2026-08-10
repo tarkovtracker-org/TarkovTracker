@@ -15,13 +15,12 @@
   const { t } = useI18n({ useScope: 'global' });
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
-  let ticking = false;
+  let rafId: number | null = null;
   const onScroll = () => {
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(() => {
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
         visible.value = window.scrollY > SCROLL_THRESHOLD;
-        ticking = false;
+        rafId = null;
       });
     }
   };
@@ -34,5 +33,9 @@
   });
   onUnmounted(() => {
     window.removeEventListener('scroll', onScroll);
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
   });
 </script>
