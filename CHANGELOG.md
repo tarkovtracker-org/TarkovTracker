@@ -1,3 +1,10 @@
+# [1.66.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.65.0...v1.66.0) (2026-08-10)
+
+
+### Features
+
+* **api:** add read-only production database observer ([#667](https://github.com/tarkovtracker-org/TarkovTracker/issues/667)) ([24d3b41](https://github.com/tarkovtracker-org/TarkovTracker/commit/24d3b41942bf00c7cba4efa5549a5c16efee527e))
+
 # [1.65.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.2...v1.65.0) (2026-08-10)
 
 
