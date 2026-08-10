@@ -90,11 +90,9 @@ Before finishing any agent task:
 - State what validation was run and what passed/failed.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
-- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier, ESLint, and the blank-line fixer on staged files). Do not run `pnpm run format` manually unless the hook is bypassed or cannot run (missing `node_modules` / husky harness). CI `format:check` is the gate; never commit knowing hooks were skipped without formatting staged paths yourself.
-- Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
-- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
-- Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' JUnit reports still reach Codecov.
-- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff) and disables per-shard coverage thresholds (Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`). Local `pnpm run test` / `pnpm run test:coverage` remain unsharded with vitest thresholds active.
+- Formatting is handled by the pre-commit hook. Do not run `pnpm run format` manually unless the hook is bypassed. CI `format:check` is the gate.
+- Coverage, bundle analysis, JUnit test results, and shard configuration are handled by CI — see
+  `docs/WORKFLOW_AUTOMATION.md`. Local `pnpm run test` / `pnpm run test:coverage` remain unsharded.
 - Lighthouse runs once per selected route on UI/performance PRs. Use repeated local or manual runs to investigate a borderline failure instead of increasing every PR's collection count.
 
 ## Production Readiness Review
@@ -124,11 +122,8 @@ When asked to "review for production readiness", "deep review", "is this safe to
   the implicit `PUBLIC` grant and leaves those explicit role grants in place, which trips advisor
   lint 0028 on `SECURITY DEFINER` functions. Trigger functions and service-role-only helpers must
   name all three roles. Grant back to `service_role` explicitly when the service role needs it.
-- **Never put a bulk data rewrite in a migration.** The deployment runner applies each migration file
-  atomically even when `-- supabase:disable-transaction` is present, so a timeout rolls back the file
-  while other deploy targets can still succeed. Ship schema separately, make every read tolerate
-  missing rows, and use an approved operation with one independently committed range only when data
-  must be materialized. See the Database Migrations section of `docs/runbook.md`.
+- **Never put a bulk data rewrite in a migration.** Ship schema separately, make reads tolerate
+  missing rows. See the Database Migrations section of `docs/runbook.md`.
 - **Keep changes scoped** to the requested task. Prefer small, reviewable diffs.
 
 ## Coding Conventions
@@ -137,7 +132,8 @@ Formatting is enforced by Prettier + ESLint (see `.prettierrc`, `eslint.config.m
 
 - 2-space indent, 100-char lines, single quotes, semicolons, trailing commas (es5).
 - `.env.example` files use one-line `# === TITLE` section headers, not full-width `# ===...===` separator blocks. Tokenizers compress runs of repeated characters, so a long separator costs ~2–3 tokens — the same as a short one — and only adds agent token cost. These files are read often by agents; keep headers single-line and token-efficient.
-- Quote string values in `wrangler.toml`, where TOML requires string delimiters. Keep `.env`, `.env.*`, and `.dev.vars*` values unquoted by default to match dashboard entry style; quote only when dotenv semantics require it, such as preserving surrounding whitespace, `#`, or multiline content. Enter raw values without decorative quotes in Cloudflare dashboard value fields and interactive `wrangler secret put` prompts because Cloudflare preserves the submitted string. See `docs/ARCHITECTURE.md`.
+- Quote string values in `wrangler.toml` (TOML requires it). Keep `.env`/`.dev.vars` values unquoted
+  unless dotenv semantics require it. See `docs/ARCHITECTURE.md` for the full quoting convention.
 - Imports: alphabetically sorted, no blank lines between groups, group order: builtin → external → internal → parent → sibling → index → object → type.
 - Avoid unused imports/exports.
 - Keep functions small; prefer early returns. Avoid inline comments unless explaining a non-obvious decision.
@@ -180,7 +176,6 @@ Naming:
 
 ## Localization
 
-- `app/locales/en.json` is the source locale. Only edit this file.
 - Non-English files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) are Crowdin-owned exports.
 - vue-i18n fallback locale is `en` (`app/i18n.config.ts`). Missing non-English keys render English automatically.
 - `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
@@ -246,13 +241,12 @@ Naming:
 
 - Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks) for the first in-flight task.
 - Before edits, run `git status --short --branch`.
-- Never mix unrelated changes in one commit or PR.
 - Do not use `git stash` for normal context switching unless the user asks.
 - Worktree policy (parallel work isolation):
   - Default to the main checkout for the first in-flight task. Do not create a worktree for solo work or for batched pre-PR edits the user is accumulating before opening a PR.
   - Create a worktree only when starting a SECOND concurrent task while the first is still in flight (uncommitted edits in the main checkout, or an open PR waiting on CI/review). The first task stays in the main checkout; the new task gets a worktree. This is what enables parallel agents without one agent reverting another's uncommitted changes.
   - Worktree convention: path `.wt/<branch>` (co-located, gitignored), created via `bash scripts/wt.sh add <branch>`. The script runs `scripts/setup-worktree.sh` so husky + lint-staged work on commit. State the worktree path in every status update so the user knows which checkout the agent is operating in.
-  - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. Never run `git restore`, `git checkout --`, `git clean`, or `git reset` on a working tree with changes you did not make — if the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
+  - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. If the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
   - After a worktree's PR merges, remove it with `bash scripts/wt.sh rm <branch>` so stale worktrees and branches don't accumulate.
 - Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue; `node scripts/lint-blank-lines.mjs --fix` for supported source/config files) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
