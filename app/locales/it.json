@@ -1111,6 +1111,12 @@
           "load_tokens_error": "Impossibile caricare i token API.",
           "copy_failed": "Copia del token non riuscita.",
           "copy_token": "Copia token",
+          "edit_name": "Modifica nome token",
+          "edit_name_aria": "Modifica nome token per {name}",
+          "save_name": "Salva nome token",
+          "cancel_name_edit": "Annulla modifica nome token",
+          "name_updated": "Nome token aggiornato",
+          "name_update_error": "Impossibile aggiornare il nome del token. Per favore riprova.",
           "token_created": "Token creato",
           "token_created_description": "Copia e memorizza questo token ora. Non potrai visualizzarlo di nuovo.",
           "token_created_close": "Fatto",
@@ -1132,6 +1138,7 @@
           "report": {
             "load_failed": "Caricamento del token API fallito",
             "create_failed": "Creazione token API non riuscita",
+            "rename_failed": "Rinominazione del token API fallita",
             "revoke_failed": "Revoca del token API non riuscita"
           },
           "list": {
