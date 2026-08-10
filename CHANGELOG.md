@@ -1,3 +1,10 @@
+## [1.68.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.3...v1.68.4) (2026-08-10)
+
+
+### Performance Improvements
+
+* **ui:** bundle all icons locally to eliminate Iconify CDN calls ([#698](https://github.com/tarkovtracker-org/TarkovTracker/issues/698)) ([d492bba](https://github.com/tarkovtracker-org/TarkovTracker/commit/d492bba56e33007884547cde8c74b9077ee67f6e))
+
 ## [1.68.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.2...v1.68.3) (2026-08-10)
 
 
