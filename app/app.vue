@@ -1,6 +1,5 @@
 <template>
   <UApp :tooltip="{ delayDuration: 300 }">
-    <LoadingScreen />
     <NuxtRouteAnnouncer />
     <NuxtLayout>
       <NuxtErrorBoundary @error="handlePageError">

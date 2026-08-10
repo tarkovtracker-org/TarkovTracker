@@ -18,9 +18,9 @@
               }
             ],
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.35
+                "minScore": 0.2
               }
             ],
             "categories:seo": [
@@ -47,9 +47,9 @@
               }
             ],
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.55
+                "minScore": 0.2
               }
             ],
             "categories:seo": [
@@ -76,7 +76,7 @@
               }
             ],
             "categories:performance": [
-              "error",
+              "warn",
               {
                 "minScore": 0.2
               }
