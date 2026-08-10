@@ -20,6 +20,7 @@ describe('AppFooterColumn', () => {
       global: { stubs: { NuxtLink: NuxtLinkStub } },
     });
     expect(wrapper.get('nav').attributes('aria-label')).toBe('Legal');
+    expect(wrapper.get('ul').classes()).toContain('list-disc');
     expect(wrapper.get('a').attributes('href')).toBe('/privacy');
     await wrapper.get('button').trigger('click');
     expect(onClick).toHaveBeenCalledOnce();
