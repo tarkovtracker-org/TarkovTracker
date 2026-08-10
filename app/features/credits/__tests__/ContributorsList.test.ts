@@ -13,8 +13,10 @@ vi.mock('@/features/credits/useContributors', () => ({
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
-    t: (key: string, params?: Record<string, unknown>) =>
-      params?.count == null ? key : `${params.count} contributors`,
+    t: (key: string, params?: Record<string, unknown>, choice?: number) =>
+      params?.count == null
+        ? key
+        : `${params.count} ${choice === 1 ? 'contributor' : 'contributors'}`,
   }),
 }));
 const mountList = () =>
@@ -45,10 +47,12 @@ describe('ContributorsList', () => {
     pending.value = true;
     const wrapper = mountList();
     expect(wrapper.text()).toContain('page.credits.contributors.loading');
+    expect(wrapper.get('[role="status"]').attributes('role')).toBe('status');
     pending.value = false;
     showError.value = true;
     await wrapper.vm.$nextTick();
     expect(wrapper.text()).toContain('page.credits.contributors.error');
+    expect(wrapper.get('[role="alert"]').attributes('role')).toBe('alert');
     await wrapper.get('button').trigger('click');
     expect(refresh).toHaveBeenCalledOnce();
   });
@@ -59,5 +63,8 @@ describe('ContributorsList', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.text()).toContain('2 contributors');
     expect(wrapper.findAll('li')).toHaveLength(2);
+    contributors.value = [{ name: 'One' }];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('1 contributor');
   });
 });

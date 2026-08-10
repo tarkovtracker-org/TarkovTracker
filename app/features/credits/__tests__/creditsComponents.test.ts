@@ -64,6 +64,7 @@ describe('credits member presentation', () => {
       target: '_blank',
     });
     expect(wrapper.get('img').attributes('alt')).toBe('');
+    expect(wrapper.text()).toContain('common.opens_in_new_tab');
     expect(wrapper.get('[data-icon="i-mdi-open-in-new"]').attributes('data-icon')).toBe(
       'i-mdi-open-in-new'
     );
@@ -86,6 +87,7 @@ describe('credits member presentation', () => {
     const unordered = mount(CreditMemberList, { props: { members }, global });
     expect(ordered.element.tagName).toBe('OL');
     expect(ordered.classes()).toContain('grid');
+    expect(ordered.classes()).toContain('list-decimal');
     expect(unordered.element.tagName).toBe('UL');
     expect(unordered.classes()).toContain('flex');
   });

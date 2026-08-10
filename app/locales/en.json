@@ -1218,7 +1218,7 @@
         "error": "Unable to load contributors right now.",
         "empty": "No contributors found yet.",
         "contributions": "{count} contribution | {count} contributions",
-        "total": "{count} contributors"
+        "total": "{count} contributor | {count} contributors"
       },
       "description": "Meet the creators, staff, support members, beta testers, and open source contributors behind Tarkov Tracker."
     },

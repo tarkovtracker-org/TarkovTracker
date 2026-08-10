@@ -8,11 +8,11 @@
         {{ contributorCountLabel }}
       </span>
     </div>
-    <div v-if="pending" class="text-surface-300 mt-4 flex items-center gap-2 text-sm">
+    <div v-if="pending" role="status" class="text-surface-300 mt-4 flex items-center gap-2 text-sm">
       <UIcon name="i-mdi-loading" class="h-4 w-4 animate-spin" />
       <span>{{ t('page.credits.contributors.loading') }}</span>
     </div>
-    <div v-else-if="showError" class="mt-4 space-y-3">
+    <div v-else-if="showError" role="alert" class="mt-4 space-y-3">
       <p class="text-error-300 text-sm">
         {{ t('page.credits.contributors.error') }}
       </p>
@@ -33,7 +33,11 @@
   const { contributors, pending, refresh, showError } = useContributors();
   const contributorCountLabel = computed(() =>
     contributors.value.length
-      ? t('page.credits.contributors.total', { count: contributors.value.length })
+      ? t(
+          'page.credits.contributors.total',
+          { count: contributors.value.length },
+          contributors.value.length
+        )
       : ''
   );
 </script>

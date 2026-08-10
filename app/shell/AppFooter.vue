@@ -45,6 +45,7 @@
   import AppFooterColumn from '@/shell/AppFooterColumn.vue';
   import { logger } from '@/utils/logger';
   import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
+  import type { FooterNavItem } from '@/shell/footerNavigation';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const appVersion = runtimeConfig.public.appVersion || 'dev';
@@ -84,10 +85,7 @@
     { label: t('page.changelog.title'), to: '/changelog' },
   ]);
   const legalItems = computed(() => {
-    const items: (
-      | { label: string; to: string; onClick?: never }
-      | { label: string; onClick: () => void; to?: never }
-    )[] = [
+    const items: FooterNavItem[] = [
       { label: t('common.terms_of_service'), to: '/terms-of-service' },
       { label: t('common.privacy_policy'), to: '/privacy' },
     ];

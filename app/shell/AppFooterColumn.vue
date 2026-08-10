@@ -12,12 +12,7 @@
   </nav>
 </template>
 <script setup lang="ts">
-  interface FooterNavItemBase {
-    label: string;
-  }
-  type FooterNavItem =
-    | (FooterNavItemBase & { to: string; onClick?: never })
-    | (FooterNavItemBase & { onClick: () => void; to?: never });
+  import type { FooterNavItem } from '@/shell/footerNavigation';
   defineProps<{
     title: string;
     items: FooterNavItem[];

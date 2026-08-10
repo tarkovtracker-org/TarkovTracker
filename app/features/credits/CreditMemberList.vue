@@ -27,5 +27,8 @@
     row: 'flex flex-col gap-2',
     grid: 'grid grid-cols-1 gap-x-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
   };
-  const listClasses = computed(() => LIST_CLASSES[props.variant]);
+  const listClasses = computed(() => [
+    LIST_CLASSES[props.variant],
+    props.ordered ? 'list-decimal pl-5' : '',
+  ]);
 </script>
