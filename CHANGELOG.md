@@ -1,3 +1,10 @@
+# [1.67.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.66.0...v1.67.0) (2026-08-10)
+
+
+### Features
+
+* **api:** allow renaming API tokens ([#685](https://github.com/tarkovtracker-org/TarkovTracker/issues/685)) ([0cfac2c](https://github.com/tarkovtracker-org/TarkovTracker/commit/0cfac2cecc0b17e6d590fe798c99ba3e20094af6))
+
 # [1.66.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.65.0...v1.66.0) (2026-08-10)
 
 
