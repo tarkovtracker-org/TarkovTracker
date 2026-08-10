@@ -51,7 +51,11 @@
           <div class="min-w-0 flex-1 space-y-2">
             <div>
               <p class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase">
-                {{ t('page.resources.guide_label', 'Guide') }}
+                {{
+                  isOfficialGuide
+                    ? t('page.resources.official_guide_label', 'TarkovTracker.org Guide')
+                    : t('page.resources.guide_label', 'Guide')
+                }}
               </p>
               <h1 class="mt-1 text-2xl font-bold tracking-wide text-white sm:text-3xl">
                 {{ guideTitle }}
@@ -118,6 +122,22 @@
             icon="i-mdi-information-outline"
           >
             <p class="text-surface-200 text-base leading-relaxed">{{ overviewText }}</p>
+          </ResourceGuideSection>
+          <ResourceGuideSection
+            v-if="resource.videoId"
+            id="video"
+            :title="t('page.resources.guide_sections.video_walkthrough', 'Video Walkthrough')"
+            icon="i-mdi-play-circle-outline"
+          >
+            <ResourceVideoEmbed :video-id="resource.videoId" :title="videoTitle" />
+            <p class="text-surface-400 mt-2 text-sm">
+              {{
+                t(
+                  'page.resources.video.caption',
+                  'Community video walkthrough. Steps may differ slightly from the guide above.'
+                )
+              }}
+            </p>
           </ResourceGuideSection>
           <ResourceGuideSection
             v-if="resource.guide && resource.guide.steps > 0"
@@ -249,6 +269,7 @@
     getResourceBySlug,
   } from '@/features/resources/resourceData';
   import ResourceGuideSection from '@/features/resources/ResourceGuideSection.vue';
+  import ResourceVideoEmbed from '@/features/resources/ResourceVideoEmbed.vue';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const slug = computed(() => {
@@ -274,10 +295,16 @@
       CATEGORY_LABEL_FALLBACKS[resource.value.category]
     );
   });
+  const isOfficialGuide = computed(() => resource.value?.category === 'tarkovtracker_guides');
   const metaLine = computed(() => {
     if (!resource.value) return '';
     const parts: string[] = [];
-    if (resource.value.category === 'companion_apps') {
+    if (resource.value.category === 'tarkovtracker_guides') {
+      parts.push(t('page.resources.meta.official_guide', 'Official guide'));
+      parts.push(
+        t('page.resources.meta.maintained_by_team', 'Maintained by the TarkovTracker.org team')
+      );
+    } else if (resource.value.category === 'companion_apps') {
       parts.push(t('page.resources.meta.windows', 'Windows'));
       parts.push(t('page.resources.meta.companion_app', 'Companion App'));
       parts.push(t('page.resources.meta.setup_time', '5-minute setup'));
@@ -290,6 +317,13 @@
     }
     return parts.join(' · ');
   });
+  const videoTitle = computed(() =>
+    t(
+      'page.resources.video.walkthrough_title',
+      { name: guideTitle.value },
+      `${guideTitle.value} video walkthrough`
+    )
+  );
   const compatibilityText = computed(() => {
     if (!resource.value?.guide?.compatibility) return '';
     return t(`page.resources.guides.${slug.value}.compatibility`, '');
@@ -302,6 +336,12 @@
   );
   const tocItems = computed(() => {
     const items = [{ id: 'overview', label: t('common.overview', 'Overview') }];
+    if (resource.value?.videoId) {
+      items.push({
+        id: 'video',
+        label: t('page.resources.guide_sections.video_walkthrough', 'Video Walkthrough'),
+      });
+    }
     if (resource.value?.guide && resource.value.guide.steps > 0) {
       items.push({
         id: 'setup',

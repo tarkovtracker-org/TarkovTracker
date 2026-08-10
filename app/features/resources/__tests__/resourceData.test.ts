@@ -153,6 +153,13 @@ describe('resourceData locale parity', () => {
       expect(resourcesLocale.guides[resource.slug]).toBeUndefined();
     }
   });
+  it('every guide with a videoId has a valid YouTube video id format', () => {
+    for (const resource of RESOURCES.filter((entry) => entry.videoId)) {
+      expect(resource.videoId, `${resource.slug} videoId`).toMatch(/^[\w-]{11}$/);
+    }
+    const orgGuide = RESOURCES.find((resource) => resource.videoId);
+    expect(orgGuide).toBeDefined();
+  });
   it('matches search queries against name, purpose, and keywords', () => {
     const ratScanner = RESOURCES.find((resource) => resource.slug === 'ratscanner');
     if (!ratScanner) throw new Error('ratscanner missing');
@@ -162,6 +169,18 @@ describe('resourceData locale parity', () => {
     expect(
       matchesResourceSearch(ratScanner, 'API', 'RatScanner', 'Scan tooltips', 'Companion Apps')
     ).toBe(false);
+  });
+  it('uses a read guide action and empty secondary links for official guides', () => {
+    const orgGuide = RESOURCES.find((resource) => resource.slug === 'tarkovtracker_org_vs_io');
+    if (!orgGuide) throw new Error('tarkovtracker_org_vs_io missing');
+    expect(orgGuide.category).toBe('tarkovtracker_guides');
+    const primary = getPrimaryAction(orgGuide);
+    expect(primary).toMatchObject({
+      kind: 'internal',
+      href: '/resources/tarkovtracker_org_vs_io',
+      labelFallback: 'Read guide',
+    });
+    expect(splitSecondaryActions(orgGuide)).toEqual({ highlighted: null, more: [] });
   });
   it('keeps one secondary action visible and groups the rest as more', () => {
     const tarkovdev = RESOURCES.find((resource) => resource.slug === 'tarkovdev');

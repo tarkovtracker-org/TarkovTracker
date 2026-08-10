@@ -83,6 +83,24 @@ describe('ResourceCard', () => {
     expect(wrapper.get('[data-testid="more-menu"]').text()).toContain('Open website');
     expect(wrapper.get('[data-testid="more-menu"]').text()).toContain('View source');
   });
+  it('renders the official guide badge and links only to the guide for first-party guides', () => {
+    const wrapper = mountCard(
+      {
+        slug: 'tarkovtracker_org_vs_io',
+        logo: '/img/logos/tarkovtrackerlogo-mini.webp',
+        category: 'tarkovtracker_guides',
+        hasGuide: true,
+        guide: { steps: 0, tips: 0, faq: 4 },
+        primaryAction: 'guide',
+        keywords: ['io', 'org'],
+        links: [],
+      },
+      true
+    );
+    expect(wrapper.text()).toContain('Official Guide');
+    expect(wrapper.get('a[href="/resources/tarkovtracker_org_vs_io"]').text()).toBe('Read guide');
+    expect(wrapper.find('[data-testid="more-menu"]').exists()).toBe(false);
+  });
   it('renders the placeholder icon and external primary action when configured', () => {
     const wrapper = mountCard({
       slug: 'cultistcircle',

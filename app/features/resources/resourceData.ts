@@ -1,5 +1,6 @@
 export type ResourceLinkType = 'website' | 'github' | 'discord' | 'api' | 'download';
-export type ResourceCategory = 'companion_apps' | 'data_and_apis' | 'calculators_and_reference';
+export type ResourceCategory =
+  'tarkovtracker_guides' | 'companion_apps' | 'data_and_apis' | 'calculators_and_reference';
 export type ResourcePrimaryAction = 'guide' | 'website' | 'api';
 export interface ResourceLink {
   type: ResourceLinkType;
@@ -18,6 +19,7 @@ export interface Resource {
   category: ResourceCategory;
   hasGuide: boolean;
   guide?: ResourceGuideConfig;
+  videoId?: string;
   links: ResourceLink[];
   primaryAction: ResourcePrimaryAction;
   keywords: string[];
@@ -31,23 +33,37 @@ export interface ResourceAction {
   external: boolean;
 }
 export const RESOURCE_CATEGORIES: ResourceCategory[] = [
+  'tarkovtracker_guides',
   'companion_apps',
   'data_and_apis',
   'calculators_and_reference',
 ];
 export const CATEGORY_LABEL_FALLBACKS: Record<ResourceCategory, string> = {
+  tarkovtracker_guides: 'TarkovTracker.org Guides',
   companion_apps: 'Companion Apps',
   data_and_apis: 'Data & Developer Tools',
   calculators_and_reference: 'Calculators & Reference',
 };
 export const CATEGORY_BADGE_FALLBACKS: Record<ResourceCategory, string> = {
+  tarkovtracker_guides: 'Official Guide',
   companion_apps: 'Desktop App',
   data_and_apis: 'Data Platform',
   calculators_and_reference: 'Reference',
 };
 export const RESOURCES: Resource[] = [
   {
+    slug: 'tarkovtracker_org_vs_io',
+    logo: '/img/logos/tarkovtrackerlogo-mini.webp',
+    category: 'tarkovtracker_guides',
+    hasGuide: true,
+    guide: { steps: 0, tips: 0, faq: 4 },
+    primaryAction: 'guide',
+    keywords: ['io', 'org', 'difference', 'domain', 'migration', 'official', 'faq'],
+    links: [],
+  },
+  {
     slug: 'tarkovmonitor',
+    videoId: 'HGwD4drUq0I',
     logo: '/img/logos/tarkovmonitorlogo.avif',
     category: 'companion_apps',
     hasGuide: true,
@@ -65,7 +81,8 @@ export const RESOURCES: Resource[] = [
     logo: '/img/logos/ratscannerlogo.webp',
     category: 'companion_apps',
     hasGuide: true,
-    guide: { steps: 4, tips: 2, faq: 3, troubleshooting: 4, compatibility: true },
+    videoId: 'EIyZYFCLgNo',
+    guide: { steps: 4, tips: 2, faq: 4, troubleshooting: 4, compatibility: true },
     primaryAction: 'guide',
     keywords: ['scanner', 'desktop', 'market', 'barter', 'tooltip', 'price', 'quest'],
     links: [
@@ -197,11 +214,14 @@ const defaultAction = (resource: Resource): ResourceAction | null => {
 };
 export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
   if (resource.primaryAction === 'guide' && resource.hasGuide) {
+    const official = resource.category === 'tarkovtracker_guides';
     return {
       kind: 'internal',
       href: `/resources/${resource.slug}`,
-      labelKey: 'page.resources.actions.setup_guide',
-      labelFallback: 'Setup guide',
+      labelKey: official
+        ? 'page.resources.actions.read_guide'
+        : 'page.resources.actions.setup_guide',
+      labelFallback: official ? 'Read guide' : 'Setup guide',
       icon: 'i-mdi-book-open-page-variant',
       external: false,
     };
