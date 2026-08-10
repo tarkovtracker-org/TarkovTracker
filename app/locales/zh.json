@@ -1111,6 +1111,12 @@
           "load_tokens_error": "加载 API 令牌失败",
           "copy_failed": "Failed to copy token.",
           "copy_token": "Copy token",
+          "edit_name": "编辑令牌名称",
+          "edit_name_aria": "Edit token name for {name}",
+          "save_name": "保存令牌名称",
+          "cancel_name_edit": "取消令牌名称编辑",
+          "name_updated": "令牌名称已更新",
+          "name_update_error": "更新令牌名称失败。请重试。",
           "token_created": "令牌已生成",
           "token_created_description": "请立即复制并妥善保存，此令牌仅显示一次",
           "token_created_close": "完成",
@@ -1132,6 +1138,7 @@
           "report": {
             "load_failed": "加载 API 令牌失败",
             "create_failed": "创建 API 令牌失败",
+            "rename_failed": "API 令牌重命名失败",
             "revoke_failed": "撤销 API 令牌失败"
           },
           "list": {
