@@ -1,6 +1,7 @@
 <template>
-  <li class="min-w-0">
+  <li class="min-w-0" :value="rank">
     <component :is="linkTag" v-bind="linkAttributes" :title="tooltip" :class="itemClasses">
+      <CreditMemberRank :rank="rank" />
       <NuxtImg
         v-if="member.avatar"
         :src="member.avatar"
@@ -24,6 +25,7 @@
 </template>
 <script setup lang="ts">
   import CreditContributionCount from '@/features/credits/CreditContributionCount.vue';
+  import CreditMemberRank from '@/features/credits/CreditMemberRank.vue';
   import {
     creditMemberAvatarClasses,
     creditMemberAvatarSize,
@@ -33,6 +35,7 @@
   const { t } = useI18n({ useScope: 'global' });
   const props = defineProps<{
     member: CreditMember;
+    rank?: number;
     variant: CreditMemberVariant;
   }>();
   const isRow = computed(() => props.variant === 'row');
@@ -48,6 +51,6 @@
   const avatarSize = computed(() => creditMemberAvatarSize(props.variant));
   const avatarClasses = computed(() => creditMemberAvatarClasses(props.variant));
   const itemClasses = computed(() =>
-    creditMemberClasses(props.variant, Boolean(props.member.link))
+    creditMemberClasses(props.variant, Boolean(props.member.link), props.rank != null)
   );
 </script>

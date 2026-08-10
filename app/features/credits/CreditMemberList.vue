@@ -1,9 +1,10 @@
 <template>
   <component :is="listTag" role="list" :class="listClasses">
     <CreditMember
-      v-for="member in members"
+      v-for="(member, index) in members"
       :key="member.name"
       :member="member"
+      :rank="ordered ? index + 1 : undefined"
       :variant="variant"
     />
   </component>
@@ -25,10 +26,15 @@
   const listTag = computed(() => (props.ordered ? 'ol' : 'ul'));
   const LIST_CLASSES: Record<'row' | 'grid', string> = {
     row: 'flex flex-col gap-2',
-    grid: 'grid grid-cols-1 gap-x-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+    grid: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
   };
+  const gridGapClasses = computed(() => {
+    if (props.variant !== 'grid') return '';
+    return props.ordered ? 'gap-x-6 gap-y-1' : 'gap-x-2';
+  });
   const listClasses = computed(() => [
     LIST_CLASSES[props.variant],
-    props.ordered ? 'list-decimal pl-5' : '',
+    gridGapClasses.value,
+    props.ordered ? 'list-none' : '',
   ]);
 </script>

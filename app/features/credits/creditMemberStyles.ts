@@ -13,8 +13,13 @@ export const creditMemberAvatarClasses = (variant: CreditMemberVariant) => {
   const size = variant === 'row' ? 'h-9 w-9' : 'h-7 w-7';
   return `${size} shrink-0 rounded-full border border-white/15 object-cover`;
 };
-export const creditMemberClasses = (variant: CreditMemberVariant, linked: boolean) => [
+export const creditMemberClasses = (
+  variant: CreditMemberVariant,
+  linked: boolean,
+  ranked: boolean = false
+): string[] => [
   BASE_CLASSES[variant],
+  variant === 'grid' && ranked ? 'border border-white/5 bg-white/[0.02]' : '',
   linked
     ? [
         LINK_HOVER_CLASSES[variant],

@@ -69,6 +69,26 @@ describe('credits member presentation', () => {
       'i-mdi-open-in-new'
     );
   });
+  it('aligns an ordered rank inside the contributor row', () => {
+    const wrapper = mount(CreditMember, {
+      props: {
+        member: {
+          contributions: 20,
+          link: 'https://example.com/profile',
+          name: 'Contributor',
+        },
+        rank: 12,
+        variant: 'grid',
+      },
+      global,
+    });
+    expect(wrapper.get('li').attributes('value')).toBe('12');
+    const rank = wrapper.get('a > span');
+    expect(rank.text()).toBe('12.');
+    expect(rank.attributes('aria-hidden')).toBeUndefined();
+    expect(rank.attributes('aria-label')).toBeUndefined();
+    expect(wrapper.get('a').classes()).toContain('border-white/5');
+  });
   it('renders unlinked grid members without an external-link icon', () => {
     const wrapper = mount(CreditMember, {
       props: { member: { name: 'Tester' }, variant: 'grid' },
@@ -84,10 +104,20 @@ describe('credits member presentation', () => {
       props: { members, ordered: true, variant: 'grid' },
       global,
     });
+    const unorderedGrid = mount(CreditMemberList, {
+      props: { members, variant: 'grid' },
+      global,
+    });
     const unordered = mount(CreditMemberList, { props: { members }, global });
     expect(ordered.element.tagName).toBe('OL');
     expect(ordered.classes()).toContain('grid');
-    expect(ordered.classes()).toContain('list-decimal');
+    expect(ordered.classes()).toContain('list-none');
+    expect(ordered.classes()).toContain('gap-x-6');
+    expect(ordered.classes()).toContain('gap-y-1');
+    expect(ordered.classes()).not.toContain('gap-x-2');
+    expect(unorderedGrid.classes()).toContain('gap-x-2');
+    expect(unorderedGrid.classes()).not.toContain('gap-x-6');
+    expect(ordered.findAll('li').map((item) => item.get('span').text())).toEqual(['1.', '2.']);
     expect(unordered.element.tagName).toBe('UL');
     expect(unordered.classes()).toContain('flex');
   });
@@ -99,6 +129,8 @@ describe('credits member presentation', () => {
     expect(creditMemberClasses('row', true).join(' ')).toContain('hover:bg-white/10');
     expect(creditMemberClasses('grid', false).join(' ')).not.toContain('hover:');
     expect(creditMemberClasses('grid', false).join(' ')).not.toContain('focus-visible:');
+    expect(creditMemberClasses('grid', true, true).join(' ')).toContain('bg-white/[0.02]');
+    expect(creditMemberClasses('grid', true, false).join(' ')).not.toContain('border-white/5');
   });
   it('keeps the static credit groups ordered and uniquely keyed', () => {
     expect(staticCreditSections.map((section) => section.key)).toEqual([
