@@ -1209,12 +1209,6 @@
         "beta_testers": "Nuxt - Geschlossene Beta-Tester:",
         "contributors": "Open-Source-Mitwirkende:"
       },
-      "labels": {
-        "creators": "Ersteller",
-        "staff": "Kernteam",
-        "testers": "Beta-Tester",
-        "contributors": "Mitwirkende"
-      },
       "notes": {
         "alphabetical": "Alphabetisch aufgeführt; die Reihenfolge spiegelt nicht den Beitrag wider.",
         "contributors": "GitHub-Mitwirkende sind nach Anzahl der Beiträge sortiert; Bot-Konten sind ausgeschlossen."
@@ -1223,8 +1217,10 @@
         "loading": "Mitwirkende werden geladen...",
         "error": "Mitwirkende konnten derzeit nicht geladen werden.",
         "empty": "Noch keine Mitwirkenden gefunden.",
-        "contributions": "{count} Beiträge"
-      }
+        "contributions": "{count} Beiträge",
+        "total": "{count} Mitwirkender | {count} Mitwirkende"
+      },
+      "description": "Treffen Sie die Schöpfer, Mitarbeiter, Unterstützungsmitglieder, Beta-Tester und Open-Source-Mitwirkenden hinter Tarkov Tracker."
     },
     "login": {
       "subtitle": "Melde dich an, um auf dein Konto zuzugreifen",
@@ -1506,7 +1502,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Analyse-Einstellungen",
-    "game_attribution": "Escape from Tarkov und zugehörige Spielinhalte und Materialien sind Marken und urheberrechtlich geschützte Werke von Battlestate Games Limited und seinen Lizenzgebern. Alle Rechte vorbehalten. TarkovTracker ist ein inoffizielles Fan-Projekt und ist nicht mit Battlestate Games verbunden oder von diesem unterstützt."
+    "game_attribution": "Escape from Tarkov und zugehörige Spielinhalte und Materialien sind Marken und urheberrechtlich geschützte Werke von Battlestate Games Limited und seinen Lizenzgebern. Alle Rechte vorbehalten. TarkovTracker ist ein inoffizielles Fan-Projekt und ist nicht mit Battlestate Games verbunden oder von diesem unterstützt.",
+    "tagline": "Verfolge deine Flucht von Tarkov-Quests, verstecke Upgrades und Items Anforderungen an einem Ort.",
+    "sections": {
+      "explore": "Erforschen",
+      "project": "Projekt",
+      "legal": "Rechtlich"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Hauptnavigation",
