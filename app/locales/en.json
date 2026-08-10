@@ -1203,17 +1203,11 @@
     },
     "credits": {
       "sections": {
-        "original_creator": "Original creator of the project:",
-        "staff": "TarkovTracker.org Staff:",
-        "support_members": "Support Members:",
-        "beta_testers": "Nuxt - Closed Beta Testers:",
-        "contributors": "Open source contributors:"
-      },
-      "labels": {
-        "creators": "Creators",
-        "staff": "Core Team",
-        "testers": "Beta Testers",
-        "contributors": "Contributors"
+        "original_creator": "Original Creator",
+        "staff": "TarkovTracker.org Staff",
+        "support_members": "Support Members",
+        "beta_testers": "Nuxt - Closed Beta Testers",
+        "contributors": "Open Source Contributors"
       },
       "notes": {
         "alphabetical": "Listed alphabetically; order does not reflect contribution.",
@@ -1223,8 +1217,10 @@
         "loading": "Loading contributors...",
         "error": "Unable to load contributors right now.",
         "empty": "No contributors found yet.",
-        "contributions": "{count} contributions"
-      }
+        "contributions": "{count} contribution | {count} contributions",
+        "total": "{count} contributors"
+      },
+      "description": "Meet the creators, staff, support members, beta testers, and open source contributors behind Tarkov Tracker."
     },
     "login": {
       "subtitle": "Sign in to access your account",
@@ -1506,7 +1502,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Analytics Preferences",
-    "game_attribution": "Escape from Tarkov and related game content and materials are trademarks and copyrighted works of Battlestate Games Limited and its licensors. All rights reserved. TarkovTracker is an unofficial fan project and is not affiliated with or endorsed by Battlestate Games."
+    "game_attribution": "Escape from Tarkov and related game content and materials are trademarks and copyrighted works of Battlestate Games Limited and its licensors. All rights reserved. TarkovTracker is an unofficial fan project and is not affiliated with or endorsed by Battlestate Games.",
+    "tagline": "Track your Escape from Tarkov quests, hideout upgrades, and item requirements in one place.",
+    "sections": {
+      "explore": "Explore",
+      "project": "Project",
+      "legal": "Legal"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Main Navigation",
