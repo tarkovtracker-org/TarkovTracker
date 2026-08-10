@@ -165,6 +165,14 @@ Naming:
 - Use union/string literal types for constrained values. `as const` for literal inference.
 - Do not duplicate types already in Supabase generated files.
 
+## Icons
+
+- Icons use `@nuxt/icon` (registered automatically by `@nuxt/ui`). Use `<UIcon name="i-{collection}-{name}" />` or the `icon` prop on UI components.
+- Three Iconify collections are installed locally: `@iconify-json/mdi` (primary), `@iconify-json/heroicons`, `@iconify-json/lucide` (Nuxt UI internal).
+- `icon.clientBundle.scan` in `nuxt.config.ts` bundles all statically-referenced icons at build time into the client bundle. This eliminates runtime CDN fetches for the vast majority of icons.
+- Dynamically-bound icon names (`:name="variable"`) that the scanner cannot resolve at build time fall back to the Iconify CDN at runtime. The CSP `connect-src` entry for `api.iconify.design` exists for this fallback path.
+- When adding new icons, prefer icons from the installed collections (mdi, heroicons, lucide). Adding a new collection requires installing `@iconify-json/{collection}` and adding it to `.fallowrc.json` `ignoreDependencies`.
+
 ## Localization
 
 - Non-English files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) are Crowdin-owned exports.
