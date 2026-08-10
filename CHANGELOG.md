@@ -1,3 +1,10 @@
+## [1.68.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.4...v1.68.5) (2026-08-10)
+
+
+### Performance Improvements
+
+* **app:** remove spa-loading-template and LoadingScreen blocking layers ([#699](https://github.com/tarkovtracker-org/TarkovTracker/issues/699)) ([3142352](https://github.com/tarkovtracker-org/TarkovTracker/commit/31423527cf21e2d6d59f8ee00d15f5e74d06286f))
+
 ## [1.68.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.3...v1.68.4) (2026-08-10)
 
 
