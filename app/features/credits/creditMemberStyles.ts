@@ -16,8 +16,8 @@ export const creditMemberAvatarClasses = (variant: CreditMemberVariant) => {
 export const creditMemberClasses = (
   variant: CreditMemberVariant,
   linked: boolean,
-  ranked = false
-) => [
+  ranked: boolean = false
+): string[] => [
   BASE_CLASSES[variant],
   variant === 'grid' && ranked ? 'border border-white/5 bg-white/[0.02]' : '',
   linked

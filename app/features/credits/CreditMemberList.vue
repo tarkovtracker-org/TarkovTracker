@@ -28,9 +28,13 @@
     row: 'flex flex-col gap-2',
     grid: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
   };
+  const gridGapClasses = computed(() => {
+    if (props.variant !== 'grid') return '';
+    return props.ordered ? 'gap-x-6 gap-y-1' : 'gap-x-2';
+  });
   const listClasses = computed(() => [
     LIST_CLASSES[props.variant],
-    props.variant === 'grid' ? (props.ordered ? 'gap-x-6 gap-y-1' : 'gap-x-2') : '',
+    gridGapClasses.value,
     props.ordered ? 'list-none' : '',
   ]);
 </script>

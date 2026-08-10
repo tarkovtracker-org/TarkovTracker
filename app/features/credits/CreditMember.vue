@@ -1,13 +1,7 @@
 <template>
   <li class="min-w-0" :value="rank">
     <component :is="linkTag" v-bind="linkAttributes" :title="tooltip" :class="itemClasses">
-      <span
-        v-if="rank != null"
-        aria-hidden="true"
-        class="text-surface-300 w-7 shrink-0 text-right text-xs font-semibold tabular-nums"
-      >
-        {{ rank }}.
-      </span>
+      <CreditMemberRank :rank="rank" />
       <NuxtImg
         v-if="member.avatar"
         :src="member.avatar"
@@ -31,6 +25,7 @@
 </template>
 <script setup lang="ts">
   import CreditContributionCount from '@/features/credits/CreditContributionCount.vue';
+  import CreditMemberRank from '@/features/credits/CreditMemberRank.vue';
   import {
     creditMemberAvatarClasses,
     creditMemberAvatarSize,

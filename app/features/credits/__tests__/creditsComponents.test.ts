@@ -83,8 +83,10 @@ describe('credits member presentation', () => {
       global,
     });
     expect(wrapper.get('li').attributes('value')).toBe('12');
-    expect(wrapper.get('a > span').text()).toBe('12.');
-    expect(wrapper.get('a > span').attributes('aria-hidden')).toBe('true');
+    const rank = wrapper.get('a > span');
+    expect(rank.text()).toBe('12.');
+    expect(rank.attributes('aria-hidden')).toBeUndefined();
+    expect(rank.attributes('aria-label')).toBe('12');
     expect(wrapper.get('a').classes()).toContain('border-white/5');
   });
   it('renders unlinked grid members without an external-link icon', () => {
