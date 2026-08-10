@@ -776,7 +776,7 @@ flowchart LR
    It rejects privileged/write-capable roles and unbounded transaction or lock timeouts before it
    runs the telemetry reports. It never reads application rows or runs migration preflight.
 7. `preflight --migration <path>` parses the migration to identify referenced relations and
-   operation classes, then collects table/index, traffic, vacuum, query, lock, and blocking reports
+   operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
    `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.

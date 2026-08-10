@@ -190,9 +190,6 @@
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "scripts/prod-db": [
-      "node scripts/lint-blank-lines.mjs --fix"
-    ],
     "supabase/**/*.json": [
       "prettier --write",
       "node scripts/lint-blank-lines.mjs --fix"
