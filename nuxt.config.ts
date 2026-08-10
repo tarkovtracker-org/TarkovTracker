@@ -276,6 +276,34 @@ export default defineNuxtConfig({
     head: {
       titleTemplate: '%s | Tarkov Tracker',
       title: 'Escape from Tarkov Quest, Hideout, and Item Tracker',
+      style: [
+        {
+          textContent: [
+            '#__nuxt:empty::before{',
+            'content:"";',
+            'display:block;',
+            'position:fixed;',
+            'inset:0;',
+            'width:64px;',
+            'background:hsl(220 20% 10%);',
+            'border-right:1px solid hsl(220 15% 18%);',
+            'z-index:50',
+            '}',
+            '#__nuxt:empty::after{',
+            'content:"";',
+            'display:block;',
+            'position:fixed;',
+            'top:0;',
+            'left:64px;',
+            'right:0;',
+            'height:44px;',
+            'background:hsl(220 20% 10%);',
+            'border-bottom:1px solid hsl(220 15% 18%);',
+            'z-index:40',
+            '}',
+          ].join(''),
+        },
+      ],
       script: [
         {
           type: 'application/ld+json',

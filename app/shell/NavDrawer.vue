@@ -42,6 +42,7 @@
             src="/img/logos/tarkovtrackerlogo-light.webp"
             :alt="t('navigation_drawer.brand_name')"
             class="h-auto w-full"
+            fetchpriority="high"
             preload
           />
         </div>
@@ -78,6 +79,10 @@
   </nav>
 </template>
 <script setup lang="ts">
+  import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
+  import DrawerItem from '@/features/drawer/DrawerItem.vue';
+  import DrawerLevel from '@/features/drawer/DrawerLevel.vue';
+  import DrawerLinks from '@/features/drawer/DrawerLinks.vue';
   import { useAppStore } from '@/stores/useApp';
   import { useTarkovStore } from '@/stores/useTarkov';
   const { t } = useI18n({ useScope: 'global' });
@@ -111,10 +116,4 @@
     }
     return appStore.drawerRail ? 'w-16' : 'w-56';
   });
-  const DrawerLinks = defineAsyncComponent(() => import('@/features/drawer/DrawerLinks.vue'));
-  const DrawerLevel = defineAsyncComponent(() => import('@/features/drawer/DrawerLevel.vue'));
-  const DrawerGameSettings = defineAsyncComponent(
-    () => import('@/features/drawer/DrawerGameSettings.vue')
-  );
-  const DrawerItem = defineAsyncComponent(() => import('@/features/drawer/DrawerItem.vue'));
 </script>

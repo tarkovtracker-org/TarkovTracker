@@ -15,8 +15,15 @@
   const { t } = useI18n({ useScope: 'global' });
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
+  let ticking = false;
   const onScroll = () => {
-    visible.value = window.scrollY > SCROLL_THRESHOLD;
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(() => {
+        visible.value = window.scrollY > SCROLL_THRESHOLD;
+        ticking = false;
+      });
+    }
   };
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

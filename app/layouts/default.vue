@@ -50,12 +50,19 @@
 </template>
 <script setup lang="ts">
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
+  import AppBar from '@/shell/AppBar.vue';
+  import AppFooter from '@/shell/AppFooter.vue';
+  import NavDrawer from '@/shell/NavDrawer.vue';
   import { useAppStore } from '@/stores/useApp';
+  const consentBannerImport = () => import('@/components/analytics/AnalyticsConsentBanner.vue');
+  const AnalyticsConsentBanner = defineAsyncComponent(consentBannerImport);
+  if (import.meta.client) {
+    consentBannerImport();
+  }
   const DRAWER_EXPANDED_WIDTH = '224px';
   const DRAWER_COLLAPSED_WIDTH = '64px';
   const appStore = useAppStore();
   const route = useRoute();
-  // Use shared breakpoints to avoid duplicate listeners
   const { belowMd } = useSharedBreakpoints();
   const mainMarginLeft = computed(() => {
     if (belowMd.value) {
@@ -77,11 +84,4 @@
     'flex min-h-0 flex-1 flex-col p-0',
     usesWindowScroll.value ? 'overflow-visible' : 'overflow-y-auto',
   ]);
-  // Lazy-load shell components
-  const NavDrawer = defineAsyncComponent(() => import('@/shell/NavDrawer.vue'));
-  const AppFooter = defineAsyncComponent(() => import('@/shell/AppFooter.vue'));
-  const AppBar = defineAsyncComponent(() => import('@/shell/AppBar.vue'));
-  const AnalyticsConsentBanner = defineAsyncComponent(
-    () => import('@/components/analytics/AnalyticsConsentBanner.vue')
-  );
 </script>
