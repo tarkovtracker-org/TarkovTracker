@@ -12,6 +12,9 @@
 -- idempotent unschedule-then-schedule guard (cron.schedule throws on a
 -- duplicate jobname and cron.unschedule raises when the job is missing).
 -- 45 3 UTC keeps it staggered behind the other nightly cleanup jobs.
+-- An 89-day window keeps actual retention at or under the disclosed 90-day
+-- maximum despite the once-daily run cadence (a row created just after a run
+-- would otherwise persist ~91 days).
 CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA extensions;
 
 DO $$
@@ -25,5 +28,5 @@ $$;
 SELECT cron.schedule(
   'account-deletion-attempts-cleanup',
   '45 3 * * *',
-  $$SELECT public.cleanup_old_deletion_attempts(90)$$
+  $$SELECT public.cleanup_old_deletion_attempts(89)$$
 );

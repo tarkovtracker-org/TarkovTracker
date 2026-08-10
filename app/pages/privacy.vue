@@ -205,8 +205,9 @@
             <li class="leading-relaxed">
               <strong>Cloudflare Pages & Workers:</strong>
               Web hosting, content delivery network (CDN), static asset serving, API request
-              handling, and edge key-value caching (limited to public, precomputed game data with a
-              7-day retention; no personal data is stored at the edge)
+              handling, and edge key-value caching. Edge caches hold public, precomputed game data
+              with a 7-day retention; shared profile and team responses (display names, progress,
+              and identifiers) are cached for only a few seconds to serve concurrent requests
             </li>
             <li class="leading-relaxed">
               <strong>OAuth Providers:</strong>
@@ -297,8 +298,9 @@
             </li>
             <li class="leading-relaxed">
               <strong>Cloudflare:</strong>
-              Web hosting, CDN, DDoS protection, API request handling, edge caching of public game
-              data, and performance optimization
+              Web hosting, CDN, DDoS protection, API request handling, edge caching (public game
+              data retained up to 7 days; shared profile and team data for a few seconds), and
+              performance optimization
             </li>
             <li class="leading-relaxed">
               <strong>Google Analytics and Microsoft Clarity:</strong>
