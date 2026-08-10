@@ -54,9 +54,10 @@ failures with local repeated runs when runner variance is suspected.
 promoted Twitch embed disabled (see above). Best-practices, SEO, and accessibility floors are
 `error`-level at 0.9 since the embed-free audits clear them comfortably (best-practices and SEO
 1.0, accessibility 0.92-0.96). Performance floors stay conservative: `/hideout` has little margin
-and `/` can dip on cold starts. The `/hideout` performance floor remains 0.2 so the job continues
-to detect regressions despite occasional runner variance. These routes need real layout-shift
-(CLS ~1.38) and main-thread (TBT ~2.3s) work before raising. Raise `lighthouserc.json` score floors after
+and `/` can dip on cold starts. The `/hideout` performance floor remains 0.2; single-run scores
+near the threshold can still require a rerun to distinguish runner variance from a regression.
+These routes need real layout-shift (CLS ~1.38) and main-thread (TBT ~2.3s) work before raising.
+Raise `lighthouserc.json` score floors after
 performance/accessibility work instead of treating the current floors as long-term targets.
 
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
