@@ -84,7 +84,10 @@
     { label: t('page.changelog.title'), to: '/changelog' },
   ]);
   const legalItems = computed(() => {
-    const items: { label: string; to?: string; onClick?: () => void }[] = [
+    const items: (
+      | { label: string; to: string; onClick?: never }
+      | { label: string; onClick: () => void; to?: never }
+    )[] = [
       { label: t('common.terms_of_service'), to: '/terms-of-service' },
       { label: t('common.privacy_policy'), to: '/privacy' },
     ];

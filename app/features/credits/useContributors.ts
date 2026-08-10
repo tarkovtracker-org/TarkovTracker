@@ -8,10 +8,7 @@ const mapContributorToMember = (item: ContributorApiItem): CreditMember => ({
 });
 export const useContributors = () => {
   const runtimeConfig = useRuntimeConfig();
-  const cacheVersion =
-    import.meta.env.VITE_CONTRIBUTORS_CACHE_VERSION?.trim() ||
-    String(runtimeConfig.public.appVersion ?? '').trim() ||
-    '0.0.0-dev';
+  const cacheVersion = String(runtimeConfig.public.appVersion ?? '').trim() || '0.0.0-dev';
   const request = useFetch<ContributorsResponse>(`/api/contributors?v=${cacheVersion}`, {
     key: `credits-contributors-${cacheVersion}`,
     default: () => ({ items: [] }),

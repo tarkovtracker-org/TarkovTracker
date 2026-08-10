@@ -1,7 +1,7 @@
 <template>
   <nav :aria-label="title">
     <h2 class="text-surface-300 text-xs font-semibold tracking-wider uppercase">{{ title }}</h2>
-    <ul role="list" class="mt-3 flex flex-col gap-0.5">
+    <ul class="mt-3 flex flex-col gap-0.5">
       <li v-for="item in items" :key="item.label">
         <button v-if="item.onClick" type="button" :class="linkClass" @click="item.onClick">
           {{ item.label }}
@@ -12,11 +12,12 @@
   </nav>
 </template>
 <script setup lang="ts">
-  interface FooterNavItem {
+  interface FooterNavItemBase {
     label: string;
-    to?: string;
-    onClick?: () => void;
   }
+  type FooterNavItem =
+    | (FooterNavItemBase & { to: string; onClick?: never })
+    | (FooterNavItemBase & { onClick: () => void; to?: never });
   defineProps<{
     title: string;
     items: FooterNavItem[];

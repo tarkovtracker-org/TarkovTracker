@@ -16,6 +16,9 @@ export const creditMemberAvatarClasses = (variant: CreditMemberVariant) => {
 export const creditMemberClasses = (variant: CreditMemberVariant, linked: boolean) => [
   BASE_CLASSES[variant],
   linked
-    ? `${LINK_HOVER_CLASSES[variant]} focus-visible:ring-primary-500 transition-colors focus-visible:ring-2 focus-visible:outline-none`
+    ? [
+        LINK_HOVER_CLASSES[variant],
+        'focus-visible:ring-primary-500 transition-colors focus-visible:ring-2 focus-visible:outline-none',
+      ].join(' ')
     : '',
 ];
