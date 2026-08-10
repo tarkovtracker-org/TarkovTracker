@@ -766,12 +766,13 @@
   };
   const applyTokenRename = (
     requestId: number,
-    token: TokenRow,
+    tokenId: string,
     userId: string,
     nextName: string | null
   ) => {
-    if (!isCurrentTokenRename(requestId, userId, token.id)) return;
-    token.note = nextName;
+    if (!isCurrentTokenRename(requestId, userId, tokenId)) return;
+    const currentToken = tokens.value.find((token) => token.id === tokenId);
+    if (currentToken) currentToken.note = nextName;
     editingTokenId.value = null;
     toast.add({
       title: t('page.settings.card.apitokens.name_updated'),
@@ -794,7 +795,7 @@
     renamingId.value = token.id;
     try {
       await persistTokenName(context.table, token.id, context.userId, nextName);
-      applyTokenRename(requestId, token, context.userId, nextName);
+      applyTokenRename(requestId, token.id, context.userId, nextName);
     } catch (error) {
       handleTokenRenameFailure(requestId, error, token.id, context.userId);
     } finally {

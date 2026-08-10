@@ -411,6 +411,44 @@ describe('ApiTokens', () => {
     ).toHaveLength(0);
     expect(wrapper.text()).not.toContain('Renamed Token A');
   });
+  it('applies a token rename to the current row after a concurrent list reload', async () => {
+    let resolveRename: ((value: { data: { token_id: string }; error: null }) => void) | undefined;
+    mockUpdateSingle.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRename = resolve;
+        })
+    );
+    mockRevokeToken.mockResolvedValueOnce(undefined);
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoadMany('user-a', [
+      makeTokenRow('user-a', 'Existing Token', { token_id: 'user-a-token' }),
+      makeTokenRow('user-a', 'Other Token', { token_id: 'user-a-other-token' }),
+    ]);
+    await flushPromises();
+    await wrapper
+      .findAll('button[aria-label="page.settings.card.apitokens.edit_name_aria"]')[0]!
+      .trigger('click');
+    await wrapper
+      .find('input[aria-label="page.settings.card.apitokens.edit_name"]')
+      .setValue('Renamed Token');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    const revokeButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text() === 'page.settings.card.apitokens.revoke_button');
+    await revokeButtons[1]!.trigger('click');
+    await flushPromises();
+    resolveLoadMany('user-a', [
+      makeTokenRow('user-a', 'Existing Token', { token_id: 'user-a-token' }),
+    ]);
+    await flushPromises();
+    resolveRename?.({ data: { token_id: 'user-a-token' }, error: null });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Renamed Token');
+    expect(wrapper.text()).not.toContain('Existing Token');
+  });
   it('shows an error instead of bypassing the function when token creation throws a statusless error', async () => {
     mockCreateToken.mockRejectedValueOnce(new Error('Internal server error'));
     const wrapper = await createWrapper();

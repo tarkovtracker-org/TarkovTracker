@@ -22,6 +22,12 @@ describe('API token note update migration', () => {
       'GRANT UPDATE (note) ON TABLE public.api_tokens TO authenticated'
     );
     expect(migrationSql).not.toMatch(/GRANT UPDATE \((?!note\))[^)]*\)/);
+    expect(migrationSql).not.toMatch(
+      /GRANT UPDATE ON TABLE public\.api_tokens TO (?:PUBLIC|anon|authenticated)/
+    );
+    expect(migrationSql).not.toMatch(
+      /GRANT UPDATE \(note\) ON TABLE public\.api_tokens TO (?:PUBLIC|anon)/
+    );
   });
   it('limits the update policy to the authenticated owner', () => {
     expect(migrationSql).toMatch(
