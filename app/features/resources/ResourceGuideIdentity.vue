@@ -4,7 +4,7 @@
       v-if="resource.logo"
       class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/5"
     >
-      <NuxtImg :src="resource.logo" :alt="title" class="h-full w-full object-contain" />
+      <NuxtImg :src="resource.logo" alt="" class="h-full w-full object-contain" />
     </div>
     <div
       v-else

@@ -51,7 +51,7 @@ describe('resource guide content', () => {
     });
     expect(wrapper.text()).toContain('TarkovTracker.org Guide');
     expect(wrapper.text()).toContain('Official guide');
-    expect(wrapper.find('img').attributes('alt')).toBe('TarkovTracker.org vs TarkovTracker.io');
+    expect(wrapper.find('img').attributes('alt')).toBe('');
     expect(wrapper.findAll('a')).toHaveLength(2);
   });
   it('renders companion actions and compatibility guidance', async () => {
