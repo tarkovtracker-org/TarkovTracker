@@ -75,7 +75,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 
 Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest path/to/file.test.ts` | By name: `pnpm exec vitest -t "pattern"`
 
 Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
@@ -140,6 +140,9 @@ Formatting is enforced by Prettier + ESLint (see `.prettierrc`, `eslint.config.m
 - Imports: alphabetically sorted, no blank lines between groups, group order: builtin → external → internal → parent → sibling → index → object → type.
 - Avoid unused imports/exports.
 - Keep functions small; prefer early returns. Avoid inline comments unless explaining a non-obvious decision.
+- Tailwind classes are auto-sorted by Prettier via `prettier-plugin-tailwindcss`.
+- For animations/utilities not in Tailwind, define them in `app/assets/css/tailwind.css` using `@theme` or `@keyframes`.
+- Inline styles only for truly dynamic values (e.g., computed positions).
 
 Naming:
 
@@ -285,23 +288,19 @@ Naming:
 
 ## Deeper References
 
-- Agent-context index: `docs/agent-context/README.md`
-- Generated codebase knowledge base (start at the index): `docs/agent-context/summary/index.md`
-- Style, testing, and validation details: `docs/agent-context/style-and-validation.md`
-- Architecture: `docs/ARCHITECTURE.md`
-- System specs (caching, data fetching, overlay, precompute): `docs/SYSTEMS.md`
-- Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
-- Contributing (human workflow entry point): `.github/CONTRIBUTING.md`
-- Local development setup and coding standards: `docs/contributing/development.md`
-- Pull-request requirements: `docs/contributing/pull-requests.md`
-- Security policy: `SECURITY.md`
-- Support routing: `SUPPORT.md`
-- Code of conduct: `CODE_OF_CONDUCT.md`
-- Runbook: `docs/runbook.md`
-- API docs: `docs/API.md`
-- Workflow automation: `docs/WORKFLOW_AUTOMATION.md`
-- Analytics setup: `docs/agent-context/codex-analytics-setup.md`
-- Design spec: `DESIGN.md`
+For domain-specific component, interface, data-model, or workflow details, load `docs/agent-context/summary/index.md` on demand.
+
+| Topic                                             | Location                      |
+| ------------------------------------------------- | ----------------------------- |
+| Architecture & env vars                           | `docs/ARCHITECTURE.md`        |
+| System specs (caching, data, overlay, precompute) | `docs/SYSTEMS.md`             |
+| API reference                                     | `docs/API.md`                 |
+| Rate limiting                                     | `docs/RATE_LIMITING.md`       |
+| Runbook (deploy, incidents)                       | `docs/runbook.md`             |
+| Workflow automation (CI/CD, hooks, releases)      | `docs/WORKFLOW_AUTOMATION.md` |
+| Contributing                                      | `.github/CONTRIBUTING.md`     |
+| Security policy                                   | `SECURITY.md`                 |
+| Design spec                                       | `DESIGN.md`                   |
 
 ## Custom Instructions
 
