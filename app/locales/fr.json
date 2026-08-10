@@ -1209,12 +1209,6 @@
         "beta_testers": "Nuxt - Testeurs de bêta fermée :",
         "contributors": "Contributeurs open source :"
       },
-      "labels": {
-        "creators": "Créateurs",
-        "staff": "Équipe principale",
-        "testers": "Testeurs bêta",
-        "contributors": "Contributeurs"
-      },
       "notes": {
         "alphabetical": "Classés par ordre alphabétique ; l’ordre ne reflète pas la contribution.",
         "contributors": "Les contributeurs GitHub sont triés par nombre de contributions ; les comptes bots sont exclus."
@@ -1223,8 +1217,10 @@
         "loading": "Chargement des contributeurs...",
         "error": "Impossible de charger les contributeurs pour le moment.",
         "empty": "Aucun contributeur trouvé pour le moment.",
-        "contributions": "Contributions {count}"
-      }
+        "contributions": "Contributions {count}",
+        "total": "Contributeur {count} | Contributeurs {count}"
+      },
+      "description": "Rencontrez les créateurs, le personnel, les membres du support, les bêta-testeurs, et les contributeurs open source derrière Tarkov Tracker."
     },
     "login": {
       "subtitle": "Connectez-vous pour accéder à votre compte",
@@ -1506,7 +1502,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Préférences analytiques",
-    "game_attribution": "Escape from Tarkov et le contenu et les matériaux de jeu associés sont des marques déposées et des œuvres protégées par le droit d'auteur de Battlestate Games Limited et de ses concédants. Tous droits réservés. TarkovTracker est un projet de fans non officiel et n'est pas affilié à Battlestate Games ni approuvé par celui-ci."
+    "game_attribution": "Escape from Tarkov et le contenu et les matériaux de jeu associés sont des marques déposées et des œuvres protégées par le droit d'auteur de Battlestate Games Limited et de ses concédants. Tous droits réservés. TarkovTracker est un projet de fans non officiel et n'est pas affilié à Battlestate Games ni approuvé par celui-ci.",
+    "tagline": "Suivez votre fuite des quêtes de Tarkov, des améliorations cachées et des exigences d'objets en un seul endroit.",
+    "sections": {
+      "explore": "Explorer",
+      "project": "Projet",
+      "legal": "Mentions légales"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Navigation principale",
