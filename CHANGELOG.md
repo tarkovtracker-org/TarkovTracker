@@ -1,3 +1,10 @@
+# [1.65.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.2...v1.65.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** improve credits and footer navigation ([#681](https://github.com/tarkovtracker-org/TarkovTracker/issues/681)) ([5d1940b](https://github.com/tarkovtracker-org/TarkovTracker/commit/5d1940b98b8809dbc9c4aa5c9acb61e2a55c80d2))
+
 ## [1.64.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.1...v1.64.2) (2026-08-09)
 
 ## [1.64.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.0...v1.64.1) (2026-08-08)
