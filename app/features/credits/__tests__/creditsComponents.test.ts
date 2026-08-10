@@ -86,7 +86,7 @@ describe('credits member presentation', () => {
     const rank = wrapper.get('a > span');
     expect(rank.text()).toBe('12.');
     expect(rank.attributes('aria-hidden')).toBeUndefined();
-    expect(rank.attributes('aria-label')).toBe('12');
+    expect(rank.attributes('aria-label')).toBeUndefined();
     expect(wrapper.get('a').classes()).toContain('border-white/5');
   });
   it('renders unlinked grid members without an external-link icon', () => {
