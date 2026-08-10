@@ -191,14 +191,15 @@ describe('prod-db command boundary', () => {
     const result = JSON.parse(
       run(['health'], {
         PROD_DB_TARGET: 'primary',
-        PROD_DB_URL: 'postgresql://pi_prod_observer:observer%3Asecret@example.test?sslmode=require',
+        PROD_DB_URL:
+          'postgresql://pi_prod_observer:observer%3Asecret@example.test?sslmode=verify-full',
       })
     );
     expect(result.data.rows[0].pgpass_database_matches_username).toBe(true);
   });
   it('keeps credentials out of child arguments and redacts command failures', () => {
     const connection =
-      'postgresql://pi_prod_observer:observer%3Asecret@example.test:5432/postgres?sslmode=require';
+      'postgresql://pi_prod_observer:observer%3Asecret@example.test:5432/postgres?sslmode=verify-full';
     const result = JSON.parse(
       run(['health'], { PROD_DB_TARGET: 'primary', PROD_DB_URL: connection })
     );

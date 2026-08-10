@@ -336,7 +336,8 @@ JSON and never applies migrations.
 Use a TLS-protected direct database connection for `PROD_DB_URL` (`:5432`, or session-mode Supavisor when direct
 IPv6 connectivity is unavailable). The transaction pooler is unsupported; the wrapper rejects a
 `:6543` URL because that is the documented default transaction-pooler endpoint, even though Supavisor
-can be configured differently. The URL must set `sslmode=require`, `verify-ca`, or `verify-full`.
+can be configured differently. The URL must set `sslmode=verify-full` so both encryption and server
+certificate identity are enforced.
 The credential must belong to a dedicated observer role with no
 data-write or DDL privileges; the environment must not contain `service_role`, `postgres`, migration,
 or Management API credentials. The wrapper removes the URL password before invoking the Supabase
@@ -354,7 +355,7 @@ scripts/prod-db table-stats
 scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql
 ```
 
-Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=require` in the
+Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=verify-full` in the
 mode-`0600` `.prod-db.env` file so the password does not enter shell history. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 

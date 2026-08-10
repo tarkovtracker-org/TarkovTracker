@@ -182,8 +182,7 @@ function validateConnectionUrl(parsed) {
 }
 function validateConnectionSecurity(parsed) {
   const sslMode = parsed.searchParams.get('sslmode');
-  if (!['require', 'verify-ca', 'verify-full'].includes(sslMode))
-    throw new Error('PROD_DB_URL must set sslmode=require, verify-ca, or verify-full');
+  if (sslMode !== 'verify-full') throw new Error('PROD_DB_URL must set sslmode=verify-full');
 }
 function validateConnectionProtocol(parsed) {
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol))
