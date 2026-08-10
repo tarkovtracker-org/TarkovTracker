@@ -1209,12 +1209,6 @@
         "beta_testers": "Nuxt - Tester Closed Beta:",
         "contributors": "Contributors Open Source:"
       },
-      "labels": {
-        "creators": "Creatori",
-        "staff": "Core Team",
-        "testers": "Beta Testers",
-        "contributors": "Contributori"
-      },
       "notes": {
         "alphabetical": "Elencato alfabeticamente; l'ordine non riflette il contributo.",
         "contributors": "I contributori di GitHub sono ordinati per numero di contributi; i bot sono esclusi."
@@ -1223,8 +1217,10 @@
         "loading": "Caricamento contributori...",
         "error": "Impossibile caricare i contributori in questo momento.",
         "empty": "Nessun contributore trovato.",
-        "contributions": "{count} contribuzioni"
-      }
+        "contributions": "{count} contribuzioni",
+        "total": "{count} contributor | {count} contributors"
+      },
+      "description": "Incontra creatori, personale, membri di supporto, beta tester e collaboratori open source dietro Tarkov Tracker."
     },
     "login": {
       "subtitle": "Accedi al tuo account",
@@ -1506,7 +1502,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Preferenze analitiche",
-    "game_attribution": "Escape from Tarkov e i contenuti e materiali correlati al gioco sono marchi registrati e opere protette da copyright di Battlestate Games Limited e dei suoi licenziatari. Tutti i diritti riservati. TarkovTracker è un progetto fan non ufficiale e non è affiliato né approvato da Battlestate Games."
+    "game_attribution": "Escape from Tarkov e i contenuti e materiali correlati al gioco sono marchi registrati e opere protette da copyright di Battlestate Games Limited e dei suoi licenziatari. Tutti i diritti riservati. TarkovTracker è un progetto fan non ufficiale e non è affiliato né approvato da Battlestate Games.",
+    "tagline": "Traccia la tua fuga dalle missioni di Tarkov, gli aggiornamenti nascosti e i requisiti dell'articolo in un unico posto.",
+    "sections": {
+      "explore": "Esplora",
+      "project": "Progetto",
+      "legal": "Legale"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Navigazione principale",
