@@ -90,11 +90,14 @@
             </li>
             <li class="leading-relaxed">
               <strong>Log Data:</strong>
-              Access times, referring/exit pages, and error logs. Your IP address appears only in
-              transient access logs maintained by our hosting providers (Cloudflare) under their own
-              privacy policies. Where we retain account-linked IP records for abuse prevention, we
-              store a one-way keyed hash (HMAC-SHA256) of the IP address along with your browser
-              User-Agent string — never the raw IP address itself
+              Access times, referring/exit pages, and error logs. Your IP address otherwise appears
+              only in transient access logs maintained by our hosting providers (Cloudflare) under
+              their own privacy policies. Where we retain account-linked IP records, we store a
+              one-way keyed hash (HMAC-SHA256) of the IP address along with your browser User-Agent
+              string — never the raw IP address. As limited exceptions, we store the raw IP address
+              with your User-Agent in account-deletion rate-limit records (retained for up to 90
+              days) and in administrative audit logs, solely for abuse prevention and security
+              auditing
             </li>
             <li class="leading-relaxed">
               <strong>API Access Data:</strong>
@@ -129,8 +132,10 @@
               <strong>OAuth Providers:</strong>
               Profile information, email addresses, and authentication tokens from Twitch, Discord,
               Google, GitHub, or other supported providers. Some providers (such as Discord) require
-              us to request your email address to uniquely identify your account — we use it solely
-              for authentication and account recovery, and we do not send marketing email
+              us to request your email address to uniquely identify your account — we use it for
+              authentication, account recovery, and the service-related email communications
+              described in this policy (technical notices, security alerts, support messages, and
+              policy-change notices). We do not send marketing email
             </li>
             <li class="leading-relaxed">
               <strong>Game Data Sources:</strong>
@@ -200,7 +205,8 @@
             <li class="leading-relaxed">
               <strong>Cloudflare Pages & Workers:</strong>
               Web hosting, content delivery network (CDN), static asset serving, API request
-              handling, and edge key-value caching
+              handling, and edge key-value caching (limited to public, precomputed game data with a
+              7-day retention; no personal data is stored at the edge)
             </li>
             <li class="leading-relaxed">
               <strong>OAuth Providers:</strong>
@@ -291,8 +297,8 @@
             </li>
             <li class="leading-relaxed">
               <strong>Cloudflare:</strong>
-              Web hosting, CDN, DDoS protection, API request handling, edge caching, and performance
-              optimization
+              Web hosting, CDN, DDoS protection, API request handling, edge caching of public game
+              data, and performance optimization
             </li>
             <li class="leading-relaxed">
               <strong>Google Analytics and Microsoft Clarity:</strong>
@@ -386,8 +392,10 @@
               Remove your personal information and progress data from active systems within 30 days
             </li>
             <li class="leading-relaxed">
-              Permanently remove account-linked security audit records (such as hashed IP addresses
-              and User-Agent strings), which are deleted automatically when your account is removed
+              Remove account-linked security audit records (such as hashed IP addresses and
+              User-Agent strings), which are deleted when your account is removed — except
+              account-deletion rate-limit records, which are kept for up to 90 days to prevent abuse
+              of the deletion process
             </li>
             <li class="leading-relaxed">
               Anonymize or delete your data from team records (team names and shared data may
