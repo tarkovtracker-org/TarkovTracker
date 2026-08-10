@@ -133,7 +133,7 @@
       </div>
     </div>
     <!-- Context Menu -->
-    <ContextMenu ref="contextMenu">
+    <ContextMenu v-if="contextMenuOpened" ref="contextMenu">
       <template #default="{ close }">
         <!-- Task Options -->
         <template v-if="props.taskWikiLink">
@@ -208,13 +208,11 @@
 </template>
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
+  import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { openExternalUrl } from '@/utils/redirect';
   import type ContextMenu from '@/components/ui/ContextMenu.vue';
-  const ItemCountControls = defineAsyncComponent(
-    () => import('@/features/neededitems/ItemCountControls.vue')
-  );
   interface Props {
     // Basic item identification
     itemId?: string;
@@ -301,6 +299,7 @@
   } as const;
   type BackgroundKey = keyof typeof BACKGROUND_CLASS_MAP;
   const contextMenu = ref<InstanceType<typeof ContextMenu>>();
+  const contextMenuOpened = ref(false);
   // Compute image source based on available props
   const computedImageSrc = computed(() => {
     if (props.src) return props.src;
@@ -407,9 +406,13 @@
     }
   };
   const handleContextMenu = (event: MouseEvent) => {
-    // Only show context menu if there are links available
     if (props.devLink || props.wikiLink || props.itemName || props.taskWikiLink) {
-      contextMenu.value?.open(event);
+      event.preventDefault();
+      event.stopPropagation();
+      contextMenuOpened.value = true;
+      nextTick(() => {
+        contextMenu.value?.open(event);
+      });
     }
   };
   const openTaskWiki = () => {
