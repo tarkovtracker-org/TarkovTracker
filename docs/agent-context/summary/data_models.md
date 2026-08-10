@@ -201,7 +201,8 @@ erDiagram
     }
     user_system {
         uuid user_id
-        uuid team_id
+        uuid pvp_team_id
+        uuid pve_team_id
         uuid seasonal_team_id
         bool is_admin
     }
