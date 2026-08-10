@@ -6,6 +6,8 @@
   },
   "version": "1.68.3",
   "dependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@iconify-json/lucide": "^1.2.122",
     "@iconify-json/mdi": "^1.2.3",
     "@nuxt/image": "^2.0.0",
     "@nuxt/ui": "^4.10.0",

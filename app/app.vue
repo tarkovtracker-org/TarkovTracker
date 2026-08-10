@@ -82,15 +82,6 @@
       lang: locale.value,
     },
     link: [
-      {
-        rel: 'preconnect',
-        href: 'https://api.iconify.design',
-        crossorigin: 'anonymous',
-      },
-      {
-        rel: 'dns-prefetch',
-        href: 'https://api.iconify.design',
-      },
       ...(pageOwnsCanonical.value
         ? []
         : [
