@@ -62,8 +62,27 @@ const HEALTH_SQL = `select
   ) as has_table_write
 from pg_catalog.pg_roles r
 where r.rolname = current_user`;
-const RESERVED_SQL_WORDS =
-  /\b(?:insert|update|delete|merge|alter|drop|create|grant|revoke|truncate|comment|copy|call|do|refresh|vacuum|analyze|cluster|reindex|set\s+role|security\s+definer)\b/i;
+const RESERVED_SQL_WORDS = new Set([
+  'alter',
+  'analyze',
+  'call',
+  'cluster',
+  'comment',
+  'copy',
+  'create',
+  'delete',
+  'do',
+  'drop',
+  'grant',
+  'insert',
+  'merge',
+  'refresh',
+  'reindex',
+  'revoke',
+  'truncate',
+  'update',
+  'vacuum',
+]);
 const UNSAFE_SQL_PATTERNS = [
   /;\s*\S/,
   /\bpg_sleep\s*\(/i,
@@ -175,7 +194,7 @@ function validateCredentialPresence(username, password) {
     throw new Error('PROD_DB_URL must include the dedicated observer username and password');
 }
 function validateObserverPassword(password) {
-  if (/\r|\n/.test(password)) throw new Error('PROD_DB_URL password must not contain line breaks');
+  if (/[\r\n]/.test(password)) throw new Error('PROD_DB_URL password must not contain line breaks');
 }
 function validateCredentialParameters(parsed) {
   const sensitiveParameters = ['password', 'passfile', 'sslpassword', 'servicefile'];
@@ -257,7 +276,7 @@ function getCommandEnvironment() {
   return { ...environment, PGAPPNAME: OBSERVER_APPLICATION_NAME };
 }
 function escapePgpass(value) {
-  return value.replaceAll('\\', '\\\\').replaceAll(':', '\\:');
+  return value.replaceAll('\\', String.raw`\\`).replaceAll(':', String.raw`\:`);
 }
 async function getCommandContext(target) {
   const environment = getCommandEnvironment();
@@ -409,7 +428,12 @@ async function runQuery(sql, label) {
   }
 }
 function isUnsafeSql(sql) {
-  return RESERVED_SQL_WORDS.test(sql) || UNSAFE_SQL_PATTERNS.some((pattern) => pattern.test(sql));
+  const words = sql.toLowerCase().match(/[a-z_]+/g) ?? [];
+  const hasReservedWord = words.some((word) => RESERVED_SQL_WORDS.has(word));
+  const hasReservedPhrase = /\bset\s+role\b|\bsecurity\s+definer\b/i.test(sql);
+  return (
+    hasReservedWord || hasReservedPhrase || UNSAFE_SQL_PATTERNS.some((pattern) => pattern.test(sql))
+  );
 }
 function validateCanaryHealth(report) {
   const health = firstRow(report.data);
@@ -498,7 +522,7 @@ limit 100`,
   const selectedColumns = rows
     .map((row) => row.column_name)
     .filter((name) => typeof name === 'string' && SAFE_SAMPLE_COLUMN_PATTERN.test(name))
-    .map((name) => `\"${name.replaceAll('"', '""')}\"`);
+    .map((name) => `"${name.replaceAll('"', '""')}"`);
   if (selectedColumns.length === 0)
     throw new Error(`no non-sensitive sample columns available for ${safeTable}`);
   return runQuery(
@@ -528,25 +552,71 @@ function rowsOf(report) {
 function parseSizeBytes(value) {
   if (typeof value === 'number') return value;
   if (typeof value !== 'string') return null;
-  const match = value.trim().match(/^(\d+(?:\.\d+)?)\s*(bytes|kB|MB|GB|TB)$/i);
+  const match = /^(\d+(?:\.\d+)?)\s*(bytes|kB|MB|GB|TB)$/i.exec(value.trim());
   if (!match) return null;
   const multipliers = { bytes: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3, tb: 1024 ** 4 };
   return Number(match[1]) * multipliers[match[2].toLowerCase()];
 }
 function normalizeMigrationSql(source) {
-  const tokens = /--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'/g;
-  return source.replace(tokens, (token) => token.replace(/[^\n]/g, ' '));
+  let normalized = '';
+  let index = 0;
+  while (index < source.length) {
+    const token = getMaskedSqlToken(source, index);
+    if (!token) {
+      normalized += source[index];
+      index += 1;
+      continue;
+    }
+    normalized += source.slice(index, token.end).replace(/[^\n]/g, ' ');
+    if (token.malformed) normalized += "'";
+    index = token.end;
+  }
+  return normalized;
+}
+function getMaskedSqlToken(source, index) {
+  const lineComment = getDelimitedSqlToken(source, index, '--', '\n', 0);
+  if (lineComment) return lineComment;
+  const blockComment = getDelimitedSqlToken(source, index, '/*', '*/', 2);
+  if (blockComment) return blockComment;
+  if (source[index] !== "'") return undefined;
+  return getSqlLiteralToken(source, index);
+}
+function getDelimitedSqlToken(source, index, opening, closing, closingLength) {
+  if (!source.startsWith(opening, index)) return undefined;
+  const end = source.indexOf(closing, index + opening.length);
+  return { end: end === -1 ? source.length : end + closingLength };
+}
+function getSqlLiteralToken(source, start) {
+  let index = start + 1;
+  while (index < source.length) {
+    if (source[index] !== "'") {
+      index += 1;
+      continue;
+    }
+    if (source[index + 1] === "'") {
+      index += 2;
+      continue;
+    }
+    return { end: index + 1, malformed: false };
+  }
+  return { end: source.length, malformed: true };
 }
 function extractMigrationRelations(source) {
   const normalizedSource = normalizeMigrationSql(source);
+  const identifier = String.raw`([a-zA-Z_][a-zA-Z0-9_$]*(?:\.[a-zA-Z_][a-zA-Z0-9_$]*)?)`;
   const patterns = [
-    /\b(?:alter\s+table|create\s+(?:unique\s+)?index\s+\S+\s+on|drop\s+table|truncate\s+table|update|delete\s+from|insert\s+into)\s+(?:if\s+(?:not\s+)?exists\s+)?([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi,
-    /\bfrom\s+([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi,
-    /\bjoin\s+([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)/gi,
+    new RegExp(
+      String.raw`\b(?:alter\s+table|drop\s+table|truncate\s+table)\s+(?:if\s+(?:not\s+)?exists\s+)?${identifier}`,
+      'gi'
+    ),
+    new RegExp(String.raw`\bcreate\s+(?:unique\s+)?index\s+\S+\s+on\s+${identifier}`, 'gi'),
+    new RegExp(String.raw`\b(?:update|delete\s+from|insert\s+into)\s+${identifier}`, 'gi'),
+    new RegExp(String.raw`\bfrom\s+${identifier}`, 'gi'),
+    new RegExp(String.raw`\bjoin\s+${identifier}`, 'gi'),
   ];
   const matches = patterns.flatMap((pattern) => [...normalizedSource.matchAll(pattern)]);
   const relations = matches.map((match) => normalizeRelation(match[1])).filter(Boolean);
-  return [...new Set(relations)].sort();
+  return [...new Set(relations)].sort((left, right) => left.localeCompare(right));
 }
 function normalizeRelation(value) {
   const relation = value.replace(/^public\./i, 'public.');
@@ -583,11 +653,24 @@ function classifyMigration(source) {
   const hasQuotedIdentifier = /["`]/.test(normalized);
   const hasMalformedLiteral = normalized.includes("'");
   const hasDynamicSql = /\b(?:execute|format)\b/.test(normalized);
+  const supportedStatementPrefixes = [
+    'alter table',
+    'create index',
+    'create unique index',
+    'delete from',
+    'drop table',
+    'insert into',
+    'comment on',
+    'grant',
+    'reset',
+    'revoke',
+    'select',
+    'set',
+    'truncate table',
+    'update',
+  ];
   const hasUnclassifiedStatement = statementTexts.some(
-    (statement) =>
-      !/^(?:alter\s+table|create\s+(?:unique\s+)?index|drop\s+table|truncate\s+table|update|delete\s+from|insert\s+into|select|set|reset|grant|revoke|comment\s+on)\b/.test(
-        statement
-      )
+    (statement) => !supportedStatementPrefixes.some((prefix) => statement.startsWith(prefix))
   );
   const incomplete = [
     unsupported_constructs.length > 0,
@@ -846,9 +929,13 @@ async function main() {
   const handler = COMMAND_HANDLERS.get(operation);
   if (!handler) return usage(`unknown operation: ${operation}`);
   const result = await handler(parseArgs(rest));
-  if (result !== undefined) console.log(JSON.stringify(result));
+  console.log(JSON.stringify(result));
 }
 function isHelpOperation(operation) {
   return operation === undefined || ['--help', '-h'].includes(operation);
 }
-main().catch(fail);
+try {
+  await main();
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
