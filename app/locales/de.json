@@ -1111,6 +1111,12 @@
           "load_tokens_error": "API-Tokens konnten nicht geladen werden.",
           "copy_failed": "Failed to copy token.",
           "copy_token": "Copy token",
+          "edit_name": "Tokenname bearbeiten",
+          "edit_name_aria": "Tokenname für {name} bearbeiten",
+          "save_name": "Spielsteinname speichern",
+          "cancel_name_edit": "Tokenname abbrechen",
+          "name_updated": "Tokenname aktualisiert",
+          "name_update_error": "Fehler beim Aktualisieren des Token-Namens. Bitte versuchen Sie es erneut.",
           "token_created": "Token erstellt",
           "token_created_description": "Kopiere und speichere dieses Token jetzt. Du kannst es später nicht mehr einsehen.",
           "token_created_close": "Fertig",
@@ -1132,6 +1138,7 @@
           "report": {
             "load_failed": "Laden der API-Token fehlgeschlagen",
             "create_failed": "Erstellung des API-Tokens fehlgeschlagen",
+            "rename_failed": "API-Token umbenennen fehlgeschlagen",
             "revoke_failed": "Widerruf des API-Tokens fehlgeschlagen"
           },
           "list": {
