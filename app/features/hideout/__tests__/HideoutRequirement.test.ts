@@ -66,8 +66,7 @@ describe('HideoutRequirement', () => {
     expect(setHideoutPartCountMock).toHaveBeenCalledWith('req-1', 0);
     expect(setHideoutPartUncompleteMock).toHaveBeenCalledWith('req-1');
   });
-  it('queues pending context menu event when async component is not loaded', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('suppresses native context menu on right-click', async () => {
     const wrapper = mount(HideoutRequirement, {
       props: defaultProps,
       global: { stubs: defaultStubs },
@@ -81,6 +80,5 @@ describe('HideoutRequirement', () => {
     });
     element.element.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
-    consoleError.mockRestore();
   });
 });
