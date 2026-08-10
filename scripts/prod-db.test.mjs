@@ -207,20 +207,19 @@ describe('prod-db command boundary', () => {
     expect(result.data.rows[0].pgpass_file_received).toBe(true);
     expect(existsSync(result.data.rows[0].pgpass_path)).toBe(false);
     expect(result.data.rows[0].prod_db_url_received).toBe(false);
-    expect(() =>
+    let failure;
+    try {
       run(['health'], {
         FAKE_SUPABASE_FAIL: 'true',
         PROD_DB_TARGET: 'primary',
         PROD_DB_URL: connection,
-      })
-    ).toThrowError(expect.not.stringContaining('observer:secret'));
-    expect(() =>
-      run(['health'], {
-        FAKE_SUPABASE_FAIL: 'true',
-        PROD_DB_TARGET: 'primary',
-        PROD_DB_URL: connection,
-      })
-    ).toThrowError(expect.not.stringContaining(String.raw`observer\:secret`));
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.message).not.toContain('observer:secret');
+    expect(failure.message).not.toContain(String.raw`observer\:secret`);
   });
   it('ignores bracket-prefixed CLI noise before JSON output', () => {
     const result = JSON.parse(run(['health'], { FAKE_SUPABASE_NOISE: 'true' }));
