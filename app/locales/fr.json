@@ -1351,12 +1351,18 @@
       "suggest_title": "Vous connaissez une ressource utile de Tarkov ?",
       "suggest_description": "Suggérer un outil ou un guide communautaire pour l'inclusion sur cette page.",
       "suggest_cta": "Suggérer une ressource",
+      "migration_banner": {
+        "title": "Vous vous déplacez de TarkovTracker.io ?",
+        "cta": "Lire le guide de migration"
+      },
       "categories": {
+        "tarkovtracker_guides": "Guides TarkovTracker.org",
         "companion_apps": "Appli compagnon",
         "data_and_apis": "Outils de développement et de données",
         "calculators_and_reference": "Calculateurs & Référence"
       },
       "category_badges": {
+        "tarkovtracker_guides": "Guide officiel",
         "companion_apps": "Application pour ordinateur",
         "data_and_apis": "Plateforme de données",
         "calculators_and_reference": "Référence"
@@ -1377,6 +1383,8 @@
       "guide_not_found": "Guide introuvable. La ressource que vous cherchez peut ne pas encore avoir de tutoriel.",
       "guide_title_template": "Guide {name}",
       "meta": {
+        "official_guide": "Guide officiel",
+        "maintained_by_team": "Maintenu par l'équipe TarkovTracker.org",
         "windows": "Fenêtres",
         "setup_time": "Configuration de 5 minutes",
         "community_data": "Communauté maintenue",
@@ -1391,11 +1399,16 @@
         "download": "Télécharger"
       },
       "guide_sections": {
+        "video_walkthrough": "Déplacement vidéo",
         "troubleshooting": "Dépannage",
         "tips": "Trucs & Astuces",
         "faq": "Questions fréquentes"
       },
       "items": {
+        "tarkovtracker_org_vs_io": {
+          "name": "TarkovTracker.org contre TarkovTracker.io",
+          "description": "Quel site TarkovTracker devriez-vous utiliser ? Comment TarkovTracker.org se rapproche du site .io original et comment déplacer votre progression."
+        },
         "tarkovdev": {
           "name": "Tarkov.dev",
           "description": "Objet, quête, trader et données de marché gérées par la communauté pour les joueurs et les développeurs."
@@ -1418,6 +1431,27 @@
         }
       },
       "guides": {
+        "tarkovtracker_org_vs_io": {
+          "overview": "TarkovTracker existe sur deux domaines. TarkovTracker.io est le site original créé par le fondateur du projet TarkovTracker et héberge la base de code originale. TarkovTracker. rg est la suite activement maintenue gérée par un contributeur de longue date et l'ancien responsable du projet original, comme un fork libre et open-source sous la même licence GNU GPLv3. Ce guide explique les différences et les moyens supportés pour reconstruire votre progression sur TarkovTracker.org.",
+          "step_1_title": "Créez ou connectez-vous à votre compte TarkovTracker.org",
+          "step_1_desc": "Créez un compte TarkovTracker.org ou connectez-vous au compte où vous voulez suivre votre progression d'effacement actuel.",
+          "step_2_title": "Importer vos métadonnées de profil Tarkov.dev",
+          "step_2_desc": "Ouvrez Paramètres, choisissez Imports et utilisez l'importation de profil Tarkov.dev pour restaurer les détails de profil pris en charge tels que le niveau, la faction et les compétences.",
+          "step_3_title": "Importez vos logs de jeu EFT",
+          "step_3_desc": "Dans le même onglet Importations, sélectionnez votre dossier de logs EFT pour récupérer les événements de début de quête et d'achèvement qui sont toujours présents dans vos journaux locaux.",
+          "step_4_title": "Vérifier les tâches et masquer la progression",
+          "step_4_desc": "Vérifiez votre liste de tâches et cachez-vous, puis restaurez manuellement la progression que Tarkov.dev et vos logs de jeu disponibles n'ont pas pu récupérer.",
+          "step_5_title": "Connecter les outils de compagnon pris en charge",
+          "step_5_desc": "Configurez TarkovMonitor avec un nouveau jeton d'API en lecture et écriture de TarkovTracker.org pour que les futures mises à jour de progression soient prises en charge sur votre compte .org.",
+          "faq_1_q": "Quelle est la différence entre TarkovTracker.io et TarkovTracker.org?",
+          "faq_1_a": "TarkovTracker.io est le site original. Il est relativement stable mais a connu des problèmes et n'est plus maintenu - son dernier déploiement a eu lieu en août 2024 et il n'y a pas de développement ou de soutien actif. TarkovTracker. rg est le fork activement maintenu : il reçoit des mises à jour régulières, supporte les changements de jeu après EFT 0.15, et ajoute de nouvelles fonctionnalités. Parce qu'il est en cours de développement actif, il peut occasionnellement avoir des bugs ou des temps d'arrêt et alors que nous travaillons dur pour l'empêcher, la perte de données ne peut être totalement exclue.",
+          "faq_2_q": "Quel site dois-je utiliser ?",
+          "faq_2_a": "Utilisez TarkovTracker.org. C'est la seule version qui reçoit des mises à jour, des corrections de bugs et le support de l'évasion actuelle à partir du contenu de Tarkov. De nouveaux comptes devraient toujours être créés sur TarkovTracker.org.",
+          "faq_3_q": "Comment puis-je migrer mes progrès de .io vers .org?",
+          "faq_3_a": "TarkovTracker.org ne fournit pas actuellement d'import de jeton .io direct. Créez ou connectez-vous à votre . le compte rg, puis utilisez le profil Tarkov.dev supporté et les importations de journaux de jeux EFT dans les paramètres. Vérifier les tâches et masquer la progression manuellement car ces sources peuvent ne pas contenir tout ce qui est enregistré sur .io. Progression ne se synchronise pas entre les deux sites.",
+          "faq_4_q": "Est-ce que l'équipe TarkovTracker.org gère TarkovTracker.io ?",
+          "faq_4_a": "Non, le domaine et le déploiement du .io sont détenus et contrôlés par le fondateur du projet original. Nous n'avons pas accès à ce site et ne pouvons pas corriger, mettre à jour ou fournir de support pour quoi que ce soit sur .io."
+        },
         "tarkovdev": {
           "overview": "Tarkov.dev est l'épine dorsale de l'écosystème des données de la communauté. Il maintient un jeu de données open-source d'éléments, de quêtes, de traders, de stations de cache, et plus encore, tous accessibles via une API GraphQL gratuite. TarkovTracker lui-même utilise cette API pour rester à jour avec les dernières données du jeu. Si vous construisez des outils, écrivez des tutoriels ou simplement voulez rechercher des statistiques d'objets, Tarkov.dev est la source faisant foi.",
           "step_1_title": "Parcourir le site web",
@@ -1485,7 +1519,9 @@
           "faq_2_q": "RatScanner fonctionne-t-il avec le marché aux puces?",
           "faq_2_a": "Oui. Il montre les prix actuels du marché aux puces et peut aider à comparer la valeur des puces avec la valeur du trader.",
           "faq_3_q": "Est-ce que RatScanner peut afficher les objets nécessaires à TarkovTracker ?",
-          "faq_3_a": "Il peut afficher des informations générales sur les éléments de son fournisseur de données. Pour les exigences basées sur votre progression personnelle de TarkovTracker, utilisez la page Objets Nécessaires."
+          "faq_3_a": "Il peut afficher des informations générales sur les éléments de son fournisseur de données. Pour les exigences basées sur votre progression personnelle de TarkovTracker, utilisez la page Objets Nécessaires.",
+          "faq_4_q": "RatScanner fonctionne-t-il avec TarkovTracker.org ?",
+          "faq_4_a": "Oui. Installez RatScanner, ouvrez la section TarkovTracker dans ses paramètres, et basculez le backend de TarkovTracker de .io à .org avant d'entrer dans votre tarkovtracker. rg API token. L'équipe TarkovTracker.org aide maintenant à maintenir RatScanner, donc l'intégration .org et les valeurs par défaut continueront à s'améliorer dans les prochaines versions."
         },
         "cultistcircle": {
           "overview": "CultistCircle est une calculatrice gratuite construite par la communauté pour le Cercle Cultist dans Escape from Tarkov. Il vous permet de rechercher des recettes, quels objets vous pouvez sacrifier et ce que vous obtenez en retour, sans avoir à expérimenter en jeu. Construit par un développeur solo de la communauté, c'est une référence pratique pour planifier efficacement vos échanges de cercle.",
@@ -1500,7 +1536,13 @@
           "faq_2_q": "CultistCircle est-il affilié à TarkovTracker?",
           "faq_2_a": "Non, CultistCircle est un projet indépendant réalisé par un développeur de communauté solo. Il est listé ici comme une ressource communautaire utile."
         }
-      }
+      },
+      "video": {
+        "walkthrough_title": "Marche vidéo {name}",
+        "caption": "Les étapes peuvent différer légèrement du guide écrit.",
+        "play": "Lire la vidéo : {title}"
+      },
+      "official_guide_label": "Guide de TarkovTracker.org"
     }
   },
   "footer": {
