@@ -146,7 +146,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Setup Deno
         if: matrix.shard == 1
-        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.9.4
       - name: Run Deno tests
