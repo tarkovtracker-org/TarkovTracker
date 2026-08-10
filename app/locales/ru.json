@@ -220,6 +220,10 @@
     "complete": "Complete",
     "pvp": "PvP",
     "pve": "PvE",
+    "seasonal_pvp": "Сезонная PvP",
+    "pvp_description": "Игрок против игрока (стандартный)",
+    "pve_description": "Player vs Environment (Co-op)",
+    "seasonal_pvp_description": "Сезон {season}",
     "retry": "Повторить",
     "open_tasks": "Открытые задачи",
     "view_on_tarkov_dev": "Посмотреть на Tarkov.dev",
@@ -307,6 +311,7 @@
     "game_edition": "Издание игры",
     "reset_pvp_data": "Сбросить данные PvP",
     "reset_pve_data": "Сбросить данные PvE",
+    "reset_seasonal_data": "Сброс сезонных PvP данных",
     "reset_all_data": "Сбросить все данные",
     "import_failed": "Не удалось импортировать",
     "delete_archived_run": "Удалить Запуск в Архив",
@@ -1106,6 +1111,12 @@
           "load_tokens_error": "Не удалось загрузить API токены.",
           "copy_failed": "Не удалось скопировать токен.",
           "copy_token": "Скопировать токен",
+          "edit_name": "Изменить имя токена",
+          "edit_name_aria": "Редактировать имя токена для {name}",
+          "save_name": "Сохранить имя токена",
+          "cancel_name_edit": "Отменить изменение имени токена",
+          "name_updated": "Имя токена обновлено",
+          "name_update_error": "Не удалось обновить имя токена. Пожалуйста, попробуйте еще раз.",
           "token_created": "Токен создан",
           "token_created_description": "Скопируйте и сохраните этот токен сейчас. Позже просмотреть его будет нельзя.",
           "token_created_close": "Готово",
@@ -1127,6 +1138,7 @@
           "report": {
             "load_failed": "Не удалось загрузить API токены",
             "create_failed": "Не удалось создать API токен",
+            "rename_failed": "Не удалось переименовать API токен",
             "revoke_failed": "Не удалось отозвать API токен"
           },
           "list": {
@@ -1180,6 +1192,9 @@
           "create_team_error_ui_update": "Состояние команды не обновилось. Перезагрузите страницу или попробуйте снова.",
           "leave_team_success": "Команда успешно покинута.",
           "leave_team_error": "Не удалось покинуть вашу команду.",
+          "already_in_team": "Вы уже состоите в команде {mode} . Сначала выйдите из своей команды.",
+          "url_copied": "URL скопирован в буфер обмена",
+          "copy_url_failed": "Не удалось скопировать URL в буфер обмена",
           "no_team": "Вы не состоите в команде.",
           "team_invite_url_label": "Ссылка для приглашения в команду",
           "copy_link": "Копировать",
@@ -1201,12 +1216,6 @@
         "beta_testers": "Nuxt - Тестеры закрытой беты:",
         "contributors": "Контрибьюторы open source:"
       },
-      "labels": {
-        "creators": "Создатели",
-        "staff": "Основная команда",
-        "testers": "Бета-тестеры",
-        "contributors": "Контрибьюторы"
-      },
       "notes": {
         "alphabetical": "Список в алфавитном порядке; порядок не отражает вклад.",
         "contributors": "Контрибьюторы GitHub отсортированы по количеству вкладов; аккаунты-боты исключены."
@@ -1215,8 +1224,10 @@
         "loading": "Загрузка контрибьюторов...",
         "error": "Сейчас не удалось загрузить контрибьюторов.",
         "empty": "Пока контрибьюторы не найдены.",
-        "contributions": "{count} вкладов"
-      }
+        "contributions": "{count} вкладов",
+        "total": "Участники {count} | Участники {count}"
+      },
+      "description": "Встречайте создателей, сотрудников, участников поддержки, бета-тестеров и разработчиков с открытым исходным кодом за Tarkov Tracker."
     },
     "login": {
       "subtitle": "Войдите, чтобы получить доступ к своему аккаунту",
@@ -1340,12 +1351,18 @@
       "suggest_title": "Know a useful Tarkov resource?",
       "suggest_description": "Suggest a community tool or guide for inclusion on this page.",
       "suggest_cta": "Suggest a resource",
+      "migration_banner": {
+        "title": "Перемещение с TarkovTracker.io?",
+        "cta": "Прочтите руководство по миграции"
+      },
       "categories": {
+        "tarkovtracker_guides": "Гиды TarkovTracker.org",
         "companion_apps": "Companion Apps",
         "data_and_apis": "Data & Developer Tools",
         "calculators_and_reference": "Calculators & Reference"
       },
       "category_badges": {
+        "tarkovtracker_guides": "Официальное руководство",
         "companion_apps": "Desktop App",
         "data_and_apis": "Data Platform",
         "calculators_and_reference": "Reference"
@@ -1366,6 +1383,8 @@
       "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
       "guide_title_template": "{name} Guide",
       "meta": {
+        "official_guide": "Официальное руководство",
+        "maintained_by_team": "Поддерживается командой TarkovTracker.org",
         "windows": "Windows",
         "setup_time": "5-minute setup",
         "community_data": "Community maintained",
@@ -1380,11 +1399,16 @@
         "download": "Download"
       },
       "guide_sections": {
+        "video_walkthrough": "Прохождение видео",
         "troubleshooting": "Troubleshooting",
         "tips": "Tips & Tricks",
         "faq": "Common Questions"
       },
       "items": {
+        "tarkovtracker_org_vs_io": {
+          "name": "TarkovTracker.org против TarkovTracker.io",
+          "description": "На каком сайте TarkovTracker вы должны работать, как TarkovTracker.org относится к оригинальному сайту .io и как продвигать свой прогресс."
+        },
         "tarkovdev": {
           "name": "Tarkov.dev",
           "description": "Community-maintained item, quest, trader, and market data for players and developers."
@@ -1407,6 +1431,27 @@
         }
       },
       "guides": {
+        "tarkovtracker_org_vs_io": {
+          "overview": "ТарковТрекер существует на двух доменах. ТарковТрекер - оригинальный сайт, созданный основателем проекта ТарковТракер и содержащий оригинальную кодовую базу. rg - активно поддерживаемое продолжение, выполняемое давним автором и бывшим сопровождающим оригинального проекта, как бесплатная вилка с открытым исходным кодом под той же лицензией GNU GPLv3. В этом руководстве объясняются различия и поддерживаемые способы восстановления вашего прогресса на TarkovTracker.org.",
+          "step_1_title": "Создайте или войдите в свой аккаунт TarkovTracker.org",
+          "step_1_desc": "Создайте учетную запись TarkovTracker.org или войдите в аккаунт, где вы хотите отслеживать текущий прогресс.",
+          "step_2_title": "Импортировать метаданные вашего профиля Tarkov.dev",
+          "step_2_desc": "Откройте Настройки, выберите Импорт и используйте импорт профиля Tarkov.dev для восстановления поддерживаемых деталей профиля, таких как уровень, фракция и навыки.",
+          "step_3_title": "Импортировать ваши журналы игр EFT",
+          "step_3_desc": "В той же вкладке Импорты выберите папку журналов EFT, чтобы восстановить запуск квеста и завершение событий, которые все еще присутствуют в локальных журналах.",
+          "step_4_title": "Проверка задач и прогресс скрытия",
+          "step_4_desc": "Проверьте список задач и скрытие из списка, а затем вручную восстановите прогресс, который не удалось восстановить Тарков.dev и ваши доступные игровые журналы.",
+          "step_5_title": "Подключите поддерживаемые инструменты спутника",
+          "step_5_desc": "Настройте TarkovMonitor с новым TarkovTracker.org чтение токена API, чтобы будущие поддерживаемые обновления прогресса вошли в вашу учётную запись .org.",
+          "faq_1_q": "В чем разница между TarkovTracker.io и TarkovTracker.org?",
+          "faq_1_a": "TarkovTracker.io - оригинальный сайт. Он является относительно стабильным, но имеет известные вопросы и более не поддерживается: его последнее развертывание было в августе 2024 года и нет активного развития или поддержки. TarkovTracker. rg - это активно поддерживаемая ветка: он получает регулярные обновления, поддерживает изменения в игре после EFT 0.15 и добавляет новые функции. Так как он находится в активной разработке, он может иногда иметь ошибки или время простоя, и в то время как мы работаем над его предотвращением, потерю данных нельзя полностью исключать.",
+          "faq_2_q": "Какой сайт я должен использовать?",
+          "faq_2_a": "Использовать TarkovTracker.org. Это единственная версия, которая получает обновления, исправления ошибок и поддержку текущего Escape от содержимого Tarkov. Новые учетные записи должны всегда создаваться на сайте TarkovTracker.org.",
+          "faq_3_q": "Как перенести мой прогресс с .io на .org?",
+          "faq_3_a": "TarkovTracker.org в настоящее время не предоставляет прямой импорт токена .io. rg аккаунт, затем используйте поддерживаемый профиль Tarkov.dev и журнал игры EFT в Настройках. Проверять задачи и вручную скрывать прогресс, потому что эти источники могут не содержать все, записанные на .io. Прогресс не синхронизирует данные между двумя сайтами.",
+          "faq_4_q": "Разве команда TarkovTracker.org управляет TarkovTracker.io?",
+          "faq_4_a": "No. Домен .io и развертывание принадлежат и контролируются первоначальным основателем проекта. Мы не имеем доступа к нему и не можем исправить, обновить или предоставить поддержку для .io."
+        },
         "tarkovdev": {
           "overview": "Tarkov.dev is the backbone of the community data ecosystem. It maintains an open-source dataset of items, quests, traders, hideout stations, and more, all accessible through free static JSON endpoints at json.tarkov.dev. TarkovTracker itself uses these endpoints to stay up to date with the latest game data. If you build tools, write guides, or just want to look up item stats, Tarkov.dev is the authoritative source.",
           "step_1_title": "Browse the website",
@@ -1474,7 +1519,9 @@
           "faq_2_q": "Does RatScanner work with the flea market?",
           "faq_2_a": "Yes. It shows current flea-market prices and can help compare flea versus trader value.",
           "faq_3_q": "Can RatScanner show items needed for TarkovTracker?",
-          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page."
+          "faq_3_a": "It can show general item information from its data provider. For requirements based on your personal TarkovTracker progress, use the Needed Items page.",
+          "faq_4_q": "Работает ли RatScanner с TarkovTracker.org?",
+          "faq_4_a": "Да. Установите RatScanner, откройте раздел TarkovTracker в настройках и переключите бэкэнд TarkovTracker с .io на .org перед входом в тарковтрекер. rg API token. Команда TarkovTracker.org теперь помогает поддерживать RatScanner, поэтому .org интеграция и значения по умолчанию будут улучшаться в будущих выпусках."
         },
         "cultistcircle": {
           "overview": "CultistCircle is a free community-built calculator for the Cultist Circle feature in Escape from Tarkov. It lets you look up recipes — what items you can sacrifice and what you get in return — without having to experiment in-game. Built by a solo community developer, it is a handy reference for planning your circle trades efficiently.",
@@ -1489,7 +1536,13 @@
           "faq_2_q": "Is CultistCircle affiliated with TarkovTracker?",
           "faq_2_a": "No, CultistCircle is an independent project by a solo community developer. It is listed here as a useful community resource."
         }
-      }
+      },
+      "video": {
+        "walkthrough_title": "{name} просмотр видео",
+        "caption": "Прохождение видео сообществом. Шаги могут слегка отличаться от написанного руководства.",
+        "play": "Воспроизвести видео: {title}"
+      },
+      "official_guide_label": "Руководство по TarkovTracker.org"
     }
   },
   "footer": {
@@ -1498,7 +1551,13 @@
       "github": "GitHub"
     },
     "analytics_preferences": "Настройки аналитики",
-    "game_attribution": "Escape from Tarkov и связанный игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games Limited и ее лицензиаров. Все права защищены. TarkovTracker является неофициальным фанатским проектом и не связан с Battlestate Games и не одобрен ею."
+    "game_attribution": "Escape from Tarkov и связанный игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games Limited и ее лицензиаров. Все права защищены. TarkovTracker является неофициальным фанатским проектом и не связан с Battlestate Games и не одобрен ею.",
+    "tagline": "Отслеживайте свои побеги от заданий Таркова, улучшений в укрытии и требований к предметам в одном месте.",
+    "sections": {
+      "explore": "Исследовать",
+      "project": "Проект",
+      "legal": "Юридическая информация"
+    }
   },
   "navigation_drawer": {
     "main_navigation": "Основная навигация",
@@ -1526,13 +1585,18 @@
     "xp_settings_link": "View XP and level settings"
   },
   "profile": {
-    "title_with_mode": "Профиль {name} {mode}"
+    "title_with_mode": "Профиль {name} {mode}",
+    "mode_pvp": "ПВП",
+    "mode_pve": "PVE",
+    "mode_seasonal_pvp": "SEASONAL PVP",
+    "season_short": "С{season}"
   },
   "streamer_tools": {
     "subtitle": "Создавайте ссылки на источник браузера для OBS, Streamlabs Desktop, XSplit и vMix для отображения прогресса Каппы в прямом эфире.",
     "manage_sharing": "Управление доступом",
     "login_required": "Войдите, чтобы создать персональные ссылки на оверлей стримера.",
     "mode_private": "Этот игровой режим приватный. Публичный доступ должен быть включён, чтобы ссылки на источник браузера работали.",
+    "visibility_load_failed": "Не удается загрузить настройки общего доступа.",
     "open_account_settings": "Открыть настройки аккаунта",
     "content_title": "Контент",
     "mode_label": "Режим игры",
@@ -1737,10 +1801,10 @@
       "description": "Управляйте видимостью профилей игровых режимов по общей ссылке.",
       "public": "Публичный",
       "private": "Приватный",
-      "toggle_pvp_label": "Toggle PvP profile sharing",
-      "toggle_pve_label": "Toggle PvE profile sharing",
-      "copy_pvp_link": "Copy PvP profile link",
-      "copy_pve_link": "Copy PvE profile link",
+      "toggle_label": "Вкл/выкл обмен профилем {mode}",
+      "copy_link": "Скопировать ссылку профиля {mode}",
+      "load_failed": "Не удается загрузить настройки общего доступа.",
+      "save_failed": "Не удается обновить настройки общего доступа.",
       "login_required": "Войдите, чтобы управлять видимостью общего профиля."
     },
     "game_settings": {
@@ -1752,9 +1816,11 @@
       "reset_pvp_warning": "Это навсегда удалит весь ваш PvP прогресс, включая задания, убежище и уровень. Ваши данные PvE не будут затронуты.",
       "reset_pve_confirmation": "Вы уверены, что хотите сбросить свой прогресс в PvE?",
       "reset_pve_warning": "Это навсегда удалит весь ваш PvE прогресс, включая задания, убежище и уровень. Ваши данные PvP не будут затронуты.",
+      "reset_seasonal_confirmation": "Вы уверены, что хотите сбросить ваш прогресс в PvP сезона?",
+      "reset_seasonal_warning": "Это навсегда удалит весь прогресс вашего сезона PvP. Ваши постоянные данные PvP и PvE не будут затронуты.",
       "reset_all_confirmation": "Вы уверены, что хотите сбросить ВЕСЬ свой прогресс?",
       "reset_all_warning": "Это навсегда удалит ВЕСЬ ваш прогресс для режимов PvP и PvE. Это действие нельзя отменить!",
-      "prestige_pvp_warning": "Ваш текущий PvP-прогон будет архивирован, затем прогресс PvP будет сброшен для следующего уровня престижа. Данные PvE не затрагиваются.",
+      "prestige_mode_warning": "Ваш текущий запуск {mode} будет архивирован, после чего его прогресс будет сброшен на следующий уровень престижа. Другие режимы не повлияют.",
       "reset_confirm": "Сбросить",
       "export_description": "Скачайте резервную копию прогресса для режимов PvP и PvE.",
       "export_button": "Экспортировать резервную копию",
@@ -1781,12 +1847,17 @@
       "import_preview_pvp_tasks": "Задания PvP",
       "import_preview_pve_level": "Уровень PvE",
       "import_preview_pve_tasks": "Задания PvE",
+      "import_preview_seasonal_level": "Сезонный уровень PvP",
+      "import_preview_seasonal_tasks": "Сезонные задачи PvP",
       "import_target_label": "Цель импорта",
       "import_target_pvp": "Только PvP",
       "import_target_pve": "Только PvE",
-      "import_target_both": "PvP и PvE",
+      "import_target_all": "Все доступные",
+      "seasonal_import_locked": "Сезонный PvP импорт временно заблокирован до тех пор, пока не будет проверена исходная информация для сезона {season}.",
       "import_success_title": "Копия импортирована",
       "import_success_description": "Ваш прогресс был успешно восстановлен.",
+      "import_error_title": "Ошибка резервного копирования",
+      "import_error_description": "Ваша резервная копия не может быть импортирована. Пожалуйста, попробуйте еще раз.",
       "export_error_title": "Ошибка экспорта",
       "debug_export_error_title": "Не удалось экспортировать отладочный снимок",
       "reset_title": "Сбросить прогресс",
@@ -1822,6 +1893,11 @@
       "success_title": "Сброс данных PvE",
       "success_description": "Ваш прогресс PvE успешно сброшен.",
       "error_description": "Не удалось сбросить данные PvE. Пожалуйста, попробуйте еще раз."
+    },
+    "reset_seasonal": {
+      "success_title": "Сброс данных PvP сезона",
+      "success_description": "Ваш прогресс в активном сезоне был успешно сброшен.",
+      "error_description": "Не удалось сбросить сезонные данные PvP. Пожалуйста, попробуйте еще раз."
     },
     "reset_all": {
       "success_title": "Сброс всех данных",
@@ -1893,6 +1969,9 @@
     "prestige": {
       "pvp_only_title": "Престиж доступен только в PvP",
       "pvp_only": "Переключитесь в режим PvP, чтобы сделать престиж PvP-профиля.",
+      "persistent_mode_unsupported_title": "Престиж недоступен",
+      "persistent_mode_unsupported": "Престиж недоступен для постоянного PvE режима.",
+      "seasonal_mode_unsupported": "Престиж недоступен в сезонных PvP.",
       "current_level": "Текущий уровень престижа",
       "set_current": "Установить текущий престиж",
       "set_current_hint": "Используйте это, если вы уже получили престиж в игре и нужно только синхронизировать трекер. Это не сбрасывает прогресс и не создаёт запись в истории.",
@@ -1905,10 +1984,10 @@
       "requirements_description": "Трекер проверяет ваш следующий реальный престиж: Престиж {level}.",
       "requirements_empty": "Для этого уровня престижа в трекере нет дополнительных требований.",
       "archive_title": "Архивировать забег и начать следующий престиж",
-      "archive_description": "Используйте это только если вы действительно получаете престиж прямо сейчас. Текущий PvP-забег будет архивирован, а прогресс PvP будет сброшен для следующего уровня престижа.",
+      "archive_description_mode": "Используйте это только тогда, когда достигнет настоящего престижа. Ваш текущий запуск {mode} будет архивирован и прогресс будет сброшен на следующий уровень престижа.",
       "archive_cta": "Архивировать забег и начать Престиж {level}",
       "archive_cta_disabled": "Престиж недоступен",
-      "archive_dialog_title": "Архивировать текущий PvP-забег",
+      "archive_dialog_title_mode": "Архивировать текущий {mode} запуск",
       "archive_sync_hint": "Если нужно только привести трекер в соответствие с уже полученным в игре престижем, используйте выше «Установить текущий престиж».",
       "archive_soft_gate_unmet": "По данным трекера, ещё не выполнено требований: {count}. Вы всё равно можете продолжить, если трекеру не хватает контекста.",
       "archive_soft_gate_manual": "Требований, которые ещё нужно проверить вручную в игре: {count}.",
@@ -2082,6 +2161,7 @@
       "skills_count": "Обнаружено навыков: {count}",
       "last_refreshed": "Данные Tarkov.dev обновлены",
       "last_refreshed_unknown": "Неизвестен",
+      "data_age_warning": "This Tarkov.dev snapshot is {days} days old. If you played since then, open your profile on Tarkov.dev so it refreshes, then fetch again before importing.",
       "cooldown_hint": "Недавно импортировано. Вы можете повторно импортировать этот профиль примерно за {minutes} мин.",
       "turnstile_hint": "Заполните проверку ниже для получения профиля.",
       "skills_details_toggle": "Показать значения навыков",
@@ -2176,7 +2256,10 @@
   },
   "game_settings": {
     "toggle_game_mode_label": "Toggle game mode",
-    "select_faction_label": "Select faction"
+    "select_game_mode_label": "Выберите режим игры",
+    "select_faction_label": "Select faction",
+    "season_ends_in": "Сезон {season} заканчивается в {days}d {hours}ч {minutes}м",
+    "season_ended": "Сезон {season} завершен"
   },
   "oauth": {
     "consent": {

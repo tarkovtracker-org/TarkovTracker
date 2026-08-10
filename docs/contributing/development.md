@@ -61,6 +61,10 @@ source — do not duplicate its rules here. Key reminders for new contributors:
   logger.error('Error message', error);
   ```
 
+- For local client performance profiling, set `VITE_PERF_DEBUG=true` in `.env` before starting the
+  dev server. The flag also accepts `1`, `yes`, or `on`; it enables timing logs from
+  `app/utils/perf.ts` and should remain unset or `false` for normal development.
+
 ## Commit Conventions
 
 - Follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`. The

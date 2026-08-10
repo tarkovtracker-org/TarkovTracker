@@ -13,6 +13,7 @@ Update this file or a scoped child `AGENTS.md` in the same PR when a change modi
 - required validation steps, PR/release workflow, or commit scopes
 - localization workflow, Crowdin behavior, or locale file ownership
 - analytics tooling, MCP access, or external data integrations
+- production database observer commands, credentials, or migration preflight behavior
 - deprecated patterns that agents must avoid
 - behavior of a system documented in `docs/SYSTEMS.md` (Tarkov.dev integration, data fetching
   pipeline, multi-layer caching, overlay corrections, precompute workflow, Tarkov.dev profile
@@ -74,7 +75,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 
 Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
 
 Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
@@ -89,11 +90,9 @@ Before finishing any agent task:
 - State what validation was run and what passed/failed.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
-- Formatting is handled by the pre-commit hook (husky + lint-staged runs prettier, ESLint, and the blank-line fixer on staged files). Do not run `pnpm run format` manually unless the hook is bypassed or cannot run (missing `node_modules` / husky harness). CI `format:check` is the gate; never commit knowing hooks were skipped without formatting staged paths yourself.
-- Coverage is uploaded to Codecov by the CI `test` job (see `.github/workflows/ci.yml`). Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
-- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
-- Test results (JUnit XML) are uploaded by the CI `test` job via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' JUnit reports still reach Codecov.
-- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff) and disables per-shard coverage thresholds (Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`). Local `pnpm run test` / `pnpm run test:coverage` remain unsharded with vitest thresholds active.
+- Formatting is handled by the pre-commit hook. Do not run `pnpm run format` manually unless the hook is bypassed. CI `format:check` is the gate.
+- Coverage, bundle analysis, JUnit test results, and shard configuration are handled by CI — see
+  `docs/WORKFLOW_AUTOMATION.md`. Local `pnpm run test` / `pnpm run test:coverage` remain unsharded.
 
 ## Production Readiness Review
 
@@ -122,11 +121,8 @@ When asked to "review for production readiness", "deep review", "is this safe to
   the implicit `PUBLIC` grant and leaves those explicit role grants in place, which trips advisor
   lint 0028 on `SECURITY DEFINER` functions. Trigger functions and service-role-only helpers must
   name all three roles. Grant back to `service_role` explicitly when the service role needs it.
-- **Never put a bulk data rewrite in a migration.** The deployment runner applies each migration file
-  atomically even when `-- supabase:disable-transaction` is present, so a timeout rolls back the file
-  while other deploy targets can still succeed. Ship schema separately, make every read tolerate
-  missing rows, and use an approved operation with one independently committed range only when data
-  must be materialized. See the Database Migrations section of `docs/runbook.md`.
+- **Never put a bulk data rewrite in a migration.** Ship schema separately, make reads tolerate
+  missing rows. See the Database Migrations section of `docs/runbook.md`.
 - **Keep changes scoped** to the requested task. Prefer small, reviewable diffs.
 
 ## Coding Conventions
@@ -134,9 +130,15 @@ When asked to "review for production readiness", "deep review", "is this safe to
 Formatting is enforced by Prettier + ESLint (see `.prettierrc`, `eslint.config.mjs`). Key rules:
 
 - 2-space indent, 100-char lines, single quotes, semicolons, trailing commas (es5).
+- `.env.example` files use one-line `# === TITLE` section headers, not full-width `# ===...===` separator blocks. Tokenizers compress runs of repeated characters, so a long separator costs ~2–3 tokens — the same as a short one — and only adds agent token cost. These files are read often by agents; keep headers single-line and token-efficient.
+- Quote string values in `wrangler.toml` (TOML requires it). Keep `.env`/`.dev.vars` values unquoted
+  unless dotenv semantics require it. See `docs/ARCHITECTURE.md` for the full quoting convention.
 - Imports: alphabetically sorted, no blank lines between groups, group order: builtin → external → internal → parent → sibling → index → object → type.
 - Avoid unused imports/exports.
 - Keep functions small; prefer early returns. Avoid inline comments unless explaining a non-obvious decision.
+- Tailwind classes are auto-sorted by Prettier via `prettier-plugin-tailwindcss`.
+- For animations/utilities not in Tailwind, define them in `app/assets/css/tailwind.css` (`@utility` for custom utilities, `@keyframes` for animations).
+- Inline styles only for truly dynamic values (e.g., computed positions).
 
 Naming:
 
@@ -163,9 +165,16 @@ Naming:
 - Use union/string literal types for constrained values. `as const` for literal inference.
 - Do not duplicate types already in Supabase generated files.
 
+## Icons
+
+- Icons use `@nuxt/icon` (registered automatically by `@nuxt/ui`). Use `<UIcon name="i-{collection}-{name}" />` or the `icon` prop on UI components.
+- Three Iconify collections are installed locally: `@iconify-json/mdi` (primary), `@iconify-json/heroicons`, `@iconify-json/lucide` (Nuxt UI internal).
+- `icon.clientBundle.scan` in `nuxt.config.ts` bundles all statically-referenced icons at build time into the client bundle. This eliminates runtime CDN fetches for the vast majority of icons.
+- Dynamically-bound icon names (`:name="variable"`) that the scanner cannot resolve at build time fall back to the Iconify CDN at runtime. The CSP `connect-src` entry for `api.iconify.design` exists for this fallback path.
+- When adding new icons, prefer icons from the installed collections (mdi, heroicons, lucide). Adding a new collection requires installing `@iconify-json/{collection}` and adding it to `.fallowrc.json` `ignoreDependencies`.
+
 ## Localization
 
-- `app/locales/en.json` is the source locale. Only edit this file.
 - Non-English files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) are Crowdin-owned exports.
 - vue-i18n fallback locale is `en` (`app/i18n.config.ts`). Missing non-English keys render English automatically.
 - `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
@@ -192,6 +201,9 @@ Naming:
   Tarkov.dev profile and EFT-log
   imports must remain unavailable for Seasonal until their Season profile data is verified.
 - Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
+- API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
+  must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
+  or usage data.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling
@@ -208,6 +220,7 @@ Naming:
 - When using Tarkov API or MCP tools, state only what the API returned. Missing API data is not proof the content doesn't exist in-game.
 - The root `socket.yml` limits Socket PR alerts to dependency manifest changes; CodeAnt locale filters live in `.codeant/configuration.json`. Kilo, Snyk, and Supabase PR integrations remain vendor-dashboard settings.
 - Use browser-based dashboard inspection only as a fallback when MCP/API access is missing or insufficient.
+- Production database inspection uses `scripts/prod-db`; it is read-only, emits normalized JSON with statistics-reset metadata, and must use a dedicated observer role over a direct or session-mode connection. Run the telemetry-only `canary` before enabling Pi access. Never provide Pi or another agent with service-role, postgres-admin, migration, or Management API credentials.
 
 ## Git Workflow
 
@@ -227,13 +240,12 @@ Naming:
 
 - Prefer a normal branch in the current checkout (with existing `node_modules` and husky hooks) for the first in-flight task.
 - Before edits, run `git status --short --branch`.
-- Never mix unrelated changes in one commit or PR.
 - Do not use `git stash` for normal context switching unless the user asks.
 - Worktree policy (parallel work isolation):
   - Default to the main checkout for the first in-flight task. Do not create a worktree for solo work or for batched pre-PR edits the user is accumulating before opening a PR.
   - Create a worktree only when starting a SECOND concurrent task while the first is still in flight (uncommitted edits in the main checkout, or an open PR waiting on CI/review). The first task stays in the main checkout; the new task gets a worktree. This is what enables parallel agents without one agent reverting another's uncommitted changes.
   - Worktree convention: path `.wt/<branch>` (co-located, gitignored), created via `bash scripts/wt.sh add <branch>`. The script runs `scripts/setup-worktree.sh` so husky + lint-staged work on commit. State the worktree path in every status update so the user knows which checkout the agent is operating in.
-  - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. Never run `git restore`, `git checkout --`, `git clean`, or `git reset` on a working tree with changes you did not make — if the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
+  - One agent per worktree. Never operate in a worktree another agent is using. Never run `git worktree remove` on a worktree you did not create. If the tree is unexpectedly dirty, stop and ask the user instead of cleaning it.
   - After a worktree's PR merges, remove it with `bash scripts/wt.sh rm <branch>` so stale worktrees and branches don't accumulate.
 - Before every commit: ensure hooks can run (`node_modules` present and `core.hooksPath` / `.husky/_` exist). If they cannot, either run the bootstrap script or manually format/lint staged paths (Prettier for docs/markdown; ESLint for app TS/Vue; `node scripts/lint-blank-lines.mjs --fix` for supported source/config files) so CI `format:check` will pass. Do not commit with known-skipped hooks and unformatted staged files.
 - Commit scopes (from `commitlint.config.js`): `app`, `workers`, `api`, `ui`, `tasks`, `hideout`, `maps`, `team`, `settings`, `admin`, `i18n`, `deps`, `config`, `ci`, `test`, `docs`, `release`. Do not invent new scopes; omit the scope if none fits. Map common cases: `ui` for theme/styling/shell work, `docs` for repository/process documentation such as `AGENTS.md`.
@@ -243,13 +255,20 @@ Naming:
 
 ## Environment Variables
 
-- Use one canonical env var name per concept.
-- Use `NUXT_PUBLIC_*` for browser-exposed Nuxt runtime config.
+- Use one canonical env var name per concept. Shared Supabase project settings use `SUPABASE_URL`
+  and `SUPABASE_ANON_KEY` across Nuxt, Pages, Workers, and Edge Functions; do not duplicate them
+  as `NUXT_PUBLIC_SUPABASE_*` values.
+- Use `NUXT_PUBLIC_*` for browser-exposed Nuxt-only runtime config.
 - Use `NUXT_*` for private Nuxt runtime config (server-only).
 - Browser log forwarding is opt-in: keep `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` empty unless the sink is
   external or `/api/logs/client` is protected by an edge rate-limit rule.
 - Use platform-native names for Supabase Edge Functions (`SUPABASE_*`, `STRIPE_*`, `DISCORD_*`).
-- Do not add legacy aliases or fallback chains without explicit approval.
+- Treat `wrangler.toml` as the source of truth for Cloudflare Pages plaintext variables, bindings,
+  and placement in production and preview. Keep only encrypted secrets in the Pages dashboard; do
+  not duplicate `[vars]` there.
+- Do not add legacy aliases or fallback chains without explicit approval. The environment map uses
+  one canonical name per concept; deprecated Supabase, Nuxt, Vite, and Edge Function aliases have
+  been removed.
 - If an env var is renamed, update source, docs, examples, CI/deploy references, and tests in the same change.
 - See `docs/ARCHITECTURE.md` for the canonical env var map.
 
@@ -271,23 +290,19 @@ Naming:
 
 ## Deeper References
 
-- Agent-context index: `docs/agent-context/README.md`
-- Generated codebase knowledge base (start at the index): `docs/agent-context/summary/index.md`
-- Style, testing, and validation details: `docs/agent-context/style-and-validation.md`
-- Architecture: `docs/ARCHITECTURE.md`
-- System specs (caching, data fetching, overlay, precompute): `docs/SYSTEMS.md`
-- Rate limiting / abuse ownership: `docs/RATE_LIMITING.md`
-- Contributing (human workflow entry point): `.github/CONTRIBUTING.md`
-- Local development setup and coding standards: `docs/contributing/development.md`
-- Pull-request requirements: `docs/contributing/pull-requests.md`
-- Security policy: `SECURITY.md`
-- Support routing: `SUPPORT.md`
-- Code of conduct: `CODE_OF_CONDUCT.md`
-- Runbook: `docs/runbook.md`
-- API docs: `docs/API.md`
-- Workflow automation: `docs/WORKFLOW_AUTOMATION.md`
-- Analytics setup: `docs/agent-context/codex-analytics-setup.md`
-- Design spec: `DESIGN.md`
+For domain-specific component, interface, data-model, or workflow details, load `docs/agent-context/summary/index.md` on demand.
+
+| Topic                                             | Location                      |
+| ------------------------------------------------- | ----------------------------- |
+| Architecture & env vars                           | `docs/ARCHITECTURE.md`        |
+| System specs (caching, data, overlay, precompute) | `docs/SYSTEMS.md`             |
+| API reference                                     | `docs/API.md`                 |
+| Rate limiting                                     | `docs/RATE_LIMITING.md`       |
+| Runbook (deploy, incidents)                       | `docs/runbook.md`             |
+| Workflow automation (CI/CD, hooks, releases)      | `docs/WORKFLOW_AUTOMATION.md` |
+| Contributing                                      | `.github/CONTRIBUTING.md`     |
+| Security policy                                   | `SECURITY.md`                 |
+| Design spec                                       | `DESIGN.md`                   |
 
 ## Custom Instructions
 

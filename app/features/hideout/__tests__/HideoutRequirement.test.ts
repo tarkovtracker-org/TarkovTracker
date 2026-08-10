@@ -19,6 +19,28 @@ vi.mock('@/utils/formatters', () => ({
   useLocaleNumberFormatter: () => (value: number) => String(value),
 }));
 describe('HideoutRequirement', () => {
+  const defaultProps = {
+    level: 1,
+    requirement: {
+      count: 3,
+      id: 'req-1',
+      item: {
+        id: 'item-1',
+        link: 'https://tarkov.dev/item/item-1',
+        name: 'Toolset',
+        wikiLink: 'https://wiki.example.com/Toolset',
+      },
+    },
+    stationId: 'station-1',
+  };
+  const defaultStubs = {
+    AppTooltip: true,
+    ContextMenu: true,
+    ContextMenuItem: true,
+    GameItem: true,
+    UButton: true,
+    UIcon: true,
+  };
   beforeEach(() => {
     vi.clearAllMocks();
     currentCount = 0;
@@ -26,28 +48,8 @@ describe('HideoutRequirement', () => {
   });
   it('marks requirement complete when clicked while incomplete', async () => {
     const wrapper = mount(HideoutRequirement, {
-      props: {
-        level: 1,
-        requirement: {
-          count: 3,
-          id: 'req-1',
-          item: {
-            id: 'item-1',
-            name: 'Toolset',
-          },
-        },
-        stationId: 'station-1',
-      },
-      global: {
-        stubs: {
-          AppTooltip: true,
-          ContextMenu: true,
-          ContextMenuItem: true,
-          GameItem: true,
-          UButton: true,
-          UIcon: true,
-        },
-      },
+      props: defaultProps,
+      global: { stubs: defaultStubs },
     });
     await wrapper.find('.group').trigger('click');
     expect(setHideoutPartCountMock).toHaveBeenCalledWith('req-1', 3);
@@ -57,31 +59,26 @@ describe('HideoutRequirement', () => {
     currentCount = 3;
     isComplete = true;
     const wrapper = mount(HideoutRequirement, {
-      props: {
-        level: 1,
-        requirement: {
-          count: 3,
-          id: 'req-1',
-          item: {
-            id: 'item-1',
-            name: 'Toolset',
-          },
-        },
-        stationId: 'station-1',
-      },
-      global: {
-        stubs: {
-          AppTooltip: true,
-          ContextMenu: true,
-          ContextMenuItem: true,
-          GameItem: true,
-          UButton: true,
-          UIcon: true,
-        },
-      },
+      props: defaultProps,
+      global: { stubs: defaultStubs },
     });
     await wrapper.find('.group').trigger('click');
     expect(setHideoutPartCountMock).toHaveBeenCalledWith('req-1', 0);
     expect(setHideoutPartUncompleteMock).toHaveBeenCalledWith('req-1');
+  });
+  it('suppresses native context menu on right-click', async () => {
+    const wrapper = mount(HideoutRequirement, {
+      props: defaultProps,
+      global: { stubs: defaultStubs },
+    });
+    const element = wrapper.find('.group');
+    const event = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    element.element.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
   });
 });

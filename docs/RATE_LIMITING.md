@@ -1,5 +1,13 @@
 # Rate Limiting & Abuse Controls
 
+<!-- AGENT QUICK REFERENCE
+Design: ONE primary enforcer per traffic class at the closest trusted edge.
+Check §Traffic classes and owners before adding a new limiter — someone may already own it.
+Layers: Cloudflare WAF → Pages Function → Worker DO → Edge Function RPC → Postgres.
+API gateway: Durable Object token-bucket (workers/api-gateway).
+App routes: Nitro middleware + Supabase RPC per-user limits.
+-->
+
 This document is the **ownership map** for every rate-limit / abuse system in TarkovTracker.
 
 If you are about to add a new limiter, read this first. Most confusion in this repo comes from
@@ -155,6 +163,8 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
   `ApiTokens.vue`). Keep that flag off in production so create stays on the Edge limiter.
 - **Token revoke** has an automatic unavailable-function fallback to direct delete in
   `useEdgeFunctions.revokeToken`. That path **skips** the Edge limiter; DB/RLS still apply.
+- **Token rename** is a direct PostgREST update and is not Edge-rate-limited. Database grants restrict
+  authenticated updates to the `note` column, and RLS restricts the row to its owner.
 - The DB still enforces the **max 3 active tokens** trigger even if rate limiting is skipped.
 - Prefer keeping create/revoke behind Edge Functions in production and avoid enabling create
   fallbacks.

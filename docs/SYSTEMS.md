@@ -1,5 +1,12 @@
 # TarkovTracker Systems Spec
 
+<!-- AGENT QUICK REFERENCE
+Endpoint table with cache TTLs: §1 (Tarkov.dev data integration)
+Each section ends with code-binding INVARIANTS — check these when modifying a system.
+Game-mode + seasonal progress storage: §7
+Implementing files are listed within each section body.
+-->
+
 This document explains **how the non-obvious systems in TarkovTracker actually work**, in plain
 language with diagrams. It is the spec you point at when you want to ask "why does the app do X?"
 and have an agent verify the answer against the code.
@@ -24,6 +31,8 @@ and have an agent verify the answer against the code.
    normalized persistence, compatibility, sharing, and teams
 8. [Tarkov.dev profile import](#8-tarkovdev-profile-import) — player profile fetch, caching,
    freshness gate, abuse controls
+9. [Production database observer](#9-production-database-observer) — bounded read-only telemetry,
+   JSON normalization, and migration preflight
 
 ---
 
@@ -715,8 +724,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   the public sitekey and private secret together, so the client cannot submit before its widget is
   ready. Without the pair the route behaves as before (no token required). Siteverify availability
   failures allow the request; explicit verification failures reject it with `403 turnstile_failed`.
-- Siteverify responses are pinned to the `NUXT_PUBLIC_APP_URL` hostname, so a token minted on
-  another origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
+- Siteverify responses are pinned to the canonical `APP_URL` hostname, so a token minted on another
+  origin is rejected with `hostname-mismatch`. Cloudflare's test secret is exempt because it
   reports `example.com` for every origin; it only validates test-key tokens, never production ones.
 - Cached and upstream `200` payloads must pass the import profile schema before use. Invalid cached
   entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
@@ -733,6 +742,91 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   route alone is not enough to unlock it; parser and field compatibility must be verified first.
 
 ---
+
+## 9. Production database observer
+
+**Summary.** `scripts/prod-db` is the canonical production inspection interface for agents and
+humans. It uses Supabase CLI inspection commands for database telemetry and a restricted SQL
+library for schema and bounded data-shape reports. The wrapper normalizes every result to JSON so
+callers do not depend on Supabase CLI presentation formatting. It never applies migrations or
+accepts arbitrary SQL.
+
+### Diagram
+
+```mermaid
+flowchart LR
+    Agent[Pi or developer] --> Observer[scripts/prod-db]
+    Observer -->|allowlisted reports| CLI[Supabase CLI inspect db]
+    Observer -->|schema and bounded shape queries| SQL[restricted SQL library]
+    CLI --> DB[(observer role)]
+    SQL --> DB
+    Observer --> JSON[normalized JSON]
+    Migration[proposed migration] --> Preflight[migration-aware preflight]
+    Preflight --> Observer
+```
+
+### Flow
+
+1. The caller selects an allowlisted operation such as `table-stats`, `outliers`, `locks`, or
+   `vacuum`.
+2. `scripts/prod-db.mjs` selects the primary direct database target or local target and invokes
+   the Supabase CLI with JSON output, then strips CLI connection noise and normalizes the result.
+3. Every report captures observation metadata, including `captured_at`, observer application name,
+   database statistics reset time, statement statistics reset time, and I/O statistics reset time.
+   These timestamps establish the window for cumulative counters.
+4. Schema, count, sample, and distribution operations use validated identifiers and bounded SQL.
+   Samples select allowlisted low-risk columns and are capped at 20 rows; distributions are capped
+   at 50 groups.
+5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
+   SQL, unbounded samples, and non-allowlisted distributions.
+6. `canary` runs only health and telemetry reports and is the first production validation path.
+   It rejects privileged/write-capable roles and unbounded transaction or lock timeouts before it
+   runs the telemetry reports. It never reads application rows or runs migration preflight.
+7. `preflight --migration <path>` parses the migration to identify referenced relations and
+   operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
+   sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
+   report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
+   `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
+8. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
+   observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
+   the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
+   arguments and command errors. The credential file is removed after each CLI invocation.
+   The role's actual database privileges are the hard safety boundary; connection defaults such as
+   `statement_timeout`, `lock_timeout`, and `default_transaction_read_only` are additional defenses.
+
+### Files
+
+- `scripts/prod-db` — stable executable entrypoint.
+- `scripts/prod-db.mjs` — allowlist, SQL validation, Supabase CLI adapter, redaction, and preflight.
+- `scripts/prod-db.test.mjs` — local integration tests for the observer contract.
+- `.env.example` — observer environment variable documentation.
+- `docs/runbook.md` — role provisioning and operational usage.
+
+### Invariants
+
+- Production inspection must use a dedicated database observer identity with no write or DDL
+  privileges. Service-role, postgres-admin, migration, and Management API credentials are never
+  accepted as observer credentials.
+- `PROD_DB_URL` uses a TLS-protected direct connection or session-mode pooler with
+  `sslmode=verify-full`; the transaction pooler is
+  unsupported because session-level settings are not safe as a security boundary there. The
+  wrapper rejects the documented default transaction-pooler port `6543`.
+- Observer passwords must not appear in child-process arguments, inherited `PROD_DB_URL` values,
+  normalized output, or command errors.
+- Every successful operation returns JSON with `ok`, `operation`, `target`, `generated_at`, an
+  `observation` object, and `data` or report fields.
+- Built-in telemetry is allowlisted and does not depend on Supabase CLI text formatting.
+- SQL identifiers are validated before interpolation, row and group limits are enforced, sensitive
+  sample columns are excluded, and sensitive distributions are rejected.
+- The observer never executes migrations, arbitrary SQL, writes, DDL, `EXPLAIN ANALYZE`, or
+  transaction-control statements.
+- `canary` is telemetry-only and excludes samples, distributions, and preflight.
+- `canary` must fail before telemetry collection when the observer is privileged, can write
+  application tables or create persistent objects, lacks default read-only transactions, or has
+  unbounded statement or lock timeouts.
+- Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
+  production reports run sequentially, and migration execution remains in the reviewed merge and
+  Supabase deployment workflow.
 
 ## When this doc is wrong
 

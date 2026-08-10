@@ -146,7 +146,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Setup Deno
         if: matrix.shard == 1
-        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.9.4
       - name: Run Deno tests
@@ -156,7 +156,7 @@ jobs:
         run: pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/${{ matrix.total }}
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
@@ -165,7 +165,7 @@ jobs:
           fail_ci_if_error: false
       - name: Upload test results to Codecov
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:

@@ -1,5 +1,14 @@
 # TarkovTracker API Documentation
 
+<!-- AGENT QUICK REFERENCE
+Progress API host: api.tarkovtracker.org (Bearer api_token auth).
+Internal routes: /api/tarkov/* (cached game-data proxy, NOT a public integration surface).
+Team routes: /api/team/* (Supabase JWT auth).
+Profile routes: /api/profile/* (public, rate-limited — no auth for shared profiles).
+Game modes in API: regular (pvp), pve, pvp-season (seasonal).
+Rate limits: §Rate Limits. OpenAPI spec: workers/api-gateway/src/openapi.ts.
+-->
+
 ## Overview
 
 TarkovTracker provides internal API routes for fetching game data and team information. Game data is proxied through Nuxt server routes to `json.tarkov.dev` with caching and overlay corrections applied.
@@ -406,6 +415,10 @@ Polling integrators (TarkovMonitor, tarkov.dev, RatScanner) should poll read end
 ### Active Token Cap
 
 Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account.
+
+Token names can be changed from Settings → API Tokens without rotating the token. Renaming updates
+only the token's optional `note`: authenticated users receive column-level `UPDATE (note)` permission,
+and row-level security requires the token owner for both the existing and resulting row.
 
 ### Token Prefixes
 

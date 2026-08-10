@@ -1,5 +1,12 @@
 # TarkovTracker Architecture Documentation
 
+<!-- AGENT QUICK REFERENCE
+Canonical env var map: §Environment Variables (~40 vars with descriptions).
+Naming: SUPABASE_* shared, NUXT_* private server, NUXT_PUBLIC_* browser-exposed.
+wrangler.toml is source of truth for Cloudflare Pages vars/bindings.
+Quoting: quote in TOML, unquoted in .env/.dev.vars unless dotenv requires it.
+-->
+
 ## Overview
 
 TarkovTracker is a sophisticated single-page application (SPA) for tracking progress in Escape from Tarkov. Built with Nuxt 4, Vue 3, and Supabase, it provides real-time multi-device synchronization, team collaboration, and comprehensive task/hideout tracking.
@@ -435,29 +442,70 @@ Node.js version: 24.x
 
 ### Environment Variables
 
-Naming convention: `NUXT_*` for Nuxt private runtime config (server-only), `NUXT_PUBLIC_*`
-for Nuxt public runtime config (browser-exposed), plain names for platform/build-time or
-Supabase Edge Functions.
+Naming convention: `SUPABASE_*` for shared Supabase project settings, `NUXT_*` for Nuxt private
+runtime config (server-only), `NUXT_PUBLIC_*` for Nuxt public runtime config (browser-exposed), and
+plain names for platform/build-time or Supabase Edge Function settings.
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are the canonical shared Supabase values. Nuxt, Cloudflare
+Pages/Workers, and Supabase Edge Functions can all consume them, so they must not be duplicated as
+`NUXT_PUBLIC_*` or `VITE_*` values.
 
 Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
+### Environment value entry standard
+
+Quote syntax depends on where a value is entered:
+
+- In `wrangler.toml`, write string values as TOML strings, for example
+  `APP_URL = "https://tarkovtracker.org"`. The TOML parser treats the quotation marks as syntax;
+  they are not part of the resulting value.
+- In `.env`, `.env.*`, and `.dev.vars*` files, use unquoted values by default, for example
+  `APP_URL=https://tarkovtracker.org`. Dotenv permits both quoted and unquoted values, but matching
+  dashboard entry style reduces copy/paste mistakes. Add quotes only when they are semantically
+  required, such as preserving leading or trailing whitespace, including `#` as data, or expressing
+  a supported multiline value.
+- In a Cloudflare Pages or Workers dashboard **Value** field, enter only the raw value, for example
+  `https://tarkovtracker.org`. Cloudflare stores and passes dashboard values as entered; quotation
+  marks typed into the field become part of the value.
+- At an interactive `wrangler secret put` value prompt, enter only the raw secret. Shell quotes used
+  around command arguments are shell syntax, but quotation marks pasted or piped as secret content
+  are data and are preserved.
+- Never place private credentials in `[vars]` or commit them to `wrangler.toml`. Store them as
+  encrypted Cloudflare secrets. It is safe for intentionally public identifiers such as the
+  Supabase anon key and Turnstile sitekey to remain plaintext configuration.
+
+Therefore, TOML strings stay quoted because TOML requires a string delimiter. Dotenv and dashboard
+values stay unquoted unless the dotenv value specifically requires quoting. Interactive secret
+fields never include decorative wrapping quotes.
+
+References: Cloudflare's Pages bindings and Workers secrets documentation, Cloudflare's Pages API
+(`env_vars.*.value` is the stored string), Node.js's dotenv specification, and TOML v1.0.
+
+Cloudflare Pages production and preview configuration is sourced from `wrangler.toml`. Dashboard
+entries are reserved for encrypted secrets; do not duplicate plaintext `[vars]` there. Smart
+Placement is enabled for both environments through the top-level `[placement]` block.
+
 **Client-side (browser) — Nuxt public runtime config:**
 
-| Variable                                         | Description                                              | Required   |
-| ------------------------------------------------ | -------------------------------------------------------- | ---------- |
-| `NUXT_PUBLIC_SUPABASE_URL`                       | Supabase project URL for auth and sync                   | Yes¹       |
-| `NUXT_PUBLIC_SUPABASE_ANON_KEY`                  | Supabase anon key for auth and sync                      | Yes¹       |
-| `NUXT_PUBLIC_APP_URL`                            | Application URL                                          | Yes (prod) |
-| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No         |
-| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²        |
-| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No         |
+| Variable                                         | Description                                              | Required |
+| ------------------------------------------------ | -------------------------------------------------------- | -------- |
+| `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹     |
+| `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹     |
+| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No       |
+| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²      |
+| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No       |
 
-> **¹ Required in production.** `SUPABASE_URL` and `SUPABASE_ANON_KEY` work as cross-platform
-> build-time fallbacks. Without Supabase configuration, auth, sync, realtime, and team features
-> are unavailable; the app runs in offline mode with localStorage only.
+> **¹ Required in production.** These shared names are consumed by Nuxt, Pages, Workers, and Edge
+> Functions. Without Supabase configuration, auth, sync, realtime, and team features are unavailable;
+> the app runs in offline mode with localStorage only.
 >
 > **² Turnstile is optional, but its public sitekey and private secret must be configured together.
 > Local development uses Cloudflare's always-pass test keys automatically.**
+
+`VITE_PERF_DEBUG` is an opt-in client performance debugging switch. Set it to `1`, `true`, `yes`,
+or `on` before starting the dev server or building the app to enable timing logs from
+`app/utils/perf.ts` through the shared client logger. Leave it unset or set it to `false` for normal
+builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
 **Server-side (Nuxt private runtime config):**
 
@@ -469,6 +517,7 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 | `NUXT_TWITCH_CLIENT_ID`                         | Twitch API client ID                                | No         |
 | `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE`              | Bot accounts excluded from contributors             | No         |
 | `NUXT_GITHUB_TIMEOUT_MS`                        | GitHub API timeout                                  | No         |
+| `NUXT_GITHUB_TOKEN`                             | GitHub API token                                    | No         |
 | `NUXT_CACHE_BYPASS_ENABLED`                     | Enable server-side cache bypass header              | No         |
 | `API_ALLOWED_HOSTS`                             | Allowed origin hosts                                | No         |
 | `API_TRUSTED_IP_RANGES`                         | Trusted IP ranges (CIDR)                            | No         |
@@ -494,22 +543,23 @@ Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
 **Build-time / platform:**
 
-| Variable             | Description                     |
-| -------------------- | ------------------------------- |
-| `APP_URL`            | App URL (CF Pages / CI)         |
-| `CF_PAGES_URL`       | Cloudflare Pages deploy URL     |
-| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID |
-| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID    |
-| `GITHUB_TOKEN`       | GitHub API token                |
+| Variable             | Description                            |
+| -------------------- | -------------------------------------- |
+| `APP_URL`            | Canonical production application URL   |
+| `CF_PAGES_URL`       | Automatic Cloudflare Pages preview URL |
+| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID        |
+| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
+| `VITE_PERF_DEBUG`    | Client performance timing logs         |
 
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — all canonical for Edge
-Functions. (`SUPABASE_SERVICE_ROLE_KEY` is deprecated only as a Nuxt app fallback; use
-`NUXT_SUPABASE_SERVICE_KEY` for Nuxt.) `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared
-canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`,
-`DISCORD_SUPPORTER_ROLE_ID`, `DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`,
-`CLOUDFLARE_API_TOKEN` are Edge-only. See `supabase/functions/.env.example`.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are platform-managed canonical
+Edge Function values. Nuxt uses `NUXT_SUPABASE_SERVICE_KEY` for the privileged key. `APP_URL` is the
+canonical application URL used by `admin-cache-purge`; it has no alias fallback.
+`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared canonical names used by both Nuxt and
+Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID`,
+`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only. See
+`supabase/functions/.env.example`.
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
 

@@ -59,12 +59,15 @@
         >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="w-full space-y-2">
-              <div class="flex items-center gap-2">
-                <UIcon name="i-mdi-key-variant" class="text-primary-400 h-5 w-5" />
-                <span class="text-surface-50 font-medium">
-                  {{ token.note || t('page.settings.card.apitokens.default_note') }}
-                </span>
-              </div>
+              <ApiTokenNameEditor
+                :name="token.note"
+                :editing="editingTokenId === token.id"
+                :loading="renamingId === token.id"
+                :disabled="renamingId !== null"
+                @edit="startTokenNameEdit(token.id)"
+                @cancel="cancelTokenNameEdit"
+                @save="renameToken(token, $event)"
+              />
               <div class="flex flex-wrap gap-1.5 text-xs">
                 <UBadge
                   :color="
@@ -167,6 +170,7 @@
                 icon="i-mdi-close-circle"
                 size="xs"
                 :loading="revokingId === token.id"
+                :disabled="renamingId === token.id"
                 @click="revokeToken(token.id)"
               >
                 {{ t('page.settings.card.apitokens.revoke_button') }}
@@ -290,6 +294,7 @@
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
+  import ApiTokenNameEditor from '@/features/settings/ApiTokenNameEditor.vue';
   import {
     API_PERMISSIONS,
     API_TOKEN_PREFIXES,
@@ -308,6 +313,9 @@
     token_value?: string;
     user_id: string;
   };
+  type ApiTokenUpdatePayload = {
+    note: string | null;
+  };
   type SupabaseTokenError = {
     code?: string;
     message?: string;
@@ -315,6 +323,7 @@
   interface SupabaseTable {
     select: (query: string) => SupabaseTable;
     insert: (data: ApiTokenInsertPayload) => SupabaseTable;
+    update: (data: ApiTokenUpdatePayload) => SupabaseTable;
     eq: (column: string, value: string) => SupabaseTable;
     order: (column: string, options?: { ascending: boolean }) => SupabaseTable;
     single: () => Promise<{ data: { token_id: string } | null; error: SupabaseTokenError }>;
@@ -334,6 +343,8 @@
   const loading = ref(false);
   const creating = ref(false);
   const revokingId = ref<string | null>(null);
+  const renamingId = ref<string | null>(null);
+  const editingTokenId = ref<string | null>(null);
   const tokens = ref<TokenRow[]>([]);
   const selectedGameMode = ref<GameMode>(GAME_MODES.PVP);
   const selectedPermissions = ref<TokenPermission[]>(['GP']);
@@ -343,6 +354,7 @@
   const supportsRawTokens = ref(true);
   let createTokenRequestId = 0;
   let loadTokensRequestId = 0;
+  let renameTokenRequestId = 0;
   const userLoggedIn = computed(() => $supabase.user.loggedIn);
   const permissionOptions = computed(() =>
     Object.entries(API_PERMISSIONS).map(([key, value]) => ({
@@ -424,12 +436,18 @@
   const invalidateTokenCreates = () => {
     createTokenRequestId += 1;
   };
+  const invalidateTokenRenames = () => {
+    renameTokenRequestId += 1;
+  };
   const resetUserScopedState = () => {
     invalidateTokenCreates();
     invalidateTokenLoads();
+    invalidateTokenRenames();
     loading.value = false;
     creating.value = false;
     revokingId.value = null;
+    renamingId.value = null;
+    editingTokenId.value = null;
     tokens.value = [];
     visibleTokens.value = new Set();
     showCreateDialog.value = false;
@@ -442,6 +460,13 @@
   };
   const isCurrentTokenCreate = (requestId: number, userId: string) => {
     return requestId === createTokenRequestId && getActiveUserId() === userId;
+  };
+  const isCurrentTokenRename = (requestId: number, userId: string, tokenId: string) => {
+    return (
+      requestId === renameTokenRequestId &&
+      getActiveUserId() === userId &&
+      editingTokenId.value === tokenId
+    );
   };
   const loadTokens = async () => {
     const table = tableClient();
@@ -683,6 +708,99 @@
     if (!token) return '';
     if (token.length <= 12) return token;
     return `${token.substring(0, 8)}...${token.substring(token.length - 4)}`;
+  };
+  const startTokenNameEdit = (tokenId: string) => {
+    if (renamingId.value !== null) return;
+    editingTokenId.value = tokenId;
+  };
+  const cancelTokenNameEdit = () => {
+    if (renamingId.value !== null) return;
+    editingTokenId.value = null;
+  };
+  const getTokenRenameContext = (tokenId: string) => {
+    const table = tableClient();
+    const userId = getActiveUserId();
+    const blocked = [!table, !userId, editingTokenId.value !== tokenId, renamingId.value !== null];
+    if (blocked.includes(true)) {
+      return null;
+    }
+    return { table: table as SupabaseTable, userId: userId as string };
+  };
+  const persistTokenName = async (
+    table: SupabaseTable,
+    tokenId: string,
+    userId: string,
+    name: string | null
+  ) => {
+    const { data, error } = await table
+      .update({ note: name })
+      .eq('token_id', tokenId)
+      .eq('user_id', userId)
+      .select('token_id')
+      .single();
+    if (error) {
+      throw error;
+    }
+    if (data?.token_id !== tokenId) {
+      throw new Error('Token rename returned no matching token');
+    }
+  };
+  const showTokenRenameError = (error: unknown, tokenId: string, userId: string) => {
+    logger.error('[ApiTokens] Failed to rename token:', error);
+    showErrorToast({
+      title: t('page.settings.card.apitokens.name_update_error'),
+      error,
+      context: {
+        action: 'rename',
+        area: 'api_tokens',
+        tokenId,
+        userId,
+      },
+      reportTitle: t('page.settings.card.apitokens.report.rename_failed'),
+    });
+  };
+  const finishTokenRename = (requestId: number) => {
+    if (requestId === renameTokenRequestId) {
+      renamingId.value = null;
+    }
+  };
+  const applyTokenRename = (
+    requestId: number,
+    tokenId: string,
+    userId: string,
+    nextName: string | null
+  ) => {
+    if (!isCurrentTokenRename(requestId, userId, tokenId)) return;
+    const currentToken = tokens.value.find((token) => token.id === tokenId);
+    if (currentToken) currentToken.note = nextName;
+    editingTokenId.value = null;
+    toast.add({
+      title: t('page.settings.card.apitokens.name_updated'),
+      color: 'success',
+    });
+  };
+  const handleTokenRenameFailure = (
+    requestId: number,
+    error: unknown,
+    tokenId: string,
+    userId: string
+  ) => {
+    if (!isCurrentTokenRename(requestId, userId, tokenId)) return;
+    showTokenRenameError(error, tokenId, userId);
+  };
+  const renameToken = async (token: TokenRow, nextName: string | null) => {
+    const context = getTokenRenameContext(token.id);
+    if (!context) return;
+    const requestId = ++renameTokenRequestId;
+    renamingId.value = token.id;
+    try {
+      await persistTokenName(context.table, token.id, context.userId, nextName);
+      applyTokenRename(requestId, token.id, context.userId, nextName);
+    } catch (error) {
+      handleTokenRenameFailure(requestId, error, token.id, context.userId);
+    } finally {
+      finishTokenRename(requestId);
+    }
   };
   const revokeToken = async (tokenId: string) => {
     if (!tokenId) return;

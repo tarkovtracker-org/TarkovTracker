@@ -152,13 +152,14 @@
   </ContextMenu>
 </template>
 <script setup lang="ts">
-  import ContextMenu from '@/components/ui/ContextMenu.vue';
-  import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import GameItem from '@/components/ui/GameItem.vue';
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { openExternalUrl } from '@/utils/redirect';
+  import type ContextMenuType from '@/components/ui/ContextMenu.vue';
+  const ContextMenu = defineAsyncComponent(() => import('@/components/ui/ContextMenu.vue'));
+  const ContextMenuItem = defineAsyncComponent(() => import('@/components/ui/ContextMenuItem.vue'));
   interface Props {
     requirement: {
       id: string;
@@ -185,7 +186,8 @@
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
   // Context menu
-  const contextMenu = ref<InstanceType<typeof ContextMenu>>();
+  const contextMenu = ref<InstanceType<typeof ContextMenuType>>();
+  const pendingContextEvent = ref<MouseEvent | null>(null);
   const editValue = ref(0);
   // Check if item requires Found in Raid status
   const isFoundInRaid = computed(() => {
@@ -257,8 +259,19 @@
   };
   const openContextMenu = (event: MouseEvent): void => {
     editValue.value = currentCount.value;
-    contextMenu.value?.open(event);
+    event.stopPropagation();
+    if (contextMenu.value) {
+      contextMenu.value.open(event);
+    } else {
+      pendingContextEvent.value = event;
+    }
   };
+  watch(contextMenu, (menu) => {
+    if (menu && pendingContextEvent.value) {
+      menu.open(pendingContextEvent.value);
+      pendingContextEvent.value = null;
+    }
+  });
   const openTarkovDev = (): void => {
     if (props.requirement.item.link) {
       openExternalUrl(props.requirement.item.link);

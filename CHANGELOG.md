@@ -1,3 +1,69 @@
+## [1.68.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.2...v1.68.3) (2026-08-10)
+
+
+### Bug Fixes
+
+* **hideout:** stop context menu event propagation before async queue ([#696](https://github.com/tarkovtracker-org/TarkovTracker/issues/696)) ([a4654a8](https://github.com/tarkovtracker-org/TarkovTracker/commit/a4654a80c8bb02f507d176a6afe0502d25842cf5))
+
+## [1.68.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.1...v1.68.2) (2026-08-10)
+
+
+### Performance Improvements
+
+* **hideout:** eliminate async component waterfalls and reduce initial render cost ([#695](https://github.com/tarkovtracker-org/TarkovTracker/issues/695)) ([b2299a9](https://github.com/tarkovtracker-org/TarkovTracker/commit/b2299a9913276d0e2beb7455c358632b1d17602d))
+
+## [1.68.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.0...v1.68.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ui:** align contributor leaderboard rows ([#694](https://github.com/tarkovtracker-org/TarkovTracker/issues/694)) ([841210c](https://github.com/tarkovtracker-org/TarkovTracker/commit/841210cffb375694bef1fee3b48105dec602b24a))
+
+# [1.68.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.67.0...v1.68.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** add official .org-vs-.io guide and video walkthroughs to resources ([#683](https://github.com/tarkovtracker-org/TarkovTracker/issues/683)) ([9d77252](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d77252d2903f58de811d0df8e334953849ff750))
+
+# [1.67.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.66.0...v1.67.0) (2026-08-10)
+
+
+### Features
+
+* **api:** allow renaming API tokens ([#685](https://github.com/tarkovtracker-org/TarkovTracker/issues/685)) ([0cfac2c](https://github.com/tarkovtracker-org/TarkovTracker/commit/0cfac2cecc0b17e6d590fe798c99ba3e20094af6))
+
+# [1.66.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.65.0...v1.66.0) (2026-08-10)
+
+
+### Features
+
+* **api:** add read-only production database observer ([#667](https://github.com/tarkovtracker-org/TarkovTracker/issues/667)) ([24d3b41](https://github.com/tarkovtracker-org/TarkovTracker/commit/24d3b41942bf00c7cba4efa5549a5c16efee527e))
+
+# [1.65.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.2...v1.65.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** improve credits and footer navigation ([#681](https://github.com/tarkovtracker-org/TarkovTracker/issues/681)) ([5d1940b](https://github.com/tarkovtracker-org/TarkovTracker/commit/5d1940b98b8809dbc9c4aa5c9acb61e2a55c80d2))
+
+## [1.64.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.1...v1.64.2) (2026-08-09)
+
+## [1.64.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.0...v1.64.1) (2026-08-08)
+
+# [1.64.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.3...v1.64.0) (2026-08-08)
+
+
+### Bug Fixes
+
+* **api:** revoke anon and authenticated EXECUTE on legacy share trigger ([#659](https://github.com/tarkovtracker-org/TarkovTracker/issues/659)) ([4db5e76](https://github.com/tarkovtracker-org/TarkovTracker/commit/4db5e76b1bb75723a4dce64b7cc4d252feeb0235))
+* **api:** stop blocking backfill and support missing mode rows ([a02f81c](https://github.com/tarkovtracker-org/TarkovTracker/commit/a02f81c197c55ce66ea1e9667b148b6221383675))
+
+
+### Features
+
+* **ui:** add GitHub avatar and profile link for Giribaldi_TTV ([ec72b83](https://github.com/tarkovtracker-org/TarkovTracker/commit/ec72b83d2b99d8299a3520564e7619b0151927d0))
+
 ## [1.63.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.2...v1.63.3) (2026-08-06)
 
 

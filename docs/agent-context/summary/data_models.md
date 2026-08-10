@@ -164,10 +164,10 @@ Maps keyed by id: `taskObjectives`, `taskCompletions`, `hideoutParts`, `hideoutM
 Defined in `app/types/tarkov.ts`:
 
 - `SystemState` / `SystemGetters` — `user_id`, `tokens`, `team`, `pvp_team_id`, `pve_team_id`,
-  `is_admin`; getters `userTokens`, `userTeam`, `userTeamIsOwn`, `isAdmin`.
+  `seasonal_team_id`, `is_admin`; getters `userTokens`, `userTeam`, `userTeamIsOwn`, `isAdmin`.
 - `TeamState` / `TeamGetters` — `owner`, `joinCode`, `members`, `memberProfiles`; getters
   `teamOwner`, `isOwner`, `inviteCode`, `teamMembers`, `teammates`.
-- `MemberProfile` — `displayName`, `level`, `tasksCompleted`, `gameMode` (`pvp`|`pve`).
+- `MemberProfile` — `displayName`, `level`, `tasksCompleted`, `gameMode` (`'pvp'|'pve'|'seasonal'`).
 
 ## Supabase Data Model
 
@@ -177,6 +177,7 @@ through RPCs/Edge Functions for elevated privileges or rate limiting.
 ```mermaid
 erDiagram
     user_progress ||--|| auth_users : "user_id"
+    user_game_mode_progress }o--|| auth_users : "user_id"
     user_system ||--|| auth_users : "user_id"
     user_preferences ||--|| auth_users : "user_id"
     teams ||--o{ team_memberships : "team_id"
@@ -191,9 +192,18 @@ erDiagram
         text game_mode
         int progress_epoch
     }
+    user_game_mode_progress {
+        uuid user_id
+        text game_mode
+        smallint season_number
+        jsonb progress_data
+        bool profile_public
+    }
     user_system {
         uuid user_id
-        uuid team_id
+        uuid pvp_team_id
+        uuid pve_team_id
+        uuid seasonal_team_id
         bool is_admin
     }
     user_preferences {
@@ -226,22 +236,25 @@ erDiagram
     }
 ```
 
-| Table / object               | Role                                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `user_progress`              | Per-user, per-mode progress JSON; realtime-enabled; payload sanitized via trigger/RPC       |
-| `user_system`                | Per-user system row (team linkage, admin flag — admin column privilege-locked)              |
-| `user_preferences`           | Per-user UI preferences (columns added incrementally via migrations)                        |
-| `teams` / `team_memberships` | Team ownership + membership (game-mode aware; RLS tuned to avoid recursion)                 |
-| `api_tokens`                 | Hashed API tokens for the gateway                                                           |
-| `supporters`                 | Supporter tier + Stripe customer linkage                                                    |
-| `stripe_events`              | Idempotency/retention for webhook events                                                    |
-| `prestige_runs`              | Prestige run history (+ progress epoch)                                                     |
-| `account_deletion_jobs`      | Account deletion job tracking                                                               |
-| `admin_audit_log`            | Admin action audit trail                                                                    |
-| RPCs                         | API gateway functions, atomic prestige progress, mutation rate limiting, ownership transfer |
+| Table / object               | Role                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `user_progress`              | Legacy per-user progress (pvp_data/pve_data); compatibility row for rolling deploys       |
+| `user_game_mode_progress`    | Normalized per-mode progress; PK `(user_id, game_mode, season_number)`; realtime-enabled  |
+| `user_system`                | Per-user system row (team linkage, seasonal_team_id, admin flag)                          |
+| `user_preferences`           | Per-user UI preferences (columns added incrementally via migrations)                      |
+| `teams` / `team_memberships` | Team ownership + membership (game-mode aware; accepts pvp/pve/seasonal)                   |
+| `api_tokens`                 | Hashed API tokens for the gateway (prefixed PVP_/PVE_/SZN_)                               |
+| `supporters`                 | Supporter tier + Stripe customer linkage                                                  |
+| `stripe_events`              | Idempotency/retention for webhook events                                                  |
+| `prestige_runs`              | Prestige run history (+ progress epoch)                                                   |
+| `account_deletion_jobs`      | Account deletion job tracking                                                             |
+| `admin_audit_log`            | Admin action audit trail                                                                  |
+| RPCs                         | `sync_user_game_mode_progress`, `merge_progress_data`, prestige, rate limiting, ownership |
 
-> Game modes appear as `regular`/`pve` in the game-data API and `pvp`/`pve` in
-> team/profile/membership contexts. Treat them as the same two-mode concept across layers.
+> Game modes: `pvp`, `pve`, `seasonal` internally. Game-data API uses `regular`/`pve`/`pvp-season`.
+> Seasonal progress is keyed by season number (pvp/pve always use season_number=0).
+> `private.active_season_number()` returns the current season; the app constant `ACTIVE_SEASON`
+> in `app/utils/constants.ts` must stay synchronized with it.
 
 ## Static Local Data
 

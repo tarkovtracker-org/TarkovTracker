@@ -16,6 +16,7 @@ import {
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
+  YOUTUBE_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
@@ -117,65 +118,22 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only (private) runtime config
     supabaseUrl: PRIVATE_SUPABASE_URL,
-    supabaseServiceKey:
-      process.env.NUXT_SUPABASE_SERVICE_KEY ||
-      // deprecated — remove after 2026-07-31
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      '',
+    supabaseServiceKey: process.env.NUXT_SUPABASE_SERVICE_KEY || '',
     supabaseAnonKey: PRIVATE_SUPABASE_ANON_KEY,
-    githubToken: process.env.GITHUB_TOKEN || '',
+    githubToken: process.env.NUXT_GITHUB_TOKEN?.trim() || '',
     githubContributorsExclude:
       process.env.NUXT_GITHUB_CONTRIBUTORS_EXCLUDE ||
-      // deprecated — remove after 2026-07-31
-      process.env.GITHUB_CONTRIBUTORS_EXCLUDE ||
       'claude,claude[bot],semantic-release-bot,semantic-release[bot]',
     githubContributorsCacheTtlMs:
-      Number(
-        process.env.NUXT_GITHUB_CONTRIBUTORS_CACHE_TTL_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.GITHUB_CONTRIBUTORS_CACHE_TTL_MS ||
-          '1800000'
-      ) || 1800000,
-    githubTimeoutMs:
-      Number(
-        process.env.NUXT_GITHUB_TIMEOUT_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.GITHUB_TIMEOUT_MS ||
-          '8000'
-      ) || 8000,
-    tarkovJsonBaseUrl:
-      process.env.NUXT_TARKOV_JSON_BASE_URL ||
-      // deprecated — remove after 2026-07-31
-      process.env.TARKOV_JSON_BASE_URL ||
-      '',
-    logSinkUrl:
-      process.env.NUXT_LOG_SINK_URL ||
-      // deprecated — remove after 2026-07-31
-      process.env.LOG_SINK_URL ||
-      '',
-    twitchClientId:
-      process.env.NUXT_TWITCH_CLIENT_ID ||
-      // deprecated — remove after 2026-07-31
-      process.env.TWITCH_CLIENT_ID ||
-      'kimne78kx3ncx6brgo4mv6wki5h1ko',
-    publicCacheBypassEnabled:
-      process.env.NUXT_CACHE_BYPASS_ENABLED === 'true' ||
-      // deprecated — remove after 2026-07-31
-      process.env.NUXT_PUBLIC_CACHE_BYPASS_ENABLED === 'true',
-    teamMembersCacheTtlMs:
-      Number(
-        process.env.NUXT_TEAM_MEMBERS_CACHE_TTL_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.TEAM_MEMBERS_CACHE_TTL_MS ||
-          '5000'
-      ) || 5000,
+      Number(process.env.NUXT_GITHUB_CONTRIBUTORS_CACHE_TTL_MS || '1800000') || 1800000,
+    githubTimeoutMs: Number(process.env.NUXT_GITHUB_TIMEOUT_MS || '8000') || 8000,
+    tarkovJsonBaseUrl: process.env.NUXT_TARKOV_JSON_BASE_URL || '',
+    logSinkUrl: process.env.NUXT_LOG_SINK_URL || '',
+    twitchClientId: process.env.NUXT_TWITCH_CLIENT_ID || 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+    publicCacheBypassEnabled: process.env.NUXT_CACHE_BYPASS_ENABLED === 'true',
+    teamMembersCacheTtlMs: Number(process.env.NUXT_TEAM_MEMBERS_CACHE_TTL_MS || '5000') || 5000,
     teamMembersRateLimitPerMinute:
-      Number(
-        process.env.NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
-          // deprecated — remove after 2026-07-31
-          process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
-          '120'
-      ) || 120,
+      Number(process.env.NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE || '120') || 120,
     stripeSecretKey: (process.env.STRIPE_SECRET_KEY ?? '').trim(),
     stripePriceScavMonthly: (process.env.STRIPE_PRICE_SCAV_MONTHLY ?? '').trim(),
     stripePriceScav6month: (process.env.STRIPE_PRICE_SCAV_6MONTH ?? '').trim(),
@@ -187,20 +145,9 @@ export default defineNuxtConfig({
     stripePriceChad6month: (process.env.STRIPE_PRICE_CHAD_6MONTH ?? '').trim(),
     stripePriceChadYearly: (process.env.STRIPE_PRICE_CHAD_YEARLY ?? '').trim(),
     accountIpHashSecret: (process.env.NUXT_ACCOUNT_IP_HASH_SECRET ?? '').trim(),
-    sharedProfileCacheTtlMs:
-      Number(
-        process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.SHARED_PROFILE_CACHE_TTL_MS ||
-          '5000'
-      ) || 5000,
+    sharedProfileCacheTtlMs: Number(process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS || '5000') || 5000,
     sharedProfileRateLimitPerMinute:
-      Number(
-        process.env.NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
-          // deprecated — remove after 2026-07-31
-          process.env.SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
-          '120'
-      ) || 120,
+      Number(process.env.NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE || '120') || 120,
     tarkovDevProfileCacheTtlMs:
       Number(process.env.NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS || '900000') || 900000,
     tarkovDevProfileRateLimitPerMinute:
@@ -236,11 +183,7 @@ export default defineNuxtConfig({
     },
     public: {
       NODE_ENV: process.env.NODE_ENV || 'production',
-      logLevel:
-        process.env.NUXT_PUBLIC_LOG_LEVEL ||
-        // deprecated — remove after 2026-07-31
-        process.env.VITE_LOG_LEVEL ||
-        '',
+      logLevel: process.env.NUXT_PUBLIC_LOG_LEVEL || '',
       appUrl: PUBLIC_APP_URL,
       appVersion,
       googleAnalyticsMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
@@ -497,7 +440,12 @@ export default defineNuxtConfig({
     },
   },
   image: {
-    domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS],
+    domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS],
+  },
+  icon: {
+    clientBundle: {
+      scan: true,
+    },
   },
   ui: {
     theme: {
