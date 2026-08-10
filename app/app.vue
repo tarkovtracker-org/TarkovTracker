@@ -73,7 +73,9 @@
     }
     return route.path;
   });
-  const pageOwnsCanonical = computed(() => route.path.startsWith('/resources/'));
+  const pageOwnsCanonical = computed(
+    () => route.path.startsWith('/resources/') && route.path !== '/resources/'
+  );
   useHead(() => ({
     htmlAttrs: {
       lang: locale.value,
