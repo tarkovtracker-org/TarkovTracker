@@ -187,6 +187,7 @@
   const requiredCount = computed(() => props.requirement.count);
   // Context menu
   const contextMenu = ref<InstanceType<typeof ContextMenuType>>();
+  const pendingContextEvent = ref<MouseEvent | null>(null);
   const editValue = ref(0);
   // Check if item requires Found in Raid status
   const isFoundInRaid = computed(() => {
@@ -258,8 +259,18 @@
   };
   const openContextMenu = (event: MouseEvent): void => {
     editValue.value = currentCount.value;
-    contextMenu.value?.open(event);
+    if (contextMenu.value) {
+      contextMenu.value.open(event);
+    } else {
+      pendingContextEvent.value = event;
+    }
   };
+  watch(contextMenu, (menu) => {
+    if (menu && pendingContextEvent.value) {
+      menu.open(pendingContextEvent.value);
+      pendingContextEvent.value = null;
+    }
+  });
   const openTarkovDev = (): void => {
     if (props.requirement.item.link) {
       openExternalUrl(props.requirement.item.link);
