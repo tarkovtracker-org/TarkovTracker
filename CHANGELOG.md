@@ -1,3 +1,10 @@
+# [1.68.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.67.0...v1.68.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** add official .org-vs-.io guide and video walkthroughs to resources ([#683](https://github.com/tarkovtracker-org/TarkovTracker/issues/683)) ([9d77252](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d77252d2903f58de811d0df8e334953849ff750))
+
 # [1.67.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.66.0...v1.67.0) (2026-08-10)
 
 
