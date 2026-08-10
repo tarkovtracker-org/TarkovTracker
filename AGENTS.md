@@ -75,7 +75,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 
 Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest path/to/file.test.ts` | By name: `pnpm exec vitest -t "pattern"`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
 
 Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
@@ -141,7 +141,7 @@ Formatting is enforced by Prettier + ESLint (see `.prettierrc`, `eslint.config.m
 - Avoid unused imports/exports.
 - Keep functions small; prefer early returns. Avoid inline comments unless explaining a non-obvious decision.
 - Tailwind classes are auto-sorted by Prettier via `prettier-plugin-tailwindcss`.
-- For animations/utilities not in Tailwind, define them in `app/assets/css/tailwind.css` using `@theme` or `@keyframes`.
+- For animations/utilities not in Tailwind, define them in `app/assets/css/tailwind.css` (`@utility` for custom utilities, `@keyframes` for animations).
 - Inline styles only for truly dynamic values (e.g., computed positions).
 
 Naming:

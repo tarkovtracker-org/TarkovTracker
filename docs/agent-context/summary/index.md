@@ -50,6 +50,7 @@ These generated docs complement — and do not replace — the hand-maintained d
 - Root `AGENTS.md` — canonical agent contract (commands, hard rules, conventions).
 - `docs/ARCHITECTURE.md` — authoritative architecture + canonical environment variable map.
 - `docs/API.md` — authoritative API reference (endpoints, caching, languages, game modes).
+- `docs/agent-context/codex-analytics-setup.md` — Codex/MCP analytics access (GA4, Clarity, Cloudflare).
 - `.github/CONTRIBUTING.md`, `docs/runbook.md`, `docs/WORKFLOW_AUTOMATION.md`, `DESIGN.md`.
 
 ## Relationships Between Documents
