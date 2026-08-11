@@ -440,6 +440,13 @@ export interface NeededItemTaskObjective extends NeededItemBase {
    * the UI can show that alternatives are allowed.
    */
   acceptedItems?: TarkovItem[];
+  /**
+   * Objective this need was derived from, when `id` is synthetic rather than a
+   * real objective id (e.g. one need per `containsAll` weapon-build mod). Set
+   * only on derived needs; use it for lookups keyed by real objective ids, such
+   * as `objectiveCompletions`, while `id` stays the progress key.
+   */
+  sourceObjectiveId?: string;
 }
 export interface NeededItemHideoutModule extends NeededItemBase {
   needType: 'hideoutModule';

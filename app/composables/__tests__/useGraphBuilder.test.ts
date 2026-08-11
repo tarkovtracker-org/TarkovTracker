@@ -232,8 +232,8 @@ describe('useGraphBuilder needed item accepted items', () => {
   });
 });
 describe('useGraphBuilder buildWeapon containsAll needs', () => {
-  it('emits a need per explicit mod alongside the base weapon', () => {
-    const task: Task = {
+  const buildTask = (foundInRaid?: boolean): Task =>
+    ({
       id: 'gunsmith-11',
       name: 'Gunsmith - Part 11',
       failConditions: [],
@@ -242,6 +242,7 @@ describe('useGraphBuilder buildWeapon containsAll needs', () => {
           id: 'obj-build',
           type: 'buildWeapon',
           count: 1,
+          ...(foundInRaid === undefined ? {} : { foundInRaid }),
           item: { id: 'vector', name: 'KRISS Vector' },
           containsAll: [
             { id: 'rail', name: 'Vector modular rail' },
@@ -251,14 +252,28 @@ describe('useGraphBuilder buildWeapon containsAll needs', () => {
         },
       ],
       taskRequirements: [],
-    } as unknown as Task;
+    }) as unknown as Task;
+  it('emits a need per explicit mod alongside the base weapon', () => {
     const { processTaskData } = useGraphBuilder();
-    const needs = processTaskData([task]).neededItemTaskObjectives;
-    expect(needs.map((need) => [need.id, need.item?.id])).toEqual([
+    const needs = processTaskData([buildTask()]).neededItemTaskObjectives;
+    const byId = [...needs].sort((a, b) => a.id.localeCompare(b.id));
+    expect(byId.map((need) => [need.id, need.item?.id])).toEqual([
       ['obj-build', 'vector'],
-      ['obj-build:rail', 'rail'],
       ['obj-build:foregrip', 'foregrip'],
+      ['obj-build:rail', 'rail'],
     ]);
     expect(needs.every((need) => need.taskId === 'gunsmith-11' && need.count === 1)).toBe(true);
+  });
+  it('keeps mod progress separate from the objective while pointing back to it', () => {
+    const { processTaskData } = useGraphBuilder();
+    const needs = processTaskData([buildTask()]).neededItemTaskObjectives;
+    const mods = needs.filter((need) => need.id !== 'obj-build');
+    expect(mods.map((need) => need.sourceObjectiveId)).toEqual(['obj-build', 'obj-build']);
+    expect(needs.find((need) => need.id === 'obj-build')?.sourceObjectiveId).toBeUndefined();
+  });
+  it('mirrors the objective found-in-raid flag onto its mods', () => {
+    const { processTaskData } = useGraphBuilder();
+    const needs = processTaskData([buildTask(true)]).neededItemTaskObjectives;
+    expect(needs.every((need) => need.foundInRaid === true)).toBe(true);
   });
 });

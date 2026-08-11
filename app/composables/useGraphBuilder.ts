@@ -22,11 +22,6 @@ import type {
   TaskObjective,
   TaskRequirement,
 } from '@/types/tarkov';
-/**
- * Explicit `containsAll` mods (e.g. Gunsmith weapon builds) are required items in
- * their own right. Each gets a synthetic progress id so counting one mod does not
- * count the others or the objective's base item.
- */
 function buildContainsAllNeeds(
   taskId: string,
   objective: TaskObjective
@@ -37,10 +32,11 @@ function buildContainsAllNeeds(
       id: `${objective.id}:${part.id}`,
       needType: 'taskObjective' as const,
       taskId,
+      sourceObjectiveId: objective.id,
       type: objective.type,
       item: part,
       count: 1,
-      foundInRaid: false,
+      foundInRaid: objective.foundInRaid ?? false,
     }));
 }
 /**
