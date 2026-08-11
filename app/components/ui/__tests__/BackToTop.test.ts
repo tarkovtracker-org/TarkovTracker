@@ -1,9 +1,9 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { reactive, ref } from 'vue';
 import BackToTop from '@/components/ui/BackToTop.vue';
-const routeState = { meta: { usesWindowScroll: false } };
+const routeState = reactive({ meta: { usesWindowScroll: false } });
 mockNuxtImport('useRoute', () => () => routeState);
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
@@ -146,6 +146,25 @@ describe('BackToTop', () => {
       mounted.get('button').trigger('click');
       expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
       expect(wrapperScrollTo).not.toHaveBeenCalled();
+    });
+  });
+  it('updates the active scroll root after route metadata changes', async () => {
+    await withMainContent(async (wrapperEl) => {
+      const mounted = mountComponent();
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      routeState.meta.usesWindowScroll = true;
+      await mounted.vm.$nextTick();
+      Object.defineProperty(wrapperEl, 'scrollTop', { value: 500, configurable: true });
+      wrapperEl.dispatchEvent(new Event('scroll'));
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      expect(mounted.get('button').attributes('style')).toContain('display: none');
+      Object.defineProperty(window, 'scrollY', { value: 400, configurable: true });
+      window.dispatchEvent(new Event('scroll'));
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      expect(mounted.get('button').attributes('style')).toBeUndefined();
     });
   });
 });

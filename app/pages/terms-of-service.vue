@@ -1,6 +1,7 @@
 <script setup lang="ts">
-  import { useMainScrollContainer } from '@/composables/useMainScrollContainer';
+  import { useScrollRoot } from '@/composables/useScrollRoot';
   const { t } = useI18n({ useScope: 'global' });
+  const { getScrollContainer } = useScrollRoot();
   useSeoMeta({
     title: 'Terms of Service',
     description: 'TarkovTracker terms of service and usage guidelines.',
@@ -62,7 +63,7 @@
     activeId.value = id;
   };
   onMounted(() => {
-    scrollRoot = useMainScrollContainer();
+    scrollRoot = getScrollContainer();
     updateActiveId();
     if (scrollRoot) {
       scrollRoot.addEventListener('scroll', scheduleUpdateActiveId, { passive: true });

@@ -49,6 +49,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useScrollRoot } from '@/composables/useScrollRoot';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import AppBar from '@/shell/AppBar.vue';
   import AppFooter from '@/shell/AppFooter.vue';
@@ -64,8 +65,8 @@
     });
   }
   const appStore = useAppStore();
-  const route = useRoute();
   const { belowMd } = useSharedBreakpoints();
+  const { usesWindowScroll } = useScrollRoot();
   const mainMarginLeft = computed(() => {
     if (belowMd.value) {
       return appStore.mobileDrawerExpanded
@@ -73,9 +74,6 @@
         : SHELL_DRAWER_COLLAPSED_WIDTH;
     }
     return appStore.drawerRail ? SHELL_DRAWER_COLLAPSED_WIDTH : SHELL_DRAWER_EXPANDED_WIDTH;
-  });
-  const usesWindowScroll = computed(() => {
-    return Boolean(route.meta?.usesWindowScroll);
   });
   useHead(
     computed(() => ({

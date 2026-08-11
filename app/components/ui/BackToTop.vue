@@ -12,14 +12,13 @@
   </Transition>
 </template>
 <script setup lang="ts">
-  import { useMainScrollContainer } from '@/composables/useMainScrollContainer';
+  import { useScrollRoot } from '@/composables/useScrollRoot';
   const { t } = useI18n({ useScope: 'global' });
-  const route = useRoute();
+  const { getScrollContainer, usesWindowScroll } = useScrollRoot();
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
   let rafId: number | null = null;
   let scrollContainer: HTMLElement | null = null;
-  const usesWindowScroll = computed(() => Boolean(route.meta?.usesWindowScroll));
   const getScrollTop = () => {
     return usesWindowScroll.value ? window.scrollY : (scrollContainer?.scrollTop ?? window.scrollY);
   };
@@ -39,7 +38,7 @@
     scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
   };
   onMounted(() => {
-    scrollContainer = useMainScrollContainer();
+    scrollContainer = getScrollContainer();
     window.addEventListener('scroll', onScroll, { passive: true });
     if (scrollContainer) {
       scrollContainer.addEventListener('scroll', onScroll, { passive: true });
