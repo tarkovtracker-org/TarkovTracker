@@ -12,6 +12,7 @@
   </Transition>
 </template>
 <script setup lang="ts">
+  import { useMainScrollContainer } from '@/composables/useMainScrollContainer';
   const { t } = useI18n({ useScope: 'global' });
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
@@ -34,8 +35,7 @@
     scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' });
   };
   onMounted(() => {
-    const containerCandidate = document.getElementById('main-content')?.firstElementChild;
-    scrollContainer = containerCandidate instanceof HTMLElement ? containerCandidate : null;
+    scrollContainer = useMainScrollContainer();
     window.addEventListener('scroll', onScroll, { passive: true });
     if (scrollContainer) {
       scrollContainer.addEventListener('scroll', onScroll, { passive: true });

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { useMainScrollContainer } from '@/composables/useMainScrollContainer';
   const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
     title: 'Terms of Service',
@@ -61,8 +62,7 @@
     activeId.value = id;
   };
   onMounted(() => {
-    const rootCandidate = document.getElementById('main-content')?.firstElementChild;
-    scrollRoot = rootCandidate instanceof HTMLElement ? rootCandidate : null;
+    scrollRoot = useMainScrollContainer();
     updateActiveId();
     if (scrollRoot) {
       scrollRoot.addEventListener('scroll', scheduleUpdateActiveId, { passive: true });
