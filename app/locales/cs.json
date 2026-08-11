@@ -2276,6 +2276,8 @@
     "badge_default_off": "Vypnout ve výchozím nastavení",
     "badge_usage_stats": "Statistiky využití",
     "badge_analytics_only": "Pouze Analytika",
+    "status_enabled": "Stav analytiky: Povoleno",
+    "status_disabled": "Analytický stav: Zakázáno",
     "change_anytime": "Změňte kdykoliv z zápatí.",
     "review_details": "Zkontrolujte podrobnosti v Zásadách ochrany osobních údajů",
     "allow": "Pomozte nám zlepšit",
