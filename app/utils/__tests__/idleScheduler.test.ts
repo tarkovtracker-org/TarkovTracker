@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { queueIdleTask, resetIdleQueue } from '@/utils/idleScheduler';
+import {
+  IDLE_SCHEDULER_DEFAULT_TIMEOUT_MS,
+  queueIdleTask,
+  resetIdleQueue,
+} from '@/utils/idleScheduler';
+const flushIdleTasks = async (taskCount: number = 1) => {
+  for (let completedTasks = 0; completedTasks < taskCount; completedTasks++) {
+    await vi.advanceTimersByTimeAsync(IDLE_SCHEDULER_DEFAULT_TIMEOUT_MS);
+  }
+};
 describe('idleScheduler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -12,7 +21,7 @@ describe('idleScheduler', () => {
   it('executes a queued task', async () => {
     const fn = vi.fn();
     const promise = queueIdleTask(fn);
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks();
     await promise;
     expect(fn).toHaveBeenCalledOnce();
   });
@@ -27,7 +36,7 @@ describe('idleScheduler', () => {
     const p3 = queueIdleTask(() => {
       order.push(3);
     });
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks(3);
     await Promise.all([p1, p2, p3]);
     expect(order).toEqual([1, 2, 3]);
   });
@@ -42,7 +51,7 @@ describe('idleScheduler', () => {
       },
       { priority: 'high' }
     );
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks(2);
     await Promise.all([p1, p2]);
     expect(order).toEqual([2, 1]);
   });
@@ -52,7 +61,7 @@ describe('idleScheduler', () => {
     promise.then(() => {
       resolved = true;
     });
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks();
     await promise;
     expect(resolved).toBe(true);
   });
@@ -62,14 +71,14 @@ describe('idleScheduler', () => {
       throw error;
     });
     const assertion = expect(promise).rejects.toBe(error);
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks();
     await assertion;
   });
   it('rejects the returned promise when task returns a rejected promise', async () => {
     const error = new Error('async fail');
     const promise = queueIdleTask(() => Promise.reject(error));
     const assertion = expect(promise).rejects.toBe(error);
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks();
     await assertion;
   });
   it('handles async tasks', async () => {
@@ -78,7 +87,7 @@ describe('idleScheduler', () => {
       await Promise.resolve();
       completed = true;
     });
-    await vi.advanceTimersByTimeAsync(6000);
+    await flushIdleTasks();
     await promise;
     expect(completed).toBe(true);
   });
@@ -86,8 +95,7 @@ describe('idleScheduler', () => {
     const fn = vi.fn();
     queueIdleTask(fn).catch(() => {});
     resetIdleQueue();
-    await vi.advanceTimersByTimeAsync(6000);
-    await vi.advanceTimersByTimeAsync(5000);
+    await flushIdleTasks();
     expect(fn).not.toHaveBeenCalled();
   });
 });

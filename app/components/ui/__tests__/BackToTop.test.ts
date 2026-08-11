@@ -43,12 +43,15 @@ describe('BackToTop', () => {
     expect(mounted.get('button').attributes('style')).toContain('display: none');
     expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
     expect(rafCallback).not.toBeNull();
+    rafCallback!(performance.now());
+    await mounted.vm.$nextTick();
+    expect(mounted.get('button').attributes('style')).toContain('display: none');
     Object.defineProperty(window, 'scrollY', { value: 400, configurable: true });
+    window.dispatchEvent(new Event('scroll'));
+    expect(window.requestAnimationFrame).toHaveBeenCalledTimes(2);
     rafCallback!(performance.now());
     await mounted.vm.$nextTick();
     expect(mounted.get('button').attributes('style')).toBeUndefined();
-    window.dispatchEvent(new Event('scroll'));
-    expect(window.requestAnimationFrame).toHaveBeenCalledTimes(2);
   });
   it('does not schedule multiple rAFs before callback fires', () => {
     mountComponent();
