@@ -196,18 +196,20 @@ export function useGraphBuilder() {
           // item; never a sparse/id-less array entry that would break grouping.
           const primaryItem = objective.item ?? validItems[0];
           const acceptedItems = validItems.length > 1 ? validItems : undefined;
-          tempNeededObjectives.push({
-            id: objective.id,
-            needType: 'taskObjective',
-            taskId: task.id,
-            type: objective.type,
-            item: primaryItem ?? objective.markerItem!,
-            markerItem: objective.markerItem,
-            count: objective.count ?? 1,
-            foundInRaid: objective.foundInRaid ?? false,
-            ...(acceptedItems ? { acceptedItems } : {}),
-          });
-          tempNeededObjectives.push(...buildContainsAllNeeds(task.id, objective));
+          tempNeededObjectives.push(
+            {
+              id: objective.id,
+              needType: 'taskObjective',
+              taskId: task.id,
+              type: objective.type,
+              item: primaryItem ?? objective.markerItem!,
+              markerItem: objective.markerItem,
+              count: objective.count ?? 1,
+              foundInRaid: objective.foundInRaid ?? false,
+              ...(acceptedItems ? { acceptedItems } : {}),
+            },
+            ...buildContainsAllNeeds(task.id, objective)
+          );
         }
       });
       // Process fail conditions for alternative tasks (complete-status triggers)
