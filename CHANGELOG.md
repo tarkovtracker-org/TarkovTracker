@@ -1,3 +1,10 @@
+## [1.68.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.7...v1.68.8) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** clarify analytics consent status ([4adb7ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/4adb7efb40b4d872380ea124ff53959a6839bf2d))
+
 ## [1.68.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.6...v1.68.7) (2026-08-11)
 
 
