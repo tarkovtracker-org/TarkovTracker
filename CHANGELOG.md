@@ -1,3 +1,10 @@
+## [1.68.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.5...v1.68.6) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** align compact credit member cards ([#704](https://github.com/tarkovtracker-org/TarkovTracker/issues/704)) ([8ba8d4e](https://github.com/tarkovtracker-org/TarkovTracker/commit/8ba8d4ef1b9583b05a9a5e974b0c5541db16c460))
+
 ## [1.68.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.4...v1.68.5) (2026-08-10)
 
 
