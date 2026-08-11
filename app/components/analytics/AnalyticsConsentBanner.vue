@@ -11,9 +11,25 @@
       <UCard class="border-surface-700/80 bg-surface-900/95 border shadow-xl backdrop-blur">
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
           <div class="space-y-3">
-            <p class="text-primary-300 text-xs font-semibold tracking-[0.25em] uppercase">
-              {{ t('analytics_consent.eyebrow') }}
-            </p>
+            <div
+              data-testid="analytics-consent-eyebrow-row"
+              class="flex flex-wrap items-center gap-2"
+            >
+              <p class="text-primary-300 text-xs font-semibold tracking-[0.25em] uppercase">
+                {{ t('analytics_consent.eyebrow') }}
+              </p>
+              <UBadge
+                data-testid="analytics-consent-status"
+                role="status"
+                aria-live="polite"
+                :color="analyticsEnabled ? 'success' : 'neutral'"
+                variant="soft"
+                size="sm"
+                class="shrink-0"
+              >
+                {{ analyticsStatusLabel }}
+              </UBadge>
+            </div>
             <div class="space-y-1">
               <h2 :id="consentTitleId" class="text-lg font-semibold text-white">
                 {{ consentTitle }}
@@ -98,6 +114,12 @@
       runtimeConfig.public.microsoftClarityProjectId,
     ].some((value) => String(value || '').trim().length > 0);
   const isVisible = computed(() => analyticsConfigured && isPromptOpen.value);
+  const analyticsEnabled = computed(() => state.value.status === 'accepted');
+  const analyticsStatusLabel = computed(() =>
+    analyticsEnabled.value
+      ? t('analytics_consent.status_enabled', 'Analytics Status: Enabled')
+      : t('analytics_consent.status_disabled', 'Analytics Status: Disabled')
+  );
   const consentTitle = computed(() => {
     if (state.value.status === 'unknown') {
       return t('analytics_consent.title');
