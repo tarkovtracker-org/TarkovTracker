@@ -18,6 +18,7 @@ const { accept, closePreferences, decline, runtimeConfig } = vi.hoisted(() => ({
 const state = ref<AnalyticsConsentState>({ status: 'unknown', updatedAt: null });
 const isPromptOpen = ref(true);
 const hasAnswered = computed(() => state.value.status !== 'unknown');
+const isAccepted = computed(() => state.value.status === 'accepted');
 const translations: Record<string, string> = {
   'analytics_consent.accepted': 'Analytics accepted',
   'analytics_consent.allow': 'Help us improve',
@@ -35,6 +36,7 @@ mockNuxtImport('useAnalyticsConsent', () => () => ({
   closePreferences,
   decline,
   hasAnswered,
+  isAccepted,
   isPromptOpen,
   state,
 }));

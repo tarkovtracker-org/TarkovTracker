@@ -22,7 +22,7 @@
                 data-testid="analytics-consent-status"
                 role="status"
                 aria-live="polite"
-                :color="analyticsEnabled ? 'success' : 'neutral'"
+                :color="isAccepted ? 'success' : 'neutral'"
                 variant="soft"
                 size="sm"
                 class="shrink-0"
@@ -98,7 +98,7 @@
 <script setup lang="ts">
   import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
-  const { accept, closePreferences, decline, hasAnswered, isPromptOpen, state } =
+  const { accept, closePreferences, decline, hasAnswered, isAccepted, isPromptOpen, state } =
     useAnalyticsConsent();
   const runtimeConfig = useRuntimeConfig();
   const consentDescriptionId = 'analytics-consent-description';
@@ -114,9 +114,8 @@
       runtimeConfig.public.microsoftClarityProjectId,
     ].some((value) => String(value || '').trim().length > 0);
   const isVisible = computed(() => analyticsConfigured && isPromptOpen.value);
-  const analyticsEnabled = computed(() => state.value.status === 'accepted');
   const analyticsStatusLabel = computed(() =>
-    analyticsEnabled.value
+    isAccepted.value
       ? t('analytics_consent.status_enabled', 'Analytics Status: Enabled')
       : t('analytics_consent.status_disabled', 'Analytics Status: Disabled')
   );
