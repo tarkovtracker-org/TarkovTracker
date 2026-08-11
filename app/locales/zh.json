@@ -2276,6 +2276,8 @@
     "badge_default_off": "默认关闭",
     "badge_usage_stats": "使用统计",
     "badge_analytics_only": "仅分析",
+    "status_enabled": "分析状态：启用",
+    "status_disabled": "分析状态：已禁用",
     "change_anytime": "可随时在页脚更改。",
     "review_details": "在隐私政策中查看详情",
     "allow": "允许",
