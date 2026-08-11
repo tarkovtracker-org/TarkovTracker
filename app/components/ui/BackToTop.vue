@@ -14,13 +14,14 @@
 <script setup lang="ts">
   import { useMainScrollContainer } from '@/composables/useMainScrollContainer';
   const { t } = useI18n({ useScope: 'global' });
+  const route = useRoute();
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
   let rafId: number | null = null;
   let scrollContainer: HTMLElement | null = null;
+  const usesWindowScroll = computed(() => Boolean(route.meta?.usesWindowScroll));
   const getScrollTop = () => {
-    const containerTop = scrollContainer ? scrollContainer.scrollTop : 0;
-    return Math.max(window.scrollY, containerTop);
+    return usesWindowScroll.value ? window.scrollY : (scrollContainer?.scrollTop ?? window.scrollY);
   };
   const onScroll = () => {
     if (rafId === null) {
@@ -31,8 +32,11 @@
     }
   };
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' });
+    if (usesWindowScroll.value || !scrollContainer) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
   };
   onMounted(() => {
     scrollContainer = useMainScrollContainer();

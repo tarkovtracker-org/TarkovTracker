@@ -1,7 +1,10 @@
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import BackToTop from '@/components/ui/BackToTop.vue';
+const routeState = { meta: { usesWindowScroll: false } };
+mockNuxtImport('useRoute', () => () => routeState);
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
@@ -22,6 +25,7 @@ describe('BackToTop', () => {
     return wrapper;
   };
   beforeEach(() => {
+    routeState.meta.usesWindowScroll = false;
     rafCallback = null;
     rafId = 1;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -114,14 +118,34 @@ describe('BackToTop', () => {
       expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
     });
   });
-  it('scrolls the content wrapper and window to top on click', async () => {
+  it('scrolls the active content wrapper to top on click', async () => {
     await withMainContent((wrapperEl) => {
       const wrapperScrollTo = vi.fn();
       wrapperEl.scrollTo = wrapperScrollTo;
       const mounted = mountComponent();
       mounted.get('button').trigger('click');
-      expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+      expect(window.scrollTo).not.toHaveBeenCalled();
       expect(wrapperScrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+  });
+  it('uses the window as the active scroll root for window-scroll routes', async () => {
+    routeState.meta.usesWindowScroll = true;
+    await withMainContent(async (wrapperEl) => {
+      const wrapperScrollTo = vi.fn();
+      wrapperEl.scrollTo = wrapperScrollTo;
+      Object.defineProperty(wrapperEl, 'scrollTop', { value: 500, configurable: true });
+      const mounted = mountComponent();
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      expect(mounted.get('button').attributes('style')).toContain('display: none');
+      Object.defineProperty(window, 'scrollY', { value: 400, configurable: true });
+      window.dispatchEvent(new Event('scroll'));
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      expect(mounted.get('button').attributes('style')).toBeUndefined();
+      mounted.get('button').trigger('click');
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+      expect(wrapperScrollTo).not.toHaveBeenCalled();
     });
   });
 });
