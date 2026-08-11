@@ -7,6 +7,7 @@ type IdleTask = {
   reject: (error: unknown) => void;
   expiresAt: number;
 };
+export const IDLE_SCHEDULER_DEFAULT_TIMEOUT_MS: number = 2000;
 const idleQueue: IdleTask[] = [];
 let idleRunnerActive = false;
 const getIdleScheduler = () => {
@@ -92,7 +93,11 @@ export const queueIdleTask = (
   task: () => void | Promise<void>,
   options: { timeout?: number; minTime?: number; priority?: 'normal' | 'high' } = {}
 ) => {
-  const { timeout = 2000, minTime = 12, priority = 'normal' } = options;
+  const {
+    timeout = IDLE_SCHEDULER_DEFAULT_TIMEOUT_MS,
+    minTime = 12,
+    priority = 'normal',
+  } = options;
   return new Promise<void>((resolve, reject) => {
     const now = getIdleNow();
     const entry: IdleTask = { task, timeout, minTime, resolve, reject, expiresAt: now + timeout };
