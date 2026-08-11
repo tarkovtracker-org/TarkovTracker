@@ -2276,6 +2276,8 @@
     "badge_default_off": "Standardmäßig aus",
     "badge_usage_stats": "Nutzungsstatistiken",
     "badge_analytics_only": "Nur Analyse",
+    "status_enabled": "Analysestatus: Aktiviert",
+    "status_disabled": "Analysestatus: Deaktiviert",
     "change_anytime": "Jederzeit über den Footer änderbar.",
     "review_details": "Details in der Datenschutzerklärung",
     "allow": "Erlauben",
