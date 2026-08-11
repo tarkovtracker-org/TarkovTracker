@@ -12,27 +12,44 @@
   </Transition>
 </template>
 <script setup lang="ts">
+  import { useScrollRoot } from '@/composables/useScrollRoot';
   const { t } = useI18n({ useScope: 'global' });
+  const { getScrollContainer, usesWindowScroll } = useScrollRoot();
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
   let rafId: number | null = null;
+  let scrollContainer: HTMLElement | null = null;
+  const getScrollTop = () => {
+    return usesWindowScroll.value ? window.scrollY : (scrollContainer?.scrollTop ?? window.scrollY);
+  };
   const onScroll = () => {
     if (rafId === null) {
       rafId = requestAnimationFrame(() => {
-        visible.value = window.scrollY > SCROLL_THRESHOLD;
+        visible.value = getScrollTop() > SCROLL_THRESHOLD;
         rafId = null;
       });
     }
   };
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (usesWindowScroll.value || !scrollContainer) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
   };
   onMounted(() => {
+    scrollContainer = getScrollContainer();
     window.addEventListener('scroll', onScroll, { passive: true });
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', onScroll, { passive: true });
+    }
     onScroll();
   });
   onUnmounted(() => {
     window.removeEventListener('scroll', onScroll);
+    if (scrollContainer) {
+      scrollContainer.removeEventListener('scroll', onScroll);
+    }
     if (rafId !== null) {
       cancelAnimationFrame(rafId);
       rafId = null;
