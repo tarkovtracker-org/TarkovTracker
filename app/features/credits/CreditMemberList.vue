@@ -30,7 +30,7 @@
   };
   const gridGapClasses = computed(() => {
     if (props.variant !== 'grid') return '';
-    return props.ordered ? 'gap-x-6 gap-y-1' : 'gap-x-2';
+    return 'gap-x-6 gap-y-1';
   });
   const listClasses = computed(() => [
     LIST_CLASSES[props.variant],
