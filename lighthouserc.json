@@ -92,7 +92,7 @@
       ]
     },
     "collect": {
-      "numberOfRuns": 3,
+      "numberOfRuns": 1,
       "settings": {
         "chromeFlags": [
           "--allow-insecure-localhost",

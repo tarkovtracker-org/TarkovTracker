@@ -99,7 +99,10 @@ jobs:
               per_page: 100,
             });
             const pathMatch = files.some(({ filename }) =>
-              filename.startsWith('app/components/') || filename.startsWith('app/features/')
+              filename === 'lighthouserc.json' ||
+              filename === '.github/workflows/pr-checks.yml' ||
+              filename.startsWith('app/components/') ||
+              filename.startsWith('app/features/')
             );
             const runLighthouse = labelMatch || pathMatch;
             core.setOutput('run_lighthouse', runLighthouse ? 'true' : 'false');

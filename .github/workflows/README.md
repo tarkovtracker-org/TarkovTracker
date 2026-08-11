@@ -41,18 +41,23 @@ workflow files, or `app/locales/en.json` still run the normal checks.
 ### PR Checks (`pr-checks.yml`)
 
 **Trigger:** PR opened/updated/reopened
-**Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes or `ui`/`performance` labels)
+**Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
 so `/api/*` routes are available during audits. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
 promoted Twitch embed, whose heavy third-party iframe (script eval, layout shift, third-party
 cookies) loads only when the streamer is live and previously made scores non-deterministic.
+**Lighthouse collection:** Each selected URL is audited once per Lighthouse job. A single run keeps
+the UI regression gate useful without making nine full audits block each update. Investigate
+failures with local repeated runs when runner variance is suspected.
 **Lighthouse thresholds:** Calibrated to the real full-data Pages preview baseline with the
 promoted Twitch embed disabled (see above). Best-practices, SEO, and accessibility floors are
 `error`-level at 0.9 since the embed-free audits clear them comfortably (best-practices and SEO
-median 1.0, accessibility 0.92-0.96). Performance floors stay conservative: `/hideout` sits at
-0.22 with no margin and `/` can dip on cold starts, so those need real layout-shift (CLS ~1.38)
-and main-thread (TBT ~2.3s) work before raising. Raise `lighthouserc.json` score floors after
+1.0, accessibility 0.92-0.96). Performance floors stay conservative: `/hideout` has little margin
+and `/` can dip on cold starts. The `/hideout` performance floor remains 0.2; single-run scores
+near the threshold can still require a rerun to distinguish runner variance from a regression.
+These routes need real layout-shift (CLS ~1.38) and main-thread (TBT ~2.3s) work before raising.
+Raise `lighthouserc.json` score floors after
 performance/accessibility work instead of treating the current floors as long-term targets.
 
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
@@ -85,16 +90,16 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-CodeRabbit skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`; normal automatic reviews
-remain enabled. CodeAnt excludes the non-English locale exports via `.codeant/configuration.json`,
-but its GitHub App can still post PR metadata. Kilo Code reviews are controlled by its GitHub App
-dashboard and have no repository workflow switch. GitHub-managed Copilot review and the duplicate
-CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also controlled outside this repository;
-the checked-in `Security` workflow already runs CodeQL for normal code PRs. To stop those apps and
-workflows from consuming usage on the automated `locales` PR, remove this repository from their
-automatic review selection or disable the duplicate integration in each vendor/GitHub dashboard.
-Socket PR alerts are limited to dependency manifest changes by the root `socket.yml`; Snyk and
-Supabase preview behavior is controlled by their integration settings.
+Cubic is the primary automatic reviewer, with Greptile retained as a useful secondary reviewer.
+CodeRabbit remains enabled and skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`, but
+its frequent rate limits make it best-effort rather than a required review dependency. Kilo Code is
+disabled because its signal was low. CodeAnt is a removal candidate because its AI, quality,
+security, and coverage checks overlap with retained integrations; its locale exclusions live in
+`.codeant/configuration.json` while its activation remains dashboard-controlled. GitHub-managed
+Copilot review and the duplicate CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also
+controlled outside this repository; the checked-in `Security` workflow already runs CodeQL for
+normal code PRs. Socket PR alerts are limited to dependency manifest changes by the root
+`socket.yml`; Snyk and Supabase preview behavior are controlled by their integration settings.
 
 ## Commands
 

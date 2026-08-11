@@ -13,7 +13,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- AI review bots are manual-only; CodeRabbit is disabled in repo config, while CodeAnt and Kilo Code must stay disabled in their GitHub App dashboards unless explicitly requested.
+- AI review integrations are configured in their GitHub App dashboards. Cubic is currently the most consistent automatic reviewer; Greptile is a useful secondary reviewer. CodeRabbit remains useful when available but is frequently rate-limited. Kilo Code is disabled because its signal was low.
 
 ## GitHub Actions Workflows
 
@@ -71,16 +71,18 @@ Enhanced PR validation:
 - `labeler` - Auto-label based on file changes
 - `size` - PR size classification (S/M/L/XL/XXL)
 - `conventional-commits` - Commit message validation
-- `lighthouse` - Performance checks (runs when the PR touches `app/components/` or `app/features/`,
-  or carries the `performance` or `ui` label)
+- `lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
+  `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
-**Lighthouse floors (`lighthouserc.json`):** accessibility, best-practices and SEO are held at 0.90.
-Performance floors are per route and are set from measured CI values, not aspiration, because
-`lighthouse-ci` asserts with optimistic aggregation over `numberOfRuns` and the GitHub runners are
-noisy. The `/hideout` floor is `0.20`: across nine consecutive runs on one branch the route measured
-between 0.18 and 0.25, with a test-only commit failing a 0.22 floor. Raising that floor requires
-fixing the underlying `/hideout` LCP regression first (about 5.1s before the Nuxt 4.5 / Vite 8
-migration versus about 11.7s after — see issue #647), not re-tightening the gate.
+**Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per Lighthouse
+job. Repeated runs are reserved for investigating a failure or for dedicated performance analysis;
+running each of three routes three times made the Lighthouse job the dominant PR bottleneck.
+
+**Lighthouse floors:** accessibility, best-practices and SEO are held at 0.90. Performance floors
+are per route and are set from measured CI values, not aspiration, because GitHub runners are noisy.
+The `/hideout` floor remains `0.20`; raising it requires fixing the underlying `/hideout` LCP
+regression first (about 5.1s before the Nuxt 4.5 / Vite 8 migration versus about 11.7s after — see
+issue #647), not re-tightening the gate.
 
 ### 5. Dependabot Auto Merge (`.github/workflows/dependabot-auto-merge.yml`)
 
