@@ -1,3 +1,13 @@
+## [1.69.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.0...v1.69.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** centralize scroll root route state ([49564ae](https://github.com/tarkovtracker-org/TarkovTracker/commit/49564ae1a37bfb4f512312fbd03ad977d2bd5453))
+* **ui:** respect active back-to-top scroll root ([ff0dd47](https://github.com/tarkovtracker-org/TarkovTracker/commit/ff0dd47b23af615602713ffa2f5a69a915f9edca))
+* **ui:** share main scroll container lookup ([56bd353](https://github.com/tarkovtracker-org/TarkovTracker/commit/56bd353c808f656b69147d41ff1b70238034bd18))
+* **ui:** track layout content scroll container in BackToTop ([edad24c](https://github.com/tarkovtracker-org/TarkovTracker/commit/edad24c664bb73ab8e3891c420a160239ffb2f3a))
+
 # [1.69.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.8...v1.69.0) (2026-08-11)
 
 
