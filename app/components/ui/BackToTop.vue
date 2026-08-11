@@ -16,23 +16,37 @@
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
   let rafId: number | null = null;
+  let scrollContainer: HTMLElement | null = null;
+  const getScrollTop = () => {
+    const containerTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    return Math.max(window.scrollY, containerTop);
+  };
   const onScroll = () => {
     if (rafId === null) {
       rafId = requestAnimationFrame(() => {
-        visible.value = window.scrollY > SCROLL_THRESHOLD;
+        visible.value = getScrollTop() > SCROLL_THRESHOLD;
         rafId = null;
       });
     }
   };
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' });
   };
   onMounted(() => {
+    const containerCandidate = document.getElementById('main-content')?.firstElementChild;
+    scrollContainer = containerCandidate instanceof HTMLElement ? containerCandidate : null;
     window.addEventListener('scroll', onScroll, { passive: true });
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', onScroll, { passive: true });
+    }
     onScroll();
   });
   onUnmounted(() => {
     window.removeEventListener('scroll', onScroll);
+    if (scrollContainer) {
+      scrollContainer.removeEventListener('scroll', onScroll);
+    }
     if (rafId !== null) {
       cancelAnimationFrame(rafId);
       rafId = null;

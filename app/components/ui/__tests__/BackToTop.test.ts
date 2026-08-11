@@ -74,4 +74,54 @@ describe('BackToTop', () => {
     wrapper = null;
     expect(window.cancelAnimationFrame).not.toHaveBeenCalled();
   });
+  const withMainContent = async (
+    fn: (wrapperEl: HTMLElement) => void | Promise<void>
+  ): Promise<void> => {
+    const main = document.createElement('main');
+    main.id = 'main-content';
+    const wrapperEl = document.createElement('div');
+    main.appendChild(wrapperEl);
+    document.body.appendChild(main);
+    try {
+      await fn(wrapperEl);
+    } finally {
+      main.remove();
+    }
+  };
+  it('tracks scroll on the layout content wrapper when it is the scroll container', async () => {
+    await withMainContent(async (wrapperEl) => {
+      Object.defineProperty(wrapperEl, 'scrollTop', {
+        value: 0,
+        writable: true,
+        configurable: true,
+      });
+      const mounted = mountComponent();
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      Object.defineProperty(wrapperEl, 'scrollTop', { value: 500, configurable: true });
+      wrapperEl.dispatchEvent(new Event('scroll'));
+      rafCallback!(performance.now());
+      await mounted.vm.$nextTick();
+      expect(mounted.get('button').attributes('style')).toBeUndefined();
+    });
+  });
+  it('removes the content wrapper scroll listener on unmount', async () => {
+    await withMainContent((wrapperEl) => {
+      const removeSpy = vi.spyOn(wrapperEl, 'removeEventListener');
+      const mounted = mountComponent();
+      mounted.unmount();
+      wrapper = null;
+      expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
+    });
+  });
+  it('scrolls the content wrapper and window to top on click', async () => {
+    await withMainContent((wrapperEl) => {
+      const wrapperScrollTo = vi.fn();
+      wrapperEl.scrollTo = wrapperScrollTo;
+      const mounted = mountComponent();
+      mounted.get('button').trigger('click');
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+      expect(wrapperScrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+  });
 });
