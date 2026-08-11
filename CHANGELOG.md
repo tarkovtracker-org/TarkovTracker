@@ -1,3 +1,22 @@
+# [1.69.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.8...v1.69.0) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ci:** preserve Lighthouse regression coverage ([8a9d4ee](https://github.com/tarkovtracker-org/TarkovTracker/commit/8a9d4ee6037fa837c1902ea18cbded1ae01c0a66))
+* **ci:** stabilize single-run Lighthouse gate ([ad18fd6](https://github.com/tarkovtracker-org/TarkovTracker/commit/ad18fd6f40185975a44831e5b70ca23cde9f837f))
+* **ci:** validate Lighthouse config changes ([71f28b6](https://github.com/tarkovtracker-org/TarkovTracker/commit/71f28b667a2e55456de21b193a7f64e0dae4ab8c))
+
+
+### Features
+
+* **tasks:** add buildWeapon containsAll mods to needed items ([#706](https://github.com/tarkovtracker-org/TarkovTracker/issues/706)) ([a13fa59](https://github.com/tarkovtracker-org/TarkovTracker/commit/a13fa5997f817ae081ce183d2db11ef827d41649)), closes [tarkovtracker-org/TarkovTracker#587](https://github.com/tarkovtracker-org/TarkovTracker/issues/587)
+
+
+### Performance Improvements
+
+* **ci:** reduce Lighthouse PR audit runs ([d468b5d](https://github.com/tarkovtracker-org/TarkovTracker/commit/d468b5d469ecf674821fc4e9da379fa834e0ee10))
+
 ## [1.68.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.7...v1.68.8) (2026-08-11)
 
 
