@@ -2276,6 +2276,8 @@
     "badge_default_off": "Désactivée par défaut",
     "badge_usage_stats": "Statistiques d'utilisation",
     "badge_analytics_only": "Analytique uniquement",
+    "status_enabled": "Statut Analytics : Activé",
+    "status_disabled": "Statut Analytics : Désactivé",
     "change_anytime": "Modifiable à tout moment depuis le pied de page.",
     "review_details": "Voir les détails dans la Politique de confidentialité",
     "allow": "Autoriser",
