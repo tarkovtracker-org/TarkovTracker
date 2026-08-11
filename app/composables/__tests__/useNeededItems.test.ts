@@ -278,6 +278,37 @@ describe('useNeededItems', () => {
       const { neededItems } = await setup();
       expect(neededItems.allItems.value.length).toBe(6);
     });
+    it('preserves separate progress keys for objectives that need the same item', async () => {
+      const sharedMod = createItem('560d657b4bdc2da74d8b4572', 'Shared weapon mod');
+      const firstObjectiveId = '676529af9c90953d090882ea';
+      const secondObjectiveId = '67652a2f4f75e1a9543289ed';
+      const taskId = '676529af9c90953d090882e7';
+      const taskObjectives: NeededItemTaskObjective[] = [
+        {
+          ...createTaskObjective(`${firstObjectiveId}:${sharedMod.id}`, taskId, sharedMod, 1),
+          sourceObjectiveId: firstObjectiveId,
+        },
+        {
+          ...createTaskObjective(`${secondObjectiveId}:${sharedMod.id}`, taskId, sharedMod, 1),
+          sourceObjectiveId: secondObjectiveId,
+        },
+      ];
+      const { neededItems } = await setup({
+        metadataStore: { neededItemTaskObjectives: taskObjectives },
+        preferencesStore: { getNeededItemsHideOwned: true },
+        tarkovStore: {
+          getObjectiveCount: (id: string) => (id === taskObjectives[1]?.id ? 1 : 0),
+        },
+      });
+      const allTaskItems = neededItems.allItems.value.filter(
+        (item): item is NeededItemTaskObjective => item.needType === 'taskObjective'
+      );
+      const filteredTaskItems = neededItems.filteredItems.value.filter(
+        (item): item is NeededItemTaskObjective => item.needType === 'taskObjective'
+      );
+      expect(allTaskItems).toEqual(taskObjectives);
+      expect(filteredTaskItems).toEqual([taskObjectives[0]]);
+    });
     it('excludes task objectives for invalid tasks', async () => {
       const { neededItems } = await setup({
         progressStore: {
