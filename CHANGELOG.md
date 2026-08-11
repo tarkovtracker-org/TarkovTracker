@@ -1,3 +1,10 @@
+## [1.68.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.6...v1.68.7) (2026-08-11)
+
+
+### Performance Improvements
+
+* **app:** fix CLS, LCP, and INP core web vitals ([#701](https://github.com/tarkovtracker-org/TarkovTracker/issues/701)) ([f29c84a](https://github.com/tarkovtracker-org/TarkovTracker/commit/f29c84a5421fe0fcdd0cc00970d21baafaa0f039))
+
 ## [1.68.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.5...v1.68.6) (2026-08-11)
 
 
