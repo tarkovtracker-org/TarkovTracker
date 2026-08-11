@@ -18,6 +18,12 @@ import {
   TARKOV_IMAGE_DOMAINS,
   YOUTUBE_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
+import {
+  SHELL_DESKTOP_BREAKPOINT_PX,
+  SHELL_DRAWER_COLLAPSED_WIDTH,
+  SHELL_DRAWER_EXPANDED_WIDTH,
+  SHELL_DRAWER_RAIL_STORAGE_KEY,
+} from './app/utils/shellConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -279,16 +285,16 @@ export default defineNuxtConfig({
       style: [
         {
           textContent: [
-            ':root{--shell-w:224px}',
-            'body{background:hsl(0 0% 4%)}',
+            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
+            'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
             '#__nuxt:empty::before{',
             'content:"";',
             'display:block;',
             'position:fixed;',
             'inset:0;',
             'width:var(--shell-w);',
-            'background:hsl(0 0% 9%);',
-            'border-right:1px solid hsl(0 0% 25%);',
+            'background:var(--color-surface-900,hsl(0 0% 9%));',
+            'border-right:1px solid var(--color-surface-700,hsl(0 0% 25%));',
             'z-index:50',
             '}',
             '#__nuxt:empty::after{',
@@ -299,12 +305,12 @@ export default defineNuxtConfig({
             'left:var(--shell-w);',
             'right:0;',
             'height:44px;',
-            'background:hsl(0 0% 9%);',
-            'border-bottom:1px solid hsl(0 0% 25%);',
+            'background:var(--color-surface-900,hsl(0 0% 9%));',
+            'border-bottom:1px solid var(--color-surface-700,hsl(0 0% 25%));',
             'z-index:40',
             '}',
-            '@media(max-width:959px){',
-            ':root{--shell-w:64px}',
+            `@media(width < ${SHELL_DESKTOP_BREAKPOINT_PX}px){`,
+            `:root{--shell-w:${SHELL_DRAWER_COLLAPSED_WIDTH}}`,
             '}',
           ].join(''),
         },
@@ -313,9 +319,9 @@ export default defineNuxtConfig({
         {
           innerHTML: [
             'try{',
-            'if(window.localStorage.getItem("app_drawerRail")==="true"',
-            '&&window.matchMedia("(min-width:960px)").matches)',
-            '{document.documentElement.style.setProperty("--shell-w","64px")}',
+            `if(window.localStorage.getItem(${JSON.stringify(SHELL_DRAWER_RAIL_STORAGE_KEY)})==="true"`,
+            `&&window.matchMedia("(min-width:${SHELL_DESKTOP_BREAKPOINT_PX}px)").matches)`,
+            `{document.documentElement.style.setProperty("--shell-w",${JSON.stringify(SHELL_DRAWER_COLLAPSED_WIDTH)})}`,
             '}catch(e){}',
           ].join(''),
         },

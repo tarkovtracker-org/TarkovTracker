@@ -55,6 +55,7 @@
   import NavDrawer from '@/shell/NavDrawer.vue';
   import { useAppStore } from '@/stores/useApp';
   import { logger } from '@/utils/logger';
+  import { SHELL_DRAWER_COLLAPSED_WIDTH, SHELL_DRAWER_EXPANDED_WIDTH } from '@/utils/shellConfig';
   const consentBannerImport = () => import('@/components/analytics/AnalyticsConsentBanner.vue');
   const AnalyticsConsentBanner = defineAsyncComponent(consentBannerImport);
   if (import.meta.client) {
@@ -62,16 +63,16 @@
       logger.error('[AnalyticsConsentBanner] Failed to preload chunk:', error);
     });
   }
-  const DRAWER_EXPANDED_WIDTH = '224px';
-  const DRAWER_COLLAPSED_WIDTH = '64px';
   const appStore = useAppStore();
   const route = useRoute();
   const { belowMd } = useSharedBreakpoints();
   const mainMarginLeft = computed(() => {
     if (belowMd.value) {
-      return appStore.mobileDrawerExpanded ? DRAWER_EXPANDED_WIDTH : DRAWER_COLLAPSED_WIDTH;
+      return appStore.mobileDrawerExpanded
+        ? SHELL_DRAWER_EXPANDED_WIDTH
+        : SHELL_DRAWER_COLLAPSED_WIDTH;
     }
-    return appStore.drawerRail ? DRAWER_COLLAPSED_WIDTH : DRAWER_EXPANDED_WIDTH;
+    return appStore.drawerRail ? SHELL_DRAWER_COLLAPSED_WIDTH : SHELL_DRAWER_EXPANDED_WIDTH;
   });
   const usesWindowScroll = computed(() => {
     return Boolean(route.meta?.usesWindowScroll);

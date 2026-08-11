@@ -17,7 +17,8 @@
   <nav
     :aria-label="t('navigation_drawer.main_navigation')"
     class="bg-sidebar shadow-nav-drawer fixed inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300"
-    :class="[sidebarWidth, modeBorderClass]"
+    :class="modeBorderClass"
+    :style="{ width: sidebarWidth }"
   >
     <div
       class="relative z-10 flex h-full scrollbar-thin flex-col overflow-x-hidden overflow-y-auto"
@@ -85,6 +86,7 @@
   import DrawerLinks from '@/features/drawer/DrawerLinks.vue';
   import { useAppStore } from '@/stores/useApp';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { SHELL_DRAWER_COLLAPSED_WIDTH, SHELL_DRAWER_EXPANDED_WIDTH } from '@/utils/shellConfig';
   const { t } = useI18n({ useScope: 'global' });
   const { belowMd } = useSharedBreakpoints();
   const appStore = useAppStore();
@@ -112,8 +114,8 @@
   });
   const sidebarWidth = computed(() => {
     if (belowMd.value) {
-      return mobileExpanded.value ? 'w-56' : 'w-16';
+      return mobileExpanded.value ? SHELL_DRAWER_EXPANDED_WIDTH : SHELL_DRAWER_COLLAPSED_WIDTH;
     }
-    return appStore.drawerRail ? 'w-16' : 'w-56';
+    return appStore.drawerRail ? SHELL_DRAWER_COLLAPSED_WIDTH : SHELL_DRAWER_EXPANDED_WIDTH;
   });
 </script>

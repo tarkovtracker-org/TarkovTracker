@@ -198,6 +198,7 @@
   import { GAME_MODES, isGameMode } from '@/utils/constants';
   import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
   import { logger } from '@/utils/logger';
+  import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
   import type { DropdownMenuItem } from '@nuxt/ui';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
   const appStore = useAppStore();
@@ -396,7 +397,7 @@
     }
   }
   const { width } = useWindowSize();
-  const mdAndDown = computed(() => width.value < 960);
+  const mdAndDown = computed(() => width.value < SHELL_DESKTOP_BREAKPOINT_PX);
   const isDrawerCollapsed = computed(() => {
     if (mdAndDown.value) {
       return !appStore.mobileDrawerExpanded;

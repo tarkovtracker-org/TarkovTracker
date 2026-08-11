@@ -1,4 +1,5 @@
 import { useBreakpoints } from '@vueuse/core';
+import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
 /**
  * Shared breakpoints composable to avoid per-component listeners
  *
@@ -12,7 +13,7 @@ import { useBreakpoints } from '@vueuse/core';
  */
 const breakpoints = useBreakpoints({
   sm: 600,
-  md: 960,
+  md: SHELL_DESKTOP_BREAKPOINT_PX,
   lg: 1024,
   xl: 1280,
   xxl: 1920,
