@@ -231,3 +231,34 @@ describe('useGraphBuilder needed item accepted items', () => {
     expect(need?.acceptedItems).toBeUndefined();
   });
 });
+describe('useGraphBuilder buildWeapon containsAll needs', () => {
+  it('emits a need per explicit mod alongside the base weapon', () => {
+    const task: Task = {
+      id: 'gunsmith-11',
+      name: 'Gunsmith - Part 11',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-build',
+          type: 'buildWeapon',
+          count: 1,
+          item: { id: 'vector', name: 'KRISS Vector' },
+          containsAll: [
+            { id: 'rail', name: 'Vector modular rail' },
+            { name: 'Missing id mod' },
+            { id: 'foregrip', name: 'Skeletonized foregrip' },
+          ],
+        },
+      ],
+      taskRequirements: [],
+    } as unknown as Task;
+    const { processTaskData } = useGraphBuilder();
+    const needs = processTaskData([task]).neededItemTaskObjectives;
+    expect(needs.map((need) => [need.id, need.item?.id])).toEqual([
+      ['obj-build', 'vector'],
+      ['obj-build:rail', 'rail'],
+      ['obj-build:foregrip', 'foregrip'],
+    ]);
+    expect(needs.every((need) => need.taskId === 'gunsmith-11' && need.count === 1)).toBe(true);
+  });
+});

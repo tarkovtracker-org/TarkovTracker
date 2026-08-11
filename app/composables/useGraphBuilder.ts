@@ -23,6 +23,27 @@ import type {
   TaskRequirement,
 } from '@/types/tarkov';
 /**
+ * Explicit `containsAll` mods (e.g. Gunsmith weapon builds) are required items in
+ * their own right. Each gets a synthetic progress id so counting one mod does not
+ * count the others or the objective's base item.
+ */
+function buildContainsAllNeeds(
+  taskId: string,
+  objective: TaskObjective
+): NeededItemTaskObjective[] {
+  return (objective.containsAll ?? [])
+    .filter((part) => Boolean(part?.id))
+    .map((part) => ({
+      id: `${objective.id}:${part.id}`,
+      needType: 'taskObjective' as const,
+      taskId,
+      type: objective.type,
+      item: part,
+      count: 1,
+      foundInRaid: false,
+    }));
+}
+/**
  * Composable for building task and hideout dependency graphs
  * Extracts complex graph algorithms from the metadata store
  */
@@ -190,6 +211,7 @@ export function useGraphBuilder() {
             foundInRaid: objective.foundInRaid ?? false,
             ...(acceptedItems ? { acceptedItems } : {}),
           });
+          tempNeededObjectives.push(...buildContainsAllNeeds(task.id, objective));
         }
       });
       // Process fail conditions for alternative tasks (complete-status triggers)
