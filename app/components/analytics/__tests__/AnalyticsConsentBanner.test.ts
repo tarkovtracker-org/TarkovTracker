@@ -2,7 +2,6 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { computed, ref } from 'vue';
 import type { AnalyticsConsentState } from '@/composables/useAnalyticsConsent';
 const { accept, closePreferences, decline, runtimeConfig } = vi.hoisted(() => ({
   accept: vi.fn(),
