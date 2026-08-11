@@ -1,3 +1,38 @@
+## [1.68.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.7...v1.68.8) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** clarify analytics consent status ([4adb7ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/4adb7efb40b4d872380ea124ff53959a6839bf2d))
+
+## [1.68.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.6...v1.68.7) (2026-08-11)
+
+
+### Performance Improvements
+
+* **app:** fix CLS, LCP, and INP core web vitals ([#701](https://github.com/tarkovtracker-org/TarkovTracker/issues/701)) ([f29c84a](https://github.com/tarkovtracker-org/TarkovTracker/commit/f29c84a5421fe0fcdd0cc00970d21baafaa0f039))
+
+## [1.68.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.5...v1.68.6) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** align compact credit member cards ([#704](https://github.com/tarkovtracker-org/TarkovTracker/issues/704)) ([8ba8d4e](https://github.com/tarkovtracker-org/TarkovTracker/commit/8ba8d4ef1b9583b05a9a5e974b0c5541db16c460))
+
+## [1.68.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.4...v1.68.5) (2026-08-10)
+
+
+### Performance Improvements
+
+* **app:** remove spa-loading-template and LoadingScreen blocking layers ([#699](https://github.com/tarkovtracker-org/TarkovTracker/issues/699)) ([3142352](https://github.com/tarkovtracker-org/TarkovTracker/commit/31423527cf21e2d6d59f8ee00d15f5e74d06286f))
+
+## [1.68.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.3...v1.68.4) (2026-08-10)
+
+
+### Performance Improvements
+
+* **ui:** bundle all icons locally to eliminate Iconify CDN calls ([#698](https://github.com/tarkovtracker-org/TarkovTracker/issues/698)) ([d492bba](https://github.com/tarkovtracker-org/TarkovTracker/commit/d492bba56e33007884547cde8c74b9077ee67f6e))
+
 ## [1.68.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.2...v1.68.3) (2026-08-10)
 
 

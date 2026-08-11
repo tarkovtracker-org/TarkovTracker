@@ -135,15 +135,6 @@
     "supabase_config_hint": "Ce deploy n'a pas de configuration Supabase publique. Mettez NUXT_PUBLIC_SUPABASE_URL et NUXT_PUBLIC_SUPABASE_ANON_KEY pour les preview, ou autorisez les builds de preview à s'exécuter en mode hors ligne.",
     "request_blocked_hint": "Une requête pour afficher cette page a été bloquée. Ouvrez les détails techniques (Inspecteur) et ajouté l'URL de la requête en échec lorsque vous signalez le problème."
   },
-  "loading_screen": {
-    "title": "Chargement de Tarkov Tracker",
-    "title_error": "Problème de chargement",
-    "subtitle": "Téléchargement des données de jeu requises...",
-    "subtitle_error": "Certaines données n’ont pas pu être chargées",
-    "first_load_info": "Cela peut prendre un moment lors du premier chargement. Les données seront mises en cache pour les prochaines visites.",
-    "partial_data_info": "L’application peut fonctionner avec des données partielles. Vous pouvez réessayer ou continuer quand même.",
-    "continue_anyway": "Continuer quand même"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Planque mise à jour",
@@ -2285,6 +2276,8 @@
     "badge_default_off": "Désactivée par défaut",
     "badge_usage_stats": "Statistiques d'utilisation",
     "badge_analytics_only": "Analytique uniquement",
+    "status_enabled": "Statut Analytics : Activé",
+    "status_disabled": "Statut Analytics : Désactivé",
     "change_anytime": "Modifiable à tout moment depuis le pied de page.",
     "review_details": "Voir les détails dans la Politique de confidentialité",
     "allow": "Autoriser",

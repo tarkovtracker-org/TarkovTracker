@@ -135,15 +135,6 @@
     "supabase_config_hint": "This deployment is missing public Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY for previews, or allow preview builds to run in offline mode.",
     "request_blocked_hint": "A request required to render this page was blocked. Open the technical details and include the failing request URL when reporting the issue."
   },
-  "loading_screen": {
-    "title": "Wczytywanie Tarkov Tracker",
-    "title_error": "Błąd wczytywania",
-    "subtitle": "Pobieranie wymaganych danych gry...",
-    "subtitle_error": "Niektóre dane nie zostały załadowane",
-    "first_load_info": "Pierwsze wczytywanie może chwilę zająć. Dane zostaną zapisane w pamięci podręcznej na potrzeby przyszłych wizyt.",
-    "partial_data_info": "The app can still work with partial data. You can retry or continue anyway.",
-    "continue_anyway": "Kontynuuj mimo to"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Hideout updated",
@@ -2285,6 +2276,8 @@
     "badge_default_off": "Off by default",
     "badge_usage_stats": "Usage stats",
     "badge_analytics_only": "Analytics only",
+    "status_enabled": "Status Analityki: Włączone",
+    "status_disabled": "Status Analityki: Wyłączone",
     "change_anytime": "Change this anytime from the footer.",
     "review_details": "Przejrzyj szczegóły polityki prywatności",
     "allow": "Help us improve",

@@ -15,8 +15,14 @@
   const { t } = useI18n({ useScope: 'global' });
   const visible = ref(false);
   const SCROLL_THRESHOLD = 300;
+  let rafId: number | null = null;
   const onScroll = () => {
-    visible.value = window.scrollY > SCROLL_THRESHOLD;
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        visible.value = window.scrollY > SCROLL_THRESHOLD;
+        rafId = null;
+      });
+    }
   };
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -27,5 +33,9 @@
   });
   onUnmounted(() => {
     window.removeEventListener('scroll', onScroll);
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
   });
 </script>

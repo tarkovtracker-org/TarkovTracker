@@ -51,6 +51,6 @@
   const avatarSize = computed(() => creditMemberAvatarSize(props.variant));
   const avatarClasses = computed(() => creditMemberAvatarClasses(props.variant));
   const itemClasses = computed(() =>
-    creditMemberClasses(props.variant, Boolean(props.member.link), props.rank != null)
+    creditMemberClasses(props.variant, Boolean(props.member.link))
   );
 </script>

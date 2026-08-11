@@ -18,6 +18,12 @@ import {
   TARKOV_IMAGE_DOMAINS,
   YOUTUBE_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
+import {
+  SHELL_DESKTOP_BREAKPOINT_PX,
+  SHELL_DRAWER_COLLAPSED_WIDTH,
+  SHELL_DRAWER_EXPANDED_WIDTH,
+  SHELL_DRAWER_RAIL_STORAGE_KEY,
+} from './app/utils/shellConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -112,7 +118,6 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   telemetry: false,
   ssr: false,
-  spaLoadingTemplate: true,
   srcDir: 'app',
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
@@ -277,7 +282,49 @@ export default defineNuxtConfig({
     head: {
       titleTemplate: '%s | Tarkov Tracker',
       title: 'Escape from Tarkov Quest, Hideout, and Item Tracker',
+      style: [
+        {
+          textContent: [
+            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
+            'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
+            '#__nuxt:empty::before{',
+            'content:"";',
+            'display:block;',
+            'position:fixed;',
+            'inset:0;',
+            'width:var(--shell-w);',
+            'background:var(--color-surface-900,hsl(0 0% 9%));',
+            'border-right:1px solid var(--color-surface-700,hsl(0 0% 25%));',
+            'z-index:50',
+            '}',
+            '#__nuxt:empty::after{',
+            'content:"";',
+            'display:block;',
+            'position:fixed;',
+            'top:0;',
+            'left:var(--shell-w);',
+            'right:0;',
+            'height:44px;',
+            'background:var(--color-surface-900,hsl(0 0% 9%));',
+            'border-bottom:1px solid var(--color-surface-700,hsl(0 0% 25%));',
+            'z-index:40',
+            '}',
+            `@media(width < ${SHELL_DESKTOP_BREAKPOINT_PX}px){`,
+            `:root{--shell-w:${SHELL_DRAWER_COLLAPSED_WIDTH}}`,
+            '}',
+          ].join(''),
+        },
+      ],
       script: [
+        {
+          innerHTML: [
+            'try{',
+            `if(window.localStorage.getItem(${JSON.stringify(SHELL_DRAWER_RAIL_STORAGE_KEY)})==="true"`,
+            `&&window.matchMedia("(min-width:${SHELL_DESKTOP_BREAKPOINT_PX}px)").matches)`,
+            `{document.documentElement.style.setProperty("--shell-w",${JSON.stringify(SHELL_DRAWER_COLLAPSED_WIDTH)})}`,
+            '}catch(e){}',
+          ].join(''),
+        },
         {
           type: 'application/ld+json',
           textContent: JSON.stringify(webApplicationSchema),

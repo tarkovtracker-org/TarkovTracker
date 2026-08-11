@@ -79,14 +79,13 @@ Client-only plugins, **numbered to control load order**:
 
 ## App Chrome (`app/shell/`) and Global Components
 
-| Component                 | Role                                                                             |
-| ------------------------- | -------------------------------------------------------------------------------- |
-| `shell/AppBar.vue`        | Top navigation bar.                                                              |
-| `shell/NavDrawer.vue`     | Side navigation drawer.                                                          |
-| `shell/AppFooter.vue`     | Footer (incl. analytics preferences control).                                    |
-| `shell/LoadingScreen.vue` | Initial load screen.                                                             |
-| `components/ui/*`         | Shared UI primitives (cards, tooltips, context menu, help spotlight, game item). |
-| `components/analytics/*`  | Consent banner.                                                                  |
+| Component                | Role                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `shell/AppBar.vue`       | Top navigation bar.                                                              |
+| `shell/NavDrawer.vue`    | Side navigation drawer.                                                          |
+| `shell/AppFooter.vue`    | Footer (incl. analytics preferences control).                                    |
+| `components/ui/*`        | Shared UI primitives (cards, tooltips, context menu, help spotlight, game item). |
+| `components/analytics/*` | Consent banner.                                                                  |
 
 ## Feature Components (`app/features/<slice>/`)
 

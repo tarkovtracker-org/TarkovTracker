@@ -22,6 +22,23 @@ import type {
   TaskObjective,
   TaskRequirement,
 } from '@/types/tarkov';
+function buildContainsAllNeeds(
+  taskId: string,
+  objective: TaskObjective
+): NeededItemTaskObjective[] {
+  return (objective.containsAll ?? [])
+    .filter((part) => Boolean(part?.id))
+    .map((part) => ({
+      id: `${objective.id}:${part.id}`,
+      needType: 'taskObjective' as const,
+      taskId,
+      sourceObjectiveId: objective.id,
+      type: objective.type,
+      item: part,
+      count: 1,
+      foundInRaid: objective.foundInRaid ?? false,
+    }));
+}
 /**
  * Composable for building task and hideout dependency graphs
  * Extracts complex graph algorithms from the metadata store
@@ -179,17 +196,20 @@ export function useGraphBuilder() {
           // item; never a sparse/id-less array entry that would break grouping.
           const primaryItem = objective.item ?? validItems[0];
           const acceptedItems = validItems.length > 1 ? validItems : undefined;
-          tempNeededObjectives.push({
-            id: objective.id,
-            needType: 'taskObjective',
-            taskId: task.id,
-            type: objective.type,
-            item: primaryItem ?? objective.markerItem!,
-            markerItem: objective.markerItem,
-            count: objective.count ?? 1,
-            foundInRaid: objective.foundInRaid ?? false,
-            ...(acceptedItems ? { acceptedItems } : {}),
-          });
+          tempNeededObjectives.push(
+            {
+              id: objective.id,
+              needType: 'taskObjective',
+              taskId: task.id,
+              type: objective.type,
+              item: primaryItem ?? objective.markerItem!,
+              markerItem: objective.markerItem,
+              count: objective.count ?? 1,
+              foundInRaid: objective.foundInRaid ?? false,
+              ...(acceptedItems ? { acceptedItems } : {}),
+            },
+            ...buildContainsAllNeeds(task.id, objective)
+          );
         }
       });
       // Process fail conditions for alternative tasks (complete-status triggers)

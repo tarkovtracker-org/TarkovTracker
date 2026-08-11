@@ -307,7 +307,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
           logger.warn('[NeededItems] Skipping objective without item/markerItem:', need);
           continue;
         }
-        key = `task:${need.taskId}:${itemId}`;
+        key = `task:${need.taskId}:${itemId}:${need.id}`;
       } else {
         itemId = getNeededItemId(need);
         if (!itemId) {
