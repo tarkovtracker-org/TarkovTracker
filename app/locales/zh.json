@@ -135,15 +135,6 @@
     "supabase_config_hint": "此部署缺少公开的 Supabase 配置。请为预览环境设置 NUXT_PUBLIC_SUPABASE_URL 和 NUXT_PUBLIC_SUPABASE_ANON_KEY，或允许预览构建以离线模式运行。",
     "request_blocked_hint": "渲染此页面所需的请求被阻止。报告问题时，请打开技术详情并附上失败请求的 URL。"
   },
-  "loading_screen": {
-    "title": "正在加载 Tarkov Tracker",
-    "title_error": "加载问题",
-    "subtitle": "正在下载所需的游戏数据...",
-    "subtitle_error": "部分数据加载失败",
-    "first_load_info": "首次加载可能需要一些时间。数据会被缓存，供后续访问使用。",
-    "partial_data_info": "应用在部分数据缺失时仍可运行。你可以重试或继续。",
-    "continue_anyway": "仍然继续"
-  },
   "toast": {
     "hideout_updated": {
       "title": "藏身处已更新",
@@ -2285,6 +2276,8 @@
     "badge_default_off": "默认关闭",
     "badge_usage_stats": "使用统计",
     "badge_analytics_only": "仅分析",
+    "status_enabled": "分析状态：启用",
+    "status_disabled": "分析状态：已禁用",
     "change_anytime": "可随时在页脚更改。",
     "review_details": "在隐私政策中查看详情",
     "allow": "允许",

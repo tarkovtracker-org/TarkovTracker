@@ -135,15 +135,6 @@
     "supabase_config_hint": "A esta implementación le falta la configuración pública de Supabase. Define NUXT_PUBLIC_SUPABASE_URL y NUXT_PUBLIC_SUPABASE_ANON_KEY para las vistas previas, o permite que las compilaciones de vista previa se ejecuten en modo sin conexión.",
     "request_blocked_hint": "Se bloqueó una solicitud necesaria para renderizar esta página. Abre los detalles técnicos e incluye la URL de la solicitud fallida al informar del problema."
   },
-  "loading_screen": {
-    "title": "Cargando Tarkov Tracker",
-    "title_error": "Problema de carga",
-    "subtitle": "Descargando los datos del juego requeridos...",
-    "subtitle_error": "No se pudieron cargar algunos datos",
-    "first_load_info": "Esto puede tardar un momento en la primera carga. Los datos se guardarán en caché para futuras visitas.",
-    "partial_data_info": "La app puede seguir funcionando con datos parciales. Puedes reintentar o continuar de todos modos.",
-    "continue_anyway": "Continuar de todos modos"
-  },
   "toast": {
     "hideout_updated": {
       "title": "Escondite actualizado",
@@ -2285,6 +2276,8 @@
     "badge_default_off": "Desactivada por defecto",
     "badge_usage_stats": "Estadísticas de uso",
     "badge_analytics_only": "Solo analítica",
+    "status_enabled": "Estado de Analytics: Activado",
+    "status_disabled": "Estado de Analytics: Deshabilitado",
     "change_anytime": "Puedes cambiarlo en cualquier momento desde el pie.",
     "review_details": "Ver detalles en la Política de privacidad",
     "allow": "Permitir",
