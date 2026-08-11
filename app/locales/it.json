@@ -2276,6 +2276,8 @@
     "badge_default_off": "Spento di default",
     "badge_usage_stats": "Statistiche di utilizzo",
     "badge_analytics_only": "Solo analisi",
+    "status_enabled": "Stato Analytics: Abilitato",
+    "status_disabled": "Stato Analytics: Disabilitato",
     "change_anytime": "Cambia in qualsiasi momento in fondo alla pagina.",
     "review_details": "Rivedi i dettagli nella Privacy Policy",
     "allow": "Aiutaci a migliorare",
