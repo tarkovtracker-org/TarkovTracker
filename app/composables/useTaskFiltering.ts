@@ -300,9 +300,10 @@ export function useTaskFiltering() {
         case 'locked': {
           if (isTaskInvalid(task.id, 'all')) continue;
           const isAvailableForAny = taskStatuses.some(isAvailable);
+          const isActiveForAny = taskStatuses.some(({ isActive }) => isActive);
           const isCompletedByAll = taskStatuses.every(({ isCompleted }) => isCompleted);
           const isFailedForAny = taskStatuses.some(({ isFailed }) => isFailed);
-          if (!isAvailableForAny && !isCompletedByAll && !isFailedForAny) {
+          if (!isAvailableForAny && !isActiveForAny && !isCompletedByAll && !isFailedForAny) {
             tempVisibleTasks.push({ ...task, neededBy: [] });
           }
           break;
@@ -352,9 +353,9 @@ export function useTaskFiltering() {
       case 'locked':
         filtered = filtered.filter((task) => {
           if (isTaskInvalid(task.id, userView)) return false;
-          const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
+          const { isActive, isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
           const unlockedTasks = progressStore.unlockedTasks?.[task.id];
-          return isCompleted !== true && isFailed !== true && unlockedTasks?.[userView] !== true;
+          return !isActive && !isCompleted && !isFailed && unlockedTasks?.[userView] !== true;
         });
         break;
       case 'completed':

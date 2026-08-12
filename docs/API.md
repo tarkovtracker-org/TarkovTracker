@@ -392,9 +392,10 @@ Task writes on `api.tarkovtracker.org` accept four states through both
 | `failed`      | `true`            | `true`          | `false`         |
 | `uncompleted` | `false`           | `false`         | `false`         |
 
-Use `active` when the player has accepted an ordinary task. An unlocked successor is only
-available: dependency processing writes it as explicitly neutral and never marks it active.
-Completing, failing, or uncompleting a task clears `active`.
+Use `active` when the player has accepted an ordinary task. When an unlocked successor has no
+stored progress, dependency processing materializes it as explicitly neutral and never marks it
+active. Existing successor progress is never overwritten by dependency propagation. Completing,
+failing, or uncompleting a task clears `active`.
 
 Single-task request:
 

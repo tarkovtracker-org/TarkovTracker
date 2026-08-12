@@ -314,19 +314,14 @@ const updateDependentTasks = (
     );
     if (!changedRequirement || protectedTaskIds?.has(dependentTask.id)) continue;
     const requirementMet = stateMeetsRequirement(newState, changedRequirement.status ?? []);
-    const shouldUnlock =
-      requirementMet &&
-      checkAllRequirementsMet(dependentTask, changedTaskId, newState, taskCompletions);
-    if (!shouldUnlock && requirementMet) continue;
-    setTaskCompletion(
-      taskCompletions,
-      dependentTask.id,
-      false,
-      false,
-      false,
-      updateTime,
-      updates
-    );
+    if (
+      !requirementMet ||
+      !checkAllRequirementsMet(dependentTask, changedTaskId, newState, taskCompletions) ||
+      Object.hasOwn(taskCompletions, dependentTask.id)
+    ) {
+      continue;
+    }
+    setTaskCompletion(taskCompletions, dependentTask.id, false, false, false, updateTime, updates);
   }
 };
 /**

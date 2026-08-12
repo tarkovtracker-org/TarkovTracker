@@ -206,6 +206,7 @@ export function useTaskCounts() {
             if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
             shouldCount =
               !taskStatuses.some(isAvailableStatus) &&
+              !taskStatuses.some(({ isActive }) => isActive) &&
               !taskStatuses.every(({ isCompleted }) => isCompleted) &&
               !taskStatuses.some(({ isFailed }) => isFailed);
             break;
@@ -241,7 +242,7 @@ export function useTaskCounts() {
             break;
           case 'locked':
             if (isTaskInvalid(task.id, userView)) continue;
-            shouldCount = !isCompleted && !isFailed && !isUnlocked;
+            shouldCount = !isActive && !isCompleted && !isFailed && !isUnlocked;
             break;
           case 'completed':
             shouldCount = isCompleted && !isFailed;

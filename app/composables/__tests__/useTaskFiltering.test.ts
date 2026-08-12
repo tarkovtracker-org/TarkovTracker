@@ -272,6 +272,16 @@ describe('useTaskFiltering', () => {
     expect(taskFiltering.filterTasksByStatus([tasks[0]!], 'available', 'self')).toEqual([]);
     expect(taskFiltering.filterTasksByStatus([tasks[0]!], 'active', 'self')).toEqual([tasks[0]]);
   });
+  it('keeps active tasks out of locked filters and trader counts', async () => {
+    const { taskFiltering, tasks, progressStore } = await setup();
+    const activeTask = tasks.find((task) => task.id === 'task-locked')!;
+    progressStore.getTaskStatus = (_teamId: string, taskId: string) =>
+      taskId === activeTask.id ? 'active' : 'incomplete';
+    expect(taskFiltering.filterTasksByStatus([activeTask], 'locked', 'self')).toEqual([]);
+    expect(taskFiltering.filterTasksByStatus([activeTask], 'locked', 'all')).toEqual([]);
+    expect(taskFiltering.calculateTraderCounts('self', 'locked')['trader-1']).toBe(0);
+    expect(taskFiltering.calculateTraderCounts('all', 'locked')['trader-1']).toBe(0);
+  });
   it('calculates status counts excluding invalid availability', async () => {
     const { taskFiltering } = await setup();
     const counts = taskFiltering.calculateStatusCounts('self');
