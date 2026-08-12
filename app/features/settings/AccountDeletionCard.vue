@@ -287,7 +287,10 @@
       <template #content>
         <div class="p-4">
           <template v-if="!isLoggedIn">
-            <LoginRequiredAlert :title="$t('settings.account_data.login_required_delete')" />
+            <LoginRequiredAlert
+              :title="$t('settings.account_data.login_required_delete')"
+              redirect-path="/settings#account"
+            />
           </template>
           <template v-else>
             <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">

@@ -38,6 +38,7 @@
           'Log in to generate personalized streamer overlay links.'
         )
       "
+      redirect-path="/settings#streamer-tools"
     />
     <template v-else>
       <UAlert

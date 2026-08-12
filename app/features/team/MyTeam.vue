@@ -8,7 +8,10 @@
         <UIcon name="i-mdi-loading" class="text-surface-400 h-6 w-6 animate-spin" />
       </div>
       <div v-else-if="!isLoggedIn" class="p-4">
-        <LoginRequiredAlert :title="$t('page.team.card.myteam.login_required')" />
+        <LoginRequiredAlert
+          :title="$t('page.team.card.myteam.login_required')"
+          redirect-path="/team"
+        />
       </div>
       <div v-else-if="!localUserTeam" class="py-4 text-center">
         {{ $t('page.team.card.myteam.no_team') }}

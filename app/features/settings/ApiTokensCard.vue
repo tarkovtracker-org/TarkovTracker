@@ -10,7 +10,11 @@
     <template #content>
       <div class="relative px-4 py-4">
         <ApiTokens v-if="isLoggedIn" />
-        <LoginRequiredAlert v-else :title="$t('page.settings.card.apitokens.not_logged_in')" />
+        <LoginRequiredAlert
+          v-else
+          :title="$t('page.settings.card.apitokens.not_logged_in')"
+          redirect-path="/settings#api"
+        />
       </div>
     </template>
   </GenericCard>

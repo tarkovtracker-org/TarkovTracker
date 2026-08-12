@@ -95,6 +95,7 @@
               'Log in to manage profile sharing visibility.'
             )
           "
+          redirect-path="/settings#account"
         />
       </div>
     </template>
