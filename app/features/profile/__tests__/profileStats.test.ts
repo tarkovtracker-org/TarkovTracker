@@ -45,10 +45,7 @@ describe('profileStats', () => {
       {
         id: 'cultist-circle-station',
         normalizedName: 'cultist-circle',
-        levels: [
-          { id: 'cultist-1', level: 1 },
-          { id: 'cultist-2', level: 2 },
-        ],
+        levels: [{ id: 'cultist-1', level: 1 }],
       },
       {
         id: 'workbench-station',
@@ -73,7 +70,6 @@ describe('profileStats', () => {
       'stash-2': true,
       'stash-3': true,
       'cultist-1': true,
-      'cultist-2': false,
       'workbench-1': false,
       'workbench-2': true,
     });

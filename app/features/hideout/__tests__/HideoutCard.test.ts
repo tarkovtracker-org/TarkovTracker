@@ -4,6 +4,16 @@ import HideoutCard from '@/features/hideout/HideoutCard.vue';
 const trackEventMock = vi.fn();
 const toastAddMock = vi.fn();
 let arePrereqsMetResult = true;
+let gameEdition = 1;
+let gameEditionData: Array<{
+  defaultCultistCircleLevel: number;
+  defaultStashLevel: number;
+  value: number;
+}> = [];
+let hideoutLevels: Record<string, { self: number }> = {
+  generator: { self: 0 },
+  workbench: { self: 0 },
+};
 let stationReqMetResult = true;
 let skillReqMetResult = true;
 let traderReqMetResult = true;
@@ -43,17 +53,14 @@ vi.mock('@/stores/useMetadata', () => ({
 }));
 vi.mock('@/stores/useProgress', () => ({
   useProgressStore: () => ({
-    gameEditionData: [],
-    hideoutLevels: {
-      generator: { self: 0 },
-      workbench: { self: 0 },
-    },
+    gameEditionData,
+    hideoutLevels,
   }),
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getCurrentGameMode: () => 'pvp',
-    getGameEdition: () => 'standard',
+    getGameEdition: () => gameEdition,
     setHideoutModuleComplete: vi.fn(),
     setHideoutModuleUncomplete: vi.fn(),
     setHideoutPartComplete: vi.fn(),
@@ -97,6 +104,12 @@ const NuxtLinkStub = {
 describe('HideoutCard', () => {
   beforeEach(() => {
     arePrereqsMetResult = true;
+    gameEdition = 1;
+    gameEditionData = [];
+    hideoutLevels = {
+      generator: { self: 0 },
+      workbench: { self: 0 },
+    };
     stationReqMetResult = true;
     skillReqMetResult = true;
     traderReqMetResult = true;
@@ -188,5 +201,57 @@ describe('HideoutCard', () => {
     expect(wrapper.text()).not.toContain('Not ready');
     expect(wrapper.html()).toContain('text-success-400');
     expect(wrapper.html()).not.toContain('text-error-400');
+  });
+  it('shows the Unheard Cultist Circle at its only level as maxed', async () => {
+    gameEdition = 5;
+    gameEditionData = [
+      {
+        defaultCultistCircleLevel: 1,
+        defaultStashLevel: 5,
+        value: 5,
+      },
+    ];
+    hideoutLevels = {
+      'cultist-circle': { self: 1 },
+    };
+    const wrapper = await mountSuspended(HideoutCard, {
+      props: {
+        station: {
+          id: 'cultist-circle',
+          imageLink: '/cultist-circle.png',
+          levels: [
+            {
+              constructionTime: 0,
+              crafts: [],
+              id: 'cultist-circle-level-1',
+              itemRequirements: [],
+              level: 1,
+              skillRequirements: [],
+              stationLevelRequirements: [],
+              traderRequirements: [],
+            },
+          ],
+          name: 'Cultist Circle',
+          normalizedName: 'cultist-circle',
+        },
+      },
+      global: {
+        mocks: {
+          $t: (key: string) => translations[key] ?? key,
+        },
+        stubs: {
+          GenericCard: GenericCardStub,
+          HideoutRequirement: true,
+          NuxtLink: NuxtLinkStub,
+          UButton: UButtonStub,
+          UIcon: true,
+          'i18n-t': {
+            template: '<span><slot name="level" /></span>',
+          },
+        },
+      },
+    });
+    expect(wrapper.text()).toContain('Max level');
+    expect(wrapper.findAll('button')).toHaveLength(1);
   });
 });
