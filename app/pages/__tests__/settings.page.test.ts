@@ -114,11 +114,10 @@ const defaultGlobalStubs = {
   },
   'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
-  ExternalLinksCard: { template: '<div data-testid="external-links-card" />' },
+  GeneralPreferencesCard: { template: '<div data-testid="general-preferences-card" />' },
   KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
-  PrivacyCard: { template: '<div data-testid="privacy-card" />' },
   ProfileSharingCard: { template: '<div data-testid="profile-sharing-card" />' },
   ResetProgressCard: { template: '<div data-testid="reset-progress-card" />' },
   SkillsCard: { template: '<div id="skills" data-testid="skills-card" />' },
@@ -247,7 +246,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="task-display-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="keybinds-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
@@ -297,7 +296,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
     });
     it('opens the account tab from the route hash without remounting', async () => {
       configureMockState({ routeHash: '#account' });

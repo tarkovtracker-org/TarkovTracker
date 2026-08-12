@@ -87,33 +87,22 @@
             </div>
           </div>
         </template>
-        <UAlert
+        <LoggedOutPlaceholder
           v-else
-          icon="i-mdi-lock"
-          color="warning"
-          variant="soft"
           :title="
             t(
               'settings.profile_sharing.login_required',
               'Log in to manage profile sharing visibility.'
             )
           "
-        >
-          <template #description>
-            <NuxtLink
-              to="/login"
-              class="text-warning-300 hover:text-warning-200 underline transition-colors"
-            >
-              {{ t('navigation_drawer.login', 'Log in') }}
-            </NuxtLink>
-          </template>
-        </UAlert>
+        />
       </div>
     </template>
   </GenericCard>
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import LoggedOutPlaceholder from '@/features/settings/LoggedOutPlaceholder.vue';
   import {
     GAME_MODE_VALUES,
     GAME_MODE_UI,

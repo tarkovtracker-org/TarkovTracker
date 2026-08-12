@@ -10,22 +10,7 @@
     <template #content>
       <div class="relative px-4 py-4">
         <ApiTokens v-if="isLoggedIn" />
-        <UAlert
-          v-else
-          color="warning"
-          variant="soft"
-          icon="i-mdi-lock"
-          :title="$t('page.settings.card.apitokens.not_logged_in')"
-        >
-          <template #description>
-            <NuxtLink
-              to="/login"
-              class="text-warning-300 hover:text-warning-200 underline transition-colors"
-            >
-              {{ $t('navigation_drawer.login', 'Log In') }}
-            </NuxtLink>
-          </template>
-        </UAlert>
+        <LoggedOutPlaceholder v-else :title="$t('page.settings.card.apitokens.not_logged_in')" />
       </div>
     </template>
   </GenericCard>
@@ -33,6 +18,7 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import ApiTokens from '@/features/settings/ApiTokens.vue';
+  import LoggedOutPlaceholder from '@/features/settings/LoggedOutPlaceholder.vue';
   const { $supabase } = useNuxtApp();
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn));
 </script>

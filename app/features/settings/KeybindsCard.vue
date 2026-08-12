@@ -44,6 +44,26 @@
                     @click="resetField(field.id)"
                   />
                 </div>
+                <div
+                  v-if="recordingField === field.id"
+                  class="flex items-center gap-1.5"
+                  :class="captureError === field.id ? 'text-error-400' : 'text-primary-300'"
+                  role="status"
+                >
+                  <span class="relative flex h-2 w-2">
+                    <span
+                      class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                      :class="captureError === field.id ? 'bg-error-400' : 'bg-primary-400'"
+                    ></span>
+                    <span
+                      class="relative inline-flex h-2 w-2 rounded-full"
+                      :class="captureError === field.id ? 'bg-error-500' : 'bg-primary-500'"
+                    ></span>
+                  </span>
+                  <span class="text-[11px] font-medium">
+                    {{ t('settings.keybinds.listening', 'Listening...') }}
+                  </span>
+                </div>
                 <span
                   v-if="warningMessages[field.id]"
                   class="text-right text-[10px]"

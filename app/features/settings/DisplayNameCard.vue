@@ -17,7 +17,7 @@
               <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
             </UTooltip>
           </div>
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-3 lg:grid-cols-3">
             <form
               v-for="mode in DISPLAY_NAME_MODES"
               :key="mode"
@@ -34,6 +34,14 @@
                   >
                     {{ getModeLabel(mode) }}
                   </label>
+                  <UBadge
+                    v-if="currentGameMode === mode"
+                    :color="getModeColor(mode)"
+                    variant="soft"
+                    size="xs"
+                  >
+                    {{ $t('settings.display_name.active_mode') }}
+                  </UBadge>
                 </div>
                 <UFormField
                   :name="`${mode}-display-name`"
@@ -69,12 +77,17 @@
         </section>
         <div class="h-px bg-white/6" />
         <section class="max-w-sm space-y-2">
-          <label
-            :for="gameEditionInputId"
-            class="text-surface-200 block cursor-pointer text-sm font-semibold"
-          >
-            {{ $t('common.game_edition') }}
-          </label>
+          <div class="flex items-center gap-2">
+            <label
+              :for="gameEditionInputId"
+              class="text-surface-200 block cursor-pointer text-sm font-semibold"
+            >
+              {{ $t('common.game_edition') }}
+            </label>
+            <UTooltip :text="$t('settings.display_name.game_edition_hint')">
+              <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
+            </UTooltip>
+          </div>
           <SelectMenuFixed
             :id="gameEditionInputId"
             v-model="selectedGameEdition"

@@ -8,6 +8,26 @@ html {
 html.no-smooth-scroll {
   scroll-behavior: auto;
 }
+/* Consistent native range slider thumbs; track height/color come from utility classes */
+@utility slider-thumb {
+  &::-webkit-slider-thumb {
+    appearance: none;
+    height: 0.875rem;
+    width: 0.875rem;
+    cursor: pointer;
+    border-radius: 9999px;
+    border: 2px solid var(--color-surface-950);
+    background: var(--color-surface-200);
+  }
+  &::-moz-range-thumb {
+    height: 0.875rem;
+    width: 0.875rem;
+    cursor: pointer;
+    border-radius: 9999px;
+    border: 2px solid var(--color-surface-950);
+    background: var(--color-surface-200);
+  }
+}
 /* Tailwind v4 + Nuxt UI v4 theme tokens */
 @theme static {
   --font-sans:

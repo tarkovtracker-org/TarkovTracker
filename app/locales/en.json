@@ -1696,6 +1696,7 @@
   },
   "settings": {
     "locale": "Language",
+    "page_description": "Manage your account, game progression, and application preferences.",
     "tabs": {
       "progression": "Progression",
       "imports": "Imports"
@@ -1750,7 +1751,8 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
-      "privacy_mode": "Streamer Mode",
+      "title": "General Preferences",
+      "privacy_mode": "Privacy Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming."
     },
     "interface": {
@@ -1761,7 +1763,10 @@
         "show_next": "Show Next Quests",
         "show_prev": "Show Previous Quests",
         "density": "Card Density",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Task Display",
+        "availability_section": "Task Availability",
+        "view_defaults_section": "Default Views"
       },
       "maps": {
         "show_extracts": "Show Extracts by Default",
@@ -1852,6 +1857,8 @@
       "export_error_title": "Export Failed",
       "debug_export_error_title": "Debug Export Failed",
       "reset_title": "Reset Progress",
+      "danger_zone_title": "Danger Zone",
+      "danger_zone_hint": "Resetting all progress permanently deletes your data for PvP, PvE, and Seasonal PvP. This cannot be undone.",
       "prestige_history_title": "Prestige History",
       "prestige_history_loading": "Loading prestige history...",
       "prestige_history_empty": "No archived prestige runs yet.",
@@ -2016,7 +2023,7 @@
       "summary_description_manual": "{count} requirement(s) still need manual in-game verification."
     },
     "display_name": {
-      "explanation": "Your display name is shown to teammates and in the navigation. Each game mode (PVP/PVE) has a separate display name.",
+      "explanation": "Your display name is shown to teammates and in the navigation. Each game mode (PvP, PvE, Seasonal PvP) has a separate display name. The panel for your currently active mode is highlighted.",
       "label": "Display Name",
       "placeholder": "Enter your display name...",
       "save": "Save",
@@ -2025,7 +2032,9 @@
       "saved_title": "Display Name Saved",
       "saved_description": "Your {mode} display name has been updated",
       "save_failed_title": "Save Failed",
-      "save_failed_description": "Failed to save display name. Please try again."
+      "save_failed_description": "Failed to save display name. Please try again.",
+      "active_mode": "Active",
+      "game_edition_hint": "Select the game edition you own so tracking matches your available content."
     },
     "skills": {
       "title": "Skills Management",
@@ -2042,7 +2051,10 @@
       "valid_range": "Valid range: 0-51",
       "sort": {
         "ingame": "In-Game"
-      }
+      },
+      "quest_tooltip": "Skill level granted automatically by completed quest rewards.",
+      "offset_tooltip": "Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.",
+      "collapsed_hint": "Showing skills required by your active tasks ({shown} of {total}). Show all to see every skill."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2064,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Listening...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,7 +2081,9 @@
       "manual_hint": "Enter your actual total XP to adjust the offset automatically.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} to next",
-      "reset_offset": "Reset XP Offset"
+      "reset_offset": "Reset XP Offset",
+      "xp_progress_aria": "Experience progress toward next level",
+      "xp_progress_value": "{percent}% toward the next level"
     },
     "danger_zone": {
       "confirm_word": "DELETE"

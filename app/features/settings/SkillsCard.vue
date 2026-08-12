@@ -28,14 +28,24 @@
       </template>
       <template #content>
         <div class="space-y-4 px-4 py-4">
-          <p class="text-surface-400 text-xs">
-            {{
-              $t(
-                'settings.skills.explanation',
-                `Quest rewards are auto-calculated. Enter your total skill level (max ${MAX_SKILL_LEVEL}) to adjust the offset.`
-              )
-            }}
-          </p>
+          <div class="space-y-1">
+            <p class="text-surface-400 text-xs">
+              {{
+                $t(
+                  'settings.skills.explanation',
+                  `Quest rewards are auto-calculated. Enter your total skill level (max ${MAX_SKILL_LEVEL}) to adjust the offset.`
+                )
+              }}
+            </p>
+            <p v-if="hasShowAllToggle && !showAllSkills" class="text-surface-500 text-xs">
+              {{
+                $t('settings.skills.collapsed_hint', {
+                  shown: visibleSkills.length,
+                  total: allGameSkills.length,
+                })
+              }}
+            </p>
+          </div>
           <div
             v-if="allGameSkills.length > 0"
             class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -116,16 +126,22 @@
                 </span>
               </div>
               <div class="mb-2 flex gap-3 text-xs">
-                <div class="text-surface-400 flex-1">
-                  {{ $t('settings.skills.quest') }}
-                  <span class="text-surface-200 font-medium">
-                    {{ getQuestSkillLevel(skill.key) }}
-                  </span>
-                </div>
-                <div class="text-surface-400 flex-1">
-                  {{ $t('settings.skills.offset') }}
-                  <span class="text-surface-200 font-medium">{{ getSkillOffset(skill.key) }}</span>
-                </div>
+                <UTooltip :text="$t('settings.skills.quest_tooltip')" class="flex-1">
+                  <div class="text-surface-400 cursor-default">
+                    {{ $t('settings.skills.quest') }}
+                    <span class="text-surface-200 font-medium">
+                      {{ getQuestSkillLevel(skill.key) }}
+                    </span>
+                  </div>
+                </UTooltip>
+                <UTooltip :text="$t('settings.skills.offset_tooltip')" class="flex-1">
+                  <div class="text-surface-400 cursor-default">
+                    {{ $t('settings.skills.offset') }}
+                    <span class="text-surface-200 font-medium">
+                      {{ formatSkillOffset(getSkillOffset(skill.key)) }}
+                    </span>
+                  </div>
+                </UTooltip>
               </div>
               <div class="flex items-center gap-2">
                 <label :for="getSkillInputId(skill.key)" class="sr-only">
@@ -282,6 +298,8 @@
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);
+  const formatSkillOffset = (offset: number): string =>
+    offset > 0 ? `+${offset}` : String(offset);
   const getDisplayLevel = (skillKey: string) => {
     const level = getSkillLevel(skillKey);
     return level >= MAX_SKILL_LEVEL ? t('skills.elite_level') : level;

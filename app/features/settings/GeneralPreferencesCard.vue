@@ -1,18 +1,23 @@
 <template>
   <GenericCard
-    icon="mdi-eye-off"
+    icon="mdi-tune-variant"
     icon-color="warning"
     highlight-color="warning"
     :fill-height="false"
-    :title="$t('settings.general.privacy_mode')"
+    :title="$t('settings.general.title')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
-      <div class="px-4 py-4">
+      <div class="space-y-3 px-4 py-4">
         <div class="flex items-center justify-between gap-3">
-          <p class="text-surface-400 text-sm">
-            {{ $t('settings.general.privacy_mode_hint') }}
-          </p>
+          <div class="space-y-1">
+            <p class="text-surface-200 text-sm font-semibold">
+              {{ $t('settings.general.privacy_mode') }}
+            </p>
+            <p class="text-surface-400 text-sm">
+              {{ $t('settings.general.privacy_mode_hint') }}
+            </p>
+          </div>
           <USwitch
             :model-value="streamerMode"
             :disabled="!isLoggedIn || streamerModeCooldown"
@@ -21,6 +26,18 @@
             }"
             @update:model-value="handleStreamerModeToggle"
           />
+        </div>
+        <USeparator />
+        <div class="flex items-center justify-between gap-3">
+          <div class="space-y-1">
+            <p class="text-surface-200 text-sm font-semibold">
+              {{ $t('settings.interface.links.antifandom') }}
+            </p>
+            <p class="text-surface-400 text-sm">
+              {{ $t('settings.interface.links.antifandom_hint') }}
+            </p>
+          </div>
+          <USwitch v-model="useAntifandom" />
         </div>
       </div>
     </template>
@@ -49,6 +66,10 @@
       streamerModeTimeoutId = null;
     }, 500);
   };
+  const useAntifandom = computed({
+    get: () => preferencesStore.getWikiUseAntifandom,
+    set: (val) => preferencesStore.setWikiUseAntifandom(val),
+  });
   onUnmounted(() => {
     if (streamerModeTimeoutId) {
       clearTimeout(streamerModeTimeoutId);

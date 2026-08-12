@@ -2,6 +2,16 @@
   <div class="px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-350">
       <div class="mx-auto max-w-290 space-y-4 lg:space-y-0">
+        <div class="flex items-center justify-between pb-4">
+          <div>
+            <h1 class="text-surface-100 text-xl font-bold">
+              {{ $t('common.settings') }}
+            </h1>
+            <p class="text-surface-400 mt-1 text-sm">
+              {{ $t('settings.page_description') }}
+            </p>
+          </div>
+        </div>
         <UTabs
           :items="settingsTabItems"
           :model-value="activeTab"
@@ -84,10 +94,9 @@
               role="tabpanel"
               :aria-label="$t('common.preferences')"
             >
-              <PrivacyCard />
+              <GeneralPreferencesCard />
               <TaskDisplayCard />
               <MapSettingsCard />
-              <ExternalLinksCard />
               <div id="keybinds" class="scroll-mt-24">
                 <KeybindsCard />
               </div>
@@ -168,11 +177,10 @@
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
-  import ExternalLinksCard from '@/features/settings/ExternalLinksCard.vue';
+  import GeneralPreferencesCard from '@/features/settings/GeneralPreferencesCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
-  import PrivacyCard from '@/features/settings/PrivacyCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
