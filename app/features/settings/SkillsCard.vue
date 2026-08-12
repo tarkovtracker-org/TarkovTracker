@@ -138,6 +138,7 @@
                   <div
                     tabindex="0"
                     class="text-surface-400 focus-visible:ring-primary-500/60 cursor-default rounded focus-visible:ring-2 focus-visible:outline-none"
+                    @click.stop
                   >
                     {{ $t('settings.skills.quest') }}
                     <span class="text-surface-200 font-medium">
@@ -157,6 +158,7 @@
                   <div
                     tabindex="0"
                     class="text-surface-400 focus-visible:ring-primary-500/60 cursor-default rounded focus-visible:ring-2 focus-visible:outline-none"
+                    @click.stop
                   >
                     {{ $t('settings.skills.offset') }}
                     <span class="text-surface-200 font-medium">
