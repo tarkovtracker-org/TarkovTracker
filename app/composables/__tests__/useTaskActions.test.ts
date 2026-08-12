@@ -353,6 +353,43 @@ describe('useTaskActions', () => {
       })
     );
   });
+  it('emits undo payloads for completed, reset, and failed task actions', async () => {
+    const task: Task = {
+      id: 'task-undo-actions',
+      name: 'Task Undo Actions',
+    };
+    const { actions, onAction } = await setup(task, [task], {
+      isTaskFailed: true,
+      taskCompletions: {
+        'task-undo-actions': { complete: true, failed: true, manual: true },
+      },
+    });
+    actions.markTaskComplete(true);
+    actions.markTaskUncomplete(true);
+    actions.markTaskFailed(true);
+    expect(onAction).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        action: 'complete',
+        undoKey: 'page.tasks.questcard.undo_complete',
+      })
+    );
+    expect(onAction).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'reset_failed',
+        undoKey: 'page.tasks.questcard.undo_reset_failed',
+        wasManualFail: true,
+      })
+    );
+    expect(onAction).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        action: 'fail',
+        undoKey: 'page.tasks.questcard.undo_failed',
+      })
+    );
+  });
   it('unpins a pinned task when completing', async () => {
     const task: Task = {
       id: 'task-pin-complete',

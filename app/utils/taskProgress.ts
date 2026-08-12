@@ -213,7 +213,6 @@ export function applyTaskAvailabilityRequirements(options: {
 }): void {
   const { task, onCompleteRequirement, onFailRequirement } = options;
   const handledRequirementTaskIds = new Set<string>();
-  const failedRequirementTaskIds = new Set<string>();
   const taskRequirements = Array.isArray(task.taskRequirements) ? task.taskRequirements : [];
   const predecessors = Array.isArray(task.predecessors) ? task.predecessors : [];
   taskRequirements.forEach((requirement) => {
@@ -221,7 +220,6 @@ export function applyTaskAvailabilityRequirements(options: {
     if (!requirementTaskId) return;
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
-      failedRequirementTaskIds.add(requirementTaskId);
     } else {
       onCompleteRequirement(requirementTaskId);
     }
@@ -230,7 +228,6 @@ export function applyTaskAvailabilityRequirements(options: {
   predecessors.forEach((predecessorId) => {
     if (!predecessorId) return;
     if (handledRequirementTaskIds.has(predecessorId)) return;
-    if (failedRequirementTaskIds.has(predecessorId)) return;
     onCompleteRequirement(predecessorId);
   });
 }
