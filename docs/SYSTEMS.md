@@ -480,14 +480,18 @@ sequenceDiagram
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
-   game-edition hideout auto-completes.
-7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts`
+   game-edition hideout auto-completes. Task progress includes `active` only when the stored JSONB
+   value explicitly contains a boolean, so legacy omission remains observable as unknown.
+7. **Task writes.** Single and batch task writes accept `active`, `completed`, `failed`, and
+   `uncompleted`. They persist canonical `complete`/`failed`/`active` triples. Dependency processing
+   writes auto-unlocked successors as explicitly neutral, never active.
+8. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
    `Vary: Accept-Encoding, Authorization, Origin`. Bodies ≥1 KiB are gzipped when the client
    accepts gzip; an explicit `gzip;q=0` is honored as a rejection, `identity;q=0` bypasses the
    size threshold, and a client that refuses every available coding gets `406`.
-8. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
+9. **Usage accounting.** `workers/api-gateway/src/services/usage.ts` records the read/write (and
    throttle flag) in `public.api_usage_daily` via `record_api_usage`, off the response path.
 
 ### Files
@@ -515,6 +519,11 @@ sequenceDiagram
 - Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
   never hide a change that came from task metadata or invalidation rather than the user's row.
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
+- Ordinary-task acceptance is explicit. `active` is encoded as `{ complete: false, failed: false,
+active: true }`; completed, failed, and neutral writes set `active: false`. Missing `active` on
+  legacy task rows means unknown and is never inferred from incomplete flags or mass-backfilled.
+- Auto-unlocked successors are neutral/available, not active. An active prerequisite is satisfied
+  only by an explicit active task or a task that has since completed.
 - The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
   so the validator and the payload can never disagree. The wire body is those bytes uncompressed,
   or a `CompressionStream('gzip')` over them when gzip is negotiated — the ETag always represents
@@ -558,7 +567,9 @@ flowchart LR
    built for; the function writes the Seasonal row only when that number equals the database's
    active season, so a cached client from a previous season cannot upload stale Seasonal state.
    Persistent PvP and PvE still sync in that case. API gateway reads resolve the active Seasonal
-   number through the database before selecting a row.
+   number through the database before selecting a row. Task completions live in these JSONB blobs;
+   the optional `active` boolean is preserved by local persistence, merges, realtime, team and
+   sharing transforms, while a missing legacy value remains missing.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
@@ -651,6 +662,9 @@ flowchart LR
   membership validation.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
   season. No Seasonal operation may silently fall back to persistent PvP.
+- Task-completion sanitizers and timestamp merges preserve explicit `active: true` and
+  `active: false` without manufacturing the property on legacy incomplete entries. No migration or
+  bulk rewrite backfills ambiguous rows.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.

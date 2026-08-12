@@ -212,10 +212,10 @@ export function useDashboardRecommendations(): {
       const requiresFailed = hasRequirementStatus(statuses, FAILED_STATUSES);
       const isComplete = tarkovStore.isTaskComplete(requiredTaskId);
       const isFailed = tarkovStore.isTaskFailed(requiredTaskId);
-      const isUnlocked = isTaskAvailable(requiredTaskId);
+      const isActive = tarkovStore.isTaskActive(requiredTaskId);
       if (requiresComplete && isComplete) return false;
       if (requiresFailed && isFailed) return false;
-      if (requiresActive && (isComplete || isUnlocked)) return false;
+      if (requiresActive && (isComplete || isActive)) return false;
       return true;
     });
   };

@@ -1,7 +1,9 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createTaskCompletionBroadcast,
   mergeMemberProfileBroadcast,
+  mergeTaskCompletionBroadcast,
   resolveTeammateIdentity,
   useTeamStore,
 } from '@/stores/useTeamStore';
@@ -41,6 +43,29 @@ describe('useTeamStore', () => {
     pinia = createPinia();
     setActivePinia(pinia);
     vi.clearAllMocks();
+  });
+  describe('task completion broadcasts', () => {
+    it('preserves explicit active and legacy unknown values', () => {
+      expect(
+        createTaskCompletionBroadcast({ active: true, complete: false, failed: false })
+      ).toEqual({ active: true, complete: false, failed: false });
+      expect(createTaskCompletionBroadcast({ complete: false, failed: false })).toEqual({
+        complete: false,
+        failed: false,
+      });
+      expect(
+        mergeTaskCompletionBroadcast(
+          { active: true, complete: false, failed: false },
+          { complete: false, failed: false }
+        )
+      ).toEqual({ active: true, complete: false, failed: false });
+      expect(
+        mergeTaskCompletionBroadcast(
+          { active: true, complete: false, failed: false },
+          { active: false, complete: true, failed: false }
+        )
+      ).toEqual({ active: false, complete: true, failed: false });
+    });
   });
   describe('Default State Initialization', () => {
     it('should initialize with default null values', () => {

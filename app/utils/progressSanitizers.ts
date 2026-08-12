@@ -40,6 +40,9 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     if (typeof completion.failed === 'boolean') {
       normalized.failed = completion.failed;
     }
+    if (typeof completion.active === 'boolean') {
+      normalized.active = completion.active;
+    }
     if (typeof completion.manual === 'boolean') {
       normalized.manual = completion.manual;
     }
@@ -206,7 +209,7 @@ const sanitizeApiTaskUpdates = (value: unknown): ApiTaskUpdate[] => {
     (entry): entry is ApiTaskUpdate =>
       isRecord(entry) &&
       typeof entry.id === 'string' &&
-      ['completed', 'failed', 'uncompleted'].includes(entry.state as string)
+      ['active', 'completed', 'failed', 'uncompleted'].includes(entry.state as string)
   );
 };
 export const sanitizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {

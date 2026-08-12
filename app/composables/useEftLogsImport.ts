@@ -255,7 +255,7 @@ const applyStartedImports = (
   for (const taskId of startedTaskIds) {
     const flags = getCompletionFlags(completions[taskId]);
     const shouldStart = shouldStartImportedTask(completedTaskIds.has(taskId), flags);
-    if (shouldStart) store.setTaskUncompleted(taskId);
+    if (shouldStart) store.setTaskActive(taskId);
   }
 };
 const applyModeImports = async (

@@ -514,13 +514,46 @@ describe('api-gateway', () => {
     expect(payload.p_field).toBe('pvp_data');
     const taskCompletions = payload.p_task_completions as Record<
       string,
-      { complete?: boolean; failed?: boolean; timestamp?: number }
+      { active?: boolean; complete?: boolean; failed?: boolean; timestamp?: number }
     > | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
+    expect(taskCompletions?.['task-main']?.active).toBe(false);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
+    expect(taskCompletions?.['task-dependent']?.active).toBe(false);
     expect(payload.p_set?.lastApiUpdate).toBeDefined();
+  });
+  it('writes the canonical active state for a single task update', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
+        },
+        tasks: [
+          {
+            id: 'task-main',
+            name: 'Main Task',
+            factionName: 'Any',
+            objectives: [],
+            taskRequirements: [],
+          },
+        ],
+      })
+    );
+    const res = await worker.fetch(postTaskRequest('task-main', { state: 'active' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_task_completions?.['task-main']).toMatchObject({
+      active: true,
+      complete: false,
+      failed: false,
+    });
+    expect(payload.p_set?.lastApiUpdate).toMatchObject({
+      tasks: [{ id: 'task-main', state: 'active' }],
+    });
   });
   it('skips lastApiUpdate for idempotent single task updates', async () => {
     let mergePayload: MergeRpcPayload | null = null;
@@ -590,7 +623,7 @@ describe('api-gateway', () => {
         headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
         body: JSON.stringify([
           { id: 'task-main', state: 'completed' },
-          { id: 'task-dependent', state: 'completed' },
+          { id: 'task-dependent', state: 'active' },
         ]),
       }),
       BASE_ENV
@@ -600,12 +633,13 @@ describe('api-gateway', () => {
     const payload = mergePayload as unknown as MergeRpcPayload;
     const taskCompletions = payload.p_task_completions as Record<
       string,
-      { complete?: boolean; failed?: boolean; timestamp?: number }
+      { active?: boolean; complete?: boolean; failed?: boolean; timestamp?: number }
     > | null;
     expect(taskCompletions?.['task-main']?.complete).toBe(true);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
-    expect(taskCompletions?.['task-dependent']?.complete).toBe(true);
+    expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
+    expect(taskCompletions?.['task-dependent']?.active).toBe(true);
   });
   it('skips lastApiUpdate for idempotent batch task updates', async () => {
     let mergePayload: MergeRpcPayload | null = null;
@@ -750,7 +784,10 @@ describe('api-gateway', () => {
               displayName: 'Tester',
               xpOffset: 0,
               taskObjectives: { 'obj-1': { complete: false, count: 0, timestamp: 1 } },
-              taskCompletions: { 'task-1': { complete: true, failed: false, timestamp: 1 } },
+              taskCompletions: {
+                'task-1': { complete: true, failed: false, timestamp: 1 },
+                'task-2': { active: true, complete: false, failed: false, timestamp: 2 },
+              },
               hideoutParts: { 'part-1': { complete: false, count: 0 } },
               hideoutModules: { 'module-1': { complete: false } },
               traders: {},
@@ -773,6 +810,13 @@ describe('api-gateway', () => {
                 name: 'Task One',
                 factionName: 'Any',
                 objectives: [{ id: 'obj-1', type: 'find', count: 2 }],
+                taskRequirements: [],
+              },
+              'task-2': {
+                id: 'task-2',
+                name: 'Task Two',
+                factionName: 'Any',
+                objectives: [],
                 taskRequirements: [],
               },
             },
@@ -819,7 +863,10 @@ describe('api-gateway', () => {
     expect(body.data.userId).toBe('user-1');
     const task = body.data.tasksProgress[0] as Record<string, unknown>;
     expect('failed' in task).toBe(false);
+    expect('active' in task).toBe(false);
     expect('invalid' in task).toBe(false);
+    const activeTask = body.data.tasksProgress.find(({ id }) => id === 'task-2');
+    expect(activeTask).toMatchObject({ active: true, complete: false, id: 'task-2' });
     const objective = body.data.taskObjectivesProgress[0] as Record<string, unknown>;
     expect('count' in objective).toBe(false);
     expect('invalid' in objective).toBe(false);
@@ -857,7 +904,7 @@ describe('api-gateway', () => {
     await expectErrorResponse(
       res,
       400,
-      'Invalid state "foo" (must be completed, uncompleted, or failed)'
+      'Invalid state "foo" (must be active, completed, uncompleted, or failed)'
     );
   });
   it('rejects POST /progress/task when state is not a string', async () => {
@@ -866,7 +913,7 @@ describe('api-gateway', () => {
     await expectErrorResponse(
       res,
       400,
-      'Invalid state "123" (must be completed, uncompleted, or failed)'
+      'Invalid state "123" (must be active, completed, uncompleted, or failed)'
     );
   });
   it('accepts POST /progress/task with URL-encoded valid task ID', async () => {

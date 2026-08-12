@@ -34,7 +34,7 @@ function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
       if (typeof item !== 'object' || !item) return null;
       const { id, state } = item as Record<string, unknown>;
       if (typeof id !== 'string' || typeof state !== 'string') return null;
-      if (!['completed', 'uncompleted', 'failed'].includes(state)) return null;
+      if (!['active', 'completed', 'uncompleted', 'failed'].includes(state)) return null;
     }
     return body as BatchTaskUpdate[];
   }
@@ -43,7 +43,7 @@ function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
     const updates: BatchTaskUpdate[] = [];
     for (const [id, state] of Object.entries(body)) {
       if (typeof state !== 'string') return null;
-      if (!['completed', 'uncompleted', 'failed'].includes(state)) return null;
+      if (!['active', 'completed', 'uncompleted', 'failed'].includes(state)) return null;
       updates.push({ id, state: state as TaskState });
     }
     return updates;
@@ -1077,10 +1077,10 @@ export default {
         const rawState = (parsedBody as { state?: unknown }).state;
         if (
           typeof rawState !== 'string' ||
-          !['completed', 'uncompleted', 'failed'].includes(rawState)
+          !['active', 'completed', 'uncompleted', 'failed'].includes(rawState)
         ) {
           return errorResponse(
-            `Invalid state "${typeof rawState === 'string' ? rawState : String(rawState ?? '')}" (must be completed, uncompleted, or failed)`,
+            `Invalid state "${typeof rawState === 'string' ? rawState : String(rawState ?? '')}" (must be active, completed, uncompleted, or failed)`,
             400,
             origin,
             reqOrigin,

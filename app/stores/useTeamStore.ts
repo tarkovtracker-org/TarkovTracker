@@ -75,7 +75,10 @@ interface TeamStoreInstance {
   isSubscribed: Ref<boolean>;
   cleanup: () => void;
 }
-type TaskCompletionSnapshot = Record<string, { complete?: boolean; failed?: boolean }>;
+type TaskCompletionSnapshot = Record<
+  string,
+  { active?: boolean; complete?: boolean; failed?: boolean }
+>;
 const TEAM_PROGRESS_REFRESH_DELAY_MS = 5500;
 const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: string): void => {
   logger.warn('[TeammateStore] Failed to hydrate mode progress:', {
@@ -165,10 +168,27 @@ function cloneTaskCompletions(
       {
         complete: completion?.complete,
         failed: completion?.failed,
+        ...(typeof completion?.active === 'boolean' ? { active: completion.active } : {}),
       },
     ])
   );
 }
+export const createTaskCompletionBroadcast = (
+  completion: TaskCompletionSnapshot[string] | undefined
+) => ({
+  complete: completion?.complete ?? false,
+  failed: completion?.failed ?? false,
+  ...(typeof completion?.active === 'boolean' ? { active: completion.active } : {}),
+});
+export const mergeTaskCompletionBroadcast = (
+  current: TaskCompletionSnapshot[string] | undefined,
+  update: { active?: boolean; complete: boolean; failed: boolean }
+) => ({
+  ...current,
+  complete: update.complete,
+  failed: update.failed,
+  ...(typeof update.active === 'boolean' ? { active: update.active } : {}),
+});
 // Singleton instance to prevent multiple listener setups
 let teamStoreInstance: TeamStoreInstance | null = null;
 export function useTeamStoreWithSupabase(): TeamStoreInstance {
@@ -197,7 +217,14 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let progressRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingTaskUpdates = new Map<
     string,
-    { userId: string; gameMode: GameMode; taskId: string; complete: boolean; failed: boolean }
+    {
+      userId: string;
+      gameMode: GameMode;
+      taskId: string;
+      complete: boolean;
+      failed: boolean;
+      active?: boolean;
+    }
   >();
   let taskBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   // Computed reference to the team document based on system store
@@ -368,6 +395,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           taskId?: string;
           complete?: boolean;
           failed?: boolean;
+          active?: boolean;
         };
         if (!data?.userId || !data?.taskId || data.userId === $supabase.user?.id) return;
         // Emit event for teammate stores to pick up
@@ -403,7 +431,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     const modeState = (tarkovStore.$state as unknown as Record<string, unknown>)[mode] as {
       displayName?: string | null;
       level?: number | null;
-      taskCompletions?: Record<string, { complete?: boolean; failed?: boolean }>;
+      taskCompletions?: Record<string, { active?: boolean; complete?: boolean; failed?: boolean }>;
     } | null;
     const completed = modeState?.taskCompletions
       ? Object.values(modeState.taskCompletions).filter((t) => t?.complete).length
@@ -467,7 +495,10 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     () => {
       const mode = tarkovStore.$state.currentGameMode || GAME_MODES.PVP;
       const modeState = (tarkovStore.$state as unknown as Record<string, unknown>)[mode] as {
-        taskCompletions?: Record<string, { complete?: boolean; failed?: boolean }>;
+        taskCompletions?: Record<
+          string,
+          { active?: boolean; complete?: boolean; failed?: boolean }
+        >;
       } | null;
       return { mode, taskCompletions: modeState?.taskCompletions || {} };
     },
@@ -499,13 +530,17 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       // Find changed tasks
       for (const [taskId, completion] of Object.entries(newVal.taskCompletions)) {
         const prev = prevTaskCompletions[taskId];
-        if (!prev || prev.complete !== completion?.complete || prev.failed !== completion?.failed) {
+        if (
+          !prev ||
+          prev.complete !== completion?.complete ||
+          prev.failed !== completion?.failed ||
+          prev.active !== completion?.active
+        ) {
           pendingTaskUpdates.set(taskId, {
             userId: $supabase.user.id,
             gameMode: newVal.mode,
             taskId,
-            complete: completion?.complete ?? false,
-            failed: completion?.failed ?? false,
+            ...createTaskCompletionBroadcast(completion),
           });
         }
       }
@@ -687,6 +722,7 @@ export function useTeammateStores() {
           taskId: string;
           complete: boolean;
           failed: boolean;
+          active?: boolean;
         };
         if (data.userId !== teammateId) return;
         // Update the teammate store with the task change
@@ -697,7 +733,10 @@ export function useTeammateStores() {
         const currentCompletions =
           (
             currentModeData as {
-              taskCompletions?: Record<string, { complete?: boolean; failed?: boolean }>;
+              taskCompletions?: Record<
+                string,
+                { active?: boolean; complete?: boolean; failed?: boolean }
+              >;
             }
           ).taskCompletions || {};
         storeInstance.$patch({
@@ -705,7 +744,7 @@ export function useTeammateStores() {
             ...currentModeData,
             taskCompletions: {
               ...currentCompletions,
-              [data.taskId]: { complete: data.complete, failed: data.failed },
+              [data.taskId]: mergeTaskCompletionBroadcast(currentCompletions[data.taskId], data),
             },
           },
         });

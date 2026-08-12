@@ -90,6 +90,34 @@ describe('mergeProgressData story chapters', () => {
     });
   });
 });
+describe('mergeProgressData task active state', () => {
+  it('round-trips explicit active and preserves legacy unknown', () => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      active: { active: true, complete: false, failed: false, timestamp: 2000 },
+      legacy: { complete: false, failed: false, timestamp: 2000 },
+    };
+    const merged = mergeProgressData(local, createProgressData({}));
+    expect(merged.taskCompletions.active).toMatchObject({ active: true });
+    expect(merged.taskCompletions.legacy).not.toHaveProperty('active');
+  });
+  it('lets a newer explicit neutral state clear active', () => {
+    const local = createProgressData({});
+    local.taskCompletions = {
+      task: { active: true, complete: false, failed: false, timestamp: 1000 },
+    };
+    const remote = createProgressData({});
+    remote.taskCompletions = {
+      task: { active: false, complete: false, failed: false, timestamp: 2000 },
+    };
+    expect(mergeProgressData(local, remote).taskCompletions.task).toMatchObject({
+      active: false,
+      complete: false,
+      failed: false,
+      timestamp: 2000,
+    });
+  });
+});
 describe('hasProgress metadata state', () => {
   it('treats prestige and reset epochs as progress', () => {
     const empty = createProgressData({});

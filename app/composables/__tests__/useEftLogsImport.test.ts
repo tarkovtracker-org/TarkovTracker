@@ -11,6 +11,7 @@ const tarkovStore = {
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
   isTaskComplete: vi.fn(() => false),
   setObjectiveCount: vi.fn(),
+  setTaskActive: vi.fn(),
   setTaskComplete: vi.fn(),
   setTaskFailed: vi.fn(),
   setTaskObjectiveComplete: vi.fn(),
@@ -276,7 +277,7 @@ describe('useEftLogsImport', () => {
     });
     await composable.parseFile(file);
     await composable.confirmImport('pvp');
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('61604635c725987e815b1a46');
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(composable.importState.value).toBe('success');
   });
   it('does not mark started tasks active when same task is also imported as completed', async () => {
@@ -287,7 +288,7 @@ describe('useEftLogsImport', () => {
     await composable.parseFile(file);
     await composable.confirmImport('pvp');
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
-    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
   });
   it('auto-routes import mode from backend logs when session mode is detectable', async () => {
     const composable = await loadComposable();

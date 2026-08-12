@@ -20,6 +20,7 @@ import {
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
 import {
+  isTaskActive as isTaskCompletionActive,
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
   type RawTaskCompletion,
@@ -188,6 +189,8 @@ export const getters = {
     isTaskCompletionComplete(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
   isTaskFailed: (state: UserState) => (taskId: string) =>
     isTaskCompletionFailed(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
+  isTaskActive: (state: UserState) => (taskId: string) =>
+    isTaskCompletionActive(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
   isTaskObjectiveComplete: (state: UserState) => (objectiveId: string) =>
     getCurrentData(state)?.taskObjectives?.[objectiveId]?.complete ?? false,
   isHideoutPartComplete: (state: UserState) => (objectiveId: string) =>
@@ -218,10 +221,11 @@ export const getters = {
     getCurrentData(state)?.storyChapters?.[chapterId]?.objectives?.[objectiveId]?.complete ?? false,
 } as const satisfies _GettersTree<UserState>;
 // Helper functions for common operations
-const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
+const createCompletion = (complete: boolean, failed = false, active = false, manual?: boolean) => {
   const completion: TaskCompletion = {
     complete,
     failed,
+    active,
     timestamp: Date.now(),
   };
   if (typeof manual === 'boolean') {
@@ -332,18 +336,21 @@ export const actions = {
     });
   },
   setTaskComplete(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(true, false, false));
+    updateObjective(this, 'taskCompletions', taskId, createCompletion(true, false, false, false));
+  },
+  setTaskActive(this: UserState, taskId: string) {
+    updateObjective(this, 'taskCompletions', taskId, createCompletion(false, false, true, false));
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
     updateObjective(
       this,
       'taskCompletions',
       taskId,
-      createCompletion(true, true, failOptions?.manual)
+      createCompletion(true, true, false, failOptions?.manual)
     );
   },
   setTaskUncompleted(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(false, false, false));
+    updateObjective(this, 'taskCompletions', taskId, createCompletion(false, false, false, false));
   },
   setTaskObjectiveComplete(this: UserState, objectiveId: string) {
     updateObjective(this, 'taskObjectives', objectiveId, {

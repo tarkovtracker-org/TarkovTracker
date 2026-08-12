@@ -190,16 +190,32 @@ const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
 };
 const normalizeTaskCompletionEntry = (
   completion: RawTaskCompletion
-): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+):
+  | {
+      complete?: boolean;
+      failed?: boolean;
+      active?: boolean;
+      timestamp?: number;
+      manual?: boolean;
+    }
+  | undefined => {
   if (completion === null || completion === undefined) return undefined;
   if (typeof completion === 'boolean') {
     return { complete: completion, failed: false };
   }
-  const normalized: { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } =
-    {
-      complete: completion.complete === true,
-      failed: completion.failed === true,
-    };
+  const normalized: {
+    complete?: boolean;
+    failed?: boolean;
+    active?: boolean;
+    timestamp?: number;
+    manual?: boolean;
+  } = {
+    complete: completion.complete === true,
+    failed: completion.failed === true,
+  };
+  if (typeof completion.active === 'boolean') {
+    normalized.active = completion.active;
+  }
   if (typeof completion.timestamp === 'number') {
     normalized.timestamp = completion.timestamp;
   }
@@ -222,7 +238,7 @@ export const normalizeTaskCompletionsMap = (
   }
   return migrated;
 };
-const API_TASK_STATES = ['completed', 'failed', 'uncompleted'] as const;
+const API_TASK_STATES = ['active', 'completed', 'failed', 'uncompleted'] as const;
 const isApiTaskState = (state: unknown): state is ApiTaskUpdate['state'] => {
   return API_TASK_STATES.includes(state as ApiTaskUpdate['state']);
 };
@@ -318,7 +334,15 @@ export function mergeProgressData(
   const mergeTaskCompletion = (
     localComp: RawTaskCompletion,
     remoteComp: RawTaskCompletion
-  ): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+  ):
+    | {
+        complete?: boolean;
+        failed?: boolean;
+        active?: boolean;
+        timestamp?: number;
+        manual?: boolean;
+      }
+    | undefined => {
     const normalizedLocal = normalizeTaskCompletionEntry(localComp);
     const normalizedRemote = normalizeTaskCompletionEntry(remoteComp);
     if (!normalizedLocal) return normalizedRemote;

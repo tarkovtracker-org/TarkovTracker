@@ -26,30 +26,20 @@ const requiresCompletedStatus = (statuses: string[]): boolean => {
   if (!statuses.length) return true;
   return statuses.includes('complete') || statuses.includes('completed');
 };
-const matchesActiveStatus = (
-  completion: RawTaskCompletion,
-  taskId: string,
-  isUnlockable: (taskId: string) => boolean
-): boolean => {
-  if (isTaskActive(completion)) return true;
-  if (isTaskComplete(completion)) return true;
-  return isUnlockable(taskId);
-};
+const matchesActiveStatus = (completion: RawTaskCompletion): boolean =>
+  isTaskActive(completion) || isTaskComplete(completion);
 const requiresActiveStatus = (statuses: string[]): boolean =>
   ['active', 'accept', 'accepted'].some((status) => statuses.includes(status));
 const matchesRequiredActiveStatus = (
   statuses: string[],
-  completion: RawTaskCompletion,
-  taskId: string,
-  isUnlockable: (taskId: string) => boolean
+  completion: RawTaskCompletion
 ): boolean => {
   if (!requiresActiveStatus(statuses)) return false;
-  return matchesActiveStatus(completion, taskId, isUnlockable);
+  return matchesActiveStatus(completion);
 };
 const hasRequiredTaskStatus = (
   requirement: TaskRequirement,
-  teamData: TaskAvailabilityTeamData,
-  isUnlockable: (taskId: string) => boolean
+  teamData: TaskAvailabilityTeamData
 ): boolean => {
   const taskId = requirement.task?.id;
   if (!taskId) return true;
@@ -59,7 +49,7 @@ const hasRequiredTaskStatus = (
     { met: isTaskComplete(completion), required: requiresCompletedStatus(statuses) },
     { met: isTaskFailed(completion), required: statuses.includes('failed') },
     {
-      met: matchesRequiredActiveStatus(statuses, completion, taskId, isUnlockable),
+      met: matchesRequiredActiveStatus(statuses, completion),
       required: true,
     },
   ];
@@ -125,24 +115,16 @@ const meetsTraderUnlockRequirement = (task: Task, context: EvaluationContext): b
 };
 const createTeamEvaluator = (context: EvaluationContext) => {
   const availabilityMemo = new Map<string, boolean>();
-  const unlockableMemo = new Map<string, boolean>();
   const visitingAvailable = new Set<string>();
-  const visitingUnlockable = new Set<string>();
-  let isUnlockable = (_taskId: string): boolean => false;
-  const compute = (
-    taskId: string,
-    allowCompleted: boolean,
-    memo: Map<string, boolean>,
-    visiting: Set<string>
-  ): boolean => {
-    const cached = memo.get(taskId);
+  const compute = (taskId: string): boolean => {
+    const cached = availabilityMemo.get(taskId);
     if (cached !== undefined) return cached;
-    if (visiting.has(taskId)) return false;
+    if (visitingAvailable.has(taskId)) return false;
     const task = context.tasksById.get(taskId);
     if (!task) return false;
-    visiting.add(taskId);
+    visitingAvailable.add(taskId);
     const checks = [
-      () => allowCompleted || !isTaskComplete(context.teamData.completions[taskId]),
+      () => !isTaskComplete(context.teamData.completions[taskId]),
       () =>
         !(task.failedRequirements ?? []).some((requirement) =>
           isTaskFailed(context.teamData.completions[requirement.task?.id ?? ''])
@@ -151,7 +133,7 @@ const createTeamEvaluator = (context: EvaluationContext) => {
       () => meetsTraderRequirements(task, context),
       () =>
         (task.taskRequirements ?? []).every((requirement) =>
-          hasRequiredTaskStatus(requirement, context.teamData, isUnlockable)
+          hasRequiredTaskStatus(requirement, context.teamData)
         ),
       () =>
         !task.factionName ||
@@ -160,12 +142,11 @@ const createTeamEvaluator = (context: EvaluationContext) => {
       () => meetsTraderUnlockRequirement(task, context),
     ];
     const available = checks.every((check) => check());
-    visiting.delete(taskId);
-    memo.set(taskId, available);
+    visitingAvailable.delete(taskId);
+    availabilityMemo.set(taskId, available);
     return available;
   };
-  isUnlockable = (taskId) => compute(taskId, true, unlockableMemo, visitingUnlockable);
-  return (taskId: string) => compute(taskId, false, availabilityMemo, visitingAvailable);
+  return compute;
 };
 export const buildTaskAvailability = (
   tasks: Task[],

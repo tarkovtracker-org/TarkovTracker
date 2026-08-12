@@ -202,6 +202,10 @@ Naming:
   Tarkov.dev profile imports support Seasonal through the upstream `pvp-season` profile path.
   EFT-log imports must remain unavailable for Seasonal until their Season log data is verified.
 - Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
+- Ordinary task acceptance is stored explicitly as optional `active`. New writes use canonical
+  triples: active `{complete:false, failed:false, active:true}`, completed/failed/neutral always set
+  `active:false`. Missing `active` on legacy rows means unknown; never infer it from incomplete
+  flags or mass-backfill ambiguous rows. Auto-unlocked successors are neutral, not active.
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.

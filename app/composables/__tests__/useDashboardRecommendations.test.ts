@@ -32,6 +32,7 @@ const createTarkovStore = (
   overrides: {
     completedObjectives?: Set<string>;
     completedTasks?: Set<string>;
+    activeTasks?: Set<string>;
     failedTasks?: Set<string>;
     fenceReputation?: number;
     getCurrentGameMode?: () => 'pvp' | 'pve';
@@ -41,6 +42,7 @@ const createTarkovStore = (
   } = {}
 ) => {
   const completedTasks = overrides.completedTasks ?? new Set<string>();
+  const activeTasks = overrides.activeTasks ?? new Set<string>();
   const failedTasks = overrides.failedTasks ?? new Set<string>();
   const completedObjectives = overrides.completedObjectives ?? new Set<string>();
   return {
@@ -50,6 +52,7 @@ const createTarkovStore = (
     getPrestigeLevel: overrides.getPrestigeLevel ?? (() => 0),
     getTraderReputation: () => overrides.fenceReputation ?? 0,
     isTaskComplete: (taskId: string) => completedTasks.has(taskId),
+    isTaskActive: (taskId: string) => activeTasks.has(taskId),
     isTaskFailed: (taskId: string) => failedTasks.has(taskId),
     isTaskObjectiveComplete:
       overrides.isTaskObjectiveComplete ??
@@ -93,6 +96,35 @@ const setup = async (options: SetupOptions = {}) => {
   return useDashboardRecommendations();
 };
 describe('useDashboardRecommendations', () => {
+  it('requires explicit active state for active task prerequisites', async () => {
+    const tasks: Task[] = [
+      {
+        id: 'dependent',
+        name: 'Dependent Task',
+        factionName: 'Any',
+        objectives: [{ id: 'dependent-1', taskId: 'dependent' }],
+        taskRequirements: [
+          { task: { id: 'prerequisite', name: 'Prerequisite' }, status: ['active'] },
+        ],
+      },
+    ];
+    const progressStore = createProgressStore({
+      tasksCompletions: { dependent: { self: false } },
+      tasksFailed: { dependent: { self: false } },
+    });
+    const legacyRecommendations = await setup({ progressStore, tasks });
+    expect(legacyRecommendations.primaryRecommendation.value?.blockers).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'prerequisite' })])
+    );
+    const activeRecommendations = await setup({
+      progressStore,
+      tasks,
+      tarkovStore: createTarkovStore({ activeTasks: new Set(['prerequisite']) }),
+    });
+    expect(activeRecommendations.primaryRecommendation.value?.blockers).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'prerequisite' })])
+    );
+  });
   it('picks the available task with the biggest downstream impact', async () => {
     const tasks: Task[] = [
       {

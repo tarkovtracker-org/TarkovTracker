@@ -79,13 +79,20 @@ describe('seasonal progress realtime synchronization', () => {
     handler?.({
       new: {
         game_mode: 'seasonal',
-        progress_data: { level: 22, taskCompletions: { task: { complete: true } } },
+        progress_data: {
+          level: 22,
+          taskCompletions: {
+            active: { active: true, complete: false, failed: false },
+            legacy: { complete: false, failed: false },
+          },
+        },
         season_number: 1,
         updated_at: new Date().toISOString(),
       },
     });
     expect(state.seasonal.level).toBe(22);
-    expect(state.seasonal.taskCompletions.task?.complete).toBe(true);
+    expect(state.seasonal.taskCompletions.active).toMatchObject({ active: true });
+    expect(state.seasonal.taskCompletions.legacy).not.toHaveProperty('active');
     expect(state.pvp).toEqual(defaultState.pvp);
     expect(state.pve).toEqual(defaultState.pve);
   });

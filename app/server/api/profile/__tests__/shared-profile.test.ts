@@ -352,8 +352,18 @@ describe('Shared Profile API', () => {
         modeProgressResponse({
           level: 33,
           taskCompletions: {
-            '597a0f5686f774273b74f676': { complete: false, failed: false },
-            '597a160786f77477531d39d2': { complete: true, failed: false, timestamp: 2000 },
+            '597a0f5686f774273b74f676': {
+              active: true,
+              complete: false,
+              failed: false,
+            },
+            '597a160786f77477531d39d2': {
+              active: false,
+              complete: true,
+              failed: false,
+              timestamp: 2000,
+            },
+            legacy: { complete: false, failed: false },
           },
         })
       )
@@ -391,9 +401,10 @@ describe('Shared Profile API', () => {
     expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json.tarkov.dev/pve/tasks');
     expect(result.mode).toBe('pve');
     expect(result.data?.taskCompletions).toMatchObject({
-      '597a0f5686f774273b74f676': { complete: true, failed: true },
-      '597a160786f77477531d39d2': { complete: true, failed: false },
+      '597a0f5686f774273b74f676': { active: false, complete: true, failed: true },
+      '597a160786f77477531d39d2': { active: false, complete: true, failed: false },
     });
+    expect(result.data?.taskCompletions?.legacy).not.toHaveProperty('active');
   });
   it('uses the configured Tarkov JSON base for failure metadata', async () => {
     runtimeConfig.tarkovJsonBaseUrl = 'https://json-mirror.example';

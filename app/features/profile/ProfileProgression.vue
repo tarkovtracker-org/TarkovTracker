@@ -275,7 +275,7 @@
     toggleStoryChapterWithLinearObjectives,
   } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
-  import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
+  import { getCompletionFlags, isTaskActive, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
     AchievementRow,
@@ -737,7 +737,13 @@
         );
         if (requiresComplete && reqFlags.complete) return true;
         if (requiresFailed && reqFlags.failed) return true;
-        if (requiresActive) return true;
+        if (
+          requiresActive &&
+          (reqFlags.complete ||
+            isTaskActive(taskCompletions.value[req.task.id] as RawTaskCompletion))
+        ) {
+          return true;
+        }
         return false;
       });
       if (!allMet) return true;
