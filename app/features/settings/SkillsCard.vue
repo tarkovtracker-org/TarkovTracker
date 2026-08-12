@@ -135,15 +135,15 @@
                   "
                   class="flex-1"
                 >
-                  <button
-                    type="button"
-                    class="text-surface-400 focus-visible:ring-primary-500/60 w-full cursor-default rounded text-left text-xs focus-visible:ring-2 focus-visible:outline-none"
+                  <div
+                    tabindex="0"
+                    class="text-surface-400 focus-visible:ring-primary-500/60 cursor-default rounded focus-visible:ring-2 focus-visible:outline-none"
                   >
                     {{ $t('settings.skills.quest') }}
                     <span class="text-surface-200 font-medium">
                       {{ getQuestSkillLevel(skill.key) }}
                     </span>
-                  </button>
+                  </div>
                 </UTooltip>
                 <UTooltip
                   :text="
@@ -154,15 +154,15 @@
                   "
                   class="flex-1"
                 >
-                  <button
-                    type="button"
-                    class="text-surface-400 focus-visible:ring-primary-500/60 w-full cursor-default rounded text-left text-xs focus-visible:ring-2 focus-visible:outline-none"
+                  <div
+                    tabindex="0"
+                    class="text-surface-400 focus-visible:ring-primary-500/60 cursor-default rounded focus-visible:ring-2 focus-visible:outline-none"
                   >
                     {{ $t('settings.skills.offset') }}
                     <span class="text-surface-200 font-medium">
                       {{ formatSkillOffset(getSkillOffset(skill.key)) }}
                     </span>
-                  </button>
+                  </div>
                 </UTooltip>
               </div>
               <div class="flex items-center gap-2">
