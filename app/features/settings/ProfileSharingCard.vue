@@ -87,7 +87,7 @@
             </div>
           </div>
         </template>
-        <LoggedOutPlaceholder
+        <LoginRequiredAlert
           v-else
           :title="
             t(
@@ -102,7 +102,7 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
-  import LoggedOutPlaceholder from '@/features/settings/LoggedOutPlaceholder.vue';
+  import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import {
     GAME_MODE_VALUES,
     GAME_MODE_UI,

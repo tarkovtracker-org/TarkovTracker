@@ -27,26 +27,15 @@
           </UButton>
         </div>
       </section>
-      <UAlert
+      <LoginRequiredAlert
         v-if="!isLoggedIn"
-        icon="i-mdi-lock-outline"
-        color="warning"
-        variant="soft"
         :title="
           t(
             'streamer_tools.login_required',
             'Log in to generate personalized streamer overlay links.'
           )
         "
-      >
-        <template #description>
-          <div class="mt-2">
-            <UButton icon="i-mdi-login" color="warning" variant="solid" to="/login">
-              {{ t('navigation_drawer.login', 'Log In') }}
-            </UButton>
-          </div>
-        </template>
-      </UAlert>
+      />
       <template v-else>
         <UAlert
           v-if="!isModePublic"
@@ -860,6 +849,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useStreamerToolsOverlay } from '@/features/streamer-tools/composables/useStreamerToolsOverlay';
   import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });

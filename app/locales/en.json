@@ -1187,6 +1187,7 @@
           "url_copied": "URL copied to clipboard",
           "copy_url_failed": "Failed to copy URL to clipboard",
           "no_team": "You are not currently in a team.",
+          "login_required": "Log in to create a team or manage your team invite link.",
           "team_invite_url_label": "Team Invite URL",
           "copy_link": "Copy",
           "link_hidden_message": "Click 'Show' to reveal your team invite link",

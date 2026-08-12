@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import LoggedOutPlaceholder from '@/features/settings/LoggedOutPlaceholder.vue';
+  import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useSystemStore } from '@/stores/useSystemStore';
@@ -287,7 +287,7 @@
       <template #content>
         <div class="p-4">
           <template v-if="!isLoggedIn">
-            <LoggedOutPlaceholder :title="$t('settings.account_data.login_required_delete')" />
+            <LoginRequiredAlert :title="$t('settings.account_data.login_required_delete')" />
           </template>
           <template v-else>
             <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
