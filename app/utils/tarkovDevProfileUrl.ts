@@ -1,11 +1,10 @@
-import { GAME_MODES, type ImportableGameMode } from '@/utils/constants';
+import { API_GAME_MODES, type GameMode } from '@/utils/constants';
 export const buildTarkovDevProfileUrl = (
   tarkovUid: number | null,
-  mode: ImportableGameMode | null | undefined
+  mode: GameMode | null | undefined
 ): string | undefined => {
-  if (tarkovUid === null || !Number.isFinite(tarkovUid) || tarkovUid <= 0) {
+  if (tarkovUid === null || !Number.isFinite(tarkovUid) || tarkovUid <= 0 || !mode) {
     return undefined;
   }
-  const modeSlug = mode === GAME_MODES.PVE ? 'pve' : 'regular';
-  return `https://tarkov.dev/players/${modeSlug}/${tarkovUid}`;
+  return `https://tarkov.dev/players/${API_GAME_MODES[mode]}/${tarkovUid}`;
 };

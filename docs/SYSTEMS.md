@@ -731,6 +731,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   entries are treated as misses, and invalid upstream payloads fail without entering shared cache.
 - Cached payloads are re-checked against the freshness gate on every serve, so a stale snapshot can
   never be imported from cache either.
+- Profile page modes use the centralized upstream slugs `regular`, `pve`, and `pvp-season`; the
+  `pvp-season` profile is imported into the stable internal `seasonal` progress mode.
 - A `fresh=1` request bypasses serving from cache but not the cache lookup or rate limits, and
   revalidates with `If-None-Match` when a cached ETag exists — "I just refreshed on tarkov.dev"
   costs at most one conditional upstream request.

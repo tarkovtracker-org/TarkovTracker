@@ -2,12 +2,7 @@ import { useSkillCalculation } from '@/composables/useSkillCalculation';
 import { useXpCalculation } from '@/composables/useXpCalculation';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import {
-  GAME_MODES,
-  getGameModeSeasonNumber,
-  isImportableGameMode,
-  type ImportableGameMode,
-} from '@/utils/constants';
+import { isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   getImportCooldownRemainingMs,
@@ -37,7 +32,7 @@ export interface UseTarkovDevImportReturn {
     profileUrl: string,
     options?: TarkovDevProfileFetchOptions
   ) => Promise<TarkovDevProfileSource | null>;
-  confirmImport: (targetMode: ImportableGameMode, editionOverride?: number | null) => Promise<void>;
+  confirmImport: (targetMode: GameMode, editionOverride?: number | null) => Promise<void>;
   setError: (message: string) => void;
   reset: () => void;
 }
@@ -71,7 +66,6 @@ function readNumericField(data: Record<string, unknown> | null, key: string): nu
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 export function useTarkovDevImport(): UseTarkovDevImportReturn {
-  const { t } = useI18n({ useScope: 'global' });
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const runtimeConfig = useRuntimeConfig();
@@ -229,24 +223,11 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     }
   }
   async function confirmImport(
-    targetMode: ImportableGameMode,
+    targetMode: GameMode,
     editionOverride?: number | null
   ): Promise<void> {
     if (!previewData.value) return;
-    if (!isImportableGameMode(targetMode)) {
-      setCodedError(
-        t(
-          'settings.data_management.seasonal_import_locked',
-          {
-            season: getGameModeSeasonNumber(GAME_MODES.SEASONAL),
-          },
-          'Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.'
-        ),
-        null,
-        null
-      );
-      return;
-    }
+    if (!isGameMode(targetMode)) return;
     const data = previewData.value;
     const originalMode = tarkovStore.getCurrentGameMode();
     const shouldRestoreMode = targetMode !== originalMode;

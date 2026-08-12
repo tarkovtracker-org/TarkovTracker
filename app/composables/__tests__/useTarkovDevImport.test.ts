@@ -14,12 +14,7 @@ const { mockGetImportCooldownRemainingMs, mockRecordImportCompletion, mockUseRun
     mockUseRuntimeConfig: vi.fn(),
   }));
 mockNuxtImport('useRuntimeConfig', () => mockUseRuntimeConfig);
-mockNuxtImport('useI18n', () => () => ({
-  t: (key: string) =>
-    key === 'settings.data_management.seasonal_import_locked'
-      ? 'Seasonal PvP imports are temporarily locked until the source data is verified for Season 1.'
-      : key,
-}));
+mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
 vi.mock('@/utils/tarkovDevImportCooldown', () => ({
   getImportCooldownRemainingMs: mockGetImportCooldownRemainingMs,
   recordImportCompletion: mockRecordImportCompletion,
@@ -315,6 +310,25 @@ describe('useTarkovDevImport', () => {
     await composable.confirmImport('pve');
     expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pve', 60 * 60_000);
   });
+  it('fetches and imports a seasonal pvp profile into seasonal progress', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/pvp-season/8560316');
+    await composable.confirmImport('seasonal');
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: { url: 'https://players.tarkov.dev/pvp-season/8560316.json' },
+      retry: 0,
+    });
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(1, 'seasonal');
+    expect(tarkovStore.setTarkovUid).toHaveBeenCalledWith(8560316);
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'seasonal', 60 * 60_000);
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
+    expect(composable.importState.value).toBe('success');
+  });
   it('does not record a cooldown for file imports', async () => {
     mockParseTarkovDevProfile.mockReturnValue({
       data: createImportData(),
@@ -324,21 +338,6 @@ describe('useTarkovDevImport', () => {
     await composable.parseFile(createFile('{"aid":123}'));
     await composable.confirmImport('pvp');
     expect(mockRecordImportCompletion).not.toHaveBeenCalled();
-  });
-  it('rejects seasonal imports before mutating progress', async () => {
-    mockParseTarkovDevProfile.mockReturnValue({
-      data: createImportData(),
-      ok: true,
-    });
-    const composable = await loadComposable();
-    await composable.parseFile(createFile('{"aid":123}'));
-    await (composable.confirmImport as (mode: string) => Promise<void>)('seasonal');
-    expect(composable.importState.value).toBe('error');
-    expect(composable.importError.value).toBe(
-      'Seasonal PvP imports are temporarily locked until the source data is verified for Season 1.'
-    );
-    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
-    expect(tarkovStore.setTarkovUid).not.toHaveBeenCalled();
   });
   it('applies imported profile data and restores the original mode', async () => {
     const parsedData = createImportData({

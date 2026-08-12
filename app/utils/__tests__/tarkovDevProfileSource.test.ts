@@ -21,6 +21,16 @@ describe('resolveTarkovDevProfileSource', () => {
       tarkovUid: 8560316,
     });
   });
+  it('extracts a seasonal pvp profile id from a Tarkov.dev player url', () => {
+    const result = resolveTarkovDevProfileSource('https://tarkov.dev/players/pvp-season/8560316');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual({
+      mode: 'seasonal',
+      profileJsonUrl: 'https://players.tarkov.dev/pvp-season/8560316.json',
+      tarkovUid: 8560316,
+    });
+  });
   it('accepts the public pvp profile json url', () => {
     const result = resolveTarkovDevProfileSource('https://players.tarkov.dev/profile/8560316.json');
     expect(result.ok).toBe(true);
@@ -38,6 +48,18 @@ describe('resolveTarkovDevProfileSource', () => {
     expect(result.data).toEqual({
       mode: 'pve',
       profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
+      tarkovUid: 8560316,
+    });
+  });
+  it('accepts the public seasonal pvp profile json url', () => {
+    const result = resolveTarkovDevProfileSource(
+      'https://players.tarkov.dev/pvp-season/8560316.json'
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual({
+      mode: 'seasonal',
+      profileJsonUrl: 'https://players.tarkov.dev/pvp-season/8560316.json',
       tarkovUid: 8560316,
     });
   });

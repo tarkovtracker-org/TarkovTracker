@@ -259,12 +259,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import {
-    ACTIVE_SEASON_NUMBER,
-    GAME_MODES,
-    isImportableGameMode,
-    type GameMode,
-  } from '@/utils/constants';
+  import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
@@ -660,7 +655,6 @@
   const modeFaction = computed(() => modeData.value.pmcFaction ?? 'USEC');
   const tarkovDevProfileUrl = computed(() => {
     if (isViewingSharedProfile.value) return undefined;
-    if (!isImportableGameMode(selectedMode.value)) return undefined;
     return buildTarkovDevProfileUrl(tarkovStore.getTarkovUid(), selectedMode.value);
   });
   const profileLevel = computed(() => {
