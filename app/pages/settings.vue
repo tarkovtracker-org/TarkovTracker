@@ -407,7 +407,7 @@
       return null;
     }
     if (path === '/prestige') {
-      return { path: '/progression' };
+      return { path: '/progression', hash };
     }
     if (hash === settingsTabHashes.prestige) {
       return { hash: settingsTabHashes.progression };

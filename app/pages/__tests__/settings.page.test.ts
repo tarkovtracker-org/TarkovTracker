@@ -409,7 +409,30 @@ describe('settings page', () => {
       await nextTick();
       expect(wrapper.find('#prestige').exists()).toBe(false);
       expect(wrapper.find('#progression').exists()).toBe(true);
-      expect(mockFns.routerReplace).toHaveBeenCalledWith({ path: '/progression', query: {} });
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        path: '/progression',
+        hash: '',
+        query: {},
+      });
+    });
+    it('preserves a non-prestige hash when redirecting the seasonal prestige route', async () => {
+      configureMockState({
+        gameMode: 'seasonal',
+        routePath: '/prestige',
+        routeHash: '#preferences',
+      });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      await nextTick();
+      expect(wrapper.find('#prestige').exists()).toBe(false);
+      expect(wrapper.find('#preferences').exists()).toBe(true);
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        path: '/progression',
+        hash: '#preferences',
+        query: {},
+      });
     });
     it('marks settings control routes as noindex', async () => {
       configureMockState({ routePath: '/progression' });
