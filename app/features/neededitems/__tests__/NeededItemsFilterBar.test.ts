@@ -29,9 +29,11 @@ const i18n = createI18n({
   silentTranslationWarn: true,
   messages: {
     en: {},
+    cs: {},
     de: {},
     es: {},
     fr: {},
+    it: {},
     ru: {},
     uk: {},
     zh: {},

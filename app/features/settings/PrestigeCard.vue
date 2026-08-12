@@ -23,7 +23,7 @@
         <div v-else class="space-y-6 px-4 py-4">
           <section class="space-y-3">
             <div class="space-y-1">
-              <p class="text-surface-100 text-sm font-semibold">
+              <p :id="currentPrestigeHeadingId" class="text-surface-100 text-sm font-semibold">
                 {{ $t('settings.prestige.current_level') }}
               </p>
               <p class="text-surface-400 text-xs">
@@ -31,18 +31,13 @@
               </p>
             </div>
             <div class="flex flex-col gap-3 md:flex-row md:items-end">
-              <div class="w-full max-w-xs space-y-2">
-                <label
-                  :for="currentPrestigeInputId"
-                  class="text-surface-200 block cursor-pointer text-sm font-semibold"
-                >
-                  {{ $t('settings.prestige.current_level') }}
-                </label>
+              <div class="w-full max-w-xs">
                 <SelectMenuFixed
                   :id="currentPrestigeInputId"
                   v-model="selectedPrestigeLevel"
                   :items="prestigeOptions"
                   value-key="value"
+                  :aria-labelledby="currentPrestigeHeadingId"
                 >
                   <template #leading>
                     <UIcon name="i-mdi-trophy" class="text-warning-400 h-4 w-4" />
@@ -474,6 +469,7 @@
   };
   const DAY_MS = 24 * 60 * 60 * 1000;
   const currentPrestigeInputId = 'settings-prestige-input';
+  const currentPrestigeHeadingId = 'settings-prestige-current-level-heading';
   const { locale, t } = useI18n({ useScope: 'global' });
   const { toWikiUrl } = useWikiLink();
   const toast = useToast();
@@ -495,12 +491,10 @@
   const currentMode = computed(() => tarkovStore.currentGameMode);
   const isPrestigeMode = computed(() => currentMode.value === GAME_MODES.PVP);
   const unsupportedModeDescription = computed(() =>
-    currentMode.value === GAME_MODES.SEASONAL
-      ? t('settings.prestige.seasonal_mode_unsupported', 'Prestige is unavailable in Seasonal PvP.')
-      : t(
-          'settings.prestige.persistent_mode_unsupported',
-          'Prestige is unavailable for persistent PvE mode.'
-        )
+    t(
+      'settings.prestige.persistent_mode_unsupported',
+      'Prestige is unavailable for persistent PvE mode.'
+    )
   );
   const currentModeLabel = computed(() => t('common.pvp', 'PvP'));
   const currentModeProgress = computed(() => tarkovStore.getCurrentProgressData());

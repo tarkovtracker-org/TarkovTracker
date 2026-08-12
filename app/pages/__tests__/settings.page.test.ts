@@ -1,13 +1,14 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import SettingsPage from '@/pages/settings.vue';
 const { mockFns, mockState } = vi.hoisted(() => ({
   mockState: {
     isLoggedIn: false,
     isAdmin: false,
     gameEdition: 1,
+    gameMode: 'pvp',
     prestigeLevel: 0,
     routeHash: '',
     routePath: '/settings',
@@ -64,7 +65,10 @@ vi.mock('@/stores/useSystemStore', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
-    getCurrentGameMode: () => 'pvp',
+    get currentGameMode() {
+      return mockState.gameMode;
+    },
+    getCurrentGameMode: () => mockState.gameMode,
     getGameEdition: () => mockState.gameEdition,
     setGameEdition: mockFns.setGameEdition,
     getPvPProgressData: () => ({ prestigeLevel: mockState.prestigeLevel }),
@@ -163,6 +167,7 @@ const configureMockState = (
     isLoggedIn?: boolean;
     isAdmin?: boolean;
     gameEdition?: number;
+    gameMode?: string;
     prestigeLevel?: number;
     routeHash?: string;
     routePath?: string;
@@ -171,6 +176,7 @@ const configureMockState = (
   mockState.isLoggedIn = options.isLoggedIn ?? false;
   mockState.isAdmin = options.isAdmin ?? false;
   mockState.gameEdition = options.gameEdition ?? 1;
+  mockState.gameMode = options.gameMode ?? 'pvp';
   mockState.prestigeLevel = options.prestigeLevel ?? 0;
   mockState.routeHash = options.routeHash ?? '';
   mockState.routePath = options.routePath ?? '/settings';
@@ -346,20 +352,53 @@ describe('settings page', () => {
       const wrapper = await mountSuspended(SettingsPage, {
         global: globalConfig,
       });
-      expect(wrapper.text()).toContain('settings.tab_groups.game');
-      expect(wrapper.text()).toContain('settings.tab_groups.account_advanced');
+      expect(wrapper.text()).toContain('settings.tab_groups.game_progress');
+      expect(wrapper.text()).toContain('settings.tab_groups.app');
+      expect(wrapper.text()).toContain('settings.tab_groups.data');
+      expect(wrapper.text()).toContain('settings.tab_groups.account');
+      expect(wrapper.text()).toContain('settings.tab_groups.tools_integrations');
+      expect(wrapper.findAll('[data-testid="tabs"] button').map((button) => button.text())).toEqual(
+        [
+          'settings.tabs.progression',
+          'common.prestige',
+          'common.preferences',
+          'settings.tabs.imports',
+          'common.backup_restore',
+          'common.account',
+          'common.api',
+          'common.streamer_tools',
+        ]
+      );
+    });
+    it('hides the prestige tab in Seasonal PvP mode', async () => {
+      configureMockState({ gameMode: 'seasonal' });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('[data-testid="desktop-tab-prestige"]').exists()).toBe(false);
       expect(wrapper.findAll('[data-testid="tabs"] button').map((button) => button.text())).toEqual(
         [
           'settings.tabs.progression',
           'common.preferences',
           'settings.tabs.imports',
-          'common.prestige',
-          'common.account',
           'common.backup_restore',
+          'common.account',
           'common.api',
           'common.streamer_tools',
         ]
       );
+    });
+    it('redirects seasonal prestige deep links to the progression tab', async () => {
+      configureMockState({ gameMode: 'seasonal', routeHash: '#prestige' });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      await nextTick();
+      expect(wrapper.find('#prestige').exists()).toBe(false);
+      expect(wrapper.find('#progression').exists()).toBe(true);
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({ hash: '#progression', query: {} });
     });
     it('marks settings control routes as noindex', async () => {
       configureMockState({ routePath: '/progression' });

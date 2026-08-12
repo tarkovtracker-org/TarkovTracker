@@ -316,7 +316,7 @@ describe('PrestigeCard', () => {
     await flushPromises();
     expect(fetchPrestigeRunsMock).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported_title');
-    expect(wrapper.text()).toContain('settings.prestige.seasonal_mode_unsupported');
+    expect(wrapper.text()).toContain('settings.prestige.persistent_mode_unsupported');
     expect(wrapper.text()).not.toContain('settings.prestige.set_current');
     expect(syncPrestigeLevelMock).not.toHaveBeenCalled();
   });

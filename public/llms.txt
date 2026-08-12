@@ -6,7 +6,7 @@ This site is primarily a client app plus JSON APIs. Public game data is availabl
 
 For API requests, use `lang` and `gameMode` where supported. Common `gameMode` values are `regular` (PvP) and `pve`. Supported `lang` values: `cs`, `de`, `en`, `es`, `fr`, `hu`, `it`, `ja`, `ko`, `pl`, `pt`, `ro`, `ru`, `sk`, `tr`, `zh`. Unsupported values fall back to `en`.
 
-UI locales (separate from the API `lang` set): `en`, `de`, `es`, `fr`, `ru`, `uk`, `zh`, `ko`.
+UI locales (separate from the API `lang` set): `cs`, `de`, `en`, `es`, `fr`, `it`, `ko`, `ru`, `uk`, `zh`.
 
 Authentication-required areas include `/account`, `/profile`, `/team`, `/settings`, and authenticated team APIs.
 

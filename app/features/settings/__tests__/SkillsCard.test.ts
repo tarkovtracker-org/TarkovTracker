@@ -13,9 +13,11 @@ const i18n = createI18n({
   fallbackWarn: false,
   messages: {
     en: {},
+    cs: {},
     de: {},
     es: {},
     fr: {},
+    it: {},
     ru: {},
     uk: {},
     zh: {},

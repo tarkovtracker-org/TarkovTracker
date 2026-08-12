@@ -9,11 +9,8 @@
   >
     <template #content>
       <div class="space-y-4 px-4 py-4">
-        <div class="grid gap-4 md:grid-cols-3">
-          <UCheckbox
-            v-model="showMapExtracts"
-            :label="$t('settings.interface.maps.show_extracts')"
-          />
+        <UCheckbox v-model="showMapExtracts" :label="$t('settings.interface.maps.show_extracts')" />
+        <div class="grid gap-4 sm:grid-cols-3">
           <div class="space-y-1">
             <div class="flex justify-between">
               <label :for="mapZoomSliderId" class="text-sm font-medium">

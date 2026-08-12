@@ -513,13 +513,13 @@ This allowlist is a subset of what upstream serves. `json.tarkov.dev` additional
 
 **Enabled UI locales** (`SUPPORTED_LOCALES` in `app/utils/locales.ts`):
 
-`en` (English), `de` (German), `es` (Spanish), `fr` (French), `ko` (Korean), `ru` (Russian), `uk` (Ukrainian), `zh` (Chinese)
+`cs` (Czech), `de` (German), `en` (English), `es` (Spanish), `fr` (French), `it` (Italian), `ko` (Korean), `ru` (Russian), `uk` (Ukrainian), `zh` (Chinese)
 
 **UI locale with upstream fallback.** `uk` (Ukrainian) is an enabled UI locale but is **not supported by `json.tarkov.dev`**. It is mapped to `en` via `LOCALE_TO_API_MAPPING` in `app/utils/constants.ts`, so Ukrainian users see English game data while the rest of the UI remains in Ukrainian.
 
 **Locale JSON files that exist but are not currently enabled** (may be enabled in the future; Crowdin may still sync translations for these):
 
-`cs` (Czech), `it` (Italian), `pl` (Polish), `pt` (Portuguese)
+`pl` (Polish), `pt` (Portuguese)
 
 ---
 
