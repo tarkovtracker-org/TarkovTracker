@@ -59,6 +59,7 @@ const createMetadataStore = (
   tasks: Task[],
   traders: Array<{ id: string; name: string; normalizedName: string }> = []
 ) => ({
+  taskById: new Map(tasks.map((task) => [task.id, task])),
   tasks,
   traders,
 });

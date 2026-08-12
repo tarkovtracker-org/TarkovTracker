@@ -66,9 +66,7 @@ export function useTaskActions(
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const { trackTaskAction } = useProductAnalytics();
-  const tasksMap = computed(
-    () => new Map(metadataStore.tasks.map((taskItem) => [taskItem.id, taskItem]))
-  );
+  const tasksMap = computed(() => metadataStore.taskById);
   const unpinTaskIfPinned = (taskId: string) => {
     if (!preferencesStore.getPinnedTaskIds.includes(taskId)) return;
     preferencesStore.togglePinnedTask(taskId);

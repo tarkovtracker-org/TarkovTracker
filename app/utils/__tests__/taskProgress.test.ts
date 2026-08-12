@@ -123,7 +123,7 @@ describe('task progress requirements', () => {
   it('backfills only unmet trader levels and valid reputation requirements', () => {
     const store = createStore({
       traderLevels: { fence: 1, prapor: 4 },
-      traderReputations: { fence: 0, prapor: 0 },
+      traderReputations: { fence: 0, prapor: 0, therapist: 0.2 },
     });
     const task: Task = {
       id: 'trader-task',
@@ -134,13 +134,19 @@ describe('task progress requirements', () => {
       traderRequirements: [
         { id: 'fence-reputation', trader: { id: 'fence', name: 'Fence' }, value: -2 },
         { id: 'prapor-reputation', trader: { id: 'prapor', name: 'Prapor' }, value: -1 },
+        {
+          id: 'therapist-reputation',
+          trader: { id: 'therapist', name: 'Therapist' },
+          value: 0.5,
+        },
       ],
     };
     applyTaskTraderRequirements({ store, task, fenceId: 'fence' });
     expect(store.setTraderLevel).toHaveBeenCalledTimes(1);
     expect(store.setTraderLevel).toHaveBeenCalledWith('fence', 2);
-    expect(store.setTraderReputation).toHaveBeenCalledTimes(1);
+    expect(store.setTraderReputation).toHaveBeenCalledTimes(2);
     expect(store.setTraderReputation).toHaveBeenCalledWith('fence', -2);
+    expect(store.setTraderReputation).toHaveBeenCalledWith('therapist', 0.5);
   });
   it('applies each requirement task once with failure taking precedence', () => {
     const onCompleteRequirement = vi.fn();
