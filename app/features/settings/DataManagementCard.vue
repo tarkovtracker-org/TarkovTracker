@@ -46,7 +46,7 @@
                   <span class="text-surface-300 text-xs font-semibold">
                     {{ $t('settings.tarkov_dev_import.refetch_mode_label') }}
                   </span>
-                  <div class="grid grid-cols-3 gap-2">
+                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <UButton
                       v-for="option in tarkovDevRefetchModeOptions"
                       :key="option.value"
@@ -308,19 +308,7 @@
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.tarkov_dev_import.import_to_mode') }}
               </label>
-              <GameModeToggle
-                v-model="tarkovDevTargetMode"
-                :disabled-modes="[GAME_MODES.SEASONAL]"
-              />
-              <p class="text-warning-300 text-xs">
-                {{
-                  $t(
-                    'settings.data_management.seasonal_import_locked',
-                    { season: ACTIVE_SEASON_NUMBER },
-                    'Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.'
-                  )
-                }}
-              </p>
+              <GameModeToggle v-model="tarkovDevTargetMode" />
             </div>
             <div class="flex gap-2">
               <UButton
@@ -967,8 +955,8 @@
   } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
-    ACTIVE_SEASON_NUMBER,
     GAME_MODES,
+    getGameModeLabel,
     sortSkillsByGameOrder,
     type GameMode,
     type ImportableGameMode,
@@ -979,7 +967,7 @@
   import type { BackupImportTargetModes } from '@/composables/useDataBackup';
   const TARKOV_DEV_ARENA_MODE = 'arena' as const;
   type DataManagementView = 'all' | 'imports' | 'backup';
-  type TarkovDevRefetchMode = ImportableGameMode | typeof TARKOV_DEV_ARENA_MODE;
+  type TarkovDevRefetchMode = GameMode | typeof TARKOV_DEV_ARENA_MODE;
   type TarkovDevRefetchModeOption = {
     disabled: boolean;
     label: string;
@@ -1114,11 +1102,12 @@
   } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevRequestGeneration = ref(0);
+  const currentTarkovDevMode = (): GameMode => tarkovStore.getCurrentGameMode();
   const currentImportableMode = (): ImportableGameMode =>
     tarkovStore.getCurrentGameMode() === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
-  const tarkovDevFixedTargetMode = ref<ImportableGameMode | null>(null);
-  const tarkovDevTargetMode = ref<ImportableGameMode>(currentImportableMode());
-  const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(currentImportableMode());
+  const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
+  const tarkovDevTargetMode = ref<GameMode>(currentTarkovDevMode());
+  const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(currentTarkovDevMode());
   const isTarkovDevProfileUrlBlank = computed(
     () => tarkovDevProfileUrlInput.value.trim().length === 0
   );
@@ -1164,19 +1153,24 @@
       value: GAME_MODES.PVE,
     },
     {
+      disabled: false,
+      label: t('common.seasonal_pvp'),
+      value: GAME_MODES.SEASONAL,
+    },
+    {
       disabled: true,
       label: t('settings.tarkov_dev_import.refetch_mode_arena'),
       value: TARKOV_DEV_ARENA_MODE,
     },
   ]);
-  function isTarkovDevImportableMode(mode: unknown): mode is ImportableGameMode {
-    return mode === GAME_MODES.PVP || mode === GAME_MODES.PVE;
+  function isTarkovDevProfileMode(mode: unknown): mode is GameMode {
+    return mode === GAME_MODES.PVP || mode === GAME_MODES.PVE || mode === GAME_MODES.SEASONAL;
   }
   const isTarkovDevRefetchModeSupported = computed(() =>
-    isTarkovDevImportableMode(tarkovDevRefetchMode.value)
+    isTarkovDevProfileMode(tarkovDevRefetchMode.value)
   );
   const tarkovDevProfileUrl = computed(() => {
-    if (!isTarkovDevImportableMode(tarkovDevRefetchMode.value)) return undefined;
+    if (!isTarkovDevProfileMode(tarkovDevRefetchMode.value)) return undefined;
     return buildTarkovDevProfileUrl(tarkovUid.value, tarkovDevRefetchMode.value);
   });
   const previewLevel = computed(() => {
@@ -1258,7 +1252,7 @@
   const tarkovDevRefetchCooldownMinutes = computed(() => {
     const uid = tarkovUid.value;
     const mode = tarkovDevRefetchMode.value;
-    if (uid === null || !isTarkovDevImportableMode(mode)) return 0;
+    if (uid === null || !isTarkovDevProfileMode(mode)) return 0;
     const remainingMs = getImportCooldownRemainingMs(
       uid,
       mode,
@@ -1267,9 +1261,10 @@
     );
     return Math.ceil(remainingMs / 60_000);
   });
-  const tarkovDevFixedTargetModeLabel = computed(() =>
-    tarkovDevFixedTargetMode.value === GAME_MODES.PVE ? t('common.pve') : t('common.pvp')
-  );
+  const tarkovDevFixedTargetModeLabel = computed(() => {
+    const mode = tarkovDevFixedTargetMode.value;
+    return mode ? t(getGameModeLabel(mode)) : t('common.pvp');
+  });
   const tarkovDevImportTargetNotice = computed(() =>
     t('settings.tarkov_dev_import.import_target_notice', {
       mode: tarkovDevFixedTargetModeLabel.value,
@@ -1280,16 +1275,16 @@
   }
   function updateTarkovDevImportTarget(
     sourceMode: GameMode | null | undefined,
-    fallbackMode?: ImportableGameMode
+    fallbackMode?: GameMode
   ) {
-    const targetMode = isTarkovDevImportableMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
+    const targetMode = isTarkovDevProfileMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
     tarkovDevFixedTargetMode.value = targetMode;
     if (!targetMode) return;
     tarkovDevRefetchMode.value = targetMode;
     tarkovDevTargetMode.value = targetMode;
   }
   function selectTarkovDevRefetchMode(mode: TarkovDevRefetchMode) {
-    if (!isTarkovDevImportableMode(mode)) return;
+    if (!isTarkovDevProfileMode(mode)) return;
     tarkovDevRefetchMode.value = mode;
     tarkovDevTargetMode.value = mode;
   }
@@ -1334,7 +1329,7 @@
   async function handleTarkovDevRefetch() {
     try {
       const refetchMode = tarkovDevRefetchMode.value;
-      if (!isTarkovDevImportableMode(refetchMode)) return;
+      if (!isTarkovDevProfileMode(refetchMode)) return;
       const linkedProfileUrl = tarkovDevProfileUrl.value;
       if (!linkedProfileUrl) return;
       const source = await fetchTarkovDevProfile(linkedProfileUrl, true);
@@ -1364,7 +1359,7 @@
   }
   function handleTarkovDevUnlink() {
     tarkovDevFixedTargetMode.value = null;
-    tarkovDevRefetchMode.value = currentImportableMode();
+    tarkovDevRefetchMode.value = currentTarkovDevMode();
     tarkovStore.setTarkovUid(null);
   }
   async function handleTarkovDevConfirm() {

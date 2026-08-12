@@ -45,7 +45,7 @@ const {
         profileUrl: string,
         options?: { fresh?: boolean; turnstileToken?: string | null }
       ) => Promise<{
-        mode: 'pvp' | 'pve' | null;
+        mode: 'pvp' | 'pve' | 'seasonal' | null;
         profileJsonUrl: string;
         tarkovUid: number;
       } | null>
@@ -89,7 +89,7 @@ const {
     warn: vi.fn(),
   },
   tarkovStoreState: {
-    currentMode: 'pvp' as 'pvp' | 'pve',
+    currentMode: 'pvp' as 'pvp' | 'pve' | 'seasonal',
     setTarkovUid: vi.fn<(uid: number | null) => void>(),
     tarkovUid: null as number | null,
   },
@@ -381,6 +381,24 @@ describe('DataManagementCard', () => {
       { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
+  });
+  it('uses a pvp-season profile url as a fixed seasonal import target', async () => {
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: 'seasonal',
+      profileJsonUrl: 'https://players.tarkov.dev/pvp-season/8560316.json',
+      tarkovUid: 8560316,
+    });
+    const wrapper = createWrapper();
+    const vm = asVm<{
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      tarkovDevFixedTargetMode: 'pvp' | 'pve' | 'seasonal' | null;
+      tarkovDevProfileUrlInput: string;
+      tarkovDevTargetMode: 'pvp' | 'pve' | 'seasonal';
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp-season/8560316';
+    await vm.handleTarkovDevProfileUrlSubmit();
+    expect(vm.tarkovDevFixedTargetMode).toBe('seasonal');
+    expect(vm.tarkovDevTargetMode).toBe('seasonal');
   });
   it('passes the Turnstile token to the fetch and resets the widget afterwards', async () => {
     turnstileState.enabled = true;
