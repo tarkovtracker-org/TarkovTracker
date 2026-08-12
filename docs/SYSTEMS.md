@@ -741,8 +741,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
 - Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
   error responses never are.
-- The client rejects a Seasonal target before mutating progress. Adding a Seasonal player-profile
-  route alone is not enough to unlock it; parser and field compatibility must be verified first.
+- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress and
+  rejects Seasonal EFT-log imports before mutating progress until that source is verified.
 
 ---
 
