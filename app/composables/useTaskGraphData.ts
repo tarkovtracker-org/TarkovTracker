@@ -4,7 +4,7 @@ import { TASK_STATE } from '@/utils/constants';
 import type { Ref } from '#imports';
 import type { Task } from '@/types/tarkov';
 import type { Edge, Node } from '@vue-flow/core';
-export type TaskNodeStatus = 'completed' | 'available' | 'locked' | 'failed';
+export type TaskNodeStatus = 'active' | 'completed' | 'available' | 'locked' | 'failed';
 export interface TaskNodeData {
   taskId: string;
   taskName: string;
@@ -22,11 +22,15 @@ export interface TaskNodeData {
   kappaRequired: boolean;
   lightkeeperRequired: boolean;
 }
-const resolveStatus = (taskId: string, tasksState: Record<string, string>): TaskNodeStatus => {
+export const resolveTaskNodeStatus = (
+  taskId: string,
+  tasksState: Record<string, string>
+): TaskNodeStatus => {
   const state = tasksState[taskId];
   if (state === TASK_STATE.COMPLETE) return 'completed';
   if (state === TASK_STATE.FAILED) return 'failed';
-  if (state === TASK_STATE.AVAILABLE || state === TASK_STATE.ACTIVE) return 'available';
+  if (state === TASK_STATE.ACTIVE) return 'active';
+  if (state === TASK_STATE.AVAILABLE) return 'available';
   return 'locked';
 };
 const collectFocusChain = (focusedTaskId: string, tasksById: Map<string, Task>): Set<string> => {
@@ -120,7 +124,7 @@ export function useTaskGraphData(
     const childInGraph = (id: string) =>
       (tasksById.get(id)?.children ?? []).some((c) => allNodeIds.has(c));
     const buildNode = (task: Task, isCrossTrader: boolean): Node<TaskNodeData> => {
-      const status = resolveStatus(task.id, stateMap);
+      const status = resolveTaskNodeStatus(task.id, stateMap);
       const isFocused = focusedTaskId.value === task.id;
       const isInFocusChain = focusChain ? focusChain.has(task.id) : true;
       const isDimmed = focusChain ? !isInFocusChain : false;

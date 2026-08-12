@@ -45,7 +45,7 @@ describe('useTeamStore', () => {
     vi.clearAllMocks();
   });
   describe('task completion broadcasts', () => {
-    it('preserves explicit active and legacy unknown values', () => {
+    it('preserves explicit active and canonicalizes newer legacy states', () => {
       expect(
         createTaskCompletionBroadcast({ active: true, complete: false, failed: false })
       ).toEqual({ active: true, complete: false, failed: false });
@@ -58,13 +58,30 @@ describe('useTeamStore', () => {
           { active: true, complete: false, failed: false },
           { complete: false, failed: false }
         )
-      ).toEqual({ active: true, complete: false, failed: false });
+      ).toEqual({ complete: false, failed: false });
+      expect(
+        mergeTaskCompletionBroadcast(
+          { active: true, complete: false, failed: false },
+          { complete: true, failed: false }
+        )
+      ).toEqual({ active: false, complete: true, failed: false });
+      expect(
+        mergeTaskCompletionBroadcast(
+          { active: true, complete: false, failed: false },
+          { complete: true, failed: true }
+        )
+      ).toEqual({ active: false, complete: true, failed: true });
       expect(
         mergeTaskCompletionBroadcast(
           { active: true, complete: false, failed: false },
           { active: false, complete: true, failed: false }
         )
       ).toEqual({ active: false, complete: true, failed: false });
+      expect(createTaskCompletionBroadcast({ complete: true, failed: false })).toEqual({
+        active: false,
+        complete: true,
+        failed: false,
+      });
     });
   });
   describe('Default State Initialization', () => {

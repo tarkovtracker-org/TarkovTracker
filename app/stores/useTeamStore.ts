@@ -178,17 +178,30 @@ export const createTaskCompletionBroadcast = (
 ) => ({
   complete: completion?.complete ?? false,
   failed: completion?.failed ?? false,
-  ...(typeof completion?.active === 'boolean' ? { active: completion.active } : {}),
+  ...(typeof completion?.active === 'boolean'
+    ? { active: completion.active }
+    : completion?.complete === true || completion?.failed === true
+      ? { active: false }
+      : {}),
 });
 export const mergeTaskCompletionBroadcast = (
   current: TaskCompletionSnapshot[string] | undefined,
   update: { active?: boolean; complete: boolean; failed: boolean }
-) => ({
-  ...current,
-  complete: update.complete,
-  failed: update.failed,
-  ...(typeof update.active === 'boolean' ? { active: update.active } : {}),
-});
+) => {
+  const merged = {
+    ...current,
+    complete: update.complete,
+    failed: update.failed,
+  };
+  if (typeof update.active === 'boolean') {
+    return { ...merged, active: update.active };
+  }
+  if (update.complete || update.failed) {
+    return { ...merged, active: false };
+  }
+  const { active: _active, ...legacyUnknown } = merged;
+  return legacyUnknown;
+};
 // Singleton instance to prevent multiple listener setups
 let teamStoreInstance: TeamStoreInstance | null = null;
 export function useTeamStoreWithSupabase(): TeamStoreInstance {

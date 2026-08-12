@@ -37,7 +37,7 @@
       </UButton>
     </div>
     <UButton
-      v-else-if="state === 'available' && !isFailed"
+      v-else-if="state === 'active' && !isFailed"
       :size="size"
       color="success"
       variant="soft"
@@ -45,6 +45,16 @@
       @click.stop="emit('complete')"
     >
       {{ t('common.complete', 'Complete') }}
+    </UButton>
+    <UButton
+      v-else-if="state === 'available' && !isFailed"
+      :size="size"
+      color="primary"
+      variant="soft"
+      class="px-3 font-semibold"
+      @click.stop="emit('active')"
+    >
+      {{ t('common.accept', 'Accept') }}
     </UButton>
   </div>
 </template>
@@ -57,6 +67,7 @@
   }>();
   const emit = defineEmits<{
     complete: [];
+    active: [];
     uncomplete: [];
     available: [];
     failed: [];

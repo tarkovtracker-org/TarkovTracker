@@ -555,6 +555,91 @@ describe('api-gateway', () => {
       tasks: [{ id: 'task-main', state: 'active' }],
     });
   });
+  it('materializes active-only successors as neutral for a single update', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
+        },
+        tasks: [
+          { id: 'task-main', taskRequirements: [] },
+          {
+            id: 'task-dependent',
+            taskRequirements: [{ task: 'task-main', status: ['active'] }],
+          },
+        ],
+      })
+    );
+    const res = await worker.fetch(postTaskRequest('task-main', { state: 'active' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
+      active: false,
+      complete: false,
+      failed: false,
+    });
+  });
+  it('materializes failed-only successors as neutral for a single update', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
+        },
+        tasks: [
+          { id: 'task-main', taskRequirements: [] },
+          {
+            id: 'task-dependent',
+            taskRequirements: [{ task: 'task-main', status: ['failed'] }],
+          },
+        ],
+      })
+    );
+    const res = await worker.fetch(postTaskRequest('task-main', { state: 'failed' }), BASE_ENV);
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
+      active: false,
+      complete: false,
+      failed: false,
+    });
+  });
+  it('materializes active-only successors as neutral in a batch update', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    vi.stubGlobal(
+      'fetch',
+      createBaseFetchMock({
+        onMerge: (payload) => {
+          mergePayload = payload;
+        },
+        tasks: [
+          { id: 'task-main', taskRequirements: [] },
+          {
+            id: 'task-dependent',
+            taskRequirements: [{ task: 'task-main', status: ['active'] }],
+          },
+        ],
+      })
+    );
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ id: 'task-main', state: 'active' }]),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
+      active: false,
+      complete: false,
+      failed: false,
+    });
+  });
   it('skips lastApiUpdate for idempotent single task updates', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
@@ -612,7 +697,7 @@ describe('api-gateway', () => {
           name: 'Dependent Task',
           factionName: 'Any',
           objectives: [],
-          taskRequirements: [{ task: 'task-main', status: ['complete'] }],
+          taskRequirements: [{ task: 'task-main', status: ['active'] }],
         },
       ],
     });
@@ -622,7 +707,7 @@ describe('api-gateway', () => {
         method: 'POST',
         headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
         body: JSON.stringify([
-          { id: 'task-main', state: 'completed' },
+          { id: 'task-main', state: 'active' },
           { id: 'task-dependent', state: 'active' },
         ]),
       }),
@@ -635,8 +720,9 @@ describe('api-gateway', () => {
       string,
       { active?: boolean; complete?: boolean; failed?: boolean; timestamp?: number }
     > | null;
-    expect(taskCompletions?.['task-main']?.complete).toBe(true);
+    expect(taskCompletions?.['task-main']?.complete).toBe(false);
     expect(taskCompletions?.['task-main']?.failed).toBe(false);
+    expect(taskCompletions?.['task-main']?.active).toBe(true);
     expect(taskCompletions?.['task-dependent']?.complete).toBe(false);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
     expect(taskCompletions?.['task-dependent']?.active).toBe(true);
@@ -787,6 +873,7 @@ describe('api-gateway', () => {
               taskCompletions: {
                 'task-1': { complete: true, failed: false, timestamp: 1 },
                 'task-2': { active: true, complete: false, failed: false, timestamp: 2 },
+                'task-3': { complete: true, failed: true, timestamp: 3 },
               },
               hideoutParts: { 'part-1': { complete: false, count: 0 } },
               hideoutModules: { 'module-1': { complete: false } },
@@ -815,6 +902,13 @@ describe('api-gateway', () => {
               'task-2': {
                 id: 'task-2',
                 name: 'Task Two',
+                factionName: 'Any',
+                objectives: [],
+                taskRequirements: [],
+              },
+              'task-3': {
+                id: 'task-3',
+                name: 'Task Three',
                 factionName: 'Any',
                 objectives: [],
                 taskRequirements: [],
@@ -863,10 +957,12 @@ describe('api-gateway', () => {
     expect(body.data.userId).toBe('user-1');
     const task = body.data.tasksProgress[0] as Record<string, unknown>;
     expect('failed' in task).toBe(false);
-    expect('active' in task).toBe(false);
+    expect(task.active).toBe(false);
     expect('invalid' in task).toBe(false);
     const activeTask = body.data.tasksProgress.find(({ id }) => id === 'task-2');
     expect(activeTask).toMatchObject({ active: true, complete: false, id: 'task-2' });
+    const failedTask = body.data.tasksProgress.find(({ id }) => id === 'task-3');
+    expect(failedTask).toMatchObject({ active: false, complete: false, failed: true, id: 'task-3' });
     const objective = body.data.taskObjectivesProgress[0] as Record<string, unknown>;
     expect('count' in objective).toBe(false);
     expect('invalid' in objective).toBe(false);

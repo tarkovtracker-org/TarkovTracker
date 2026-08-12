@@ -292,6 +292,11 @@ const checkAllRequirementsMet = (
     return false;
   });
 };
+const stateMeetsRequirement = (state: TaskState, statuses: string[]): boolean => {
+  if (statuses.includes('complete') && state === 'completed') return true;
+  if (statuses.includes('failed') && state === 'failed') return true;
+  return statuses.includes('active') && (state === 'active' || state === 'completed');
+};
 const updateDependentTasks = (
   changedTaskId: string,
   newState: TaskState,
@@ -304,35 +309,24 @@ const updateDependentTasks = (
   for (const dependentTask of tasks) {
     const requirements = dependentTask.taskRequirements ?? [];
     if (!requirements.length) continue;
-    let shouldUnlock = false;
-    let shouldLock = false;
-    for (const requirement of requirements) {
-      if (requirement?.task?.id !== changedTaskId) continue;
-      const requirementStatus = requirement.status ?? [];
-      if (!requirementStatus.includes('complete')) continue;
-      if (newState === 'completed') {
-        shouldUnlock = checkAllRequirementsMet(
-          dependentTask,
-          changedTaskId,
-          newState,
-          taskCompletions
-        );
-      } else {
-        shouldLock = true;
-      }
-    }
-    if (shouldUnlock || shouldLock) {
-      if (protectedTaskIds?.has(dependentTask.id)) continue;
-      setTaskCompletion(
-        taskCompletions,
-        dependentTask.id,
-        false,
-        false,
-        false,
-        updateTime,
-        updates
-      );
-    }
+    const changedRequirement = requirements.find(
+      (requirement) => requirement?.task?.id === changedTaskId
+    );
+    if (!changedRequirement || protectedTaskIds?.has(dependentTask.id)) continue;
+    const requirementMet = stateMeetsRequirement(newState, changedRequirement.status ?? []);
+    const shouldUnlock =
+      requirementMet &&
+      checkAllRequirementsMet(dependentTask, changedTaskId, newState, taskCompletions);
+    if (!shouldUnlock && requirementMet) continue;
+    setTaskCompletion(
+      taskCompletions,
+      dependentTask.id,
+      false,
+      false,
+      false,
+      updateTime,
+      updates
+    );
   }
 };
 /**

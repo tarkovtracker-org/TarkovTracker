@@ -46,6 +46,19 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it('records and reverses accepting a task', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+    });
+    notification.undoLastAction();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+    stop();
+  });
   it('does not fail already completed alternatives when undoing uncomplete', async () => {
     const task: Task = {
       id: 'task-main',

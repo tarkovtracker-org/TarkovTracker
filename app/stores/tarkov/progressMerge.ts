@@ -352,6 +352,13 @@ export function mergeProgressData(
     const base = remoteTs >= localTs ? normalizedRemote : normalizedLocal;
     const other = remoteTs >= localTs ? normalizedLocal : normalizedRemote;
     const merged = { ...other, ...base };
+    if (typeof base.active !== 'boolean') {
+      if (base.complete === true || base.failed === true) {
+        merged.active = false;
+      } else {
+        delete merged.active;
+      }
+    }
     const newerExplicitlySetsFalse =
       Object.prototype.hasOwnProperty.call(base, 'complete') && base.complete === false;
     if ((normalizedLocal.complete || normalizedRemote.complete) && !newerExplicitlySetsFalse) {

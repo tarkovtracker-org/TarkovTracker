@@ -59,6 +59,7 @@ const setTaskSecondaryView = vi.fn((value: string) => {
 });
 const tasksCompletions = ref<Record<string, Record<string, boolean>>>({});
 const tasksFailed = ref<Record<string, Record<string, boolean>>>({});
+const tasksState = ref<Record<string, string>>({});
 const unlockedTasks = ref<Record<string, Record<string, boolean>>>({});
 const trackFocusedTaskVisible = vi.fn();
 describe('useTaskDeepLink', () => {
@@ -77,6 +78,7 @@ describe('useTaskDeepLink', () => {
     preferenceState.taskSecondaryView = 'all';
     tasksCompletions.value = {};
     tasksFailed.value = {};
+    tasksState.value = {};
     unlockedTasks.value = {};
     vi.doMock('pinia', async () => {
       const actual = await vi.importActual<typeof import('pinia')>('pinia');
@@ -133,6 +135,7 @@ describe('useTaskDeepLink', () => {
       useProgressStore: () => ({
         tasksCompletions,
         tasksFailed,
+        tasksState,
         unlockedTasks,
       }),
     }));

@@ -480,8 +480,9 @@ sequenceDiagram
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
-   game-edition hideout auto-completes. Task progress includes `active` only when the stored JSONB
-   value explicitly contains a boolean, so legacy omission remains observable as unknown.
+   game-edition hideout auto-completes. Task progress includes `active` when the stored JSONB value
+   explicitly contains a boolean. Legacy terminal rows that omit it are normalized to `false`,
+   while ambiguous incomplete omission remains observable as unknown.
 7. **Task writes.** Single and batch task writes accept `active`, `completed`, `failed`, and
    `uncompleted`. They persist canonical `complete`/`failed`/`active` triples. Dependency processing
    writes auto-unlocked successors as explicitly neutral, never active.
@@ -521,7 +522,8 @@ sequenceDiagram
 - Read responses are `private` (token-scoped) — no shared/edge caching of authenticated progress.
 - Ordinary-task acceptance is explicit. `active` is encoded as `{ complete: false, failed: false,
 active: true }`; completed, failed, and neutral writes set `active: false`. Missing `active` on
-  legacy task rows means unknown and is never inferred from incomplete flags or mass-backfilled.
+  legacy incomplete task rows means unknown and is never inferred or mass-backfilled; a terminal
+  completed or failed row is inactive by definition and is normalized to `active: false`.
 - Auto-unlocked successors are neutral/available, not active. An active prerequisite is satisfied
   only by an explicit active task or a task that has since completed.
 - The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
@@ -569,7 +571,8 @@ flowchart LR
    Persistent PvP and PvE still sync in that case. API gateway reads resolve the active Seasonal
    number through the database before selecting a row. Task completions live in these JSONB blobs;
    the optional `active` boolean is preserved by local persistence, merges, realtime, team and
-   sharing transforms, while a missing legacy value remains missing.
+   sharing transforms. Missing legacy incomplete values remain missing, while terminal complete or
+   failed rows are normalized to `active: false`.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer

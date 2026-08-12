@@ -96,6 +96,31 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.pvp).toEqual(defaultState.pvp);
     expect(state.pve).toEqual(defaultState.pve);
   });
+  it.each([
+    ['completed', { complete: true, failed: false, timestamp: 2000 }],
+    ['failed', { complete: true, failed: true, timestamp: 2000 }],
+  ])('clears older active when realtime receives newer legacy %s', async (_status, remoteTask) => {
+    state.seasonal.taskCompletions.task = {
+      active: true,
+      complete: false,
+      failed: false,
+      timestamp: 1000,
+    };
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    handlers.get('user_game_mode_progress')?.({
+      new: {
+        game_mode: 'seasonal',
+        progress_data: { taskCompletions: { task: remoteTask } },
+        season_number: 1,
+        updated_at: new Date().toISOString(),
+      },
+    });
+    expect(state.seasonal.taskCompletions.task).toMatchObject({
+      active: false,
+      ...remoteTask,
+    });
+  });
   it('ignores historical Seasonal rows', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);

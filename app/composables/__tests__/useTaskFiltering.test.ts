@@ -122,7 +122,10 @@ const createProgressStore = () => ({
   } as Record<string, Record<string, boolean>>,
   playerFaction: { self: 'USEC' } as Record<string, string>,
   getDisplayName: (teamId: string) => teamId,
-  getTaskStatus: (teamId: string, taskId: string) => {
+  getTaskStatus: (
+    teamId: string,
+    taskId: string
+  ): 'active' | 'completed' | 'failed' | 'incomplete' => {
     const completions: Record<string, Record<string, boolean>> = {
       'task-map': { self: false },
       'task-trader': { self: true },
@@ -262,11 +265,19 @@ describe('useTaskFiltering', () => {
       'task-lightkeeper',
     ]);
   });
+  it('keeps active tasks out of available and includes them in active', async () => {
+    const { taskFiltering, tasks, progressStore } = await setup();
+    progressStore.getTaskStatus = (_teamId: string, taskId: string) =>
+      taskId === 'task-map' ? 'active' : 'incomplete';
+    expect(taskFiltering.filterTasksByStatus([tasks[0]!], 'available', 'self')).toEqual([]);
+    expect(taskFiltering.filterTasksByStatus([tasks[0]!], 'active', 'self')).toEqual([tasks[0]]);
+  });
   it('calculates status counts excluding invalid availability', async () => {
     const { taskFiltering } = await setup();
     const counts = taskFiltering.calculateStatusCounts('self');
     expect(counts).toEqual({
       all: 9,
+      active: 0,
       available: 5,
       locked: 1,
       completed: 1,
@@ -415,6 +426,7 @@ describe('useTaskFiltering', () => {
     const statusCounts = taskFiltering.calculateStatusCounts('self');
     expect(statusCounts).toEqual({
       all: 9,
+      active: 0,
       available: 5,
       locked: 1,
       completed: 1,
@@ -427,6 +439,7 @@ describe('useTaskFiltering', () => {
     const statusCounts = taskFiltering.calculateStatusCounts('self');
     expect(statusCounts).toEqual({
       all: 3,
+      active: 0,
       available: 2,
       locked: 1,
       completed: 0,
@@ -792,6 +805,11 @@ describe('useTaskFiltering', () => {
       progressStore.tasksCompletions['task-map'] = { self: false, teammate: true };
       progressStore.tasksFailed['task-map'] = { self: false, teammate: false };
       progressStore.objectiveCompletions['obj-map'] = { self: true, teammate: false };
+      progressStore.getTaskStatus = (teamId, taskId) => {
+        if (progressStore.tasksFailed[taskId]?.[teamId]) return 'failed';
+        if (progressStore.tasksCompletions[taskId]?.[teamId]) return 'completed';
+        return 'incomplete';
+      };
       await taskFiltering.updateVisibleTasks(
         {
           primaryView: 'maps',

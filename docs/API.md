@@ -402,13 +402,19 @@ Single-task request:
 { "state": "active" }
 ```
 
-Batch request (the object form with a `tasks` property remains supported for compatibility):
+Batch request:
 
 ```json
 [
   { "id": "task-1", "state": "active" },
   { "id": "task-2", "state": "completed" }
 ]
+```
+
+The legacy direct object-map form remains supported for compatibility:
+
+```json
+{ "task-1": "active", "task-2": "completed" }
 ```
 
 `GET /progress` may include `active: true` or `active: false` on each task progress object. The

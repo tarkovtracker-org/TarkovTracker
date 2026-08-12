@@ -23,12 +23,19 @@ export function useTaskCounts() {
   const taskHasRequiredKeys = (task: Task): boolean => (task.requiredKeys?.length ?? 0) > 0;
   const calculateStatusCounts = (
     userView: string
-  ): { all: number; available: number; locked: number; completed: number; failed: number } => {
+  ): {
+    all: number;
+    active: number;
+    available: number;
+    locked: number;
+    completed: number;
+    failed: number;
+  } => {
     const perfTimer = perfStart('[Tasks] calculateStatusCounts', {
       tasks: metadataStore.tasks.length,
       userView,
     });
-    const counts = { all: 0, available: 0, locked: 0, completed: 0, failed: 0 };
+    const counts = { all: 0, active: 0, available: 0, locked: 0, completed: 0, failed: 0 };
     const taskList = metadataStore.tasks;
     const showKappa = !preferencesStore.getHideNonKappaTasks;
     const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
@@ -73,10 +80,11 @@ export function useTaskCounts() {
         );
         const isAvailableForAny = relevantTeamIds.some((teamId) => {
           const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
-          const isCompleted = progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
-          const isFailed = progressStore.tasksFailed?.[task.id]?.[teamId] === true;
-          return isUnlocked && !isCompleted && !isFailed;
+          return isUnlocked && progressStore.getTaskStatus(teamId, task.id) === 'incomplete';
         });
+        const isActiveForAny = relevantTeamIds.some(
+          (teamId) => progressStore.getTaskStatus(teamId, task.id) === 'active'
+        );
         const isCompletedByAll = relevantTeamIds.every((teamId) => {
           return (
             progressStore.tasksCompletions?.[task.id]?.[teamId] === true &&
@@ -87,6 +95,8 @@ export function useTaskCounts() {
           counts.failed++;
         } else if (isCompletedByAll) {
           counts.completed++;
+        } else if (isActiveForAny) {
+          counts.active++;
         } else if (isAvailableForAny && !isTaskInvalid(task.id, 'all', visibleTeamIds)) {
           counts.available++;
         } else if (!isTaskInvalid(task.id, 'all', visibleTeamIds)) {
@@ -98,12 +108,15 @@ export function useTaskCounts() {
         if (taskFaction !== 'Any' && taskFaction !== userFaction) continue;
         counts.all++;
         const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
-        const isCompleted = progressStore.tasksCompletions?.[task.id]?.[userView] === true;
-        const isFailed = progressStore.tasksFailed?.[task.id]?.[userView] === true;
+        const status = progressStore.getTaskStatus(userView, task.id);
+        const isCompleted = status === 'completed';
+        const isFailed = status === 'failed';
         if (isFailed) {
           counts.failed++;
         } else if (isCompleted) {
           counts.completed++;
+        } else if (status === 'active') {
+          counts.active++;
         } else if (isUnlocked && !isTaskInvalid(task.id, userView)) {
           counts.available++;
         } else if (!isTaskInvalid(task.id, userView)) {
@@ -138,9 +151,10 @@ export function useTaskCounts() {
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
     const isAvailableStatus = (status: {
       isUnlocked: boolean;
+      isActive: boolean;
       isCompleted: boolean;
       isFailed: boolean;
-    }) => status.isUnlocked && !status.isCompleted && !status.isFailed;
+    }) => status.isUnlocked && !status.isActive && !status.isCompleted && !status.isFailed;
     for (const task of taskList) {
       if (excludedTaskIds.has(task.id)) continue;
       if (prestigeTaskMap.has(task.id)) {
@@ -172,8 +186,9 @@ export function useTaskCounts() {
         if (relevantTeamIds.length === 0) continue;
         const taskStatuses = relevantTeamIds.map((teamId) => ({
           isUnlocked: progressStore.unlockedTasks?.[task.id]?.[teamId] === true,
-          isCompleted: progressStore.tasksCompletions?.[task.id]?.[teamId] === true,
-          isFailed: progressStore.tasksFailed?.[task.id]?.[teamId] === true,
+          isActive: progressStore.getTaskStatus(teamId, task.id) === 'active',
+          isCompleted: progressStore.getTaskStatus(teamId, task.id) === 'completed',
+          isFailed: progressStore.getTaskStatus(teamId, task.id) === 'failed',
         }));
         let shouldCount = false;
         switch (secondaryView) {
@@ -183,6 +198,9 @@ export function useTaskCounts() {
           case 'available':
             if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
             shouldCount = taskStatuses.some(isAvailableStatus);
+            break;
+          case 'active':
+            shouldCount = taskStatuses.some(({ isActive }) => isActive);
             break;
           case 'locked':
             if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
@@ -205,8 +223,10 @@ export function useTaskCounts() {
         const userFaction = progressStore.playerFaction[userView];
         if (taskFaction !== 'Any' && taskFaction !== userFaction) continue;
         const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
-        const isCompleted = progressStore.tasksCompletions?.[task.id]?.[userView] === true;
-        const isFailed = progressStore.tasksFailed?.[task.id]?.[userView] === true;
+        const status = progressStore.getTaskStatus(userView, task.id);
+        const isActive = status === 'active';
+        const isCompleted = status === 'completed';
+        const isFailed = status === 'failed';
         let shouldCount = false;
         switch (secondaryView) {
           case 'all':
@@ -214,7 +234,10 @@ export function useTaskCounts() {
             break;
           case 'available':
             if (isTaskInvalid(task.id, userView)) continue;
-            shouldCount = isUnlocked && !isCompleted && !isFailed;
+            shouldCount = isUnlocked && !isActive && !isCompleted && !isFailed;
+            break;
+          case 'active':
+            shouldCount = isActive;
             break;
           case 'locked':
             if (isTaskInvalid(task.id, userView)) continue;

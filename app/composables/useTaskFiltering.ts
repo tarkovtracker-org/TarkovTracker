@@ -109,9 +109,8 @@ export function useTaskFiltering() {
       if (secondaryView === 'available') {
         relevantTeamIds = relevantTeamIds.filter((teamId) => {
           const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
-          const isCompleted = progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
-          const isFailed = progressStore.tasksFailed?.[task.id]?.[teamId] === true;
-          return isUnlocked && !isCompleted && !isFailed;
+          const status = progressStore.getTaskStatus(teamId, task.id);
+          return isUnlocked && status === 'incomplete';
         });
       }
       if (relevantTeamIds.length === 0) return false;
@@ -223,13 +222,18 @@ export function useTaskFiltering() {
    */
   const getTaskStatus = (taskId: string, teamId: string) => {
     const isUnlocked = progressStore.unlockedTasks?.[taskId]?.[teamId] === true;
-    const isCompleted = progressStore.tasksCompletions?.[taskId]?.[teamId] === true;
-    const isFailed = progressStore.tasksFailed?.[taskId]?.[teamId] === true;
-    return { isUnlocked, isCompleted, isFailed };
+    const status = progressStore.getTaskStatus(teamId, taskId);
+    return {
+      isUnlocked,
+      isActive: status === 'active',
+      isCompleted: status === 'completed',
+      isFailed: status === 'failed',
+    };
   };
   const getUserTaskStatus = (taskId: string, userView: string) => {
     const status = progressStore.getTaskStatus(userView, taskId);
     return {
+      isActive: status === 'active',
       isCompleted: status === 'completed',
       isFailed: status === 'failed',
     };
@@ -248,8 +252,12 @@ export function useTaskFiltering() {
         teamId,
         ...getTaskStatus(task.id, teamId),
       }));
-      const isAvailable = ({ isUnlocked, isCompleted, isFailed }: (typeof taskStatuses)[0]) =>
-        isUnlocked && !isCompleted && !isFailed;
+      const isAvailable = ({
+        isUnlocked,
+        isActive,
+        isCompleted,
+        isFailed,
+      }: (typeof taskStatuses)[0]) => isUnlocked && !isActive && !isCompleted && !isFailed;
       switch (secondaryView) {
         case 'all': {
           const usersWhoNeedTask = taskStatuses
@@ -271,6 +279,15 @@ export function useTaskFiltering() {
               );
             }
             tempVisibleTasks.push({ ...task, neededBy: usersWhoNeedTask });
+          }
+          break;
+        }
+        case 'active': {
+          const activeUsers = taskStatuses
+            .filter(({ isActive }) => isActive)
+            .map(({ teamId }) => progressStore.getDisplayName(teamId));
+          if (activeUsers.length > 0) {
+            tempVisibleTasks.push({ ...task, neededBy: activeUsers });
           }
           break;
         }
@@ -322,9 +339,12 @@ export function useTaskFiltering() {
         filtered = filtered.filter((task) => {
           if (isTaskInvalid(task.id, userView)) return false;
           const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
-          const { isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
-          return isUnlocked && !isCompleted && !isFailed;
+          const { isActive, isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
+          return isUnlocked && !isActive && !isCompleted && !isFailed;
         });
+        break;
+      case 'active':
+        filtered = filtered.filter((task) => getUserTaskStatus(task.id, userView).isActive);
         break;
       case 'failed':
         filtered = filtered.filter((task) => getUserTaskStatus(task.id, userView).isFailed);
@@ -467,9 +487,7 @@ export function useTaskFiltering() {
     taskList.forEach((task) => {
       const availableCount = teamIds.filter((teamId) => {
         const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
-        const isCompleted = progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
-        const isFailed = progressStore.tasksFailed?.[task.id]?.[teamId] === true;
-        return isUnlocked && !isCompleted && !isFailed;
+        return isUnlocked && progressStore.getTaskStatus(teamId, task.id) === 'incomplete';
       }).length;
       counts.set(task.id, availableCount);
     });
@@ -713,7 +731,7 @@ export function useTaskFiltering() {
       if (relevantTeamIds.length === 0) return false;
       return relevantTeamIds.every((teamId) => {
         const status = getTaskStatus(task.id, teamId);
-        return status.isUnlocked && !status.isCompleted && !status.isFailed;
+        return status.isUnlocked && !status.isActive && !status.isCompleted && !status.isFailed;
       });
     });
   };

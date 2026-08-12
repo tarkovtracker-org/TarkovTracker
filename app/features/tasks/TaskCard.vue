@@ -62,6 +62,7 @@
               :trader-level-reqs="traderLevelReqs"
               :location-tooltip="locationTooltip"
               :is-failed="isFailed"
+              :is-active="isActive"
               :is-invalid="isInvalid"
               :show-required-labels="preferencesStore.getShowRequiredLabels"
               :exclusive-edition-badge="exclusiveEditionBadge"
@@ -76,6 +77,7 @@
                   :size="actionButtonSize"
                   :is-failed="isFailed"
                   @complete="markTaskComplete"
+                  @active="markTaskActive"
                   @uncomplete="markTaskUncomplete"
                   @available="markTaskAvailable"
                   @failed="markTaskFailed"
@@ -423,6 +425,7 @@
     resolveTaskObjectives,
   } from '@/features/tasks/taskCardHelpers';
   import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
+  import { resolveTaskActionButtonState, type ActionButtonState } from '@/features/tasks/types';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -432,7 +435,6 @@
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { isFailedOnlyRequirement } from '@/utils/taskProgress';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
-  import type { ActionButtonState } from '@/features/tasks/types';
   import type { GameEdition, Task } from '@/types/tarkov';
   type ContextMenuRef = { open: (event: MouseEvent) => void };
   type FailureSource = {
@@ -486,7 +488,7 @@
       task: () => props.task,
       objectives: () => taskObjectives.value,
     });
-  const { isComplete, isFailed, isLocked, isInvalid } = useTaskState(() => props.task.id);
+  const { isComplete, isFailed, isActive, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
   const shouldAutoCollapseObjectives = computed(() => {
     return isComplete.value && preferencesStore.getHideCompletedTaskObjectives;
@@ -567,11 +569,16 @@
     setTimeout(done, OBJECTIVES_LEAVE_MS + 10);
   };
   // Use extracted task actions composable
-  const { markTaskComplete, markTaskUncomplete, markTaskAvailable, markTaskFailed } =
-    useTaskActions(
-      () => props.task,
-      (payload) => emit('on-task-action', payload)
-    );
+  const {
+    markTaskComplete,
+    markTaskActive,
+    markTaskUncomplete,
+    markTaskAvailable,
+    markTaskFailed,
+  } = useTaskActions(
+    () => props.task,
+    (payload) => emit('on-task-action', payload)
+  );
   // Helper for status array checks
   const hasStatus = (status: string[] | undefined, statuses: string[]) => {
     const normalized = (status ?? []).map((entry) => entry.toLowerCase());
@@ -716,6 +723,7 @@
     if (isFailed.value) return 'border-error-600/50 bg-error-950';
     if (isInvalid.value) return 'border-surface-700/40 bg-surface-900 opacity-60';
     if (isLocked.value) return 'border-surface-700/40 bg-surface-900';
+    if (isActive.value) return 'border-primary-500/45 bg-primary-950/20';
     return 'border-surface-700/40 bg-surface-900';
   });
   const accentClasses = computed(() => {
@@ -940,12 +948,14 @@
    * Returns which action button(s) should be shown.
    */
   const actionButtonState = computed((): ActionButtonState => {
-    if (!isOurFaction.value) return 'none';
-    if (isFailed.value) return 'complete';
-    if (isLocked.value) return 'locked';
-    if (isComplete.value) return 'complete';
-    if (showHotWheelsFail.value) return 'hotwheels';
-    return 'available';
+    return resolveTaskActionButtonState({
+      isOurFaction: isOurFaction.value,
+      isFailed: isFailed.value,
+      isLocked: isLocked.value,
+      isComplete: isComplete.value,
+      isActive: isActive.value,
+      showHotWheelsFail: showHotWheelsFail.value,
+    });
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
   const selectedMapIds = computed(() => {
