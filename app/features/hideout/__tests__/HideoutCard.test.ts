@@ -236,6 +236,9 @@ describe('HideoutCard', () => {
         },
       },
       global: {
+        mocks: {
+          $t: (key: string) => translations[key] ?? key,
+        },
         stubs: {
           GenericCard: GenericCardStub,
           HideoutRequirement: true,
@@ -248,7 +251,7 @@ describe('HideoutCard', () => {
         },
       },
     });
-    expect(wrapper.text()).toContain('Max station level reached');
+    expect(wrapper.text()).toContain('Max level');
     expect(wrapper.findAll('button')).toHaveLength(1);
   });
 });
