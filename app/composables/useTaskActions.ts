@@ -164,6 +164,7 @@ export function useTaskActions(
       store: tarkovStore,
       taskId: currentTask.id,
       tasksMap: tasksMap.value,
+      restoreAlternatives: !wasFailed,
     });
     if (isUndo) {
       emitAction({

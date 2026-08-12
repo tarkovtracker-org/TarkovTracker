@@ -115,8 +115,9 @@ export function uncompleteTaskForProgress(options: {
   store: TaskProgressStore;
   taskId: string;
   tasksMap: ReadonlyMap<string, Task>;
+  restoreAlternatives?: boolean;
 }): void {
-  const { store, taskId, tasksMap } = options;
+  const { store, taskId, tasksMap, restoreAlternatives = true } = options;
   const uncompleteTask = (currentTaskId: string) => {
     store.setTaskUncompleted(currentTaskId);
     const currentTask = tasksMap.get(currentTaskId);
@@ -126,6 +127,7 @@ export function uncompleteTaskForProgress(options: {
   };
   const task = tasksMap.get(taskId);
   uncompleteTask(taskId);
+  if (!restoreAlternatives) return;
   const alternatives = Array.isArray(task?.alternatives) ? task.alternatives : [];
   alternatives.forEach(uncompleteTask);
 }

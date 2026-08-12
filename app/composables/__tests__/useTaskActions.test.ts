@@ -334,18 +334,26 @@ describe('useTaskActions', () => {
     );
   });
   it('tracks manual-fail metadata when resetting a failed task', async () => {
+    const alternative: Task = {
+      id: 'completed-alternative',
+      name: 'Completed Alternative',
+    };
     const task: Task = {
       id: 'task-reset-failed',
       name: 'Task Reset Failed',
       objectives: [{ id: 'obj-reset', count: 2 }],
+      alternatives: [alternative.id],
     };
-    const { actions, onAction } = await setup(task, [task], {
+    const { actions, onAction, tarkovStore } = await setup(task, [task, alternative], {
       isTaskFailed: true,
       taskCompletions: {
+        [alternative.id]: { complete: true, failed: false },
         'task-reset-failed': { complete: true, failed: true, manual: true },
       },
     });
     actions.markTaskUncomplete();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledOnce();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-reset-failed');
     expect(onAction).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'reset_failed',
