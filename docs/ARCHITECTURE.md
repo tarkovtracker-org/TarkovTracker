@@ -168,21 +168,19 @@ Manages isolated progress for persistent PvP, persistent PvE, and numbered Seaso
 - The app does **not** persist a long-lived "linked mode" or "imported mode" field.
 - Unlinking a tarkov.dev account clears only the saved `tarkovUid`; it does not roll back imported
   progress, profile, skill, level, edition, or prestige fields.
-- Refetching a linked profile asks for a persistent profile mode because PvP and PvE profile JSON
+- Refetching a linked profile asks for a profile mode because PvP, PvE, and Seasonal profile JSON
   use the same account id but different tarkov.dev mode routes.
-- Tarkov.dev imports always ask which persistent mode to write into and default to the current mode
-  when it is importable. Seasonal is visible but locked until its profile route, parser, and field
-  compatibility are verified for the active season.
-- The import UI accepts a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetches
-  `players.tarkov.dev/profile/{uid}.json` for PvP or `players.tarkov.dev/pve/{uid}.json` for PvE
-  through the public `/api/tarkov-dev/profile` proxy, and parses that JSON with the existing
-  Tarkov.dev profile parser.
+- Tarkov.dev imports default to the current mode when the pasted source does not identify a mode.
+  Mode-specific profile URLs fix the target to prevent cross-mode writes.
+- The import UI accepts a full `tarkov.dev/players/{regular|pve|pvp-season}/{uid}` profile URL,
+  fetches `players.tarkov.dev/{profile|pve|pvp-season}/{uid}.json` through the public
+  `/api/tarkov-dev/profile` proxy, and parses that JSON with the existing Tarkov.dev profile parser.
 - The import preview keeps parsed skill values collapsed by default, but exposes the exact
   skill-id and level pairs that will be applied.
 - Tarkov.dev only refreshes that public JSON after the user opens their profile page on tarkov.dev,
   so the UI asks users to open the profile before importing.
 - Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
-  `regular` for PvP, `pve` for PvE.
+  `regular` for PvP, `pve` for PvE, and `pvp-season` for Seasonal.
 - EFT-log imports are also locked for Seasonal until the active-season data source is verified.
 - Legacy embedded `tarkovDevProfile` payloads are sanitized out of stored progress data and should
   not be reintroduced as long-lived state.

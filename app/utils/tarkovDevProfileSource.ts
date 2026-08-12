@@ -23,12 +23,11 @@ function parseProfileId(value: string | undefined): number | null {
   if (!Number.isSafeInteger(tarkovUid) || tarkovUid <= 0) return null;
   return tarkovUid;
 }
-function modeFromProfileSlug(value: string | undefined): GameMode | null {
-  const entry = Object.entries(API_GAME_MODES).find(([, slug]) => slug === value);
-  return (entry?.[0] as GameMode | undefined) ?? null;
-}
-function modeFromProfileJsonPath(value: string | undefined): GameMode | null {
-  const entry = Object.entries(PROFILE_JSON_PATHS).find(([, path]) => path === value);
+function modeFromMappedValue(
+  mapping: Record<GameMode, string>,
+  value: string | undefined
+): GameMode | null {
+  const entry = Object.entries(mapping).find(([, mappedValue]) => mappedValue === value);
   return (entry?.[0] as GameMode | undefined) ?? null;
 }
 function buildProfileSource(tarkovUid: number, mode: GameMode): TarkovDevProfileSource {
@@ -50,13 +49,13 @@ export function resolveTarkovDevProfileSource(input: string): TarkovDevProfileSo
   const host = url.hostname.toLowerCase();
   const parts = url.pathname.split('/').filter(Boolean);
   if ((host === 'tarkov.dev' || host === 'www.tarkov.dev') && parts[0] === 'players') {
-    const mode = modeFromProfileSlug(parts[1]);
+    const mode = modeFromMappedValue(API_GAME_MODES, parts[1]);
     const tarkovUid = parseProfileId(parts[2]);
     if (!mode || tarkovUid === null) return { ok: false, error: PROFILE_ID_ERROR };
     return { ok: true, data: buildProfileSource(tarkovUid, mode) };
   }
   if (host === 'players.tarkov.dev') {
-    const mode = modeFromProfileJsonPath(parts[0]);
+    const mode = modeFromMappedValue(PROFILE_JSON_PATHS, parts[0]);
     const tarkovUid = parseProfileId(parts[1]);
     if (!mode || tarkovUid === null) return { ok: false, error: PROFILE_ID_ERROR };
     return { ok: true, data: buildProfileSource(tarkovUid, mode) };

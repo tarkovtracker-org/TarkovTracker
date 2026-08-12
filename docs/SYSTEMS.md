@@ -654,7 +654,8 @@ flowchart LR
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.
-- Tarkov.dev profile and EFT-log imports cannot target Seasonal until their source data is verified.
+- Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
+  imports cannot target Seasonal until their source data is verified.
 
 ---
 
@@ -662,10 +663,10 @@ flowchart LR
 
 **Summary.** Settings → Data Management lets a user import their in-game profile (level/XP,
 skills, faction, prestige, edition guess) from tarkov.dev's player-profile snapshots on the
-players.tarkov.dev host (the `profile/{aid}` path for PvP and `pve/{aid}` for PvE, each with a
-JSON suffix). Imports can target persistent PvP or PvE. Seasonal is visible but locked until its
-profile source and mapping are verified, preventing persistent PvP data from being written into
-Season 1. The upstream JSON only refreshes when a human views the player page on tarkov.dev
+players.tarkov.dev host (the `profile/{aid}` path for PvP, `pve/{aid}` for PvE, and
+`pvp-season/{aid}` for Seasonal, each with a JSON suffix). Profile URLs fix the target mode, so
+Seasonal snapshots write only into active Seasonal progress. The upstream JSON only refreshes when
+a human views the player page on tarkov.dev
 (Turnstile-guarded
 there); tarkov.dev purges its CDN copy on refresh, so a new snapshot is visible to us immediately.
 The upstream sends no CORS headers, so the browser cannot fetch it directly — everything goes

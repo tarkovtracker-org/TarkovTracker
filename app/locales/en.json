@@ -1844,6 +1844,7 @@
       "import_target_pvp": "PvP Only",
       "import_target_pve": "PvE Only",
       "import_target_all": "All Available",
+      "seasonal_import_locked": "Seasonal PvP imports are temporarily locked until the source data is verified for Season {season}.",
       "import_success_title": "Backup Imported",
       "import_success_description": "Your progress data has been restored successfully.",
       "import_error_title": "Backup Import Failed",
