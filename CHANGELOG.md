@@ -1,3 +1,10 @@
+## [1.69.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.1...v1.69.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **settings:** support Seasonal Tarkov.dev profile imports ([#712](https://github.com/tarkovtracker-org/TarkovTracker/issues/712)) ([4da4ddf](https://github.com/tarkovtracker-org/TarkovTracker/commit/4da4ddfdd761af5170650893373c5caf4e7a703f))
+
 ## [1.69.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.0...v1.69.1) (2026-08-11)
 
 
