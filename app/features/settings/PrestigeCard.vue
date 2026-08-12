@@ -491,10 +491,12 @@
   const currentMode = computed(() => tarkovStore.currentGameMode);
   const isPrestigeMode = computed(() => currentMode.value === GAME_MODES.PVP);
   const unsupportedModeDescription = computed(() =>
-    t(
-      'settings.prestige.persistent_mode_unsupported',
-      'Prestige is unavailable for persistent PvE mode.'
-    )
+    currentMode.value === GAME_MODES.SEASONAL
+      ? t('settings.prestige.seasonal_mode_unsupported', 'Prestige is unavailable in Seasonal PvP.')
+      : t(
+          'settings.prestige.persistent_mode_unsupported',
+          'Prestige is unavailable for persistent PvE mode.'
+        )
   );
   const currentModeLabel = computed(() => t('common.pvp', 'PvP'));
   const currentModeProgress = computed(() => tarkovStore.getCurrentProgressData());

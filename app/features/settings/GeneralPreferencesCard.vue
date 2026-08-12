@@ -4,7 +4,7 @@
     icon-color="warning"
     highlight-color="warning"
     :fill-height="false"
-    :title="$t('settings.general.title')"
+    :title="$t('settings.general.title', 'General Preferences')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
@@ -12,10 +12,15 @@
         <div class="flex items-center justify-between gap-3">
           <div class="space-y-1">
             <p class="text-surface-200 text-sm font-semibold">
-              {{ $t('settings.general.privacy_mode') }}
+              {{ $t('settings.general.privacy_mode', 'Privacy Mode') }}
             </p>
             <p class="text-surface-400 text-sm">
-              {{ $t('settings.general.privacy_mode_hint') }}
+              {{
+                $t(
+                  'settings.general.privacy_mode_hint',
+                  "Hides sensitive information while you're streaming."
+                )
+              }}
             </p>
           </div>
           <USwitch
@@ -30,14 +35,19 @@
         <USeparator />
         <div class="flex items-center justify-between gap-3">
           <div class="space-y-1">
-            <p class="text-surface-200 text-sm font-semibold">
-              {{ $t('settings.interface.links.antifandom') }}
+            <p :id="antifandomLabelId" class="text-surface-200 text-sm font-semibold">
+              {{ $t('settings.interface.links.antifandom', 'Use antifandom.com') }}
             </p>
             <p class="text-surface-400 text-sm">
-              {{ $t('settings.interface.links.antifandom_hint') }}
+              {{
+                $t(
+                  'settings.interface.links.antifandom_hint',
+                  'Open wiki links on antifandom.com, a community-run, ad-light mirror of Fandom, instead of fandom.com.'
+                )
+              }}
             </p>
           </div>
-          <USwitch v-model="useAntifandom" />
+          <USwitch v-model="useAntifandom" :aria-labelledby="antifandomLabelId" />
         </div>
       </div>
     </template>
@@ -48,6 +58,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import type { SupabaseUser } from '@/types/supabase-plugin';
   const preferencesStore = usePreferencesStore();
+  const antifandomLabelId = 'settings-antifandom-label';
   const { $supabase } = useNuxtApp();
   const typedUser = computed<SupabaseUser | null>(() => {
     const supabase = $supabase as { user?: SupabaseUser } | undefined;

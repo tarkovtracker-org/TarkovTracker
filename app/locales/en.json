@@ -1974,6 +1974,7 @@
       "pvp_only": "Escape from Tarkov prestige currently exists only for PvP profiles. Switch your active tracker mode to PvP to manage prestige and archived runs.",
       "persistent_mode_unsupported_title": "Prestige Unavailable",
       "persistent_mode_unsupported": "Prestige is unavailable for persistent PvE mode.",
+      "seasonal_mode_unsupported": "Prestige is unavailable in Seasonal PvP.",
       "current_level": "Current Prestige Level",
       "set_current": "Set Current Prestige",
       "set_current_hint": "Use this when you already prestiged in-game and only need the tracker to match. This does not reset progress or create history.",
@@ -2058,7 +2059,7 @@
       },
       "quest_tooltip": "Skill level granted automatically by completed quest rewards.",
       "offset_tooltip": "Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.",
-      "collapsed_hint": "Showing skills required by your active tasks ({shown} of {total}). Show all to see every skill."
+      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",

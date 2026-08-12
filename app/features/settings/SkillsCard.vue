@@ -37,7 +37,7 @@
                 )
               }}
             </p>
-            <p v-if="hasShowAllToggle && !showAllSkills" class="text-surface-500 text-xs">
+            <p v-if="hasShowAllToggle && !showAllSkills" class="text-surface-400 text-xs">
               {{
                 $t('settings.skills.collapsed_hint', {
                   shown: visibleSkills.length,
@@ -126,21 +126,43 @@
                 </span>
               </div>
               <div class="mb-2 flex gap-3 text-xs">
-                <UTooltip :text="$t('settings.skills.quest_tooltip')" class="flex-1">
-                  <div class="text-surface-400 cursor-default">
+                <UTooltip
+                  :text="
+                    $t(
+                      'settings.skills.quest_tooltip',
+                      'Skill level granted automatically by completed quest rewards.'
+                    )
+                  "
+                  class="flex-1"
+                >
+                  <button
+                    type="button"
+                    class="text-surface-400 focus-visible:ring-primary-500/60 w-full cursor-default rounded text-left text-xs focus-visible:ring-2 focus-visible:outline-none"
+                  >
                     {{ $t('settings.skills.quest') }}
                     <span class="text-surface-200 font-medium">
                       {{ getQuestSkillLevel(skill.key) }}
                     </span>
-                  </div>
+                  </button>
                 </UTooltip>
-                <UTooltip :text="$t('settings.skills.offset_tooltip')" class="flex-1">
-                  <div class="text-surface-400 cursor-default">
+                <UTooltip
+                  :text="
+                    $t(
+                      'settings.skills.offset_tooltip',
+                      'Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.'
+                    )
+                  "
+                  class="flex-1"
+                >
+                  <button
+                    type="button"
+                    class="text-surface-400 focus-visible:ring-primary-500/60 w-full cursor-default rounded text-left text-xs focus-visible:ring-2 focus-visible:outline-none"
+                  >
                     {{ $t('settings.skills.offset') }}
                     <span class="text-surface-200 font-medium">
                       {{ formatSkillOffset(getSkillOffset(skill.key)) }}
                     </span>
-                  </div>
+                  </button>
                 </UTooltip>
               </div>
               <div class="flex items-center gap-2">

@@ -40,7 +40,7 @@
                     variant="soft"
                     size="xs"
                   >
-                    {{ $t('settings.display_name.active_mode') }}
+                    {{ $t('settings.display_name.active_mode', 'Active') }}
                   </UBadge>
                 </div>
                 <UFormField
@@ -84,7 +84,14 @@
             >
               {{ $t('common.game_edition') }}
             </label>
-            <UTooltip :text="$t('settings.display_name.game_edition_hint')">
+            <UTooltip
+              :text="
+                $t(
+                  'settings.display_name.game_edition_hint',
+                  'Select the game edition you own so tracking matches your available content.'
+                )
+              "
+            >
               <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
             </UTooltip>
           </div>

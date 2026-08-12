@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-5">
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <UButton
         icon="i-mdi-shield-sword"
         block
@@ -36,10 +36,15 @@
         <UIcon name="i-mdi-alert-octagon" class="text-error-400 mt-0.5 h-4 w-4 shrink-0" />
         <div class="space-y-0.5">
           <p class="text-error-300 text-sm font-semibold">
-            {{ $t('settings.data_management.danger_zone_title') }}
+            {{ $t('settings.data_management.danger_zone_title', 'Danger Zone') }}
           </p>
           <p class="text-surface-400 text-xs">
-            {{ $t('settings.data_management.danger_zone_hint') }}
+            {{
+              $t(
+                'settings.data_management.danger_zone_hint',
+                'Resetting all progress permanently deletes your data for PvP, PvE, and Seasonal PvP. This cannot be undone.'
+              )
+            }}
           </p>
         </div>
       </div>

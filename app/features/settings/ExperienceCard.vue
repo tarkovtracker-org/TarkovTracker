@@ -52,7 +52,9 @@
             </div>
             <div
               role="progressbar"
-              :aria-label="$t('settings.experience.xp_progress_aria')"
+              :aria-label="
+                $t('settings.experience.xp_progress_aria', 'Experience progress toward next level')
+              "
               :aria-valuenow="Math.round(xpProgress)"
               aria-valuemin="0"
               aria-valuemax="100"

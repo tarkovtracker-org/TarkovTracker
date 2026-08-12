@@ -10,8 +10,8 @@
     <template #content>
       <div class="space-y-6 px-4 py-4">
         <section class="space-y-3" :aria-labelledby="taskDisplayFlagsLabelId">
-          <p :id="taskDisplayFlagsLabelId" class="text-surface-500 text-xs font-semibold uppercase">
-            {{ $t('settings.interface.tasks.flags_section') }}
+          <p :id="taskDisplayFlagsLabelId" class="text-surface-400 text-xs font-semibold uppercase">
+            {{ $t('settings.interface.tasks.flags_section', 'Task Display') }}
           </p>
           <div class="grid gap-4 md:grid-cols-2">
             <UCheckbox
@@ -31,8 +31,8 @@
         </section>
         <USeparator />
         <section class="space-y-3" :aria-labelledby="taskAvailabilityLabelId">
-          <p :id="taskAvailabilityLabelId" class="text-surface-500 text-xs font-semibold uppercase">
-            {{ $t('settings.interface.tasks.availability_section') }}
+          <p :id="taskAvailabilityLabelId" class="text-surface-400 text-xs font-semibold uppercase">
+            {{ $t('settings.interface.tasks.availability_section', 'Task Availability') }}
           </p>
           <div class="grid gap-4 md:grid-cols-2">
             <UCheckbox
@@ -43,8 +43,8 @@
         </section>
         <USeparator />
         <section class="space-y-3" :aria-labelledby="taskViewDefaultsLabelId">
-          <p :id="taskViewDefaultsLabelId" class="text-surface-500 text-xs font-semibold uppercase">
-            {{ $t('settings.interface.tasks.view_defaults_section') }}
+          <p :id="taskViewDefaultsLabelId" class="text-surface-400 text-xs font-semibold uppercase">
+            {{ $t('settings.interface.tasks.view_defaults_section', 'Default Views') }}
           </p>
           <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div class="space-y-2">
