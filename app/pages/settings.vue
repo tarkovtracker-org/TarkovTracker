@@ -5,10 +5,15 @@
         <div class="flex items-center justify-between pb-4">
           <div>
             <h1 class="text-surface-100 text-xl font-bold">
-              {{ $t('common.settings') }}
+              {{ $t('common.settings', 'Settings') }}
             </h1>
             <p class="text-surface-400 mt-1 text-sm">
-              {{ $t('settings.page_description') }}
+              {{
+                $t(
+                  'settings.page_description',
+                  'Manage your account, game progression, and application preferences.'
+                )
+              }}
             </p>
           </div>
         </div>
@@ -290,16 +295,15 @@
     return nestedTabHashes[hash] ?? legacyTabHashes[hash] ?? null;
   };
   const showPrestigeTab = computed(() => tarkovStore.currentGameMode !== GAME_MODES.SEASONAL);
+  const canonicalizeTab = (tab: SettingsTabId): SettingsTabId =>
+    tab === 'prestige' && !showPrestigeTab.value ? 'progression' : tab;
   const resolveTabFromRoute = (path: string, hash: string): SettingsTabId => {
     if (shouldRedirectLegacyAccountHash(path, hash)) {
       return getDefaultTabFromPath(path);
     }
     const resolved =
       resolveTabFromHash(hash) ?? settingsRouteTabs[path] ?? getDefaultTabFromPath(path);
-    if (resolved === 'prestige' && !showPrestigeTab.value) {
-      return 'progression';
-    }
-    return resolved;
+    return canonicalizeTab(resolved);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
   const settingsSeo = computed(() => {
@@ -395,6 +399,21 @@
       block: 'start',
     });
   };
+  const hiddenPrestigeTarget = (
+    path: string,
+    hash: string
+  ): { path?: string; hash?: string } | null => {
+    if (showPrestigeTab.value) {
+      return null;
+    }
+    if (path === '/prestige') {
+      return { path: '/progression' };
+    }
+    if (hash === settingsTabHashes.prestige) {
+      return { hash: settingsTabHashes.progression };
+    }
+    return null;
+  };
   const onTabChange = (value: string | number) => {
     if (!isSettingsTabId(value)) {
       return;
@@ -436,14 +455,15 @@
         });
         return;
       }
-      activeTab.value = resolveTabFromRoute(path, hash);
-      if (hash === settingsTabHashes.prestige && !showPrestigeTab.value) {
+      const hiddenTarget = hiddenPrestigeTarget(path, hash);
+      if (hiddenTarget) {
         await router.replace({
-          hash: settingsTabHashes.progression,
+          ...hiddenTarget,
           query: route.query,
         });
         return;
       }
+      activeTab.value = resolveTabFromRoute(path, hash);
       if (hash) {
         await scrollToHashTarget(hash);
       }
