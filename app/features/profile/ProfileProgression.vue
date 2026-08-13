@@ -214,6 +214,7 @@
           :counted-tasks="countedTasks"
           :is-task-successful="isTaskSuccessful"
           :is-task-failed="isTaskFailed"
+          :is-task-active="isProfileTaskActive"
           :is-task-locked="isTaskLocked"
           :objective-completions="objectiveCompletions"
         />
@@ -714,8 +715,13 @@
     const completion = taskCompletions.value[taskId] as RawTaskCompletion;
     return getCompletionFlags(completion).failed;
   };
+  const isProfileTaskActive = (taskId: string): boolean => {
+    return isTaskActive(taskCompletions.value[taskId] as RawTaskCompletion);
+  };
   const isTaskLocked = (taskId: string): boolean => {
-    if (isTaskSuccessful(taskId) || isTaskFailed(taskId)) return false;
+    if (isTaskSuccessful(taskId) || isTaskFailed(taskId) || isProfileTaskActive(taskId)) {
+      return false;
+    }
     if (isViewingCurrentMode.value) {
       return progressStore.unlockedTasks[taskId]?.self !== true;
     }

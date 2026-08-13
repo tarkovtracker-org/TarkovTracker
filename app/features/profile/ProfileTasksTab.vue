@@ -137,6 +137,7 @@
     countedTasks: Task[];
     isTaskSuccessful: (taskId: string) => boolean;
     isTaskFailed: (taskId: string) => boolean;
+    isTaskActive: (taskId: string) => boolean;
     isTaskLocked: (taskId: string) => boolean;
     objectiveCompletions: Record<string, ObjectiveCompletion>;
   }
@@ -171,12 +172,15 @@
     tasks: Task[];
   }
   const sections = computed<StatusSection[]>(() => {
+    const active: Task[] = [];
     const available: Task[] = [];
     const locked: Task[] = [];
     const completed: Task[] = [];
     for (const task of props.countedTasks) {
       if (props.isTaskSuccessful(task.id) || props.isTaskFailed(task.id)) {
         completed.push(task);
+      } else if (props.isTaskActive(task.id)) {
+        active.push(task);
       } else if (props.isTaskLocked(task.id)) {
         locked.push(task);
       } else {
@@ -185,11 +189,19 @@
     }
     return [
       {
+        key: 'active',
+        label: t('common.active', 'Active'),
+        icon: 'i-mdi-play-circle-outline',
+        chipClass: 'bg-primary-700/25',
+        iconClass: 'text-primary-300',
+        tasks: active,
+      },
+      {
         key: 'available',
         label: t('common.available', 'Available'),
         icon: 'i-mdi-clipboard-check-outline',
-        chipClass: 'bg-primary-700/25',
-        iconClass: 'text-primary-300',
+        chipClass: 'bg-info-700/25',
+        iconClass: 'text-info-300',
         tasks: available,
       },
       {
@@ -213,14 +225,16 @@
   const taskStatusIcon = (taskId: string): string => {
     if (props.isTaskFailed(taskId)) return 'i-mdi-close-circle';
     if (props.isTaskSuccessful(taskId)) return 'i-mdi-check-circle';
+    if (props.isTaskActive(taskId)) return 'i-mdi-play-circle';
     if (props.isTaskLocked(taskId)) return 'i-mdi-lock';
     return 'i-mdi-circle-outline';
   };
   const taskStatusColor = (taskId: string): string => {
     if (props.isTaskFailed(taskId)) return 'text-error-400';
     if (props.isTaskSuccessful(taskId)) return 'text-success-400';
+    if (props.isTaskActive(taskId)) return 'text-primary-400';
     if (props.isTaskLocked(taskId)) return 'text-warning-400';
-    return 'text-primary-400';
+    return 'text-info-400';
   };
   const objectiveIcon = (objectiveId: string): string => {
     return props.objectiveCompletions[objectiveId]?.complete
