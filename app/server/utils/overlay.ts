@@ -421,6 +421,17 @@ type OverlayTargetData = {
   traders?: Array<{ id: string }>;
   hideoutStations?: Array<{ id: string }>;
 };
+function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOverlayData): void {
+  if (Array.isArray(target.tasks)) {
+    target.tasks = applyLocaleOverlay(target.tasks, localeOverlay.tasks);
+  }
+  if (Array.isArray(target.items)) {
+    target.items = applyLocaleOverlay(target.items, localeOverlay.items);
+  }
+  if (Array.isArray(target.traders)) {
+    target.traders = applyLocaleOverlay(target.traders, localeOverlay.traders);
+  }
+}
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
   options: { bypassCache?: boolean; gameMode?: string; locale?: string } = {}
@@ -480,24 +491,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   const locale = options.locale?.trim() || 'en';
   const localeOverlay = overlay.locales?.[locale];
   if (localeOverlay) {
-    if (Array.isArray(result.data.tasks)) {
-      result.data.tasks = applyLocaleOverlay(
-        result.data.tasks as Array<{ id: string }>,
-        localeOverlay.tasks
-      );
-    }
-    if (Array.isArray(result.data.items)) {
-      result.data.items = applyLocaleOverlay(
-        result.data.items as Array<{ id: string }>,
-        localeOverlay.items
-      );
-    }
-    if (Array.isArray(result.data.traders)) {
-      result.data.traders = applyLocaleOverlay(
-        result.data.traders as Array<{ id: string }>,
-        localeOverlay.traders
-      );
-    }
+    applyLocaleOverlays(result.data, localeOverlay);
   }
   return result;
 }
