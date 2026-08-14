@@ -7,6 +7,12 @@
       <div v-if="isLoadingTeamState" class="flex items-center justify-center py-8">
         <UIcon name="i-mdi-loading" class="text-surface-400 h-6 w-6 animate-spin" />
       </div>
+      <div v-else-if="!isLoggedIn" class="p-4">
+        <LoginRequiredAlert
+          :title="$t('page.team.card.myteam.login_required')"
+          redirect-path="/team"
+        />
+      </div>
       <div v-else-if="!localUserTeam" class="py-4 text-center">
         {{ $t('page.team.card.myteam.no_team') }}
       </div>
@@ -48,11 +54,13 @@
       </div>
     </template>
     <template #footer>
-      <div class="border-surface-700 flex items-center justify-start gap-2 border-t p-4">
-        <template v-if="isLoadingTeamState" />
+      <div
+        v-if="!isLoadingTeamState && isLoggedIn"
+        class="border-surface-700 flex items-center justify-start gap-2 border-t p-4"
+      >
         <UButton
-          v-else-if="!localUserTeam"
-          :disabled="loading.createTeam || !isLoggedIn"
+          v-if="!localUserTeam"
+          :disabled="loading.createTeam"
           :loading="loading.createTeam"
           color="primary"
           icon="i-mdi-account-group"
@@ -62,7 +70,7 @@
         </UButton>
         <UButton
           v-else
-          :disabled="loading.leaveTeam || !isLoggedIn"
+          :disabled="loading.leaveTeam"
           :loading="loading.leaveTeam"
           color="error"
           variant="outline"
@@ -81,6 +89,7 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import {
     getTeamIdFromState,

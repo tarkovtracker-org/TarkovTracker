@@ -104,7 +104,7 @@ describe('i18n-ready plugin', () => {
   it('falls back to english when the browser locale is not supported by the UI', async () => {
     Object.defineProperty(window.navigator, 'language', {
       configurable: true,
-      value: 'it-IT',
+      value: 'ja-JP',
     });
     const setLocale = vi.fn();
     const plugin = (await import('@/plugins/i18n.client')).default;

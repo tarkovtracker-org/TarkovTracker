@@ -1,43 +1,63 @@
 <template>
-  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    <UButton
-      icon="i-mdi-shield-sword"
-      block
-      :ui="{
-        base: 'bg-pvp-900 hover:bg-pvp-800 active:bg-pvp-700 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
-      }"
-      @click="showResetPvPDialog = true"
-    >
-      {{ $t('common.reset_pvp_data') }}
-    </UButton>
-    <UButton
-      icon="i-mdi-calendar-star"
-      color="warning"
-      variant="soft"
-      block
-      @click="showResetSeasonalDialog = true"
-    >
-      {{ $t('common.reset_seasonal_data', 'Reset Seasonal PvP Data') }}
-    </UButton>
-    <UButton
-      icon="i-mdi-account-group"
-      block
-      :ui="{
-        base: 'bg-pve-900 hover:bg-pve-800 active:bg-pve-700 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
-      }"
-      @click="showResetPvEDialog = true"
-    >
-      {{ $t('common.reset_pve_data') }}
-    </UButton>
-    <UButton
-      color="error"
-      variant="soft"
-      icon="i-mdi-delete-sweep"
-      block
-      @click="showResetAllDialog = true"
-    >
-      {{ $t('common.reset_all_data') }}
-    </UButton>
+  <div class="space-y-5">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <UButton
+        icon="i-mdi-shield-sword"
+        block
+        :ui="{
+          base: 'bg-pvp-900 hover:bg-pvp-800 active:bg-pvp-700 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
+        }"
+        @click="showResetPvPDialog = true"
+      >
+        {{ $t('common.reset_pvp_data') }}
+      </UButton>
+      <UButton
+        icon="i-mdi-calendar-star"
+        color="warning"
+        variant="soft"
+        block
+        @click="showResetSeasonalDialog = true"
+      >
+        {{ $t('common.reset_seasonal_data', 'Reset Seasonal PvP Data') }}
+      </UButton>
+      <UButton
+        icon="i-mdi-account-group"
+        block
+        :ui="{
+          base: 'bg-pve-900 hover:bg-pve-800 active:bg-pve-700 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
+        }"
+        @click="showResetPvEDialog = true"
+      >
+        {{ $t('common.reset_pve_data') }}
+      </UButton>
+    </div>
+    <div class="border-error-500/25 bg-error-950/15 space-y-3 rounded-lg border p-4">
+      <div class="flex items-start gap-2">
+        <UIcon name="i-mdi-alert-octagon" class="text-error-400 mt-0.5 h-4 w-4 shrink-0" />
+        <div class="space-y-0.5">
+          <p class="text-error-300 text-sm font-semibold">
+            {{ $t('settings.data_management.danger_zone_title', 'Danger Zone') }}
+          </p>
+          <p class="text-surface-400 text-xs">
+            {{
+              $t(
+                'settings.data_management.danger_zone_hint',
+                'Resetting all progress permanently deletes your data for PvP, PvE, and Seasonal PvP. This cannot be undone.'
+              )
+            }}
+          </p>
+        </div>
+      </div>
+      <UButton
+        color="error"
+        variant="soft"
+        icon="i-mdi-delete-sweep"
+        block
+        @click="showResetAllDialog = true"
+      >
+        {{ $t('common.reset_all_data') }}
+      </UButton>
+    </div>
   </div>
   <UModal v-model:open="showResetPvPDialog">
     <template #header>
@@ -117,13 +137,18 @@
     </template>
     <template #footer="{ close }">
       <div class="flex w-full items-center gap-3">
-        <UButton color="neutral" variant="soft" @click="close">
+        <UButton
+          color="neutral"
+          variant="soft"
+          class="min-w-26 justify-center text-center"
+          @click="close"
+        >
           {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"
           variant="solid"
-          class="ml-auto"
+          class="ml-auto min-w-30 justify-center text-center"
           :loading="resetting"
           @click="resetSeasonalData"
         >

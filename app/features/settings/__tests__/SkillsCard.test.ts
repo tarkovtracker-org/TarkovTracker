@@ -13,13 +13,17 @@ const i18n = createI18n({
   fallbackWarn: false,
   messages: {
     en: {},
+    cs: {},
     de: {},
     es: {},
     fr: {},
+    it: {},
     ru: {},
     uk: {},
     zh: {},
     ko: {},
+    pl: {},
+    pt: {},
   },
 });
 vi.mock('@/composables/useSkillCalculation');
@@ -243,6 +247,27 @@ describe('SkillsCard', () => {
     };
     await input.trigger('keydown', eventLength);
     expect(eventLength.preventDefault).toHaveBeenCalled();
+  });
+  it('keeps required skills in the collapsed list when they sort after optional skills', () => {
+    const skills: UseSkillCalculationMock['allGameSkills']['value'] = Array.from(
+      { length: 4 },
+      (_, index) => ({
+        key: `Optional${index}`,
+        name: `Optional${index}`,
+        requiredByTasks: [],
+        requiredLevels: [],
+        rewardedByTasks: [],
+      })
+    );
+    skills.push({
+      key: 'Required',
+      name: 'Required',
+      requiredByTasks: ['Task'],
+      requiredLevels: [1],
+      rewardedByTasks: [],
+    });
+    const wrapper = createWrapper({ allGameSkills: computed(() => skills) });
+    expect(wrapper.find('#settings-skill-Required').exists()).toBe(true);
   });
   it('allows edits when displayed value is fractional', async () => {
     const wrapper = createWrapper({

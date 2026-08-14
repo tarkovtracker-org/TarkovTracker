@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount, flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
 import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
 const {
   invokeMock,
@@ -75,7 +76,8 @@ const GenericCard = {
   props: ['icon', 'iconColor', 'highlightColor', 'fillHeight', 'title', 'titleClasses'],
 };
 const UAlert = {
-  template: '<div :data-color="color">{{ title }} {{ description }}</div>',
+  template:
+    '<div :data-color="color">{{ title }} {{ description }}<slot name="description" /></div>',
   props: ['color', 'variant', 'icon', 'title', 'description'],
 };
 const UButton = {
@@ -253,6 +255,7 @@ describe('DiscordLinkCard', () => {
   it('sends logged-out users to login without starting identity linking', async () => {
     userState.id = null;
     const wrapper = await mountCard();
+    expect(wrapper.findComponent(LoginRequiredAlert).exists()).toBe(true);
     expect(wrapper.get('a').attributes('href')).toBe('/login?redirect=%2Fsettings%23account');
     expect(wrapper.text()).toContain('settings.discord_link.login_to_link');
     expect(linkIdentityMock).not.toHaveBeenCalled();
