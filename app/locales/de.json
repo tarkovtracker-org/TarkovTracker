@@ -1187,6 +1187,7 @@
           "url_copied": "URL in Zwischenablage kopiert",
           "copy_url_failed": "Fehler beim Kopieren der URL in die Zwischenablage",
           "no_team": "Du bist derzeit in keinem Team.",
+          "login_required": "Melden Sie sich an, um ein Team zu erstellen oder verwalten Sie Ihren Team-Einladungs-Link.",
           "team_invite_url_label": "Team-Einladungs-URL",
           "copy_link": "Kopieren",
           "link_hidden_message": "Klicke auf 'Anzeigen', um deinen Team-Einladungslink anzuzeigen",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov-Monitor",
     "resources": "Resources",
+    "section_more": "Mehr",
     "profile": "Profil",
     "section_navigation": "Navigation",
     "section_external": "Extern",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "Sprache",
+    "page_description": "Verwalten Sie Ihr Konto, Spielfortschritt und die Einstellungen Ihrer Anwendung.",
     "tabs": {
       "progression": "Fortschritt",
       "imports": "Importe"
     },
     "tab_groups": {
-      "game": "Spiel",
-      "account_advanced": "Konto & Erweitert"
+      "game_progress": "Spielfortschritt",
+      "app": "App",
+      "data": "Daten",
+      "account": "Konto",
+      "tools_integrations": "Werkzeuge & Integrationen"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Allgemeine Einstellungen",
       "privacy_mode": "Streamer-Modus",
       "privacy_mode_hint": "Verbirgt sensible Informationen während du streamst."
     },
@@ -1761,7 +1768,10 @@
         "show_next": "Nächste Aufgaben anzeigen",
         "show_prev": "Vorherige Aufgaben anzeigen",
         "density": "Kartendichte",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Aufgabenanzeige",
+        "availability_section": "Aufgabenverfügbarkeit",
+        "view_defaults_section": "Standardaufrufe"
       },
       "maps": {
         "show_extracts": "Extraktionen standardmäßig anzeigen",
@@ -1852,6 +1862,8 @@
       "export_error_title": "Export fehlgeschlagen",
       "debug_export_error_title": "Debug-Export fehlgeschlagen",
       "reset_title": "Fortschritt zurücksetzen",
+      "danger_zone_title": "Gefahrenzone",
+      "danger_zone_hint": "Beim Zurücksetzen aller Fortschritte werden deine Daten für PvP, PvE und PvP dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
       "prestige_history_title": "Prestige-Verlauf",
       "prestige_history_loading": "Prestige-Verlauf wird geladen...",
       "prestige_history_empty": "Noch keine archivierten Prestige-Durchläufe.",
@@ -2025,7 +2037,9 @@
       "saved_title": "Anzeigename gespeichert",
       "saved_description": "Dein {mode}-Anzeigename wurde aktualisiert",
       "save_failed_title": "Speichern fehlgeschlagen",
-      "save_failed_description": "Anzeigename konnte nicht gespeichert werden. Bitte versuche es erneut."
+      "save_failed_description": "Anzeigename konnte nicht gespeichert werden. Bitte versuche es erneut.",
+      "active_mode": "Aktiv",
+      "game_edition_hint": "Wählen Sie die eigene Spielausgabe, so dass die Tracking zu Ihrem verfügbaren Inhalt passt."
     },
     "skills": {
       "title": "Fertigkeiten-Verwaltung",
@@ -2042,7 +2056,10 @@
       "valid_range": "Gültiger Bereich: 0-51",
       "sort": {
         "ingame": "Im Spiel"
-      }
+      },
+      "quest_tooltip": "Fertigkeitsstufe wird automatisch durch abgeschlossene Questbelohnungen gewährt.",
+      "offset_tooltip": "Manuelle Anpassung auf dem Level der Questbelohnung. Positiv bedeutet, dass du die Fertigkeit über den Questbelohnungen trainierst.",
+      "collapsed_hint": "{shown} von {total} Skills anzeigen. Zeigen Sie alle, um jeden Skill zu sehen."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2069,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Zuhören...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "Gib deine tatsächliche Gesamt-XP ein, um den Offset automatisch anzupassen.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} bis zum nächsten",
-      "reset_offset": "XP-Offset zurücksetzen"
+      "reset_offset": "XP-Offset zurücksetzen",
+      "xp_progress_aria": "Erfahrungsfortschritt auf dem nächsten Level",
+      "xp_progress_value": "{percent}% zum nächsten Level"
     },
     "danger_zone": {
       "confirm_word": "DELETE"

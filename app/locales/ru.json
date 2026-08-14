@@ -1187,6 +1187,7 @@
           "url_copied": "URL скопирован в буфер обмена",
           "copy_url_failed": "Не удалось скопировать URL в буфер обмена",
           "no_team": "Вы не состоите в команде.",
+          "login_required": "Войдите, чтобы создать команду или управлять пригласительной ссылкой вашей команды.",
           "team_invite_url_label": "Ссылка для приглашения в команду",
           "copy_link": "Копировать",
           "link_hidden_message": "Нажмите «Показать», чтобы отобразить ссылку для приглашения в команду.",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov Монитор",
     "resources": "Resources",
+    "section_more": "Ещё",
     "profile": "Профиль",
     "section_navigation": "Навигация",
     "section_external": "Внешние ресурсы",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "Язык",
+    "page_description": "Управляйте аккаунтом, игровым прогрессом и настройками приложения.",
     "tabs": {
       "progression": "Прогресс",
       "imports": "Импорт"
     },
     "tab_groups": {
-      "game": "Игра",
-      "account_advanced": "Аккаунт и расширенное"
+      "game_progress": "Прогресс игры",
+      "app": "Приложение",
+      "data": "Данные",
+      "account": "Аккаунт",
+      "tools_integrations": "Инструменты и интеграции"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Общие настройки",
       "privacy_mode": "Режим стримера",
       "privacy_mode_hint": "Скрывает конфиденциальную информацию во время трансляции."
     },
@@ -1761,7 +1768,10 @@
         "show_next": "Показывать следующие задания",
         "show_prev": "Показывать предыдущие задания",
         "density": "Плотность карточек",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Отображение задач",
+        "availability_section": "Доступность задачи",
+        "view_defaults_section": "Виды по умолчанию"
       },
       "maps": {
         "show_extracts": "Показывать выходы по умолчанию",
@@ -1852,6 +1862,8 @@
       "export_error_title": "Ошибка экспорта",
       "debug_export_error_title": "Не удалось экспортировать отладочный снимок",
       "reset_title": "Сбросить прогресс",
+      "danger_zone_title": "Опасная зона",
+      "danger_zone_hint": "Сброс всего прогресса навсегда удаляет ваши данные для PvP, PvE и сезонных PvP. Это действие нельзя отменить.",
       "prestige_history_title": "История престижа",
       "prestige_history_loading": "Загрузка истории престижа...",
       "prestige_history_empty": "Пока нет архивированных прогонов престижа.",
@@ -2025,7 +2037,9 @@
       "saved_title": "Отображаемое имя сохранено",
       "saved_description": "Ваше отображаемое имя для режима {mode} обновлено",
       "save_failed_title": "Не удалось сохранить",
-      "save_failed_description": "Не удалось сохранить отображаемое имя. Попробуйте ещё раз."
+      "save_failed_description": "Не удалось сохранить отображаемое имя. Попробуйте ещё раз.",
+      "active_mode": "Активный",
+      "game_edition_hint": "Выберите собственную редакцию, чтобы отслеживание соответствовало вашему доступному контенту."
     },
     "skills": {
       "title": "Управление навыками",
@@ -2042,7 +2056,10 @@
       "valid_range": "Допустимый диапазон: 0–51.",
       "sort": {
         "ingame": "В игре"
-      }
+      },
+      "quest_tooltip": "Уровень навыка автоматически дается наградой выполнения задания.",
+      "offset_tooltip": "Ручная настройка верхнего уровня наград за задание. Позиция означает, что вы обучили навыку над наградой заданий.",
+      "collapsed_hint": "Показаны навыки {shown} из {total} . Покажите все, чтобы увидеть все навыки."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2069,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Прослушивание...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "Введите текущее общее количество очков опыта, чтобы автоматически скорректировать смещение.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "Осталось: {amount}",
-      "reset_offset": "Сбросить смещение опыта"
+      "reset_offset": "Сбросить смещение опыта",
+      "xp_progress_aria": "Прогресс на следующем уровне",
+      "xp_progress_value": "{percent}% к следующему уровню"
     },
     "danger_zone": {
       "confirm_word": "УДАЛИТЬ"

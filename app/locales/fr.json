@@ -1187,6 +1187,7 @@
           "url_copied": "URL copiée dans le presse-papiers",
           "copy_url_failed": "Impossible de copier l'URL dans le presse-papiers",
           "no_team": "Vous n'êtes actuellement dans aucune équipe.",
+          "login_required": "Connectez-vous pour créer une équipe ou gérer le lien d'invitation de votre équipe.",
           "team_invite_url_label": "URL d'invitation de l’équipe",
           "copy_link": "Copie",
           "link_hidden_message": "Cliquez sur \"Afficher\" pour révéler le lien d'invitation de votre équipe",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Gourou Tarkov",
     "tarkovmonitor": "Moniteur Tarkov",
     "resources": "Documentation",
+    "section_more": "En savoir plus",
     "profile": "Profil",
     "section_navigation": "Navigation",
     "section_external": "Externe",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "Langue",
+    "page_description": "Gérez votre compte, votre progression de jeu et vos préférences d'application.",
     "tabs": {
       "progression": "Progression",
       "imports": "Imports"
     },
     "tab_groups": {
-      "game": "Jeu",
-      "account_advanced": "Compte et avancé"
+      "game_progress": "Progression de la partie",
+      "app": "Application",
+      "data": "Donnée",
+      "account": "Compte",
+      "tools_integrations": "Outils & Intégrations"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copier l'état de débogage"
     },
     "general": {
+      "title": "Préférences Générales",
       "privacy_mode": "Mode streamer",
       "privacy_mode_hint": "Masque les informations sensibles pendant que vous diffusez."
     },
@@ -1761,7 +1768,10 @@
         "show_next": "Afficher les quêtes suivantes",
         "show_prev": "Afficher les quêtes précédentes",
         "density": "Densité des cartes",
-        "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches"
+        "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches",
+        "flags_section": "Affichage des Tâches",
+        "availability_section": "Disponibilité des tâches",
+        "view_defaults_section": "Vues par défaut"
       },
       "maps": {
         "show_extracts": "Afficher les extractions par défaut",
@@ -1852,6 +1862,8 @@
       "export_error_title": "Échec de l'exportation",
       "debug_export_error_title": "Échec de l’export de débogage",
       "reset_title": "Réinitialiser la progression",
+      "danger_zone_title": "Zone de danger",
+      "danger_zone_hint": "La réinitialisation de tous les progrès supprime définitivement vos données pour le JcJ, le JcE et le JcJ saisonnier. Cela ne peut pas être annulé.",
       "prestige_history_title": "Historique de prestige",
       "prestige_history_loading": "Chargement de l'historique de prestige...",
       "prestige_history_empty": "Aucune run de prestige archivée pour le moment.",
@@ -2025,7 +2037,9 @@
       "saved_title": "Nom d'affichage enregistré",
       "saved_description": "Votre nom d'affichage {mode} a été mis à jour",
       "save_failed_title": "Échec de l'enregistrement",
-      "save_failed_description": "Impossible d'enregistrer le nom d'affichage. Veuillez réessayer."
+      "save_failed_description": "Impossible d'enregistrer le nom d'affichage. Veuillez réessayer.",
+      "active_mode": "Actif",
+      "game_edition_hint": "Sélectionnez l'édition du jeu que vous possédez afin que le suivi corresponde à votre contenu disponible."
     },
     "skills": {
       "title": "Gestion des compétences",
@@ -2042,7 +2056,10 @@
       "valid_range": "Plage valide : 0-51",
       "sort": {
         "ingame": "En jeu"
-      }
+      },
+      "quest_tooltip": "Niveau de compétence octroyé automatiquement par les récompenses de quête.",
+      "offset_tooltip": "Ajustement manuel en plus du niveau de récompense de quête. Positif signifie que vous avez entraîné la compétence au-dessus des récompenses de quête.",
+      "collapsed_hint": "Afficher {shown} des compétences {total} . Montrez tout pour voir chaque compétence."
     },
     "keybinds": {
       "title": "Raccourcis clavier",
@@ -2052,6 +2069,7 @@
       "undo_description": "Appuyez sur ce raccourci pour annuler votre dernier changement de progression.",
       "record_placeholder": "Cliquez pour enregistrer...",
       "recording": "Appuyez sur la combinaison de touches ...",
+      "listening": "Écoute...",
       "reset_aria": "Restaurer les valeurs par défaut",
       "conflict_omnibar": "Le raccourci entre en conflit avec le raccourci clavier Undo.",
       "conflict_undo": "Le raccourci entre en conflit avec le lien de recherche.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "Entrez votre XP total réel pour ajuster automatiquement le décalage.",
       "xp_amount": "+{amount} XP",
       "xp_to_next": "{amount} pour le suivant",
-      "reset_offset": "Réinitialiser le décalage XP"
+      "reset_offset": "Réinitialiser le décalage XP",
+      "xp_progress_aria": "Expérimentez les progrès vers le niveau suivant",
+      "xp_progress_value": "{percent}% vers le niveau suivant"
     },
     "danger_zone": {
       "confirm_word": "SUPPRIMER"
