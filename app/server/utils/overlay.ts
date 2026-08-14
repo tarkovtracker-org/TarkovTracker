@@ -25,9 +25,6 @@ interface LocaleOverlayData {
   tasks?: Record<string, Record<string, unknown>>;
   items?: Record<string, Record<string, unknown>>;
   traders?: Record<string, Record<string, unknown>>;
-  maps?: Record<string, Record<string, unknown>>;
-  prestige?: Record<string, Record<string, unknown>>;
-  storyChapters?: Record<string, Record<string, unknown>>;
 }
 interface OverlayData {
   tasks?: Record<string, Record<string, unknown>>;
@@ -257,14 +254,6 @@ function applyEntityOverlay<T extends { id: string }>(
   }
   return result;
 }
-/**
- * Apply per-locale corrections to an array of entities.
- *
- * Locale overrides patch locale-sensitive fields (name, shortName, description,
- * wikiLink, and ID-keyed objective descriptions) for a specific locale bundle.
- * They take precedence over data overrides, so apply them last. Shallow-merges
- * each entity's patch via deepMerge so ID-keyed objective patches are handled.
- */
 export function applyLocaleOverlay<T extends { id: string }>(
   entities: T[],
   localePatches: Record<string, Record<string, unknown>> | undefined
@@ -486,8 +475,6 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
       overlay.hideout
     );
   }
-  // Apply per-locale corrections last: they take precedence over data overrides
-  // for locale-sensitive fields (name, wikiLink, objective descriptions).
   const locale = options.locale?.trim() || 'en';
   const localeOverlay = overlay.locales?.[locale];
   if (localeOverlay) {

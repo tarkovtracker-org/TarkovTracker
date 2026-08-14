@@ -309,7 +309,7 @@ sequenceDiagram
     participant Handler
     participant Overlay as overlay.ts
     participant GitHub as raw.githubusercontent.com<br/>tarkov-data-overlay
-    Handler->>Overlay: applyOverlay(basePayload, { gameMode, bypassCache })
+    Handler->>Overlay: applyOverlay(basePayload, { gameMode, bypassCache, locale })
     Overlay->>Overlay: check module cache (1h TTL)
     alt cache fresh
         Overlay-->>Overlay: use cached overlay
@@ -329,6 +329,10 @@ sequenceDiagram
   (`OVERLAY_CACHE_TTL = 3600000`).
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
+- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, and `traders`
+  (locale-sensitive fields such as name, wikiLink, and objective descriptions) and are applied last
+  so they take precedence over global and mode-specific corrections. The locale defaults to `en`
+  when a handler does not pass one.
 - `tasksAdd` lets the overlay inject entirely new tasks not present upstream.
 - Objective post-processing (`objectiveTypeInferrer.ts`) normalizes objective lists and infers
   `foundInRaid` flags so the client does not have to guess.
