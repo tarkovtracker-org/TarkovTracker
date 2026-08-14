@@ -11,7 +11,7 @@
       <div class="space-y-3 px-4 py-4">
         <div class="flex items-center justify-between gap-3">
           <div class="space-y-1">
-            <p class="text-surface-200 text-sm font-semibold">
+            <p :id="privacyModeLabelId" class="text-surface-200 text-sm font-semibold">
               {{ $t('settings.general.privacy_mode', 'Privacy Mode') }}
             </p>
             <p class="text-surface-400 text-sm">
@@ -25,6 +25,7 @@
           </div>
           <USwitch
             :model-value="streamerMode"
+            :aria-labelledby="privacyModeLabelId"
             :disabled="!isLoggedIn || streamerModeCooldown"
             :ui="{
               base: 'data-[state=unchecked]:bg-error-500 data-[state=checked]:bg-success-500',
@@ -58,6 +59,7 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import type { SupabaseUser } from '@/types/supabase-plugin';
   const preferencesStore = usePreferencesStore();
+  const privacyModeLabelId = 'settings-privacy-mode-label';
   const antifandomLabelId = 'settings-antifandom-label';
   const { $supabase } = useNuxtApp();
   const typedUser = computed<SupabaseUser | null>(() => {
