@@ -1,3 +1,10 @@
+## [1.70.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.0...v1.70.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **i18n:** apply per-locale overlay corrections to tarkov.dev data ([27cd16d](https://github.com/tarkovtracker-org/TarkovTracker/commit/27cd16d86db0111d2c512894936159d68f2f9604))
+
 # [1.70.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.4...v1.70.0) (2026-08-14)
 
 
