@@ -116,7 +116,9 @@
     dismissed.value = false;
     try {
       sessionStorage.removeItem(DISMISS_KEY);
-    } catch {}
+    } catch (error) {
+      logger.warn('[PromotedTwitchEmbed] Failed to clear stored dismissal', error);
+    }
   };
   const dismiss = (): void => {
     dismissed.value = true;

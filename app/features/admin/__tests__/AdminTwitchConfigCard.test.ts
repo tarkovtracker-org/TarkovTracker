@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AdminTwitchConfigCard from '@/features/admin/AdminTwitchConfigCard.vue';
+import { logger } from '@/utils/logger';
 const { fetchMock, getSessionMock, refreshSessionMock, toastAddMock } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   getSessionMock: vi.fn(),
@@ -114,6 +115,7 @@ describe('AdminTwitchConfigCard', () => {
     expect(wrapper.findAll('input')[1]!.attributes('value')).toBe('streamer');
   });
   it('surfaces the server validation message on failure', async () => {
+    vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/twitch/config') {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
@@ -130,15 +132,42 @@ describe('AdminTwitchConfigCard', () => {
       expect.objectContaining({ color: 'error', description: 'Invalid channel' })
     );
   });
-  it('reports a load failure separately from a save failure', async () => {
-    fetchMock.mockImplementation(() => Promise.reject(new Error('offline')));
+  it('reports and logs a load failure separately from a save failure', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const error = new Error('offline');
+    fetchMock.mockImplementation(() => Promise.reject(error));
     mountCard();
     await flushPromises();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[AdminTwitchConfigCard] Failed to load Twitch config',
+      error
+    );
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'error',
         title: 'admin.twitch_config_load_failed_title',
       })
+    );
+  });
+  it('logs a save failure before displaying the existing error toast', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const error = Object.assign(new Error('Bad Request'), { data: { message: 'Invalid channel' } });
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/config') {
+        return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
+      }
+      return Promise.reject(error);
+    });
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[AdminTwitchConfigCard] Failed to save Twitch config',
+      error
+    );
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'error', description: 'Invalid channel' })
     );
   });
 });

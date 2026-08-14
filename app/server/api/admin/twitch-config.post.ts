@@ -4,7 +4,6 @@ import { createLogger } from '@/server/utils/logger';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
-const SETTING_KEY = 'promoted_twitch';
 const DISPLAY_NAME_MAX_LENGTH = 50;
 interface AdminTwitchConfigBody {
   channel?: unknown;
@@ -18,12 +17,25 @@ interface TwitchConfig {
 }
 interface SettingRow {
   value: TwitchConfig;
+  version: number;
 }
 interface AdminAuthUser {
   id?: string;
   email?: string;
 }
 export default defineEventHandler(async (event) => {
+  try {
+    return await handleUpdate(event);
+  } catch (error) {
+    logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
+      action: 'update_promoted_twitch_config',
+      adminUserId: readAdminUserIdForLog(event),
+      error,
+    });
+    throw error;
+  }
+});
+async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; version: number }> {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
@@ -33,66 +45,36 @@ export default defineEventHandler(async (event) => {
   const adminUserId = readAdminUserId(event);
   await requireAdmin(supabaseUrl, serviceKey, adminUserId);
   const input = readInput((await readBody(event)) ?? {});
-  const saved = await upsertConfig(supabaseUrl, serviceKey, adminUserId, input);
-  await writeAuditLog(supabaseUrl, serviceKey, {
+  const saved = await updateConfig(
+    supabaseUrl,
+    serviceKey,
     adminUserId,
-    action: 'twitch_config_update',
-    details: { adminEmail: readAdminEmail(event), ...saved },
-  });
-  return { config: saved };
-});
-async function writeAuditLog(
-  supabaseUrl: string,
-  serviceKey: string,
-  payload: {
-    action: string;
-    adminUserId: string;
-    details: Record<string, unknown>;
-  }
-): Promise<void> {
-  try {
-    await adminSupabaseFetch(supabaseUrl, serviceKey, '/rest/v1/admin_audit_log', {
-      method: 'POST',
-      body: JSON.stringify({
-        action: payload.action,
-        admin_user_id: payload.adminUserId,
-        details: payload.details,
-      }),
-      headers: {
-        Prefer: 'return=minimal',
-      },
-    });
-  } catch (error) {
-    logger.warn('[AdminTwitchConfig] Failed to write audit log', {
-      error,
-      action: payload.action,
-    });
-  }
+    readAdminEmail(event),
+    input
+  );
+  return { config: saved.value, version: saved.version };
 }
-async function upsertConfig(
+async function updateConfig(
   supabaseUrl: string,
   serviceKey: string,
   adminUserId: string,
+  adminEmail: string | null,
   config: TwitchConfig
-): Promise<TwitchConfig> {
+): Promise<SettingRow> {
   const rows = await adminSupabaseFetch<SettingRow[]>(
     supabaseUrl,
     serviceKey,
-    `/rest/v1/app_settings?on_conflict=key`,
+    '/rest/v1/rpc/update_promoted_twitch_config',
     {
       method: 'POST',
       body: JSON.stringify({
-        key: SETTING_KEY,
-        value: config,
-        updated_at: new Date().toISOString(),
-        updated_by: adminUserId,
+        p_value: config,
+        p_admin_user_id: adminUserId,
+        p_admin_email: adminEmail,
       }),
-      headers: {
-        Prefer: 'resolution=merge-duplicates,return=representation',
-      },
     }
   );
-  const saved = rows?.[0]?.value;
+  const saved = rows?.[0];
   if (!saved) {
     throw createError({ statusCode: 502, message: 'Twitch config update returned no row' });
   }
@@ -118,6 +100,10 @@ function readAdminUserId(event: H3Event): string {
 function readAdminEmail(event: H3Event): string | null {
   const user = (event.context as { auth?: { user?: AdminAuthUser } }).auth?.user;
   return user?.email ?? null;
+}
+function readAdminUserIdForLog(event: H3Event): string | null {
+  const user = (event.context as { auth?: { user?: AdminAuthUser } }).auth?.user;
+  return user?.id ?? null;
 }
 function readInput(body: AdminTwitchConfigBody): TwitchConfig {
   const channel = readChannel(body.channel);

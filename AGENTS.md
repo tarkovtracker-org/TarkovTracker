@@ -212,11 +212,11 @@ Naming:
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.
-- The promoted Twitch stream is admin-managed data, not build configuration. `public.app_settings` is
-  service-role-only; `/api/twitch/config` resolves the `promoted_twitch` override over the build-time
-  fallback, and `/api/admin/twitch-config` is the only writer. `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED`
-  is opt-in (`true` enables), so the promotion stays off unless an admin turns it on. See the
-  Promoted Twitch configuration section of `docs/SYSTEMS.md`.
+- The promoted Twitch stream supports a build-time fallback and an admin-managed override.
+  `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=true` directly enables the build-time fallback without an
+  admin write. `public.app_settings` is service-role-only; `/api/twitch/config` resolves the
+  admin-managed `promoted_twitch` override over that fallback, and `/api/admin/twitch-config` is the
+  only writer. See the Promoted Twitch configuration section of `docs/SYSTEMS.md`.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling

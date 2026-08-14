@@ -892,14 +892,15 @@ flowchart LR
 
 1. `AdminTwitchConfigCard` loads the effective public configuration and obtains the current Supabase
    access token before saving.
-2. `POST /api/admin/twitch-config` requires authenticated admin membership, validates the Twitch
-   channel, display name, and enabled flag, then upserts the `promoted_twitch` JSON value through the
-   service role. The successful value is recorded in the existing admin audit log.
+2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
+   channel, display name, and enabled flag. It calls `update_promoted_twitch_config`, which updates the
+   `promoted_twitch` JSON value, advances its shared version, and writes the admin audit row in one
+   database transaction. A failure rolls back both writes.
 3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
-   of breaking the embed. A failed override read is not cached, so the next request retries the
-   database. Successful resolutions are cached in-process for 30 seconds and sent with
-   `cache-control: public, max-age=15, s-maxage=30`.
+   of breaking the embed. The route reads the shared version on every request, returns it as an ETag,
+   and sends `cache-control: public, max-age=0, must-revalidate`, so neither a Nitro isolate nor the
+   edge can serve an update without revalidating the database-backed version.
 4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
    replace the player URL and clear a stored dismissal, disabling hides an active player, and an
    unavailable config endpoint keeps the build-time fallback working. Refreshes are single-flight, so
@@ -909,9 +910,11 @@ flowchart LR
 
 - `app/features/admin/AdminTwitchConfigCard.vue` — admin form and authenticated save flow.
 - `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, and audit.
-- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and caching.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and versioned
+  revalidation.
 - `app/components/PromotedTwitchEmbed.vue` — minute polling and player state updates.
-- `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table.
+- `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
+  transactional update/audit RPC.
 
 ### Invariants
 
@@ -921,15 +924,18 @@ flowchart LR
   the request body or changing settings.
 - Twitch channels are normalized to lowercase and limited to Twitch-compatible letters, digits, and
   underscores with a maximum length of 25 characters. Display names are limited to 50 characters.
+- The settings update, version increment, and audit insert are one database transaction; none may
+  commit independently.
 - Invalid or unavailable database overrides never make the public route fail; build-time runtime
   config remains the fallback.
 - The build-time fallback is opt-in: `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED` must be exactly `true` to
-  promote a stream without a database override. A missing or malformed flag resolves to disabled, so
-  no promotion can reappear by default.
-- Mounted clients re-read configuration on the same 60-second cadence as live status so an admin
-  change takes effect without reload or redeploy. The layers compound: up to 30 seconds of
-  in-process cache, up to 30 seconds of shared cache, and up to 60 seconds until the next client
-  poll, so worst-case propagation is about two minutes.
+  promote a stream without a database override or admin write. The admin-managed override can change
+  the effective channel, display name, and enabled state. A missing or malformed build-time flag
+  resolves to disabled.
+- Public responses must revalidate the shared database version instead of relying on module-local or
+  independently stale edge state.
+- Mounted clients re-read configuration on the same 60-second cadence as live status, so an admin
+  change takes effect without reload or redeploy within the next client poll after revalidation.
 
 ## When this doc is wrong
 

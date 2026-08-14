@@ -3,8 +3,7 @@ import { useRuntimeConfig } from '#imports';
 import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('twitch-config');
-const CACHE_TTL_MS = 30_000;
-const LIVE_HEADERS = { 'cache-control': 'public, max-age=15, s-maxage=30' };
+const REVALIDATE_HEADERS = { 'cache-control': 'public, max-age=0, must-revalidate' };
 const SETTING_KEY = 'promoted_twitch';
 const DEFAULT_CHANNEL = 'honeyxxo';
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
@@ -21,12 +20,13 @@ interface TwitchFallback {
 }
 interface SettingRow {
   value?: Record<string, unknown>;
+  version?: number;
 }
 interface OverrideResult {
   ok: boolean;
   value?: Record<string, unknown>;
+  version?: number;
 }
-let cached: { config: TwitchConfig; fetchedAt: number } | null = null;
 function normalizeChannel(value: unknown): string {
   if (typeof value !== 'string') return '';
   const channel = value.trim().toLowerCase();
@@ -59,11 +59,6 @@ function resolveConfig(fallback: TwitchFallback, override?: Record<string, unkno
     enabled: boolOr(override.enabled, base.enabled),
   };
 }
-function readCached(): TwitchConfig | null {
-  if (!cached) return null;
-  if (Date.now() - cached.fetchedAt >= CACHE_TTL_MS) return null;
-  return cached.config;
-}
 function readSupabaseUrl(runtime: Record<string, unknown>): string {
   return normalizeSupabaseUrl(runtime.supabaseUrl);
 }
@@ -82,9 +77,9 @@ async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<Ov
     const rows = await adminSupabaseFetch<SettingRow[]>(
       supabaseUrl,
       serviceKey,
-      `/rest/v1/app_settings?select=value&key=eq.${SETTING_KEY}&limit=1`
+      `/rest/v1/app_settings?select=value,version&key=eq.${SETTING_KEY}&limit=1`
     );
-    return { ok: true, value: rows?.[0]?.value };
+    return { ok: true, value: rows?.[0]?.value, version: rows?.[0]?.version };
   } catch (err) {
     logger.warn('Failed to read Twitch config override, falling back to env defaults', err);
     return { ok: false };
@@ -97,14 +92,13 @@ function readFallback(runtime: Record<string, unknown>): TwitchFallback {
 export default defineEventHandler(async (event) => {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
   const fallback = readFallback(runtime);
-  const cachedConfig = readCached();
-  if (cachedConfig) {
-    setResponseHeaders(event, LIVE_HEADERS);
-    return cachedConfig;
-  }
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
-  if (override.ok) cached = { config, fetchedAt: Date.now() };
-  setResponseHeaders(event, LIVE_HEADERS);
+  setResponseHeaders(event, {
+    ...REVALIDATE_HEADERS,
+    ...(override.ok && override.version !== undefined
+      ? { etag: `"promoted-twitch-${override.version}"` }
+      : {}),
+  });
   return config;
 });

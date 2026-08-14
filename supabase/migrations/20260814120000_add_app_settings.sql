@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.app_settings (
   key TEXT PRIMARY KEY,
   value JSONB NOT NULL,
+  version BIGINT NOT NULL DEFAULT 1,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
@@ -27,5 +28,38 @@ CREATE POLICY "No direct access"
   TO anon, authenticated
   USING (false)
   WITH CHECK (false);
+
+CREATE OR REPLACE FUNCTION public.update_promoted_twitch_config(
+  p_value JSONB,
+  p_admin_user_id UUID,
+  p_admin_email TEXT
+)
+RETURNS TABLE(value JSONB, version BIGINT)
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  INSERT INTO public.app_settings AS settings (key, value, version, updated_at, updated_by)
+  VALUES ('promoted_twitch', p_value, 1, NOW(), p_admin_user_id)
+  ON CONFLICT (key) DO UPDATE
+  SET value = EXCLUDED.value,
+      version = settings.version + 1,
+      updated_at = EXCLUDED.updated_at,
+      updated_by = EXCLUDED.updated_by
+  RETURNING settings.value, settings.version;
+
+  INSERT INTO public.admin_audit_log (action, admin_user_id, details)
+  VALUES (
+    'twitch_config_update',
+    p_admin_user_id,
+    jsonb_build_object('adminEmail', p_admin_email) || p_value
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.update_promoted_twitch_config(JSONB, UUID, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.update_promoted_twitch_config(JSONB, UUID, TEXT) TO service_role;
 
 COMMIT;

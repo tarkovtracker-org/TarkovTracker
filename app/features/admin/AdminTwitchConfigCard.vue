@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import { logger } from '@/utils/logger';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -28,7 +29,8 @@
     isLoading.value = true;
     try {
       applyConfig(await $fetch<TwitchConfig>('/api/twitch/config'));
-    } catch {
+    } catch (error) {
+      logger.warn('[AdminTwitchConfigCard] Failed to load Twitch config', error);
       toast.add({
         title: t('admin.twitch_config_load_failed_title', 'Twitch config unavailable'),
         description: t(
@@ -92,6 +94,7 @@
         icon: 'i-mdi-check-circle',
       });
     } catch (error) {
+      logger.warn('[AdminTwitchConfigCard] Failed to save Twitch config', error);
       toast.add({
         title: t('common.update_failed', 'Update failed'),
         description: errorMessage(error),

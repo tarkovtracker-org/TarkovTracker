@@ -185,6 +185,22 @@ describe('PromotedTwitchEmbed', () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
     wrapper.unmount();
   });
+  it('logs a warning when clearing a stored dismissal fails', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const removeItemSpy = vi.spyOn(sessionStorage, 'removeItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+    const wrapper = await mountEmbed();
+    await wrapper.get('button[aria-label="Close player"]').trigger('click');
+    await wrapper.get('button[aria-label="Reopen stream"]').trigger('click');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[PromotedTwitchEmbed] Failed to clear stored dismissal',
+      expect.any(Error)
+    );
+    expect(wrapper.find('iframe').exists()).toBe(true);
+    removeItemSpy.mockRestore();
+    wrapper.unmount();
+  });
   it('logs a warning when the config refresh fails', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     fetchMock.mockImplementation((url: string) =>

@@ -56,9 +56,12 @@ describe('/api/twitch/config', () => {
       enabled: true,
     });
   });
-  it('applies the database override when present', async () => {
+  it('applies the database override and exposes its version as an ETag', async () => {
     adminSupabaseFetchMock.mockResolvedValue([
-      { value: { channel: 'DbStreamer', displayName: 'DB Streamer', enabled: false } },
+      {
+        value: { channel: 'DbStreamer', displayName: 'DB Streamer', enabled: false },
+        version: 7,
+      },
     ]);
     const handler = await loadHandler();
     await expect(handler({})).resolves.toEqual({
@@ -66,6 +69,13 @@ describe('/api/twitch/config', () => {
       displayName: 'DB Streamer',
       enabled: false,
     });
+    expect(setResponseHeadersMock).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        'cache-control': 'public, max-age=0, must-revalidate',
+        etag: '"promoted-twitch-7"',
+      })
+    );
   });
   it('ignores malformed database override fields', async () => {
     adminSupabaseFetchMock.mockResolvedValue([
@@ -75,6 +85,7 @@ describe('/api/twitch/config', () => {
           displayName: 'x'.repeat(51),
           enabled: 'yes',
         },
+        version: 2,
       },
     ]);
     const handler = await loadHandler();
@@ -103,19 +114,32 @@ describe('/api/twitch/config', () => {
       enabled: true,
     });
   });
-  it('caches the resolved config within the TTL', async () => {
-    adminSupabaseFetchMock.mockResolvedValue([]);
-    const handler = await loadHandler();
-    await handler({});
-    await handler({});
-    expect(adminSupabaseFetchMock).toHaveBeenCalledTimes(1);
-  });
-  it('does not cache the fallback when the override read fails', async () => {
+  it('revalidates the database on every request so versions propagate across isolates', async () => {
     adminSupabaseFetchMock
-      .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce([
-        { value: { channel: 'DbStreamer', displayName: 'DB Streamer', enabled: true } },
+        {
+          value: { channel: 'FirstStreamer', displayName: 'First', enabled: true },
+          version: 1,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          value: { channel: 'SecondStreamer', displayName: 'Second', enabled: false },
+          version: 2,
+        },
       ]);
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toMatchObject({ channel: 'firststreamer', enabled: true });
+    await expect(handler({})).resolves.toMatchObject({ channel: 'secondstreamer', enabled: false });
+    expect(adminSupabaseFetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('retries after an override read failure', async () => {
+    adminSupabaseFetchMock.mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce([
+      {
+        value: { channel: 'DbStreamer', displayName: 'DB Streamer', enabled: true },
+        version: 3,
+      },
+    ]);
     const handler = await loadHandler();
     await expect(handler({})).resolves.toMatchObject({ channel: 'envstreamer' });
     await expect(handler({})).resolves.toMatchObject({ channel: 'dbstreamer' });
