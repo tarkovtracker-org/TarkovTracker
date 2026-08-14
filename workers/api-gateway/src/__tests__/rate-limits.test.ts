@@ -133,6 +133,10 @@ describe('ApiGatewayRateLimiter durable object', () => {
     ['array JSON', '[]'],
     ['non-positive limit', JSON.stringify({ limit: 0, windowSec: 60 })],
     ['non-positive window', JSON.stringify({ limit: 1, windowSec: 0 })],
+    ['unsupported anchor', JSON.stringify({ limit: 1, windowSec: 60, anchor: 'sliding' })],
+    ['boolean limit', JSON.stringify({ limit: true, windowSec: 60 })],
+    ['string limit', JSON.stringify({ limit: '5', windowSec: 60 })],
+    ['single-element array limit', JSON.stringify({ limit: [5], windowSec: 60 })],
   ])('rejects %s without touching storage', async (_name, body) => {
     const state = makeState();
     const getSpy = vi.spyOn(state.storage, 'get');

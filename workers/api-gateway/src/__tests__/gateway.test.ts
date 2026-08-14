@@ -283,6 +283,7 @@ describe('api-gateway', () => {
     const body = (await res.json()) as { openapi: string; info?: { title?: string } };
     expect(body.openapi).toBe('3.1.0');
     expect(body.info?.title).toBe('TarkovTracker API Gateway');
+    expect(res.headers.get('Vary')).toContain('Origin');
   });
   it('serves Scalar docs at api root', async () => {
     const res = await worker.fetch(buildRequest('/'), BASE_ENV);
@@ -669,6 +670,42 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     await expectErrorResponse(res, 400, 'Invalid JSON body');
+  });
+  it('rejects POST /progress/tasks with an empty array body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: '[]',
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 400, 'Invalid request body');
+  });
+  it('rejects POST /progress/tasks with an empty object body', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 400, 'Invalid request body');
+  });
+  it('rejects POST /progress/tasks with a whitespace-only task id', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ id: '   ', state: 'completed' }]),
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 400, 'Invalid request body');
   });
   it('returns an error when the merge RPC matches no progress row', async () => {
     vi.stubGlobal(

@@ -19,6 +19,7 @@ export function corsHeaders(envOrigin?: string, requestOrigin?: string): Record<
     'Access-Control-Max-Age': '86400',
     'Access-Control-Expose-Headers':
       'ETag, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset',
+    Vary: 'Origin',
   };
 }
 export function retryAfterSeconds(resetAt: number): number {

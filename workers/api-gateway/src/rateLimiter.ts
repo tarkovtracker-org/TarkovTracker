@@ -47,8 +47,8 @@ function badRequest(): Response {
   return new Response('Bad Request', { status: 400 });
 }
 function positiveNumber(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : null;
+  if (typeof value !== 'number') return null;
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 async function readRequestBody(request: Request): Promise<Record<string, unknown> | null> {
   try {
@@ -66,6 +66,7 @@ async function parseRateLimitConfig(request: Request): Promise<RateLimitConfig |
   const limit = positiveNumber(payload.limit);
   const windowSec = positiveNumber(payload.windowSec);
   if (limit === null || windowSec === null) return badRequest();
+  if (payload.anchor !== undefined && payload.anchor !== 'utc-day') return badRequest();
   return {
     anchor: payload.anchor === 'utc-day' ? 'utc-day' : undefined,
     ephemeral: payload.retain !== true,

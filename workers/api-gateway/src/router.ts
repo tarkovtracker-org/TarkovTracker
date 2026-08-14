@@ -139,16 +139,19 @@ function isTaskState(value: unknown): value is TaskState {
 function isBatchTaskUpdate(value: unknown): value is BatchTaskUpdate {
   if (!value || typeof value !== 'object') return false;
   const { id, state } = value as Record<string, unknown>;
-  return typeof id === 'string' && isTaskState(state);
+  return typeof id === 'string' && id.trim().length > 0 && isTaskState(state);
 }
 function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
   if (Array.isArray(body)) {
+    if (body.length === 0) return null;
     return body.every(isBatchTaskUpdate) ? body : null;
   }
   if (!body || typeof body !== 'object') return null;
+  const entries = Object.entries(body);
+  if (entries.length === 0) return null;
   const updates: BatchTaskUpdate[] = [];
-  for (const [id, state] of Object.entries(body)) {
-    if (!isTaskState(state)) return null;
+  for (const [id, state] of entries) {
+    if (id.trim().length === 0 || !isTaskState(state)) return null;
     updates.push({ id, state });
   }
   return updates;
