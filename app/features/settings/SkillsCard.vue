@@ -250,6 +250,15 @@
     if (smAndUp.value) return 2;
     return 1;
   });
+  const collapsedSkills = computed(() => {
+    const requiredSkills = allGameSkills.value.filter(
+      (skill) => (skill.requiredLevels?.length ?? 0) > 0
+    );
+    const optionalSkills = allGameSkills.value.filter(
+      (skill) => (skill.requiredLevels?.length ?? 0) === 0
+    );
+    return [...requiredSkills, ...optionalSkills];
+  });
   const skillsWithRequirementsCount = computed(() => {
     return allGameSkills.value.filter((skill) => (skill.requiredLevels?.length ?? 0) > 0).length;
   });
@@ -265,7 +274,7 @@
   });
   const visibleSkills = computed(() => {
     if (showAllSkills.value) return allGameSkills.value;
-    return allGameSkills.value.slice(0, collapsedVisibleCount.value);
+    return collapsedSkills.value.slice(0, collapsedVisibleCount.value);
   });
   const getSkillCardId = (skillKey: string): string =>
     `settings-skill-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
