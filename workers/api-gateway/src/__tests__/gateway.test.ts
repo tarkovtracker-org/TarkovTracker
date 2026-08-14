@@ -671,37 +671,17 @@ describe('api-gateway', () => {
     );
     await expectErrorResponse(res, 400, 'Invalid JSON body');
   });
-  it('rejects POST /progress/tasks with an empty array body', async () => {
+  it.each([
+    ['empty array', '[]'],
+    ['empty object', '{}'],
+    ['whitespace-only task id', JSON.stringify([{ id: '   ', state: 'completed' }])],
+  ])('rejects POST /progress/tasks with %s', async (_name, body) => {
     vi.stubGlobal('fetch', createBaseFetchMock());
     const res = await worker.fetch(
       buildRequest('/progress/tasks', {
         method: 'POST',
         headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: '[]',
-      }),
-      BASE_ENV
-    );
-    await expectErrorResponse(res, 400, 'Invalid request body');
-  });
-  it('rejects POST /progress/tasks with an empty object body', async () => {
-    vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/tasks', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: '{}',
-      }),
-      BASE_ENV
-    );
-    await expectErrorResponse(res, 400, 'Invalid request body');
-  });
-  it('rejects POST /progress/tasks with a whitespace-only task id', async () => {
-    vi.stubGlobal('fetch', createBaseFetchMock());
-    const res = await worker.fetch(
-      buildRequest('/progress/tasks', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
-        body: JSON.stringify([{ id: '   ', state: 'completed' }]),
+        body,
       }),
       BASE_ENV
     );

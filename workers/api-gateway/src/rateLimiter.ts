@@ -97,7 +97,7 @@ function createRateLimitState(config: RateLimitConfig, now: number): RateLimitSt
 export class ApiGatewayRateLimiter {
   private data?: RateLimitState;
   private loaded = false;
-  constructor(private state: DurableObjectState) {}
+  constructor(private readonly state: DurableObjectState) {}
   private json(body: RateLimitResponse): Response {
     return new Response(JSON.stringify(body), {
       status: 200,

@@ -183,13 +183,16 @@ const QVALUE_PATTERN = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/;
 // decodable), and an identity rejection is honored.
 type ContentCoding = 'gzip' | 'identity' | '*';
 const CONTENT_CODINGS = new Set<ContentCoding>(['gzip', 'identity', '*']);
+function parseQValue(qParam: string | undefined, qValue: string): number {
+  if (!qParam) return 1;
+  return QVALUE_PATTERN.test(qValue) ? Number(qValue) : 0;
+}
 function parseContentCoding(part: string): [ContentCoding, number] | null {
   const [rawCoding, ...params] = part.split(';');
   const coding = rawCoding.trim().toLowerCase() as ContentCoding;
   if (!CONTENT_CODINGS.has(coding)) return null;
   const qParam = params.map((param) => param.trim().toLowerCase()).find((param) => param.startsWith('q='));
-  const qValue = qParam?.slice(2) ?? '';
-  return [coding, !qParam ? 1 : QVALUE_PATTERN.test(qValue) ? Number(qValue) : 0];
+  return [coding, parseQValue(qParam, qParam?.slice(2) ?? '')];
 }
 function contentCodingQuality(
   preferences: Map<ContentCoding, number>,
