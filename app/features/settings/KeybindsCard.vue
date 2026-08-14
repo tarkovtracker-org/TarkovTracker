@@ -44,6 +44,10 @@
                     @click="resetField(field.id)"
                   />
                 </div>
+                <KeybindListeningIndicator
+                  v-if="recordingField === field.id"
+                  :has-error="captureError === field.id"
+                />
                 <span
                   v-if="warningMessages[field.id]"
                   class="text-right text-[10px]"
@@ -61,6 +65,7 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import KeybindListeningIndicator from '@/features/settings/KeybindListeningIndicator.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import {
     DEFAULT_KEYBINDS,

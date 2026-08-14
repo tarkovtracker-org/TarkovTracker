@@ -44,21 +44,9 @@
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
-        icon="i-mdi-cog-outline"
-        locale-key="common.settings"
-        to="/settings"
-        :is-collapsed="props.isCollapsed"
-      ></DrawerItem>
-      <DrawerItem
         icon="i-mdi-trophy"
         locale-key="common.kappa_lightkeeper"
         to="/kappa"
-        :is-collapsed="props.isCollapsed"
-      ></DrawerItem>
-      <DrawerItem
-        icon="i-mdi-heart-outline"
-        locale-key="common.support"
-        to="/supporter"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
     </ul>

@@ -21,13 +21,17 @@ const i18n = createI18n({
         },
       },
     },
+    cs: {},
     de: {},
     es: {},
     fr: {},
+    it: {},
     ru: {},
     uk: {},
     zh: {},
     ko: {},
+    pl: {},
+    pt: {},
   },
 });
 const colorVariants: Array<{ color: ProgressCardColor; barClass: string }> = [
