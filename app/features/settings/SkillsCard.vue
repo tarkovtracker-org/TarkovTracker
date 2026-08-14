@@ -135,11 +135,7 @@
                   "
                   class="flex-1"
                 >
-                  <div
-                    tabindex="0"
-                    class="text-surface-400 focus-visible:ring-primary-500/60 cursor-default rounded focus-visible:ring-2 focus-visible:outline-none"
-                    @click.stop
-                  >
+                  <div class="text-surface-400 cursor-default" @click.stop>
                     {{ $t('settings.skills.quest') }}
                     <span class="text-surface-200 font-medium">
                       {{ getQuestSkillLevel(skill.key) }}
@@ -155,11 +151,7 @@
                   "
                   class="flex-1"
                 >
-                  <div
-                    tabindex="0"
-                    class="text-surface-400 focus-visible:ring-primary-500/60 cursor-default rounded focus-visible:ring-2 focus-visible:outline-none"
-                    @click.stop
-                  >
+                  <div class="text-surface-400 cursor-default" @click.stop>
                     {{ $t('settings.skills.offset') }}
                     <span class="text-surface-200 font-medium">
                       {{ formatSkillOffset(getSkillOffset(skill.key)) }}
