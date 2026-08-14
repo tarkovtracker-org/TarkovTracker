@@ -1,3 +1,10 @@
+## [1.70.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.1...v1.70.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **api:** improve locale overlay coverage and cache freshness ([#725](https://github.com/tarkovtracker-org/TarkovTracker/issues/725)) ([d1de3fe](https://github.com/tarkovtracker-org/TarkovTracker/commit/d1de3fec225f0c424fa24d7f7a68ff1b64eeec14))
+
 ## [1.70.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.0...v1.70.1) (2026-08-14)
 
 
