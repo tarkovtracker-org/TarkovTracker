@@ -354,6 +354,8 @@ sequenceDiagram
 ### Files
 
 - `app/server/utils/overlay.ts` — fetch, cache, merge.
+- `app/server/utils/overlayResponseHeaders.ts` — restores overlay metadata headers when corrections
+  are applied after an edge-cache read.
 - `app/server/utils/deepMerge.ts` — `deepMerge` + `isPlainObject`.
 - `app/server/utils/objectiveTypeInferrer.ts` — objective normalization.
 

@@ -60,7 +60,6 @@ vi.mock('h3', async () => {
 });
 vi.mock('~/server/utils/edgeCache', () => ({
   edgeCache: mockEdgeCache,
-  setOverlayResponseHeaders: mockSetOverlayResponseHeaders,
   shouldBypassCache: mockShouldBypassCache,
 }));
 vi.mock('~/server/utils/language-helpers', () => ({
@@ -76,6 +75,9 @@ vi.mock('~/server/utils/logger', () => ({
 }));
 vi.mock('~/server/utils/overlay', () => ({
   applyOverlay: mockApplyOverlay,
+}));
+vi.mock('~/server/utils/overlayResponseHeaders', () => ({
+  setOverlayResponseHeaders: mockSetOverlayResponseHeaders,
 }));
 vi.mock('~/server/utils/tarkov-cache-config', () => ({
   CACHE_TTL_DEFAULT: 111,

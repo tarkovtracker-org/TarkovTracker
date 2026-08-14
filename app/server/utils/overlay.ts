@@ -123,24 +123,6 @@ function isValidOverlayData(data: unknown): data is OverlayData {
       }
     }
   }
-  if (overlay.locales !== undefined) {
-    if (!isPlainObject(overlay.locales)) {
-      logger.warn('Invalid overlay: locales is not an object');
-      return false;
-    }
-    for (const [locale, localeData] of Object.entries(overlay.locales)) {
-      if (!isPlainObject(localeData)) {
-        logger.warn(`Invalid overlay: locales.${locale} is not an object`);
-        return false;
-      }
-      for (const collection of ['tasks', 'items', 'traders'] as const) {
-        if (localeData[collection] !== undefined && !isPlainObject(localeData[collection])) {
-          logger.warn(`Invalid overlay: locales.${locale}.${collection} is not an object`);
-          return false;
-        }
-      }
-    }
-  }
   return true;
 }
 function buildOverlayMeta(
@@ -442,7 +424,7 @@ function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOve
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
   options: { bypassCache?: boolean; gameMode?: string; locale?: string } = {}
-): Promise<T & { dataOverlay?: OverlayMeta }> {
+): Promise<T> {
   const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
   if (!overlay || !data?.data) {

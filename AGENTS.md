@@ -193,6 +193,10 @@ Naming:
 - Pinia stores in `app/stores/`, auto-registered by Nuxt. Use `pinia-plugin-persistedstate` where applicable.
 - Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
+- The hideout Tarkov-data route caches the adapted base payload, then applies the current overlay
+  after `edgeCache()` and calls `setOverlayResponseHeaders()` before returning. Other
+  overlay-enabled Tarkov-data routes cache their final corrected payload. Preserve this ordering so
+  the hideout edge TTL cannot pin stale corrections.
 - Internal game modes are `pvp`, `pve`, and `seasonal`; game-data requests map Seasonal to the
   upstream `pvp-season` slug. Active Seasonal progress is keyed by season number in
   `user_game_mode_progress`, while `user_progress` remains the account-metadata and rolling-deploy

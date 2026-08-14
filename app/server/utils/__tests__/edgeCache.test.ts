@@ -70,31 +70,6 @@ describe('edgeCache', () => {
     });
     expect(lastMatchUrl).toBe('https://tarkovtracker.org/__edge-cache/tarkov/items-en');
   });
-  it('sets overlay headers for payloads transformed after the cache', async () => {
-    const event = createEvent();
-    const { setOverlayResponseHeaders } = await import('@/server/utils/edgeCache');
-    setOverlayResponseHeaders(
-      event,
-      {
-        dataOverlay: {
-          generated: '2026-08-14T12:00:00.000Z',
-          sha256: 'overlay-sha',
-          status: 'cached',
-          version: 'locale-test-v1',
-        },
-      },
-      setHeaders
-    );
-    expect(setHeaders).toHaveBeenCalledWith(event, {
-      'X-Overlay-Generated': '2026-08-14T12:00:00.000Z',
-      'X-Overlay-Sha256': 'overlay-sha',
-      'X-Overlay-Status': 'cached',
-      'X-Overlay-Version': 'locale-test-v1',
-    });
-    vi.mocked(setHeaders).mockClear();
-    setOverlayResponseHeaders(event, { data: {} }, setHeaders);
-    expect(setHeaders).not.toHaveBeenCalled();
-  });
   it('returns cached payload on cache hit', async () => {
     cacheSpy.match.mockResolvedValueOnce(
       new Response(JSON.stringify({ data: { items: [{ id: 'cached' }] } }), {

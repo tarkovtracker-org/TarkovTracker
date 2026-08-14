@@ -1,7 +1,8 @@
-import { edgeCache, setOverlayResponseHeaders, shouldBypassCache } from '~/server/utils/edgeCache';
+import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
 import { applyOverlay } from '~/server/utils/overlay';
+import { setOverlayResponseHeaders } from '~/server/utils/overlayResponseHeaders';
 import { CACHE_TTL_DEFAULT, validateGameMode } from '~/server/utils/tarkov-cache-config';
 import { createTarkovJsonHideoutFetcher } from '~/server/utils/tarkov-json';
 const logger = createLogger('TarkovHideout');
