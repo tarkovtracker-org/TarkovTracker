@@ -136,25 +136,30 @@ function authorize(
 function isTaskState(value: unknown): value is TaskState {
   return typeof value === 'string' && TASK_STATES.has(value as TaskState);
 }
+function hasValidTaskId(id: string): boolean {
+  return id.trim().length > 0;
+}
 function isBatchTaskUpdate(value: unknown): value is BatchTaskUpdate {
   if (!value || typeof value !== 'object') return false;
   const { id, state } = value as Record<string, unknown>;
-  return typeof id === 'string' && id.trim().length > 0 && isTaskState(state);
+  return typeof id === 'string' && hasValidTaskId(id) && isTaskState(state);
 }
-function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
-  if (Array.isArray(body)) {
-    if (body.length === 0) return null;
-    return body.every(isBatchTaskUpdate) ? body : null;
-  }
-  if (!body || typeof body !== 'object') return null;
-  const entries = Object.entries(body);
-  if (entries.length === 0) return null;
+function normalizeBatchArray(body: unknown[]): BatchTaskUpdate[] | null {
+  if (body.length === 0) return null;
+  return body.every(isBatchTaskUpdate) ? body : null;
+}
+function normalizeBatchObject(body: Record<string, unknown>): BatchTaskUpdate[] | null {
   const updates: BatchTaskUpdate[] = [];
-  for (const [id, state] of entries) {
-    if (id.trim().length === 0 || !isTaskState(state)) return null;
+  for (const [id, state] of Object.entries(body)) {
+    if (!hasValidTaskId(id) || !isTaskState(state)) return null;
     updates.push({ id, state });
   }
-  return updates;
+  return updates.length === 0 ? null : updates;
+}
+function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
+  if (Array.isArray(body)) return normalizeBatchArray(body);
+  if (!body || typeof body !== 'object') return null;
+  return normalizeBatchObject(body as Record<string, unknown>);
 }
 function objectiveStateError(state: unknown): string | null {
   if (state === undefined || (typeof state === 'string' && ['completed', 'uncompleted'].includes(state))) {
