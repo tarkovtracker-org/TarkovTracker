@@ -247,13 +247,16 @@ describe('SkillsCard', () => {
     expect(eventLength.preventDefault).toHaveBeenCalled();
   });
   it('keeps required skills in the collapsed list when they sort after optional skills', () => {
-    const skills = Array.from({ length: 4 }, (_, index) => ({
-      key: `Optional${index}`,
-      name: `Optional${index}`,
-      requiredByTasks: [],
-      requiredLevels: [],
-      rewardedByTasks: [],
-    }));
+    const skills: UseSkillCalculationMock['allGameSkills']['value'] = Array.from(
+      { length: 4 },
+      (_, index) => ({
+        key: `Optional${index}`,
+        name: `Optional${index}`,
+        requiredByTasks: [],
+        requiredLevels: [],
+        rewardedByTasks: [],
+      })
+    );
     skills.push({
       key: 'Required',
       name: 'Required',
