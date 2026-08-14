@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       throw error;
     }
     try {
-      return await applyOverlay(baseResponse, { bypassCache, gameMode });
+      return await applyOverlay(baseResponse, { bypassCache, gameMode, locale: lang });
     } catch (overlayError) {
       logger.error('Failed to apply overlay:', overlayError);
       throw overlayError;

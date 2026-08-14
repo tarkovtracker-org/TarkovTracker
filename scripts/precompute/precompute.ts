@@ -99,7 +99,7 @@ export async function runPrecompute(
 }
 async function precomputeTasksCore(lang: string, gameMode: ValidGameMode): Promise<unknown> {
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
-  const payload = await applyOverlay(await baseFetcher(), { gameMode });
+  const payload = await applyOverlay(await baseFetcher(), { gameMode, locale: lang });
   assertLooksLikeTasksCore(payload);
   return payload;
 }
@@ -116,7 +116,9 @@ function assertLooksLikeTasksCore(payload: unknown): void {
   }
   for (const task of tasks) {
     if (!task || typeof task !== 'object' || Array.isArray(task)) {
-      throw new Error('Sanity check failed: payload contains a malformed task; refusing to write to KV');
+      throw new Error(
+        'Sanity check failed: payload contains a malformed task; refusing to write to KV'
+      );
     }
     const candidate = task as { failConditions?: unknown; id?: unknown; objectives?: unknown };
     if (

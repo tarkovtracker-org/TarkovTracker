@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
+  applyLocaleOverlay,
   applyTaskObjectiveAdditions,
   expandObjectiveAdditions,
   getObjectiveItemIds,
@@ -65,6 +66,56 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
       task1: { name: 'fixed' },
       task2: { name: 'pve-only' },
     });
+  });
+});
+describe('applyLocaleOverlay', () => {
+  it('shallow-merges locale patches (name/wikiLink) over matching entities', () => {
+    const tasks = [
+      {
+        id: '6761f28a022f60bb320f3e95',
+        name: 'Neuanfang',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Neuanfang',
+      },
+      { id: 'other-task', name: 'Unchanged' },
+    ];
+    const patches = {
+      '6761f28a022f60bb320f3e95': {
+        name: 'New Beginning',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/New_Beginning_(Prestige_1)',
+      },
+    };
+    expect(applyLocaleOverlay(tasks, patches)).toEqual([
+      {
+        id: '6761f28a022f60bb320f3e95',
+        name: 'New Beginning',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/New_Beginning_(Prestige_1)',
+      },
+      { id: 'other-task', name: 'Unchanged' },
+    ]);
+  });
+  it('applies ID-keyed objective description patches', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Task',
+        objectives: [{ id: 'obj-1', description: 'old description' }],
+      },
+    ];
+    const patches = {
+      'task-1': { objectives: { 'obj-1': { description: 'new description' } } },
+    };
+    expect(applyLocaleOverlay(tasks, patches)).toEqual([
+      {
+        id: 'task-1',
+        name: 'Task',
+        objectives: [{ id: 'obj-1', description: 'new description' }],
+      },
+    ]);
+  });
+  it('returns entities unchanged when no locale patches are provided', () => {
+    const tasks = [{ id: 'task-1', name: 'Task' }];
+    expect(applyLocaleOverlay(tasks, undefined)).toBe(tasks);
+    expect(applyLocaleOverlay(tasks, {})).toEqual(tasks);
   });
 });
 describe('getObjectiveItemIds', () => {

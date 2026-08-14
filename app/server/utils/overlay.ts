@@ -21,6 +21,11 @@ interface ModeOverlayData {
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
 }
+interface LocaleOverlayData {
+  tasks?: Record<string, Record<string, unknown>>;
+  items?: Record<string, Record<string, unknown>>;
+  traders?: Record<string, Record<string, unknown>>;
+}
 interface OverlayData {
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
@@ -29,6 +34,7 @@ interface OverlayData {
   hideout?: Record<string, Record<string, unknown>>;
   editions?: Record<string, unknown>;
   modes?: Record<string, ModeOverlayData>;
+  locales?: Record<string, LocaleOverlayData>;
   $meta?: {
     version: string;
     generated: string;
@@ -248,6 +254,16 @@ function applyEntityOverlay<T extends { id: string }>(
   }
   return result;
 }
+export function applyLocaleOverlay<T extends { id: string }>(
+  entities: T[],
+  localePatches: Record<string, Record<string, unknown>> | undefined
+): T[] {
+  if (!localePatches || !entities) return entities;
+  return entities.map((entity) => {
+    const patch = localePatches[entity.id];
+    return patch ? (deepMerge(entity as Record<string, unknown>, patch) as T) : entity;
+  });
+}
 type ObjectiveAddEntry = Record<string, unknown>;
 const DEFAULT_OVERLAY_OBJECTIVE_TYPE = 'giveItem';
 const DEFAULT_OVERLAY_OBJECTIVE_COUNT = 1;
@@ -394,9 +410,20 @@ type OverlayTargetData = {
   traders?: Array<{ id: string }>;
   hideoutStations?: Array<{ id: string }>;
 };
+function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOverlayData): void {
+  if (Array.isArray(target.tasks)) {
+    target.tasks = applyLocaleOverlay(target.tasks, localeOverlay.tasks);
+  }
+  if (Array.isArray(target.items)) {
+    target.items = applyLocaleOverlay(target.items, localeOverlay.items);
+  }
+  if (Array.isArray(target.traders)) {
+    target.traders = applyLocaleOverlay(target.traders, localeOverlay.traders);
+  }
+}
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
-  options: { bypassCache?: boolean; gameMode?: string } = {}
+  options: { bypassCache?: boolean; gameMode?: string; locale?: string } = {}
 ): Promise<T> {
   const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
@@ -447,6 +474,11 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
       result.data.hideoutStations as Array<{ id: string }>,
       overlay.hideout
     );
+  }
+  const locale = options.locale?.trim() || 'en';
+  const localeOverlay = overlay.locales?.[locale];
+  if (localeOverlay) {
+    applyLocaleOverlays(result.data, localeOverlay);
   }
   return result;
 }

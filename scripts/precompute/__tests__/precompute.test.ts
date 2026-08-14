@@ -72,7 +72,7 @@ describe('runPrecompute', () => {
     await runPrecompute(kv, { gameMode: 'pve', lang: 'de' });
     expect(createFetcherMock).toHaveBeenCalledTimes(1);
     expect(createFetcherMock).toHaveBeenCalledWith({ gameMode: 'pve', lang: 'de' });
-    expect(applyOverlayMock).toHaveBeenCalledWith({ raw: true }, { gameMode: 'pve' });
+    expect(applyOverlayMock).toHaveBeenCalledWith({ raw: true }, { gameMode: 'pve', locale: 'de' });
   });
   it('expands to all supported lang and gameMode combinations when no filter is provided', async () => {
     const kv = createKvMock();
