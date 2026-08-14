@@ -32,12 +32,6 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (key: string, params?: { channel?: string }) => params?.channel ?? key,
   }),
 }));
-vi.mock('vue-i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({
-    t: (key: string, params?: { channel?: string }) => params?.channel ?? key,
-  }),
-}));
 const mountCard = () =>
   mount(AdminTwitchConfigCard, {
     global: {
@@ -134,6 +128,17 @@ describe('AdminTwitchConfigCard', () => {
     await flushPromises();
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({ color: 'error', description: 'Invalid channel' })
+    );
+  });
+  it('reports a load failure separately from a save failure', async () => {
+    fetchMock.mockImplementation(() => Promise.reject(new Error('offline')));
+    mountCard();
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        title: 'admin.twitch_config_load_failed_title',
+      })
     );
   });
 });

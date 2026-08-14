@@ -30,8 +30,11 @@
       applyConfig(await $fetch<TwitchConfig>('/api/twitch/config'));
     } catch {
       toast.add({
-        title: t('common.update_failed', 'Update failed'),
-        description: t('admin.twitch_config_failed_description', 'Could not update Twitch config.'),
+        title: t('admin.twitch_config_load_failed_title', 'Twitch config unavailable'),
+        description: t(
+          'admin.twitch_config_load_failed_description',
+          'Could not load the current Twitch config.'
+        ),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
