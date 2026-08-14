@@ -1,5 +1,5 @@
 import { createError, defineEventHandler, readBody } from 'h3';
-import { adminSupabaseFetch, getIsAdmin } from '@/server/utils/adminSupabase';
+import { adminSupabaseFetch, getIsAdmin, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   }
   const adminUserId = readAdminUserId(event);
   await requireAdmin(supabaseUrl, serviceKey, adminUserId);
-  const input = readInput(await readBody(event));
+  const input = readInput((await readBody(event)) ?? {});
   const saved = await upsertConfig(supabaseUrl, serviceKey, adminUserId, input);
   await writeAuditLog(supabaseUrl, serviceKey, {
     adminUserId,
@@ -128,8 +128,7 @@ function readInput(body: AdminTwitchConfigBody): TwitchConfig {
   };
 }
 function readSupabaseUrl(runtime: Record<string, unknown>): string {
-  const value = runtime.supabaseUrl;
-  return typeof value === 'string' ? value.replace(/\/$/, '') : '';
+  return normalizeSupabaseUrl(runtime.supabaseUrl);
 }
 function readServiceKey(runtime: Record<string, unknown>): string {
   const value = runtime.supabaseServiceKey;
@@ -145,8 +144,15 @@ function readChannel(value: unknown): string {
   }
   return channel;
 }
+function readOptionalString(value: unknown, message: string): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') {
+    throw createError({ statusCode: 400, message });
+  }
+  return value.trim();
+}
 function readDisplayName(value: unknown, channel: string): string {
-  const trimmed = typeof value === 'string' ? value.trim() : null;
+  const trimmed = readOptionalString(value, 'Invalid display name');
   if (!trimmed) return channel;
   if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) {
     throw createError({ statusCode: 400, message: 'Invalid display name' });

@@ -1,29 +1,36 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AdminTwitchConfigCard from '@/features/admin/AdminTwitchConfigCard.vue';
-const fetchMock = vi.fn();
-const toastAddMock = vi.fn();
-const getSessionMock = vi.fn();
-const refreshSessionMock = vi.fn();
+const { fetchMock, getSessionMock, refreshSessionMock, toastAddMock } = vi.hoisted(() => ({
+  fetchMock: vi.fn(),
+  getSessionMock: vi.fn(),
+  refreshSessionMock: vi.fn(),
+  toastAddMock: vi.fn(),
+}));
 const systemStore = reactive({ isAdmin: true });
 vi.stubGlobal('$fetch', fetchMock);
 vi.mock('@/stores/useSystemStore', () => ({
   useSystemStoreWithSupabase: () => ({ systemStore }),
 }));
-vi.mock('#imports', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#imports')>()),
-  useNuxtApp: () => ({
-    $supabase: {
-      client: {
-        auth: {
-          getSession: getSessionMock,
-          refreshSession: refreshSessionMock,
-        },
+mockNuxtImport('useNuxtApp', () => () => ({
+  $supabase: {
+    client: {
+      auth: {
+        getSession: getSessionMock,
+        refreshSession: refreshSessionMock,
       },
     },
+  },
+}));
+mockNuxtImport('useToast', () => () => ({ add: toastAddMock }));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({
+    t: (key: string, params?: { channel?: string }) => params?.channel ?? key,
   }),
-  useToast: () => ({ add: toastAddMock }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
@@ -79,10 +86,54 @@ describe('AdminTwitchConfigCard', () => {
     expect(wrapper.findAll('input')[1]!.attributes('value')).toBe('Streamer');
     expect(wrapper.find('button').attributes('disabled')).toBeUndefined();
   });
-  it('does not save when the current user is not an admin', async () => {
+  it('does not send a write request when the current user is not an admin', async () => {
     systemStore.isAdmin = false;
     const wrapper = mountCard();
     await flushPromises();
     expect(wrapper.find('button').attributes('disabled')).toBeDefined();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/admin/twitch-config', expect.anything());
+  });
+  it('applies the saved configuration returned by the API', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/config') {
+        return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
+      }
+      return Promise.resolve({
+        config: { channel: 'streamer', displayName: 'streamer', enabled: true },
+      });
+    });
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.findAll('input')[1]!.setValue('   ');
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/twitch-config',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer admin-token' },
+        body: { channel: 'streamer', displayName: '', enabled: true },
+      })
+    );
+    expect(wrapper.findAll('input')[1]!.attributes('value')).toBe('streamer');
+  });
+  it('surfaces the server validation message on failure', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/config') {
+        return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
+      }
+      return Promise.reject(
+        Object.assign(new Error('Bad Request'), { data: { message: 'Invalid channel' } })
+      );
+    });
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'error', description: 'Invalid channel' })
+    );
   });
 });

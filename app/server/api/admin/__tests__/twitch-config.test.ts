@@ -153,4 +153,38 @@ describe('POST /api/admin/twitch-config', () => {
       statusCode: 400,
     });
   });
+  it('rejects a non-string display name', async () => {
+    mockReadBody.mockResolvedValue({ channel: 'validchannel', displayName: 123, enabled: true });
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+  it.each([null, undefined])('rejects an empty body (%s) with a 400', async (body) => {
+    mockReadBody.mockResolvedValue(body);
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 400,
+    });
+  });
+  it('normalizes a Supabase URL that carries a query string', async () => {
+    runtimeConfig.supabaseUrl = 'https://test.supabase.co/?apikey=leaked';
+    mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          { value: { channel: 'validchannel', displayName: 'validchannel', enabled: true } },
+        ])
+      )
+      .mockResolvedValueOnce(emptyResponse());
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    await handler(makeEvent({ id: 'admin-1' }));
+    expect(mockFetch.mock.calls[0]?.[0]).toBe(
+      'https://test.supabase.co/rest/v1/user_system?select=is_admin&user_id=eq.admin-1&limit=1'
+    );
+  });
 });
