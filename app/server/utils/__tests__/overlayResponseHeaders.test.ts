@@ -36,6 +36,7 @@ describe('setOverlayResponseHeaders', () => {
         version: 'unsafe\nvalue',
       })
     ).toEqual({ 'X-Overlay-Sha256': 'safe-sha' });
+    expect(buildOverlayResponseHeaders({ version: '' })).toEqual({});
   });
   it.each([null, {}, { dataOverlay: null }])(
     'ignores payloads without overlay metadata',

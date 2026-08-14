@@ -111,6 +111,7 @@ describe('applyOverlay locale integration', () => {
     ['locale map', []],
     ['locale entry', { en: null }],
     ['locale collection', { en: { tasks: [] } }],
+    ['locale patch', { en: { tasks: { 'task-1': 'garbage' } } }],
   ])('handles a malformed %s without changing base data', async (_label, locales) => {
     stubOverlayFetch({
       $meta: { version: 'locale-test-v1' },

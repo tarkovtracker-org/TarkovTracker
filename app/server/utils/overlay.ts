@@ -261,7 +261,9 @@ export function applyLocaleOverlay<T extends { id: string }>(
   if (!localePatches || !entities) return entities;
   return entities.map((entity) => {
     const patch = localePatches[entity.id];
-    return patch ? (deepMerge(entity as Record<string, unknown>, patch) as T) : entity;
+    return isPlainObject(patch)
+      ? (deepMerge(entity as Record<string, unknown>, patch) as T)
+      : entity;
   });
 }
 type ObjectiveAddEntry = Record<string, unknown>;

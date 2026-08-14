@@ -18,7 +18,7 @@ function getOverlayMeta(payload: unknown): OverlayHeadersMeta | null {
   return typeof meta === 'object' && meta !== null ? (meta as OverlayHeadersMeta) : null;
 }
 function isSafeHeaderValue(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
+  if (typeof value !== 'string' || value.length === 0) return false;
   return Array.from(value).every((character) => {
     const codePoint = character.codePointAt(0) ?? 0;
     return codePoint <= 255 && !INVALID_HEADER_CODE_POINTS.has(codePoint);
