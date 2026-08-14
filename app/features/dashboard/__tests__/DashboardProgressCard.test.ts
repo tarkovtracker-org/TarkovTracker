@@ -30,6 +30,8 @@ const i18n = createI18n({
     uk: {},
     zh: {},
     ko: {},
+    pl: {},
+    pt: {},
   },
 });
 const colorVariants: Array<{ color: ProgressCardColor; barClass: string }> = [

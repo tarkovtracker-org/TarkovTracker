@@ -33,7 +33,7 @@ describe('useSafeLocale', () => {
     expect(useSafeLocale().value).toBe('fr');
   });
   it('falls back to english when browser locale is not supported by the UI', async () => {
-    vi.stubGlobal('navigator', { ...window.navigator, language: 'pl-PL' });
+    vi.stubGlobal('navigator', { ...window.navigator, language: 'ja-JP' });
     const { resetI18nReady, useSafeLocale } = await import('@/composables/i18nHelpers');
     resetI18nReady();
     expect(useSafeLocale().value).toBe('en');

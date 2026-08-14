@@ -38,6 +38,8 @@ const i18n = createI18n({
     uk: {},
     zh: {},
     ko: {},
+    pl: {},
+    pt: {},
   },
 });
 const setup = async () => {
