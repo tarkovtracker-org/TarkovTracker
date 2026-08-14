@@ -897,11 +897,13 @@ flowchart LR
    service role. The successful value is recorded in the existing admin audit log.
 3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
-   of breaking the embed. The resolved value is cached in-process and at the browser/edge for one
-   minute.
+   of breaking the embed. A failed override read is not cached, so the next request retries the
+   database. Successful resolutions are cached in-process for 30 seconds and sent with
+   `cache-control: public, max-age=15, s-maxage=30`.
 4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
-   replace the player URL, disabling hides an active player, and an unavailable config endpoint keeps
-   the build-time fallback working.
+   replace the player URL and clear a stored dismissal, disabling hides an active player, and an
+   unavailable config endpoint keeps the build-time fallback working. Refreshes are single-flight, so
+   a slow request cannot be overtaken by the next 60-second tick.
 
 ### Files
 
@@ -921,8 +923,13 @@ flowchart LR
   underscores with a maximum length of 25 characters. Display names are limited to 50 characters.
 - Invalid or unavailable database overrides never make the public route fail; build-time runtime
   config remains the fallback.
+- The build-time fallback is opt-in: `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED` must be exactly `true` to
+  promote a stream without a database override. A missing or malformed flag resolves to disabled, so
+  no promotion can reappear by default.
 - Mounted clients re-read configuration on the same 60-second cadence as live status so an admin
-  change takes effect without reload or redeploy.
+  change takes effect without reload or redeploy. The layers compound: up to 30 seconds of
+  in-process cache, up to 30 seconds of shared cache, and up to 60 seconds until the next client
+  poll, so worst-case propagation is about two minutes.
 
 ## When this doc is wrong
 
