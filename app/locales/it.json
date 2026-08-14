@@ -1187,6 +1187,7 @@
           "url_copied": "URL copiato negli appunti",
           "copy_url_failed": "Impossibile copiare l'URL negli appunti",
           "no_team": "Non fai parte di nessuna squadra.",
+          "login_required": "Accedi per creare un team o gestire il link di invito del tuo team.",
           "team_invite_url_label": "URL invito nel team",
           "copy_link": "Copia",
           "link_hidden_message": "Clicca su 'Mostra' per rivelare il link di invito del tuo team",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov Monitor",
     "resources": "Risorse",
+    "section_more": "Altro",
     "profile": "Profilo",
     "section_navigation": "Navigazione",
     "section_external": "Strumenti esterni",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "Lingua",
+    "page_description": "Gestisci il tuo account, la progressione del gioco e le preferenze dell'applicazione.",
     "tabs": {
       "progression": "Progresso",
       "imports": "Importazioni"
     },
     "tab_groups": {
-      "game": "Gioco",
-      "account_advanced": "Account & Avanzate"
+      "game_progress": "Progresso Di Gioco",
+      "app": "App",
+      "data": "Dati",
+      "account": "Account",
+      "tools_integrations": "Strumenti E Integrazioni"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copia debug"
     },
     "general": {
+      "title": "Preferenze Generali",
       "privacy_mode": "Modalità Streamer",
       "privacy_mode_hint": "Nasconde informazioni sensibili durante lo streaming."
     },
@@ -1761,7 +1768,10 @@
         "show_next": "Mostra missioni successive",
         "show_prev": "Mostra missioni precedenti",
         "density": "Densità pannello",
-        "require_trader_levels": "Richiede livello di fedeltà trader e reputazione per la disponibilità della missione"
+        "require_trader_levels": "Richiede livello di fedeltà trader e reputazione per la disponibilità della missione",
+        "flags_section": "Visualizzazione Attività",
+        "availability_section": "Disponibilità Attività",
+        "view_defaults_section": "Viste Predefinite"
       },
       "maps": {
         "show_extracts": "Mostra estrazioni di default",
@@ -1852,6 +1862,8 @@
       "export_error_title": "Esportazione fallita",
       "debug_export_error_title": "Esportazione Debug fallita",
       "reset_title": "Azzera progressi",
+      "danger_zone_title": "Zona Pericolosa",
+      "danger_zone_hint": "Il ripristino di tutti i progressi elimina permanentemente i tuoi dati per PvP, PvE e PvP stagionale. Questo non può essere annullato.",
       "prestige_history_title": "Timeline Prestigio",
       "prestige_history_loading": "Caricamento cronologia prestigio...",
       "prestige_history_empty": "Nessun prestigio archiviato fin'ora.",
@@ -2025,7 +2037,9 @@
       "saved_title": "Username salvato",
       "saved_description": "Il tuo username {mode} è stato aggiornato",
       "save_failed_title": "Salvataggio non riuscito",
-      "save_failed_description": "Impossibile salvare l'username. Riprova."
+      "save_failed_description": "Impossibile salvare l'username. Riprova.",
+      "active_mode": "Attivo",
+      "game_edition_hint": "Seleziona l'edizione del gioco che possiedi in modo che il tracciamento corrisponda ai tuoi contenuti disponibili."
     },
     "skills": {
       "title": "Gestione abilità",
@@ -2042,7 +2056,10 @@
       "valid_range": "Range valido: 0-51",
       "sort": {
         "ingame": "In gioco"
-      }
+      },
+      "quest_tooltip": "Livello di abilità concesso automaticamente con ricompense di missione completate.",
+      "offset_tooltip": "Regolazione manuale in cima al livello della ricompensa della missione. Positivo significa che hai addestrato le ricompense della missione sopra",
+      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
     },
     "keybinds": {
       "title": "Scorciatoie tastiera",
@@ -2052,6 +2069,7 @@
       "undo_description": "Premi questa scorciatoia per ripristinare i tuoi progressi più recenti.",
       "record_placeholder": "Clicca per registrare...",
       "recording": "Premi combinazione tasti...",
+      "listening": "Ascoltando...",
       "reset_aria": "Ripristina",
       "conflict_omnibar": "La scorciatoia è in conflitto con la combinazione di tasti Annulla.",
       "conflict_undo": "La scorciatoia è in conflitto con la combinazione di tasti Ricerca.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "Inserisci il tuo XP totale effettivo per regolare automaticamente lo scostamento.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} al prossimo",
-      "reset_offset": "Ripristina offset XP"
+      "reset_offset": "Ripristina offset XP",
+      "xp_progress_aria": "Esperienza verso il livello successivo",
+      "xp_progress_value": "{percent}% verso il livello successivo"
     },
     "danger_zone": {
       "confirm_word": "ELIMINA"
