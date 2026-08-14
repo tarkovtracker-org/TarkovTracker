@@ -1187,6 +1187,7 @@
           "url_copied": "URL zkopírováno do schránky",
           "copy_url_failed": "Kopírování URL do schránky se nezdařilo",
           "no_team": "V současné době nejste v týmu.",
+          "login_required": "Přihlaste se k vytvoření týmu nebo spravujte pozvánku vašeho týmu.",
           "team_invite_url_label": "URL pozvánky do týmu",
           "copy_link": "Kopírovat",
           "link_hidden_message": "Klepnutím na tlačítko 'Zobrazit' zobrazíte odkaz pozvánky vašeho týmu",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov Monitor",
     "resources": "Resources",
+    "section_more": "Více",
     "profile": "Profil",
     "section_navigation": "Navigation",
     "section_external": "Externí",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "Jazyk",
+    "page_description": "Spravujte svůj účet, průběh hry a nastavení aplikací.",
     "tabs": {
       "progression": "Pokrok",
       "imports": "Dovoz"
     },
     "tab_groups": {
-      "game": "Hra",
-      "account_advanced": "Účet & Pokročilé"
+      "game_progress": "Průběh hry",
+      "app": "Aplikace",
+      "data": "Údaje",
+      "account": "Účet",
+      "tools_integrations": "Nástroje a integrace"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Obecné předvolby",
       "privacy_mode": "Streamovací režim",
       "privacy_mode_hint": "Skryje citlivé informace během vysílání."
     },
@@ -1761,7 +1768,10 @@
         "show_next": "Zobrazit další úkoly",
         "show_prev": "Zobrazit předchozí úkoly",
         "density": "Hustota karty",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Zobrazení úloh",
+        "availability_section": "Dostupnost úkolu",
+        "view_defaults_section": "Výchozí zobrazení"
       },
       "maps": {
         "show_extracts": "Ve výchozím nastavení zobrazit extrakty",
@@ -1852,6 +1862,8 @@
       "export_error_title": "Export selhal",
       "debug_export_error_title": "Export ladění se nezdařil",
       "reset_title": "Obnovit průběh",
+      "danger_zone_title": "Nebezpečná zóna",
+      "danger_zone_hint": "Obnovení veškerého postupu trvale smaže vaše data pro PvP, PvE a Seasonal PvP. Tuto akci nelze vrátit zpět.",
       "prestige_history_title": "Prestige History",
       "prestige_history_loading": "Načítání historie prestiži...",
       "prestige_history_empty": "Zatím neběží žádná archivovaná prestiž.",
@@ -2025,7 +2037,9 @@
       "saved_title": "Zobrazované jméno uloženo",
       "saved_description": "Vaše {mode} zobrazované jméno bylo aktualizováno",
       "save_failed_title": "Uložení se nezdařilo",
-      "save_failed_description": "Nepodařilo se uložit zobrazované jméno. Zkuste to prosím znovu."
+      "save_failed_description": "Nepodařilo se uložit zobrazované jméno. Zkuste to prosím znovu.",
+      "active_mode": "Aktivní",
+      "game_edition_hint": "Vyberte verzi hry, kterou vlastníte, aby sledování odpovídalo vašemu dostupnému obsahu."
     },
     "skills": {
       "title": "Správa dovedností",
@@ -2042,7 +2056,10 @@
       "valid_range": "Valid range: 0-51",
       "sort": {
         "ingame": "Ve hře"
-      }
+      },
+      "quest_tooltip": "Úroveň dovedností udělená automaticky dokončenými odměnami.",
+      "offset_tooltip": "Ruční nastavení nad úrovní odměny. Pozitivní znamená, že jste vyškolili dovednost nad odměnu za hledání práce.",
+      "collapsed_hint": "Zobrazení {shown} dovedností {total} . Ukaž vše a uvidíš všechny dovednosti."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2069,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Poslouchám...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "Zadejte celkovou hodnotu XP pro automatickou úpravu posunu.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} do dalšího",
-      "reset_offset": "Resetovat odsazení XP"
+      "reset_offset": "Resetovat odsazení XP",
+      "xp_progress_aria": "Zkus pokrok směrem k další úrovni",
+      "xp_progress_value": "{percent}% směrem k další úrovni"
     },
     "danger_zone": {
       "confirm_word": "ODSTRANIT"
