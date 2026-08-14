@@ -1,6 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { OverlayMeta } from '@/server/utils/overlay';
-type OverlayResult<T> = T & { dataOverlay?: OverlayMeta };
 const stubOverlayFetch = (overlay: unknown) => {
   const fetchMock = vi.fn(async () => {
     return new Response(JSON.stringify(overlay), {
@@ -66,9 +64,7 @@ describe('applyOverlay locale integration', () => {
         traders: [{ id: 'trader-1', name: 'Base Trader' }],
       },
     };
-    const english = (await applyOverlay(payload, {
-      gameMode: 'pve',
-    })) as OverlayResult<typeof payload>;
+    const english = await applyOverlay(payload, { gameMode: 'pve' });
     expect(english.data).toEqual({
       items: [{ id: 'item-1', name: 'English Item', shortName: 'Global item' }],
       tasks: [
@@ -85,10 +81,7 @@ describe('applyOverlay locale integration', () => {
       status: 'fresh',
       version: 'locale-test-v1',
     });
-    const german = (await applyOverlay(payload, {
-      gameMode: 'pve',
-      locale: 'de',
-    })) as OverlayResult<typeof payload>;
+    const german = await applyOverlay(payload, { gameMode: 'pve', locale: 'de' });
     expect(german.data?.tasks?.[0]).toMatchObject({ name: 'Deutsche Aufgabe' });
     expect(german.data?.items?.[0]).toMatchObject({
       name: 'Deutscher Gegenstand',
@@ -113,5 +106,20 @@ describe('applyOverlay locale integration', () => {
     const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
     const result = await applyOverlay(payload, { locale: 'fr' });
     expect(result.data?.tasks).toEqual([{ id: 'task-1', name: 'Base Task' }]);
+  });
+  it.each([
+    ['locale map', []],
+    ['locale entry', { en: null }],
+    ['locale collection', { en: { tasks: [] } }],
+  ])('handles a malformed %s without changing base data', async (_label, locales) => {
+    stubOverlayFetch({
+      $meta: { version: 'locale-test-v1' },
+      locales,
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
+    const result = await applyOverlay(payload);
+    expect(result.data).toEqual(payload.data);
+    expect(result.dataOverlay.status).toBe('fresh');
   });
 });

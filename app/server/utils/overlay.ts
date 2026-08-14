@@ -421,12 +421,21 @@ function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOve
     target.traders = applyLocaleOverlay(target.traders, localeOverlay.traders);
   }
 }
+function applyEntityCollectionOverlay(
+  target: OverlayTargetData,
+  collection: 'hideoutStations' | 'items' | 'traders',
+  patches: Record<string, Record<string, unknown>> | undefined
+): void {
+  const entities = target[collection];
+  if (!patches || !Array.isArray(entities)) return;
+  target[collection] = applyEntityOverlay(entities, patches);
+}
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
   options: { bypassCache?: boolean; gameMode?: string; locale?: string } = {}
-): Promise<T> {
+): Promise<T & { dataOverlay: OverlayMeta }> {
   const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
-  const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
+  const result = { ...data, dataOverlay: meta } as T & { dataOverlay: OverlayMeta };
   if (!overlay || !data?.data) {
     return result;
   }
@@ -454,27 +463,9 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);
     result.data.tasks = [...correctedTasks, ...dedupedAdditions];
   }
-  // Apply item corrections (if present)
-  if (overlay.items && Array.isArray(result.data.items)) {
-    result.data.items = applyEntityOverlay(
-      result.data.items as Array<{ id: string }>,
-      overlay.items
-    );
-  }
-  // Apply trader corrections (if present)
-  if (overlay.traders && Array.isArray(result.data.traders)) {
-    result.data.traders = applyEntityOverlay(
-      result.data.traders as Array<{ id: string }>,
-      overlay.traders
-    );
-  }
-  // Apply hideout corrections (if present)
-  if (overlay.hideout && Array.isArray(result.data.hideoutStations)) {
-    result.data.hideoutStations = applyEntityOverlay(
-      result.data.hideoutStations as Array<{ id: string }>,
-      overlay.hideout
-    );
-  }
+  applyEntityCollectionOverlay(result.data, 'items', overlay.items);
+  applyEntityCollectionOverlay(result.data, 'traders', overlay.traders);
+  applyEntityCollectionOverlay(result.data, 'hideoutStations', overlay.hideout);
   const locale = options.locale?.trim() || 'en';
   const localeOverlay = overlay.locales?.[locale];
   if (localeOverlay) {

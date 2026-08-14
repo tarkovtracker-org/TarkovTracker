@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { setOverlayResponseHeaders } from '@/server/utils/overlayResponseHeaders';
+import {
+  buildOverlayResponseHeaders,
+  setOverlayResponseHeaders,
+} from '@/server/utils/overlayResponseHeaders';
 import type { H3Event, setResponseHeaders } from 'h3';
 describe('setOverlayResponseHeaders', () => {
   const event = {} as H3Event;
@@ -23,6 +26,16 @@ describe('setOverlayResponseHeaders', () => {
       'X-Overlay-Status': 'cached',
       'X-Overlay-Version': 'locale-test-v1',
     });
+  });
+  it('omits metadata that is not safe for an HTTP header', () => {
+    expect(
+      buildOverlayResponseHeaders({
+        generated: 'unsafe-😀',
+        sha256: 'safe-sha',
+        status: 42,
+        version: 'unsafe\nvalue',
+      })
+    ).toEqual({ 'X-Overlay-Sha256': 'safe-sha' });
   });
   it.each([null, {}, { dataOverlay: null }])(
     'ignores payloads without overlay metadata',
