@@ -1,3 +1,10 @@
+## [1.69.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.3...v1.69.4) (2026-08-14)
+
+
+### Bug Fixes
+
+* **api:** harden gateway input validation and CORS caching ([b3f697e](https://github.com/tarkovtracker-org/TarkovTracker/commit/b3f697ec117212d6b85d56cb4f871bacb9311d2d))
+
 ## [1.69.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.2...v1.69.3) (2026-08-12)
 
 ## [1.69.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.1...v1.69.2) (2026-08-12)
