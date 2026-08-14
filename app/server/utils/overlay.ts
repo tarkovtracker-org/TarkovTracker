@@ -151,17 +151,21 @@ function buildOverlayFailure(error: string): OverlayFetchResult {
   lastOverlayMeta = buildOverlayMeta(cachedOverlay, cachedOverlay ? 'stale' : 'missing', { error });
   return { overlay: cachedOverlay, meta: lastOverlayMeta };
 }
-async function fetchOverlayResponse(): Promise<Response> {
+function createOverlayRequest(): {
+  clearTimeout: () => void;
+  response: Promise<Response>;
+} {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(OVERLAY_URL_WITH_BUSTER, {
-      signal: controller.signal,
-      headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return {
+    clearTimeout: () => clearTimeout(timeoutId),
+    response: Promise.resolve().then(() =>
+      fetch(OVERLAY_URL_WITH_BUSTER, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
+      })
+    ),
+  };
 }
 async function processOverlayResponse(
   response: Response,
@@ -193,11 +197,14 @@ function logOverlayFetchError(error: unknown): void {
   logger.warn('Error fetching overlay:', error);
 }
 async function refreshOverlay(now: number): Promise<OverlayFetchResult> {
+  const request = createOverlayRequest();
   try {
-    return await processOverlayResponse(await fetchOverlayResponse(), now);
+    return await processOverlayResponse(await request.response, now);
   } catch (error) {
     logOverlayFetchError(error);
     return buildOverlayFailure(error instanceof Error ? error.message : String(error));
+  } finally {
+    request.clearTimeout();
   }
 }
 function startOverlayRefresh(now: number): {

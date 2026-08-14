@@ -350,9 +350,10 @@ sequenceDiagram
 - `bypassCache: true` (from `shouldBypassCache`) forces an awaited overlay refresh — used after
   publishing a correction.
 - A hideout request with an expired module-cached overlay serves the stale correction immediately
-  and registers one coalesced refresh with the Cloudflare execution context. A failed deferred
-  refresh backs off for one minute before another hideout request may retry it. Cold requests still
-  await the initial overlay fetch.
+  and registers one coalesced refresh with the Cloudflare execution context. Background task
+  rejections are logged and contained. A failed deferred refresh backs off for one minute before
+  another hideout request may retry it. Cold requests still await the initial overlay fetch, whose
+  five-second timeout covers both response headers and body parsing.
 - Hideout applies the overlay after reading its versioned base-data edge entry, so its correction
   freshness is bounded by the overlay module's one-hour cache and browser cache TTL rather than the
   hideout edge TTL. Other

@@ -130,6 +130,31 @@ describe('applyOverlay locale integration', () => {
     const refreshed = await applyOverlay(payload, { scheduleRefresh });
     expect(refreshed.dataOverlay).toMatchObject({ status: 'cached', version: 'v2' });
   });
+  it('keeps the fetch timeout active while parsing the overlay body', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const signal = init?.signal as AbortSignal;
+      return {
+        json: () =>
+          new Promise((_resolve, reject) => {
+            const rejectWithAbort = () => {
+              const error = new Error('body parsing aborted');
+              error.name = 'AbortError';
+              reject(error);
+            };
+            if (signal.aborted) rejectWithAbort();
+            else signal.addEventListener('abort', rejectWithAbort, { once: true });
+          }),
+        ok: true,
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const resultPromise = applyOverlay({ data: { tasks: [] } });
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await resultPromise;
+    expect(result.dataOverlay).toMatchObject({ status: 'missing' });
+  });
   it('backs off deferred refreshes after an overlay fetch failure', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
