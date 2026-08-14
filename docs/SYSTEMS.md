@@ -461,7 +461,7 @@ sequenceDiagram
 
 ### Flow
 
-1. **Routing + User-Agent gate.** `workers/api-gateway/src/index.ts` normalizes the path, rejects
+1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path, rejects
    requests without a 5–200 character `User-Agent`, and (when enabled) 308-redirects legacy
    `/api/v2` hosts to the api subdomain.
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
@@ -481,7 +481,7 @@ sequenceDiagram
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
    game-edition hideout auto-completes.
-7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts`
+7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
    `Vary: Accept-Encoding, Authorization, Origin`. Bodies ≥1 KiB are gzipped when the client
@@ -492,7 +492,11 @@ sequenceDiagram
 
 ### Files
 
-- `workers/api-gateway/src/index.ts` — routing, rate limiting, conditional response layer
+- `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
+- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, host/legacy redirect, route dispatch
+- `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
+- `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
+- `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
 - `workers/api-gateway/src/auth.ts` — token validation
 - `workers/api-gateway/src/handlers/progress.ts`, `workers/api-gateway/src/handlers/team.ts` —
   progress reads/writes

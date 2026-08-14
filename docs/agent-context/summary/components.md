@@ -138,14 +138,18 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 ## Cloudflare Worker (`workers/api-gateway/src/`)
 
-| Component                                     | Responsibility                                                 |
-| --------------------------------------------- | -------------------------------------------------------------- |
-| `index.ts`                                    | Worker entry, routing, `ApiGatewayRateLimiter` Durable Object. |
-| `auth.ts`                                     | Bearer token extraction, SHA-256 validation, usage tracking.   |
-| `handlers/progress.ts`                        | Get/update progress (tasks, objectives, level).                |
-| `handlers/team.ts`                            | Team progress aggregation.                                     |
-| `handlers/token.ts`                           | Token info endpoint.                                           |
-| `services/tarkov.ts`                          | Fetch tasks/hideout for transforms.                            |
-| `utils/transform.ts`                          | Progress transform + hideout auto-complete.                    |
-| `utils/{invalidation,memory-cache,logger}.ts` | Cache invalidation + in-memory cache.                          |
-| `openapi.ts`                                  | OpenAPI spec (validated in CI).                                |
+| Component                                     | Responsibility                                               |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| `index.ts`                                    | Worker entry (thin adapter).                                 |
+| `router.ts`                                   | Routing, User-Agent gate, host/legacy redirect.              |
+| `authentication.ts`                           | Abuse gate, token auth, daily-quota enforcement.             |
+| `rateLimiter.ts`                              | `ApiGatewayRateLimiter` Durable Object + quota client.       |
+| `responses.ts`                                | CORS, envelopes, conditional response, ETag/compression.     |
+| `auth.ts`                                     | Bearer token extraction, SHA-256 validation, usage tracking. |
+| `handlers/progress.ts`                        | Get/update progress (tasks, objectives, level).              |
+| `handlers/team.ts`                            | Team progress aggregation.                                   |
+| `handlers/token.ts`                           | Token info endpoint.                                         |
+| `services/tarkov.ts`                          | Fetch tasks/hideout for transforms.                          |
+| `utils/transform.ts`                          | Progress transform + hideout auto-complete.                  |
+| `utils/{invalidation,memory-cache,logger}.ts` | Cache invalidation + in-memory cache.                        |
+| `openapi.ts`                                  | OpenAPI spec (validated in CI).                              |
