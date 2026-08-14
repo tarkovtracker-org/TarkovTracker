@@ -72,14 +72,15 @@
   const DISMISS_KEY = 'tt-twitch-dismissed';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
-  const config = runtimeConfig.public.promotedTwitch as {
+  const fallback = runtimeConfig.public.promotedTwitch as {
     channel?: string;
     displayName?: string;
     enabled?: boolean;
-    endsAt?: string;
   };
-  const channel = config.channel?.trim().toLowerCase() || 'honeyxxo';
-  const displayName = config.displayName?.trim() || channel;
+  const normalizeChannel = (value: string | undefined): string => value?.trim().toLowerCase() || '';
+  const channel = ref(normalizeChannel(fallback.channel) || 'honeyxxo');
+  const displayName = ref(fallback.displayName?.trim() || channel.value);
+  const enabled = ref(fallback.enabled !== false);
   const isVisible = ref(false);
   const isLive = ref(false);
   const dismissed = ref(false);
@@ -88,7 +89,7 @@
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   const buildPlayerUrl = (): string => {
     const params = new URLSearchParams({
-      channel,
+      channel: channel.value,
       parent: window.location.hostname,
       autoplay: 'true',
       muted: 'true',
@@ -115,10 +116,26 @@
       isVisible.value = true;
     }
   };
+  const loadConfig = async (): Promise<void> => {
+    try {
+      const data = await $fetch<{ channel: string; displayName: string; enabled: boolean }>(
+        '/api/twitch/config'
+      );
+      const nextChannel = normalizeChannel(data.channel) || channel.value;
+      if (nextChannel !== channel.value) {
+        isLive.value = false;
+        isVisible.value = false;
+        playerUrl.value = '';
+      }
+      channel.value = nextChannel;
+      displayName.value = data.displayName?.trim() || channel.value;
+      enabled.value = data.enabled;
+    } catch {}
+  };
   const checkLive = async (): Promise<void> => {
     try {
       const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
-        query: { channel },
+        query: { channel: channel.value },
       });
       isLive.value = data.isLive;
       if (dismissed.value) return;
@@ -133,14 +150,22 @@
       isVisible.value = false;
     }
   };
-  onMounted(() => {
-    if (config.enabled === false) return;
-    if (config.endsAt && new Date(config.endsAt) < new Date()) return;
+  const refresh = async (): Promise<void> => {
+    await loadConfig();
+    if (!enabled.value) {
+      isLive.value = false;
+      isVisible.value = false;
+      playerUrl.value = '';
+      return;
+    }
+    await checkLive();
+  };
+  onMounted(async () => {
     try {
       dismissed.value = sessionStorage.getItem(DISMISS_KEY) === '1';
     } catch {}
-    checkLive();
-    pollTimer = setInterval(checkLive, 60_000);
+    await refresh();
+    pollTimer = setInterval(refresh, 60_000);
   });
   onUnmounted(() => {
     if (pollTimer) clearInterval(pollTimer);

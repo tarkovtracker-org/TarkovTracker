@@ -33,6 +33,8 @@ and have an agent verify the answer against the code.
    freshness gate, abuse controls
 9. [Production database observer](#9-production-database-observer) — bounded read-only telemetry,
    JSON normalization, and migration preflight
+10. [Promoted Twitch configuration](#10-promoted-twitch-configuration) — admin-managed stream
+    selection, public resolution, and client polling
 
 ---
 
@@ -864,6 +866,63 @@ flowchart LR
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow.
+
+## 10. Promoted Twitch configuration
+
+**Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but
+an administrator can change the active channel, display name, and enabled state without a frontend
+redeploy. The override is stored in a service-role-only settings table, resolved by a public Nitro
+route, and refreshed by mounted clients once per minute.
+
+### Diagram
+
+```mermaid
+flowchart LR
+    Admin[Admin page] -->|Bearer token| Write[POST /api/admin/twitch-config]
+    Write --> Gate[Admin membership check]
+    Gate --> Settings[(public.app_settings)]
+    Write --> Audit[(admin_audit_log)]
+    Embed[PromotedTwitchEmbed] -->|every 60s| Read[GET /api/twitch/config]
+    Read --> Settings
+    Read --> Fallback[Public runtime config fallback]
+    Embed --> Live[GET /api/twitch/live]
+```
+
+### Flow
+
+1. `AdminTwitchConfigCard` loads the effective public configuration and obtains the current Supabase
+   access token before saving.
+2. `POST /api/admin/twitch-config` requires authenticated admin membership, validates the Twitch
+   channel, display name, and enabled flag, then upserts the `promoted_twitch` JSON value through the
+   service role. The successful value is recorded in the existing admin audit log.
+3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
+   missing table, missing row, malformed override, or unavailable database falls back safely instead
+   of breaking the embed. The resolved value is cached in-process and at the browser/edge for one
+   minute.
+4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
+   replace the player URL, disabling hides an active player, and an unavailable config endpoint keeps
+   the build-time fallback working.
+
+### Files
+
+- `app/features/admin/AdminTwitchConfigCard.vue` — admin form and authenticated save flow.
+- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, and audit.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and caching.
+- `app/components/PromotedTwitchEmbed.vue` — minute polling and player state updates.
+- `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table.
+
+### Invariants
+
+- `public.app_settings` grants no table access to `PUBLIC`, `anon`, or `authenticated`; all reads and
+  writes go through server routes using the service role.
+- The admin write route must authenticate the user and verify `user_system.is_admin` before reading
+  the request body or changing settings.
+- Twitch channels are normalized to lowercase and limited to Twitch-compatible letters, digits, and
+  underscores with a maximum length of 25 characters. Display names are limited to 50 characters.
+- Invalid or unavailable database overrides never make the public route fail; build-time runtime
+  config remains the fallback.
+- Mounted clients re-read configuration on the same 60-second cadence as live status so an admin
+  change takes effect without reload or redeploy.
 
 ## When this doc is wrong
 

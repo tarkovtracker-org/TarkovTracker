@@ -209,7 +209,6 @@ export default defineNuxtConfig({
         channel: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_CHANNEL || 'honeyxxo',
         displayName: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_DISPLAY_NAME || 'honeyxxo',
         enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED !== 'false',
-        endsAt: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENDS_AT || '2026-06-09T00:00:00+00:00',
       },
     },
   },

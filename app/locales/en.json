@@ -51,7 +51,20 @@
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
     "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Twitch Stream",
+    "twitch_config_description": "Set the Twitch channel promoted in the corner of the site. Takes effect for visitors within about a minute.",
+    "twitch_channel_label": "Channel",
+    "twitch_channel_placeholder": "Twitch channel name",
+    "twitch_display_name_label": "Display name",
+    "twitch_display_name_placeholder": "Channel display name",
+    "twitch_enabled_label": "Enabled",
+    "twitch_disabled_label": "Disabled",
+    "twitch_config_saved_title": "Twitch config updated",
+    "twitch_config_saved_description": "Promoted stream is now {channel}.",
+    "twitch_config_failed_title": "Update failed",
+    "twitch_config_failed_description": "Could not update Twitch config.",
+    "twitch_config_login_required": "You must be signed in to update Twitch config."
   },
   "alerts": {
     "no_map_data": "No map data available for this selection."

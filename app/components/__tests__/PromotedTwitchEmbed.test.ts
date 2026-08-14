@@ -3,30 +3,25 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
-const { fetchMock, runtimeConfig } = vi.hoisted(() => ({
+const { fetchMock } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
-  runtimeConfig: {
-    public: {
-      promotedTwitch: {
-        channel: 'teststreamer',
-        displayName: 'TestStreamer',
-        enabled: true,
-        endsAt: '2999-01-01T00:00:00+00:00',
-      } as {
-        channel?: string;
-        displayName?: string;
-        enabled?: boolean;
-        endsAt?: string;
-      },
+}));
+mockNuxtImport('useRuntimeConfig', () => () => ({
+  public: {
+    promotedTwitch: {
+      channel: 'teststreamer',
+      displayName: 'TestStreamer',
+      enabled: true,
     },
   },
 }));
-mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 mockNuxtImport('useI18n', () => () => ({
   t: (key: string, fallbackOrParams?: unknown) =>
     typeof fallbackOrParams === 'string' ? fallbackOrParams : key,
 }));
 vi.stubGlobal('$fetch', fetchMock);
+let twitchConfig: { channel: string; displayName: string; enabled: boolean };
+let liveResult: { isLive: boolean };
 const UButtonStub = {
   inheritAttrs: false,
   props: ['icon', 'to'],
@@ -45,7 +40,7 @@ const mountEmbed = async () => {
       },
     },
   });
-  // Resolve the onMounted checkLive() microtasks before assertions.
+  // Resolve the onMounted loadConfig()/checkLive() microtasks before assertions.
   await flushPromises();
   await nextTick();
   return wrapper;
@@ -53,32 +48,26 @@ const mountEmbed = async () => {
 describe('PromotedTwitchEmbed', () => {
   beforeEach(() => {
     fetchMock.mockReset();
-    fetchMock.mockResolvedValue({ isLive: true });
-    runtimeConfig.public.promotedTwitch = {
-      channel: 'teststreamer',
-      displayName: 'TestStreamer',
-      enabled: true,
-      endsAt: '2999-01-01T00:00:00+00:00',
-    };
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(url === '/api/twitch/config' ? twitchConfig : liveResult)
+    );
+    twitchConfig = { channel: 'teststreamer', displayName: 'TestStreamer', enabled: true };
+    liveResult = { isLive: true };
     sessionStorage.clear();
   });
   afterEach(() => {
     vi.restoreAllMocks();
   });
   it('does not check live status or render when disabled', async () => {
-    runtimeConfig.public.promotedTwitch.enabled = false;
+    twitchConfig.enabled = false;
     const wrapper = await mountEmbed();
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(wrapper.find('iframe').exists()).toBe(false);
-  });
-  it('does not render once the promotion end date has passed', async () => {
-    runtimeConfig.public.promotedTwitch.endsAt = '2000-01-01T00:00:00+00:00';
-    const wrapper = await mountEmbed();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/twitch/live', expect.anything());
     expect(wrapper.find('iframe').exists()).toBe(false);
   });
   it('renders the player iframe when the channel is live', async () => {
     const wrapper = await mountEmbed();
+    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
     expect(fetchMock).toHaveBeenCalledWith('/api/twitch/live', {
       query: { channel: 'teststreamer' },
     });
@@ -89,7 +78,7 @@ describe('PromotedTwitchEmbed', () => {
     expect(iframe.attributes('src')).toContain('muted=true');
   });
   it('stays hidden when the channel is offline', async () => {
-    fetchMock.mockResolvedValue({ isLive: false });
+    liveResult = { isLive: false };
     const wrapper = await mountEmbed();
     expect(wrapper.find('iframe').exists()).toBe(false);
   });
@@ -117,13 +106,38 @@ describe('PromotedTwitchEmbed', () => {
   it('polls live status on an interval', async () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
     const wrapper = await mountEmbed();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 60_000);
-    // Invoke the registered poll callback directly to avoid real timer waits.
     const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
     pollCallback();
     await flushPromises();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    wrapper.unmount();
+  });
+  it('applies config changes on the next poll', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const wrapper = await mountEmbed();
+    twitchConfig = { channel: 'replacement', displayName: 'Replacement', enabled: true };
+    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    pollCallback();
+    await flushPromises();
+    await nextTick();
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
+      query: { channel: 'replacement' },
+    });
+    expect(wrapper.find('iframe').attributes('src')).toContain('channel=replacement');
+    wrapper.unmount();
+  });
+  it('hides an active player when config is disabled on the next poll', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const wrapper = await mountEmbed();
+    twitchConfig.enabled = false;
+    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    pollCallback();
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.find('iframe').exists()).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     wrapper.unmount();
   });
 });
