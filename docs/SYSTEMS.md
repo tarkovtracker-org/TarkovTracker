@@ -80,6 +80,12 @@ their upstream data does not currently need corrections.
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](#5-precompute-workflow).
 
+The hideout route is the cache-order exception: its `json-v4` edge entry stores the adapted base
+payload, then the handler applies the current module-cached overlay after every edge-cache read. Its
+browser IndexedDB entry also uses `json-v4`, with a one-hour TTL matching overlay freshness. This
+keeps the 12-hour edge cache and the browser cache from pinning an old overlay correction. The other
+overlay-enabled routes cache their final overlay-applied payload.
+
 ### Diagram
 
 ```mermaid
@@ -203,7 +209,8 @@ replaces the key with the translated string.
    the `TARKOV_DATA` KV binding populated by the scheduled precompute workflow. See
    [Precompute](#5-precompute-workflow).
 2. **Edge Cache API** (per-colo, Cloudflare `caches.default`) — the standard layer. Stores the
-   adapted + overlay-applied payload with `s-maxage = ttl + staleTtl`.
+   adapted + overlay-applied payload with `s-maxage = ttl + staleTtl`. The hideout route instead
+   stores its adapted base payload and applies the current overlay after the cache read.
 3. **Upstream fetch** — on a cold miss, run the full pipeline (fetch → adapt → overlay) and write
    the result back into the edge cache.
 4. **Dev fallback** — when running locally with no Cache API (`globalThis.caches` undefined), skip
@@ -290,6 +297,10 @@ flowchart TD
   catch block (502 on upstream failure) do not set it — the invariant covers the success
   paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
+- Hideout edge-cache entries must contain the adapted base payload, not the overlay-applied response;
+  `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.
+- The browser hideout cache version must match the server route version and its TTL must not exceed
+  the one-hour overlay TTL.
 - The precomputed envelope is only trusted if `isPrecomputedEnvelope()` returns true; a corrupt
   write falls through to the edge cache instead of serving `null`.
 
@@ -336,12 +347,26 @@ sequenceDiagram
 - `tasksAdd` lets the overlay inject entirely new tasks not present upstream.
 - Objective post-processing (`objectiveTypeInferrer.ts`) normalizes objective lists and infers
   `foundInRaid` flags so the client does not have to guess.
-- `bypassCache: true` (from `shouldBypassCache`) forces a fresh overlay fetch — used after publishing
-  a correction.
+- `bypassCache: true` (from `shouldBypassCache`) forces an awaited overlay refresh — used after
+  publishing a correction.
+- A hideout request with an expired module-cached overlay serves the stale correction immediately
+  and registers one coalesced refresh with the Cloudflare execution context. Background task
+  rejections are logged and contained. A failed deferred refresh backs off for one minute before
+  another hideout request may retry it. Cold requests still await the initial overlay fetch, whose
+  five-second timeout covers both response headers and body parsing.
+- Hideout applies the overlay after reading its versioned base-data edge entry, so its correction
+  freshness is bounded by the overlay module's one-hour cache and browser cache TTL rather than the
+  hideout edge TTL. Other
+  overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
+  a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
 ### Files
 
-- `app/server/utils/overlay.ts` — fetch, cache, merge.
+- `app/server/utils/overlay.ts` — fetch, cache, merge, and deferred refresh coordination.
+- `app/server/utils/backgroundTask.ts` — keeps deferred refreshes alive through the Cloudflare
+  execution context.
+- `app/server/utils/overlayResponseHeaders.ts` — restores overlay metadata headers when corrections
+  are applied after an edge-cache read.
 - `app/server/utils/deepMerge.ts` — `deepMerge` + `isPlainObject`.
 - `app/server/utils/objectiveTypeInferrer.ts` — objective normalization.
 
@@ -352,7 +377,8 @@ sequenceDiagram
 - A missing or malformed overlay must never cause a 5xx; the base payload is returned with
   `X-Overlay-Status: missing`.
 - Overlay metadata (`status`, `version`, `generated`, `sha256`) must be propagated to response
-  headers so we can debug which correction was applied.
+  headers so we can debug which correction was applied. Routes that apply an overlay after
+  `edgeCache()` must call `setOverlayResponseHeaders()` before returning.
 
 ---
 

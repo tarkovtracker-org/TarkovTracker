@@ -58,7 +58,10 @@ export interface OverlayMeta {
 // OVERLAY_URL can be overridden by the environment variable.
 let cachedOverlay: OverlayData | null = null;
 let cacheTimestamp = 0;
+let overlayRefreshPromise: Promise<OverlayFetchResult> | null = null;
+let nextOverlayRefreshAt = 0;
 const OVERLAY_CACHE_TTL = 3600000; // 1 hour in milliseconds
+const OVERLAY_REFRESH_RETRY_MS = 60000;
 const FETCH_TIMEOUT_MS = 5000; // 5 seconds
 // GitHub raw URL for the overlay
 // Note: Using raw.githubusercontent.com directly until jsDelivr cache propagates
@@ -142,65 +145,117 @@ function buildOverlayMeta(
 /**
  * Fetch the overlay data from CDN (with caching)
  */
-async function fetchOverlay(
-  forceRefresh: boolean = false
-): Promise<{ overlay: OverlayData | null; meta: OverlayMeta }> {
-  const now = Date.now();
-  // Return cached overlay if still valid
-  if (!forceRefresh && cachedOverlay && now - cacheTimestamp < OVERLAY_CACHE_TTL) {
-    lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'cached', {
-      cacheAgeMs: now - cacheTimestamp,
-    });
-    return { overlay: cachedOverlay, meta: lastOverlayMeta };
-  }
-  try {
-    // Set up abort controller with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const response = await fetch(OVERLAY_URL_WITH_BUSTER, {
+type OverlayFetchResult = { overlay: OverlayData | null; meta: OverlayMeta };
+type OverlayRefreshScheduler = (task: Promise<unknown>) => void;
+function buildOverlayFailure(error: string): OverlayFetchResult {
+  lastOverlayMeta = buildOverlayMeta(cachedOverlay, cachedOverlay ? 'stale' : 'missing', { error });
+  return { overlay: cachedOverlay, meta: lastOverlayMeta };
+}
+function createOverlayRequest(): {
+  clearTimeout: () => void;
+  response: Promise<Response>;
+} {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return {
+    clearTimeout: () => clearTimeout(timeoutId),
+    response: Promise.resolve().then(() =>
+      fetch(OVERLAY_URL_WITH_BUSTER, {
         signal: controller.signal,
         headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
-      });
-      if (!response.ok) {
-        logger.warn(`Failed to fetch overlay: ${response.status}`);
-        lastOverlayMeta = buildOverlayMeta(cachedOverlay, cachedOverlay ? 'stale' : 'missing', {
-          error: `HTTP ${response.status}`,
-        });
-        return { overlay: cachedOverlay, meta: lastOverlayMeta };
-      }
-      const parsedData = await response.json();
-      // Validate the parsed data before caching
-      if (!isValidOverlayData(parsedData)) {
-        logger.warn('Fetched overlay failed validation, using stale cache');
-        lastOverlayMeta = buildOverlayMeta(cachedOverlay, cachedOverlay ? 'stale' : 'missing', {
-          error: 'validation_failed',
-        });
-        return { overlay: cachedOverlay, meta: lastOverlayMeta };
-      }
-      cachedOverlay = parsedData;
-      cacheTimestamp = now;
-      logger.info(`Loaded overlay v${cachedOverlay.$meta?.version}`);
-      lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'fresh', {
-        fetchedAt: new Date(now).toISOString(),
-        cacheAgeMs: 0,
-      });
-      return { overlay: cachedOverlay, meta: lastOverlayMeta };
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      logger.warn(`Fetch timeout after ${FETCH_TIMEOUT_MS}ms`);
-    } else {
-      logger.warn('Error fetching overlay:', error);
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    lastOverlayMeta = buildOverlayMeta(cachedOverlay, cachedOverlay ? 'stale' : 'missing', {
-      error: message,
-    });
-    return { overlay: cachedOverlay, meta: lastOverlayMeta };
+      })
+    ),
+  };
+}
+async function processOverlayResponse(
+  response: Response,
+  now: number
+): Promise<OverlayFetchResult> {
+  if (!response.ok) {
+    logger.warn(`Failed to fetch overlay: ${response.status}`);
+    return buildOverlayFailure(`HTTP ${response.status}`);
   }
+  const parsedData = await response.json();
+  if (!isValidOverlayData(parsedData)) {
+    logger.warn('Fetched overlay failed validation, using stale cache');
+    return buildOverlayFailure('validation_failed');
+  }
+  cachedOverlay = parsedData;
+  cacheTimestamp = now;
+  logger.info(`Loaded overlay v${cachedOverlay.$meta?.version}`);
+  lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'fresh', {
+    fetchedAt: new Date(now).toISOString(),
+    cacheAgeMs: 0,
+  });
+  return { overlay: cachedOverlay, meta: lastOverlayMeta };
+}
+function logOverlayFetchError(error: unknown): void {
+  if (error instanceof Error && error.name === 'AbortError') {
+    logger.warn(`Fetch timeout after ${FETCH_TIMEOUT_MS}ms`);
+    return;
+  }
+  logger.warn('Error fetching overlay:', error);
+}
+async function refreshOverlay(now: number): Promise<OverlayFetchResult> {
+  const request = createOverlayRequest();
+  try {
+    return await processOverlayResponse(await request.response, now);
+  } catch (error) {
+    logOverlayFetchError(error);
+    return buildOverlayFailure(error instanceof Error ? error.message : String(error));
+  } finally {
+    request.clearTimeout();
+  }
+}
+function startOverlayRefresh(now: number): {
+  promise: Promise<OverlayFetchResult>;
+  started: boolean;
+} {
+  if (overlayRefreshPromise) return { promise: overlayRefreshPromise, started: false };
+  const promise = refreshOverlay(now)
+    .then((result) => {
+      nextOverlayRefreshAt =
+        result.meta.status === 'fresh' ? 0 : Date.now() + OVERLAY_REFRESH_RETRY_MS;
+      return result;
+    })
+    .finally(() => {
+      overlayRefreshPromise = null;
+    });
+  overlayRefreshPromise = promise;
+  return { promise, started: true };
+}
+function isOverlayCacheFresh(now: number, forceRefresh: boolean): boolean {
+  return !forceRefresh && cachedOverlay !== null && now - cacheTimestamp < OVERLAY_CACHE_TTL;
+}
+function canDeferOverlayRefresh(
+  forceRefresh: boolean,
+  scheduleRefresh: OverlayRefreshScheduler | undefined
+): scheduleRefresh is OverlayRefreshScheduler {
+  return !forceRefresh && cachedOverlay !== null && Boolean(scheduleRefresh);
+}
+function buildCachedOverlayResult(now: number, status: 'cached' | 'stale'): OverlayFetchResult {
+  const overlay = cachedOverlay as OverlayData;
+  lastOverlayMeta = buildOverlayMeta(overlay, status, { cacheAgeMs: now - cacheTimestamp });
+  return { overlay, meta: lastOverlayMeta };
+}
+function scheduleOverlayRefresh(now: number, scheduleRefresh: OverlayRefreshScheduler): void {
+  if (now < nextOverlayRefreshAt) return;
+  const refresh = startOverlayRefresh(now);
+  if (refresh.started) scheduleRefresh(refresh.promise);
+}
+async function fetchOverlay(
+  forceRefresh: boolean = false,
+  scheduleRefresh?: OverlayRefreshScheduler
+): Promise<OverlayFetchResult> {
+  const now = Date.now();
+  if (isOverlayCacheFresh(now, forceRefresh)) {
+    return buildCachedOverlayResult(now, 'cached');
+  }
+  if (canDeferOverlayRefresh(forceRefresh, scheduleRefresh)) {
+    scheduleOverlayRefresh(now, scheduleRefresh);
+    return buildCachedOverlayResult(now, 'stale');
+  }
+  return await startOverlayRefresh(now).promise;
 }
 /**
  * Apply overlay corrections to an array of entities
@@ -261,7 +316,9 @@ export function applyLocaleOverlay<T extends { id: string }>(
   if (!localePatches || !entities) return entities;
   return entities.map((entity) => {
     const patch = localePatches[entity.id];
-    return patch ? (deepMerge(entity as Record<string, unknown>, patch) as T) : entity;
+    return isPlainObject(patch)
+      ? (deepMerge(entity as Record<string, unknown>, patch) as T)
+      : entity;
   });
 }
 type ObjectiveAddEntry = Record<string, unknown>;
@@ -421,12 +478,29 @@ function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOve
     target.traders = applyLocaleOverlay(target.traders, localeOverlay.traders);
   }
 }
+function applyEntityCollectionOverlay(
+  target: OverlayTargetData,
+  collection: 'hideoutStations' | 'items' | 'traders',
+  patches: Record<string, Record<string, unknown>> | undefined
+): void {
+  const entities = target[collection];
+  if (!patches || !Array.isArray(entities)) return;
+  target[collection] = applyEntityOverlay(entities, patches);
+}
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
-  options: { bypassCache?: boolean; gameMode?: string; locale?: string } = {}
-): Promise<T> {
-  const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
-  const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
+  options: {
+    bypassCache?: boolean;
+    gameMode?: string;
+    locale?: string;
+    scheduleRefresh?: OverlayRefreshScheduler;
+  } = {}
+): Promise<T & { dataOverlay: OverlayMeta }> {
+  const { overlay, meta } = await fetchOverlay(
+    Boolean(options.bypassCache),
+    options.scheduleRefresh
+  );
+  const result = { ...data, dataOverlay: meta } as T & { dataOverlay: OverlayMeta };
   if (!overlay || !data?.data) {
     return result;
   }
@@ -454,27 +528,9 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);
     result.data.tasks = [...correctedTasks, ...dedupedAdditions];
   }
-  // Apply item corrections (if present)
-  if (overlay.items && Array.isArray(result.data.items)) {
-    result.data.items = applyEntityOverlay(
-      result.data.items as Array<{ id: string }>,
-      overlay.items
-    );
-  }
-  // Apply trader corrections (if present)
-  if (overlay.traders && Array.isArray(result.data.traders)) {
-    result.data.traders = applyEntityOverlay(
-      result.data.traders as Array<{ id: string }>,
-      overlay.traders
-    );
-  }
-  // Apply hideout corrections (if present)
-  if (overlay.hideout && Array.isArray(result.data.hideoutStations)) {
-    result.data.hideoutStations = applyEntityOverlay(
-      result.data.hideoutStations as Array<{ id: string }>,
-      overlay.hideout
-    );
-  }
+  applyEntityCollectionOverlay(result.data, 'items', overlay.items);
+  applyEntityCollectionOverlay(result.data, 'traders', overlay.traders);
+  applyEntityCollectionOverlay(result.data, 'hideoutStations', overlay.hideout);
   const locale = options.locale?.trim() || 'en';
   const localeOverlay = overlay.locales?.[locale];
   if (localeOverlay) {
