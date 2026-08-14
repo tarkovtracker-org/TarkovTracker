@@ -150,6 +150,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -169,6 +170,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -188,6 +190,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -253,6 +256,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -272,6 +276,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -292,6 +297,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,

@@ -21,6 +21,14 @@ interface ModeOverlayData {
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
 }
+interface LocaleOverlayData {
+  tasks?: Record<string, Record<string, unknown>>;
+  items?: Record<string, Record<string, unknown>>;
+  traders?: Record<string, Record<string, unknown>>;
+  maps?: Record<string, Record<string, unknown>>;
+  prestige?: Record<string, Record<string, unknown>>;
+  storyChapters?: Record<string, Record<string, unknown>>;
+}
 interface OverlayData {
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
@@ -29,6 +37,7 @@ interface OverlayData {
   hideout?: Record<string, Record<string, unknown>>;
   editions?: Record<string, unknown>;
   modes?: Record<string, ModeOverlayData>;
+  locales?: Record<string, LocaleOverlayData>;
   $meta?: {
     version: string;
     generated: string;
@@ -248,6 +257,24 @@ function applyEntityOverlay<T extends { id: string }>(
   }
   return result;
 }
+/**
+ * Apply per-locale corrections to an array of entities.
+ *
+ * Locale overrides patch locale-sensitive fields (name, shortName, description,
+ * wikiLink, and ID-keyed objective descriptions) for a specific locale bundle.
+ * They take precedence over data overrides, so apply them last. Shallow-merges
+ * each entity's patch via deepMerge so ID-keyed objective patches are handled.
+ */
+export function applyLocaleOverlay<T extends { id: string }>(
+  entities: T[],
+  localePatches: Record<string, Record<string, unknown>> | undefined
+): T[] {
+  if (!localePatches || !entities) return entities;
+  return entities.map((entity) => {
+    const patch = localePatches[entity.id];
+    return patch ? (deepMerge(entity as Record<string, unknown>, patch) as T) : entity;
+  });
+}
 type ObjectiveAddEntry = Record<string, unknown>;
 const DEFAULT_OVERLAY_OBJECTIVE_TYPE = 'giveItem';
 const DEFAULT_OVERLAY_OBJECTIVE_COUNT = 1;
@@ -396,7 +423,7 @@ type OverlayTargetData = {
 };
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
-  options: { bypassCache?: boolean; gameMode?: string } = {}
+  options: { bypassCache?: boolean; gameMode?: string; locale?: string } = {}
 ): Promise<T> {
   const { overlay, meta } = await fetchOverlay(Boolean(options.bypassCache));
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay?: OverlayMeta };
@@ -447,6 +474,30 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
       result.data.hideoutStations as Array<{ id: string }>,
       overlay.hideout
     );
+  }
+  // Apply per-locale corrections last: they take precedence over data overrides
+  // for locale-sensitive fields (name, wikiLink, objective descriptions).
+  const locale = options.locale?.trim() || 'en';
+  const localeOverlay = overlay.locales?.[locale];
+  if (localeOverlay) {
+    if (Array.isArray(result.data.tasks)) {
+      result.data.tasks = applyLocaleOverlay(
+        result.data.tasks as Array<{ id: string }>,
+        localeOverlay.tasks
+      );
+    }
+    if (Array.isArray(result.data.items)) {
+      result.data.items = applyLocaleOverlay(
+        result.data.items as Array<{ id: string }>,
+        localeOverlay.items
+      );
+    }
+    if (Array.isArray(result.data.traders)) {
+      result.data.traders = applyLocaleOverlay(
+        result.data.traders as Array<{ id: string }>,
+        localeOverlay.traders
+      );
+    }
   }
   return result;
 }
