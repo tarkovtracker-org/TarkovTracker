@@ -94,6 +94,7 @@
   const playerUrl = ref('');
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let refreshInFlight: Promise<void> | null = null;
+  let hasResolvedConfig = false;
   const buildPlayerUrl = (): string => {
     const params = new URLSearchParams({
       channel: channel.value,
@@ -131,17 +132,18 @@
       isVisible.value = true;
     }
   };
-  const switchChannel = (next: string): void => {
+  const adoptChannel = (next: string): void => {
     hidePlayer();
-    clearDismissal();
+    if (hasResolvedConfig) clearDismissal();
     channel.value = next;
   };
   const resolveDisplayName = (value: string | undefined): string => value?.trim() || channel.value;
   const applyConfig = (data: TwitchConfigResponse): void => {
     const nextChannel = normalizeChannel(data.channel) || channel.value;
-    if (nextChannel !== channel.value) switchChannel(nextChannel);
+    if (nextChannel !== channel.value) adoptChannel(nextChannel);
     displayName.value = resolveDisplayName(data.displayName);
     enabled.value = data.enabled;
+    hasResolvedConfig = true;
   };
   const loadConfig = async (): Promise<void> => {
     try {

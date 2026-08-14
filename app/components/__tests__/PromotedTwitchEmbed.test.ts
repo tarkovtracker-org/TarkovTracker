@@ -140,6 +140,15 @@ describe('PromotedTwitchEmbed', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     wrapper.unmount();
   });
+  it('keeps a stored dismissal when the first resolved channel differs from the fallback', async () => {
+    sessionStorage.setItem('tt-twitch-dismissed', '1');
+    twitchConfig = { channel: 'dbstreamer', displayName: 'DB Streamer', enabled: true };
+    const wrapper = await mountEmbed();
+    expect(sessionStorage.getItem('tt-twitch-dismissed')).toBe('1');
+    expect(wrapper.find('iframe').exists()).toBe(false);
+    expect(wrapper.find('button[aria-label="Reopen stream"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
   it('clears a stored dismissal when the promoted channel changes', async () => {
     sessionStorage.setItem('tt-twitch-dismissed', '1');
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
