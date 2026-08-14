@@ -1187,6 +1187,7 @@
           "url_copied": "URL copiada al portapapeles",
           "copy_url_failed": "Error al copiar la URL al portapapeles",
           "no_team": "Actualmente no estás en un equipo.",
+          "login_required": "Inicia sesión para crear un equipo o administrar el enlace de invitación de tu equipo.",
           "team_invite_url_label": "URL de Invitación al Equipo",
           "copy_link": "Copiar",
           "link_hidden_message": "Haga clic en \"Mostrar\" para revelar el enlace de invitación de su equipo.",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Tarkov Gurú",
     "tarkovmonitor": "Monitor Tarkov",
     "resources": "Resources",
+    "section_more": "Más",
     "profile": "Perfil",
     "section_navigation": "Navegación",
     "section_external": "Externo",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "Idioma",
+    "page_description": "Administra tu cuenta, progreso del juego y preferencias de la aplicación.",
     "tabs": {
       "progression": "Progreso",
       "imports": "Importaciones"
     },
     "tab_groups": {
-      "game": "Juego",
-      "account_advanced": "Cuenta y avanzado"
+      "game_progress": "Progreso del juego",
+      "app": "App",
+      "data": "Datos",
+      "account": "Cuenta",
+      "tools_integrations": "Herramientas e integraciones"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Preferencias generales",
       "privacy_mode": "Modo streamer",
       "privacy_mode_hint": "Oculta información sensible mientras transmites."
     },
@@ -1761,7 +1768,10 @@
         "show_next": "Mostrar misiones siguientes",
         "show_prev": "Mostrar misiones anteriores",
         "density": "Densidad de tarjetas",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Mostrar tarea",
+        "availability_section": "Disponibilidad de tareas",
+        "view_defaults_section": "Vistas por defecto"
       },
       "maps": {
         "show_extracts": "Mostrar extracciones por defecto",
@@ -1852,6 +1862,8 @@
       "export_error_title": "Error de exportación",
       "debug_export_error_title": "Error al exportar la depuración",
       "reset_title": "Restablecer progreso",
+      "danger_zone_title": "Zona de peligro",
+      "danger_zone_hint": "Restableciendo todo el progreso permanentemente borra sus datos para JcJ, JcJ y JcJ estacional. Esto no se puede deshacer.",
       "prestige_history_title": "Historial de prestigio",
       "prestige_history_loading": "Cargando historial de prestigio...",
       "prestige_history_empty": "Aún no hay runs de prestigio archivadas.",
@@ -2025,7 +2037,9 @@
       "saved_title": "Nombre para mostrar guardado",
       "saved_description": "Tu nombre para mostrar de {mode} se ha actualizado",
       "save_failed_title": "Error al guardar",
-      "save_failed_description": "No se pudo guardar el nombre para mostrar. Inténtalo de nuevo."
+      "save_failed_description": "No se pudo guardar el nombre para mostrar. Inténtalo de nuevo.",
+      "active_mode": "Activo",
+      "game_edition_hint": "Selecciona la edición del juego que tienes para que el seguimiento coincida con tu contenido disponible."
     },
     "skills": {
       "title": "Gestión de Habilidades",
@@ -2042,7 +2056,10 @@
       "valid_range": "Rango válido: 0-51",
       "sort": {
         "ingame": "En el juego"
-      }
+      },
+      "quest_tooltip": "Nivel de habilidad otorgado automáticamente por las recompensas de misión completadas.",
+      "offset_tooltip": "Ajuste manual sobre el nivel de recompensa de misión. Positivo significa que has entrenado la habilidad sobre las recompensas de misión.",
+      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2069,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Escuchando...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "Ingrese su XP total real para ajustar la compensación automáticamente.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} para el siguiente",
-      "reset_offset": "Restablecer compensación de XP"
+      "reset_offset": "Restablecer compensación de XP",
+      "xp_progress_aria": "Progreso de la experiencia hacia el siguiente nivel",
+      "xp_progress_value": "{percent}% hacia el siguiente nivel"
     },
     "danger_zone": {
       "confirm_word": "ELIMINAR"
