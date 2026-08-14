@@ -1187,6 +1187,7 @@
           "url_copied": "URL 已复制到剪贴板",
           "copy_url_failed": "复制URL到剪贴板失败",
           "no_team": "你当前未加入任何队伍",
+          "login_required": "登录以创建团队或管理您的团队邀请链接。",
           "team_invite_url_label": "队伍邀请链接",
           "copy_link": "复制",
           "link_hidden_message": "点击「显示」查看队伍邀请链接",
@@ -1561,6 +1562,7 @@
     "tarkovguru": "Tarkov 大师",
     "tarkovmonitor": "Tarkov 监视器",
     "resources": "Resources",
+    "section_more": "更多",
     "profile": "个人资料",
     "section_navigation": "导航",
     "section_external": "外部链接",
@@ -1696,13 +1698,17 @@
   },
   "settings": {
     "locale": "语言",
+    "page_description": "管理您的帐户、游戏进度和应用程序首选项。",
     "tabs": {
       "progression": "进度",
       "imports": "导入"
     },
     "tab_groups": {
-      "game": "游戏",
-      "account_advanced": "账户和高级"
+      "game_progress": "游戏进度",
+      "app": "应用",
+      "data": "数据",
+      "account": "账户",
+      "tools_integrations": "工具和集成"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1756,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "常规首选项",
       "privacy_mode": "主播模式",
       "privacy_mode_hint": "在你直播时隐藏敏感信息。"
     },
@@ -1761,7 +1768,10 @@
         "show_next": "显示后续任务",
         "show_prev": "显示前置任务",
         "density": "卡片密度",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "任务显示",
+        "availability_section": "任务可用性",
+        "view_defaults_section": "默认视图"
       },
       "maps": {
         "show_extracts": "默认显示撤离点",
@@ -1852,6 +1862,8 @@
       "export_error_title": "导出失败",
       "debug_export_error_title": "调试导出失败",
       "reset_title": "重置进度",
+      "danger_zone_title": "危险区域",
+      "danger_zone_hint": "重置所有进度将永久删除您的 PvP、PvE 和季节性PvP 的数据。此操作无法撤消。",
       "prestige_history_title": "声望历史",
       "prestige_history_loading": "正在加载声望历史...",
       "prestige_history_empty": "暂无已归档的声望周目。",
@@ -2025,7 +2037,9 @@
       "saved_title": "显示名称已保存",
       "saved_description": "你的 {mode} 显示名称已更新",
       "save_failed_title": "保存失败",
-      "save_failed_description": "无法保存显示名称。请重试。"
+      "save_failed_description": "无法保存显示名称。请重试。",
+      "active_mode": "已启用",
+      "game_edition_hint": "选择您自己的游戏版本，因此跟踪符合您的可用内容。"
     },
     "skills": {
       "title": "技能管理",
@@ -2042,7 +2056,10 @@
       "valid_range": "有效范围：0-51",
       "sort": {
         "ingame": "游戏内"
-      }
+      },
+      "quest_tooltip": "通过完成任务奖励自动授予技能等级。",
+      "offset_tooltip": "在任务奖励级别顶部手动调整。正面意味着你培训了任务奖励以上的技能。",
+      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2069,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "正在监听...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,7 +2086,9 @@
       "manual_hint": "输入实际总经验可自动调整偏移量",
       "xp_amount": "{amount} 经验",
       "xp_to_next": "距下一级还需 {amount}",
-      "reset_offset": "重置经验偏移量"
+      "reset_offset": "重置经验偏移量",
+      "xp_progress_aria": "向下一级发展经验",
+      "xp_progress_value": "{percent}% toward the next level"
     },
     "danger_zone": {
       "confirm_word": "删除账户"
