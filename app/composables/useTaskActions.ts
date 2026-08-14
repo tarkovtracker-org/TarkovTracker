@@ -4,10 +4,13 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
   applyTaskAvailabilityRequirements,
+  applyTaskTraderRequirements,
   completeTaskForProgress,
+  ensureTaskMinPlayerLevel,
   failTaskForProgress,
+  uncompleteTaskForProgress,
 } from '@/utils/taskProgress';
-import type { Task, TaskObjective } from '@/types/tarkov';
+import type { Task } from '@/types/tarkov';
 export type TaskActionPayload = {
   taskId: string;
   taskName: string;
@@ -23,6 +26,37 @@ export type UseTaskActionsReturn = {
   markTaskAvailable: () => void;
   markTaskFailed: (isUndo?: boolean) => void;
 };
+const toYesNo = (value: unknown) => (value ? 'yes' : 'no');
+const getKnownTraderName = (trader: NonNullable<Task['trader']>) =>
+  trader.normalizedName || trader.name || 'unknown';
+const getTaskTraderName = (task: Task) => {
+  if (!task.trader) return 'unknown';
+  return getKnownTraderName(task.trader);
+};
+const getTaskName = (task: Task, fallback: () => string) => task.name ?? fallback();
+const getTaskObjectiveCount = (task: Task) => task.objectives?.length ?? 0;
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+const getTaskAnalyticsParams = (
+  currentTask: Task,
+  gameMode: string,
+  params: Record<string, boolean | number | string> = {}
+) => ({
+  game_mode: gameMode,
+  task_has_required_keys: toYesNo(currentTask.requiredKeys?.length),
+  task_id: currentTask.id,
+  task_is_kappa: toYesNo(currentTask.kappaRequired),
+  task_is_lightkeeper: toYesNo(currentTask.lightkeeperRequired),
+  task_name: currentTask.name || currentTask.id,
+  task_trader: getTaskTraderName(currentTask),
+  ...params,
+});
+const getUncompleteAction = (wasFailed: boolean) =>
+  wasFailed ? ('reset_failed' as const) : ('uncomplete' as const);
+const getUncompleteStatusKey = (wasFailed: boolean) =>
+  wasFailed ? 'page.tasks.questcard.status_reset_failed' : 'page.tasks.questcard.status_uncomplete';
+const getUncompleteUndoKey = (wasFailed: boolean) =>
+  wasFailed ? 'page.tasks.questcard.undo_reset_failed' : 'page.tasks.questcard.undo_uncomplete';
 export function useTaskActions(
   task: () => Task,
   onAction?: (payload: TaskActionPayload) => void
@@ -32,45 +66,10 @@ export function useTaskActions(
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
   const { trackTaskAction } = useProductAnalytics();
-  const tasks = computed(() => metadataStore.tasks);
+  const tasksMap = computed(() => metadataStore.taskById);
   const unpinTaskIfPinned = (taskId: string) => {
-    if (preferencesStore.getPinnedTaskIds.includes(taskId)) {
-      preferencesStore.togglePinnedTask(taskId);
-    }
-  };
-  // Create O(1) lookup map for tasks (more efficient than O(n) find operations)
-  const tasksMap = computed(() => {
-    const map = new Map<string, Task>();
-    tasks.value.forEach((taskItem) => {
-      map.set(taskItem.id, taskItem);
-    });
-    return map;
-  });
-  const handleTaskObjectives = (
-    objectives: TaskObjective[],
-    action: 'setTaskObjectiveComplete' | 'setTaskObjectiveUncomplete'
-  ) => {
-    objectives.forEach((objective) => {
-      if (!objective?.id) return;
-      if (action === 'setTaskObjectiveComplete') {
-        tarkovStore.setTaskObjectiveComplete(objective.id);
-        if (objective.count !== undefined && objective.count > 0) {
-          tarkovStore.setObjectiveCount(objective.id, objective.count);
-        }
-        return;
-      }
-      tarkovStore.setTaskObjectiveUncomplete(objective.id);
-    });
-  };
-  const clearTaskObjectives = (objectives: TaskObjective[]) => {
-    objectives.forEach((objective) => {
-      if (!objective?.id) return;
-      tarkovStore.setTaskObjectiveUncomplete(objective.id);
-      const currentCount = tarkovStore.getObjectiveCount(objective.id);
-      if ((objective.count ?? 0) > 0 || currentCount > 0) {
-        tarkovStore.setObjectiveCount(objective.id, 0);
-      }
-    });
+    if (!preferencesStore.getPinnedTaskIds.includes(taskId)) return;
+    preferencesStore.togglePinnedTask(taskId);
   };
   const completeTaskForAvailability = (taskId: string) => {
     completeTaskForProgress({
@@ -86,104 +85,54 @@ export function useTaskActions(
       tasksMap: tasksMap.value,
     });
   };
-  const handleAlternatives = (
-    alternatives: string[] | undefined,
-    taskAction: 'setTaskFailed' | 'setTaskUncompleted',
-    objectiveAction: 'setTaskObjectiveComplete' | 'setTaskObjectiveUncomplete'
-  ) => {
-    if (!Array.isArray(alternatives)) return;
-    alternatives.forEach((alternativeTaskId) => {
-      const preserveCompletedAlternative =
-        taskAction === 'setTaskFailed' && tarkovStore.isTaskComplete(alternativeTaskId);
-      if (preserveCompletedAlternative) return;
-      if (taskAction === 'setTaskFailed') {
-        tarkovStore.setTaskFailed(alternativeTaskId);
-      } else {
-        tarkovStore.setTaskUncompleted(alternativeTaskId);
-      }
-      const alternativeTask = tasksMap.value.get(alternativeTaskId);
-      if (alternativeTask?.objectives) {
-        if (taskAction === 'setTaskFailed') {
-          clearTaskObjectives(alternativeTask.objectives);
-        } else {
-          handleTaskObjectives(alternativeTask.objectives, objectiveAction);
-        }
-      }
-    });
-  };
-  const ensureMinLevel = () => {
-    const minLevel = task().minPlayerLevel ?? 0;
-    // Note: playerLevel is a getter that returns a function, so it must be called with ()
-    if (tarkovStore.playerLevel() < minLevel) {
-      tarkovStore.setLevel(minLevel);
-    }
-  };
-  const ensureTraderRequirements = () => {
+  const ensureTraderRequirements = (currentTask: Task) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
-    const currentTask = task();
-    for (const requirement of currentTask.traderLevelRequirements ?? []) {
-      const traderId = requirement.trader?.id;
-      if (!traderId) continue;
-      if (tarkovStore.getTraderLevel(traderId) < requirement.level) {
-        tarkovStore.setTraderLevel(traderId, requirement.level);
-      }
-    }
     const fenceId = metadataStore.traders.find((trader) => trader.normalizedName === 'fence')?.id;
-    for (const requirement of currentTask.traderRequirements ?? []) {
-      const traderId = requirement.trader?.id;
-      if (!traderId) continue;
-      const reputation = tarkovStore.getTraderReputation(traderId);
-      if (requirement.value >= 0 && reputation < requirement.value) {
-        tarkovStore.setTraderReputation(traderId, requirement.value);
-      } else if (requirement.value < 0 && traderId === fenceId && reputation > requirement.value) {
-        tarkovStore.setTraderReputation(traderId, requirement.value);
-      }
-    }
+    applyTaskTraderRequirements({
+      store: tarkovStore,
+      task: currentTask,
+      fenceId,
+    });
   };
   const isTaskManuallyFailed = (taskId: string) => {
     const completion = tarkovStore.getCurrentProgressData().taskCompletions?.[taskId];
-    if (!completion || typeof completion !== 'object') return false;
+    if (!isObject(completion)) return false;
     if (!Object.prototype.hasOwnProperty.call(completion, 'manual')) return false;
-    return (completion as { manual?: boolean }).manual === true;
+    return completion.manual === true;
   };
-  const getTaskAnalyticsParams = (
+  const getWasManualFail = (taskId: string, wasFailed: boolean) => {
+    if (!wasFailed) return false;
+    return isTaskManuallyFailed(taskId);
+  };
+  const analyticsParams = (
     currentTask: Task,
     params: Record<string, boolean | number | string> = {}
-  ) => ({
-    game_mode: tarkovStore.getCurrentGameMode(),
-    task_has_required_keys: currentTask.requiredKeys?.length ? 'yes' : 'no',
-    task_id: currentTask.id,
-    task_is_kappa: currentTask.kappaRequired ? 'yes' : 'no',
-    task_is_lightkeeper: currentTask.lightkeeperRequired ? 'yes' : 'no',
-    task_name: currentTask.name || currentTask.id,
-    task_trader: currentTask.trader?.normalizedName || currentTask.trader?.name || 'unknown',
-    ...params,
-  });
+  ) => getTaskAnalyticsParams(currentTask, tarkovStore.getCurrentGameMode(), params);
   const emitAction = (payload: TaskActionPayload) => {
     trackTaskAction(payload);
     onAction?.(payload);
   };
   const markTaskComplete = (isUndo = false) => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('common.task', 'Task');
+    const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
         action: 'complete',
-        analyticsParams: getTaskAnalyticsParams(currentTask, {
-          objective_count: currentTask.objectives?.length ?? 0,
+        analyticsParams: analyticsParams(currentTask, {
+          objective_count: getTaskObjectiveCount(currentTask),
         }),
         statusKey: 'page.tasks.questcard.status_complete',
       });
     }
-    tarkovStore.setTaskComplete(currentTask.id);
+    completeTaskForProgress({
+      store: tarkovStore,
+      taskId: currentTask.id,
+      tasksMap: tasksMap.value,
+    });
     unpinTaskIfPinned(currentTask.id);
-    if (currentTask.objectives) {
-      handleTaskObjectives(currentTask.objectives, 'setTaskObjectiveComplete');
-    }
-    handleAlternatives(currentTask.alternatives, 'setTaskFailed', 'setTaskObjectiveComplete');
-    ensureMinLevel();
+    ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -195,81 +144,77 @@ export function useTaskActions(
   };
   const markTaskUncomplete = (isUndo = false) => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('common.task', 'Task');
+    const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     const wasFailed = tarkovStore.isTaskFailed(currentTask.id);
-    const wasManualFail = wasFailed && isTaskManuallyFailed(currentTask.id);
+    const wasManualFail = getWasManualFail(currentTask.id, wasFailed);
+    const action = getUncompleteAction(wasFailed);
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
-        action: wasFailed ? 'reset_failed' : 'uncomplete',
-        analyticsParams: getTaskAnalyticsParams(currentTask, {
-          was_manual_fail: wasManualFail ? 'yes' : 'no',
+        action,
+        analyticsParams: analyticsParams(currentTask, {
+          was_manual_fail: toYesNo(wasManualFail),
         }),
         wasManualFail,
-        statusKey: wasFailed
-          ? 'page.tasks.questcard.status_reset_failed'
-          : 'page.tasks.questcard.status_uncomplete',
+        statusKey: getUncompleteStatusKey(wasFailed),
       });
     }
-    tarkovStore.setTaskUncompleted(currentTask.id);
-    if (currentTask.objectives) {
-      handleTaskObjectives(currentTask.objectives, 'setTaskObjectiveUncomplete');
-    }
-    handleAlternatives(
-      currentTask.alternatives,
-      'setTaskUncompleted',
-      'setTaskObjectiveUncomplete'
-    );
+    uncompleteTaskForProgress({
+      store: tarkovStore,
+      taskId: currentTask.id,
+      tasksMap: tasksMap.value,
+      restoreAlternatives: !wasFailed,
+    });
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
-        action: wasFailed ? 'reset_failed' : 'uncomplete',
+        action,
         wasManualFail,
-        undoKey: wasFailed
-          ? 'page.tasks.questcard.undo_reset_failed'
-          : 'page.tasks.questcard.undo_uncomplete',
+        undoKey: getUncompleteUndoKey(wasFailed),
       });
     }
   };
   const markTaskAvailable = () => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('common.task', 'Task');
+    const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     applyTaskAvailabilityRequirements({
       onCompleteRequirement: completeTaskForAvailability,
       onFailRequirement: failTaskForAvailability,
       task: currentTask,
     });
-    ensureMinLevel();
-    ensureTraderRequirements();
+    ensureTaskMinPlayerLevel(tarkovStore, currentTask);
+    ensureTraderRequirements(currentTask);
     emitAction({
       taskId: currentTask.id,
       taskName,
       action: 'available',
-      analyticsParams: getTaskAnalyticsParams(currentTask),
+      analyticsParams: analyticsParams(currentTask),
       statusKey: 'page.tasks.questcard.status_available',
     });
   };
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();
-    const taskName = currentTask.name ?? t('common.task', 'Task');
+    const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
         action: 'fail',
-        analyticsParams: getTaskAnalyticsParams(currentTask, {
+        analyticsParams: analyticsParams(currentTask, {
           was_manual_fail: 'yes',
         }),
         statusKey: 'page.tasks.questcard.status_failed',
       });
     }
-    tarkovStore.setTaskFailed(currentTask.id, { manual: true });
+    failTaskForProgress({
+      store: tarkovStore,
+      taskId: currentTask.id,
+      tasksMap: tasksMap.value,
+      manual: true,
+    });
     unpinTaskIfPinned(currentTask.id);
-    if (currentTask.objectives) {
-      clearTaskObjectives(currentTask.objectives);
-    }
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
