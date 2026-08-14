@@ -12,10 +12,13 @@ const { adminSupabaseFetchMock, setResponseHeadersMock, runtimeConfig } = vi.hoi
     supabaseServiceKey: 'service-key',
   },
 }));
-vi.mock('@/server/utils/adminSupabase', () => ({
+vi.mock('@/server/utils/adminSupabase', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/utils/adminSupabase')>()),
   adminSupabaseFetch: adminSupabaseFetchMock,
 }));
 vi.mock('h3', () => ({
+  createError: (input: { statusCode?: number; message?: string }) =>
+    Object.assign(new Error(input.message ?? 'error'), input),
   defineEventHandler: (handler: unknown) => handler,
   setResponseHeaders: setResponseHeadersMock,
 }));
@@ -106,5 +109,40 @@ describe('/api/twitch/config', () => {
     await handler({});
     await handler({});
     expect(adminSupabaseFetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('does not cache the fallback when the override read fails', async () => {
+    adminSupabaseFetchMock
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce([
+        { value: { channel: 'DbStreamer', displayName: 'DB Streamer', enabled: true } },
+      ]);
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toMatchObject({ channel: 'envstreamer' });
+    await expect(handler({})).resolves.toMatchObject({ channel: 'dbstreamer' });
+    expect(adminSupabaseFetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('stays disabled when the build-time flag is absent', async () => {
+    runtimeConfig.public.promotedTwitch = {
+      channel: 'EnvStreamer',
+      displayName: 'EnvStreamer',
+    } as (typeof runtimeConfig)['public']['promotedTwitch'];
+    adminSupabaseFetchMock.mockResolvedValue([]);
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual({
+      channel: 'envstreamer',
+      displayName: 'EnvStreamer',
+      enabled: false,
+    });
+  });
+  it('normalizes a Supabase URL that carries a query string', async () => {
+    runtimeConfig.supabaseUrl = 'https://test.supabase.co/?apikey=leaked';
+    adminSupabaseFetchMock.mockResolvedValue([]);
+    const handler = await loadHandler();
+    await handler({});
+    expect(adminSupabaseFetchMock).toHaveBeenCalledWith(
+      'https://test.supabase.co',
+      'service-key',
+      expect.stringContaining('/rest/v1/app_settings')
+    );
   });
 });

@@ -208,7 +208,7 @@ export default defineNuxtConfig({
       promotedTwitch: {
         channel: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_CHANNEL || 'honeyxxo',
         displayName: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_DISPLAY_NAME || 'honeyxxo',
-        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED !== 'false',
+        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED === 'true',
       },
     },
   },
