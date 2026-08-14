@@ -1,3 +1,30 @@
+# [1.70.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.4...v1.70.0) (2026-08-14)
+
+
+### Bug Fixes
+
+* **i18n:** add pl and pt to llms.txt UI locales line ([973b5f2](https://github.com/tarkovtracker-org/TarkovTracker/commit/973b5f21b58f83194a7530a3ff0391f0e48295ab))
+* **settings:** apply review feedback to settings cards and locale copy ([49bfe5b](https://github.com/tarkovtracker-org/TarkovTracker/commit/49bfe5baed299b68806482d04357ed8627fdf7ab))
+* **settings:** canonicalize hidden prestige deep links and simplify routing ([cd685a2](https://github.com/tarkovtracker-org/TarkovTracker/commit/cd685a2e225f76c515c4e06f8f988f106f001c06))
+* **i18n:** enable Polish and Portuguese locales in supported list ([1049bdc](https://github.com/tarkovtracker-org/TarkovTracker/commit/1049bdce09f594796f4fa92b0ccc322ede38aa46))
+* **settings:** extract keybind listening indicator to reduce template complexity ([f8d66ba](https://github.com/tarkovtracker-org/TarkovTracker/commit/f8d66ba88b19db8ccde412080afbce73dd8b3df1))
+* **settings:** keep required skills visible when collapsed ([edbb774](https://github.com/tarkovtracker-org/TarkovTracker/commit/edbb774984e23db94983ee4ed749ce340e9460cb))
+* **ui:** label general preference switches ([94be44c](https://github.com/tarkovtracker-org/TarkovTracker/commit/94be44c5725f061ecdb2eeee3c806e87dccb14a5))
+* **ui:** preserve redirect path on login-required cards ([cf76e00](https://github.com/tarkovtracker-org/TarkovTracker/commit/cf76e00ec45e550b02e950b2fb10d7b064a4bdf1))
+* **settings:** preserve tab hash when redirecting hidden prestige route ([95acb33](https://github.com/tarkovtracker-org/TarkovTracker/commit/95acb33067bbb23ccc7253246a8e32cd11c04b72))
+* **ui:** refine settings navigation and locale support ([c1ef41b](https://github.com/tarkovtracker-org/TarkovTracker/commit/c1ef41b8343a829767acf6e499dae56f478fb0fa))
+* **ui:** remove inert tabindex from SkillsCard tooltip triggers ([1da1621](https://github.com/tarkovtracker-org/TarkovTracker/commit/1da16214b90658a218b264253e7c466cd118fc07))
+* **ui:** rewrite slider-thumb as scoped CSS utilities ([e3cb5cd](https://github.com/tarkovtracker-org/TarkovTracker/commit/e3cb5cddae0edda6c780585013ac341a8460ec6d))
+* **settings:** stop click propagation on skill tooltip triggers ([a6eed57](https://github.com/tarkovtracker-org/TarkovTracker/commit/a6eed57b73d9fb854133bc45ee219b13e1ceb1fc))
+* **settings:** use focusable non-actionable tooltip trigger in skills card ([fe01439](https://github.com/tarkovtracker-org/TarkovTracker/commit/fe0143954eb24c2cf2609140fc9360d35189aa5d))
+* **settings:** use native progress/output elements and sync locale docs ([0807914](https://github.com/tarkovtracker-org/TarkovTracker/commit/0807914fd712544b75ffa8ee60f14a51ebaf6a86))
+
+
+### Features
+
+* **ui:** centralize login-required states into LoginRequiredAlert ([4ef35be](https://github.com/tarkovtracker-org/TarkovTracker/commit/4ef35bef1264a2741587fb58acd58523402ca81a))
+* **ui:** improve settings page layout hierarchy and interaction feedback ([3af94d2](https://github.com/tarkovtracker-org/TarkovTracker/commit/3af94d2ca1181b8ea4108ef723bb22c85d98bc5b))
+
 ## [1.69.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.3...v1.69.4) (2026-08-14)
 
 
