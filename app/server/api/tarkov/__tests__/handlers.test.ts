@@ -22,6 +22,7 @@ const {
   mockGetQuery,
   mockGetValidatedLanguage,
   mockSanitizeTaskRewards,
+  mockSetOverlayResponseHeaders,
   mockSetResponseHeaders,
   mockShouldBypassCache,
   mockValidateGameMode,
@@ -40,6 +41,7 @@ const {
   mockGetQuery: vi.fn(),
   mockGetValidatedLanguage: vi.fn(),
   mockSanitizeTaskRewards: vi.fn(),
+  mockSetOverlayResponseHeaders: vi.fn(),
   mockSetResponseHeaders: vi.fn(),
   mockShouldBypassCache: vi.fn(),
   mockValidateGameMode: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock('h3', async () => {
 });
 vi.mock('~/server/utils/edgeCache', () => ({
   edgeCache: mockEdgeCache,
+  setOverlayResponseHeaders: mockSetOverlayResponseHeaders,
   shouldBypassCache: mockShouldBypassCache,
 }));
 vi.mock('~/server/utils/language-helpers', () => ({
@@ -154,11 +157,21 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'hideout-json-v3-en-regular',
-      expect.any(Function),
+      'hideout-json-v4-en-regular',
+      baseFetcher,
       111,
       { cacheKeyPrefix: 'tarkov' }
     );
+    expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, {
+      data: { tasks: [] },
+    });
+  });
+  it('rethrows hideout cache failures', async () => {
+    mockEdgeCache.mockRejectedValueOnce(new Error('hideout cache failed'));
+    const { default: handler } = await import('@/server/api/tarkov/hideout.get');
+    await expect(handler(event)).rejects.toThrow('hideout cache failed');
+    expect(mockApplyOverlay).not.toHaveBeenCalled();
+    expect(mockSetOverlayResponseHeaders).not.toHaveBeenCalled();
   });
   it('builds expected cache key for items-lite', async () => {
     const { default: handler } = await import('@/server/api/tarkov/items-lite.get');

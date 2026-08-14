@@ -57,6 +57,14 @@ function isTruthyFlag(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return ['1', 'true', 'yes', 'y', 'on'].includes(value.toLowerCase());
 }
+function getOverlayResponseHeaders(overlayMeta: OverlayHeadersMeta | null): Record<string, string> {
+  return {
+    ...(overlayMeta?.status ? { 'X-Overlay-Status': overlayMeta.status } : {}),
+    ...(overlayMeta?.version ? { 'X-Overlay-Version': overlayMeta.version } : {}),
+    ...(overlayMeta?.generated ? { 'X-Overlay-Generated': overlayMeta.generated } : {}),
+    ...(overlayMeta?.sha256 ? { 'X-Overlay-Sha256': overlayMeta.sha256 } : {}),
+  };
+}
 function setCacheResponseHeaders(
   event: H3Event,
   setHeaders: typeof setResponseHeaders,
@@ -73,11 +81,17 @@ function setCacheResponseHeaders(
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
     'Cache-Control': cacheControl,
-    ...(overlayMeta?.status ? { 'X-Overlay-Status': overlayMeta.status } : {}),
-    ...(overlayMeta?.version ? { 'X-Overlay-Version': overlayMeta.version } : {}),
-    ...(overlayMeta?.generated ? { 'X-Overlay-Generated': overlayMeta.generated } : {}),
-    ...(overlayMeta?.sha256 ? { 'X-Overlay-Sha256': overlayMeta.sha256 } : {}),
+    ...getOverlayResponseHeaders(overlayMeta),
   });
+}
+export function setOverlayResponseHeaders(
+  event: H3Event,
+  payload: unknown,
+  setHeaders: typeof setResponseHeaders = setResponseHeaders
+): void {
+  const overlayMeta = getOverlayHeadersMeta(payload);
+  if (!overlayMeta) return;
+  setHeaders(event, getOverlayResponseHeaders(overlayMeta));
 }
 function getCloudflareCacheFromGlobal(): CacheLike | undefined {
   if (typeof globalThis.caches === 'undefined') return undefined;

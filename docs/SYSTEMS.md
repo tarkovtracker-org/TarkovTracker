@@ -80,6 +80,11 @@ their upstream data does not currently need corrections.
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](#5-precompute-workflow).
 
+The hideout route is the cache-order exception: its `json-v4` edge entry stores the adapted base
+payload, then the handler applies the current module-cached overlay after every edge-cache read. This
+keeps a 12-hour base-data cache from pinning an old overlay correction. The other overlay-enabled
+routes cache their final overlay-applied payload.
+
 ### Diagram
 
 ```mermaid
@@ -203,7 +208,8 @@ replaces the key with the translated string.
    the `TARKOV_DATA` KV binding populated by the scheduled precompute workflow. See
    [Precompute](#5-precompute-workflow).
 2. **Edge Cache API** (per-colo, Cloudflare `caches.default`) — the standard layer. Stores the
-   adapted + overlay-applied payload with `s-maxage = ttl + staleTtl`.
+   adapted + overlay-applied payload with `s-maxage = ttl + staleTtl`. The hideout route instead
+   stores its adapted base payload and applies the current overlay after the cache read.
 3. **Upstream fetch** — on a cold miss, run the full pipeline (fetch → adapt → overlay) and write
    the result back into the edge cache.
 4. **Dev fallback** — when running locally with no Cache API (`globalThis.caches` undefined), skip
@@ -290,6 +296,8 @@ flowchart TD
   catch block (502 on upstream failure) do not set it — the invariant covers the success
   paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
+- Hideout cache entries must contain the adapted base payload, not the overlay-applied response;
+  `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.
 - The precomputed envelope is only trusted if `isPrecomputedEnvelope()` returns true; a corrupt
   write falls through to the edge cache instead of serving `null`.
 
@@ -338,6 +346,10 @@ sequenceDiagram
   `foundInRaid` flags so the client does not have to guess.
 - `bypassCache: true` (from `shouldBypassCache`) forces a fresh overlay fetch — used after publishing
   a correction.
+- Hideout applies the overlay after reading its versioned base-data edge entry, so its correction
+  freshness is bounded by the overlay module's 1-hour cache rather than the hideout edge TTL. Other
+  overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
+  a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
 ### Files
 
@@ -352,7 +364,8 @@ sequenceDiagram
 - A missing or malformed overlay must never cause a 5xx; the base payload is returned with
   `X-Overlay-Status: missing`.
 - Overlay metadata (`status`, `version`, `generated`, `sha256`) must be propagated to response
-  headers so we can debug which correction was applied.
+  headers so we can debug which correction was applied. Routes that apply an overlay after
+  `edgeCache()` must call `setOverlayResponseHeaders()` before returning.
 
 ---
 
