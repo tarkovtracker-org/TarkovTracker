@@ -78,7 +78,8 @@ const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
 const ITEMS_CACHE_VERSION = 'json-v1';
 const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 const TASK_REWARDS_CACHE_VERSION = 'json-v2';
-const HIDEOUT_CACHE_VERSION = 'json-v3';
+const HIDEOUT_CACHE_VERSION = 'json-v4';
+const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;
 const PRESTIGE_CACHE_VERSION = 'json-v2';
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 5 * 60 * 1000;
@@ -1173,7 +1174,7 @@ export const useMetadataStore = defineStore('metadata', {
         cacheLanguage: requestLanguage,
         endpoint: '/api/tarkov/hideout',
         queryParams: { lang: requestLanguage, gameMode: requestGameMode },
-        cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
+        cacheTTL: HIDEOUT_CACHE_TTL_MS,
         loadingKey: 'hideoutLoading',
         errorKey: 'hideoutError',
         processData: (data) => {

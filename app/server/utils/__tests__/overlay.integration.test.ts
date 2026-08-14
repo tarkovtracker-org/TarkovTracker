@@ -12,6 +12,7 @@ const stubOverlayFetch = (overlay: unknown) => {
 afterEach(() => {
   vi.resetModules();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 describe('applyOverlay locale integration', () => {
   it('applies the selected locale after global and mode corrections', async () => {
@@ -94,6 +95,63 @@ describe('applyOverlay locale integration', () => {
     );
     expect(german.dataOverlay?.status).toBe('cached');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('serves stale data while coalescing a deferred overlay refresh', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+    let resolveRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ $meta: { version: 'v1' } }), { status: 200 })
+      )
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveRefresh = resolve;
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const payload = { data: { tasks: [] } };
+    await applyOverlay(payload);
+    vi.setSystemTime(new Date('2026-08-14T13:00:00.001Z'));
+    const backgroundTasks: Array<Promise<unknown>> = [];
+    const scheduleRefresh = (task: Promise<unknown>) => backgroundTasks.push(task);
+    const [first, second] = await Promise.all([
+      applyOverlay(payload, { scheduleRefresh }),
+      applyOverlay(payload, { scheduleRefresh }),
+    ]);
+    expect(first.dataOverlay).toMatchObject({ status: 'stale', version: 'v1' });
+    expect(second.dataOverlay).toMatchObject({ status: 'stale', version: 'v1' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(backgroundTasks).toHaveLength(1);
+    resolveRefresh(new Response(JSON.stringify({ $meta: { version: 'v2' } }), { status: 200 }));
+    await backgroundTasks[0];
+    const refreshed = await applyOverlay(payload, { scheduleRefresh });
+    expect(refreshed.dataOverlay).toMatchObject({ status: 'cached', version: 'v2' });
+  });
+  it('backs off deferred refreshes after an overlay fetch failure', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ $meta: { version: 'v1' } }), { status: 200 })
+      )
+      .mockRejectedValueOnce(new Error('overlay unavailable'));
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const payload = { data: { tasks: [] } };
+    await applyOverlay(payload);
+    vi.setSystemTime(new Date('2026-08-14T13:00:00.001Z'));
+    const backgroundTasks: Array<Promise<unknown>> = [];
+    const scheduleRefresh = (task: Promise<unknown>) => backgroundTasks.push(task);
+    const stale = await applyOverlay(payload, { scheduleRefresh });
+    expect(stale.dataOverlay.status).toBe('stale');
+    await backgroundTasks[0];
+    await applyOverlay(payload, { scheduleRefresh });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(backgroundTasks).toHaveLength(1);
   });
   it('leaves unsupported locales unchanged by locale corrections', async () => {
     stubOverlayFetch({

@@ -194,9 +194,11 @@ Naming:
 - Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
 - The hideout Tarkov-data route caches the adapted base payload, then applies the current overlay
-  after `edgeCache()` and calls `setOverlayResponseHeaders()` before returning. Other
-  overlay-enabled Tarkov-data routes cache their final corrected payload. Preserve this ordering so
-  the hideout edge TTL cannot pin stale corrections.
+  after `edgeCache()` and calls `setOverlayResponseHeaders()` before returning. Its browser
+  IndexedDB entry uses the matching `json-v4` version and a one-hour TTL. Warm requests serve a
+  stale overlay immediately while one Cloudflare-lifetime refresh runs in the background; failed
+  deferred refreshes back off for one minute. Other overlay-enabled Tarkov-data routes cache their
+  final corrected payload. Preserve this ordering so no cache layer pins stale hideout corrections.
 - Internal game modes are `pvp`, `pve`, and `seasonal`; game-data requests map Seasonal to the
   upstream `pvp-season` slug. Active Seasonal progress is keyed by season number in
   `user_game_mode_progress`, while `user_progress` remains the account-metadata and rolling-deploy

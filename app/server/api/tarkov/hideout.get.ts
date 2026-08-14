@@ -1,3 +1,4 @@
+import { scheduleBackgroundTask } from '~/server/utils/backgroundTask';
 import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { createLogger } from '~/server/utils/logger';
@@ -18,7 +19,12 @@ export default defineEventHandler(async (event) => {
     const baseResponse = await edgeCache(event, cacheKey, baseFetcher, CACHE_TTL_DEFAULT, {
       cacheKeyPrefix: 'tarkov',
     });
-    const response = await applyOverlay(baseResponse, { bypassCache, gameMode, locale: lang });
+    const response = await applyOverlay(baseResponse, {
+      bypassCache,
+      gameMode,
+      locale: lang,
+      scheduleRefresh: (task) => scheduleBackgroundTask(event, task),
+    });
     setOverlayResponseHeaders(event, response);
     return response;
   } catch (error) {

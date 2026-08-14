@@ -22,6 +22,7 @@ const {
   mockGetQuery,
   mockGetValidatedLanguage,
   mockSanitizeTaskRewards,
+  mockScheduleBackgroundTask,
   mockSetOverlayResponseHeaders,
   mockSetResponseHeaders,
   mockShouldBypassCache,
@@ -41,6 +42,7 @@ const {
   mockGetQuery: vi.fn(),
   mockGetValidatedLanguage: vi.fn(),
   mockSanitizeTaskRewards: vi.fn(),
+  mockScheduleBackgroundTask: vi.fn(),
   mockSetOverlayResponseHeaders: vi.fn(),
   mockSetResponseHeaders: vi.fn(),
   mockShouldBypassCache: vi.fn(),
@@ -58,6 +60,9 @@ vi.mock('h3', async () => {
     setResponseHeaders: mockSetResponseHeaders,
   };
 });
+vi.mock('~/server/utils/backgroundTask', () => ({
+  scheduleBackgroundTask: mockScheduleBackgroundTask,
+}));
 vi.mock('~/server/utils/edgeCache', () => ({
   edgeCache: mockEdgeCache,
   shouldBypassCache: mockShouldBypassCache,
@@ -156,7 +161,14 @@ describe('Tarkov API handlers', () => {
       bypassCache: false,
       gameMode: 'regular',
       locale: 'en',
+      scheduleRefresh: expect.any(Function),
     });
+    const overlayOptions = mockApplyOverlay.mock.calls[0]?.[1] as {
+      scheduleRefresh: (task: Promise<unknown>) => void;
+    };
+    const refreshTask = Promise.resolve();
+    overlayOptions.scheduleRefresh(refreshTask);
+    expect(mockScheduleBackgroundTask).toHaveBeenCalledWith(event, refreshTask);
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
       'hideout-json-v4-en-regular',
