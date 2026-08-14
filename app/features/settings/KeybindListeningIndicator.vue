@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center gap-1.5" :class="colorClass" role="status">
+  <output class="flex items-center gap-1.5" :class="colorClass">
     <span class="relative flex h-2 w-2">
       <span
         class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
@@ -10,7 +10,7 @@
     <span class="text-[11px] font-medium">
       {{ t('settings.keybinds.listening', 'Listening...') }}
     </span>
-  </div>
+  </output>
 </template>
 <script setup lang="ts">
   const props = defineProps<{

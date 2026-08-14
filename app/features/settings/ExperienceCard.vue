@@ -50,24 +50,17 @@
                 {{ $t('settings.experience.xp_to_next', { amount: formatNumber(xpToNextLevel) }) }}
               </span>
             </div>
-            <div
-              role="progressbar"
+            <progress
+              :value="Math.round(xpProgress)"
+              max="100"
               :aria-label="
                 $t('settings.experience.xp_progress_aria', 'Experience progress toward next level')
               "
-              :aria-valuenow="Math.round(xpProgress)"
-              aria-valuemin="0"
-              aria-valuemax="100"
               :aria-valuetext="
                 $t('settings.experience.xp_progress_value', { percent: Math.round(xpProgress) })
               "
-              class="bg-surface-800/35 h-2 overflow-hidden rounded-full"
-            >
-              <div
-                class="bg-primary-500/60 h-full rounded-full transition-[width] duration-300 ease-out"
-                :style="{ width: `${xpProgress}%` }"
-              ></div>
-            </div>
+              class="bg-surface-800/35 [&::-moz-progress-bar]:bg-primary-500/60 [&::-webkit-progress-bar]:bg-surface-800/35 [&::-webkit-progress-value]:bg-primary-500/60 block h-2 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:rounded-full [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full"
+            ></progress>
           </div>
         </div>
         <div class="border-surface-700 bg-surface-800/40 space-y-3 rounded-lg border p-3">
