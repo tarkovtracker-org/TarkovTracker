@@ -217,7 +217,9 @@ Details and response headers: [`API.md`](./API.md#rate-limits-api-gateway)
 
 Implementation notes:
 
-- Enforcer class: `ApiGatewayRateLimiter` in `workers/api-gateway/src/index.ts`
+- Enforcer class: `ApiGatewayRateLimiter` in `workers/api-gateway/src/rateLimiter.ts`
+- Gateway routing, authentication, and HTTP responses are isolated in `router.ts`,
+  `authentication.ts`, and `responses.ts`; `index.ts` remains the Worker entrypoint
 - Keys are namespaced (`daily-read:<userId>`, `daily-write:<userId>`)
 - Daily quota uses a UTC-day fixed window; a quota unit is consumed when a valid authenticated
   request is admitted for processing (downstream failures do not trigger refunds)
@@ -437,7 +439,10 @@ Treat these deliberately; do not “make everything fail open” without underst
 | Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick}/`                                                                        |
 | Frontend mutation callers              | `app/composables/api/useEdgeFunctions.ts`                                                                                                                           |
 | Worker tier constants                  | `workers/api-gateway/src/limits.ts`                                                                                                                                 |
-| Worker DO enforcer                     | `workers/api-gateway/src/index.ts` (`ApiGatewayRateLimiter`)                                                                                                        |
+| Worker entrypoint and routing          | `workers/api-gateway/src/index.ts`, `workers/api-gateway/src/router.ts`                                                                                             |
+| Worker authentication and quotas       | `workers/api-gateway/src/authentication.ts`                                                                                                                         |
+| Worker DO enforcer                     | `workers/api-gateway/src/rateLimiter.ts` (`ApiGatewayRateLimiter`)                                                                                                  |
+| Worker response and cache handling     | `workers/api-gateway/src/responses.ts`                                                                                                                              |
 | Pages shared limiter                   | `app/server/utils/sharedEdgeStore.ts`                                                                                                                               |
 | Pages consumers                        | `app/server/api/team/members.ts`, `app/server/api/profile/[userId]/[mode].get.ts`, `app/server/api/tarkov-dev/profile.get.ts`, `app/server/api/logs/client.post.ts` |
 | Account-delete limiter                 | `supabase/functions/account-delete/index.ts`                                                                                                                        |

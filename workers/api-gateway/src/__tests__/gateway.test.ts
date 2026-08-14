@@ -283,6 +283,7 @@ describe('api-gateway', () => {
     const body = (await res.json()) as { openapi: string; info?: { title?: string } };
     expect(body.openapi).toBe('3.1.0');
     expect(body.info?.title).toBe('TarkovTracker API Gateway');
+    expect(res.headers.get('Vary')).toContain('Origin');
   });
   it('serves Scalar docs at api root', async () => {
     const res = await worker.fetch(buildRequest('/'), BASE_ENV);
@@ -669,6 +670,22 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     await expectErrorResponse(res, 400, 'Invalid JSON body');
+  });
+  it.each([
+    ['empty array', '[]'],
+    ['empty object', '{}'],
+    ['whitespace-only task id', JSON.stringify([{ id: '   ', state: 'completed' }])],
+  ])('rejects POST /progress/tasks with %s', async (_name, body) => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body,
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 400, 'Invalid request body');
   });
   it('returns an error when the merge RPC matches no progress row', async () => {
     vi.stubGlobal(

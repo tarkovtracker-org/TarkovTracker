@@ -65,7 +65,8 @@ can read it and an agent can verify any claim against the code. Each system sect
 - `app/stores/` — Pinia stores. Core state: `useTarkovStore` with `useMetadataStore`, `useProgressStore`, `usePreferencesStore`.
 - `app/locales/` — JSON locale files. `en.json` is source; non-English files are Crowdin-owned.
 - `supabase/` — `config.toml`, `functions/` (Deno edge functions), `migrations/`.
-- `workers/` — Cloudflare Workers: `api-gateway`.
+- `workers/` — Cloudflare Workers. The `api-gateway` entrypoint delegates routing,
+  authentication, rate limiting, and response construction to focused modules in `src/`.
 - `scripts/precompute/` — standalone precompute of heavy tasks-core payloads into the `TARKOV_DATA` KV namespace, run by the scheduled GitHub Actions workflow `.github/workflows/precompute-tarkov-data.yml` (the account's Workers Free tier CPU limit rules out a scheduled Worker). Reuses the `app/server/utils` pipeline via tsx tsconfig paths; request handlers read the entries via `edgeCache`'s `precomputed` option and fall back to the per-colo Cache API when the binding or entry is absent.
 - `docs/` — Project documentation.
 - `public/` — Static assets.

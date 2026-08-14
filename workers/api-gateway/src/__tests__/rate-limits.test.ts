@@ -127,6 +127,34 @@ describe('ApiGatewayRateLimiter durable object', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each([
+    ['malformed JSON', '{'],
+    ['null JSON', 'null'],
+    ['array JSON', '[]'],
+    ['non-positive limit', JSON.stringify({ limit: 0, windowSec: 60 })],
+    ['non-positive window', JSON.stringify({ limit: 1, windowSec: 0 })],
+    ['unsupported anchor', JSON.stringify({ limit: 1, windowSec: 60, anchor: 'sliding' })],
+    ['boolean limit', JSON.stringify({ limit: true, windowSec: 60 })],
+    ['string limit', JSON.stringify({ limit: '5', windowSec: 60 })],
+    ['single-element array limit', JSON.stringify({ limit: [5], windowSec: 60 })],
+  ])('rejects %s without touching storage', async (_name, body) => {
+    const state = makeState();
+    const getSpy = vi.spyOn(state.storage, 'get');
+    const limiter = new ApiGatewayRateLimiter(state);
+    const response = await limiter.fetch(
+      new Request('https://rate-limit', { method: 'POST', body })
+    );
+    expect(response.status).toBe(400);
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+  it('rejects unsupported methods without touching storage', async () => {
+    const state = makeState();
+    const getSpy = vi.spyOn(state.storage, 'get');
+    const limiter = new ApiGatewayRateLimiter(state);
+    const response = await limiter.fetch(new Request('https://rate-limit'));
+    expect(response.status).toBe(405);
+    expect(getSpy).not.toHaveBeenCalled();
+  });
   it('anchors utc-day windows to the next UTC midnight', async () => {
     const limiter = new ApiGatewayRateLimiter(makeState());
     const expectedReset = Math.floor(Date.now() / DAY_MS) * DAY_MS + DAY_MS;
