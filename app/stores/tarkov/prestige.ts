@@ -387,6 +387,13 @@ export const buildPrestigeRequirementRows = (
       continue;
     }
     if (condition.type === 'taskStatus' && condition.task?.id) {
+      // Task names here come straight from the raw prestige metadata: the
+      // /api/tarkov/prestige endpoint does not run applyOverlay yet, so locale
+      // corrections are not applied and upstream names stay as tarkov.dev
+      // ships them (e.g. the prestige-1 quest renders as German "Neuanfang"
+      // instead of "New Beginning"). Consuming locale corrections for the
+      // prestige dataset is tracked by the overlay epic (tarkovtracker-org/TarkovTracker#730);
+      // do not normalize names here until that lands.
       const taskName = condition.task.name || 'Task';
       const taskRole: PrestigeRequirementTaskRole =
         taskName === 'Collector'
