@@ -411,11 +411,6 @@ export async function handleGatewayRequest(
     });
   } catch (error) {
     console.error('API error:', error);
-    return errorResponse(
-      error instanceof Error ? error.message : 'Internal server error',
-      500,
-      origin,
-      reqOrigin
-    );
+    return errorResponse('Internal server error', 500, origin, reqOrigin);
   }
 }
