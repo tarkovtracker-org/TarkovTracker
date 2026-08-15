@@ -195,13 +195,22 @@ function buildTarkovCacheUrls(baseUrl: string): string[] {
   return urls;
 }
 function buildTwitchConfigUrls(baseUrl: string): string[] {
-  return buildCacheOrigins(baseUrl).map((origin) => `${origin}${TWITCH_CONFIG_PATH}`);
+  if (!baseUrl) return [];
+  try {
+    return buildCacheOrigins(baseUrl).map((origin) => `${origin}${TWITCH_CONFIG_PATH}`);
+  } catch {
+    return [];
+  }
 }
 function combinePurgeFailures(
   first: CloudflarePurgeResponse,
   second: CloudflarePurgeResponse
 ): CloudflarePurgeResponse {
-  return { success: false, errors: [...first.errors, ...second.errors], messages: [] };
+  return {
+    success: false,
+    errors: [...(first.errors ?? []), ...(second.errors ?? [])],
+    messages: [],
+  };
 }
 function purgeSuccessMessage(purgeType: PurgeRequest['purgeType']): string {
   if (purgeType === 'all') return 'All cache purged successfully';
@@ -223,9 +232,9 @@ async function purgeTwitchConfigCache(
     tags: [TWITCH_CONFIG_CACHE_TAG],
   });
   if (tagPurge.success) return tagPurge;
-  const urlPurge = await purgeCloudflareCache(zoneId, apiToken, {
-    files: buildTwitchConfigUrls(baseUrl),
-  });
+  const urls = buildTwitchConfigUrls(baseUrl);
+  if (urls.length === 0) return tagPurge;
+  const urlPurge = await purgeCloudflareCache(zoneId, apiToken, { files: urls });
   if (urlPurge.success) return urlPurge;
   return combinePurgeFailures(tagPurge, urlPurge);
 }
@@ -324,16 +333,15 @@ Deno.serve(async (req) => {
       console.error('[admin-cache-purge] Missing Cloudflare credentials');
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
-    // Get base URL for cache key construction (non-"all" purges only)
-    const rawBaseUrl = Deno.env.get('APP_URL')?.trim();
-    let baseUrl = '';
-    if (purgeType !== 'all') {
-      if (!rawBaseUrl) {
+    // Get base URL for cache key construction (Tarkov data purges only)
+    const baseUrl = Deno.env.get('APP_URL')?.trim() ?? '';
+    if (purgeType === 'tarkov-data') {
+      if (!baseUrl) {
         console.error('[admin-cache-purge] Missing APP_URL');
         return createErrorResponse('Application URL not configured', 500, req);
       }
       try {
-        const protocol = new URL(rawBaseUrl).protocol;
+        const protocol = new URL(baseUrl).protocol;
         if (protocol !== 'http:' && protocol !== 'https:') {
           throw new Error('Unsupported APP_URL protocol');
         }
@@ -341,7 +349,6 @@ Deno.serve(async (req) => {
         console.error('[admin-cache-purge] Invalid APP_URL');
         return createErrorResponse('Application URL invalid', 500, req);
       }
-      baseUrl = rawBaseUrl;
     }
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;

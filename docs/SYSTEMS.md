@@ -906,7 +906,7 @@ flowchart LR
    database transaction. A failure rolls back both writes.
 3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
    with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
-   `promoted-twitch-config` cache tag. If the zone rejects tag purges, the edge function falls back
+   `promoted-twitch-config` cache tag. If the tag purge fails, the edge function falls back
    to purging the `/api/twitch/config` URL (apex and `www` variants). A failed purge fails the save
    (`502`) so a broken invalidation is never silent.
 4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
