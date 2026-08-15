@@ -803,9 +803,6 @@
   >;
   let lastUserOpenedPopover: 'colors' | 'settings' | 'help' | null = null;
   const onPopoverOpenChange = (key: 'colors' | 'settings' | 'help', isOpen: boolean) => {
-    if (key === 'help' && isOpen) {
-      helpOpenedThisSession.value = true;
-    }
     if (isOpen) {
       lastUserOpenedPopover = key;
       return;
@@ -814,6 +811,10 @@
     lastUserOpenedPopover = null;
     nextTick(() => popoverTriggers[key]?.focus());
   };
+  watch(mapHelpOpen, (isOpen) => {
+    if (!isOpen) return;
+    helpOpenedThisSession.value = true;
+  });
   watch([mapColorsOpen, mapSettingsOpen, mapHelpOpen], ([colors, settings, help]) => {
     if (colors) {
       mapSettingsOpen.value = false;
