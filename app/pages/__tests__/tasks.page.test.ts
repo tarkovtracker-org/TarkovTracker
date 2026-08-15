@@ -214,10 +214,13 @@ vi.mock('vue-router', async (importOriginal) => ({
     push: vi.fn(() => Promise.resolve()),
   }),
 }));
-const { leafletGetViewStateSpy, leafletSetViewStateSpy } = vi.hoisted(() => ({
-  leafletGetViewStateSpy: vi.fn(),
-  leafletSetViewStateSpy: vi.fn(),
-}));
+const { leafletGetViewStateSpy, leafletSetViewStateSpy, leafletGetFloorSpy, leafletSetFloorSpy } =
+  vi.hoisted(() => ({
+    leafletGetViewStateSpy: vi.fn(),
+    leafletSetViewStateSpy: vi.fn(),
+    leafletGetFloorSpy: vi.fn(),
+    leafletSetFloorSpy: vi.fn(),
+  }));
 vi.mock('@/features/maps/LeafletMap.vue', () => ({
   __esModule: true,
   default: defineComponent({
@@ -229,6 +232,10 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
       initialView: {
         type: Object,
         default: null,
+      },
+      initialFloor: {
+        type: String,
+        default: undefined,
       },
       showFullscreenToggle: {
         type: Boolean,
@@ -246,10 +253,12 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
         closeActivePopup: () => undefined,
         getViewState: leafletGetViewStateSpy,
         setViewState: leafletSetViewStateSpy,
+        getFloor: leafletGetFloorSpy,
+        setFloor: leafletSetFloorSpy,
       });
       return { props };
     },
-    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)">
+    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)" :data-initial-floor="props.initialFloor ?? ''">
       <button
         v-if="props.showFullscreenToggle"
         type="button"
@@ -328,6 +337,8 @@ describe('tasks page', () => {
     handleTaskQueryParamMock.mockClear();
     leafletGetViewStateSpy.mockReset();
     leafletSetViewStateSpy.mockReset();
+    leafletGetFloorSpy.mockReset();
+    leafletSetFloorSpy.mockReset();
     isGlobalTaskMock.mockImplementation((_task: Task) => false);
     preferencesStoreMock.getTaskPrimaryView = 'all';
     preferencesStoreMock.getTaskSecondaryView = 'available';
@@ -487,6 +498,33 @@ describe('tasks page', () => {
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     expect(leafletSetViewStateSpy).toHaveBeenCalledWith(overlayViewState);
   });
+  it('carries the inline map floor into the full screen overlay', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    leafletGetFloorSpy.mockReturnValue('3rd Floor');
+    await mountPage();
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const fullscreenMap = wrapper.find(
+      '[data-testid="map-fullscreen-overlay"] [data-testid="leaflet-map"]'
+    );
+    expect(fullscreenMap.attributes('data-initial-floor')).toBe('3rd Floor');
+  });
+  it('restores the full screen floor onto the inline map on close', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    leafletGetFloorSpy.mockReturnValue('Ground Level');
+    await mountPage();
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    leafletGetFloorSpy.mockReturnValue('2nd Floor');
+    await wrapper.find('[data-testid="map-fullscreen-exit"]').trigger('click');
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
+    expect(leafletSetFloorSpy).toHaveBeenCalledWith('2nd Floor');
+  });
   it('closes the map full screen overlay from the in-map control', async () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
@@ -639,6 +677,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskMapView = mapViewRef as unknown as string;
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
     leafletGetViewStateSpy.mockReturnValue({ center: [1, 2], zoom: 3 });
+    leafletGetFloorSpy.mockReturnValue('Ground Level');
     await mountAttachedPage();
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
     await flushTransition();
@@ -648,6 +687,7 @@ describe('tasks page', () => {
     await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     expect(leafletSetViewStateSpy).not.toHaveBeenCalled();
+    expect(leafletSetFloorSpy).not.toHaveBeenCalled();
     expect(isInsideInertSubtree(panelToggleElement)).toBe(false);
   });
   it('shows re-hide footer action in map section when hidden tasks are visible', async () => {

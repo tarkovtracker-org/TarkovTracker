@@ -467,6 +467,7 @@
               :is-fullscreen="true"
               fill
               :initial-view="fullscreenMapView"
+              :initial-floor="fullscreenInitialFloor"
               @toggle-fullscreen="closeMapFullscreen"
             />
           </div>
@@ -681,6 +682,8 @@
     closeActivePopup: () => void;
     getViewState?: () => MapViewState | null;
     setViewState?: (state: MapViewState) => void;
+    getFloor?: () => string;
+    setFloor?: (floor: string) => void;
   }
   const leafletMapRef = ref<MapComponentRef | null>(null);
   const { jumpToMapObjective, cleanup: cleanupMapPopup } = useMapObjectivePopup({
@@ -689,6 +692,7 @@
   });
   const fullscreenLeafletMapRef = ref<MapComponentRef | null>(null);
   const fullscreenMapView = ref<MapViewState | null>(null);
+  const fullscreenInitialFloor = ref<string | undefined>(undefined);
   const isMapFullscreen = ref(false);
   const FULLSCREEN_OVERLAY_SELECTOR = '[data-testid="map-fullscreen-overlay"]';
   const getFullscreenOverlay = (): HTMLElement | null =>
@@ -743,19 +747,28 @@
     inertBackgroundElements.some((background) => background.contains(element));
   const readFullscreenMapView = (): MapViewState | null =>
     fullscreenLeafletMapRef.value?.getViewState?.() ?? null;
+  const readFullscreenFloor = (): string | undefined => fullscreenLeafletMapRef.value?.getFloor?.();
   const restoreInlineMapView = (view: MapViewState): void => {
     if (fullscreenMapId !== selectedMapId.value) return;
     leafletMapRef.value?.setViewState?.(view);
   };
+  const restoreInlineMapFloor = (floor: string | undefined): void => {
+    if (!floor || fullscreenMapId !== selectedMapId.value) return;
+    leafletMapRef.value?.setFloor?.(floor);
+  };
   const openMapFullscreen = () => {
     fullscreenMapId = selectedMapId.value;
     fullscreenMapView.value = leafletMapRef.value?.getViewState?.() ?? null;
+    fullscreenInitialFloor.value = leafletMapRef.value?.getFloor?.() ?? undefined;
     isMapFullscreen.value = true;
   };
   const closeMapFullscreen = () => {
     const overlayView = readFullscreenMapView();
+    const overlayFloor = readFullscreenFloor();
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
+    fullscreenInitialFloor.value = undefined;
+    restoreInlineMapFloor(overlayFloor);
     if (overlayView) nextTick(() => restoreInlineMapView(overlayView));
   };
   const PORTALLED_POPOVER_SELECTOR = '[data-reka-popper-content-wrapper]';

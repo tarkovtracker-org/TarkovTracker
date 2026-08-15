@@ -45,6 +45,8 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
   };
 });
 const refreshViewSpy = vi.fn();
+const setFloorSpy = vi.fn();
+const useLeafletMapOptionsSpy = vi.fn();
 vi.mock('@/composables/useLeafletMap', () => ({
   withoutZoomSnap: (instance: { options: { zoomSnap?: number } }, apply: () => void): void => {
     const originalZoomSnap = instance.options.zoomSnap ?? 0;
@@ -55,23 +57,26 @@ vi.mock('@/composables/useLeafletMap', () => ({
       instance.options.zoomSnap = originalZoomSnap;
     }
   },
-  useLeafletMap: () => ({
-    mapInstance: shallowRef(mockMapInstance),
-    leaflet: shallowRef(null),
-    selectedFloor: ref(''),
-    floors: ref([]),
-    hasMultipleFloors: ref(false),
-    isLoading: ref(mapState.isLoading),
-    isIdle: ref(false),
-    svgLayer: shallowRef(null),
-    objectiveLayer: shallowRef(null),
-    extractLayer: shallowRef(null),
-    spawnLayer: shallowRef(null),
-    setFloor: vi.fn(),
-    refreshView: refreshViewSpy,
-    clearMarkers: vi.fn(),
-    destroy: vi.fn(),
-  }),
+  useLeafletMap: (options: unknown) => {
+    useLeafletMapOptionsSpy(options);
+    return {
+      mapInstance: shallowRef(mockMapInstance),
+      leaflet: shallowRef(null),
+      selectedFloor: ref(''),
+      floors: ref([]),
+      hasMultipleFloors: ref(false),
+      isLoading: ref(mapState.isLoading),
+      isIdle: ref(false),
+      svgLayer: shallowRef(null),
+      objectiveLayer: shallowRef(null),
+      extractLayer: shallowRef(null),
+      spawnLayer: shallowRef(null),
+      setFloor: setFloorSpy,
+      refreshView: refreshViewSpy,
+      clearMarkers: vi.fn(),
+      destroy: vi.fn(),
+    };
+  },
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
@@ -125,6 +130,8 @@ describe('LeafletMap controls', () => {
   beforeEach(() => {
     localStorage.clear();
     refreshViewSpy.mockClear();
+    setFloorSpy.mockClear();
+    useLeafletMapOptionsSpy.mockClear();
     mockMapInstance.options.zoomSnap = 1;
     mockMapInstance.zoomSnapDuringCall = undefined;
     mockMapInstance.size = { x: 800, y: 600 };
@@ -160,6 +167,24 @@ describe('LeafletMap controls', () => {
     expect(refreshViewSpy).toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('passes the initialFloor prop through to useLeafletMap', async () => {
+    const wrapper = await mountMap({ initialFloor: '2nd Floor' });
+    expect(useLeafletMapOptionsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ initialFloor: '2nd Floor' })
+    );
+    wrapper.unmount();
+  });
+  it('exposes the current floor and the floor setter', async () => {
+    const wrapper = await mountMap();
+    const vm = wrapper.vm as unknown as {
+      getFloor: () => string;
+      setFloor: (floor: string) => void;
+    };
+    expect(vm.getFloor()).toBe('');
+    vm.setFloor('garage');
+    expect(setFloorSpy).toHaveBeenCalledWith('garage');
+    wrapper.unmount();
+  });
   it('clears the help notification dot when help is opened from the first-use hint', async () => {
     const wrapper = await mountMap();
     const hint = wrapper.find('[data-testid="map-first-use-hint"]');
@@ -184,6 +209,18 @@ describe('LeafletMap controls', () => {
     expect(wrapper.find('[data-testid="map-first-use-hint"]').exists()).toBe(false);
     expect(localStorage.getItem('mapControlsHintSeen')).toBe('true');
     wrapper.unmount();
+  });
+  it('persists the help seen flag so the dot stays hidden after remount', async () => {
+    const wrapper = await mountMap();
+    expect(wrapper.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="map-hint-all-controls"]').trigger('click');
+    await nextTick();
+    expect(wrapper.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(false);
+    expect(localStorage.getItem('mapHelpSeen')).toBe('true');
+    wrapper.unmount();
+    const remounted = await mountMap();
+    expect(remounted.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(false);
+    remounted.unmount();
   });
   it('exposes the current view state and skips a hidden container', async () => {
     const wrapper = await mountMap();

@@ -312,7 +312,7 @@
                 "
               >
                 <span
-                  v-if="!helpOpenedThisSession"
+                  v-if="!mapHelpSeen"
                   data-testid="map-help-unseen-dot"
                   class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
                 />
@@ -641,14 +641,26 @@
   import type { TarkovMap } from '@/types/tarkov';
   import type L from 'leaflet';
   const MAP_CONTROLS_HINT_KEY = 'mapControlsHintSeen';
+  const MAP_HELP_SEEN_KEY = 'mapHelpSeen';
   const mapControlsHintSeen = ref(false);
+  const mapHelpSeen = ref(false);
   onMounted(() => {
     try {
       mapControlsHintSeen.value = window.localStorage.getItem(MAP_CONTROLS_HINT_KEY) === 'true';
+      mapHelpSeen.value = window.localStorage.getItem(MAP_HELP_SEEN_KEY) === 'true';
     } catch (error) {
-      logger.warn('[LeafletMap] Failed to read map controls hint flag:', error);
+      logger.warn('[LeafletMap] Failed to read map hint flags:', error);
     }
   });
+  const markMapHelpSeen = () => {
+    if (mapHelpSeen.value) return;
+    mapHelpSeen.value = true;
+    try {
+      window.localStorage.setItem(MAP_HELP_SEEN_KEY, 'true');
+    } catch (error) {
+      logger.warn('[LeafletMap] Failed to persist map help seen flag:', error);
+    }
+  };
   const dismissMapControlsHint = () => {
     mapControlsHintSeen.value = true;
     try {
@@ -687,6 +699,7 @@
     fill?: boolean;
     height?: number;
     initialView?: MapViewState | null;
+    initialFloor?: string;
   }
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
@@ -699,6 +712,7 @@
     fill: false,
     height: undefined,
     initialView: null,
+    initialFloor: undefined,
   });
   const emit = defineEmits<{ 'toggle-fullscreen': [] }>();
   const { t } = useI18n({ useScope: 'global' });
@@ -735,6 +749,7 @@
     containerRef: mapContainer,
     map: toRef(props, 'map'),
     initialView: props.initialView ?? null,
+    initialFloor: props.initialFloor,
   });
   const ZONE_HOVER_DELTA = 0.16;
   const ZONE_HOVER_MAX = 0.6;
@@ -803,7 +818,6 @@
   const mapColorsOpen = ref(false);
   const mapSettingsOpen = ref(false);
   const mapHelpOpen = ref(false);
-  const helpOpenedThisSession = ref(false);
   const popoverTriggers = { colors: null, settings: null, help: null } as Record<
     'colors' | 'settings' | 'help',
     HTMLElement | null
@@ -820,7 +834,7 @@
   };
   watch(mapHelpOpen, (isOpen) => {
     if (!isOpen) return;
-    helpOpenedThisSession.value = true;
+    markMapHelpSeen();
   });
   watch([mapColorsOpen, mapSettingsOpen, mapHelpOpen], ([colors, settings, help]) => {
     if (colors) {
@@ -1881,12 +1895,15 @@
     }
     withoutZoomSnap(instance, () => instance.setView(state.center, state.zoom, { animate: false }));
   };
+  const getFloor = (): string => selectedFloor.value;
   defineExpose({
     activateObjectivePopup,
     closeActivePopup,
     refreshView,
     getViewState,
     setViewState,
+    getFloor,
+    setFloor,
   });
   onUnmounted(() => {
     window.removeEventListener('keydown', onGlobalMapKeydown);

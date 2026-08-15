@@ -790,7 +790,6 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       // Create a custom pane for the map background to ensure it stays behind markers
       const backgroundPane = mapInstance.value.createPane('mapBackground');
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)
-      // Set initial view using map bounds, or restore a previous view when provided
       const bounds = getLeafletBounds(renderConfig);
       setInitialMapView(mapInstance.value, consumeInitialView(), bounds);
       // Set initial floor
