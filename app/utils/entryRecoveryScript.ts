@@ -1,7 +1,3 @@
-// Recovery for entry-module load failures (e.g. a stale chunk request served
-// the SPA fallback during a rolling deploy). Runs before the bundle so it
-// works when the app itself never boots. Shares the reload-cooldown key with
-// ChunkRecovery in app.vue so both mechanisms share one retry budget.
 export const ENTRY_RECOVERY_SCRIPT = [
   '(function(){',
   'var KEY="tt:auto-reload-on-asset-error",COOLDOWN=120000;',
