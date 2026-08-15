@@ -105,6 +105,7 @@ describe('POST /api/admin/twitch-config', () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     const result = await handler(makeEvent({ id: 'admin-1', email: 'admin@example.com' }));
     expect(result).toEqual({
+      cacheInvalidated: true,
       config: { channel: 'newstreamer', displayName: 'New Streamer', enabled: false },
       version: 4,
     });
@@ -129,7 +130,7 @@ describe('POST /api/admin/twitch-config', () => {
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({ statusCode: 502 });
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
-  it('fails the update when the cache purge fails', async () => {
+  it('returns the committed config with a warning when the cache purge fails', async () => {
     mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
     mockFetch
       .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
@@ -143,9 +144,20 @@ describe('POST /api/admin/twitch-config', () => {
       )
       .mockResolvedValueOnce(jsonResponse({ success: false }, { ok: false, status: 502 }));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
-    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({ statusCode: 502 });
+    await expect(handler(makeEvent({ id: 'admin-1' }))).resolves.toEqual({
+      cacheInvalidated: false,
+      config: { channel: 'validchannel', displayName: 'validchannel', enabled: true },
+      version: 2,
+    });
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      '[AdminTwitchConfig] Failed to purge Twitch config cache',
+      expect.objectContaining({
+        action: 'purge_promoted_twitch_config',
+        adminUserId: 'admin-1',
+      })
+    );
   });
-  it('fails the update when the purge authorization header is missing', async () => {
+  it('returns the committed config with a warning when purge authorization is missing', async () => {
     mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
       jsonResponse([
@@ -159,7 +171,11 @@ describe('POST /api/admin/twitch-config', () => {
     const event = makeEvent({ id: 'admin-1' });
     (event as unknown as { node: { req: { headers: Record<string, string> } } }).node.req.headers =
       {};
-    await expect(handler(event)).rejects.toMatchObject({ statusCode: 502 });
+    await expect(handler(event)).resolves.toEqual({
+      cacheInvalidated: false,
+      config: { channel: 'validchannel', displayName: 'validchannel', enabled: true },
+      version: 2,
+    });
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
   it('logs and propagates a transactional update failure', async () => {

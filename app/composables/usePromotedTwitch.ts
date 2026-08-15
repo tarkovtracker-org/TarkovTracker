@@ -2,6 +2,7 @@ export interface PromotedTwitchConfig {
   channel: string;
   displayName: string;
   enabled: boolean;
+  version: number;
 }
 const sharedConfig = ref<PromotedTwitchConfig | null>(null);
 export const usePromotedTwitch = () => {

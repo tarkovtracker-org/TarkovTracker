@@ -907,8 +907,9 @@ flowchart LR
 3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
    with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
    `promoted-twitch-config` cache tag. If the tag purge fails, the edge function falls back
-   to purging the `/api/twitch/config` URL (apex and `www` variants). A failed purge fails the save
-   (`502`) so a broken invalidation is never silent.
+   to purging the `/api/twitch/config` URL (apex and `www` variants). If both purges fail, the route
+   returns the committed config with `cacheInvalidated: false`; the admin UI applies the saved value
+   locally and shows an explicit warning instead of encouraging a duplicate database write.
 4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
    of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
@@ -917,14 +918,17 @@ flowchart LR
    (`s-maxage=31536000` / `cloudflare-cdn-cache-control: public, max-age=31536000`), so Cloudflare
    serves cache hits without invoking the Function. When the database read fails, the fallback
    response is sent with `no-store` so a transient outage never pins the env-default fallback at the
-   edge for a year.
+   edge for a year. Missing or invalid Supabase credentials are treated as the same uncacheable
+   failure. Successful responses include the settings version.
 5. `PromotedTwitchEmbed` fetches config once on mount and again on tab focus (an edge-cache hit),
    watches the shared client state for immediate propagation of admin saves in the same tab, and
    polls only `/api/twitch/live` every 60 seconds while `enabled === true`, pausing the timer while
-   the tab is hidden. Live responses are edge-cached for 30 seconds, so the CDN absorbs the polling
-   traffic instead of the Function. Channel changes replace the player URL and clear a stored
-   dismissal, disabling hides an active player, and an unavailable config endpoint keeps the
-   build-time fallback working.
+   the tab is hidden. It ignores fetched configs older than the latest shared version, so a browser
+   cache hit or overlapping focus request cannot revert an admin save. Live responses are
+   edge-cached for 30 seconds, so the CDN absorbs the polling traffic instead of the Function.
+   Channel changes advance a request generation so stale live results cannot apply after a channel
+   cycles back. Channel changes replace the player URL and clear a stored dismissal, disabling hides
+   an active player, and an unavailable config endpoint keeps the build-time fallback working.
 
 ### Files
 
@@ -965,9 +969,11 @@ flowchart LR
   run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
   outage cannot pin the env-default fallback at the edge.
 - The admin route must purge the `promoted-twitch-config` tag only after the database transaction
-  commits, and must fail the save if the purge fails.
+  commits. If invalidation fails, it must return the committed config with an explicit warning flag;
+  the client must apply that config and visibly warn the admin without retrying the database write.
 - Mounted clients must never poll the config endpoint: they fetch it once per mount/focus and poll
-  live status only while enabled, stopping while the tab is hidden.
+  live status only while enabled, stopping while the tab is hidden. Older config versions and stale
+  live-request generations must never overwrite the latest shared configuration or player state.
 
 ## 11. Boot-time asset-failure recovery
 

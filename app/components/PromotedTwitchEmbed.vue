@@ -69,7 +69,7 @@
   </ClientOnly>
 </template>
 <script setup lang="ts">
-  import { usePromotedTwitch } from '@/composables/usePromotedTwitch';
+  import { usePromotedTwitch, type PromotedTwitchConfig } from '@/composables/usePromotedTwitch';
   import { logger } from '@/utils/logger';
   const DISMISS_KEY = 'tt-twitch-dismissed';
   const POLL_INTERVAL_MS = 60_000;
@@ -80,11 +80,7 @@
     displayName?: string;
     enabled?: boolean;
   };
-  interface TwitchConfigResponse {
-    channel: string;
-    displayName: string;
-    enabled: boolean;
-  }
+  type TwitchConfigResponse = PromotedTwitchConfig;
   const normalizeChannel = (value: string | undefined): string => value?.trim().toLowerCase() || '';
   const channel = ref(normalizeChannel(fallback.channel) || 'honeyxxo');
   const displayName = ref(fallback.displayName?.trim() || channel.value);
@@ -95,9 +91,15 @@
   const isExpanded = ref(true);
   const playerUrl = ref('');
   let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let liveInFlight: { channel: string; promise: Promise<void> } | null = null;
+  let liveInFlight: {
+    channel: string;
+    generation: number;
+    promise: Promise<void>;
+  } | null = null;
   let configInFlight: Promise<void> | null = null;
+  let configVersion = 0;
   let hasResolvedConfig = false;
+  let liveGeneration = 0;
   const { config: sharedConfig } = usePromotedTwitch();
   const buildPlayerUrl = (): string => {
     const params = new URLSearchParams({
@@ -139,24 +141,24 @@
     }
   };
   const adoptChannel = (next: string): void => {
+    liveGeneration += 1;
     hidePlayer();
     if (hasResolvedConfig) clearDismissal();
     channel.value = next;
   };
   const resolveDisplayName = (value: string | undefined): string => value?.trim() || channel.value;
   const applyLocalConfig = (data: TwitchConfigResponse): void => {
+    if (data.version < configVersion) return;
+    configVersion = data.version;
+    const enabledChanged = data.enabled !== enabled.value;
     const nextChannel = normalizeChannel(data.channel) || channel.value;
-    if (nextChannel !== channel.value) {
-      adoptChannel(nextChannel);
-      if (data.enabled) void checkLive();
-    }
+    const channelChanged = nextChannel !== channel.value;
+    if (channelChanged) adoptChannel(nextChannel);
     displayName.value = resolveDisplayName(data.displayName);
     enabled.value = data.enabled;
     hasResolvedConfig = true;
+    if (channelChanged && data.enabled && !enabledChanged) void checkLive();
   };
-  watch(sharedConfig, (config) => {
-    if (config) applyLocalConfig(config);
-  });
   const refreshConfig = (): Promise<void> => {
     configInFlight ??= (async () => {
       try {
@@ -179,36 +181,63 @@
       isVisible.value = true;
     }
   };
-  const applyLiveResult = (requestedChannel: string, live: boolean): void => {
-    if (requestedChannel !== channel.value || !enabled.value) return;
+  const applyLiveResult = (
+    requestedChannel: string,
+    requestedGeneration: number,
+    live: boolean
+  ): void => {
+    if (
+      requestedChannel !== channel.value ||
+      requestedGeneration !== liveGeneration ||
+      !enabled.value
+    ) {
+      return;
+    }
     isLive.value = live;
     if (dismissed.value) return;
     updatePlayerVisibility(live);
   };
-  const discardLiveResult = (requestedChannel: string): void => {
-    if (requestedChannel !== channel.value) return;
+  const discardLiveResult = (requestedChannel: string, requestedGeneration: number): void => {
+    if (requestedChannel !== channel.value || requestedGeneration !== liveGeneration) return;
     isLive.value = false;
     isVisible.value = false;
   };
   const checkLive = (): Promise<void> => {
     const requestedChannel = channel.value;
-    if (liveInFlight?.channel === requestedChannel) return liveInFlight.promise;
+    const requestedGeneration = liveGeneration;
+    if (
+      liveInFlight?.channel === requestedChannel &&
+      liveInFlight.generation === requestedGeneration
+    ) {
+      return liveInFlight.promise;
+    }
     const request = (async () => {
       try {
         const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
           query: { channel: requestedChannel },
         });
-        applyLiveResult(requestedChannel, data.isLive);
+        applyLiveResult(requestedChannel, requestedGeneration, data.isLive);
       } catch {
-        discardLiveResult(requestedChannel);
+        discardLiveResult(requestedChannel, requestedGeneration);
       }
     })();
-    liveInFlight = { channel: requestedChannel, promise: request };
+    liveInFlight = {
+      channel: requestedChannel,
+      generation: requestedGeneration,
+      promise: request,
+    };
     void request.finally(() => {
       if (liveInFlight?.promise === request) liveInFlight = null;
     });
     return request;
   };
+  watch(
+    sharedConfig,
+    (config) => {
+      if (config) applyLocalConfig(config);
+    },
+    { immediate: true }
+  );
   const stopPolling = (): void => {
     if (pollTimer) {
       clearInterval(pollTimer);
@@ -223,6 +252,7 @@
     }, POLL_INTERVAL_MS);
   };
   watch(enabled, (next) => {
+    liveGeneration += 1;
     if (next) {
       startPolling();
       void checkLive();

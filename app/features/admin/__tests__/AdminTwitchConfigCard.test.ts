@@ -70,7 +70,7 @@ describe('AdminTwitchConfigCard', () => {
       if (url === '/api/twitch/config') {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
       }
-      return Promise.resolve({ config: {} });
+      return Promise.resolve({ cacheInvalidated: true, config: {}, version: 1 });
     });
   });
   it('loads the effective Twitch configuration', async () => {
@@ -96,7 +96,9 @@ describe('AdminTwitchConfigCard', () => {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
       }
       return Promise.resolve({
+        cacheInvalidated: true,
         config: { channel: 'streamer', displayName: 'streamer', enabled: true },
+        version: 2,
       });
     });
     const wrapper = mountCard();
@@ -113,6 +115,28 @@ describe('AdminTwitchConfigCard', () => {
       })
     );
     expect(wrapper.findAll('input')[1]!.attributes('value')).toBe('streamer');
+  });
+  it('warns when the config was saved but cache invalidation failed', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/config') {
+        return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
+      }
+      return Promise.resolve({
+        cacheInvalidated: false,
+        config: { channel: 'streamer', displayName: 'Streamer', enabled: true },
+        version: 2,
+      });
+    });
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'warning',
+        title: 'admin.twitch_config_saved_with_warning_title',
+      })
+    );
   });
   it('surfaces the server validation message on failure', async () => {
     vi.spyOn(logger, 'warn').mockImplementation(() => undefined);

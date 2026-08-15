@@ -30,7 +30,7 @@ const loadHandler = async () => {
   vi.resetModules();
   return (await import('@/server/api/twitch/config.get')).default as (
     event: unknown
-  ) => Promise<{ channel: string; displayName: string; enabled: boolean }>;
+  ) => Promise<{ channel: string; displayName: string; enabled: boolean; version: number }>;
 };
 describe('/api/twitch/config', () => {
   beforeEach(() => {
@@ -54,6 +54,7 @@ describe('/api/twitch/config', () => {
       channel: 'envstreamer',
       displayName: 'EnvStreamer',
       enabled: true,
+      version: 0,
     });
   });
   it('applies the database override and requires revalidation', async () => {
@@ -68,6 +69,7 @@ describe('/api/twitch/config', () => {
       channel: 'dbstreamer',
       displayName: 'DB Streamer',
       enabled: false,
+      version: 7,
     });
     expect(setResponseHeadersMock).toHaveBeenCalledWith(
       {},
@@ -95,17 +97,20 @@ describe('/api/twitch/config', () => {
       channel: 'envstreamer',
       displayName: 'EnvStreamer',
       enabled: true,
+      version: 2,
     });
   });
-  it('skips the database when Supabase config is missing', async () => {
+  it('does not cache the fallback when Supabase config is missing', async () => {
     runtimeConfig.supabaseUrl = '';
     const handler = await loadHandler();
     await expect(handler({})).resolves.toEqual({
       channel: 'envstreamer',
       displayName: 'EnvStreamer',
       enabled: true,
+      version: 0,
     });
     expect(adminSupabaseFetchMock).not.toHaveBeenCalled();
+    expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
   });
   it('falls back to env defaults when the database read fails', async () => {
     adminSupabaseFetchMock.mockRejectedValue(new Error('network down'));
@@ -114,6 +119,7 @@ describe('/api/twitch/config', () => {
       channel: 'envstreamer',
       displayName: 'EnvStreamer',
       enabled: true,
+      version: 0,
     });
     expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
   });
@@ -159,6 +165,7 @@ describe('/api/twitch/config', () => {
       channel: 'envstreamer',
       displayName: 'EnvStreamer',
       enabled: false,
+      version: 0,
     });
   });
   it('normalizes a Supabase URL that carries a query string', async () => {
@@ -181,8 +188,10 @@ describe('/api/twitch/config', () => {
         channel: 'envstreamer',
         displayName: 'EnvStreamer',
         enabled: true,
+        version: 0,
       });
       expect(adminSupabaseFetchMock).not.toHaveBeenCalled();
+      expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
     }
   );
 });

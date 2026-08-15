@@ -22,7 +22,7 @@ mockNuxtImport('useI18n', () => () => ({
     typeof fallbackOrParams === 'string' ? fallbackOrParams : key,
 }));
 vi.stubGlobal('$fetch', fetchMock);
-let twitchConfig: { channel: string; displayName: string; enabled: boolean };
+let twitchConfig: { channel: string; displayName: string; enabled: boolean; version: number };
 let liveResult: { isLive: boolean };
 const UButtonStub = {
   inheritAttrs: false,
@@ -52,7 +52,12 @@ describe('PromotedTwitchEmbed', () => {
     fetchMock.mockImplementation((url: string) =>
       Promise.resolve(url === '/api/twitch/config' ? twitchConfig : liveResult)
     );
-    twitchConfig = { channel: 'teststreamer', displayName: 'TestStreamer', enabled: true };
+    twitchConfig = {
+      channel: 'teststreamer',
+      displayName: 'TestStreamer',
+      enabled: true,
+      version: 1,
+    };
     liveResult = { isLive: true };
     sessionStorage.clear();
     usePromotedTwitch().resetConfig();
@@ -133,6 +138,7 @@ describe('PromotedTwitchEmbed', () => {
       channel: 'replacement',
       displayName: 'Replacement',
       enabled: true,
+      version: 2,
     });
     await flushPromises();
     await nextTick();
@@ -142,12 +148,38 @@ describe('PromotedTwitchEmbed', () => {
     expect(wrapper.find('iframe').attributes('src')).toContain('channel=replacement');
     wrapper.unmount();
   });
+  it('does not let an older focus response overwrite an admin save', async () => {
+    const wrapper = await mountEmbed();
+    let resolveConfig: ((value: typeof twitchConfig) => void) | undefined;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/config') {
+        return new Promise((resolve) => {
+          resolveConfig = resolve;
+        });
+      }
+      return Promise.resolve(liveResult);
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    usePromotedTwitch().applyConfig({
+      channel: 'replacement',
+      displayName: 'Replacement',
+      enabled: true,
+      version: 2,
+    });
+    await nextTick();
+    resolveConfig?.(twitchConfig);
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.find('iframe').attributes('src')).toContain('channel=replacement');
+    wrapper.unmount();
+  });
   it('hides an active player and stops polling when the shared config disables the stream', async () => {
     const wrapper = await mountEmbed();
     usePromotedTwitch().applyConfig({
       channel: 'teststreamer',
       displayName: 'TestStreamer',
       enabled: false,
+      version: 2,
     });
     await flushPromises();
     await nextTick();
@@ -157,7 +189,12 @@ describe('PromotedTwitchEmbed', () => {
   });
   it('keeps a stored dismissal when the first resolved channel differs from the fallback', async () => {
     sessionStorage.setItem('tt-twitch-dismissed', '1');
-    twitchConfig = { channel: 'dbstreamer', displayName: 'DB Streamer', enabled: true };
+    twitchConfig = {
+      channel: 'dbstreamer',
+      displayName: 'DB Streamer',
+      enabled: true,
+      version: 1,
+    };
     const wrapper = await mountEmbed();
     expect(sessionStorage.getItem('tt-twitch-dismissed')).toBe('1');
     expect(wrapper.find('iframe').exists()).toBe(false);
@@ -172,6 +209,7 @@ describe('PromotedTwitchEmbed', () => {
       channel: 'replacement',
       displayName: 'Replacement',
       enabled: true,
+      version: 2,
     });
     await flushPromises();
     await nextTick();
@@ -219,6 +257,7 @@ describe('PromotedTwitchEmbed', () => {
       channel: 'replacement',
       displayName: 'Replacement',
       enabled: true,
+      version: 2,
     });
     await flushPromises();
     await nextTick();
@@ -226,6 +265,44 @@ describe('PromotedTwitchEmbed', () => {
     await flushPromises();
     await nextTick();
     expect(wrapper.find('iframe').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('discards a stale A to B to A live result', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const wrapper = await mountEmbed();
+    const liveResolvers: Array<(value: { isLive: boolean }) => void> = [];
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/live') {
+        return new Promise((resolve) => {
+          liveResolvers.push(resolve);
+        });
+      }
+      return Promise.resolve(twitchConfig);
+    });
+    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    pollCallback();
+    usePromotedTwitch().applyConfig({
+      channel: 'replacement',
+      displayName: 'Replacement',
+      enabled: true,
+      version: 2,
+    });
+    await nextTick();
+    usePromotedTwitch().applyConfig({
+      channel: 'teststreamer',
+      displayName: 'TestStreamer',
+      enabled: true,
+      version: 3,
+    });
+    await flushPromises();
+    await nextTick();
+    liveResolvers[0]?.({ isLive: true });
+    await flushPromises();
+    expect(wrapper.find('iframe').exists()).toBe(false);
+    liveResolvers[2]?.({ isLive: true });
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.find('iframe').attributes('src')).toContain('channel=teststreamer');
     wrapper.unmount();
   });
   it('logs a warning when clearing a stored dismissal fails', async () => {

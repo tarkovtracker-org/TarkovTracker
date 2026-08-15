@@ -25,21 +25,24 @@ interface AdminAuthUser {
   id?: string;
   email?: string;
 }
-export default defineEventHandler(
-  async (event): Promise<{ config: TwitchConfig; version: number }> => {
-    try {
-      return await handleUpdate(event);
-    } catch (error) {
-      logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
-        action: 'update_promoted_twitch_config',
-        adminUserId: readAdminUserIdForLog(event),
-        error,
-      });
-      throw error;
-    }
+interface UpdateResult {
+  cacheInvalidated: boolean;
+  config: TwitchConfig;
+  version: number;
+}
+export default defineEventHandler(async (event): Promise<UpdateResult> => {
+  try {
+    return await handleUpdate(event);
+  } catch (error) {
+    logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
+      action: 'update_promoted_twitch_config',
+      adminUserId: readAdminUserIdForLog(event),
+      error,
+    });
+    throw error;
   }
-);
-async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; version: number }> {
+});
+async function handleUpdate(event: H3Event): Promise<UpdateResult> {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
@@ -56,28 +59,25 @@ async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; ver
     readAdminEmail(event),
     input
   );
-  await purgeConfigCache(runtime, event);
-  return { config: saved.value, version: saved.version };
+  const cacheInvalidated = await purgeConfigCache(runtime, event);
+  return { cacheInvalidated, config: saved.value, version: saved.version };
 }
-async function purgeConfigCache(runtime: Record<string, unknown>, event: H3Event): Promise<void> {
-  const supabaseUrl = readSupabaseUrl(runtime);
-  const authHeader = readAuthHeader(event);
-  if (!supabaseUrl) {
-    throw createError({ statusCode: 502, message: 'Cache purge config missing' });
-  }
+async function purgeConfigCache(
+  runtime: Record<string, unknown>,
+  event: H3Event
+): Promise<boolean> {
   try {
-    await invokeCachePurge(supabaseUrl, readAnonKey(runtime), authHeader);
+    const supabaseUrl = readSupabaseUrl(runtime);
+    if (!supabaseUrl) throw new Error('Cache purge config missing');
+    await invokeCachePurge(supabaseUrl, readAnonKey(runtime), readAuthHeader(event));
+    return true;
   } catch (error) {
-    if (isHttpError(error)) throw error;
     logger.error('[AdminTwitchConfig] Failed to purge Twitch config cache', {
       action: 'purge_promoted_twitch_config',
       adminUserId: readAdminUserIdForLog(event),
       error,
     });
-    throw createError({
-      statusCode: 502,
-      message: 'Twitch config saved but cache purge failed',
-    });
+    return false;
   }
 }
 function readAnonKey(runtime: Record<string, unknown>): string {
@@ -85,13 +85,8 @@ function readAnonKey(runtime: Record<string, unknown>): string {
 }
 function readAuthHeader(event: H3Event): string {
   const authHeader = getRequestHeader(event, 'authorization');
-  if (!authHeader) {
-    throw createError({ statusCode: 502, message: 'Cache purge config missing' });
-  }
+  if (!authHeader) throw new Error('Cache purge authorization missing');
   return authHeader;
-}
-function isHttpError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'statusCode' in error;
 }
 async function invokeCachePurge(
   supabaseUrl: string,
@@ -120,8 +115,7 @@ async function invokeCachePurge(
 async function buildPurgeFailureError(response: Response): Promise<Error> {
   const detail = await response.text().catch(() => '');
   const suffix = detail ? `: ${detail}` : '';
-  const message = `Twitch config saved but cache purge failed (${response.status})${suffix}`;
-  return createError({ statusCode: 502, message });
+  return new Error(`Cache purge failed (${response.status})${suffix}`);
 }
 async function updateConfig(
   supabaseUrl: string,

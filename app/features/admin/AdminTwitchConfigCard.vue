@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { usePromotedTwitch } from '@/composables/usePromotedTwitch';
+  import { usePromotedTwitch, type PromotedTwitchConfig } from '@/composables/usePromotedTwitch';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { logger } from '@/utils/logger';
   const { $supabase } = useNuxtApp();
@@ -9,10 +9,11 @@
   const { applyConfig: applySharedConfig } = usePromotedTwitch();
   const CHANNEL_MAX_LENGTH = 25;
   const DISPLAY_NAME_MAX_LENGTH = 50;
-  interface TwitchConfig {
-    channel: string;
-    displayName: string;
-    enabled: boolean;
+  type TwitchConfig = Omit<PromotedTwitchConfig, 'version'>;
+  interface TwitchConfigSaveResult {
+    cacheInvalidated: boolean;
+    config: TwitchConfig;
+    version: number;
   }
   const channel = ref('');
   const displayName = ref('');
@@ -75,7 +76,7 @@
           t('admin.twitch_config_login_required', 'You must be signed in to update Twitch config.')
         );
       }
-      const saved = await $fetch<{ config: TwitchConfig }>('/api/admin/twitch-config', {
+      const saved = await $fetch<TwitchConfigSaveResult>('/api/admin/twitch-config', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: {
@@ -85,17 +86,29 @@
         },
       });
       applyConfig(saved.config);
-      applySharedConfig(saved.config);
-      toast.add({
-        title: t('admin.twitch_config_saved_title', 'Twitch config updated'),
-        description: t(
-          'admin.twitch_config_saved_description',
-          { channel: channel.value },
-          'Promoted stream is now {channel}.'
-        ),
-        color: 'success',
-        icon: 'i-mdi-check-circle',
-      });
+      applySharedConfig({ ...saved.config, version: saved.version });
+      if (saved.cacheInvalidated) {
+        toast.add({
+          title: t('admin.twitch_config_saved_title', 'Twitch config updated'),
+          description: t(
+            'admin.twitch_config_saved_description',
+            { channel: channel.value },
+            'Promoted stream is now {channel}.'
+          ),
+          color: 'success',
+          icon: 'i-mdi-check-circle',
+        });
+      } else {
+        toast.add({
+          title: t('admin.twitch_config_saved_with_warning_title', 'Twitch config saved'),
+          description: t(
+            'admin.twitch_config_saved_with_warning_description',
+            'The config was saved, but cached visitors may see the previous value until cache invalidation recovers.'
+          ),
+          color: 'warning',
+          icon: 'i-mdi-alert',
+        });
+      }
     } catch (error) {
       logger.warn('[AdminTwitchConfigCard] Failed to save Twitch config', error);
       toast.add({

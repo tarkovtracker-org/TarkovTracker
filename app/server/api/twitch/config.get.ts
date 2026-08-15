@@ -19,6 +19,7 @@ interface TwitchConfig {
   channel: string;
   displayName: string;
   enabled: boolean;
+  version: number;
 }
 interface TwitchFallback {
   channel?: string;
@@ -27,9 +28,11 @@ interface TwitchFallback {
 }
 interface SettingRow {
   value?: Record<string, unknown>;
+  version?: number;
 }
 interface OverrideResult {
   value?: Record<string, unknown>;
+  version?: number;
   failed?: boolean;
 }
 function normalizeChannel(value: unknown): string {
@@ -50,9 +53,12 @@ function displayNameOr(value: unknown, fallback: string): string {
 function boolOr(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
-function resolveConfig(fallback: TwitchFallback, override?: Record<string, unknown>): TwitchConfig {
+function resolveConfig(
+  fallback: TwitchFallback,
+  override?: Record<string, unknown>
+): Omit<TwitchConfig, 'version'> {
   const channel = normalizeChannel(fallback.channel) || DEFAULT_CHANNEL;
-  const base: TwitchConfig = {
+  const base = {
     channel,
     displayName: displayNameOr(fallback.displayName, channel),
     enabled: boolOr(fallback.enabled, false),
@@ -74,7 +80,7 @@ function readServiceKey(runtime: Record<string, unknown>): string {
 async function readOverride(runtime: Record<string, unknown>): Promise<OverrideResult> {
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
-  if (!supabaseUrl || !serviceKey) return {};
+  if (!supabaseUrl || !serviceKey) return { failed: true };
   return fetchSetting(supabaseUrl, serviceKey);
 }
 async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<OverrideResult> {
@@ -82,9 +88,9 @@ async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<Ov
     const rows = await adminSupabaseFetch<SettingRow[]>(
       supabaseUrl,
       serviceKey,
-      `/rest/v1/app_settings?select=value&key=eq.${SETTING_KEY}&limit=1`
+      `/rest/v1/app_settings?select=value,version&key=eq.${SETTING_KEY}&limit=1`
     );
-    return { value: rows?.[0]?.value };
+    return { value: rows?.[0]?.value, version: rows?.[0]?.version };
   } catch (err) {
     logger.warn('Failed to read Twitch config override, falling back to env defaults', err);
     return { failed: true };
@@ -100,5 +106,8 @@ export default defineEventHandler(async (event): Promise<TwitchConfig> => {
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
   setResponseHeaders(event, override.failed ? NO_STORE_HEADERS : CACHE_HEADERS);
-  return config;
+  return {
+    ...config,
+    version: Number.isSafeInteger(override.version) ? (override.version as number) : 0,
+  };
 });
