@@ -24,6 +24,8 @@ export interface UseLeafletMapOptions {
   map: Ref<TarkovMap | null>;
   /** Initial floor selection */
   initialFloor?: string;
+  /** Initial view (center + zoom) to apply instead of fitting map bounds */
+  initialView?: { center: [number, number]; zoom: number } | null;
   /** Enable idle detection for performance */
   enableIdleDetection?: boolean;
   /** Idle timeout in milliseconds */
@@ -160,6 +162,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     containerRef,
     map,
     initialFloor,
+    initialView,
     enableIdleDetection = true,
     idleTimeout = 60000, // 1 minute
   } = options;
@@ -772,9 +775,18 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       // Create a custom pane for the map background to ensure it stays behind markers
       const backgroundPane = mapInstance.value.createPane('mapBackground');
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)
-      // Set initial view using map bounds
+      // Set initial view using map bounds, or restore a previous view when provided
       const bounds = getLeafletBounds(renderConfig);
-      mapInstance.value.fitBounds(bounds);
+      if (
+        initialView &&
+        Array.isArray(initialView.center) &&
+        initialView.center.length === 2 &&
+        Number.isFinite(initialView.zoom)
+      ) {
+        mapInstance.value.setView(initialView.center, initialView.zoom, { animate: false });
+      } else {
+        mapInstance.value.fitBounds(bounds);
+      }
       // Set initial floor
       selectedFloor.value = resolveInitialFloor(svgConfig, tileConfig, initialFloor);
       renderKey.value = getRenderKey() ?? '';

@@ -412,6 +412,7 @@
     showSpawnToggle?: boolean;
     showLegend?: boolean;
     height?: number;
+    initialView?: { center: [number, number]; zoom: number } | null;
   }
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
@@ -420,6 +421,7 @@
     showSpawnToggle: true,
     showLegend: true,
     height: undefined,
+    initialView: null,
   });
   const { t } = useI18n({ useScope: 'global' });
   const router = useRouter();
@@ -450,6 +452,7 @@
   } = useLeafletMap({
     containerRef: mapContainer,
     map: toRef(props, 'map'),
+    initialView: props.initialView ?? null,
   });
   const ZONE_HOVER_DELTA = 0.16;
   const ZONE_HOVER_MAX = 0.6;
@@ -1474,10 +1477,27 @@
       activePinnedPopupCleanup();
     }
   };
+  const getViewState = (): { center: [number, number]; zoom: number } | null => {
+    const instance = mapInstance.value;
+    if (!instance) return null;
+    const center = instance.getCenter();
+    return { center: [center.lat, center.lng], zoom: instance.getZoom() };
+  };
+  const setViewState = (state: { center: [number, number]; zoom: number }): void => {
+    const instance = mapInstance.value;
+    if (!instance || !state) return;
+    if (instance.getZoom() !== state.zoom) {
+      instance.setView(state.center, state.zoom, { animate: false });
+      return;
+    }
+    instance.panTo(state.center, { animate: false });
+  };
   defineExpose({
     activateObjectivePopup,
     closeActivePopup,
     refreshView,
+    getViewState,
+    setViewState,
   });
   onUnmounted(() => {
     window.removeEventListener('keydown', onGlobalMapKeydown);

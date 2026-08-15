@@ -14,49 +14,81 @@
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
               <div class="bg-surface-800/50 rounded-lg p-4">
                 <div class="mb-3 flex items-start justify-between gap-3">
-                  <div class="min-w-0 space-y-2">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <span
-                        class="bg-primary-500/15 border-primary-500/25 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
-                      >
-                        <UIcon
-                          name="i-mdi-map-marker-radius-outline"
-                          class="text-primary-300 h-4 w-4"
-                        />
-                      </span>
-                      <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
-                        {{ selectedMapData?.name || t('tasks.view.map') }}
-                      </h3>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span
-                        v-for="(entry, index) in mapTimeEntries"
-                        :key="`${entry.value}-${index}`"
-                        class="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-semibold"
-                        :class="entry.badgeClass"
-                      >
-                        <UIcon :name="entry.icon" :class="['h-4 w-4 shrink-0', entry.iconClass]" />
-                        <span class="tracking-wide uppercase" :class="entry.labelClass">
-                          {{ getMapTimeLabel(entry.period) }}
-                        </span>
-                        <span class="tabular-nums" :class="entry.valueClass">
-                          {{ entry.value }}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                  <UButton
+                  <button
+                    type="button"
                     data-testid="map-panel-toggle"
-                    icon="i-mdi-chevron-down"
+                    :aria-expanded="isMapPanelExpanded"
+                    aria-controls="tasks-map-panel-content"
+                    :aria-label="t('page.tasks.map.toggle_panel')"
+                    class="hover:bg-surface-800/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-800 group -m-1.5 flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    @click="toggleMapPanelVisibility"
+                  >
+                    <span
+                      class="bg-primary-500/15 border-primary-500/25 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
+                    >
+                      <UIcon
+                        name="i-mdi-map-marker-radius-outline"
+                        class="text-primary-300 h-4 w-4"
+                      />
+                    </span>
+                    <span class="min-w-0 flex-1 space-y-1.5">
+                      <span class="flex min-w-0 items-center gap-2">
+                        <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
+                          {{ selectedMapData?.name || t('tasks.view.map') }}
+                        </h3>
+                        <span
+                          class="text-surface-400 border-surface-700 bg-surface-800/60 group-hover:text-surface-100 inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap transition-colors"
+                        >
+                          <UIcon
+                            :name="isMapPanelExpanded ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
+                            class="h-3.5 w-3.5 transition-transform duration-200"
+                          />
+                          {{
+                            isMapPanelExpanded
+                              ? t('page.tasks.map.hide_map')
+                              : t('page.tasks.map.show_map')
+                          }}
+                        </span>
+                      </span>
+                      <span class="flex flex-wrap items-center gap-2">
+                        <span
+                          v-for="(entry, index) in mapTimeEntries"
+                          :key="`${entry.value}-${index}`"
+                          class="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-semibold"
+                          :class="entry.badgeClass"
+                        >
+                          <UIcon
+                            :name="entry.icon"
+                            :class="['h-4 w-4 shrink-0', entry.iconClass]"
+                          />
+                          <span class="tracking-wide uppercase" :class="entry.labelClass">
+                            {{ getMapTimeLabel(entry.period) }}
+                          </span>
+                          <span class="tabular-nums" :class="entry.valueClass">
+                            {{ entry.value }}
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                  <UButton
+                    data-testid="map-fullscreen-toggle"
+                    icon="i-mdi-fullscreen"
                     variant="ghost"
                     color="neutral"
                     size="xs"
-                    :aria-label="t('page.tasks.map.toggle_panel')"
-                    :aria-expanded="isMapPanelExpanded"
-                    aria-controls="tasks-map-panel-content"
-                    :class="{ 'rotate-180': isMapPanelExpanded }"
-                    class="mt-0.5 shrink-0 transition-transform duration-200"
-                    @click="toggleMapPanelVisibility"
+                    :aria-label="
+                      isMapFullscreen
+                        ? t('page.tasks.map.exit_fullscreen')
+                        : t('page.tasks.map.open_fullscreen')
+                    "
+                    :title="
+                      isMapFullscreen
+                        ? t('page.tasks.map.exit_fullscreen')
+                        : t('page.tasks.map.open_fullscreen')
+                    "
+                    class="mt-0.5 shrink-0"
+                    @click="isMapFullscreen ? closeMapFullscreen() : openMapFullscreen()"
                   />
                 </div>
                 <Transition
@@ -326,10 +358,86 @@
         </div>
       </Transition>
     </Teleport>
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="isMapFullscreen"
+          data-testid="map-fullscreen-overlay"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('page.tasks.map.fullscreen_label')"
+          class="bg-surface-950 fixed inset-0 z-[100] flex flex-col"
+        >
+          <div
+            class="bg-surface-900 border-surface-800 flex items-center justify-between gap-3 border-b px-4 py-3"
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              <span
+                class="bg-primary-500/15 border-primary-500/25 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
+              >
+                <UIcon name="i-mdi-map-marker-radius-outline" class="text-primary-300 h-4 w-4" />
+              </span>
+              <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
+                {{ selectedMapData?.name || t('tasks.view.map') }}
+              </h3>
+              <span class="text-surface-500 hidden text-xs font-medium sm:inline">
+                {{ t('page.tasks.map.fullscreen_label') }}
+              </span>
+            </div>
+            <div class="flex min-w-0 items-center gap-2">
+              <span
+                v-for="(entry, index) in mapTimeEntries"
+                :key="`fullscreen-${entry.value}-${index}`"
+                class="hidden items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-semibold md:inline-flex"
+                :class="entry.badgeClass"
+              >
+                <UIcon :name="entry.icon" :class="['h-4 w-4 shrink-0', entry.iconClass]" />
+                <span class="tracking-wide uppercase" :class="entry.labelClass">
+                  {{ getMapTimeLabel(entry.period) }}
+                </span>
+                <span class="tabular-nums" :class="entry.valueClass">
+                  {{ entry.value }}
+                </span>
+              </span>
+              <UButton
+                data-testid="map-fullscreen-exit"
+                icon="i-mdi-fullscreen-exit"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                :aria-label="t('page.tasks.map.exit_fullscreen')"
+                @click="closeMapFullscreen"
+              >
+                {{ t('page.tasks.map.exit_fullscreen') }}
+              </UButton>
+            </div>
+          </div>
+          <div v-if="selectedMapData" class="min-h-0 flex-1">
+            <LeafletMapComponent
+              ref="fullscreenLeafletMapRef"
+              :map="selectedMapData"
+              :marks="mapObjectiveMarks"
+              :show-extracts="true"
+              :show-extract-toggle="true"
+              :show-legend="true"
+              :height="fullscreenMapHeight"
+              :initial-view="fullscreenMapView"
+            />
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 <script setup lang="ts">
-  import { useStorage } from '@vueuse/core';
+  import { useScrollLock, useStorage, useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import {
     type DashboardFocusProgressInteraction,
@@ -460,8 +568,12 @@
     stopResize,
     onResizeKeydown,
   } = useMapResize();
-  const isMapPanelExpanded = useStorage<boolean>(STORAGE_KEYS.tasksMapPanelExpanded, false);
+  const isMapPanelExpanded = useStorage<boolean>(STORAGE_KEYS.tasksMapPanelExpanded, true);
   const toggleMapPanelVisibility = () => {
+    if (isMapFullscreen.value) {
+      closeMapFullscreen();
+      return;
+    }
     if (isMapPanelExpanded.value) {
       stopResize();
     }
@@ -485,13 +597,54 @@
     return new Set(filteredTasks.map((task) => task.id));
   });
   const mapContainerRef = ref<HTMLElement | null>(null);
-  const leafletMapRef = ref<{
+  type MapViewState = { center: [number, number]; zoom: number };
+  interface MapComponentRef {
     activateObjectivePopup: (id: string) => boolean;
     closeActivePopup: () => void;
-  } | null>(null);
+    getViewState?: () => MapViewState | null;
+    setViewState?: (state: MapViewState) => void;
+  }
+  const leafletMapRef = ref<MapComponentRef | null>(null);
   const { jumpToMapObjective, cleanup: cleanupMapPopup } = useMapObjectivePopup({
     leafletMapRef,
     mapContainerRef,
+  });
+  const { height: windowHeight } = useWindowSize();
+  const FULLSCREEN_HEADER_HEIGHT = 68;
+  const fullscreenMapHeight = computed(() => {
+    const height = windowHeight.value;
+    if (!height) return undefined;
+    return Math.max(320, Math.round(height - FULLSCREEN_HEADER_HEIGHT));
+  });
+  const fullscreenLeafletMapRef = ref<MapComponentRef | null>(null);
+  const fullscreenMapView = ref<MapViewState | null>(null);
+  const isMapFullscreen = ref(false);
+  const openMapFullscreen = () => {
+    fullscreenMapView.value = leafletMapRef.value?.getViewState?.() ?? null;
+    isMapPanelExpanded.value = true;
+    isMapFullscreen.value = true;
+  };
+  const closeMapFullscreen = () => {
+    const overlayView = fullscreenLeafletMapRef.value?.getViewState?.() ?? null;
+    isMapFullscreen.value = false;
+    fullscreenMapView.value = null;
+    if (overlayView && leafletMapRef.value?.setViewState) {
+      leafletMapRef.value.setViewState(overlayView);
+    }
+  };
+  const handleFullscreenKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && isMapFullscreen.value) {
+      closeMapFullscreen();
+    }
+  };
+  const bodyScrollLock = useScrollLock(document.body);
+  watch(isMapFullscreen, (isActive) => {
+    bodyScrollLock.value = isActive;
+    if (isActive) {
+      window.addEventListener('keydown', handleFullscreenKeydown);
+    } else {
+      window.removeEventListener('keydown', handleFullscreenKeydown);
+    }
   });
   const handleJumpToMapObjective = async (objectiveId: string) => {
     isMapPanelExpanded.value = true;
@@ -727,5 +880,8 @@
     cleanupMapPopup();
     cleanupNotification();
     cleanupDeepLink();
+    isMapFullscreen.value = false;
+    bodyScrollLock.value = false;
+    window.removeEventListener('keydown', handleFullscreenKeydown);
   });
 </script>
