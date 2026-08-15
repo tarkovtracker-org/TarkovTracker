@@ -99,7 +99,7 @@ describe('entryRecoveryScript', () => {
     expect(replace).not.toHaveBeenCalled();
   });
   it('bails without reloading when sessionStorage is unavailable', () => {
-    vi.spyOn(window.sessionStorage, 'getItem').mockImplementation(() => {
+    const getItemSpy = vi.spyOn(window.sessionStorage, 'getItem').mockImplementation(() => {
       throw new Error('denied');
     });
     const replace = stubLocation();
@@ -107,5 +107,62 @@ describe('entryRecoveryScript', () => {
     const failingScript = createFailingScript({ type: 'module', src: '/_nuxt/stale.js' });
     failingScript.dispatchEvent(new Event('error'));
     expect(replace).not.toHaveBeenCalled();
+    getItemSpy.mockRestore();
+  });
+  it('skips the reload when the cooldown write fails', () => {
+    const setItemSpy = vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({ type: 'module', src: '/_nuxt/stale.js' });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).not.toHaveBeenCalled();
+    setItemSpy.mockRestore();
+  });
+  it('reloads for a protocol-relative module URL on the same origin', () => {
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({ type: 'module', src: '//app.test/_nuxt/stale.js' });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+  it('ignores a protocol-relative module URL on a different host', () => {
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({ type: 'module', src: '//evil.example.com/x.js' });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).not.toHaveBeenCalled();
+  });
+  it('ignores a deceptive origin-prefix URL', () => {
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({
+      type: 'module',
+      src: 'https://app.test.evil.example.com/x.js',
+    });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).not.toHaveBeenCalled();
+  });
+  it('ignores an invalid script URL', () => {
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({ type: 'module', src: 'http://[::1' });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).not.toHaveBeenCalled();
+  });
+  it('ignores a module script without a src', () => {
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({ type: 'module' });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).not.toHaveBeenCalled();
+  });
+  it('reloads for a bare relative module URL', () => {
+    const replace = stubLocation();
+    executeRecoveryScript();
+    const failingScript = createFailingScript({ type: 'module', src: 'chunks/stale.js' });
+    failingScript.dispatchEvent(new Event('error'));
+    expect(replace).toHaveBeenCalledTimes(1);
   });
 });
