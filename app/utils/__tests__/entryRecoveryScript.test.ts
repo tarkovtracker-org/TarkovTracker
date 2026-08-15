@@ -42,6 +42,7 @@ function stubLocation(): ReturnType<typeof vi.fn> {
 }
 describe('entryRecoveryScript', () => {
   let originalLocation: PropertyDescriptor | undefined;
+  let sessionStorageSpy: ReturnType<typeof vi.spyOn> | undefined;
   beforeEach(() => {
     originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
     window.sessionStorage.clear();
@@ -51,9 +52,12 @@ describe('entryRecoveryScript', () => {
     for (const handler of registeredHandlers.splice(0)) {
       window.removeEventListener('error', handler, true);
     }
+    sessionStorageSpy?.mockRestore();
+    sessionStorageSpy = undefined;
     if (originalLocation) {
       Object.defineProperty(window, 'location', originalLocation);
     }
+    vi.restoreAllMocks();
   });
   it('reloads with a retry marker when a same-origin module script fails to load', () => {
     const replace = stubLocation();
@@ -99,7 +103,7 @@ describe('entryRecoveryScript', () => {
     expect(replace).not.toHaveBeenCalled();
   });
   it('bails without reloading when sessionStorage is unavailable', () => {
-    const getItemSpy = vi.spyOn(window.sessionStorage, 'getItem').mockImplementation(() => {
+    sessionStorageSpy = vi.spyOn(window.sessionStorage, 'getItem').mockImplementation(() => {
       throw new Error('denied');
     });
     const replace = stubLocation();
@@ -107,10 +111,9 @@ describe('entryRecoveryScript', () => {
     const failingScript = createFailingScript({ type: 'module', src: '/_nuxt/stale.js' });
     failingScript.dispatchEvent(new Event('error'));
     expect(replace).not.toHaveBeenCalled();
-    getItemSpy.mockRestore();
   });
   it('skips the reload when the cooldown write fails', () => {
-    const setItemSpy = vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => {
+    sessionStorageSpy = vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => {
       throw new Error('denied');
     });
     const replace = stubLocation();
@@ -118,7 +121,6 @@ describe('entryRecoveryScript', () => {
     const failingScript = createFailingScript({ type: 'module', src: '/_nuxt/stale.js' });
     failingScript.dispatchEvent(new Event('error'));
     expect(replace).not.toHaveBeenCalled();
-    setItemSpy.mockRestore();
   });
   it('reloads for a protocol-relative module URL on the same origin', () => {
     const replace = stubLocation();
