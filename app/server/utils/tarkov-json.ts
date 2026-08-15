@@ -762,6 +762,25 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
 // `level` entries gate trader loyalty level (`value` = level), `reputation`
 // entries gate standing (`value` = standing). Split them into the two Task
 // fields so availability and progress checks compare against the right metric.
+const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
+function pushTraderRequirement(
+  adapted: (TraderRequirement & { level?: number }) | undefined,
+  traderLevelRequirements: TaskTraderLevelRequirement[],
+  traderRequirements: TraderRequirement[]
+): void {
+  if (!adapted) return;
+  if (adapted.requirementType === 'level') {
+    traderLevelRequirements.push({
+      id: adapted.id,
+      trader: adapted.trader,
+      level: adapted.level ?? adapted.value,
+      requirementType: 'level',
+      compareMethod: adapted.compareMethod,
+    });
+    return;
+  }
+  traderRequirements.push(adapted);
+}
 function adaptTraderRequirements(
   raw: unknown,
   context: AdapterContext
@@ -773,26 +792,16 @@ function adaptTraderRequirements(
   const traderLevelRequirements: TaskTraderLevelRequirement[] = [];
   const traderRequirements: TraderRequirement[] = [];
   for (const requirement of raw) {
-    const adapted = adaptTraderRequirement(requirement, context) as
-      (TraderRequirement & { level?: number }) | undefined;
-    if (!adapted) continue;
-    if (adapted.requirementType === 'level') {
-      if (typeof adapted.id !== 'string') continue;
-      traderLevelRequirements.push({
-        id: adapted.id,
-        trader: adapted.trader,
-        level: adapted.level ?? adapted.value,
-        requirementType: 'level',
-        compareMethod: adapted.compareMethod,
-      });
-    } else {
-      traderRequirements.push(adapted);
-    }
+    pushTraderRequirement(
+      adaptTraderRequirement(requirement, context) as
+        (TraderRequirement & { level?: number }) | undefined,
+      traderLevelRequirements,
+      traderRequirements
+    );
   }
   return {
-    traderLevelRequirements:
-      traderLevelRequirements.length > 0 ? traderLevelRequirements : undefined,
-    traderRequirements: traderRequirements.length > 0 ? traderRequirements : undefined,
+    traderLevelRequirements: onlyIfPopulated(traderLevelRequirements),
+    traderRequirements: onlyIfPopulated(traderRequirements),
   };
 }
 // json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
