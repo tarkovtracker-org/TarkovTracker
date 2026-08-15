@@ -333,7 +333,6 @@ Deno.serve(async (req) => {
       console.error('[admin-cache-purge] Missing Cloudflare credentials');
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
-    // Get base URL for cache key construction (Tarkov data purges only)
     const baseUrl = Deno.env.get('APP_URL')?.trim() ?? '';
     if (purgeType === 'tarkov-data') {
       if (!baseUrl) {

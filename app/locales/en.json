@@ -58,7 +58,7 @@
     "twitch_config_saved_title": "Twitch config updated",
     "twitch_config_saved_description": "Promoted stream is now {channel}.",
     "twitch_config_saved_with_warning_title": "Twitch config saved",
-    "twitch_config_saved_with_warning_description": "The config was saved, but cached visitors may see the previous value until cache invalidation recovers.",
+    "twitch_config_saved_with_warning_description": "The config was saved, but cached visitors may still see the previous value. Retry the save to attempt cache invalidation again.",
     "twitch_config_failed_description": "Could not update Twitch config.",
     "twitch_config_load_failed_title": "Twitch config unavailable",
     "twitch_config_load_failed_description": "Could not load the current Twitch config.",
