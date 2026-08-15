@@ -71,7 +71,12 @@ describe('/api/twitch/config', () => {
     });
     expect(setResponseHeadersMock).toHaveBeenCalledWith(
       {},
-      { 'cache-control': 'public, max-age=0, must-revalidate' }
+      {
+        'cache-control': 'public, max-age=300, s-maxage=31536000',
+        'cloudflare-cdn-cache-control': 'public, max-age=31536000',
+        'cache-tag': 'promoted-twitch-config',
+        vary: 'Origin',
+      }
     );
   });
   it('ignores malformed database override fields', async () => {
@@ -111,7 +116,7 @@ describe('/api/twitch/config', () => {
       enabled: true,
     });
   });
-  it('revalidates the database on every request so versions propagate across isolates', async () => {
+  it('reads the database on each handler execution (edge cache fills)', async () => {
     adminSupabaseFetchMock
       .mockResolvedValueOnce([
         {

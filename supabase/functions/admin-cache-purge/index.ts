@@ -9,6 +9,7 @@ import {
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
 const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
+const TWITCH_CONFIG_CACHE_TAG = 'promoted-twitch-config';
 const TARKOV_CACHE_KEYS = [
   { key: 'bootstrap', includesGameMode: false },
   { key: 'tasks-core', includesGameMode: true },
@@ -40,7 +41,7 @@ const TARKOV_LANGUAGES = [
 ];
 const TARKOV_GAME_MODES = ['regular', 'pve'];
 interface PurgeRequest {
-  purgeType: 'all' | 'tarkov-data';
+  purgeType: 'all' | 'tarkov-data' | 'twitch-config';
 }
 interface CloudflarePurgeResponse {
   success: boolean;
@@ -106,6 +107,68 @@ async function purgeAllCache(zoneId: string, apiToken: string): Promise<Cloudfla
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ purge_everything: true }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      const text = await response.text();
+      return {
+        success: false,
+        errors: [
+          { code: response.status, message: `Cloudflare API error (${response.status}): ${text}` },
+        ],
+        messages: [],
+      };
+    }
+    try {
+      return (await response.json()) as CloudflarePurgeResponse;
+    } catch (e) {
+      return {
+        success: false,
+        errors: [
+          {
+            code: 500,
+            message: `Invalid JSON response: ${e instanceof Error ? e.message : String(e)}`,
+          },
+        ],
+        messages: [],
+      };
+    }
+  } catch (err) {
+    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+    return {
+      success: false,
+      errors: [
+        {
+          code: isTimeout ? 408 : 500,
+          message: isTimeout
+            ? 'Request timed out after 8s'
+            : `Network error: ${err instanceof Error ? err.message : String(err)}`,
+        },
+      ],
+      messages: [],
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+/**
+ * Purge the promoted Twitch config cache entry by tag.
+ */
+async function purgeTwitchConfigCache(
+  zoneId: string,
+  apiToken: string
+): Promise<CloudflarePurgeResponse> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${CLOUDFLARE_API_URL}/zones/${zoneId}/purge_cache`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tags: [TWITCH_CONFIG_CACHE_TAG] }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -283,7 +346,7 @@ Deno.serve(async (req) => {
     }
     // Parse request body
     const rawBody = await req.text();
-    let body: Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' }>;
+    let body: Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' | 'twitch-config' }>;
     try {
       body = JSON.parse(rawBody) as Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' }>;
       // Support both camelCase (new) and snake_case (legacy) for backward compatibility
@@ -304,8 +367,12 @@ Deno.serve(async (req) => {
     }
     const purgeType = body.purgeType!;
     // Validate purge type
-    if (!['all', 'tarkov-data'].includes(purgeType)) {
-      return createErrorResponse("Invalid purgeType. Must be 'all' or 'tarkov-data'", 400, req);
+    if (!['all', 'tarkov-data', 'twitch-config'].includes(purgeType)) {
+      return createErrorResponse(
+        "Invalid purgeType. Must be 'all', 'tarkov-data', or 'twitch-config'",
+        400,
+        req
+      );
     }
     // Get Cloudflare credentials
     const zoneId = Deno.env.get('CLOUDFLARE_ZONE_ID');
@@ -314,27 +381,33 @@ Deno.serve(async (req) => {
       console.error('[admin-cache-purge] Missing Cloudflare credentials');
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
-    // Get base URL for cache key construction
+    // Get base URL for cache key construction (Tarkov data purges only)
     const baseUrl = Deno.env.get('APP_URL')?.trim();
-    if (!baseUrl) {
-      console.error('[admin-cache-purge] Missing APP_URL');
-      return createErrorResponse('Application URL not configured', 500, req);
-    }
-    try {
-      const protocol = new URL(baseUrl).protocol;
-      if (protocol !== 'http:' && protocol !== 'https:') {
-        throw new Error('Unsupported APP_URL protocol');
+    if (purgeType === 'tarkov-data') {
+      if (!baseUrl) {
+        console.error('[admin-cache-purge] Missing APP_URL');
+        return createErrorResponse('Application URL not configured', 500, req);
       }
-    } catch {
-      console.error('[admin-cache-purge] Invalid APP_URL');
-      return createErrorResponse('Application URL invalid', 500, req);
+      try {
+        const protocol = new URL(baseUrl).protocol;
+        if (protocol !== 'http:' && protocol !== 'https:') {
+          throw new Error('Unsupported APP_URL protocol');
+        }
+      } catch {
+        console.error('[admin-cache-purge] Invalid APP_URL');
+        return createErrorResponse('Application URL invalid', 500, req);
+      }
     }
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;
     if (purgeType === 'all') {
       purgeResult = await purgeAllCache(zoneId, apiToken);
-    } else {
+    } else if (purgeType === 'twitch-config') {
+      purgeResult = await purgeTwitchConfigCache(zoneId, apiToken);
+    } else if (baseUrl) {
       purgeResult = await purgeTarkovDataCache(zoneId, apiToken, baseUrl);
+    } else {
+      return createErrorResponse('Application URL not configured', 500, req);
     }
     // Log the admin action
     await logAdminAction(
@@ -365,7 +438,9 @@ Deno.serve(async (req) => {
         message:
           purgeType === 'all'
             ? 'All cache purged successfully'
-            : 'Tarkov data cache purged successfully',
+            : purgeType === 'twitch-config'
+              ? 'Twitch config cache purged successfully'
+              : 'Tarkov data cache purged successfully',
         purgeType: purgeType,
         cloudflareResultId: purgeResult.result?.id,
         timestamp: new Date().toISOString(),

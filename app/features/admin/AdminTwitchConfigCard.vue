@@ -1,10 +1,12 @@
 <script setup lang="ts">
+  import { usePromotedTwitch } from '@/composables/usePromotedTwitch';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { logger } from '@/utils/logger';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { systemStore } = useSystemStoreWithSupabase();
+  const { applyConfig: applySharedConfig } = usePromotedTwitch();
   const CHANNEL_MAX_LENGTH = 25;
   const DISPLAY_NAME_MAX_LENGTH = 50;
   interface TwitchConfig {
@@ -83,6 +85,7 @@
         },
       });
       applyConfig(saved.config);
+      applySharedConfig(saved.config);
       toast.add({
         title: t('admin.twitch_config_saved_title', 'Twitch config updated'),
         description: t(

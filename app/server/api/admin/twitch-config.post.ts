@@ -1,8 +1,9 @@
-import { createError, defineEventHandler, readBody } from 'h3';
+import { createError, defineEventHandler, getRequestHeader, readBody } from 'h3';
 import { adminSupabaseFetch, getIsAdmin, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
+const EDGE_FUNCTION_PATH = '/functions/v1/admin-cache-purge';
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
 const DISPLAY_NAME_MAX_LENGTH = 50;
 interface AdminTwitchConfigBody {
@@ -54,7 +55,47 @@ async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; ver
     readAdminEmail(event),
     input
   );
+  await purgeConfigCache(runtime, event);
   return { config: saved.value, version: saved.version };
+}
+async function purgeConfigCache(runtime: Record<string, unknown>, event: H3Event): Promise<void> {
+  const supabaseUrl = readSupabaseUrl(runtime);
+  const anonKey = runtime.supabaseAnonKey;
+  const authHeader = getRequestHeader(event, 'authorization');
+  if (!supabaseUrl || !authHeader) {
+    throw createError({ statusCode: 500, message: 'Cache purge config missing' });
+  }
+  try {
+    const response = await fetch(`${supabaseUrl}${EDGE_FUNCTION_PATH}`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        apikey: typeof anonKey === 'string' ? anonKey : '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ purgeType: 'twitch-config' }),
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw createError({
+        statusCode: 502,
+        message: `Twitch config saved but cache purge failed (${response.status})${detail ? `: ${detail}` : ''}`,
+      });
+    }
+  } catch (error) {
+    if (error && typeof error === 'object' && 'statusCode' in error) {
+      throw error;
+    }
+    logger.error('[AdminTwitchConfig] Failed to purge Twitch config cache', {
+      action: 'purge_promoted_twitch_config',
+      adminUserId: readAdminUserIdForLog(event),
+      error,
+    });
+    throw createError({
+      statusCode: 502,
+      message: 'Twitch config saved but cache purge failed',
+    });
+  }
 }
 async function updateConfig(
   supabaseUrl: string,

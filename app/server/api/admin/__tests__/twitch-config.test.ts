@@ -28,6 +28,11 @@ mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 function makeEvent(authUser: { id?: string; email?: string } | null): H3Event {
   return {
     context: authUser ? { auth: { user: authUser } } : ({} as H3EventContext),
+    node: {
+      req: {
+        headers: authUser ? { authorization: 'Bearer admin-token' } : {},
+      },
+    },
   } as unknown as H3Event;
 }
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
@@ -80,20 +85,23 @@ describe('POST /api/admin/twitch-config', () => {
       statusCode: 403,
     });
   });
-  it('upserts the Twitch config and writes an audit log', async () => {
+  it('upserts the Twitch config, writes an audit log, and purges the cache tag', async () => {
     mockReadBody.mockResolvedValue({
       channel: 'NewStreamer',
       displayName: 'New Streamer',
       enabled: false,
     });
-    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
-      jsonResponse([
-        {
-          value: { channel: 'newstreamer', displayName: 'New Streamer', enabled: false },
-          version: 4,
-        },
-      ])
-    );
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            value: { channel: 'newstreamer', displayName: 'New Streamer', enabled: false },
+            version: 4,
+          },
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     const result = await handler(makeEvent({ id: 'admin-1', email: 'admin@example.com' }));
     expect(result).toEqual({
@@ -107,6 +115,52 @@ describe('POST /api/admin/twitch-config', () => {
       p_admin_user_id: 'admin-1',
       p_admin_email: 'admin@example.com',
     });
+    const purgeCall = mockFetch.mock.calls[2] as [string, RequestInit];
+    expect(purgeCall[0]).toBe('https://test.supabase.co/functions/v1/admin-cache-purge');
+    expect(purgeCall[1].headers).toMatchObject({ Authorization: 'Bearer admin-token' });
+    expect(JSON.parse(purgeCall[1].body as string)).toEqual({ purgeType: 'twitch-config' });
+  });
+  it('does not purge the cache when the database update fails', async () => {
+    mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 500 }));
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({ statusCode: 502 });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+  it('fails the update when the cache purge fails', async () => {
+    mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            value: { channel: 'validchannel', displayName: 'validchannel', enabled: true },
+            version: 2,
+          },
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: false }, { ok: false, status: 502 }));
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({ statusCode: 502 });
+  });
+  it('fails the update when the purge authorization header is missing', async () => {
+    mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          value: { channel: 'validchannel', displayName: 'validchannel', enabled: true },
+          version: 2,
+        },
+      ])
+    );
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    const event = makeEvent({ id: 'admin-1' });
+    (event as unknown as { node: { req: { headers: Record<string, string> } } }).node.req.headers =
+      {};
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 500 });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
   it('logs and propagates a transactional update failure', async () => {
     mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
@@ -126,14 +180,17 @@ describe('POST /api/admin/twitch-config', () => {
   });
   it('defaults the display name to the channel when omitted', async () => {
     mockReadBody.mockResolvedValue({ channel: 'OnlyChannel', enabled: true });
-    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
-      jsonResponse([
-        {
-          value: { channel: 'onlychannel', displayName: 'onlychannel', enabled: true },
-          version: 1,
-        },
-      ])
-    );
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            value: { channel: 'onlychannel', displayName: 'onlychannel', enabled: true },
+            version: 1,
+          },
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await handler(makeEvent({ id: 'admin-1' }));
     const upsertCall = mockFetch.mock.calls[1] as [string, RequestInit];
@@ -189,14 +246,17 @@ describe('POST /api/admin/twitch-config', () => {
   it('normalizes a Supabase URL that carries a query string', async () => {
     runtimeConfig.supabaseUrl = 'https://test.supabase.co/?apikey=leaked';
     mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
-    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
-      jsonResponse([
-        {
-          value: { channel: 'validchannel', displayName: 'validchannel', enabled: true },
-          version: 1,
-        },
-      ])
-    );
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            value: { channel: 'validchannel', displayName: 'validchannel', enabled: true },
+            version: 1,
+          },
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await handler(makeEvent({ id: 'admin-1' }));
     expect(mockFetch.mock.calls[0]?.[0]).toBe(

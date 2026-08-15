@@ -69,8 +69,10 @@
   </ClientOnly>
 </template>
 <script setup lang="ts">
+  import { usePromotedTwitch } from '@/composables/usePromotedTwitch';
   import { logger } from '@/utils/logger';
   const DISMISS_KEY = 'tt-twitch-dismissed';
+  const POLL_INTERVAL_MS = 60_000;
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const fallback = runtimeConfig.public.promotedTwitch as {
@@ -93,8 +95,10 @@
   const isExpanded = ref(true);
   const playerUrl = ref('');
   let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let refreshInFlight: Promise<void> | null = null;
+  let liveInFlight: Promise<void> | null = null;
+  let configInFlight: Promise<void> | null = null;
   let hasResolvedConfig = false;
+  const { config: sharedConfig, applyConfig: applySharedConfig } = usePromotedTwitch();
   const buildPlayerUrl = (): string => {
     const params = new URLSearchParams({
       channel: channel.value,
@@ -140,60 +144,104 @@
     channel.value = next;
   };
   const resolveDisplayName = (value: string | undefined): string => value?.trim() || channel.value;
-  const applyConfig = (data: TwitchConfigResponse): void => {
+  const applyLocalConfig = (data: TwitchConfigResponse): void => {
     const nextChannel = normalizeChannel(data.channel) || channel.value;
-    if (nextChannel !== channel.value) adoptChannel(nextChannel);
+    if (nextChannel !== channel.value) {
+      adoptChannel(nextChannel);
+      if (enabled.value) void checkLive();
+    }
     displayName.value = resolveDisplayName(data.displayName);
     enabled.value = data.enabled;
     hasResolvedConfig = true;
   };
-  const loadConfig = async (): Promise<void> => {
-    try {
-      applyConfig(await $fetch<TwitchConfigResponse>('/api/twitch/config'));
-    } catch (error) {
-      logger.warn('[PromotedTwitchEmbed] Failed to refresh promoted stream config', error);
-    }
+  const applyConfig = (data: TwitchConfigResponse): void => {
+    applyLocalConfig(data);
+    applySharedConfig(data);
   };
-  const checkLive = async (): Promise<void> => {
-    try {
-      const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
-        query: { channel: channel.value },
-      });
-      isLive.value = data.isLive;
-      if (dismissed.value) return;
-      if (data.isLive && !isVisible.value) {
-        playerUrl.value = buildPlayerUrl();
-        isVisible.value = true;
-      } else if (!data.isLive) {
+  watch(sharedConfig, (config) => {
+    if (config) applyLocalConfig(config);
+  });
+  const refreshConfig = (): Promise<void> => {
+    configInFlight ??= (async () => {
+      try {
+        applyConfig(await $fetch<TwitchConfigResponse>('/api/twitch/config'));
+      } catch (error) {
+        logger.warn('[PromotedTwitchEmbed] Failed to refresh promoted stream config', error);
+      }
+    })().finally(() => {
+      configInFlight = null;
+    });
+    return configInFlight;
+  };
+  const checkLive = (): Promise<void> => {
+    liveInFlight ??= (async () => {
+      try {
+        const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
+          query: { channel: channel.value },
+        });
+        isLive.value = data.isLive;
+        if (dismissed.value || !enabled.value) return;
+        if (data.isLive && !isVisible.value) {
+          playerUrl.value = buildPlayerUrl();
+          isVisible.value = true;
+        } else if (!data.isLive) {
+          isVisible.value = false;
+        }
+      } catch {
+        isLive.value = false;
         isVisible.value = false;
       }
-    } catch {
-      isLive.value = false;
-      isVisible.value = false;
+    })().finally(() => {
+      liveInFlight = null;
+    });
+    return liveInFlight;
+  };
+  const stopPolling = (): void => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
     }
   };
-  const runRefresh = async (): Promise<void> => {
-    await loadConfig();
-    if (!enabled.value) {
+  const startPolling = (): void => {
+    stopPolling();
+    if (!enabled.value || document.hidden) return;
+    pollTimer = setInterval(() => {
+      void checkLive();
+    }, POLL_INTERVAL_MS);
+  };
+  watch(enabled, (next) => {
+    if (next) {
+      startPolling();
+      void checkLive();
+    } else {
+      stopPolling();
       hidePlayer();
+    }
+  });
+  const handleVisibility = (): void => {
+    if (document.hidden) {
+      stopPolling();
       return;
     }
-    await checkLive();
-  };
-  const refresh = (): Promise<void> => {
-    refreshInFlight ??= runRefresh().finally(() => {
-      refreshInFlight = null;
-    });
-    return refreshInFlight;
+    void refreshConfig();
+    if (enabled.value) {
+      void checkLive();
+      startPolling();
+    }
   };
   onMounted(async () => {
     try {
       dismissed.value = sessionStorage.getItem(DISMISS_KEY) === '1';
     } catch {}
-    await refresh();
-    pollTimer = setInterval(refresh, 60_000);
+    document.addEventListener('visibilitychange', handleVisibility);
+    await refreshConfig();
+    if (enabled.value) {
+      await checkLive();
+      startPolling();
+    }
   });
   onUnmounted(() => {
-    if (pollTimer) clearInterval(pollTimer);
+    document.removeEventListener('visibilitychange', handleVisibility);
+    stopPolling();
   });
 </script>

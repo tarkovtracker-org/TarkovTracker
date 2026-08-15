@@ -873,8 +873,9 @@ flowchart LR
 
 **Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but
 an administrator can change the active channel, display name, and enabled state without a frontend
-redeploy. The override is stored in a service-role-only settings table, resolved by a public Nitro
-route, and refreshed by mounted clients once per minute.
+redeploy. The override is stored in a service-role-only settings table. The public config route is
+cached at the edge with a long TTL and explicitly invalidated after an admin update; live status is
+also edge-cached per TTL, so mounted clients do not invoke the Pages Function for every poll.
 
 ### Diagram
 
@@ -884,36 +885,59 @@ flowchart LR
     Write --> Gate[Admin membership check]
     Gate --> Settings[(public.app_settings)]
     Write --> Audit[(admin_audit_log)]
-    Embed[PromotedTwitchEmbed] -->|every 60s| Read[GET /api/twitch/config]
-    Read --> Settings
-    Read --> Fallback[Public runtime config fallback]
-    Embed --> Live[GET /api/twitch/live]
+    Write -->|purge tag after commit| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
+    Embed[PromotedTwitchEmbed] -->|once per mount + focus| Read[GET /api/twitch/config]
+    Read --> Edge[Edge cache, 1y TTL]
+    Edge --> Settings
+    Edge --> Fallback[Public runtime config fallback]
+    Embed -->|every 60s while enabled| Live[GET /api/twitch/live]
+    Live --> LiveEdge[Edge cache, 30s TTL]
 ```
 
 ### Flow
 
 1. `AdminTwitchConfigCard` loads the effective public configuration and obtains the current Supabase
-   access token before saving.
+   access token before saving. After a successful save it also publishes the saved config to the
+   shared `usePromotedTwitch` client state, so the embed in the same tab adopts the change
+   immediately without waiting for a poll.
 2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
    channel, display name, and enabled flag. It calls `update_promoted_twitch_config`, which updates the
    `promoted_twitch` JSON value, advances its shared version, and writes the admin audit row in one
    database transaction. A failure rolls back both writes.
-3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
+3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
+   with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
+   `promoted-twitch-config` cache tag. A failed purge fails the save (`502`) so a broken
+   invalidation is never silent.
+4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
-   of breaking the embed. The route reads the database on every request and sends
-   `cache-control: public, max-age=0, must-revalidate`, so neither a Nitro isolate nor the edge can
-   serve an update without revalidating the database-backed value.
-4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
-   replace the player URL and clear a stored dismissal, disabling hides an active player, and an
-   unavailable config endpoint keeps the build-time fallback working. Refreshes are single-flight, so
-   a slow request cannot be overtaken by the next 60-second tick.
+   of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
+   on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
+   five minutes (`max-age=300`) and a Cloudflare edge TTL of one year
+   (`s-maxage=31536000` / `cloudflare-cdn-cache-control: public, max-age=31536000`), so Cloudflare
+   serves cache hits without invoking the Function.
+5. `PromotedTwitchEmbed` fetches config once on mount and again on tab focus (an edge-cache hit),
+   watches the shared client state for immediate propagation of admin saves in the same tab, and
+   polls only `/api/twitch/live` every 60 seconds while `enabled === true`, pausing the timer while
+   the tab is hidden. Live responses are edge-cached for 30 seconds, so the CDN absorbs the polling
+   traffic instead of the Function. Channel changes replace the player URL and clear a stored
+   dismissal, disabling hides an active player, and an unavailable config endpoint keeps the
+   build-time fallback working.
 
 ### Files
 
-- `app/features/admin/AdminTwitchConfigCard.vue` — admin form and authenticated save flow.
-- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, and audit.
-- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and revalidation.
-- `app/components/PromotedTwitchEmbed.vue` — minute polling and player state updates.
+- `app/features/admin/AdminTwitchConfigCard.vue` — admin form, authenticated save flow, and shared
+  state publish.
+- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, audit, and
+  post-commit cache purge.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and edge-cache
+  headers.
+- `app/server/api/twitch/live.get.ts` — live-status check with short edge caching.
+- `app/components/PromotedTwitchEmbed.vue` — config-once fetch, live polling, and player state
+  updates.
+- `app/composables/usePromotedTwitch.ts` — shared client config state for cross-component
+  propagation.
+- `supabase/functions/admin-cache-purge/index.ts` — Cloudflare Purge API calls, including the
+  `twitch-config` tag purge.
 - `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
   transactional update/audit RPC.
 
@@ -933,10 +957,13 @@ flowchart LR
   promote a stream without a database override or admin write. The admin-managed override can change
   the effective channel, display name, and enabled state. A missing or malformed build-time flag
   resolves to disabled.
-- Public responses must re-read the database-backed value instead of relying on module-local or
-  independently stale edge state.
-- Mounted clients re-read configuration on the same 60-second cadence as live status, so an admin
-  change takes effect without reload or redeploy within the next client poll after revalidation.
+- The config response must carry the `promoted-twitch-config` cache tag and long edge TTLs so
+  Cloudflare serves cache hits without executing the Pages Function; the route and its database read
+  run only on cache fills.
+- The admin route must purge the `promoted-twitch-config` tag only after the database transaction
+  commits, and must fail the save if the purge fails.
+- Mounted clients must never poll the config endpoint: they fetch it once per mount/focus and poll
+  live status only while enabled, stopping while the tab is hidden.
 
 ## 11. Boot-time asset-failure recovery
 

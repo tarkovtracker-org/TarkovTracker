@@ -3,7 +3,13 @@ import { useRuntimeConfig } from '#imports';
 import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('twitch-config');
-const REVALIDATE_HEADERS = { 'cache-control': 'public, max-age=0, must-revalidate' };
+const CACHE_TAG = 'promoted-twitch-config';
+const CACHE_HEADERS = {
+  'cache-control': 'public, max-age=300, s-maxage=31536000',
+  'cloudflare-cdn-cache-control': 'public, max-age=31536000',
+  'cache-tag': CACHE_TAG,
+  vary: 'Origin',
+};
 const SETTING_KEY = 'promoted_twitch';
 const DEFAULT_CHANNEL = 'honeyxxo';
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
@@ -91,6 +97,6 @@ export default defineEventHandler(async (event): Promise<TwitchConfig> => {
   const fallback = readFallback(runtime);
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
-  setResponseHeaders(event, REVALIDATE_HEADERS);
+  setResponseHeaders(event, CACHE_HEADERS);
   return config;
 });
