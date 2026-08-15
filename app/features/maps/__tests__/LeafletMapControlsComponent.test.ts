@@ -222,6 +222,18 @@ describe('LeafletMap controls', () => {
     expect(remounted.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(false);
     remounted.unmount();
   });
+  it('hides the help dot on every mounted map instance when help opens in another one', async () => {
+    const inlineMap = await mountMap();
+    const fullscreenMap = await mountMap();
+    expect(inlineMap.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(true);
+    expect(fullscreenMap.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(true);
+    await fullscreenMap.find('[data-testid="map-hint-all-controls"]').trigger('click');
+    await nextTick();
+    expect(fullscreenMap.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(false);
+    expect(inlineMap.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(false);
+    inlineMap.unmount();
+    fullscreenMap.unmount();
+  });
   it('exposes the current view state and skips a hidden container', async () => {
     const wrapper = await mountMap();
     const vm = wrapper.vm as unknown as {

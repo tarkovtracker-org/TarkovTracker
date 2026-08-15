@@ -642,8 +642,12 @@
   import type L from 'leaflet';
   const MAP_CONTROLS_HINT_KEY = 'mapControlsHintSeen';
   const MAP_HELP_SEEN_KEY = 'mapHelpSeen';
+  const MAP_HELP_SEEN_EVENT = 'map-help-seen';
   const mapControlsHintSeen = ref(false);
   const mapHelpSeen = ref(false);
+  const onMapHelpSeenElsewhere = () => {
+    mapHelpSeen.value = true;
+  };
   onMounted(() => {
     try {
       mapControlsHintSeen.value = window.localStorage.getItem(MAP_CONTROLS_HINT_KEY) === 'true';
@@ -651,6 +655,7 @@
     } catch (error) {
       logger.warn('[LeafletMap] Failed to read map hint flags:', error);
     }
+    window.addEventListener(MAP_HELP_SEEN_EVENT, onMapHelpSeenElsewhere);
   });
   const markMapHelpSeen = () => {
     if (mapHelpSeen.value) return;
@@ -660,6 +665,7 @@
     } catch (error) {
       logger.warn('[LeafletMap] Failed to persist map help seen flag:', error);
     }
+    window.dispatchEvent(new CustomEvent(MAP_HELP_SEEN_EVENT));
   };
   const dismissMapControlsHint = () => {
     mapControlsHintSeen.value = true;
@@ -1909,6 +1915,7 @@
     window.removeEventListener('keydown', onGlobalMapKeydown);
     window.removeEventListener('keyup', onGlobalMapKeyup);
     window.removeEventListener('blur', onMapWindowBlur);
+    window.removeEventListener(MAP_HELP_SEEN_EVENT, onMapHelpSeenElsewhere);
     clearKeyboardCursorHover();
     stopMapKeyboardLoop(true);
     teardownSvgReadyWatcher();
