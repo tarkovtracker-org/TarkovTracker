@@ -1,3 +1,11 @@
+## [1.71.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.1...v1.71.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **api:** authenticate before decoding URL params in gateway write routes ([c5b7365](https://github.com/tarkovtracker-org/TarkovTracker/commit/c5b736520d841f8514a46c413639990a6e457838))
+* **api:** stop leaking internal error messages in gateway 500 responses ([fca6504](https://github.com/tarkovtracker-org/TarkovTracker/commit/fca6504ad19e0fd03905dcc42366cca72d6ba215))
+
 ## [1.71.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.0...v1.71.1) (2026-08-15)
 
 
