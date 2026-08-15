@@ -396,7 +396,16 @@ describe('tarkov JSON adapters', () => {
         map: 'map1',
         requiredPrestige: 'prestige1',
         taskRequirements: [{ task: 'task0', status: ['complete'] }],
-        traderRequirements: [{ trader: 'trader1', value: 0.2 }],
+        traderRequirements: [
+          { trader: 'trader1', value: 0.2 },
+          {
+            id: 'level-req1',
+            requirementType: 'level',
+            compareMethod: '>=',
+            value: 2,
+            trader: 'trader1',
+          },
+        ],
         objectives: [
           {
             id: 'objective1',
@@ -519,6 +528,24 @@ describe('tarkov JSON adapters', () => {
       maps: [{ id: 'map1', name: 'Customs' }],
       items: expect.arrayContaining([expect.objectContaining({ id: 'item1', name: 'Salewa' })]),
     });
+  });
+  it('splits trader requirements by requirementType (level vs reputation)', () => {
+    const tasks = adaptTasksCoreResponse(tasksPayload, mapsPayload, tradersPayload).data.tasks;
+    expect(tasks[0]?.traderLevelRequirements).toEqual([
+      {
+        id: 'level-req1',
+        trader: { id: 'trader1', name: 'Prapor' },
+        level: 2,
+        requirementType: 'level',
+        compareMethod: '>=',
+      },
+    ]);
+    expect(tasks[0]?.traderRequirements).toEqual([
+      {
+        trader: { id: 'trader1', name: 'Prapor' },
+        value: 0.2,
+      },
+    ]);
   });
   it('adapts hideout and prestige data without items lookup', () => {
     const hideout = adaptHideoutResponse(hideoutPayload, { tradersPayload }).data;

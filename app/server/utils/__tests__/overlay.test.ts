@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
   applyLocaleOverlay,
@@ -6,6 +6,16 @@ import {
   expandObjectiveAdditions,
   getObjectiveItemIds,
 } from '@/server/utils/overlay';
+const stubOverlayFetch = (overlay: unknown) => {
+  const fetchMock = vi.fn(async () => {
+    return new Response(JSON.stringify(overlay), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock as typeof fetch);
+  return fetchMock;
+};
 describe('deepMerge id-keyed arrays', () => {
   it('deep merges plain-object patches by id and leaves non-object patches unchanged', () => {
     const target = {
@@ -66,6 +76,69 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
       task1: { name: 'fixed' },
       task2: { name: 'pve-only' },
     });
+  });
+  it('splits overlaid trader requirements into level and reputation fields', async () => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'split-test-v1' },
+      modes: {
+        pve: {
+          tasks: {
+            'task-1': {
+              traderRequirements: [
+                {
+                  id: 'overlay.1',
+                  requirementType: 'level',
+                  compareMethod: '>=',
+                  value: 1,
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+                {
+                  id: 'overlay.2',
+                  requirementType: 'reputation',
+                  compareMethod: '>=',
+                  value: 0.2,
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const payload = {
+      data: {
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Base Task',
+            traderLevelRequirements: [{ id: 'api-level', trader: { id: 'trader-1' }, level: 3 }],
+            traderRequirements: [{ id: 'api-rep', trader: { id: 'trader-1' }, value: 0.5 }],
+          },
+        ],
+      },
+    };
+    const result = await applyOverlay(payload, { gameMode: 'pve' });
+    const task = result.data?.tasks?.[0];
+    expect(task?.traderLevelRequirements).toEqual([
+      {
+        id: 'overlay.1',
+        requirementType: 'level',
+        compareMethod: '>=',
+        value: 1,
+        trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(task?.traderRequirements).toEqual([
+      {
+        id: 'overlay.2',
+        requirementType: 'reputation',
+        compareMethod: '>=',
+        value: 0.2,
+        trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 describe('applyLocaleOverlay', () => {

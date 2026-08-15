@@ -22,7 +22,9 @@ import type {
   TarkovTasksCoreQueryResult,
   Task,
   TaskObjective,
+  TaskTraderLevelRequirement,
   Trader,
+  TraderRequirement,
 } from '@/types/tarkov';
 const logger = createLogger('TarkovJson');
 const TARKOV_JSON_BASE_URL = 'https://json.tarkov.dev';
@@ -756,6 +758,43 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
     trader: adaptTraderRef(raw.trader, context),
   });
 }
+// The upstream API discriminates trader requirements by `requirementType`:
+// `level` entries gate trader loyalty level (`value` = level), `reputation`
+// entries gate standing (`value` = standing). Split them into the two Task
+// fields so availability and progress checks compare against the right metric.
+function adaptTraderRequirements(
+  raw: unknown,
+  context: AdapterContext
+): {
+  traderLevelRequirements?: TaskTraderLevelRequirement[];
+  traderRequirements?: TraderRequirement[];
+} {
+  if (!Array.isArray(raw)) return {};
+  const traderLevelRequirements: TaskTraderLevelRequirement[] = [];
+  const traderRequirements: TraderRequirement[] = [];
+  for (const requirement of raw) {
+    const adapted = adaptTraderRequirement(requirement, context) as
+      (TraderRequirement & { level?: number }) | undefined;
+    if (!adapted) continue;
+    if (adapted.requirementType === 'level') {
+      if (typeof adapted.id !== 'string') continue;
+      traderLevelRequirements.push({
+        id: adapted.id,
+        trader: adapted.trader,
+        level: adapted.level ?? adapted.value,
+        requirementType: 'level',
+        compareMethod: adapted.compareMethod,
+      });
+    } else {
+      traderRequirements.push(adapted);
+    }
+  }
+  return {
+    traderLevelRequirements:
+      traderLevelRequirements.length > 0 ? traderLevelRequirements : undefined,
+    traderRequirements: traderRequirements.length > 0 ? traderRequirements : undefined,
+  };
+}
 // json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
 // Accept both shapes.
 function adaptRequiredPrestigeRef(value: unknown): { id: string } | undefined {
@@ -781,9 +820,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
       : undefined,
     objectives: [],
     failConditions: [],
-    traderRequirements: Array.isArray(raw.traderRequirements)
-      ? raw.traderRequirements.map((requirement) => adaptTraderRequirement(requirement, context))
-      : undefined,
+    ...adaptTraderRequirements(raw.traderRequirements, context),
     factionName: typeof raw.factionName === 'string' ? raw.factionName : undefined,
   }) as Task;
 }

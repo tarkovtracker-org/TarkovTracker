@@ -71,7 +71,9 @@ function resolveOverlayUrl(value: string | undefined): string {
   const candidate = value?.trim() || DEFAULT_OVERLAY_URL;
   try {
     const url = new URL(candidate);
-    return url.protocol === 'https:' ? url.toString() : DEFAULT_OVERLAY_URL;
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.toString()
+      : DEFAULT_OVERLAY_URL;
   } catch {
     return DEFAULT_OVERLAY_URL;
   }
@@ -443,6 +445,24 @@ function normalizeTaskAdditions(
       return { ...entry, factionName, objectives, failConditions };
     });
 }
+// Overlay task patches carry trader requirements in the raw upstream shape
+// (one `traderRequirements` list discriminated by `requirementType`), but the
+// adapted task splits them into `traderLevelRequirements` + `traderRequirements`
+// (reputation-only). The patch replaces the whole set, so re-run the split on
+// the merged task whenever a patch touches `traderRequirements`.
+function applyTraderRequirementSplit(task: Record<string, unknown>): void {
+  const raw = task.traderRequirements;
+  if (!Array.isArray(raw)) return;
+  const traderLevelRequirements = raw.filter(
+    (requirement) => isPlainObject(requirement) && requirement.requirementType === 'level'
+  );
+  const traderRequirements = raw.filter(
+    (requirement) => !(isPlainObject(requirement) && requirement.requirementType === 'level')
+  );
+  task.traderLevelRequirements =
+    traderLevelRequirements.length > 0 ? traderLevelRequirements : undefined;
+  task.traderRequirements = traderRequirements.length > 0 ? traderRequirements : undefined;
+}
 function mergeModeCorrections(
   shared: Record<string, Record<string, unknown>> | undefined,
   modeSpecific: Record<string, Record<string, unknown>> | undefined
@@ -514,7 +534,13 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const correctedTasks = applyEntityOverlay(
       result.data.tasks as Array<{ id: string }>,
       mergedTasks
-    ).map((task) => applyTaskObjectiveAdditions(task));
+    ).map((task) => {
+      const patch = mergedTasks?.[task.id];
+      if (patch && 'traderRequirements' in patch) {
+        applyTraderRequirementSplit(task as Record<string, unknown>);
+      }
+      return applyTaskObjectiveAdditions(task);
+    });
     const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd);
     logger.info(
       `Overlay tasksAdd: ${normalizedAdditions.length} additions after filtering disabled`
@@ -522,7 +548,13 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const addedTasks = applyEntityOverlay(normalizedAdditions, mergedTasks, {
       logLabel: 'tasksAdd',
       logEvenWhenZero: false,
-    }).map((task) => applyTaskObjectiveAdditions(task));
+    }).map((task) => {
+      const patch = mergedTasks?.[task.id];
+      if (patch && 'traderRequirements' in patch) {
+        applyTraderRequirementSplit(task as Record<string, unknown>);
+      }
+      return applyTaskObjectiveAdditions(task);
+    });
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);

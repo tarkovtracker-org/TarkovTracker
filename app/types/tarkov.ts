@@ -91,11 +91,15 @@ export interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
   value: number;
+  requirementType?: 'level' | 'reputation';
+  compareMethod?: '>=' | '<' | '<=' | '>';
 }
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
   level: number;
+  requirementType?: 'level' | 'reputation';
+  compareMethod?: '>=' | '<' | '<=' | '>';
 }
 export interface TraderLevelRequirementWithMet extends TaskTraderLevelRequirement {
   met: boolean;
