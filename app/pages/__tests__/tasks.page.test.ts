@@ -598,6 +598,28 @@ describe('tasks page', () => {
     await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
   });
+  it('lets an open popover consume Escape before closing full screen', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    wrapper = await mountSuspended(TasksPage, {
+      attachTo: document.body,
+      global: { stubs: defaultGlobalStubs },
+    });
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const popover = document.createElement('div');
+    popover.setAttribute('data-reka-popper-content-wrapper', '');
+    popover.innerHTML = '<div role="dialog" data-state="open"></div>';
+    document.body.appendChild(popover);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(true);
+    popover.remove();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
+  });
   it('closes full screen and skips the view restore when the map view is left', async () => {
     const mapViewRef = ref('map-1');
     preferencesStoreMock.getTaskPrimaryView = 'maps';

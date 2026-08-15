@@ -384,13 +384,13 @@
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
-        <div
+        <dialog
           v-if="isMapFullscreen"
+          open
           data-testid="map-fullscreen-overlay"
-          role="dialog"
           aria-modal="true"
           :aria-label="t('page.tasks.map.fullscreen_label')"
-          class="bg-surface-950 fixed inset-0 z-100 flex flex-col"
+          class="bg-surface-950 text-surface-200 fixed inset-0 z-100 flex h-full max-h-none w-full max-w-none flex-col"
         >
           <div
             class="bg-surface-900 border-surface-800 flex items-center justify-between gap-3 border-b px-4 py-3"
@@ -469,7 +469,7 @@
               @toggle-fullscreen="closeMapFullscreen"
             />
           </div>
-        </div>
+        </dialog>
       </Transition>
     </Teleport>
   </div>
@@ -753,11 +753,18 @@
     fullscreenMapView.value = null;
     if (overlayView) restoreInlineMapView(overlayView);
   };
+  const PORTALLED_POPOVER_SELECTOR = '[data-reka-popper-content-wrapper]';
   const isFocusInsidePortalledPopover = (): boolean => {
     const activeElement = document.activeElement;
     if (!(activeElement instanceof HTMLElement)) return false;
-    return Boolean(activeElement.closest('[data-reka-popper-content-wrapper]'));
+    return Boolean(activeElement.closest(PORTALLED_POPOVER_SELECTOR));
   };
+  const isPopoverLayerOpen = (): boolean =>
+    Boolean(
+      document.querySelector(`${PORTALLED_POPOVER_SELECTOR} [role="dialog"][data-state="open"]`)
+    );
+  const shouldCloseOnEscape = (event: KeyboardEvent): boolean =>
+    !event.defaultPrevented && !isPopoverLayerOpen();
   const resolveFullscreenTabTarget = (
     event: KeyboardEvent,
     overlay: HTMLElement
@@ -778,13 +785,12 @@
     target.focus();
   };
   const handleFullscreenKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      if (event.defaultPrevented) return;
-      closeMapFullscreen();
-      return;
-    }
     if (event.key === 'Tab') {
       trapFullscreenTab(event);
+      return;
+    }
+    if (event.key === 'Escape' && shouldCloseOnEscape(event)) {
+      closeMapFullscreen();
     }
   };
   const bodyScrollLock = useScrollLock(document.body);
