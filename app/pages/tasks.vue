@@ -14,65 +14,66 @@
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
               <div class="bg-surface-800/50 rounded-lg p-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    data-testid="map-panel-toggle"
-                    :aria-expanded="isMapPanelExpanded"
-                    aria-controls="tasks-map-panel-content"
-                    :aria-label="t('page.tasks.map.toggle_panel')"
-                    class="group hover:bg-surface-700/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-800 -m-1.5 flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                    @click="toggleMapPanelVisibility"
-                  >
-                    <span
-                      class="bg-primary-500/15 border-primary-500/25 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
-                    >
-                      <UIcon
-                        name="i-mdi-map-marker-radius-outline"
-                        class="text-primary-300 h-4.5 w-4.5"
-                      />
-                    </span>
-                    <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <h3 class="text-surface-100 truncate text-base leading-tight font-semibold">
-                        {{ selectedMapData?.name || t('tasks.view.map') }}
-                      </h3>
-                      <AppTooltip
-                        :text="t('page.tasks.map.raid_time_tooltip')"
-                        :content="{ side: 'bottom' }"
+                  <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <h3 class="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        data-testid="map-panel-toggle"
+                        :aria-expanded="isMapPanelExpanded"
+                        aria-controls="tasks-map-panel-content"
+                        :aria-label="t('page.tasks.map.toggle_panel')"
+                        class="group hover:bg-surface-700/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-800 -m-1.5 flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        @click="toggleMapPanelVisibility"
                       >
                         <span
-                          class="bg-surface-900/50 inline-flex items-center gap-1.5 rounded-full border border-white/8 px-2.5 py-1"
+                          class="bg-primary-500/15 border-primary-500/25 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
                         >
-                          <template
-                            v-for="(entry, index) in mapTimeEntries"
-                            :key="`${entry.value}-${index}`"
-                          >
-                            <span v-if="index > 0" class="h-3 w-px bg-white/10" />
-                            <span class="flex items-center gap-1 text-[11px]">
-                              <UIcon
-                                :name="entry.icon"
-                                :class="['h-3.5 w-3.5 shrink-0', clockEntryIconClass(entry.period)]"
-                              />
-                              <span
-                                class="tracking-wide uppercase"
-                                :class="clockEntryLabelClass(entry.period)"
-                              >
-                                {{ getMapTimeLabel(entry.period) }}
-                              </span>
-                              <span
-                                class="tabular-nums"
-                                :class="clockEntryValueClass(entry.period)"
-                              >
-                                {{ entry.value }}
-                              </span>
-                            </span>
-                          </template>
+                          <UIcon
+                            name="i-mdi-map-marker-radius-outline"
+                            class="text-primary-300 h-4.5 w-4.5"
+                          />
                         </span>
-                      </AppTooltip>
-                      <span v-if="!isMapPanelExpanded" class="text-surface-500 text-xs font-medium">
-                        {{ t('page.tasks.map.map_hidden_hint') }}
+                        <span
+                          class="text-surface-100 truncate text-base leading-tight font-semibold"
+                        >
+                          {{ selectedMapData?.name || t('tasks.view.map') }}
+                        </span>
+                      </button>
+                    </h3>
+                    <AppTooltip
+                      :text="t('page.tasks.map.raid_time_tooltip')"
+                      :content="{ side: 'bottom' }"
+                    >
+                      <span
+                        class="bg-surface-900/50 inline-flex items-center gap-1.5 rounded-full border border-white/8 px-2.5 py-1"
+                      >
+                        <template
+                          v-for="(entry, index) in mapTimeEntries"
+                          :key="`${entry.value}-${index}`"
+                        >
+                          <span v-if="index > 0" class="h-3 w-px bg-white/10" />
+                          <span class="flex items-center gap-1 text-[11px]">
+                            <UIcon
+                              :name="entry.icon"
+                              :class="['h-3.5 w-3.5 shrink-0', clockEntryIconClass(entry.period)]"
+                            />
+                            <span
+                              class="tracking-wide uppercase"
+                              :class="clockEntryLabelClass(entry.period)"
+                            >
+                              {{ getMapTimeLabel(entry.period) }}
+                            </span>
+                            <span class="tabular-nums" :class="clockEntryValueClass(entry.period)">
+                              {{ entry.value }}
+                            </span>
+                          </span>
+                        </template>
                       </span>
+                    </AppTooltip>
+                    <span v-if="!isMapPanelExpanded" class="text-surface-500 text-xs font-medium">
+                      {{ t('page.tasks.map.map_hidden_hint') }}
                     </span>
-                  </button>
+                  </div>
                   <AppTooltip
                     :text="
                       isMapPanelExpanded
@@ -389,7 +390,7 @@
           role="dialog"
           aria-modal="true"
           :aria-label="t('page.tasks.map.fullscreen_label')"
-          class="bg-surface-950 fixed inset-0 z-[100] flex flex-col"
+          class="bg-surface-950 fixed inset-0 z-100 flex flex-col"
         >
           <div
             class="bg-surface-900 border-surface-800 flex items-center justify-between gap-3 border-b px-4 py-3"
@@ -703,42 +704,87 @@
     ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
   };
   let fullscreenOpenerElement: HTMLElement | null = null;
+  let fullscreenMapId: string | null = null;
+  let inertBackgroundElements: HTMLElement[] = [];
+  const collectInertSiblings = (element: HTMLElement): HTMLElement[] => {
+    const parent = element.parentElement;
+    if (!parent) return [];
+    return Array.from(parent.children).filter(
+      (child): child is HTMLElement => child !== element && child instanceof HTMLElement
+    );
+  };
+  const collectFullscreenBackgroundElements = (overlay: HTMLElement): HTMLElement[] => {
+    const elements: HTMLElement[] = [];
+    let node: HTMLElement | null = overlay;
+    while (node && node !== document.body) {
+      elements.push(...collectInertSiblings(node));
+      node = node.parentElement;
+    }
+    return elements;
+  };
+  const applyFullscreenBackgroundInert = () => {
+    const overlay = getFullscreenOverlay();
+    if (!overlay) return;
+    inertBackgroundElements = collectFullscreenBackgroundElements(overlay);
+    inertBackgroundElements.forEach((element) => {
+      element.inert = true;
+    });
+  };
+  const clearFullscreenBackgroundInert = () => {
+    inertBackgroundElements.forEach((element) => {
+      element.inert = false;
+    });
+    inertBackgroundElements = [];
+  };
+  const readFullscreenMapView = (): MapViewState | null =>
+    fullscreenLeafletMapRef.value?.getViewState?.() ?? null;
+  const restoreInlineMapView = (view: MapViewState): void => {
+    if (fullscreenMapId !== selectedMapId.value) return;
+    leafletMapRef.value?.setViewState?.(view);
+  };
   const openMapFullscreen = () => {
+    fullscreenMapId = selectedMapId.value;
     fullscreenMapView.value = leafletMapRef.value?.getViewState?.() ?? null;
     isMapFullscreen.value = true;
   };
   const closeMapFullscreen = () => {
-    const overlayView = fullscreenLeafletMapRef.value?.getViewState?.() ?? null;
+    const overlayView = readFullscreenMapView();
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
-    if (overlayView && leafletMapRef.value?.setViewState) {
-      leafletMapRef.value.setViewState(overlayView);
-    }
+    if (overlayView) restoreInlineMapView(overlayView);
+  };
+  const isFocusInsidePortalledPopover = (): boolean => {
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement)) return false;
+    return Boolean(activeElement.closest('[data-reka-popper-content-wrapper]'));
+  };
+  const resolveFullscreenTabTarget = (
+    event: KeyboardEvent,
+    overlay: HTMLElement
+  ): HTMLElement | undefined => {
+    const focusable = getFullscreenFocusableElements(overlay);
+    const [edge, wrap] = event.shiftKey
+      ? [focusable[0], focusable[focusable.length - 1]]
+      : [focusable[focusable.length - 1], focusable[0]];
+    if (document.activeElement === edge) return wrap;
+    return overlay.contains(document.activeElement) ? undefined : wrap;
+  };
+  const trapFullscreenTab = (event: KeyboardEvent) => {
+    const overlay = getFullscreenOverlay();
+    if (!overlay || isFocusInsidePortalledPopover()) return;
+    const target = resolveFullscreenTabTarget(event, overlay);
+    if (!target) return;
+    event.preventDefault();
+    target.focus();
   };
   const handleFullscreenKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
+      if (event.defaultPrevented) return;
       closeMapFullscreen();
       return;
     }
-    if (event.key !== 'Tab') return;
-    const overlay = getFullscreenOverlay();
-    if (!overlay) return;
-    const focusable = getFullscreenFocusableElements(overlay);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (!first || !last) {
-      event.preventDefault();
-      return;
-    }
-    const activeElement = document.activeElement;
-    if (event.shiftKey) {
-      if (activeElement === first || !overlay.contains(activeElement)) {
-        event.preventDefault();
-        last.focus();
-      }
-    } else if (activeElement === last || !overlay.contains(activeElement)) {
-      event.preventDefault();
-      first.focus();
+    if (event.key === 'Tab') {
+      trapFullscreenTab(event);
     }
   };
   const bodyScrollLock = useScrollLock(document.body);
@@ -749,17 +795,23 @@
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
       window.addEventListener('keydown', handleFullscreenKeydown);
       nextTick(() => {
+        applyFullscreenBackgroundInert();
         getFullscreenOverlay()
           ?.querySelector<HTMLElement>('[data-testid="map-fullscreen-exit"]')
           ?.focus();
       });
     } else {
+      clearFullscreenBackgroundInert();
       window.removeEventListener('keydown', handleFullscreenKeydown);
       if (fullscreenOpenerElement) {
         fullscreenOpenerElement.focus();
         fullscreenOpenerElement = null;
       }
     }
+  });
+  watch(showMapDisplay, (isMapView) => {
+    if (isMapView || !isMapFullscreen.value) return;
+    closeMapFullscreen();
   });
   const handleJumpToMapObjective = async (objectiveId: string) => {
     isMapPanelExpanded.value = true;
@@ -998,6 +1050,7 @@
     isMapFullscreen.value = false;
     bodyScrollLock.value = false;
     fullscreenOpenerElement = null;
+    clearFullscreenBackgroundInert();
     window.removeEventListener('keydown', handleFullscreenKeydown);
   });
 </script>

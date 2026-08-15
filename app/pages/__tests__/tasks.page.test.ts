@@ -304,6 +304,14 @@ describe('tasks page', () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     await nextTick();
   };
+  const isInsideInertSubtree = (element: Element | null): boolean => {
+    let node: HTMLElement | null = element as HTMLElement | null;
+    while (node) {
+      if (node.inert) return true;
+      node = node.parentElement;
+    }
+    return false;
+  };
   beforeEach(async () => {
     visibleTasksRef.value = [defaultTask];
     focusedTaskRef.value = null;
@@ -484,7 +492,7 @@ describe('tasks page', () => {
     await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
   });
-  it('hides the map full screen control while the map panel is collapsed', async () => {
+  it('keeps the map full screen control mounted while the map panel is collapsed', async () => {
     localStorage.setItem(STORAGE_KEYS.tasksMapPanelExpanded, 'false');
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
@@ -518,14 +526,97 @@ describe('tasks page', () => {
     expect(overlay.exists()).toBe(true);
     const exitButton = wrapper.find('[data-testid="map-fullscreen-exit"]');
     expect(document.activeElement).toBe(exitButton.element);
+    const overlayMapToggle = wrapper.find(
+      '[data-testid="map-fullscreen-overlay"] [data-testid="map-fullscreen-toggle"]'
+    );
+    expect(overlayMapToggle.exists()).toBe(true);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
-    expect(overlay.element.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(overlayMapToggle.element);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
-    expect(overlay.element.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(exitButton.element);
     await exitButton.trigger('click');
     await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     expect(document.activeElement).toBe(fullscreenToggle.element);
+  });
+  it('marks background content inert while the full screen map is open', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    wrapper = await mountSuspended(TasksPage, {
+      attachTo: document.body,
+      global: { stubs: defaultGlobalStubs },
+    });
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const overlay = wrapper.find('[data-testid="map-fullscreen-overlay"]');
+    expect(overlay.exists()).toBe(true);
+    const panelToggleElement = wrapper.find('[data-testid="map-panel-toggle"]').element;
+    expect(isInsideInertSubtree(panelToggleElement)).toBe(true);
+    expect(isInsideInertSubtree(overlay.element)).toBe(false);
+    await wrapper.find('[data-testid="map-fullscreen-exit"]').trigger('click');
+    await flushTransition();
+    expect(isInsideInertSubtree(panelToggleElement)).toBe(false);
+  });
+  it('leaves focus alone while a portalled popover is open in full screen', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    wrapper = await mountSuspended(TasksPage, {
+      attachTo: document.body,
+      global: { stubs: defaultGlobalStubs },
+    });
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const popover = document.createElement('div');
+    popover.setAttribute('data-reka-popper-content-wrapper', '');
+    const popoverInput = document.createElement('button');
+    popover.appendChild(popoverInput);
+    document.body.appendChild(popover);
+    popoverInput.focus();
+    expect(document.activeElement).toBe(popoverInput);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(document.activeElement).toBe(popoverInput);
+    popover.remove();
+  });
+  it('keeps full screen open when Escape was already handled by a nested control', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    wrapper = await mountSuspended(TasksPage, {
+      attachTo: document.body,
+      global: { stubs: defaultGlobalStubs },
+    });
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const handledEscape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    handledEscape.preventDefault();
+    window.dispatchEvent(handledEscape);
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
+  });
+  it('closes full screen and skips the view restore when the map view is left', async () => {
+    const mapViewRef = ref('map-1');
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = mapViewRef as unknown as string;
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    leafletGetViewStateSpy.mockReturnValue({ center: [1, 2], zoom: 3 });
+    wrapper = await mountSuspended(TasksPage, {
+      attachTo: document.body,
+      global: { stubs: defaultGlobalStubs },
+    });
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const panelToggleElement = wrapper.find('[data-testid="map-panel-toggle"]').element;
+    expect(isInsideInertSubtree(panelToggleElement)).toBe(true);
+    mapViewRef.value = 'all';
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
+    expect(leafletSetViewStateSpy).not.toHaveBeenCalled();
+    expect(isInsideInertSubtree(panelToggleElement)).toBe(false);
   });
   it('shows re-hide footer action in map section when hidden tasks are visible', async () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
