@@ -157,6 +157,34 @@ function parseSvgContent(content: string): SVGElement | null {
   }
   return doc.documentElement as unknown as SVGElement;
 }
+type MapInitialView = { center: [number, number]; zoom: number };
+function isFiniteLatLng(center: unknown): boolean {
+  return Array.isArray(center) && center.length === 2 && center.every(Number.isFinite);
+}
+function isRestorableMapView(view: MapInitialView | null | undefined): view is MapInitialView {
+  if (!view) return false;
+  return isFiniteLatLng(view.center) && Number.isFinite(view.zoom);
+}
+function applyRestoredMapView(instance: L.Map, view: MapInitialView): void {
+  const originalZoomSnap = instance.options.zoomSnap ?? 0;
+  instance.options.zoomSnap = 0;
+  try {
+    instance.setView(view.center, view.zoom, { animate: false });
+  } finally {
+    instance.options.zoomSnap = originalZoomSnap;
+  }
+}
+function setInitialMapView(
+  instance: L.Map,
+  view: MapInitialView | null | undefined,
+  bounds: L.LatLngBoundsExpression
+): void {
+  if (isRestorableMapView(view)) {
+    applyRestoredMapView(instance, view);
+    return;
+  }
+  instance.fitBounds(bounds);
+}
 export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapReturn {
   const {
     containerRef,
@@ -179,6 +207,12 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const spawnLayer = shallowRef<L.LayerGroup | null>(null);
   const crsKey = ref('');
   const renderKey = ref('');
+  let hasAppliedInitialView = false;
+  const consumeInitialView = (): MapInitialView | null => {
+    if (hasAppliedInitialView) return null;
+    hasAppliedInitialView = true;
+    return initialView ?? null;
+  };
   // Map event handlers
   const onWheel = (e: WheelEvent) => {
     if (!mapInstance.value) return;
@@ -755,18 +789,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)
       // Set initial view using map bounds, or restore a previous view when provided
       const bounds = getLeafletBounds(renderConfig);
-      if (
-        initialView &&
-        Array.isArray(initialView.center) &&
-        initialView.center.length === 2 &&
-        Number.isFinite(initialView.center[0]) &&
-        Number.isFinite(initialView.center[1]) &&
-        Number.isFinite(initialView.zoom)
-      ) {
-        mapInstance.value.setView(initialView.center, initialView.zoom, { animate: false });
-      } else {
-        mapInstance.value.fitBounds(bounds);
-      }
+      setInitialMapView(mapInstance.value, consumeInitialView(), bounds);
       // Set initial floor
       selectedFloor.value = resolveInitialFloor(svgConfig, tileConfig, initialFloor);
       renderKey.value = getRenderKey() ?? '';

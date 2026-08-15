@@ -840,20 +840,25 @@
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
   };
-  const zoomMapBy = (direction: 1 | -1) => {
-    const instance = mapInstance.value;
-    if (!instance) return;
+  const withoutZoomSnap = (instance: L.Map, apply: () => void): void => {
     const originalZoomSnap = instance.options.zoomSnap ?? 0;
     instance.options.zoomSnap = 0;
     try {
-      if (direction > 0) {
-        instance.zoomIn();
-      } else {
-        instance.zoomOut();
-      }
+      apply();
     } finally {
       instance.options.zoomSnap = originalZoomSnap;
     }
+  };
+  const zoomMapBy = (direction: 1 | -1) => {
+    const instance = mapInstance.value;
+    if (!instance) return;
+    withoutZoomSnap(instance, () => {
+      if (direction > 0) {
+        instance.zoomIn();
+        return;
+      }
+      instance.zoomOut();
+    });
   };
   const zoomMapIn = () => {
     zoomMapBy(1);
@@ -1861,17 +1866,19 @@
   const getViewState = (): { center: [number, number]; zoom: number } | null => {
     const instance = mapInstance.value;
     if (!instance) return null;
+    const size = instance.getSize();
+    if (size.x === 0 || size.y === 0) return null;
     const center = instance.getCenter();
     return { center: [center.lat, center.lng], zoom: instance.getZoom() };
   };
   const setViewState = (state: { center: [number, number]; zoom: number }): void => {
     const instance = mapInstance.value;
     if (!instance || !state) return;
-    if (instance.getZoom() !== state.zoom) {
-      instance.setView(state.center, state.zoom, { animate: false });
+    if (instance.getZoom() === state.zoom) {
+      instance.panTo(state.center, { animate: false });
       return;
     }
-    instance.panTo(state.center, { animate: false });
+    withoutZoomSnap(instance, () => instance.setView(state.center, state.zoom, { animate: false }));
   };
   defineExpose({
     activateObjectivePopup,

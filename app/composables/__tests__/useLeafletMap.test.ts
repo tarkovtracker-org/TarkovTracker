@@ -273,6 +273,37 @@ describe('useLeafletMap', () => {
       });
       wrapper.unmount();
     });
+    it('disables zoom snapping while restoring a fractional initialView zoom', async () => {
+      const mapData = {
+        id: 'customs',
+        name: 'Customs',
+        normalizedName: 'customs',
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as TarkovMap;
+      mockMapInstance.options.zoomSnap = 1;
+      let zoomSnapDuringSetView: number | undefined;
+      mockMapInstance.setView.mockImplementation(() => {
+        zoomSnapDuringSetView = mockMapInstance.options.zoomSnap;
+        return mockMapInstance;
+      });
+      const initialView: { center: [number, number]; zoom: number } = {
+        center: [55.5, 37.6],
+        zoom: 6.4,
+      };
+      const { wrapper } = await mountUseLeafletMap(mapData, undefined, initialView);
+      expect(zoomSnapDuringSetView).toBe(0);
+      expect(mockMapInstance.options.zoomSnap).toBe(1);
+      wrapper.unmount();
+    });
     it('falls back to fitting bounds when initialView is missing', async () => {
       const mapData = {
         id: 'customs',
