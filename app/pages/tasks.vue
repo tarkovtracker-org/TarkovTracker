@@ -13,83 +13,89 @@
           <template v-else>
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
               <div class="bg-surface-800/50 rounded-lg p-4">
-                <div class="mb-3 flex items-start justify-between gap-3">
+                <div class="mb-3 flex items-center justify-between gap-3">
                   <button
                     type="button"
                     data-testid="map-panel-toggle"
                     :aria-expanded="isMapPanelExpanded"
                     aria-controls="tasks-map-panel-content"
                     :aria-label="t('page.tasks.map.toggle_panel')"
-                    class="hover:bg-surface-800/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-800 group -m-1.5 flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    class="group hover:bg-surface-700/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-800 -m-1.5 flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     @click="toggleMapPanelVisibility"
                   >
                     <span
-                      class="bg-primary-500/15 border-primary-500/25 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
+                      class="bg-primary-500/15 border-primary-500/25 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
                     >
                       <UIcon
                         name="i-mdi-map-marker-radius-outline"
-                        class="text-primary-300 h-4 w-4"
+                        class="text-primary-300 h-4.5 w-4.5"
                       />
                     </span>
-                    <span class="min-w-0 flex-1 space-y-1.5">
-                      <span class="flex min-w-0 items-center gap-2">
-                        <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
-                          {{ selectedMapData?.name || t('tasks.view.map') }}
-                        </h3>
+                    <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <h3 class="text-surface-100 truncate text-base leading-tight font-semibold">
+                        {{ selectedMapData?.name || t('tasks.view.map') }}
+                      </h3>
+                      <AppTooltip
+                        :text="t('page.tasks.map.raid_time_tooltip')"
+                        :content="{ side: 'bottom' }"
+                      >
                         <span
-                          class="text-surface-400 border-surface-700 bg-surface-800/60 group-hover:text-surface-100 inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap transition-colors"
+                          class="bg-surface-900/50 inline-flex items-center gap-1.5 rounded-full border border-white/8 px-2.5 py-1"
                         >
-                          <UIcon
-                            :name="isMapPanelExpanded ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
-                            class="h-3.5 w-3.5 transition-transform duration-200"
-                          />
-                          {{
-                            isMapPanelExpanded
-                              ? t('page.tasks.map.hide_map')
-                              : t('page.tasks.map.show_map')
-                          }}
+                          <template
+                            v-for="(entry, index) in mapTimeEntries"
+                            :key="`${entry.value}-${index}`"
+                          >
+                            <span v-if="index > 0" class="h-3 w-px bg-white/10" />
+                            <span class="flex items-center gap-1 text-[11px]">
+                              <UIcon
+                                :name="entry.icon"
+                                :class="['h-3.5 w-3.5 shrink-0', clockEntryIconClass(entry.period)]"
+                              />
+                              <span
+                                class="tracking-wide uppercase"
+                                :class="clockEntryLabelClass(entry.period)"
+                              >
+                                {{ getMapTimeLabel(entry.period) }}
+                              </span>
+                              <span
+                                class="tabular-nums"
+                                :class="clockEntryValueClass(entry.period)"
+                              >
+                                {{ entry.value }}
+                              </span>
+                            </span>
+                          </template>
                         </span>
-                      </span>
-                      <span class="flex flex-wrap items-center gap-2">
-                        <span
-                          v-for="(entry, index) in mapTimeEntries"
-                          :key="`${entry.value}-${index}`"
-                          class="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-semibold"
-                          :class="entry.badgeClass"
-                        >
-                          <UIcon
-                            :name="entry.icon"
-                            :class="['h-4 w-4 shrink-0', entry.iconClass]"
-                          />
-                          <span class="tracking-wide uppercase" :class="entry.labelClass">
-                            {{ getMapTimeLabel(entry.period) }}
-                          </span>
-                          <span class="tabular-nums" :class="entry.valueClass">
-                            {{ entry.value }}
-                          </span>
-                        </span>
+                      </AppTooltip>
+                      <span v-if="!isMapPanelExpanded" class="text-surface-500 text-xs font-medium">
+                        {{ t('page.tasks.map.map_hidden_hint') }}
                       </span>
                     </span>
                   </button>
-                  <UButton
-                    data-testid="map-fullscreen-toggle"
-                    icon="i-mdi-fullscreen"
-                    variant="ghost"
-                    color="neutral"
-                    size="xs"
-                    :aria-label="
-                      isMapFullscreen
-                        ? t('page.tasks.map.exit_fullscreen')
-                        : t('page.tasks.map.open_fullscreen')
+                  <AppTooltip
+                    :text="
+                      isMapPanelExpanded
+                        ? t('page.tasks.map.hide_map')
+                        : t('page.tasks.map.show_map')
                     "
-                    :title="
-                      isMapFullscreen
-                        ? t('page.tasks.map.exit_fullscreen')
-                        : t('page.tasks.map.open_fullscreen')
-                    "
-                    class="mt-0.5 shrink-0"
-                    @click="isMapFullscreen ? closeMapFullscreen() : openMapFullscreen()"
-                  />
+                  >
+                    <UButton
+                      data-testid="map-collapse-toggle"
+                      :icon="isMapPanelExpanded ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
+                      variant="ghost"
+                      color="neutral"
+                      size="sm"
+                      :aria-label="
+                        isMapPanelExpanded
+                          ? t('page.tasks.map.hide_map')
+                          : t('page.tasks.map.show_map')
+                      "
+                      class="h-8 w-8 shrink-0"
+                      :ui="{ leadingIcon: 'transition-transform duration-200' }"
+                      @click="toggleMapPanelVisibility"
+                    />
+                  </AppTooltip>
                 </div>
                 <Transition
                   enter-active-class="transition duration-150 ease-out"
@@ -108,24 +114,34 @@
                         :show-extracts="true"
                         :show-extract-toggle="true"
                         :show-legend="true"
+                        :show-fullscreen-toggle="true"
                         :height="mapHeight"
+                        @toggle-fullscreen="openMapFullscreen"
                       />
-                      <div
-                        ref="resizeHandleRef"
-                        role="separator"
-                        aria-orientation="horizontal"
-                        :aria-label="t('page.tasks.map.resize_handle')"
-                        :aria-valuemin="mapHeightMin"
-                        :aria-valuemax="mapHeightMax"
-                        :aria-valuenow="mapHeight"
-                        tabindex="0"
-                        class="bg-surface-900/60 border-surface-700 text-surface-400 hover:text-surface-200 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-8 w-full cursor-row-resize touch-none items-center justify-center rounded-md border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                        :class="{ 'ring-primary-500 text-surface-200 ring-1': isResizing }"
-                        @pointerdown="startResize"
-                        @keydown="onResizeKeydown"
+                      <AppTooltip
+                        :text="t('maps.tooltips.drag_to_resize')"
+                        :content="{ side: 'top' }"
                       >
-                        <UIcon name="i-mdi-drag-horizontal-variant" class="h-4 w-4" />
-                      </div>
+                        <div
+                          ref="resizeHandleRef"
+                          role="separator"
+                          aria-orientation="horizontal"
+                          :aria-label="t('page.tasks.map.resize_handle')"
+                          :aria-valuemin="mapHeightMin"
+                          :aria-valuemax="mapHeightMax"
+                          :aria-valuenow="mapHeight"
+                          tabindex="0"
+                          class="group hover:border-primary-500/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-3.5 w-full cursor-ns-resize touch-none items-center justify-center rounded-md border border-transparent transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                          :class="{ 'ring-primary-500 ring-1': isResizing }"
+                          @pointerdown="startResize"
+                          @keydown="onResizeKeydown"
+                        >
+                          <span
+                            class="bg-surface-600 group-hover:bg-primary-400 h-1 w-8 rounded-full transition-colors"
+                            :class="{ 'bg-primary-400': isResizing }"
+                          />
+                        </div>
+                      </AppTooltip>
                     </template>
                     <UAlert
                       v-else
@@ -378,48 +394,66 @@
           <div
             class="bg-surface-900 border-surface-800 flex items-center justify-between gap-3 border-b px-4 py-3"
           >
-            <div class="flex min-w-0 items-center gap-2">
+            <div class="flex min-w-0 items-center gap-2.5">
               <span
-                class="bg-primary-500/15 border-primary-500/25 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
+                class="bg-primary-500/15 border-primary-500/25 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
               >
-                <UIcon name="i-mdi-map-marker-radius-outline" class="text-primary-300 h-4 w-4" />
+                <UIcon
+                  name="i-mdi-map-marker-radius-outline"
+                  class="text-primary-300 h-4.5 w-4.5"
+                />
               </span>
-              <h3 class="text-surface-100 truncate text-lg leading-tight font-semibold">
+              <h3 class="text-surface-100 truncate text-base leading-tight font-semibold">
                 {{ selectedMapData?.name || t('tasks.view.map') }}
               </h3>
               <span class="text-surface-500 hidden text-xs font-medium sm:inline">
                 {{ t('page.tasks.map.fullscreen_label') }}
               </span>
-            </div>
-            <div class="flex min-w-0 items-center gap-2">
-              <span
-                v-for="(entry, index) in mapTimeEntries"
-                :key="`fullscreen-${entry.value}-${index}`"
-                class="hidden items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-semibold md:inline-flex"
-                :class="entry.badgeClass"
+              <AppTooltip
+                :text="t('page.tasks.map.raid_time_tooltip')"
+                :content="{ side: 'bottom' }"
               >
-                <UIcon :name="entry.icon" :class="['h-4 w-4 shrink-0', entry.iconClass]" />
-                <span class="tracking-wide uppercase" :class="entry.labelClass">
-                  {{ getMapTimeLabel(entry.period) }}
+                <span
+                  class="bg-surface-950/60 hidden items-center gap-1.5 rounded-full border border-white/8 px-2.5 py-1 md:inline-flex"
+                >
+                  <template
+                    v-for="(entry, index) in mapTimeEntries"
+                    :key="`fullscreen-${entry.value}-${index}`"
+                  >
+                    <span v-if="index > 0" class="h-3 w-px bg-white/10" />
+                    <span class="flex items-center gap-1 text-[11px]">
+                      <UIcon
+                        :name="entry.icon"
+                        :class="['h-3.5 w-3.5 shrink-0', clockEntryIconClass(entry.period)]"
+                      />
+                      <span
+                        class="tracking-wide uppercase"
+                        :class="clockEntryLabelClass(entry.period)"
+                      >
+                        {{ getMapTimeLabel(entry.period) }}
+                      </span>
+                      <span class="tabular-nums" :class="clockEntryValueClass(entry.period)">
+                        {{ entry.value }}
+                      </span>
+                    </span>
+                  </template>
                 </span>
-                <span class="tabular-nums" :class="entry.valueClass">
-                  {{ entry.value }}
-                </span>
-              </span>
+              </AppTooltip>
+            </div>
+            <AppTooltip :text="t('maps.tooltips.exit_fullscreen')">
               <UButton
                 data-testid="map-fullscreen-exit"
                 icon="i-mdi-fullscreen-exit"
                 color="neutral"
                 variant="soft"
                 size="sm"
-                :aria-label="t('page.tasks.map.exit_fullscreen')"
+                class="h-8 w-8"
+                :aria-label="t('maps.tooltips.exit_fullscreen')"
                 @click="closeMapFullscreen"
-              >
-                {{ t('page.tasks.map.exit_fullscreen') }}
-              </UButton>
-            </div>
+              />
+            </AppTooltip>
           </div>
-          <div v-if="selectedMapData" class="min-h-0 flex-1">
+          <div v-if="selectedMapData" class="flex min-h-0 flex-1">
             <LeafletMapComponent
               ref="fullscreenLeafletMapRef"
               :map="selectedMapData"
@@ -427,8 +461,11 @@
               :show-extracts="true"
               :show-extract-toggle="true"
               :show-legend="true"
-              :height="fullscreenMapHeight"
+              :show-fullscreen-toggle="true"
+              :is-fullscreen="true"
+              fill
               :initial-view="fullscreenMapView"
+              @toggle-fullscreen="closeMapFullscreen"
             />
           </div>
         </div>
@@ -437,7 +474,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { useScrollLock, useStorage, useWindowSize } from '@vueuse/core';
+  import { useScrollLock, useStorage } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import {
     type DashboardFocusProgressInteraction,
@@ -558,6 +595,43 @@
   });
   const selectedMapId = computed(() => selectedMapData.value?.id ?? null);
   const { getMapTimeLabel, mapTimeEntries } = useMapTime(getTaskMapView, tarkovTime);
+  const MAP_CLOCK_ENTRY_STYLES: Record<string, { icon: string; label: string; value: string }> = {
+    dawn: {
+      icon: 'text-primary-300/80',
+      label: 'text-primary-300/70',
+      value: 'text-primary-200/85',
+    },
+    day: {
+      icon: 'text-warning-300/80',
+      label: 'text-warning-300/70',
+      value: 'text-warning-200/85',
+    },
+    dusk: {
+      icon: 'text-warning-300/70',
+      label: 'text-warning-300/60',
+      value: 'text-warning-200/80',
+    },
+    night: {
+      icon: 'text-info-300/80',
+      label: 'text-info-300/70',
+      value: 'text-info-200/85',
+    },
+    default: {
+      icon: 'text-surface-300/80',
+      label: 'text-surface-300/70',
+      value: 'text-surface-200/85',
+    },
+  };
+  const DEFAULT_CLOCK_ENTRY_STYLE: { icon: string; label: string; value: string } = {
+    icon: 'text-surface-300/80',
+    label: 'text-surface-300/70',
+    value: 'text-surface-200/85',
+  };
+  const getClockEntryStyle = (period: string) =>
+    MAP_CLOCK_ENTRY_STYLES[period] ?? DEFAULT_CLOCK_ENTRY_STYLE;
+  const clockEntryIconClass = (period: string) => getClockEntryStyle(period).icon;
+  const clockEntryLabelClass = (period: string) => getClockEntryStyle(period).label;
+  const clockEntryValueClass = (period: string) => getClockEntryStyle(period).value;
   const {
     mapHeight,
     mapHeightMax,
@@ -609,13 +683,6 @@
     leafletMapRef,
     mapContainerRef,
   });
-  const { height: windowHeight } = useWindowSize();
-  const FULLSCREEN_HEADER_HEIGHT = 68;
-  const fullscreenMapHeight = computed(() => {
-    const height = windowHeight.value;
-    if (!height) return undefined;
-    return Math.max(320, Math.round(height - FULLSCREEN_HEADER_HEIGHT));
-  });
   const fullscreenLeafletMapRef = ref<MapComponentRef | null>(null);
   const fullscreenMapView = ref<MapViewState | null>(null);
   const isMapFullscreen = ref(false);
@@ -638,7 +705,6 @@
   let fullscreenOpenerElement: HTMLElement | null = null;
   const openMapFullscreen = () => {
     fullscreenMapView.value = leafletMapRef.value?.getViewState?.() ?? null;
-    isMapPanelExpanded.value = true;
     isMapFullscreen.value = true;
   };
   const closeMapFullscreen = () => {

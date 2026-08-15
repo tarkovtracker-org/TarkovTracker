@@ -750,28 +750,6 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       // Create map instance with custom CRS
       const mapOptions = getLeafletMapOptions(leaflet.value, renderConfig);
       mapInstance.value = leaflet.value.map(containerRef.value, mapOptions);
-      const ZoomWithReset = leaflet.value.Control.Zoom.extend({
-        onAdd(this: L.Control.Zoom, map: L.Map) {
-          const container = leaflet.value!.Control.Zoom.prototype.onAdd!.call(this, map);
-          const resetBtn = leaflet.value!.DomUtil.create(
-            'a',
-            'leaflet-control-zoom-reset',
-            container
-          );
-          resetBtn.textContent = '\u27F2';
-          resetBtn.href = '#';
-          resetBtn.title = 'Reset view';
-          resetBtn.setAttribute('role', 'button');
-          resetBtn.setAttribute('aria-label', 'Reset view');
-          leaflet.value!.DomEvent.disableClickPropagation(resetBtn);
-          leaflet.value!.DomEvent.on(resetBtn, 'click', (e: Event) => {
-            leaflet.value!.DomEvent.preventDefault(e);
-            refreshView();
-          });
-          return container;
-        },
-      });
-      new ZoomWithReset({ position: 'bottomright' }).addTo(mapInstance.value);
       // Create a custom pane for the map background to ensure it stays behind markers
       const backgroundPane = mapInstance.value.createPane('mapBackground');
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)

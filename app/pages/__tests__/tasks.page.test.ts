@@ -230,7 +230,16 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
         type: Object,
         default: null,
       },
+      showFullscreenToggle: {
+        type: Boolean,
+        default: false,
+      },
+      isFullscreen: {
+        type: Boolean,
+        default: false,
+      },
     },
+    emits: ['toggle-fullscreen'],
     setup(props, { expose }) {
       expose({
         activateObjectivePopup: () => true,
@@ -240,15 +249,25 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
       });
       return { props };
     },
-    template:
-      '<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)" />',
+    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)">
+      <button
+        v-if="props.showFullscreenToggle"
+        type="button"
+        data-testid="map-fullscreen-toggle"
+        @click="$emit('toggle-fullscreen')"
+      />
+    </div>`,
   }),
 }));
 const UButtonStub = {
   emits: ['click'],
   template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
 };
+const AppTooltipStub = {
+  template: '<div><slot /></div>',
+};
 const defaultGlobalStubs = {
+  AppTooltip: AppTooltipStub,
   TaskCard: {
     props: ['accentVariant', 'task'],
     template: '<div data-testid="task-card" :data-accent="accentVariant">{{ task.id }}</div>',
@@ -279,6 +298,11 @@ describe('tasks page', () => {
   const getLeafletMarks = (): MapObjectiveMark[] => {
     const raw = wrapper.find('[data-testid="leaflet-map"]').attributes('data-marks') ?? '[]';
     return JSON.parse(raw) as MapObjectiveMark[];
+  };
+  const flushTransition = async () => {
+    await nextTick();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await nextTick();
   };
   beforeEach(async () => {
     visibleTasksRef.value = [defaultTask];
@@ -430,8 +454,7 @@ describe('tasks page', () => {
     await mountPage();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
-    await nextTick();
-    await nextTick();
+    await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(true);
     const fullscreenMap = wrapper.find(
       '[data-testid="map-fullscreen-overlay"] [data-testid="leaflet-map"]'
@@ -442,11 +465,26 @@ describe('tasks page', () => {
     const exitButton = wrapper.find('[data-testid="map-fullscreen-exit"]');
     expect(exitButton.exists()).toBe(true);
     await exitButton.trigger('click');
-    await nextTick();
+    await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     expect(leafletSetViewStateSpy).toHaveBeenCalledWith(overlayViewState);
   });
-  it('expands the map panel when opening full screen from a collapsed panel', async () => {
+  it('closes the map full screen overlay from the in-map control', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    await mountPage();
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const overlayToggle = wrapper.find(
+      '[data-testid="map-fullscreen-overlay"] [data-testid="map-fullscreen-toggle"]'
+    );
+    expect(overlayToggle.exists()).toBe(true);
+    await overlayToggle.trigger('click');
+    await flushTransition();
+    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
+  });
+  it('hides the map full screen control while the map panel is collapsed', async () => {
     localStorage.setItem(STORAGE_KEYS.tasksMapPanelExpanded, 'false');
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
@@ -454,10 +492,15 @@ describe('tasks page', () => {
     await mountPage();
     const toggleButton = wrapper.find('[data-testid="map-panel-toggle"]');
     expect(toggleButton.attributes('aria-expanded')).toBe('false');
-    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
-    await nextTick();
-    expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(true);
+    const panelContent = wrapper.find('#tasks-map-panel-content');
+    expect(panelContent.attributes('style')).toContain('display: none');
+    expect(panelContent.find('[data-testid="map-fullscreen-toggle"]').exists()).toBe(true);
+    await toggleButton.trigger('click');
+    await flushTransition();
     expect(toggleButton.attributes('aria-expanded')).toBe('true');
+    expect(wrapper.find('#tasks-map-panel-content').attributes('style') ?? '').not.toContain(
+      'display: none'
+    );
   });
   it('moves focus into the full screen overlay and restores it on close', async () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
@@ -470,19 +513,17 @@ describe('tasks page', () => {
     const fullscreenToggle = wrapper.find('[data-testid="map-fullscreen-toggle"]');
     fullscreenToggle.element.focus();
     await fullscreenToggle.trigger('click');
-    await nextTick();
-    await nextTick();
+    await flushTransition();
     const overlay = wrapper.find('[data-testid="map-fullscreen-overlay"]');
     expect(overlay.exists()).toBe(true);
     const exitButton = wrapper.find('[data-testid="map-fullscreen-exit"]');
     expect(document.activeElement).toBe(exitButton.element);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
-    expect(document.activeElement).toBe(exitButton.element);
+    expect(overlay.element.contains(document.activeElement)).toBe(true);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
-    expect(document.activeElement).toBe(exitButton.element);
+    expect(overlay.element.contains(document.activeElement)).toBe(true);
     await exitButton.trigger('click');
-    await nextTick();
-    await nextTick();
+    await flushTransition();
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     expect(document.activeElement).toBe(fullscreenToggle.element);
   });
