@@ -781,6 +781,8 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
         initialView &&
         Array.isArray(initialView.center) &&
         initialView.center.length === 2 &&
+        Number.isFinite(initialView.center[0]) &&
+        Number.isFinite(initialView.center[1]) &&
         Number.isFinite(initialView.zoom)
       ) {
         mapInstance.value.setView(initialView.center, initialView.zoom, { animate: false });

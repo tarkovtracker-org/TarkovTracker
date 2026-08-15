@@ -294,6 +294,31 @@ describe('useLeafletMap', () => {
       expect(mockMapInstance.fitBounds).toHaveBeenCalled();
       wrapper.unmount();
     });
+    it('falls back to fitting bounds when initialView has a non-finite center coordinate', async () => {
+      const mapData = {
+        id: 'customs',
+        name: 'Customs',
+        normalizedName: 'customs',
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as TarkovMap;
+      const initialView: { center: [number, number]; zoom: number } = {
+        center: [Number.NaN, 37.6],
+        zoom: 6,
+      };
+      const { wrapper } = await mountUseLeafletMap(mapData, undefined, initialView);
+      expect(mockMapInstance.setView).not.toHaveBeenCalled();
+      expect(mockMapInstance.fitBounds).toHaveBeenCalled();
+      wrapper.unmount();
+    });
     it('ignores stale async init when map becomes unavailable before layer setup', async () => {
       const deferredFetch = createDeferred<{ ok: boolean; text: () => Promise<string> }>();
       const fetchSpy = vi.fn(() => deferredFetch.promise);

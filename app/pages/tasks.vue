@@ -619,6 +619,23 @@
   const fullscreenLeafletMapRef = ref<MapComponentRef | null>(null);
   const fullscreenMapView = ref<MapViewState | null>(null);
   const isMapFullscreen = ref(false);
+  const FULLSCREEN_OVERLAY_SELECTOR = '[data-testid="map-fullscreen-overlay"]';
+  const getFullscreenOverlay = (): HTMLElement | null =>
+    document.querySelector<HTMLElement>(FULLSCREEN_OVERLAY_SELECTOR);
+  const FULLSCREEN_FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(',');
+  const getFullscreenFocusableElements = (container: HTMLElement): HTMLElement[] => {
+    return Array.from(
+      container.querySelectorAll<HTMLElement>(FULLSCREEN_FOCUSABLE_SELECTOR)
+    ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
+  };
+  let fullscreenOpenerElement: HTMLElement | null = null;
   const openMapFullscreen = () => {
     fullscreenMapView.value = leafletMapRef.value?.getViewState?.() ?? null;
     isMapPanelExpanded.value = true;
@@ -633,17 +650,49 @@
     }
   };
   const handleFullscreenKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && isMapFullscreen.value) {
+    if (event.key === 'Escape') {
       closeMapFullscreen();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const overlay = getFullscreenOverlay();
+    if (!overlay) return;
+    const focusable = getFullscreenFocusableElements(overlay);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) {
+      event.preventDefault();
+      return;
+    }
+    const activeElement = document.activeElement;
+    if (event.shiftKey) {
+      if (activeElement === first || !overlay.contains(activeElement)) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (activeElement === last || !overlay.contains(activeElement)) {
+      event.preventDefault();
+      first.focus();
     }
   };
   const bodyScrollLock = useScrollLock(document.body);
   watch(isMapFullscreen, (isActive) => {
     bodyScrollLock.value = isActive;
     if (isActive) {
+      fullscreenOpenerElement =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       window.addEventListener('keydown', handleFullscreenKeydown);
+      nextTick(() => {
+        getFullscreenOverlay()
+          ?.querySelector<HTMLElement>('[data-testid="map-fullscreen-exit"]')
+          ?.focus();
+      });
     } else {
       window.removeEventListener('keydown', handleFullscreenKeydown);
+      if (fullscreenOpenerElement) {
+        fullscreenOpenerElement.focus();
+        fullscreenOpenerElement = null;
+      }
     }
   });
   const handleJumpToMapObjective = async (objectiveId: string) => {
@@ -882,6 +931,7 @@
     cleanupDeepLink();
     isMapFullscreen.value = false;
     bodyScrollLock.value = false;
+    fullscreenOpenerElement = null;
     window.removeEventListener('keydown', handleFullscreenKeydown);
   });
 </script>
