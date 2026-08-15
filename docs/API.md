@@ -404,6 +404,11 @@ A pre-authentication IP-based abuse gate (Cloudflare Workers Rate Limiting bindi
 the token validation step from floods. It is deliberately coarse — infrastructure protection,
 not a customer quota — and is not advertised as a per-IP entitlement.
 
+Authentication and the daily-quota check run before request-input validation, so a malformed request
+from an unauthenticated or over-quota client returns `401`/`429` rather than `400`. Once a request is
+authorized, validation `400` responses (malformed URL params, invalid JSON body) carry the same
+`X-RateLimit-*` headers as successful responses.
+
 Responses for which the daily-quota service returns a quota decision include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (Unix seconds). When that decision denies the request, the gateway responds with `429` and `Retry-After`. Pre-authentication abuse-gate `429` responses include only `Retry-After`, and fail-open responses (daily-quota service temporarily unavailable) omit the `X-RateLimit-*` headers. When a free-tier user exhausts a daily quota, the `429` body includes an upgrade link. Admins can inspect the top consumers via `GET /api/admin/api-usage`; usage is bucketed by UTC day, so the report covers the current and previous UTC day (the `since` field gives the exact starting day).
 
 ### Conditional Requests & Polling
