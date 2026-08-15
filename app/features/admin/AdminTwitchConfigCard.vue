@@ -84,7 +84,7 @@
       title: t('admin.twitch_config_saved_with_warning_title', 'Twitch config saved'),
       description: t(
         'admin.twitch_config_saved_with_warning_description',
-        'The config was saved, but cached visitors may still see the previous value. Retry the save to attempt cache invalidation again.'
+        'The config was saved, but cached visitors may still see the previous value.'
       ),
       color: 'warning',
       icon: 'i-mdi-alert',
