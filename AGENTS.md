@@ -209,6 +209,11 @@ Naming:
   Tarkov.dev profile imports support Seasonal through the upstream `pvp-season` profile path.
   EFT-log imports must remain unavailable for Seasonal until their Season log data is verified.
 - Public progress API clients must send a 5–200 character `User-Agent`; infrastructure routes are exempt. Usage reporting stores the latest normalized value per token/day.
+- API gateway routes must call `authorize()` before validating or decoding request input (URL params
+  and body). Authentication and daily-quota enforcement come first so a malformed request from an
+  unauthenticated or over-quota client answers `401`/`429`, never `400`. Pass `auth.rlHeaders` into
+  the resulting `400` responses so validation errors carry the same `X-RateLimit-*` headers as
+  successful ones (empty on the fail-open path, where no quota decision exists).
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.

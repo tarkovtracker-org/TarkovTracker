@@ -852,6 +852,9 @@ describe('api-gateway', () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
     const res = await worker.fetch(postTaskRequest('%E0%A4%A', { state: 'completed' }), BASE_ENV);
     await expectErrorResponse(res, 400, 'Invalid task ID in URL');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
   });
   it('rejects POST /progress/task with malformed JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
@@ -928,6 +931,43 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     await expectErrorResponse(res, 400, 'Invalid objective ID in URL');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
+  });
+  it('authenticates before decoding malformed-URL task writes', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/%E0%A4%A', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tt_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Invalid token format');
+  });
+  it('authenticates before decoding malformed-URL objective writes', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/%E0%A4%A', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tt_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Invalid token format');
+  });
+  it('returns 429 (not 400) on malformed-URL writes when the daily quota is exceeded', async () => {
+    const env: Env = {
+      ...BASE_ENV,
+      API_GATEWAY_LIMITER: makeLimiter({ allowed: false, remaining: 0 }),
+    };
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(postTaskRequest('%E0%A4%A', { state: 'completed' }), env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
   });
   it('rejects POST /progress/task/objective with malformed JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());

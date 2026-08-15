@@ -268,16 +268,17 @@ export function decodeUrlParam(
   raw: string,
   label: string,
   envOrigin?: string,
-  requestOrigin?: string
+  requestOrigin?: string,
+  extraHeaders?: Record<string, string>
 ): string | Response {
   let decoded: string;
   try {
     decoded = decodeURIComponent(raw).trim();
   } catch {
-    return errorResponse(`Invalid ${label} in URL`, 400, envOrigin, requestOrigin);
+    return errorResponse(`Invalid ${label} in URL`, 400, envOrigin, requestOrigin, extraHeaders);
   }
   if (!decoded) {
-    return errorResponse(`Missing ${label} in URL`, 400, envOrigin, requestOrigin);
+    return errorResponse(`Missing ${label} in URL`, 400, envOrigin, requestOrigin, extraHeaders);
   }
   return decoded;
 }

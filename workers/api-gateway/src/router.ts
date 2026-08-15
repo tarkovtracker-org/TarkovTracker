@@ -259,10 +259,16 @@ async function routeLevel(context: RouteContext): Promise<Response | null> {
 async function routeObjective(context: RouteContext): Promise<Response | null> {
   const match = context.apiPath.match(/^\/progress\/task\/objective\/([^/]+)$/);
   if (!match || context.request.method !== 'POST') return null;
-  const objectiveId = decodeUrlParam(match[1], 'objective ID', context.origin, context.reqOrigin);
-  if (objectiveId instanceof Response) return objectiveId;
   const auth = await authorize(context, 'WP', 'progress-write');
   if (auth instanceof Response) return auth;
+  const objectiveId = decodeUrlParam(
+    match[1],
+    'objective ID',
+    context.origin,
+    context.reqOrigin,
+    auth.rlHeaders
+  );
+  if (objectiveId instanceof Response) return objectiveId;
   const body = await parseJsonObjectBody(
     context.request,
     context.origin,
@@ -286,10 +292,16 @@ async function routeObjective(context: RouteContext): Promise<Response | null> {
 async function routeTask(context: RouteContext): Promise<Response | null> {
   const match = context.apiPath.match(/^\/progress\/task\/([^/]+)$/);
   if (!match || context.request.method !== 'POST') return null;
-  const taskId = decodeUrlParam(match[1], 'task ID', context.origin, context.reqOrigin);
-  if (taskId instanceof Response) return taskId;
   const auth = await authorize(context, 'WP', 'progress-write');
   if (auth instanceof Response) return auth;
+  const taskId = decodeUrlParam(
+    match[1],
+    'task ID',
+    context.origin,
+    context.reqOrigin,
+    auth.rlHeaders
+  );
+  if (taskId instanceof Response) return taskId;
   const body = await parseJsonObjectBody(
     context.request,
     context.origin,
