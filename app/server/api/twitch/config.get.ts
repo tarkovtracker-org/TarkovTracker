@@ -10,6 +10,7 @@ const CACHE_HEADERS = {
   'cache-tag': CACHE_TAG,
   vary: 'Origin',
 };
+const NO_STORE_HEADERS = { 'cache-control': 'no-store' };
 const SETTING_KEY = 'promoted_twitch';
 const DEFAULT_CHANNEL = 'honeyxxo';
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
@@ -29,6 +30,7 @@ interface SettingRow {
 }
 interface OverrideResult {
   value?: Record<string, unknown>;
+  failed?: boolean;
 }
 function normalizeChannel(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -85,7 +87,7 @@ async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<Ov
     return { value: rows?.[0]?.value };
   } catch (err) {
     logger.warn('Failed to read Twitch config override, falling back to env defaults', err);
-    return {};
+    return { failed: true };
   }
 }
 function readFallback(runtime: Record<string, unknown>): TwitchFallback {
@@ -97,6 +99,6 @@ export default defineEventHandler(async (event): Promise<TwitchConfig> => {
   const fallback = readFallback(runtime);
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
-  setResponseHeaders(event, CACHE_HEADERS);
+  setResponseHeaders(event, override.failed ? NO_STORE_HEADERS : CACHE_HEADERS);
   return config;
 });

@@ -4,6 +4,7 @@ import { createLogger } from '@/server/utils/logger';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
 const EDGE_FUNCTION_PATH = '/functions/v1/admin-cache-purge';
+const PURGE_TIMEOUT_MS = 10_000;
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
 const DISPLAY_NAME_MAX_LENGTH = 50;
 interface AdminTwitchConfigBody {
@@ -62,7 +63,7 @@ async function purgeConfigCache(runtime: Record<string, unknown>, event: H3Event
   const supabaseUrl = readSupabaseUrl(runtime);
   const authHeader = readAuthHeader(event);
   if (!supabaseUrl) {
-    throw createError({ statusCode: 500, message: 'Cache purge config missing' });
+    throw createError({ statusCode: 502, message: 'Cache purge config missing' });
   }
   try {
     await invokeCachePurge(supabaseUrl, readAnonKey(runtime), authHeader);
@@ -85,7 +86,7 @@ function readAnonKey(runtime: Record<string, unknown>): string {
 function readAuthHeader(event: H3Event): string {
   const authHeader = getRequestHeader(event, 'authorization');
   if (!authHeader) {
-    throw createError({ statusCode: 500, message: 'Cache purge config missing' });
+    throw createError({ statusCode: 502, message: 'Cache purge config missing' });
   }
   return authHeader;
 }
@@ -97,17 +98,24 @@ async function invokeCachePurge(
   anonKey: string,
   authHeader: string
 ): Promise<void> {
-  const response = await fetch(`${supabaseUrl}${EDGE_FUNCTION_PATH}`, {
-    method: 'POST',
-    headers: {
-      Authorization: authHeader,
-      apikey: anonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ purgeType: 'twitch-config' }),
-  });
-  if (response.ok) return;
-  throw await buildPurgeFailureError(response);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PURGE_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${supabaseUrl}${EDGE_FUNCTION_PATH}`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ purgeType: 'twitch-config' }),
+      signal: controller.signal,
+    });
+    if (response.ok) return;
+    throw await buildPurgeFailureError(response);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 async function buildPurgeFailureError(response: Response): Promise<Error> {
   const detail = await response.text().catch(() => '');

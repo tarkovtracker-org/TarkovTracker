@@ -201,6 +201,33 @@ describe('PromotedTwitchEmbed', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     wrapper.unmount();
   });
+  it('discards a stale live result when the channel changes mid-flight', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const wrapper = await mountEmbed();
+    const liveResolvers: Array<(value: { isLive: boolean }) => void> = [];
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/live') {
+        return new Promise((resolve) => {
+          liveResolvers.push(resolve);
+        });
+      }
+      return Promise.resolve(twitchConfig);
+    });
+    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    pollCallback();
+    usePromotedTwitch().applyConfig({
+      channel: 'replacement',
+      displayName: 'Replacement',
+      enabled: true,
+    });
+    await flushPromises();
+    await nextTick();
+    liveResolvers[0]?.({ isLive: true });
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.find('iframe').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('logs a warning when clearing a stored dismissal fails', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const removeItemSpy = vi.spyOn(sessionStorage, 'removeItem').mockImplementation(() => {
@@ -239,23 +266,26 @@ describe('PromotedTwitchEmbed', () => {
     let hidden = false;
     const originalDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
-    hidden = true;
-    document.dispatchEvent(new Event('visibilitychange'));
-    await flushPromises();
-    expect(clearIntervalSpy).toHaveBeenCalled();
-    const callsWhileHidden = fetchMock.mock.calls.length;
-    hidden = false;
-    document.dispatchEvent(new Event('visibilitychange'));
-    await flushPromises();
-    await nextTick();
-    expect(fetchMock.mock.calls.length).toBeGreaterThan(callsWhileHidden);
-    expect(fetchMock.mock.calls[callsWhileHidden]?.[0]).toBe('/api/twitch/config');
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', expect.anything());
-    expect(setIntervalSpy).toHaveBeenCalledTimes(2);
-    if (originalDescriptor) {
-      Object.defineProperty(document, 'hidden', originalDescriptor);
-    } else {
-      delete (document as { hidden?: boolean }).hidden;
+    try {
+      hidden = true;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      const callsWhileHidden = fetchMock.mock.calls.length;
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+      await nextTick();
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(callsWhileHidden);
+      expect(fetchMock.mock.calls[callsWhileHidden]?.[0]).toBe('/api/twitch/config');
+      expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', expect.anything());
+      expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(document, 'hidden', originalDescriptor);
+      } else {
+        delete (document as { hidden?: boolean }).hidden;
+      }
     }
     wrapper.unmount();
   });

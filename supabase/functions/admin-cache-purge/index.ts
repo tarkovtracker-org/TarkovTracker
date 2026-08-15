@@ -149,10 +149,6 @@ async function purgeCloudflareCache(
     clearTimeout(timeoutId);
   }
 }
-/**
- * Produce the origin variants (apex and www) for a given base URL so cache
- * entries served on either hostname are both purged.
- */
 function buildCacheOrigins(baseUrl: string): string[] {
   const parsed = new URL(baseUrl);
   const host = parsed.hostname;
@@ -218,10 +214,6 @@ function purgeSuccessMessage(purgeType: PurgeRequest['purgeType']): string {
 function purgeAllCache(zoneId: string, apiToken: string): Promise<CloudflarePurgeResponse> {
   return purgeCloudflareCache(zoneId, apiToken, { purge_everything: true });
 }
-/**
- * Purge the promoted Twitch config cache entry by tag, falling back to a
- * purge-by-URL when the zone rejects tag purges.
- */
 async function purgeTwitchConfigCache(
   zoneId: string,
   apiToken: string,

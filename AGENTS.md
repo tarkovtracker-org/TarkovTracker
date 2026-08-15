@@ -221,7 +221,10 @@ Naming:
   `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=true` directly enables the build-time fallback without an
   admin write. `public.app_settings` is service-role-only; `/api/twitch/config` resolves the
   admin-managed `promoted_twitch` override over that fallback, and `/api/admin/twitch-config` is the
-  only writer. See the Promoted Twitch configuration section of `docs/SYSTEMS.md`.
+  only writer. `/api/twitch/config` is edge-cached with the `promoted-twitch-config` tag and is
+  invalidated by the `admin-cache-purge` edge function (`twitch-config` purge type, tag purge with a
+  purge-by-URL fallback) after a committed admin update. See the Promoted Twitch configuration
+  section of `docs/SYSTEMS.md`.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling

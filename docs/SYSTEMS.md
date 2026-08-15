@@ -915,7 +915,9 @@ flowchart LR
    on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
    five minutes (`max-age=300`) and a Cloudflare edge TTL of one year
    (`s-maxage=31536000` / `cloudflare-cdn-cache-control: public, max-age=31536000`), so Cloudflare
-   serves cache hits without invoking the Function.
+   serves cache hits without invoking the Function. When the database read fails, the fallback
+   response is sent with `no-store` so a transient outage never pins the env-default fallback at the
+   edge for a year.
 5. `PromotedTwitchEmbed` fetches config once on mount and again on tab focus (an edge-cache hit),
    watches the shared client state for immediate propagation of admin saves in the same tab, and
    polls only `/api/twitch/live` every 60 seconds while `enabled === true`, pausing the timer while
@@ -960,7 +962,8 @@ flowchart LR
   resolves to disabled.
 - The config response must carry the `promoted-twitch-config` cache tag and long edge TTLs so
   Cloudflare serves cache hits without executing the Pages Function; the route and its database read
-  run only on cache fills.
+  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
+  outage cannot pin the env-default fallback at the edge.
 - The admin route must purge the `promoted-twitch-config` tag only after the database transaction
   commits, and must fail the save if the purge fails.
 - Mounted clients must never poll the config endpoint: they fetch it once per mount/focus and poll

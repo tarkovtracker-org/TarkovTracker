@@ -115,6 +115,7 @@ describe('/api/twitch/config', () => {
       displayName: 'EnvStreamer',
       enabled: true,
     });
+    expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
   });
   it('reads the database on each handler execution (edge cache fills)', async () => {
     adminSupabaseFetchMock

@@ -159,7 +159,7 @@ describe('POST /api/admin/twitch-config', () => {
     const event = makeEvent({ id: 'admin-1' });
     (event as unknown as { node: { req: { headers: Record<string, string> } } }).node.req.headers =
       {};
-    await expect(handler(event)).rejects.toMatchObject({ statusCode: 500 });
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 502 });
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
   it('logs and propagates a transactional update failure', async () => {
