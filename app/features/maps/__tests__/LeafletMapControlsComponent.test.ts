@@ -46,6 +46,15 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
 });
 const refreshViewSpy = vi.fn();
 vi.mock('@/composables/useLeafletMap', () => ({
+  withoutZoomSnap: (instance: { options: { zoomSnap?: number } }, apply: () => void): void => {
+    const originalZoomSnap = instance.options.zoomSnap ?? 0;
+    instance.options.zoomSnap = 0;
+    try {
+      apply();
+    } finally {
+      instance.options.zoomSnap = originalZoomSnap;
+    }
+  },
   useLeafletMap: () => ({
     mapInstance: shallowRef(mockMapInstance),
     leaflet: shallowRef(null),
@@ -135,19 +144,19 @@ describe('LeafletMap controls', () => {
   });
   it('keeps fractional zoom by disabling zoom snapping for zoom controls', async () => {
     const wrapper = await mountMap();
-    await wrapper.find('button[aria-label="Zoom in"]').trigger('click');
+    await wrapper.find('[data-testid="map-zoom-in"]').trigger('click');
     expect(mockMapInstance.zoomIn).toHaveBeenCalled();
     expect(mockMapInstance.zoomSnapDuringCall).toBe(0);
     expect(mockMapInstance.options.zoomSnap).toBe(1);
     mockMapInstance.zoomSnapDuringCall = undefined;
-    await wrapper.find('button[aria-label="Zoom out"]').trigger('click');
+    await wrapper.find('[data-testid="map-zoom-out"]').trigger('click');
     expect(mockMapInstance.zoomOut).toHaveBeenCalled();
     expect(mockMapInstance.zoomSnapDuringCall).toBe(0);
     wrapper.unmount();
   });
   it('resets the view from the reset control', async () => {
     const wrapper = await mountMap();
-    await wrapper.find('button[aria-label="Reset view"]').trigger('click');
+    await wrapper.find('[data-testid="map-reset-view"]').trigger('click');
     expect(refreshViewSpy).toHaveBeenCalled();
     wrapper.unmount();
   });
@@ -155,19 +164,22 @@ describe('LeafletMap controls', () => {
     const wrapper = await mountMap();
     const hint = wrapper.find('[data-testid="map-first-use-hint"]');
     expect(hint.exists()).toBe(true);
-    const helpTrigger = wrapper.find('button[aria-label="Map controls"]');
-    expect(helpTrigger.find('span.bg-primary-400').exists()).toBe(true);
-    await hint.find('button.text-primary-300').trigger('click');
+    const helpTrigger = wrapper.find('[data-testid="map-help-toggle"]');
+    expect(helpTrigger.find('[data-testid="map-help-unseen-dot"]').exists()).toBe(true);
+    await hint.find('[data-testid="map-hint-all-controls"]').trigger('click');
     await nextTick();
     expect(wrapper.find('[data-testid="map-first-use-hint"]').exists()).toBe(false);
     expect(
-      wrapper.find('button[aria-label="Map controls"]').find('span.bg-primary-400').exists()
+      wrapper
+        .find('[data-testid="map-help-toggle"]')
+        .find('[data-testid="map-help-unseen-dot"]')
+        .exists()
     ).toBe(false);
     wrapper.unmount();
   });
   it('dismisses the first-use hint and remembers it', async () => {
     const wrapper = await mountMap();
-    await wrapper.find('[data-testid="map-first-use-hint"] button.bg-primary-500').trigger('click');
+    await wrapper.find('[data-testid="map-hint-dismiss"]').trigger('click');
     await nextTick();
     expect(wrapper.find('[data-testid="map-first-use-hint"]').exists()).toBe(false);
     expect(localStorage.getItem('mapControlsHintSeen')).toBe('true');

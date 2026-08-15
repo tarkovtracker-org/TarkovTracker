@@ -25,7 +25,7 @@ export interface UseLeafletMapOptions {
   /** Initial floor selection */
   initialFloor?: string;
   /** Initial view (center + zoom) to apply instead of fitting map bounds */
-  initialView?: { center: [number, number]; zoom: number } | null;
+  initialView?: MapViewState | null;
   /** Enable idle detection for performance */
   enableIdleDetection?: boolean;
   /** Idle timeout in milliseconds */
@@ -157,30 +157,33 @@ function parseSvgContent(content: string): SVGElement | null {
   }
   return doc.documentElement as unknown as SVGElement;
 }
-type MapInitialView = { center: [number, number]; zoom: number };
-function isFiniteLatLng(center: unknown): boolean {
-  return Array.isArray(center) && center.length === 2 && center.every(Number.isFinite);
+export interface MapViewState {
+  center: [number, number];
+  zoom: number;
 }
-function isRestorableMapView(view: MapInitialView | null | undefined): view is MapInitialView {
-  if (!view) return false;
-  return isFiniteLatLng(view.center) && Number.isFinite(view.zoom);
-}
-function applyRestoredMapView(instance: L.Map, view: MapInitialView): void {
+export function withoutZoomSnap(instance: L.Map, apply: () => void): void {
   const originalZoomSnap = instance.options.zoomSnap ?? 0;
   instance.options.zoomSnap = 0;
   try {
-    instance.setView(view.center, view.zoom, { animate: false });
+    apply();
   } finally {
     instance.options.zoomSnap = originalZoomSnap;
   }
 }
+function isFiniteLatLng(center: unknown): boolean {
+  return Array.isArray(center) && center.length === 2 && center.every(Number.isFinite);
+}
+function isRestorableMapView(view: MapViewState | null | undefined): view is MapViewState {
+  if (!view) return false;
+  return isFiniteLatLng(view.center) && Number.isFinite(view.zoom);
+}
 function setInitialMapView(
   instance: L.Map,
-  view: MapInitialView | null | undefined,
+  view: MapViewState | null | undefined,
   bounds: L.LatLngBoundsExpression
 ): void {
   if (isRestorableMapView(view)) {
-    applyRestoredMapView(instance, view);
+    withoutZoomSnap(instance, () => instance.setView(view.center, view.zoom, { animate: false }));
     return;
   }
   instance.fitBounds(bounds);
@@ -208,7 +211,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const crsKey = ref('');
   const renderKey = ref('');
   let hasAppliedInitialView = false;
-  const consumeInitialView = (): MapInitialView | null => {
+  const consumeInitialView = (): MapViewState | null => {
     if (hasAppliedInitialView) return null;
     hasAppliedInitialView = true;
     return initialView ?? null;

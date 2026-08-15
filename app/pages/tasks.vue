@@ -515,6 +515,7 @@
   import { STORAGE_KEYS } from '@/utils/storageKeys';
   import { getTaskSecondaryViewForPrimaryView } from '@/utils/taskFilterNormalization';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
+  import type { MapViewState } from '@/composables/useLeafletMap';
   import type { TaskActionPayload } from '@/composables/useTaskActions';
   import type { Task } from '@/types/tarkov';
   import type {
@@ -597,7 +598,18 @@
   });
   const selectedMapId = computed(() => selectedMapData.value?.id ?? null);
   const { getMapTimeLabel, mapTimeEntries } = useMapTime(getTaskMapView, tarkovTime);
-  const MAP_CLOCK_ENTRY_STYLES: Record<string, { icon: string; label: string; value: string }> = {
+  type MapClockPeriod = 'dawn' | 'day' | 'dusk' | 'night' | 'default';
+  interface ClockEntryStyle {
+    icon: string;
+    label: string;
+    value: string;
+  }
+  const DEFAULT_CLOCK_ENTRY_STYLE: ClockEntryStyle = {
+    icon: 'text-surface-300/80',
+    label: 'text-surface-300/70',
+    value: 'text-surface-200/85',
+  };
+  const MAP_CLOCK_ENTRY_STYLES: Record<MapClockPeriod, ClockEntryStyle> = {
     dawn: {
       icon: 'text-primary-300/80',
       label: 'text-primary-300/70',
@@ -618,19 +630,10 @@
       label: 'text-info-300/70',
       value: 'text-info-200/85',
     },
-    default: {
-      icon: 'text-surface-300/80',
-      label: 'text-surface-300/70',
-      value: 'text-surface-200/85',
-    },
+    default: DEFAULT_CLOCK_ENTRY_STYLE,
   };
-  const DEFAULT_CLOCK_ENTRY_STYLE: { icon: string; label: string; value: string } = {
-    icon: 'text-surface-300/80',
-    label: 'text-surface-300/70',
-    value: 'text-surface-200/85',
-  };
-  const getClockEntryStyle = (period: string) =>
-    MAP_CLOCK_ENTRY_STYLES[period] ?? DEFAULT_CLOCK_ENTRY_STYLE;
+  const getClockEntryStyle = (period: string): ClockEntryStyle =>
+    MAP_CLOCK_ENTRY_STYLES[period as MapClockPeriod] ?? DEFAULT_CLOCK_ENTRY_STYLE;
   const clockEntryIconClass = (period: string) => getClockEntryStyle(period).icon;
   const clockEntryLabelClass = (period: string) => getClockEntryStyle(period).label;
   const clockEntryValueClass = (period: string) => getClockEntryStyle(period).value;
@@ -673,7 +676,6 @@
     return new Set(filteredTasks.map((task) => task.id));
   });
   const mapContainerRef = ref<HTMLElement | null>(null);
-  type MapViewState = { center: [number, number]; zoom: number };
   interface MapComponentRef {
     activateObjectivePopup: (id: string) => boolean;
     closeActivePopup: () => void;

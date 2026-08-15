@@ -302,6 +302,7 @@
               <button
                 :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
                 type="button"
+                data-testid="map-help-toggle"
                 :aria-label="t('maps.help.title')"
                 class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 :class="
@@ -312,6 +313,7 @@
               >
                 <span
                   v-if="!helpOpenedThisSession"
+                  data-testid="map-help-unseen-dot"
                   class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
                 />
                 <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
@@ -463,6 +465,7 @@
           <AppTooltip :text="t('maps.tooltips.zoom_in')" :kbds="['E']">
             <button
               type="button"
+              data-testid="map-zoom-in"
               :disabled="!canZoomIn"
               :aria-label="t('maps.tooltips.zoom_in')"
               class="focus-visible:ring-primary-500 text-surface-200 hover:text-surface-50 focus-visible:ring-offset-surface-850 disabled:hover:text-surface-200 flex h-9 w-9 items-center justify-center transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
@@ -474,6 +477,7 @@
           <AppTooltip :text="t('maps.tooltips.zoom_out')" :kbds="['Q']">
             <button
               type="button"
+              data-testid="map-zoom-out"
               :disabled="!canZoomOut"
               :aria-label="t('maps.tooltips.zoom_out')"
               class="focus-visible:ring-primary-500 text-surface-200 hover:text-surface-50 focus-visible:ring-offset-surface-850 disabled:hover:text-surface-200 flex h-9 w-9 items-center justify-center transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
@@ -486,6 +490,7 @@
           <AppTooltip :text="t('maps.tooltips.reset_view')" :kbds="['R']">
             <button
               type="button"
+              data-testid="map-reset-view"
               :aria-label="t('maps.tooltips.reset_view')"
               class="focus-visible:ring-primary-500 text-surface-200 hover:text-surface-50 focus-visible:ring-offset-surface-850 flex h-9 w-9 items-center justify-center transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               @click="resetMapView"
@@ -525,6 +530,7 @@
             <button
               type="button"
               class="bg-primary-500 hover:bg-primary-400 text-surface-950 rounded px-3 py-1 text-xs font-semibold transition-colors"
+              data-testid="map-hint-dismiss"
               @click="dismissFirstUseHint"
             >
               {{ t('common.got_it') }}
@@ -532,6 +538,7 @@
             <button
               type="button"
               class="text-primary-300 hover:text-primary-200 text-xs font-medium underline-offset-2 transition-colors hover:underline"
+              data-testid="map-hint-all-controls"
               @click="openHelpFromHint"
             >
               {{ t('maps.hint.all_controls') }}
@@ -608,7 +615,7 @@
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
   import { createApp } from 'vue';
-  import { useLeafletMap } from '@/composables/useLeafletMap';
+  import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     MAP_BUTTON_ACTIVE_CLASS,
     MAP_BUTTON_INACTIVE_CLASS,
@@ -679,7 +686,7 @@
     isFullscreen?: boolean;
     fill?: boolean;
     height?: number;
-    initialView?: { center: [number, number]; zoom: number } | null;
+    initialView?: MapViewState | null;
   }
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
@@ -840,15 +847,6 @@
   });
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
-  };
-  const withoutZoomSnap = (instance: L.Map, apply: () => void): void => {
-    const originalZoomSnap = instance.options.zoomSnap ?? 0;
-    instance.options.zoomSnap = 0;
-    try {
-      apply();
-    } finally {
-      instance.options.zoomSnap = originalZoomSnap;
-    }
   };
   const zoomMapBy = (direction: 1 | -1) => {
     const instance = mapInstance.value;
@@ -1868,13 +1866,13 @@
     const size = instance.getSize();
     return size.x > 0 && size.y > 0;
   };
-  const getViewState = (): { center: [number, number]; zoom: number } | null => {
+  const getViewState = (): MapViewState | null => {
     const instance = mapInstance.value;
     if (!instance || !hasLaidOutContainer(instance)) return null;
     const center = instance.getCenter();
     return { center: [center.lat, center.lng], zoom: instance.getZoom() };
   };
-  const setViewState = (state: { center: [number, number]; zoom: number }): void => {
+  const setViewState = (state: MapViewState): void => {
     const instance = mapInstance.value;
     if (!instance || !hasLaidOutContainer(instance)) return;
     if (instance.getZoom() === state.zoom) {
