@@ -179,7 +179,7 @@ Naming:
 
 - Non-English files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) are Crowdin-owned exports.
 - vue-i18n fallback locale is `en` (`app/i18n.config.ts`). Missing non-English keys render English automatically.
-- `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
+- `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational. It also emits non-fatal drift warnings comparing flattened parsed values (missing keys count as English fallback): an enabled locale with >90% of values identical to the English source, or a locale file <30% identical that is missing from `SUPPORTED_LOCALES`.
 - Locale keys must be snake_case. Provide fallback strings in `t('key', 'Fallback')` calls.
 - When adding user-facing copy: add key to `en.json` only, run `pnpm run i18n:check`. Crowdin handles propagation.
 - Crowdin-only PRs that change only non-English exports are excluded from repository-owned CI, PR metadata, security, and Dependabot workflows via their `paths-ignore` filters. Changes to source code or `en.json` still run normal checks.
