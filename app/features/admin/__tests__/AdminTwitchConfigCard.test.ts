@@ -76,7 +76,7 @@ describe('AdminTwitchConfigCard', () => {
   it('loads the effective Twitch configuration', async () => {
     const wrapper = mountCard();
     await flushPromises();
-    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config', undefined);
+    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config', { cache: 'no-store' });
     expect(wrapper.findAll('input')[0]!.attributes('value')).toBe('streamer');
     expect(wrapper.findAll('input')[1]!.attributes('value')).toBe('Streamer');
     expect(wrapper.find('button').attributes('disabled')).toBeUndefined();

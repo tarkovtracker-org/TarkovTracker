@@ -31,7 +31,7 @@
   const loadConfig = async () => {
     isLoading.value = true;
     try {
-      applyConfig(await $fetch<TwitchConfig>('/api/twitch/config'));
+      applyConfig(await $fetch<TwitchConfig>('/api/twitch/config', { cache: 'no-store' }));
     } catch (error) {
       logger.warn('[AdminTwitchConfigCard] Failed to load Twitch config', error);
       toast.add({

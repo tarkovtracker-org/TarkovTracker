@@ -225,8 +225,9 @@ Naming:
   invalidated by the `admin-cache-purge` edge function (`twitch-config` purge type, tag purge with a
   purge-by-URL fallback) after a committed admin update. Purge failures return the committed config
   with an explicit warning flag so clients reconcile without repeating the write. Config responses
-  carry the settings version so stale browser cache entries cannot overwrite a newer admin save. See
-  the Promoted Twitch configuration section of `docs/SYSTEMS.md`.
+  carry the settings version so stale browser cache entries cannot overwrite a newer admin save. The
+  admin form disables browser caching when loading config so it cannot submit stale settings. See the
+  Promoted Twitch configuration section of `docs/SYSTEMS.md`.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling

@@ -896,10 +896,11 @@ flowchart LR
 
 ### Flow
 
-1. `AdminTwitchConfigCard` loads the effective public configuration and obtains the current Supabase
-   access token before saving. After a successful save it also publishes the saved config to the
-   shared `usePromotedTwitch` client state, so the embed in the same tab adopts the change
-   immediately without waiting for a poll.
+1. `AdminTwitchConfigCard` loads the effective public configuration with browser caching disabled,
+   so a previously cached response cannot make a later save revert newer settings. It obtains the
+   current Supabase access token before saving. After a successful save it also publishes the saved
+   config to the shared `usePromotedTwitch` client state, so the embed in the same tab adopts the
+   change immediately without waiting for a poll.
 2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
    channel, display name, and enabled flag. It calls `update_promoted_twitch_config`, which updates the
    `promoted_twitch` JSON value, advances its shared version, and writes the admin audit row in one
