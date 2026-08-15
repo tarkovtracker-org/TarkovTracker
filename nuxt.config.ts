@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
+import { ENTRY_RECOVERY_SCRIPT } from './app/utils/entryRecoveryScript';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
   assertCloudflarePagesOutput,
@@ -315,6 +316,9 @@ export default defineNuxtConfig({
         },
       ],
       script: [
+        {
+          innerHTML: ENTRY_RECOVERY_SCRIPT,
+        },
         {
           innerHTML: [
             'try{',
