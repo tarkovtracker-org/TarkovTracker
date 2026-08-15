@@ -680,10 +680,10 @@
   interface MapComponentRef {
     activateObjectivePopup: (id: string) => boolean;
     closeActivePopup: () => void;
-    getViewState?: () => MapViewState | null;
-    setViewState?: (state: MapViewState) => void;
-    getFloor?: () => string;
-    setFloor?: (floor: string) => void;
+    getViewState: () => MapViewState | null;
+    setViewState: (state: MapViewState) => void;
+    getFloor: () => string;
+    setFloor: (floor: string) => void;
   }
   const leafletMapRef = ref<MapComponentRef | null>(null);
   const { jumpToMapObjective, cleanup: cleanupMapPopup } = useMapObjectivePopup({
@@ -746,20 +746,23 @@
   const isInInertBackground = (element: HTMLElement): boolean =>
     inertBackgroundElements.some((background) => background.contains(element));
   const readFullscreenMapView = (): MapViewState | null =>
-    fullscreenLeafletMapRef.value?.getViewState?.() ?? null;
-  const readFullscreenFloor = (): string | undefined => fullscreenLeafletMapRef.value?.getFloor?.();
+    fullscreenLeafletMapRef.value?.getViewState() ?? null;
+  const readFullscreenFloor = (): string | undefined => fullscreenLeafletMapRef.value?.getFloor();
   const restoreInlineMapView = (view: MapViewState): void => {
     if (fullscreenMapId !== selectedMapId.value) return;
-    leafletMapRef.value?.setViewState?.(view);
+    leafletMapRef.value?.setViewState(view);
   };
   const restoreInlineMapFloor = (floor: string | undefined): void => {
     if (!floor || fullscreenMapId !== selectedMapId.value) return;
-    leafletMapRef.value?.setFloor?.(floor);
+    leafletMapRef.value?.setFloor(floor);
   };
   const openMapFullscreen = () => {
     fullscreenMapId = selectedMapId.value;
-    fullscreenMapView.value = leafletMapRef.value?.getViewState?.() ?? null;
-    fullscreenInitialFloor.value = leafletMapRef.value?.getFloor?.() ?? undefined;
+    const inlineMap = leafletMapRef.value;
+    if (inlineMap) {
+      fullscreenMapView.value = inlineMap.getViewState();
+      fullscreenInitialFloor.value = inlineMap.getFloor();
+    }
     isMapFullscreen.value = true;
   };
   const closeMapFullscreen = () => {
