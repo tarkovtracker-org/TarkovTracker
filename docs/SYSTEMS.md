@@ -898,9 +898,9 @@ flowchart LR
    database transaction. A failure rolls back both writes.
 3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
-   of breaking the embed. The route reads the shared version on every request, returns it as an ETag,
-   and sends `cache-control: public, max-age=0, must-revalidate`, so neither a Nitro isolate nor the
-   edge can serve an update without revalidating the database-backed version.
+   of breaking the embed. The route reads the database on every request and sends
+   `cache-control: public, max-age=0, must-revalidate`, so neither a Nitro isolate nor the edge can
+   serve an update without revalidating the database-backed value.
 4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
    replace the player URL and clear a stored dismissal, disabling hides an active player, and an
    unavailable config endpoint keeps the build-time fallback working. Refreshes are single-flight, so
@@ -910,8 +910,7 @@ flowchart LR
 
 - `app/features/admin/AdminTwitchConfigCard.vue` — admin form and authenticated save flow.
 - `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, and audit.
-- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and versioned
-  revalidation.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and revalidation.
 - `app/components/PromotedTwitchEmbed.vue` — minute polling and player state updates.
 - `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
   transactional update/audit RPC.
@@ -932,7 +931,7 @@ flowchart LR
   promote a stream without a database override or admin write. The admin-managed override can change
   the effective channel, display name, and enabled state. A missing or malformed build-time flag
   resolves to disabled.
-- Public responses must revalidate the shared database version instead of relying on module-local or
+- Public responses must re-read the database-backed value instead of relying on module-local or
   independently stale edge state.
 - Mounted clients re-read configuration on the same 60-second cadence as live status, so an admin
   change takes effect without reload or redeploy within the next client poll after revalidation.

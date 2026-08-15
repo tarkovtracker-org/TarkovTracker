@@ -20,12 +20,9 @@ interface TwitchFallback {
 }
 interface SettingRow {
   value?: Record<string, unknown>;
-  version?: number;
 }
 interface OverrideResult {
-  ok: boolean;
   value?: Record<string, unknown>;
-  version?: number;
 }
 function normalizeChannel(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -69,7 +66,7 @@ function readServiceKey(runtime: Record<string, unknown>): string {
 async function readOverride(runtime: Record<string, unknown>): Promise<OverrideResult> {
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
-  if (!supabaseUrl || !serviceKey) return { ok: true };
+  if (!supabaseUrl || !serviceKey) return {};
   return fetchSetting(supabaseUrl, serviceKey);
 }
 async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<OverrideResult> {
@@ -77,12 +74,12 @@ async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<Ov
     const rows = await adminSupabaseFetch<SettingRow[]>(
       supabaseUrl,
       serviceKey,
-      `/rest/v1/app_settings?select=value,version&key=eq.${SETTING_KEY}&limit=1`
+      `/rest/v1/app_settings?select=value&key=eq.${SETTING_KEY}&limit=1`
     );
-    return { ok: true, value: rows?.[0]?.value, version: rows?.[0]?.version };
+    return { value: rows?.[0]?.value };
   } catch (err) {
     logger.warn('Failed to read Twitch config override, falling back to env defaults', err);
-    return { ok: false };
+    return {};
   }
 }
 function readFallback(runtime: Record<string, unknown>): TwitchFallback {
@@ -94,11 +91,6 @@ export default defineEventHandler(async (event) => {
   const fallback = readFallback(runtime);
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
-  setResponseHeaders(event, {
-    ...REVALIDATE_HEADERS,
-    ...(override.ok && override.version !== undefined
-      ? { etag: `"promoted-twitch-${override.version}"` }
-      : {}),
-  });
+  setResponseHeaders(event, REVALIDATE_HEADERS);
   return config;
 });

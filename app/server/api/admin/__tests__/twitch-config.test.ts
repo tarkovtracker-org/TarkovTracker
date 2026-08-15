@@ -58,6 +58,17 @@ describe('POST /api/admin/twitch-config', () => {
       statusCode: 500,
     });
   });
+  it.each(['http://test.supabase.co', 'ftp://test.supabase.co'])(
+    'rejects a non-HTTPS Supabase URL (%s)',
+    async (url) => {
+      runtimeConfig.supabaseUrl = url;
+      const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+      await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+        statusCode: 500,
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
   it('requires authentication', async () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });

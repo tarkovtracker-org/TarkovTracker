@@ -56,7 +56,7 @@ describe('/api/twitch/config', () => {
       enabled: true,
     });
   });
-  it('applies the database override and exposes its version as an ETag', async () => {
+  it('applies the database override and requires revalidation', async () => {
     adminSupabaseFetchMock.mockResolvedValue([
       {
         value: { channel: 'DbStreamer', displayName: 'DB Streamer', enabled: false },
@@ -71,10 +71,7 @@ describe('/api/twitch/config', () => {
     });
     expect(setResponseHeadersMock).toHaveBeenCalledWith(
       {},
-      expect.objectContaining({
-        'cache-control': 'public, max-age=0, must-revalidate',
-        etag: '"promoted-twitch-7"',
-      })
+      { 'cache-control': 'public, max-age=0, must-revalidate' }
     );
   });
   it('ignores malformed database override fields', async () => {
@@ -169,4 +166,17 @@ describe('/api/twitch/config', () => {
       expect.stringContaining('/rest/v1/app_settings')
     );
   });
+  it.each(['http://test.supabase.co', 'ftp://test.supabase.co'])(
+    'rejects a non-HTTPS Supabase URL (%s)',
+    async (url) => {
+      runtimeConfig.supabaseUrl = url;
+      const handler = await loadHandler();
+      await expect(handler({})).resolves.toEqual({
+        channel: 'envstreamer',
+        displayName: 'EnvStreamer',
+        enabled: true,
+      });
+      expect(adminSupabaseFetchMock).not.toHaveBeenCalled();
+    }
+  );
 });
