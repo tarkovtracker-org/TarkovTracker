@@ -452,6 +452,10 @@ All endpoints return errors in this format:
 }
 ```
 
+Unexpected gateway failures always return the fixed body `Internal server error` with status `500`.
+The underlying exception is logged server-side only, so clients must not parse `500` bodies for
+diagnostic detail. Client-correctable problems keep their specific `4xx` messages.
+
 ---
 
 ## Caching Behavior
