@@ -1,3 +1,10 @@
+## [1.71.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.0...v1.71.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **app:** recover when the entry module fails to load after a deploy ([#737](https://github.com/tarkovtracker-org/TarkovTracker/issues/737)) ([dd659b7](https://github.com/tarkovtracker-org/TarkovTracker/commit/dd659b76ed957140cbdf2dd3061a966923c83255)), closes [#697](https://github.com/tarkovtracker-org/TarkovTracker/issues/697)
+
 # [1.71.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.2...v1.71.0) (2026-08-15)
 
 
