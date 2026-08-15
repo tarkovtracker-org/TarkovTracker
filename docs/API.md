@@ -442,7 +442,7 @@ Legacy `tt_` tokens are no longer accepted; they fail with `401 Invalid token fo
 
 ## Error Responses
 
-All endpoints return errors in this format:
+Nuxt/Pages `/api/*` routes return errors in this format:
 
 ```json
 {
@@ -452,10 +452,11 @@ All endpoints return errors in this format:
 }
 ```
 
-Unexpected gateway failures always return `500` with the fixed body
-`{"success": false, "error": "Internal server error"}`. The underlying exception is logged
+The public API gateway (`api.tarkovtracker.org`) uses its own envelope,
+`{"success": false, "error": "..."}`. Unexpected gateway failures always return `500` with the fixed
+body `{"success": false, "error": "Internal server error"}`; the underlying exception is logged
 server-side only, so clients must not parse `500` bodies for diagnostic detail. Client-correctable
-problems keep their specific `4xx` messages, in the same `{"success": false, "error": ... }` shape.
+problems keep their specific `4xx` messages in the same envelope.
 
 ---
 
