@@ -35,6 +35,8 @@ and have an agent verify the answer against the code.
    JSON normalization, and migration preflight
 10. [Promoted Twitch configuration](#10-promoted-twitch-configuration) — admin-managed stream
     selection, public resolution, and client polling
+11. [Boot-time asset-failure recovery](#11-boot-time-asset-failure-recovery) — recovering from
+    stale-chunk load failures before and after the app boots
 
 ---
 
@@ -935,6 +937,64 @@ flowchart LR
   independently stale edge state.
 - Mounted clients re-read configuration on the same 60-second cadence as live status, so an admin
   change takes effect without reload or redeploy within the next client poll after revalidation.
+
+## 11. Boot-time asset-failure recovery
+
+**Summary**: When a hashed chunk or the entry module fails to load — typically a stale
+`/_nuxt/*` request answered by the Cloudflare Pages SPA fallback (`HTTP 200`, `text/html`, cached 5
+hours) during a rolling deploy — the app recovers automatically. Recovery runs in two layers that
+share one retry budget: a pre-boot inline script for entry-module failures (the bundle never
+boots, so in-bundle code cannot run) and the in-app ChunkRecovery for lazy-chunk failures after
+boot.
+
+**Flow**
+
+```
+Page load
+  → inline recovery script registers in <head> (before the entry module)
+  → entry module fails? (error event on same-origin <script type="module">)
+      → cooldown budget available? → record attempt → reload once with ?_tt_retry=<ts>
+      → budget exhausted or storage write fails → stay on the broken page (manual refresh needed)
+  → app boots → lazy chunk fails? (ChunkLoadError / blocked network request)
+      → NuxtErrorBoundary / error handlers in app.vue → same budget check → hard reload once
+      → still failing → friendly localized error page (errors.chunk_load_blocked /
+        errors.network_access_denied)
+```
+
+**Step-by-step**
+
+1. `nuxt.config.ts` emits the inline recovery script from `app/utils/entryRecoveryScript.ts` via
+   `app.head.script`, so it lands in `<head>` before the entry module script in the built
+   `index.html`.
+2. The script registers a capture-phase `error` listener. It ignores classic scripts and
+   cross-origin scripts; for same-origin `type="module"` failures it checks the shared cooldown,
+   writes the attempt timestamp to sessionStorage, and reloads with a `_tt_retry` cache-buster so
+   the HTML request revalidates (`max-age=0, must-revalidate`) against the fresh deployment and
+   boots with the new chunk names.
+3. Once the app boots, `app/app.vue`'s ChunkRecovery handles lazy-chunk and network failures with
+   the same budget key, then surfaces localized error messages when recovery cannot succeed.
+
+### Files
+
+- `app/utils/entryRecoveryScript.ts` — the pre-boot inline script string.
+- `nuxt.config.ts` — `app.head.script` placement, before the entry module in `<head>`.
+- `app/app.vue` — ChunkRecovery: error patterns, cooldown check, hard reload, error page copy.
+- `app/locales/en.json` — `errors.chunk_load_blocked` / `errors.network_access_denied` keys.
+
+### Invariants
+
+- The inline script must not depend on the bundle and must execute before the entry module.
+- Recovery only triggers for `type="module"` script elements whose `src` parses (via the URL
+  constructor against the page) to exactly `window.location.origin`. No string-prefix checks —
+  they admit deceptive hosts such as `https://app.test.evil.example.com` and cross-host
+  protocol-relative URLs.
+- Both layers share the `tt:auto-reload-on-asset-error` sessionStorage key and the 120000 ms
+  cooldown: at most one recovery reload per 2 minutes per tab session, so a prolonged outage
+  cannot produce a reload loop.
+- A throwing sessionStorage write must abort the reload (return before `location.replace`),
+  otherwise storage breakage produces an unbounded reload loop.
+- The retry URL always carries `_tt_retry=<timestamp>` so the reload bypasses the browser's cached
+  HTML and revalidates against the current deployment.
 
 ## When this doc is wrong
 
