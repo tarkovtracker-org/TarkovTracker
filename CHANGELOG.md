@@ -1,3 +1,10 @@
+# [1.71.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.2...v1.71.0) (2026-08-15)
+
+
+### Features
+
+* **admin:** manage promoted Twitch stream ([#731](https://github.com/tarkovtracker-org/TarkovTracker/issues/731)) ([4ab7312](https://github.com/tarkovtracker-org/TarkovTracker/commit/4ab73121c5d3e62b8f37ce834ca0844dafc3d64e))
+
 ## [1.70.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.1...v1.70.2) (2026-08-14)
 
 
