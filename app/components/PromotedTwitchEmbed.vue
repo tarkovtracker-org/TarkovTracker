@@ -69,26 +69,35 @@
   </ClientOnly>
 </template>
 <script setup lang="ts">
+  import { logger } from '@/utils/logger';
   const DISMISS_KEY = 'tt-twitch-dismissed';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
-  const config = runtimeConfig.public.promotedTwitch as {
+  const fallback = runtimeConfig.public.promotedTwitch as {
     channel?: string;
     displayName?: string;
     enabled?: boolean;
-    endsAt?: string;
   };
-  const channel = config.channel?.trim().toLowerCase() || 'honeyxxo';
-  const displayName = config.displayName?.trim() || channel;
+  interface TwitchConfigResponse {
+    channel: string;
+    displayName: string;
+    enabled: boolean;
+  }
+  const normalizeChannel = (value: string | undefined): string => value?.trim().toLowerCase() || '';
+  const channel = ref(normalizeChannel(fallback.channel) || 'honeyxxo');
+  const displayName = ref(fallback.displayName?.trim() || channel.value);
+  const enabled = ref(fallback.enabled === true);
   const isVisible = ref(false);
   const isLive = ref(false);
   const dismissed = ref(false);
   const isExpanded = ref(true);
   const playerUrl = ref('');
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let refreshInFlight: Promise<void> | null = null;
+  let hasResolvedConfig = false;
   const buildPlayerUrl = (): string => {
     const params = new URLSearchParams({
-      channel,
+      channel: channel.value,
       parent: window.location.hostname,
       autoplay: 'true',
       muted: 'true',
@@ -98,6 +107,19 @@
   const toggleExpanded = (): void => {
     isExpanded.value = !isExpanded.value;
   };
+  const hidePlayer = (): void => {
+    isLive.value = false;
+    isVisible.value = false;
+    playerUrl.value = '';
+  };
+  const clearDismissal = (): void => {
+    dismissed.value = false;
+    try {
+      sessionStorage.removeItem(DISMISS_KEY);
+    } catch (error) {
+      logger.warn('[PromotedTwitchEmbed] Failed to clear stored dismissal', error);
+    }
+  };
   const dismiss = (): void => {
     dismissed.value = true;
     isVisible.value = false;
@@ -106,19 +128,36 @@
     } catch {}
   };
   const undismiss = (): void => {
-    dismissed.value = false;
-    try {
-      sessionStorage.removeItem(DISMISS_KEY);
-    } catch {}
+    clearDismissal();
     if (isLive.value) {
       playerUrl.value = buildPlayerUrl();
       isVisible.value = true;
     }
   };
+  const adoptChannel = (next: string): void => {
+    hidePlayer();
+    if (hasResolvedConfig) clearDismissal();
+    channel.value = next;
+  };
+  const resolveDisplayName = (value: string | undefined): string => value?.trim() || channel.value;
+  const applyConfig = (data: TwitchConfigResponse): void => {
+    const nextChannel = normalizeChannel(data.channel) || channel.value;
+    if (nextChannel !== channel.value) adoptChannel(nextChannel);
+    displayName.value = resolveDisplayName(data.displayName);
+    enabled.value = data.enabled;
+    hasResolvedConfig = true;
+  };
+  const loadConfig = async (): Promise<void> => {
+    try {
+      applyConfig(await $fetch<TwitchConfigResponse>('/api/twitch/config'));
+    } catch (error) {
+      logger.warn('[PromotedTwitchEmbed] Failed to refresh promoted stream config', error);
+    }
+  };
   const checkLive = async (): Promise<void> => {
     try {
       const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
-        query: { channel },
+        query: { channel: channel.value },
       });
       isLive.value = data.isLive;
       if (dismissed.value) return;
@@ -133,14 +172,26 @@
       isVisible.value = false;
     }
   };
-  onMounted(() => {
-    if (config.enabled === false) return;
-    if (config.endsAt && new Date(config.endsAt) < new Date()) return;
+  const runRefresh = async (): Promise<void> => {
+    await loadConfig();
+    if (!enabled.value) {
+      hidePlayer();
+      return;
+    }
+    await checkLive();
+  };
+  const refresh = (): Promise<void> => {
+    refreshInFlight ??= runRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+    return refreshInFlight;
+  };
+  onMounted(async () => {
     try {
       dismissed.value = sessionStorage.getItem(DISMISS_KEY) === '1';
     } catch {}
-    checkLive();
-    pollTimer = setInterval(checkLive, 60_000);
+    await refresh();
+    pollTimer = setInterval(refresh, 60_000);
   });
   onUnmounted(() => {
     if (pollTimer) clearInterval(pollTimer);

@@ -10,6 +10,24 @@ function isHttpError(error: unknown): error is { statusCode: number } {
   );
 }
 /**
+ * Normalize a configured Supabase base URL into a safe prefix for REST paths.
+ * Drops any query string or fragment and the trailing slash so appending
+ * `/rest/v1/...` cannot land after a `?` or `#`. Returns `''` when the value is
+ * missing, is not a parseable absolute URL, or does not use HTTPS so callers fail closed.
+ */
+export function normalizeSupabaseUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:') return '';
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+/**
  * Shared Supabase REST helper for admin server routes. Uses the service-role
  * key, bounds the request with an AbortController timeout so a stalled upstream
  * cannot hang the handler, and normalizes failures to a 502. Returns `null` for

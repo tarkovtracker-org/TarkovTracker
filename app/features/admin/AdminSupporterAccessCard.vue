@@ -55,7 +55,7 @@
       });
     } catch (error) {
       toast.add({
-        title: t('admin.supporter_override_failed_title'),
+        title: t('common.update_failed', 'Update failed'),
         description:
           error instanceof Error ? error.message : t('admin.supporter_override_failed_description'),
         color: 'error',
@@ -94,9 +94,7 @@
           <div class="flex items-end">
             <USwitch
               v-model="enabled"
-              :label="
-                enabled ? t('admin.supporter_enabled_label') : t('admin.supporter_disabled_label')
-              "
+              :label="enabled ? t('common.enabled', 'Enabled') : t('common.disabled', 'Disabled')"
             />
           </div>
         </div>

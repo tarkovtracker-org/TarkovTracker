@@ -33,6 +33,8 @@ and have an agent verify the answer against the code.
    freshness gate, abuse controls
 9. [Production database observer](#9-production-database-observer) — bounded read-only telemetry,
    JSON normalization, and migration preflight
+10. [Promoted Twitch configuration](#10-promoted-twitch-configuration) — admin-managed stream
+    selection, public resolution, and client polling
 
 ---
 
@@ -864,6 +866,75 @@ flowchart LR
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow.
+
+## 10. Promoted Twitch configuration
+
+**Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but
+an administrator can change the active channel, display name, and enabled state without a frontend
+redeploy. The override is stored in a service-role-only settings table, resolved by a public Nitro
+route, and refreshed by mounted clients once per minute.
+
+### Diagram
+
+```mermaid
+flowchart LR
+    Admin[Admin page] -->|Bearer token| Write[POST /api/admin/twitch-config]
+    Write --> Gate[Admin membership check]
+    Gate --> Settings[(public.app_settings)]
+    Write --> Audit[(admin_audit_log)]
+    Embed[PromotedTwitchEmbed] -->|every 60s| Read[GET /api/twitch/config]
+    Read --> Settings
+    Read --> Fallback[Public runtime config fallback]
+    Embed --> Live[GET /api/twitch/live]
+```
+
+### Flow
+
+1. `AdminTwitchConfigCard` loads the effective public configuration and obtains the current Supabase
+   access token before saving.
+2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
+   channel, display name, and enabled flag. It calls `update_promoted_twitch_config`, which updates the
+   `promoted_twitch` JSON value, advances its shared version, and writes the admin audit row in one
+   database transaction. A failure rolls back both writes.
+3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
+   missing table, missing row, malformed override, or unavailable database falls back safely instead
+   of breaking the embed. The route reads the database on every request and sends
+   `cache-control: public, max-age=0, must-revalidate`, so neither a Nitro isolate nor the edge can
+   serve an update without revalidating the database-backed value.
+4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
+   replace the player URL and clear a stored dismissal, disabling hides an active player, and an
+   unavailable config endpoint keeps the build-time fallback working. Refreshes are single-flight, so
+   a slow request cannot be overtaken by the next 60-second tick.
+
+### Files
+
+- `app/features/admin/AdminTwitchConfigCard.vue` — admin form and authenticated save flow.
+- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, and audit.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and revalidation.
+- `app/components/PromotedTwitchEmbed.vue` — minute polling and player state updates.
+- `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
+  transactional update/audit RPC.
+
+### Invariants
+
+- `public.app_settings` grants no table access to `PUBLIC`, `anon`, or `authenticated`; all reads and
+  writes go through server routes using the service role.
+- The admin write route must authenticate the user and verify `user_system.is_admin` before reading
+  the request body or changing settings.
+- Twitch channels are normalized to lowercase and limited to Twitch-compatible letters, digits, and
+  underscores with a maximum length of 25 characters. Display names are limited to 50 characters.
+- The settings update, version increment, and audit insert are one database transaction; none may
+  commit independently.
+- Invalid or unavailable database overrides never make the public route fail; build-time runtime
+  config remains the fallback.
+- The build-time fallback is opt-in: `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED` must be exactly `true` to
+  promote a stream without a database override or admin write. The admin-managed override can change
+  the effective channel, display name, and enabled state. A missing or malformed build-time flag
+  resolves to disabled.
+- Public responses must re-read the database-backed value instead of relying on module-local or
+  independently stale edge state.
+- Mounted clients re-read configuration on the same 60-second cadence as live status, so an admin
+  change takes effect without reload or redeploy within the next client poll after revalidation.
 
 ## When this doc is wrong
 
