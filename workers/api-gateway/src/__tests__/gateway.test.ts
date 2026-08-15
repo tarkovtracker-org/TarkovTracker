@@ -704,7 +704,7 @@ describe('api-gateway', () => {
       })
     );
     const res = await worker.fetch(postTaskRequest('task-main', { state: 'completed' }), BASE_ENV);
-    await expectErrorResponse(res, 500, 'Progress row not found for user');
+    await expectErrorResponse(res, 500, 'Internal server error');
   });
   it('does not lose unrelated keys when two writers merge concurrently', async () => {
     // Both writers read the same stale snapshot (GET always returns the
@@ -1486,7 +1486,7 @@ describe('api-gateway', () => {
       expect(res.headers.get('Access-Control-Allow-Origin')).toBeTruthy();
       const body = (await res.json()) as { success: boolean; error: string };
       expect(body.success).toBe(false);
-      expect(body.error).toBe('digest unavailable');
+      expect(body.error).toBe('Internal server error');
     } finally {
       digest.mockRestore();
     }
