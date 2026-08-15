@@ -176,6 +176,9 @@ const mountUseLeafletMap = async (
 describe('useLeafletMap', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockMapInstance.setView.mockReset();
+    mockMapInstance.options.zoomDelta = 1;
+    mockMapInstance.options.zoomSnap = 1;
     vi.useFakeTimers();
     lastSvgElement = null;
     containerRefForTest = ref(document.createElement('div')) as Ref<HTMLElement | null>;

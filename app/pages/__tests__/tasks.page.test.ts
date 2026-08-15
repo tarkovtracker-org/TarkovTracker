@@ -1,5 +1,5 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -295,6 +295,13 @@ describe('tasks page', () => {
       global: { stubs: defaultGlobalStubs },
     });
   };
+  const mountAttachedPage = async () => {
+    wrapper?.unmount();
+    wrapper = await mountSuspended(TasksPage, {
+      attachTo: document.body,
+      global: { stubs: defaultGlobalStubs },
+    });
+  };
   const getLeafletMarks = (): MapObjectiveMark[] => {
     const raw = wrapper.find('[data-testid="leaflet-map"]').attributes('data-marks') ?? '[]';
     return JSON.parse(raw) as MapObjectiveMark[];
@@ -346,6 +353,9 @@ describe('tasks page', () => {
     const module = await import('@/pages/tasks.vue');
     TasksPage = module.default;
     await mountPage();
+  });
+  afterEach(() => {
+    wrapper?.unmount();
   });
   it('renders task cards when tasks are available', async () => {
     expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true);
@@ -514,10 +524,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
-    wrapper = await mountSuspended(TasksPage, {
-      attachTo: document.body,
-      global: { stubs: defaultGlobalStubs },
-    });
+    await mountAttachedPage();
     const fullscreenToggle = wrapper.find('[data-testid="map-fullscreen-toggle"]');
     fullscreenToggle.element.focus();
     await fullscreenToggle.trigger('click');
@@ -539,14 +546,29 @@ describe('tasks page', () => {
     expect(wrapper.find('[data-testid="map-fullscreen-overlay"]').exists()).toBe(false);
     expect(document.activeElement).toBe(fullscreenToggle.element);
   });
+  it('names the map heading after the map and pairs both disclosure controls', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    await mountPage();
+    const headerToggle = wrapper.find('[data-testid="map-panel-toggle"]');
+    expect(headerToggle.attributes('aria-label')).toBeUndefined();
+    expect(headerToggle.text()).toContain('Map One');
+    const collapseToggle = wrapper.find('[data-testid="map-collapse-toggle"]');
+    expect(collapseToggle.attributes('aria-expanded')).toBe(
+      headerToggle.attributes('aria-expanded')
+    );
+    expect(collapseToggle.attributes('aria-controls')).toBe('tasks-map-panel-content');
+    await collapseToggle.trigger('click');
+    await flushTransition();
+    expect(headerToggle.attributes('aria-expanded')).toBe('false');
+    expect(collapseToggle.attributes('aria-expanded')).toBe('false');
+  });
   it('marks background content inert while the full screen map is open', async () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
-    wrapper = await mountSuspended(TasksPage, {
-      attachTo: document.body,
-      global: { stubs: defaultGlobalStubs },
-    });
+    await mountAttachedPage();
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
     await flushTransition();
     const overlay = wrapper.find('[data-testid="map-fullscreen-overlay"]');
@@ -562,10 +584,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
-    wrapper = await mountSuspended(TasksPage, {
-      attachTo: document.body,
-      global: { stubs: defaultGlobalStubs },
-    });
+    await mountAttachedPage();
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
     await flushTransition();
     const popover = document.createElement('div');
@@ -583,10 +602,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
-    wrapper = await mountSuspended(TasksPage, {
-      attachTo: document.body,
-      global: { stubs: defaultGlobalStubs },
-    });
+    await mountAttachedPage();
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
     await flushTransition();
     const handledEscape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
@@ -602,10 +618,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
-    wrapper = await mountSuspended(TasksPage, {
-      attachTo: document.body,
-      global: { stubs: defaultGlobalStubs },
-    });
+    await mountAttachedPage();
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
     await flushTransition();
     const popover = document.createElement('div');
@@ -626,10 +639,7 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskMapView = mapViewRef as unknown as string;
     metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
     leafletGetViewStateSpy.mockReturnValue({ center: [1, 2], zoom: 3 });
-    wrapper = await mountSuspended(TasksPage, {
-      attachTo: document.body,
-      global: { stubs: defaultGlobalStubs },
-    });
+    await mountAttachedPage();
     await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
     await flushTransition();
     const panelToggleElement = wrapper.find('[data-testid="map-panel-toggle"]').element;

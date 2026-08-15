@@ -21,7 +21,6 @@
                         data-testid="map-panel-toggle"
                         :aria-expanded="isMapPanelExpanded"
                         aria-controls="tasks-map-panel-content"
-                        :aria-label="t('page.tasks.map.toggle_panel')"
                         class="group hover:bg-surface-700/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-800 -m-1.5 flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                         @click="toggleMapPanelVisibility"
                       >
@@ -87,6 +86,8 @@
                       variant="ghost"
                       color="neutral"
                       size="sm"
+                      :aria-expanded="isMapPanelExpanded"
+                      aria-controls="tasks-map-panel-content"
                       :aria-label="
                         isMapPanelExpanded
                           ? t('page.tasks.map.hide_map')
@@ -736,6 +737,8 @@
     });
     inertBackgroundElements = [];
   };
+  const isInInertBackground = (element: HTMLElement): boolean =>
+    inertBackgroundElements.some((background) => background.contains(element));
   const readFullscreenMapView = (): MapViewState | null =>
     fullscreenLeafletMapRef.value?.getViewState?.() ?? null;
   const restoreInlineMapView = (view: MapViewState): void => {
@@ -751,7 +754,7 @@
     const overlayView = readFullscreenMapView();
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
-    if (overlayView) restoreInlineMapView(overlayView);
+    if (overlayView) nextTick(() => restoreInlineMapView(overlayView));
   };
   const PORTALLED_POPOVER_SELECTOR = '[data-reka-popper-content-wrapper]';
   const isFocusInsidePortalledPopover = (): boolean => {
@@ -759,10 +762,12 @@
     if (!(activeElement instanceof HTMLElement)) return false;
     return Boolean(activeElement.closest(PORTALLED_POPOVER_SELECTOR));
   };
-  const isPopoverLayerOpen = (): boolean =>
-    Boolean(
-      document.querySelector(`${PORTALLED_POPOVER_SELECTOR} [role="dialog"][data-state="open"]`)
+  const isPopoverLayerOpen = (): boolean => {
+    const layers = document.querySelectorAll<HTMLElement>(
+      `${PORTALLED_POPOVER_SELECTOR} [role="dialog"][data-state="open"]`
     );
+    return Array.from(layers).some((layer) => !isInInertBackground(layer));
+  };
   const shouldCloseOnEscape = (event: KeyboardEvent): boolean =>
     !event.defaultPrevented && !isPopoverLayerOpen();
   const resolveFullscreenTabTarget = (

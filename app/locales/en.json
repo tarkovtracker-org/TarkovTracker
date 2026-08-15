@@ -939,7 +939,6 @@
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",
-        "toggle_panel": "Toggle map panel",
         "show_map": "Show map",
         "hide_map": "Hide map",
         "fullscreen_label": "Full screen",

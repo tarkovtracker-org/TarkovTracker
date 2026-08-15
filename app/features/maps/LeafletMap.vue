@@ -1864,17 +1864,19 @@
       activePinnedPopupCleanup();
     }
   };
+  const hasLaidOutContainer = (instance: L.Map): boolean => {
+    const size = instance.getSize();
+    return size.x > 0 && size.y > 0;
+  };
   const getViewState = (): { center: [number, number]; zoom: number } | null => {
     const instance = mapInstance.value;
-    if (!instance) return null;
-    const size = instance.getSize();
-    if (size.x === 0 || size.y === 0) return null;
+    if (!instance || !hasLaidOutContainer(instance)) return null;
     const center = instance.getCenter();
     return { center: [center.lat, center.lng], zoom: instance.getZoom() };
   };
   const setViewState = (state: { center: [number, number]; zoom: number }): void => {
     const instance = mapInstance.value;
-    if (!instance || !state) return;
+    if (!instance || !hasLaidOutContainer(instance)) return;
     if (instance.getZoom() === state.zoom) {
       instance.panTo(state.center, { animate: false });
       return;
