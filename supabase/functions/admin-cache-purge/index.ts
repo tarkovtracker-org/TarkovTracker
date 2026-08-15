@@ -10,6 +10,9 @@ import {
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
 const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
 const TWITCH_CONFIG_CACHE_TAG = 'promoted-twitch-config';
+const TWITCH_CONFIG_PATH = '/api/twitch/config';
+const PURGE_TIMEOUT_MS = 8000;
+const PURGE_CHUNK_SIZE = 30;
 const TARKOV_CACHE_KEYS = [
   { key: 'bootstrap', includesGameMode: false },
   { key: 'tasks-core', includesGameMode: true },
@@ -93,12 +96,42 @@ async function logAdminAction(
     console.error('[admin-cache-purge] Failed to log audit action:', error);
   }
 }
-/**
- * Purge entire Cloudflare cache for the zone
- */
-async function purgeAllCache(zoneId: string, apiToken: string): Promise<CloudflarePurgeResponse> {
+function errorResponse(code: number, message: string): CloudflarePurgeResponse {
+  return { success: false, errors: [{ code, message }], messages: [] };
+}
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+function invalidJsonResponse(err: unknown): CloudflarePurgeResponse {
+  return errorResponse(500, `Invalid JSON response: ${errorMessage(err)}`);
+}
+function networkResponse(err: unknown): CloudflarePurgeResponse {
+  if (isAbortError(err)) {
+    return errorResponse(408, 'Request timed out after 8s');
+  }
+  return errorResponse(500, `Network error: ${errorMessage(err)}`);
+}
+async function parseResponse(response: Response): Promise<CloudflarePurgeResponse> {
+  if (!response.ok) {
+    const text = await response.text();
+    return errorResponse(response.status, `Cloudflare API error (${response.status}): ${text}`);
+  }
+  try {
+    return (await response.json()) as CloudflarePurgeResponse;
+  } catch (err) {
+    return invalidJsonResponse(err);
+  }
+}
+async function purgeCloudflareCache(
+  zoneId: string,
+  apiToken: string,
+  payload: Record<string, unknown>
+): Promise<CloudflarePurgeResponse> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), PURGE_TIMEOUT_MS);
   try {
     const response = await fetch(`${CLOUDFLARE_API_URL}/zones/${zoneId}/purge_cache`, {
       method: 'POST',
@@ -106,113 +139,117 @@ async function purgeAllCache(zoneId: string, apiToken: string): Promise<Cloudfla
         Authorization: `Bearer ${apiToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ purge_everything: true }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    clearTimeout(timeoutId);
-    if (!response.ok) {
-      const text = await response.text();
-      return {
-        success: false,
-        errors: [
-          { code: response.status, message: `Cloudflare API error (${response.status}): ${text}` },
-        ],
-        messages: [],
-      };
-    }
-    try {
-      return (await response.json()) as CloudflarePurgeResponse;
-    } catch (e) {
-      return {
-        success: false,
-        errors: [
-          {
-            code: 500,
-            message: `Invalid JSON response: ${e instanceof Error ? e.message : String(e)}`,
-          },
-        ],
-        messages: [],
-      };
-    }
+    return await parseResponse(response);
   } catch (err) {
-    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
-    return {
-      success: false,
-      errors: [
-        {
-          code: isTimeout ? 408 : 500,
-          message: isTimeout
-            ? 'Request timed out after 8s'
-            : `Network error: ${err instanceof Error ? err.message : String(err)}`,
-        },
-      ],
-      messages: [],
-    };
+    return networkResponse(err);
   } finally {
     clearTimeout(timeoutId);
   }
 }
 /**
- * Purge the promoted Twitch config cache entry by tag.
+ * Produce the origin variants (apex and www) for a given base URL so cache
+ * entries served on either hostname are both purged.
+ */
+function buildCacheOrigins(baseUrl: string): string[] {
+  const parsed = new URL(baseUrl);
+  const host = parsed.hostname;
+  const portSuffix = parsed.port ? `:${parsed.port}` : '';
+  const origins = [parsed.origin];
+  if (host.startsWith('www.')) {
+    origins.push(`${parsed.protocol}//${host.replace(/^www\./, '')}${portSuffix}`);
+  } else {
+    origins.push(`${parsed.protocol}//www.${host}${portSuffix}`);
+  }
+  return origins;
+}
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+function buildEntryUrls(
+  cacheBase: string,
+  entry: { key: string; includesGameMode: boolean }
+): string[] {
+  const urls: string[] = [];
+  for (const lang of TARKOV_LANGUAGES) {
+    if (entry.includesGameMode) {
+      for (const gameMode of TARKOV_GAME_MODES) {
+        urls.push(`${cacheBase}/${entry.key}-${lang}-${gameMode}`);
+      }
+    } else {
+      urls.push(`${cacheBase}/${entry.key}-${lang}`);
+    }
+  }
+  return urls;
+}
+function buildTarkovCacheUrls(baseUrl: string): string[] {
+  const urls: string[] = [];
+  for (const origin of buildCacheOrigins(baseUrl)) {
+    const cacheBase = `${origin}${EDGE_CACHE_PATH}`;
+    for (const entry of TARKOV_CACHE_KEYS) {
+      urls.push(...buildEntryUrls(cacheBase, entry));
+    }
+  }
+  return urls;
+}
+function buildTwitchConfigUrls(baseUrl: string): string[] {
+  return buildCacheOrigins(baseUrl).map((origin) => `${origin}${TWITCH_CONFIG_PATH}`);
+}
+function combinePurgeFailures(
+  first: CloudflarePurgeResponse,
+  second: CloudflarePurgeResponse
+): CloudflarePurgeResponse {
+  return { success: false, errors: [...first.errors, ...second.errors], messages: [] };
+}
+function purgeSuccessMessage(purgeType: PurgeRequest['purgeType']): string {
+  if (purgeType === 'all') return 'All cache purged successfully';
+  if (purgeType === 'twitch-config') return 'Twitch config cache purged successfully';
+  return 'Tarkov data cache purged successfully';
+}
+/**
+ * Purge entire Cloudflare cache for the zone
+ */
+function purgeAllCache(zoneId: string, apiToken: string): Promise<CloudflarePurgeResponse> {
+  return purgeCloudflareCache(zoneId, apiToken, { purge_everything: true });
+}
+/**
+ * Purge the promoted Twitch config cache entry by tag, falling back to a
+ * purge-by-URL when the zone rejects tag purges.
  */
 async function purgeTwitchConfigCache(
   zoneId: string,
-  apiToken: string
+  apiToken: string,
+  baseUrl: string
 ): Promise<CloudflarePurgeResponse> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(`${CLOUDFLARE_API_URL}/zones/${zoneId}/purge_cache`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ tags: [TWITCH_CONFIG_CACHE_TAG] }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!response.ok) {
-      const text = await response.text();
-      return {
-        success: false,
-        errors: [
-          { code: response.status, message: `Cloudflare API error (${response.status}): ${text}` },
-        ],
-        messages: [],
-      };
-    }
-    try {
-      return (await response.json()) as CloudflarePurgeResponse;
-    } catch (e) {
-      return {
-        success: false,
-        errors: [
-          {
-            code: 500,
-            message: `Invalid JSON response: ${e instanceof Error ? e.message : String(e)}`,
-          },
-        ],
-        messages: [],
-      };
-    }
-  } catch (err) {
-    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
-    return {
-      success: false,
-      errors: [
-        {
-          code: isTimeout ? 408 : 500,
-          message: isTimeout
-            ? 'Request timed out after 8s'
-            : `Network error: ${err instanceof Error ? err.message : String(err)}`,
-        },
-      ],
-      messages: [],
-    };
-  } finally {
-    clearTimeout(timeoutId);
+  const tagPurge = await purgeCloudflareCache(zoneId, apiToken, {
+    tags: [TWITCH_CONFIG_CACHE_TAG],
+  });
+  if (tagPurge.success) return tagPurge;
+  const urlPurge = await purgeCloudflareCache(zoneId, apiToken, {
+    files: buildTwitchConfigUrls(baseUrl),
+  });
+  if (urlPurge.success) return urlPurge;
+  return combinePurgeFailures(tagPurge, urlPurge);
+}
+function markPurgeFailure(
+  aggregate: CloudflarePurgeResponse,
+  result: CloudflarePurgeResponse
+): void {
+  if (!result.success) {
+    aggregate.success = false;
+    aggregate.errors.push(...(result.errors ?? []));
   }
+  aggregate.messages.push(...(result.messages ?? []));
+}
+function collectPurgeIds(ids: string[], result: CloudflarePurgeResponse): void {
+  const id = result.result?.id;
+  if (id) ids.push(id);
 }
 /**
  * Purge specific Tarkov data cache URLs
@@ -222,108 +259,20 @@ async function purgeTarkovDataCache(
   apiToken: string,
   baseUrl: string
 ): Promise<CloudflarePurgeResponse> {
-  const parsed = new URL(baseUrl);
-  const origins = new Set<string>();
-  origins.add(parsed.origin);
-  const host = parsed.hostname;
-  const portSuffix = parsed.port ? `:${parsed.port}` : '';
-  if (host.startsWith('www.')) {
-    origins.add(`${parsed.protocol}//${host.replace(/^www\./, '')}${portSuffix}`);
-  } else {
-    origins.add(`${parsed.protocol}//www.${host}${portSuffix}`);
-  }
-  const baseUrls = Array.from(origins);
-  const urlsToPurge: string[] = [];
-  for (const base of baseUrls) {
-    const cacheBase = `${base}${EDGE_CACHE_PATH}`;
-    for (const entry of TARKOV_CACHE_KEYS) {
-      for (const lang of TARKOV_LANGUAGES) {
-        if (entry.includesGameMode) {
-          for (const gameMode of TARKOV_GAME_MODES) {
-            urlsToPurge.push(`${cacheBase}/${entry.key}-${lang}-${gameMode}`);
-          }
-        } else {
-          urlsToPurge.push(`${cacheBase}/${entry.key}-${lang}`);
-        }
-      }
-    }
-  }
-  // Cloudflare limits files to 30 per call
-  const CHUNK_SIZE = 30;
-  const chunks: string[][] = [];
-  for (let i = 0; i < urlsToPurge.length; i += CHUNK_SIZE) {
-    chunks.push(urlsToPurge.slice(i, i + CHUNK_SIZE));
-  }
-  const aggregatedResult: CloudflarePurgeResponse = {
+  const aggregate: CloudflarePurgeResponse = {
     success: true,
     errors: [],
     messages: [],
     result: { id: '' },
   };
   const resultIds: string[] = [];
-  // Execute purge for each chunk
-  for (const chunk of chunks) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await fetch(`${CLOUDFLARE_API_URL}/zones/${zoneId}/purge_cache`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ files: chunk }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        aggregatedResult.success = false;
-        aggregatedResult.errors.push({
-          code: response.status,
-          message: `Cloudflare API error (${response.status} ${response.statusText}): ${text}`,
-        });
-        continue;
-      }
-      let data: CloudflarePurgeResponse;
-      try {
-        data = (await response.json()) as CloudflarePurgeResponse;
-      } catch (e) {
-        aggregatedResult.success = false;
-        aggregatedResult.errors.push({
-          code: 500,
-          message: `Invalid JSON response: ${e instanceof Error ? e.message : String(e)}`,
-        });
-        continue;
-      }
-      if (!data.success) {
-        aggregatedResult.success = false;
-        if (data.errors) {
-          aggregatedResult.errors.push(...data.errors);
-        }
-      }
-      if (data.messages) {
-        aggregatedResult.messages.push(...data.messages);
-      }
-      if (data.result?.id) {
-        resultIds.push(data.result.id);
-      }
-    } catch (err) {
-      const isTimeout = err instanceof DOMException && err.name === 'AbortError';
-      console.error('[admin-cache-purge] Error purging chunk:', err);
-      aggregatedResult.success = false;
-      aggregatedResult.errors.push({
-        code: isTimeout ? 408 : 500,
-        message: isTimeout
-          ? 'Request timed out after 8s'
-          : `Network error: ${err instanceof Error ? err.message : String(err)}`,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+  for (const chunk of chunkArray(buildTarkovCacheUrls(baseUrl), PURGE_CHUNK_SIZE)) {
+    const result = await purgeCloudflareCache(zoneId, apiToken, { files: chunk });
+    markPurgeFailure(aggregate, result);
+    collectPurgeIds(resultIds, result);
   }
-  // Combine IDs from all successful chunks
-  aggregatedResult.result = { id: resultIds.join(',') };
-  return aggregatedResult;
+  aggregate.result = { id: resultIds.join(',') };
+  return aggregate;
 }
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -348,7 +297,9 @@ Deno.serve(async (req) => {
     const rawBody = await req.text();
     let body: Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' | 'twitch-config' }>;
     try {
-      body = JSON.parse(rawBody) as Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' }>;
+      body = JSON.parse(rawBody) as Partial<
+        PurgeRequest & { purge_type?: 'all' | 'tarkov-data' | 'twitch-config' }
+      >;
       // Support both camelCase (new) and snake_case (legacy) for backward compatibility
       if (!body.purgeType && !body.purge_type) {
         body.purgeType = 'tarkov-data';
@@ -381,15 +332,16 @@ Deno.serve(async (req) => {
       console.error('[admin-cache-purge] Missing Cloudflare credentials');
       return createErrorResponse('Cloudflare credentials not configured', 500, req);
     }
-    // Get base URL for cache key construction (Tarkov data purges only)
-    const baseUrl = Deno.env.get('APP_URL')?.trim();
-    if (purgeType === 'tarkov-data') {
-      if (!baseUrl) {
+    // Get base URL for cache key construction (non-"all" purges only)
+    const rawBaseUrl = Deno.env.get('APP_URL')?.trim();
+    let baseUrl = '';
+    if (purgeType !== 'all') {
+      if (!rawBaseUrl) {
         console.error('[admin-cache-purge] Missing APP_URL');
         return createErrorResponse('Application URL not configured', 500, req);
       }
       try {
-        const protocol = new URL(baseUrl).protocol;
+        const protocol = new URL(rawBaseUrl).protocol;
         if (protocol !== 'http:' && protocol !== 'https:') {
           throw new Error('Unsupported APP_URL protocol');
         }
@@ -397,17 +349,16 @@ Deno.serve(async (req) => {
         console.error('[admin-cache-purge] Invalid APP_URL');
         return createErrorResponse('Application URL invalid', 500, req);
       }
+      baseUrl = rawBaseUrl;
     }
     // Execute cache purge
     let purgeResult: CloudflarePurgeResponse;
     if (purgeType === 'all') {
       purgeResult = await purgeAllCache(zoneId, apiToken);
     } else if (purgeType === 'twitch-config') {
-      purgeResult = await purgeTwitchConfigCache(zoneId, apiToken);
-    } else if (baseUrl) {
-      purgeResult = await purgeTarkovDataCache(zoneId, apiToken, baseUrl);
+      purgeResult = await purgeTwitchConfigCache(zoneId, apiToken, baseUrl);
     } else {
-      return createErrorResponse('Application URL not configured', 500, req);
+      purgeResult = await purgeTarkovDataCache(zoneId, apiToken, baseUrl);
     }
     // Log the admin action
     await logAdminAction(
@@ -435,12 +386,7 @@ Deno.serve(async (req) => {
     return createSuccessResponse(
       {
         success: true,
-        message:
-          purgeType === 'all'
-            ? 'All cache purged successfully'
-            : purgeType === 'twitch-config'
-              ? 'Twitch config cache purged successfully'
-              : 'Tarkov data cache purged successfully',
+        message: purgeSuccessMessage(purgeType),
         purgeType: purgeType,
         cloudflareResultId: purgeResult.result?.id,
         timestamp: new Date().toISOString(),

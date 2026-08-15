@@ -60,32 +60,14 @@ async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; ver
 }
 async function purgeConfigCache(runtime: Record<string, unknown>, event: H3Event): Promise<void> {
   const supabaseUrl = readSupabaseUrl(runtime);
-  const anonKey = runtime.supabaseAnonKey;
-  const authHeader = getRequestHeader(event, 'authorization');
-  if (!supabaseUrl || !authHeader) {
+  const authHeader = readAuthHeader(event);
+  if (!supabaseUrl) {
     throw createError({ statusCode: 500, message: 'Cache purge config missing' });
   }
   try {
-    const response = await fetch(`${supabaseUrl}${EDGE_FUNCTION_PATH}`, {
-      method: 'POST',
-      headers: {
-        Authorization: authHeader,
-        apikey: typeof anonKey === 'string' ? anonKey : '',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ purgeType: 'twitch-config' }),
-    });
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw createError({
-        statusCode: 502,
-        message: `Twitch config saved but cache purge failed (${response.status})${detail ? `: ${detail}` : ''}`,
-      });
-    }
+    await invokeCachePurge(supabaseUrl, readAnonKey(runtime), authHeader);
   } catch (error) {
-    if (error && typeof error === 'object' && 'statusCode' in error) {
-      throw error;
-    }
+    if (isHttpError(error)) throw error;
     logger.error('[AdminTwitchConfig] Failed to purge Twitch config cache', {
       action: 'purge_promoted_twitch_config',
       adminUserId: readAdminUserIdForLog(event),
@@ -96,6 +78,42 @@ async function purgeConfigCache(runtime: Record<string, unknown>, event: H3Event
       message: 'Twitch config saved but cache purge failed',
     });
   }
+}
+function readAnonKey(runtime: Record<string, unknown>): string {
+  return typeof runtime.supabaseAnonKey === 'string' ? runtime.supabaseAnonKey : '';
+}
+function readAuthHeader(event: H3Event): string {
+  const authHeader = getRequestHeader(event, 'authorization');
+  if (!authHeader) {
+    throw createError({ statusCode: 500, message: 'Cache purge config missing' });
+  }
+  return authHeader;
+}
+function isHttpError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'statusCode' in error;
+}
+async function invokeCachePurge(
+  supabaseUrl: string,
+  anonKey: string,
+  authHeader: string
+): Promise<void> {
+  const response = await fetch(`${supabaseUrl}${EDGE_FUNCTION_PATH}`, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ purgeType: 'twitch-config' }),
+  });
+  if (response.ok) return;
+  throw await buildPurgeFailureError(response);
+}
+async function buildPurgeFailureError(response: Response): Promise<Error> {
+  const detail = await response.text().catch(() => '');
+  const suffix = detail ? `: ${detail}` : '';
+  const message = `Twitch config saved but cache purge failed (${response.status})${suffix}`;
+  return createError({ statusCode: 502, message });
 }
 async function updateConfig(
   supabaseUrl: string,

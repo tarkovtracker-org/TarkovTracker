@@ -906,8 +906,9 @@ flowchart LR
    database transaction. A failure rolls back both writes.
 3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
    with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
-   `promoted-twitch-config` cache tag. A failed purge fails the save (`502`) so a broken
-   invalidation is never silent.
+   `promoted-twitch-config` cache tag. If the zone rejects tag purges, the edge function falls back
+   to purging the `/api/twitch/config` URL (apex and `www` variants). A failed purge fails the save
+   (`502`) so a broken invalidation is never silent.
 4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
    of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
@@ -937,7 +938,7 @@ flowchart LR
 - `app/composables/usePromotedTwitch.ts` — shared client config state for cross-component
   propagation.
 - `supabase/functions/admin-cache-purge/index.ts` — Cloudflare Purge API calls, including the
-  `twitch-config` tag purge.
+  `twitch-config` tag purge with a purge-by-URL fallback.
 - `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
   transactional update/audit RPC.
 

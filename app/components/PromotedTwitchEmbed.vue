@@ -173,20 +173,28 @@
     });
     return configInFlight;
   };
+  const updatePlayerVisibility = (live: boolean): void => {
+    if (!live) {
+      isVisible.value = false;
+      return;
+    }
+    if (!isVisible.value) {
+      playerUrl.value = buildPlayerUrl();
+      isVisible.value = true;
+    }
+  };
+  const applyLiveResult = (live: boolean): void => {
+    isLive.value = live;
+    if (dismissed.value || !enabled.value) return;
+    updatePlayerVisibility(live);
+  };
   const checkLive = (): Promise<void> => {
     liveInFlight ??= (async () => {
       try {
         const data = await $fetch<{ isLive: boolean }>('/api/twitch/live', {
           query: { channel: channel.value },
         });
-        isLive.value = data.isLive;
-        if (dismissed.value || !enabled.value) return;
-        if (data.isLive && !isVisible.value) {
-          playerUrl.value = buildPlayerUrl();
-          isVisible.value = true;
-        } else if (!data.isLive) {
-          isVisible.value = false;
-        }
+        applyLiveResult(data.isLive);
       } catch {
         isLive.value = false;
         isVisible.value = false;
