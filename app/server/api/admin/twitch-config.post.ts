@@ -4,7 +4,7 @@ import { createLogger } from '@/server/utils/logger';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
 const EDGE_FUNCTION_PATH = '/functions/v1/admin-cache-purge';
-const PURGE_TIMEOUT_MS = 10_000;
+const PURGE_TIMEOUT_MS = 25_000;
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
 const DISPLAY_NAME_MAX_LENGTH = 50;
 interface AdminTwitchConfigBody {
