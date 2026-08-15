@@ -16,7 +16,7 @@ function isHttpError(error: unknown): error is { statusCode: number } {
  * missing, is not a parseable absolute URL, or does not use HTTPS so callers fail closed.
  */
 export function normalizeSupabaseUrl(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim()) return '';
+  if (typeof value !== 'string') return '';
   try {
     const url = new URL(value.trim());
     if (url.protocol !== 'https:') return '';

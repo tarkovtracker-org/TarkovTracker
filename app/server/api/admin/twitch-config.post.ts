@@ -23,18 +23,20 @@ interface AdminAuthUser {
   id?: string;
   email?: string;
 }
-export default defineEventHandler(async (event) => {
-  try {
-    return await handleUpdate(event);
-  } catch (error) {
-    logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
-      action: 'update_promoted_twitch_config',
-      adminUserId: readAdminUserIdForLog(event),
-      error,
-    });
-    throw error;
+export default defineEventHandler(
+  async (event): Promise<{ config: TwitchConfig; version: number }> => {
+    try {
+      return await handleUpdate(event);
+    } catch (error) {
+      logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
+        action: 'update_promoted_twitch_config',
+        adminUserId: readAdminUserIdForLog(event),
+        error,
+      });
+      throw error;
+    }
   }
-});
+);
 async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; version: number }> {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
   const supabaseUrl = readSupabaseUrl(runtime);

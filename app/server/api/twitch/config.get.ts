@@ -86,7 +86,7 @@ function readFallback(runtime: Record<string, unknown>): TwitchFallback {
   const publicConfig = runtime.public as { promotedTwitch?: TwitchFallback } | undefined;
   return publicConfig?.promotedTwitch ?? {};
 }
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event): Promise<TwitchConfig> => {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
   const fallback = readFallback(runtime);
   const override = await readOverride(runtime);
