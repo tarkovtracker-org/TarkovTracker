@@ -66,6 +66,30 @@
     if (error instanceof Error) return serverMessage(error) ?? error.message;
     return t('admin.twitch_config_failed_description', 'Could not update Twitch config.');
   };
+  const showSaveResult = (saved: TwitchConfigSaveResult): void => {
+    if (saved.cacheInvalidated) {
+      toast.add({
+        title: t('admin.twitch_config_saved_title', 'Twitch config updated'),
+        description: t(
+          'admin.twitch_config_saved_description',
+          { channel: channel.value },
+          'Promoted stream is now {channel}.'
+        ),
+        color: 'success',
+        icon: 'i-mdi-check-circle',
+      });
+      return;
+    }
+    toast.add({
+      title: t('admin.twitch_config_saved_with_warning_title', 'Twitch config saved'),
+      description: t(
+        'admin.twitch_config_saved_with_warning_description',
+        'The config was saved, but cached visitors may see the previous value until cache invalidation recovers.'
+      ),
+      color: 'warning',
+      icon: 'i-mdi-alert',
+    });
+  };
   const saveConfig = async () => {
     if (!canSave.value) return;
     isSaving.value = true;
@@ -87,28 +111,7 @@
       });
       applyConfig(saved.config);
       applySharedConfig({ ...saved.config, version: saved.version });
-      if (saved.cacheInvalidated) {
-        toast.add({
-          title: t('admin.twitch_config_saved_title', 'Twitch config updated'),
-          description: t(
-            'admin.twitch_config_saved_description',
-            { channel: channel.value },
-            'Promoted stream is now {channel}.'
-          ),
-          color: 'success',
-          icon: 'i-mdi-check-circle',
-        });
-      } else {
-        toast.add({
-          title: t('admin.twitch_config_saved_with_warning_title', 'Twitch config saved'),
-          description: t(
-            'admin.twitch_config_saved_with_warning_description',
-            'The config was saved, but cached visitors may see the previous value until cache invalidation recovers.'
-          ),
-          color: 'warning',
-          icon: 'i-mdi-alert',
-        });
-      }
+      showSaveResult(saved);
     } catch (error) {
       logger.warn('[AdminTwitchConfigCard] Failed to save Twitch config', error);
       toast.add({

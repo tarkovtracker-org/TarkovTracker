@@ -147,17 +147,26 @@
     channel.value = next;
   };
   const resolveDisplayName = (value: string | undefined): string => value?.trim() || channel.value;
+  const applyConfigChannel = (value: string): boolean => {
+    const nextChannel = normalizeChannel(value) || channel.value;
+    if (nextChannel === channel.value) return false;
+    adoptChannel(nextChannel);
+    return true;
+  };
+  const shouldCheckChangedChannel = (
+    channelChanged: boolean,
+    nextEnabled: boolean,
+    enabledChanged: boolean
+  ): boolean => channelChanged && nextEnabled && !enabledChanged;
   const applyLocalConfig = (data: TwitchConfigResponse): void => {
     if (data.version < configVersion) return;
     configVersion = data.version;
     const enabledChanged = data.enabled !== enabled.value;
-    const nextChannel = normalizeChannel(data.channel) || channel.value;
-    const channelChanged = nextChannel !== channel.value;
-    if (channelChanged) adoptChannel(nextChannel);
+    const channelChanged = applyConfigChannel(data.channel);
     displayName.value = resolveDisplayName(data.displayName);
     enabled.value = data.enabled;
     hasResolvedConfig = true;
-    if (channelChanged && data.enabled && !enabledChanged) void checkLive();
+    if (shouldCheckChangedChannel(channelChanged, data.enabled, enabledChanged)) void checkLive();
   };
   const refreshConfig = (): Promise<void> => {
     configInFlight ??= (async () => {
@@ -181,18 +190,14 @@
       isVisible.value = true;
     }
   };
+  const isCurrentLiveRequest = (requestedChannel: string, requestedGeneration: number): boolean =>
+    requestedChannel === channel.value && requestedGeneration === liveGeneration && enabled.value;
   const applyLiveResult = (
     requestedChannel: string,
     requestedGeneration: number,
     live: boolean
   ): void => {
-    if (
-      requestedChannel !== channel.value ||
-      requestedGeneration !== liveGeneration ||
-      !enabled.value
-    ) {
-      return;
-    }
+    if (!isCurrentLiveRequest(requestedChannel, requestedGeneration)) return;
     isLive.value = live;
     if (dismissed.value) return;
     updatePlayerVisibility(live);
