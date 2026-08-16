@@ -17,6 +17,17 @@ const mockProgressStore = {
 vi.mock('@/stores/useProgress', () => ({
   useProgressStore: () => mockProgressStore,
 }));
+const defaultMarkerColors: Record<string, string> = { PINNED_OBJECTIVE: '#7c3bed' };
+const mockPreferencesStore = {
+  getPinnedTaskIds: [] as string[],
+  getMapShowPinnedObjectives: true,
+  getMapShowSelfObjectives: true,
+  getMapShowTeamObjectives: true,
+  getMapMarkerColors: { ...defaultMarkerColors },
+};
+vi.mock('@/stores/usePreferences', () => ({
+  usePreferencesStore: () => mockPreferencesStore,
+}));
 describe('MapRequiredItemsSummary', () => {
   const mapId = 'customs';
   const task: Task = {
@@ -60,8 +71,30 @@ describe('MapRequiredItemsSummary', () => {
         },
       },
     });
+  const pinnedTask: Task = {
+    id: 'task-pinned',
+    name: 'Pinned Task',
+    objectives: [
+      {
+        id: 'pinned-obj-1',
+        type: 'plantItem',
+        maps: [{ id: 'customs' }],
+        items: [{ id: 'item-pinned', name: 'Pinned Item', shortName: 'PI' }],
+        count: 1,
+      },
+    ] as TaskObjective[],
+  } as Task;
+  const equipmentIds = (element: { attributes: (key: string) => string | undefined }) =>
+    (JSON.parse(element.attributes('data-equipment') ?? '[]') as Array<{ id: string }>).map(
+      (item) => item.id
+    );
   beforeEach(() => {
     mockProgressStore.objectiveCompletions = {};
+    mockPreferencesStore.getPinnedTaskIds = [];
+    mockPreferencesStore.getMapShowPinnedObjectives = true;
+    mockPreferencesStore.getMapShowSelfObjectives = true;
+    mockPreferencesStore.getMapShowTeamObjectives = true;
+    mockPreferencesStore.getMapMarkerColors = { ...defaultMarkerColors };
   });
   it('aggregates bring-mode equipment for the selected map with counts', () => {
     const wrapper = mountSummary([task]);
@@ -121,5 +154,61 @@ describe('MapRequiredItemsSummary', () => {
     };
     const wrapper = mountSummary([task]);
     expect(wrapper.find('.bg-surface-800/50').exists()).toBe(false);
+  });
+  it('splits pinned tasks into a leading accented group', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    const wrapper = mountSummary([task, pinnedTask]);
+    const groups = wrapper.findAll('[data-variant="equipment"]');
+    expect(groups).toHaveLength(2);
+    expect(equipmentIds(groups[0]!)).toEqual(['item-pinned']);
+    expect(equipmentIds(groups[1]!)).toEqual(['item-1']);
+    expect(wrapper.text()).toContain('page.tasks.pinned_tasks_section');
+    expect(wrapper.text()).toContain('page.tasks.map.active_tasks_group');
+  });
+  it('applies the custom pinned marker colour as the group accent', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    mockPreferencesStore.getMapMarkerColors = { PINNED_OBJECTIVE: '#123456' };
+    const wrapper = mountSummary([pinnedTask]);
+    expect(wrapper.html()).toContain('#123456');
+  });
+  it('renders no group titles when nothing is pinned', () => {
+    const wrapper = mountSummary([task]);
+    expect(wrapper.text()).toContain('page.tasks.map.required_items_summary');
+    expect(wrapper.text()).not.toContain('page.tasks.pinned_tasks_section');
+    expect(wrapper.text()).not.toContain('page.tasks.map.active_tasks_group');
+  });
+  it('hides the pinned group when the pinned chip is off', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    mockPreferencesStore.getMapShowPinnedObjectives = false;
+    const wrapper = mountSummary([task, pinnedTask]);
+    const groups = wrapper.findAll('[data-variant="equipment"]');
+    expect(groups).toHaveLength(1);
+    expect(equipmentIds(groups[0]!)).toEqual(['item-1']);
+    expect(wrapper.text()).not.toContain('page.tasks.pinned_tasks_section');
+    expect(wrapper.text()).not.toContain('page.tasks.map.active_tasks_group');
+  });
+  it('hides the active group when the regular chip is off', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    mockPreferencesStore.getMapShowSelfObjectives = false;
+    const wrapper = mountSummary([task, pinnedTask]);
+    const groups = wrapper.findAll('[data-variant="equipment"]');
+    expect(groups).toHaveLength(1);
+    expect(equipmentIds(groups[0]!)).toEqual(['item-pinned']);
+    expect(wrapper.text()).toContain('page.tasks.pinned_tasks_section');
+  });
+  it('renders nothing when both chips are off', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    mockPreferencesStore.getMapShowPinnedObjectives = false;
+    mockPreferencesStore.getMapShowSelfObjectives = false;
+    const wrapper = mountSummary([task, pinnedTask]);
+    expect(wrapper.findAll('[data-variant]')).toHaveLength(0);
+    expect(wrapper.text().trim()).toBe('');
+  });
+  it('ignores the team chip', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    const withTeam = mountSummary([task, pinnedTask]).html();
+    mockPreferencesStore.getMapShowTeamObjectives = false;
+    const withoutTeam = mountSummary([task, pinnedTask]).html();
+    expect(withoutTeam).toBe(withTeam);
   });
 });
