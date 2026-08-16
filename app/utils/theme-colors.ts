@@ -82,6 +82,8 @@ export const THEME_COLORS = {
 export const MAP_MARKER_COLORS = {
   /** Self objectives - matches --color-warning-500 */
   SELF_OBJECTIVE: '#f59e0b',
+  /** Pinned task objectives - matches --color-selection-500 */
+  PINNED_OBJECTIVE: '#7c3bed',
   /** Team objectives - matches --color-info-400 */
   TEAM_OBJECTIVE: '#3c9add',
   /** Selected/pinned marker - matches --color-selection-500 */
@@ -112,9 +114,34 @@ export type MapMarkerColors = Record<MapMarkerColorKey, string>;
 export type MapColorOption = { key: MapMarkerColorKey; label: string };
 type MapColorOptionTranslator = (key: string) => string;
 export const MAP_MARKER_COLOR_KEYS = Object.keys(MAP_MARKER_COLORS) as MapMarkerColorKey[];
+/**
+ * Frozen snapshot of the marker color keys as they existed BEFORE the
+ * PINNED_OBJECTIVE key was introduced. Used only by `hasExactLegacyDefaults`
+ * below. Users who persisted `mapMarkerColors` prior to this change will not
+ * have a `PINNED_OBJECTIVE` entry in their stored value; if that check looped
+ * over the current `MAP_MARKER_COLOR_KEYS` (which now includes
+ * `PINNED_OBJECTIVE`), it would find the key missing and incorrectly report
+ * that the stored value is NOT an exact legacy default, silently breaking
+ * `migrateLegacyMapMarkerColors` for existing users. Do NOT add new keys to
+ * this list when new marker colors are introduced in the future.
+ */
+const LEGACY_MAP_MARKER_COLOR_KEYS: MapMarkerColorKey[] = [
+  'SELF_OBJECTIVE',
+  'TEAM_OBJECTIVE',
+  'SELECTED',
+  'PMC_EXTRACT',
+  'SCAV_EXTRACT',
+  'SHARED_EXTRACT',
+  'COOP_EXTRACT',
+  'PMC_SPAWN',
+  'DEFAULT_EXTRACT',
+  'MARKER_BORDER',
+  'EXTRACT_DOT_BORDER',
+];
 export const getMapColorOptions = (t: MapColorOptionTranslator): MapColorOption[] => {
   return [
     { key: 'SELF_OBJECTIVE', label: t('settings.interface.maps.colors.self_objective') },
+    { key: 'PINNED_OBJECTIVE', label: t('settings.interface.maps.colors.pinned_objective') },
     { key: 'TEAM_OBJECTIVE', label: t('settings.interface.maps.colors.team_objective') },
     { key: 'SELECTED', label: t('settings.interface.maps.colors.selected') },
     { key: 'PMC_EXTRACT', label: t('common.pmc_extract') },
@@ -140,7 +167,7 @@ const normalizeHex = (value: string): string => value.trim().toLowerCase();
 const hasExactLegacyDefaults = (value: unknown): value is MapMarkerColors => {
   if (!value || typeof value !== 'object') return false;
   const candidateColors = value as Record<string, unknown>;
-  for (const key of MAP_MARKER_COLOR_KEYS) {
+  for (const key of LEGACY_MAP_MARKER_COLOR_KEYS) {
     const rawCandidate = candidateColors[key];
     if (typeof rawCandidate !== 'string') return false;
     if (normalizeHex(rawCandidate) !== normalizeHex(LEGACY_MAP_MARKER_COLORS[key])) {

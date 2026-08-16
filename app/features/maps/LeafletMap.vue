@@ -551,19 +551,39 @@
           v-if="props.showLegend"
           class="bg-surface-850/95 text-surface-300 flex flex-wrap items-center gap-4 rounded-lg border border-white/8 px-3 py-2 text-xs shadow-lg"
         >
-          <div class="flex items-center gap-1">
-            <div
-              class="h-3 w-3 rounded-full border border-white/30"
-              :style="{ backgroundColor: mapColors.SELF_OBJECTIVE }"
-            />
-            <span>{{ t('maps.legend.your_objectives') }}</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <div
-              class="h-3 w-3 rounded-full border border-white/30"
-              :style="{ backgroundColor: mapColors.TEAM_OBJECTIVE }"
-            />
-            <span>{{ t('maps.legend.team_objectives') }}</span>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-surface-400 text-[10px] font-medium tracking-wide uppercase">
+              {{ t('maps.legend.tasks') }}
+            </span>
+            <button
+              v-for="chip in objectiveChips"
+              :key="chip.key"
+              type="button"
+              class="flex items-center gap-2 rounded-full border px-3 py-1.5 transition-opacity"
+              :class="chip.isOn ? '' : 'opacity-55 hover:opacity-80'"
+              :style="{
+                borderColor: chip.isOn
+                  ? `color-mix(in srgb, ${chip.color} 45%, transparent)`
+                  : 'var(--color-surface-700)',
+                backgroundColor: chip.isOn
+                  ? `color-mix(in srgb, ${chip.color} 15%, transparent)`
+                  : 'transparent',
+              }"
+              :aria-pressed="chip.isOn"
+              @click="chip.toggle()"
+            >
+              <span
+                class="h-2 w-2 shrink-0 rounded-full"
+                :class="chip.isOn ? '' : 'box-border border-[1.5px]'"
+                :style="chip.isOn ? { backgroundColor: chip.color } : { borderColor: chip.color }"
+              />
+              <span
+                class="text-surface-100"
+                :class="chip.isOn ? '' : 'text-surface-400 line-through'"
+              >
+                {{ chip.label }}
+              </span>
+            </button>
           </div>
           <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1">
             <div class="h-3 w-3 rounded-full" :style="{ backgroundColor: mapColors.PMC_SPAWN }" />
@@ -629,6 +649,7 @@
     useLeafletMapControls,
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -675,21 +696,6 @@
       logger.warn('[LeafletMap] Failed to persist map controls hint flag:', error);
     }
   };
-  interface MapZone {
-    map: { id: string };
-    outline: Array<{ x: number; z: number }>;
-  }
-  interface MapMarkLocation {
-    map: { id: string };
-    positions?: Array<{ x: number; y?: number; z: number }>;
-    [key: string]: unknown;
-  }
-  interface MapMark {
-    id?: string;
-    zones: MapZone[];
-    possibleLocations?: MapMarkLocation[];
-    users?: string[];
-  }
   interface Props {
     map: TarkovMap;
     marks?: MapMark[];
@@ -737,6 +743,61 @@
   const isMapUnavailable = computed(() => {
     return props.map?.unavailable === true;
   });
+  type ObjectiveCategory = 'self' | 'pinned' | 'team';
+  const getObjectiveCategory = (mark: MapMark): ObjectiveCategory => {
+    if (mark.pinned) return 'pinned';
+    return mark.users?.includes('self') ? 'self' : 'team';
+  };
+  const mapShowSelfObjectives = computed({
+    get: () => preferencesStore.getMapShowSelfObjectives,
+    set: (value: boolean) => preferencesStore.setMapShowSelfObjectives(value),
+  });
+  const mapShowPinnedObjectives = computed({
+    get: () => preferencesStore.getMapShowPinnedObjectives,
+    set: (value: boolean) => preferencesStore.setMapShowPinnedObjectives(value),
+  });
+  const mapShowTeamObjectives = computed({
+    get: () => preferencesStore.getMapShowTeamObjectives,
+    set: (value: boolean) => preferencesStore.setMapShowTeamObjectives(value),
+  });
+  interface ObjectiveChip {
+    key: ObjectiveCategory;
+    label: string;
+    color: string;
+    isOn: boolean;
+    toggle: () => void;
+  }
+  const objectiveChips = computed<ObjectiveChip[]>(() => {
+    return [
+      {
+        key: 'self',
+        label: t('maps.legend.regular'),
+        color: mapColors.value.SELF_OBJECTIVE,
+        isOn: mapShowSelfObjectives.value,
+        toggle: () => {
+          mapShowSelfObjectives.value = !mapShowSelfObjectives.value;
+        },
+      },
+      {
+        key: 'pinned',
+        label: t('maps.legend.pinned'),
+        color: mapColors.value.PINNED_OBJECTIVE,
+        isOn: mapShowPinnedObjectives.value,
+        toggle: () => {
+          mapShowPinnedObjectives.value = !mapShowPinnedObjectives.value;
+        },
+      },
+      {
+        key: 'team',
+        label: t('maps.legend.team'),
+        color: mapColors.value.TEAM_OBJECTIVE,
+        isOn: mapShowTeamObjectives.value,
+        toggle: () => {
+          mapShowTeamObjectives.value = !mapShowTeamObjectives.value;
+        },
+      },
+    ];
+  });
   const mapContainer = ref<HTMLElement | null>(null);
   const {
     mapInstance,
@@ -763,36 +824,7 @@
   const SPAWN_CLUSTER_GRID_SIZE = 50;
   const SPAWN_CLUSTER_MIN_RADIUS = 6;
   const SPAWN_CLUSTER_MAX_RADIUS = 14;
-  const FNV1A_OFFSET_BASIS = 0x811c9dc5;
-  const FNV1A_PRIME = 0x01000193;
   const MARKER_SVG_LOAD_DELAY_MS = 500;
-  const updateFnv1a = (hash: number, value: string | number): number => {
-    const token = typeof value === 'number' ? String(value) : value;
-    for (let i = 0; i < token.length; i++) {
-      hash ^= token.charCodeAt(i);
-      hash = Math.imul(hash, FNV1A_PRIME);
-    }
-    hash ^= 124;
-    return Math.imul(hash, FNV1A_PRIME) >>> 0;
-  };
-  const hashZoneOutline = (outline: Array<{ x: number; z: number }>): number => {
-    let zoneHash = updateFnv1a(FNV1A_OFFSET_BASIS, outline.length);
-    for (const point of outline) {
-      zoneHash = updateFnv1a(zoneHash, point.x);
-      zoneHash = updateFnv1a(zoneHash, point.z);
-    }
-    return zoneHash;
-  };
-  const hashLocationPositions = (
-    positions?: Array<{ x: number; y?: number; z: number }>
-  ): number => {
-    let locationHash = updateFnv1a(FNV1A_OFFSET_BASIS, positions?.length ?? 0);
-    for (const point of positions ?? []) {
-      locationHash = updateFnv1a(locationHash, point.x);
-      locationHash = updateFnv1a(locationHash, point.z);
-    }
-    return locationHash;
-  };
   const {
     hasCoopExtracts,
     hasPmcSpawns,
@@ -1475,35 +1507,6 @@
       cleanupMountedComponent();
     });
   };
-  function getMarksHash(marks: MapMark[], mapId: string): string {
-    let hash = updateFnv1a(FNV1A_OFFSET_BASIS, mapId);
-    hash = updateFnv1a(hash, marks.length);
-    for (const mark of marks) {
-      hash = updateFnv1a(hash, mark.id ?? '');
-      const sortedUsers = [...(mark.users ?? [])].sort();
-      hash = updateFnv1a(hash, sortedUsers.length);
-      for (const user of sortedUsers) {
-        hash = updateFnv1a(hash, user);
-      }
-      const zoneHashes = mark.zones
-        .filter((zone) => zone.map.id === mapId)
-        .map((zone) => hashZoneOutline(zone.outline))
-        .sort((a, b) => a - b);
-      hash = updateFnv1a(hash, zoneHashes.length);
-      for (const zoneHash of zoneHashes) {
-        hash = updateFnv1a(hash, zoneHash);
-      }
-      const locationHashes = (mark.possibleLocations ?? [])
-        .filter((location) => location.map.id === mapId)
-        .map((location) => hashLocationPositions(location.positions))
-        .sort((a, b) => a - b);
-      hash = updateFnv1a(hash, locationHashes.length);
-      for (const locationHash of locationHashes) {
-        hash = updateFnv1a(hash, locationHash);
-      }
-    }
-    return hash.toString(16).padStart(8, '0');
-  }
   function createObjectiveMarkers(): void {
     if (!leaflet.value || !objectiveLayer.value || !props.map) return;
     const L = leaflet.value;
@@ -1540,9 +1543,22 @@
       }
       return Math.abs(sum / 2);
     };
+    const categoryColors: Record<ObjectiveCategory, string> = {
+      self: mapColors.value.SELF_OBJECTIVE,
+      pinned: mapColors.value.PINNED_OBJECTIVE,
+      team: mapColors.value.TEAM_OBJECTIVE,
+    };
+    const categoryEnabled: Record<ObjectiveCategory, boolean> = {
+      self: mapShowSelfObjectives.value,
+      pinned: mapShowPinnedObjectives.value,
+      team: mapShowTeamObjectives.value,
+    };
     props.marks.forEach((mark) => {
       const objectiveId = mark.id;
       if (!objectiveId) return;
+      const category = getObjectiveCategory(mark);
+      if (!categoryEnabled[category]) return;
+      const markerColor = categoryColors[category];
       mark.possibleLocations?.forEach((location) => {
         if (location.map.id !== props.map.id) return;
         const positions = location.positions;
@@ -1550,10 +1566,6 @@
         const pos = positions[0];
         if (!pos) return;
         const latLng = gameToLatLng(pos.x, pos.z);
-        const isSelf = mark.users?.includes('self') ?? false;
-        const markerColor = isSelf
-          ? mapColors.value.SELF_OBJECTIVE
-          : mapColors.value.TEAM_OBJECTIVE;
         const marker = L.circleMarker([latLng.lat, latLng.lng], {
           radius: 8,
           fillColor: markerColor,
@@ -1568,8 +1580,7 @@
         if (zone.outline.length < 3) return;
         const latLngs = outlineToLatLngArray(zone.outline);
         if (latLngs.length < 3) return;
-        const isSelf = mark.users?.includes('self') ?? false;
-        const zoneColor = isSelf ? mapColors.value.SELF_OBJECTIVE : mapColors.value.TEAM_OBJECTIVE;
+        const zoneColor = markerColor;
         const polygonLatLngs = latLngs.map((ll) => [ll.lat, ll.lng]) as L.LatLngExpression[];
         const polygon = L.polygon(polygonLatLngs, {
           color: zoneColor,
@@ -1800,6 +1811,10 @@
     { deep: true }
   );
   watch(mapZoneOpacity, () => {
+    lastMarksHash.value = '';
+    updateMarkers();
+  });
+  watch([mapShowSelfObjectives, mapShowPinnedObjectives, mapShowTeamObjectives], () => {
     lastMarksHash.value = '';
     updateMarkers();
   });

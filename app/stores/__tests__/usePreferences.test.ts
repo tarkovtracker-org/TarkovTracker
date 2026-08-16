@@ -133,6 +133,9 @@ describe('usePreferencesStore', () => {
       expect(store.mapZoomSpeed).toBe(1);
       expect(store.mapPanSpeed).toBe(1);
       expect(store.pinnedTaskIds).toEqual([]);
+      expect(store.mapShowSelfObjectives).toBe(true);
+      expect(store.mapShowPinnedObjectives).toBe(true);
+      expect(store.mapShowTeamObjectives).toBe(true);
     });
     it('sanitizes keybinds assigned through store actions', () => {
       const store = usePreferencesStore();
@@ -944,6 +947,18 @@ describe('usePreferencesStore', () => {
       store.pinnedTaskIds = ['task-1', 'task-2'];
       expect(store.getPinnedTaskIds).toEqual(['task-1', 'task-2']);
     });
+    it('should return map objective visibility state with default true', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapShowSelfObjectives).toBe(true);
+      expect(store.getMapShowPinnedObjectives).toBe(true);
+      expect(store.getMapShowTeamObjectives).toBe(true);
+      store.mapShowSelfObjectives = false;
+      store.mapShowPinnedObjectives = false;
+      store.mapShowTeamObjectives = false;
+      expect(store.getMapShowSelfObjectives).toBe(false);
+      expect(store.getMapShowPinnedObjectives).toBe(false);
+      expect(store.getMapShowTeamObjectives).toBe(false);
+    });
     it('should return skillSortMode state with default priority', () => {
       const store = usePreferencesStore();
       expect(store.getSkillSortMode).toBe('priority');
@@ -1291,6 +1306,15 @@ describe('usePreferencesStore', () => {
       store.setShowFailedFilter(false);
       expect(store.showFailedFilter).toBe(false);
     });
+    it('should set map objective visibility filters', () => {
+      const store = usePreferencesStore();
+      store.setMapShowSelfObjectives(false);
+      expect(store.mapShowSelfObjectives).toBe(false);
+      store.setMapShowPinnedObjectives(false);
+      expect(store.mapShowPinnedObjectives).toBe(false);
+      store.setMapShowTeamObjectives(false);
+      expect(store.mapShowTeamObjectives).toBe(false);
+    });
   });
   describe('Actions - XP and Level', () => {
     it('should set use automatic level calculation', () => {
@@ -1440,6 +1464,17 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.$patch({ pinnedTaskIds: undefined });
       expect(store.getPinnedTaskIds).toEqual([]);
+    });
+    it('should handle nullish map objective visibility state in getters', () => {
+      const store = usePreferencesStore();
+      store.$patch({
+        mapShowSelfObjectives: undefined,
+        mapShowPinnedObjectives: undefined,
+        mapShowTeamObjectives: undefined,
+      });
+      expect(store.getMapShowSelfObjectives).toBe(true);
+      expect(store.getMapShowPinnedObjectives).toBe(true);
+      expect(store.getMapShowTeamObjectives).toBe(true);
     });
     it('should handle nullish mapMarkerColors in getter', () => {
       const store = usePreferencesStore();
