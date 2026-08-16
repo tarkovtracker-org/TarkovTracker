@@ -446,16 +446,19 @@ function normalizeTaskAdditions(
       return { ...entry, factionName, objectives, failConditions };
     });
 }
+const isLevelRequirement = (requirement: unknown): requirement is Record<string, unknown> =>
+  isPlainObject(requirement) && requirement.requirementType === 'level';
+const hasFiniteLevelThreshold = (requirement: Record<string, unknown>): boolean => {
+  const level = requirement.level ?? requirement.value;
+  return typeof level === 'number' && Number.isFinite(level);
+};
 function applyTraderRequirementSplit(task: Record<string, unknown>): void {
   const raw = task.traderRequirements;
   if (!Array.isArray(raw)) return;
   const traderLevelRequirements = raw
-    .map((requirement): Record<string, unknown> | null => {
-      if (!isPlainObject(requirement) || requirement.requirementType !== 'level') return null;
-      const level = requirement.level ?? requirement.value;
-      return typeof level === 'number' && Number.isFinite(level) ? { ...requirement, level } : null;
-    })
-    .filter((requirement): requirement is Record<string, unknown> => requirement !== null);
+    .filter(isLevelRequirement)
+    .filter(hasFiniteLevelThreshold)
+    .map((requirement) => ({ ...requirement, level: requirement.level ?? requirement.value }));
   const traderRequirements = raw.filter(
     (requirement) => isPlainObject(requirement) && requirement.requirementType !== 'level'
   );
