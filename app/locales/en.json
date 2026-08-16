@@ -318,7 +318,8 @@
     "reset_all_data": "Reset All Data",
     "import_failed": "Import Failed",
     "delete_archived_run": "Delete Archived Run",
-    "validation_error": "Validation Error"
+    "validation_error": "Validation Error",
+    "got_it": "Got it"
   },
   "page_help": {
     "button": "Help",
@@ -503,15 +504,43 @@
       "shared_extract": "Shared Extract (Either Faction)",
       "coop_extract": "Co-op Extract (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "reset_view": "Reset view",
+      "open_fullscreen": "Open map full screen",
+      "exit_fullscreen": "Exit full screen",
+      "drag_to_resize": "Drag to resize map",
+      "switch_floor": "Switch floor (Ctrl + Scroll)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "to Pan",
-        "zoom_keys": "to Zoom",
-        "click": "to Click at Cursor",
-        "reset": "to Reset View",
-        "cycle_floors": "+ Scroll to Cycle Floors",
-        "zoom": "+ Scroll to Zoom"
+      "help": {
+        "pan": "or drag to pan",
+        "zoom": "to zoom",
+        "reset": "to reset view",
+        "cycle_floors": "to cycle floors",
+        "floor_panel": "or use the floor panel",
+        "click_at_cursor": "to click at cursor",
+        "click_marker": "Click a marker for details",
+        "fullscreen": "Use the full screen button in the map controls",
+        "resize": "Drag the bottom edge of the map to resize"
       }
+    },
+    "help": {
+      "title": "Map controls",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Floors",
+        "interact": "Interact",
+        "view": "View"
+      }
+    },
+    "hint": {
+      "title": "Quick map controls",
+      "drag_to_pan": "Drag to pan",
+      "shift_scroll_zoom": "Shift + Scroll to zoom",
+      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
+      "all_controls": "All controls"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -910,7 +939,9 @@
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",
-        "toggle_panel": "Toggle map panel",
+        "show_map": "Show map",
+        "hide_map": "Hide map",
+        "fullscreen_label": "Full screen",
         "required_items_summary": "Required items for active tasks",
         "required_keys_summary": "Required keys for active tasks",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "{count} tasks hidden on this map.",
         "map_complete_tasks_showing": "{count} map-complete tasks shown on this map.",
         "map_complete_tasks_toggle_show": "Show hidden",
-        "map_complete_tasks_toggle_hide": "Hide map-complete"
+        "map_complete_tasks_toggle_hide": "Hide map-complete",
+        "map_hidden_hint": "Map hidden — click to show",
+        "raid_time_tooltip": "Current in-game raid time"
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",

@@ -24,6 +24,8 @@ export interface UseLeafletMapOptions {
   map: Ref<TarkovMap | null>;
   /** Initial floor selection */
   initialFloor?: string;
+  /** Initial view (center + zoom) to apply instead of fitting map bounds */
+  initialView?: MapViewState | null;
   /** Enable idle detection for performance */
   enableIdleDetection?: boolean;
   /** Idle timeout in milliseconds */
@@ -155,11 +157,43 @@ function parseSvgContent(content: string): SVGElement | null {
   }
   return doc.documentElement as unknown as SVGElement;
 }
+export interface MapViewState {
+  center: [number, number];
+  zoom: number;
+}
+export function withoutZoomSnap(instance: L.Map, apply: () => void): void {
+  const originalZoomSnap = instance.options.zoomSnap ?? 0;
+  instance.options.zoomSnap = 0;
+  try {
+    apply();
+  } finally {
+    instance.options.zoomSnap = originalZoomSnap;
+  }
+}
+function isFiniteLatLng(center: unknown): boolean {
+  return Array.isArray(center) && center.length === 2 && center.every(Number.isFinite);
+}
+function isRestorableMapView(view: MapViewState | null | undefined): view is MapViewState {
+  if (!view) return false;
+  return isFiniteLatLng(view.center) && Number.isFinite(view.zoom);
+}
+function setInitialMapView(
+  instance: L.Map,
+  view: MapViewState | null | undefined,
+  bounds: L.LatLngBoundsExpression
+): void {
+  if (isRestorableMapView(view)) {
+    withoutZoomSnap(instance, () => instance.setView(view.center, view.zoom, { animate: false }));
+    return;
+  }
+  instance.fitBounds(bounds);
+}
 export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapReturn {
   const {
     containerRef,
     map,
     initialFloor,
+    initialView,
     enableIdleDetection = true,
     idleTimeout = 60000, // 1 minute
   } = options;
@@ -176,6 +210,12 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const spawnLayer = shallowRef<L.LayerGroup | null>(null);
   const crsKey = ref('');
   const renderKey = ref('');
+  let hasAppliedInitialView = false;
+  const consumeInitialView = (): MapViewState | null => {
+    if (hasAppliedInitialView) return null;
+    hasAppliedInitialView = true;
+    return initialView ?? null;
+  };
   // Map event handlers
   const onWheel = (e: WheelEvent) => {
     if (!mapInstance.value) return;
@@ -747,34 +787,11 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       // Create map instance with custom CRS
       const mapOptions = getLeafletMapOptions(leaflet.value, renderConfig);
       mapInstance.value = leaflet.value.map(containerRef.value, mapOptions);
-      const ZoomWithReset = leaflet.value.Control.Zoom.extend({
-        onAdd(this: L.Control.Zoom, map: L.Map) {
-          const container = leaflet.value!.Control.Zoom.prototype.onAdd!.call(this, map);
-          const resetBtn = leaflet.value!.DomUtil.create(
-            'a',
-            'leaflet-control-zoom-reset',
-            container
-          );
-          resetBtn.textContent = '\u27F2';
-          resetBtn.href = '#';
-          resetBtn.title = 'Reset view';
-          resetBtn.setAttribute('role', 'button');
-          resetBtn.setAttribute('aria-label', 'Reset view');
-          leaflet.value!.DomEvent.disableClickPropagation(resetBtn);
-          leaflet.value!.DomEvent.on(resetBtn, 'click', (e: Event) => {
-            leaflet.value!.DomEvent.preventDefault(e);
-            refreshView();
-          });
-          return container;
-        },
-      });
-      new ZoomWithReset({ position: 'bottomright' }).addTo(mapInstance.value);
       // Create a custom pane for the map background to ensure it stays behind markers
       const backgroundPane = mapInstance.value.createPane('mapBackground');
       backgroundPane.style.zIndex = '200'; // Below overlayPane (400) and markerPane (600)
-      // Set initial view using map bounds
       const bounds = getLeafletBounds(renderConfig);
-      mapInstance.value.fitBounds(bounds);
+      setInitialMapView(mapInstance.value, consumeInitialView(), bounds);
       // Set initial floor
       selectedFloor.value = resolveInitialFloor(svgConfig, tileConfig, initialFloor);
       renderKey.value = getRenderKey() ?? '';
