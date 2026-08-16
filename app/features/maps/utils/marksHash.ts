@@ -26,7 +26,7 @@ const FNV1A_PRIME = 0x01000193;
 const updateFnv1a = (hash: number, value: string | number): number => {
   const token = typeof value === 'number' ? String(value) : value;
   for (let i = 0; i < token.length; i++) {
-    hash ^= token.charCodeAt(i);
+    hash ^= token.codePointAt(i) ?? 0;
     hash = Math.imul(hash, FNV1A_PRIME);
   }
   hash ^= 124;
@@ -56,7 +56,7 @@ export function getMarksHash(marks: MapMark[], mapId: string): string {
     // pinned affects marker rendering (fill colour), so it must be folded in here too.
     // Any field that changes how a mark is drawn — not just its identity — belongs in this hash.
     hash = updateFnv1a(hash, mark.pinned ? '1' : '0');
-    const sortedUsers = [...(mark.users ?? [])].sort();
+    const sortedUsers = [...(mark.users ?? [])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     hash = updateFnv1a(hash, sortedUsers.length);
     for (const user of sortedUsers) {
       hash = updateFnv1a(hash, user);

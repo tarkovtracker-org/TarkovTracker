@@ -11,7 +11,6 @@ describe('theme-colors', () => {
     expect(MAP_MARKER_COLORS.PINNED_OBJECTIVE).toBe('#7c3bed');
     // Must be a distinct key from SELECTED so the popup-pin behaviour
     // (attachHoverPinPopup / setLayerSelected) stays unambiguous.
-    expect(MAP_MARKER_COLORS.PINNED_OBJECTIVE).not.toBe(undefined);
     expect('SELECTED' in MAP_MARKER_COLORS).toBe(true);
   });
   it('includes PINNED_OBJECTIVE in getMapColorOptions with the expected label key', () => {
