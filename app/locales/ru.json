@@ -318,7 +318,8 @@
     "reset_all_data": "Сбросить все данные",
     "import_failed": "Не удалось импортировать",
     "delete_archived_run": "Удалить Запуск в Архив",
-    "validation_error": "Ошибка проверки"
+    "validation_error": "Ошибка проверки",
+    "got_it": "Понятно"
   },
   "page_help": {
     "button": "Помощь",
@@ -503,15 +504,43 @@
       "shared_extract": "Общий выход (любая фракция)",
       "coop_extract": "Совместный выход (ЧВК + Дикий)"
     },
+    "tooltips": {
+      "zoom_in": "Увеличить",
+      "zoom_out": "Уменьшить",
+      "reset_view": "Сбросить вид",
+      "open_fullscreen": "Открыть весь экран карты",
+      "exit_fullscreen": "Выйти из полноэкранного режима",
+      "drag_to_resize": "Перетащите для изменения размера карты",
+      "switch_floor": "Переключатель пола (Ctrl + свиток)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "чтобы переместить",
-        "zoom_keys": "чтобы изменить масштаб",
-        "click": "чтобы нажать на курсор",
-        "reset": "чтобы сбросить вид",
-        "cycle_floors": "+ Прокрутка для смены этажей",
-        "zoom": "+ Прокрутка для изменения масштаба"
+      "help": {
+        "pan": "или перетащите для перемещения",
+        "zoom": "увеличить",
+        "reset": "сбросить вид",
+        "cycle_floors": "велосипедные этажи",
+        "floor_panel": "или используйте нижнюю панель",
+        "click_at_cursor": "кликать под курсором",
+        "click_marker": "Нажмите на маркер для подробностей",
+        "fullscreen": "Использовать полноэкранную кнопку в панели управления картой",
+        "resize": "Перетащите нижний край карты для изменения размера"
       }
+    },
+    "help": {
+      "title": "Управление картой",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Этажи",
+        "interact": "Взаимодействие",
+        "view": "Вид"
+      }
+    },
+    "hint": {
+      "title": "Быстрое управление картой",
+      "drag_to_pan": "Перетащите для закрепления",
+      "shift_scroll_zoom": "Shift + прокрутка до масштаба",
+      "ctrl_scroll_floors": "Ctrl + Прокрутка для изменения этажей",
+      "all_controls": "Все элементы управления"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -910,7 +939,9 @@
       "loading": "Загружаем задания",
       "map": {
         "resize_handle": "Изменить высоту карты",
-        "toggle_panel": "Показать или скрыть панель карты",
+        "show_map": "Показать карту",
+        "hide_map": "Скрыть карту",
+        "fullscreen_label": "Полный экран",
         "required_items_summary": "Необходимые предметы для активных заданий",
         "required_keys_summary": "Необходимые ключи для активных заданий",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "{count} заданий скрыто на этой карте.",
         "map_complete_tasks_showing": "{count} выполненных заданий показано на этой карте.",
         "map_complete_tasks_toggle_show": "Показать скрытые",
-        "map_complete_tasks_toggle_hide": "Скрыть выполненные"
+        "map_complete_tasks_toggle_hide": "Скрыть выполненные",
+        "map_hidden_hint": "Карта скрыта — нажмите, чтобы показать",
+        "raid_time_tooltip": "Время рейда в игре"
       },
       "pinned_tasks_section": "Закреплённые задания",
       "focused_task_section": "Выбранное задание",
