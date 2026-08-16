@@ -342,6 +342,13 @@ sequenceDiagram
 
 - Module-level cache (`cachedOverlay`, `cacheTimestamp`) with a 1-hour TTL
   (`OVERLAY_CACHE_TTL = 3600000`).
+- Overlay task patches carry trader requirements in the raw upstream shape: one
+  `traderRequirements` list discriminated by `requirementType` (`level` gates
+  trader loyalty level, `reputation` gates standing). `applyOverlay` re-splits
+  a patched task's merged list into `traderLevelRequirements` and
+  `traderRequirements` (reputation-only) so availability and progress checks
+  evaluate the right metric; a patch's `traderRequirements` replaces the whole
+  requirement set.
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
 - Per-locale corrections under `locales[locale]` patch `tasks`, `items`, and `traders`

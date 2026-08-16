@@ -67,14 +67,17 @@ const FETCH_TIMEOUT_MS = 5000; // 5 seconds
 // Note: Using raw.githubusercontent.com directly until jsDelivr cache propagates
 const DEFAULT_OVERLAY_URL =
   'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
+const ALLOWED_OVERLAY_PROTOCOLS = ['https:', 'http:'];
 function resolveOverlayUrl(value: string | undefined): string {
-  const candidate = value?.trim() || DEFAULT_OVERLAY_URL;
+  const candidate = value ? value.trim() : DEFAULT_OVERLAY_URL;
+  let url: URL;
   try {
-    const url = new URL(candidate);
-    return url.protocol === 'https:' ? url.toString() : DEFAULT_OVERLAY_URL;
+    url = new URL(candidate);
   } catch {
     return DEFAULT_OVERLAY_URL;
   }
+  if (!ALLOWED_OVERLAY_PROTOCOLS.includes(url.protocol)) return DEFAULT_OVERLAY_URL;
+  return url.toString();
 }
 const OVERLAY_URL = resolveOverlayUrl(process.env.OVERLAY_URL);
 const OVERLAY_CACHE_BUSTER = process.env.OVERLAY_CACHE_BUSTER?.trim();
@@ -443,6 +446,26 @@ function normalizeTaskAdditions(
       return { ...entry, factionName, objectives, failConditions };
     });
 }
+const isLevelRequirement = (requirement: unknown): requirement is Record<string, unknown> =>
+  isPlainObject(requirement) && requirement.requirementType === 'level';
+const hasFiniteLevelThreshold = (requirement: Record<string, unknown>): boolean => {
+  const level = requirement.level ?? requirement.value;
+  return typeof level === 'number' && Number.isFinite(level);
+};
+function applyTraderRequirementSplit(task: Record<string, unknown>): void {
+  const raw = task.traderRequirements;
+  if (!Array.isArray(raw)) return;
+  const traderLevelRequirements = raw
+    .filter(isLevelRequirement)
+    .filter(hasFiniteLevelThreshold)
+    .map((requirement) => ({ ...requirement, level: requirement.level ?? requirement.value }));
+  const traderRequirements = raw.filter(
+    (requirement) => isPlainObject(requirement) && requirement.requirementType !== 'level'
+  );
+  task.traderLevelRequirements =
+    traderLevelRequirements.length > 0 ? traderLevelRequirements : undefined;
+  task.traderRequirements = traderRequirements.length > 0 ? traderRequirements : undefined;
+}
 function mergeModeCorrections(
   shared: Record<string, Record<string, unknown>> | undefined,
   modeSpecific: Record<string, Record<string, unknown>> | undefined
@@ -514,7 +537,13 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const correctedTasks = applyEntityOverlay(
       result.data.tasks as Array<{ id: string }>,
       mergedTasks
-    ).map((task) => applyTaskObjectiveAdditions(task));
+    ).map((task) => {
+      const patch = mergedTasks?.[task.id];
+      if (patch && 'traderRequirements' in patch) {
+        applyTraderRequirementSplit(task as Record<string, unknown>);
+      }
+      return applyTaskObjectiveAdditions(task);
+    });
     const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd);
     logger.info(
       `Overlay tasksAdd: ${normalizedAdditions.length} additions after filtering disabled`
@@ -522,7 +551,12 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const addedTasks = applyEntityOverlay(normalizedAdditions, mergedTasks, {
       logLabel: 'tasksAdd',
       logEvenWhenZero: false,
-    }).map((task) => applyTaskObjectiveAdditions(task));
+    }).map((task) => {
+      if ('traderRequirements' in task) {
+        applyTraderRequirementSplit(task as Record<string, unknown>);
+      }
+      return applyTaskObjectiveAdditions(task);
+    });
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);
