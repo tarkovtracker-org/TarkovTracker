@@ -318,7 +318,8 @@
     "reset_all_data": "Redefinir todos os dados",
     "import_failed": "Importação Falhou",
     "delete_archived_run": "Excluir Corrida Arquivada",
-    "validation_error": "Erro de validação"
+    "validation_error": "Erro de validação",
+    "got_it": "Eu tenho que"
   },
   "page_help": {
     "button": "Help",
@@ -503,15 +504,43 @@
       "shared_extract": "Shared Extract (Either Faction)",
       "coop_extract": "Co-op Extract (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Aumentar zoom",
+      "zoom_out": "Diminuir zoom",
+      "reset_view": "Reset view",
+      "open_fullscreen": "Abrir mapa em tela cheia",
+      "exit_fullscreen": "Sair da tela cheia",
+      "drag_to_resize": "Arraste para redimensionar o mapa",
+      "switch_floor": "Trocar chão (Ctrl + Scroll)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "to Pan",
-        "zoom_keys": "to Zoom",
-        "click": "to Click at Cursor",
-        "reset": "to Reset View",
-        "cycle_floors": "+ Scroll to Cycle Floors",
-        "zoom": "+ Scroll to Zoom"
+      "help": {
+        "pan": "ou arraste para pan",
+        "zoom": "para ampliar",
+        "reset": "para resetar visão",
+        "cycle_floors": "ciclo de andares",
+        "floor_panel": "ou use o painel do chão",
+        "click_at_cursor": "para clicar no cursor",
+        "click_marker": "Clique em um marcador para detalhes",
+        "fullscreen": "Use o botão de tela cheia nos controles do mapa",
+        "resize": "Arraste a borda inferior do mapa para redimensionar"
       }
+    },
+    "help": {
+      "title": "Controles do mapa",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Floors",
+        "interact": "Interagir",
+        "view": "Visualizar"
+      }
+    },
+    "hint": {
+      "title": "Controles rápidos de mapa",
+      "drag_to_pan": "Arrastar para virar",
+      "shift_scroll_zoom": "Shift + Rolar para ampliar",
+      "ctrl_scroll_floors": "Ctrl + Role para alterar os andares",
+      "all_controls": "Todos os controles"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -910,7 +939,9 @@
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",
-        "toggle_panel": "Toggle map panel",
+        "show_map": "Mostrar mapa",
+        "hide_map": "Ocultar mapa",
+        "fullscreen_label": "Tela cheia",
         "required_items_summary": "Required items for active tasks",
         "required_keys_summary": "Required keys for active tasks",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "{count} tasks hidden on this map.",
         "map_complete_tasks_showing": "{count} map-complete tasks shown on this map.",
         "map_complete_tasks_toggle_show": "Show hidden",
-        "map_complete_tasks_toggle_hide": "Hide map-complete"
+        "map_complete_tasks_toggle_hide": "Hide map-complete",
+        "map_hidden_hint": "Mapa oculto - clique para mostrar",
+        "raid_time_tooltip": "Tempo atual de incursão no jogo"
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",
