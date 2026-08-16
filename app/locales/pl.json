@@ -507,7 +507,7 @@
     "tooltips": {
       "zoom_in": "Powiększ",
       "zoom_out": "Pomniejsz",
-      "reset_view": "Reset view",
+      "reset_view": "Resetuj widok",
       "open_fullscreen": "Otwórz pełny ekran mapy",
       "exit_fullscreen": "Wyjdź z pełnego ekranu",
       "drag_to_resize": "Przeciągnij, aby zmienić rozmiar mapy",
@@ -530,7 +530,7 @@
       "title": "Sterowanie mapą",
       "groups": {
         "navigate": "Navigate",
-        "floors": "Floors",
+        "floors": "Podłogi",
         "interact": "Interakcja",
         "view": "Widok"
       }
