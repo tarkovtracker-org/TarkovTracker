@@ -56,7 +56,7 @@ interface CloudflarePurgeResponse {
 }
 interface EdgeRuntimeGlobal {
   EdgeRuntime?: {
-    waitUntil<T>(promise: Promise<T>): Promise<T>;
+    waitUntil<T>(promise: Promise<T>): void;
   };
 }
 type SupabaseClient = AuthSuccess['supabase'];
@@ -254,10 +254,11 @@ function scheduleBackgroundTask(task: () => Promise<unknown>): void {
     console.error('[admin-cache-purge] EdgeRuntime unavailable; delayed purge not scheduled');
     return;
   }
+  const backgroundTask = task().catch((error) => {
+    console.error('[admin-cache-purge] Delayed purge task rejected:', error);
+  });
   try {
-    void EdgeRuntime.waitUntil(task()).catch((error) => {
-      console.error('[admin-cache-purge] Delayed purge task rejected:', error);
-    });
+    EdgeRuntime.waitUntil(backgroundTask);
   } catch (error) {
     console.error('[admin-cache-purge] Failed to schedule delayed purge:', error);
   }
