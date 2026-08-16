@@ -507,7 +507,7 @@
     "tooltips": {
       "zoom_in": "Aumentar zoom",
       "zoom_out": "Diminuir zoom",
-      "reset_view": "Reset view",
+      "reset_view": "Redefinir visão",
       "open_fullscreen": "Abrir mapa em tela cheia",
       "exit_fullscreen": "Sair da tela cheia",
       "drag_to_resize": "Arraste para redimensionar o mapa",
@@ -530,7 +530,7 @@
       "title": "Controles do mapa",
       "groups": {
         "navigate": "Navigate",
-        "floors": "Floors",
+        "floors": "Andares",
         "interact": "Interagir",
         "view": "Visualizar"
       }
