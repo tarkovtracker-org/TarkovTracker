@@ -1,3 +1,17 @@
+## [1.72.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.1...v1.72.2) (2026-08-16)
+
+
+### Bug Fixes
+
+* **app:** drop level trader requirements without a numeric level ([51dd545](https://github.com/tarkovtracker-org/TarkovTracker/commit/51dd545e29f2eab21a27daf45242fc5d5171ed3c))
+* **app:** drop malformed overlay trader requirements and unstub fetch ([fbcb4d2](https://github.com/tarkovtracker-org/TarkovTracker/commit/fbcb4d258dfc5f687ebfae0998428bce38bd2f4a))
+* **app:** drop non-finite trader level requirements in adapter ([0aad054](https://github.com/tarkovtracker-org/TarkovTracker/commit/0aad05474a6d1444c577dfd7f36c490787b5e560))
+* **app:** reduce trader requirement and overlay URL complexity ([9d24823](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d24823bae074f7db8383b0fe06cdd00ba8ddc7e))
+* **app:** reject non-finite overlay trader level thresholds ([4bfa570](https://github.com/tarkovtracker-org/TarkovTracker/commit/4bfa570345ea9d6333a5c2991b78fe1b4c20df72))
+* **app:** restore .env.example and commit-msg hook mode ([f8cb77d](https://github.com/tarkovtracker-org/TarkovTracker/commit/f8cb77dd6ae90a4cf00e5331e83a5f6d9bbd2051))
+* **app:** set level on overlaid trader gates and split tasksAdd requirements ([a64fc4f](https://github.com/tarkovtracker-org/TarkovTracker/commit/a64fc4f8145d2349fd7c0477d89ff67c46e49b5c))
+* **app:** split trader requirements by type for tasks and overlay patches ([8f6853f](https://github.com/tarkovtracker-org/TarkovTracker/commit/8f6853fa19d5c4157c5c3ae3884d9e35198deb56))
+
 ## [1.72.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.0...v1.72.1) (2026-08-16)
 
 
