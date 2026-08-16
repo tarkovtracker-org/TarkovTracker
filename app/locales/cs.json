@@ -531,16 +531,16 @@
       "groups": {
         "navigate": "Navigate",
         "floors": "Podlahy",
-        "interact": "Interact",
-        "view": "View"
+        "interact": "Interakce",
+        "view": "Zobrazit"
       }
     },
     "hint": {
-      "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
-      "all_controls": "All controls"
+      "title": "Ovládání rychlých map",
+      "drag_to_pan": "Přetáhněte k pánvi",
+      "shift_scroll_zoom": "Přesunout + posunout na přiblížení",
+      "ctrl_scroll_floors": "Ctrl + Posunutím změníte podlahy",
+      "all_controls": "Všechny ovládací prvky"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -939,9 +939,9 @@
       "loading": "Načítání úkolů",
       "map": {
         "resize_handle": "Změnit velikost výšky mapy",
-        "show_map": "Show map",
-        "hide_map": "Hide map",
-        "fullscreen_label": "Full screen",
+        "show_map": "Zobrazit mapu",
+        "hide_map": "Skrýt mapu",
+        "fullscreen_label": "Celá obrazovka",
         "required_items_summary": "Požadované položky pro aktivní úkoly",
         "required_keys_summary": "Požadované klíče pro aktivní úkoly",
         "time_period": {
@@ -955,8 +955,8 @@
         "map_complete_tasks_showing": "Úlohy úplné {count} na mapě zobrazené na této mapě.",
         "map_complete_tasks_toggle_show": "Zobrazit skryté",
         "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní",
-        "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "map_hidden_hint": "Mapa skrytá — klikněte pro zobrazení",
+        "raid_time_tooltip": "Aktuální čas nájezdu ve hře"
       },
       "pinned_tasks_section": "Připnuté úkoly",
       "focused_task_section": "Zaměřený úkol",
