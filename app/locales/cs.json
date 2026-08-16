@@ -57,6 +57,8 @@
     "twitch_display_name_placeholder": "Název zobrazení kanálu",
     "twitch_config_saved_title": "Nastavení Twitch aktualizováno",
     "twitch_config_saved_description": "Propagovaný stream je nyní {channel}.",
+    "twitch_config_saved_with_warning_title": "Nastavení Twitch uloženo",
+    "twitch_config_saved_with_warning_description": "Konfigurace byla uložena, ale návštěvníci v mezipaměti mohou stále vidět předchozí hodnotu.",
     "twitch_config_failed_description": "Nelze aktualizovat konfiguraci Twitch.",
     "twitch_config_load_failed_title": "Nastavení Twitch není k dispozici",
     "twitch_config_load_failed_description": "Nelze načíst aktuální konfiguraci Twitch.",
