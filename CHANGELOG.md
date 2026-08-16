@@ -1,3 +1,23 @@
+## [1.72.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.0...v1.72.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **admin:** add Twitch cache purge URL fallback and dedupe purge calls ([1e16aec](https://github.com/tarkovtracker-org/TarkovTracker/commit/1e16aec621c3b21f3be5c442f70d9c00e1dfbca2))
+* **admin:** address Twitch cache-and-invalidate review findings ([1e099b7](https://github.com/tarkovtracker-org/TarkovTracker/commit/1e099b7fdb85f1ba38827026e2605b097914e554))
+* **admin:** avoid duplicate Twitch saves ([4b1afd2](https://github.com/tarkovtracker-org/TarkovTracker/commit/4b1afd2e4ef863be4ca3906b0a2b83399a0d226c))
+* **admin:** bound the purge route timeout above the edge fn worst case ([2e4a9b6](https://github.com/tarkovtracker-org/TarkovTracker/commit/2e4a9b619693693dbb8919d3bfa221a217bcbf4f))
+* **admin:** bound Twitch config edge TTL to one hour ([dfff07a](https://github.com/tarkovtracker-org/TarkovTracker/commit/dfff07a4db54bd1b2a119b87471e452df8b12fbc))
+* **admin:** bypass stale Twitch config cache ([fbcdd87](https://github.com/tarkovtracker-org/TarkovTracker/commit/fbcdd871edab48e76544eeb47d982cff5f2631dc))
+* **admin:** clarify Twitch purge recovery ([1b22cf9](https://github.com/tarkovtracker-org/TarkovTracker/commit/1b22cf91f34c52030af5175893250c7e10b05a60))
+* **admin:** close Twitch lifecycle races ([128e13a](https://github.com/tarkovtracker-org/TarkovTracker/commit/128e13ab3646dde555128f972556bddb8b1a761d))
+* **admin:** complete Twitch cache hardening ([72e359c](https://github.com/tarkovtracker-org/TarkovTracker/commit/72e359cb59e69580e9c38b5861b94d8bc600bef5))
+* **admin:** edge-cache promoted Twitch config with tag purge ([088e1ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/088e1ef3ff68f17689c4bbf4391cd3bf31dac2f3))
+* **admin:** harden long-lived Twitch config cache ([4b60a26](https://github.com/tarkovtracker-org/TarkovTracker/commit/4b60a26699a7acbee10c3b6081a171cc48f3e458))
+* **admin:** harden Twitch cache synchronization ([cc27c95](https://github.com/tarkovtracker-org/TarkovTracker/commit/cc27c958575f427b530d81e6a55eae347b76b40e))
+* **admin:** only require APP_URL for the Twitch tag-purge fallback ([d686c9b](https://github.com/tarkovtracker-org/TarkovTracker/commit/d686c9b69f42c1bea1cc413faabb915ec2fc8365))
+* **admin:** register handled purge task ([0b870f1](https://github.com/tarkovtracker-org/TarkovTracker/commit/0b870f1e305974f422d25a0a3c4d9f50ea39d57c))
+
 # [1.72.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.2...v1.72.0) (2026-08-16)
 
 
