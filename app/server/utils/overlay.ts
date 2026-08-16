@@ -446,17 +446,12 @@ function normalizeTaskAdditions(
       return { ...entry, factionName, objectives, failConditions };
     });
 }
-// Overlay task patches carry trader requirements in the raw upstream shape
-// (one `traderRequirements` list discriminated by `requirementType`), but the
-// adapted task splits them into `traderLevelRequirements` + `traderRequirements`
-// (reputation-only). The patch replaces the whole set, so re-run the split on
-// the merged task whenever a patch touches `traderRequirements`.
 function applyTraderRequirementSplit(task: Record<string, unknown>): void {
   const raw = task.traderRequirements;
   if (!Array.isArray(raw)) return;
-  const traderLevelRequirements = raw.filter(
-    (requirement) => isPlainObject(requirement) && requirement.requirementType === 'level'
-  );
+  const traderLevelRequirements = raw
+    .filter((requirement) => isPlainObject(requirement) && requirement.requirementType === 'level')
+    .map((requirement) => ({ ...requirement, level: requirement.value }));
   const traderRequirements = raw.filter(
     (requirement) => !(isPlainObject(requirement) && requirement.requirementType === 'level')
   );
@@ -550,8 +545,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
       logLabel: 'tasksAdd',
       logEvenWhenZero: false,
     }).map((task) => {
-      const patch = mergedTasks?.[task.id];
-      if (patch && 'traderRequirements' in patch) {
+      if ('traderRequirements' in task) {
         applyTraderRequirementSplit(task as Record<string, unknown>);
       }
       return applyTaskObjectiveAdditions(task);

@@ -199,6 +199,12 @@ Naming:
   stale overlay immediately while one Cloudflare-lifetime refresh runs in the background; failed
   deferred refreshes back off for one minute. Other overlay-enabled Tarkov-data routes cache their
   final corrected payload. Preserve this ordering so no cache layer pins stale hideout corrections.
+- Task adaptation and overlay patches carry trader requirements in the raw upstream shape (one
+  `traderRequirements` list discriminated by `requirementType`). The adapter and `applyOverlay`
+  split them into `traderLevelRequirements` (level gates) and reputation-only `traderRequirements`;
+  a task patch's `traderRequirements` replaces the whole requirement set, and the split runs for
+  patched tasks and `tasksAdd` entries alike. See the Overlay corrections section of
+  `docs/SYSTEMS.md`.
 - Internal game modes are `pvp`, `pve`, and `seasonal`; game-data requests map Seasonal to the
   upstream `pvp-season` slug. Active Seasonal progress is keyed by season number in
   `user_game_mode_progress`, while `user_progress` remains the account-metadata and rolling-deploy

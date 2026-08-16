@@ -126,6 +126,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
         requirementType: 'level',
         compareMethod: '>=',
         value: 1,
+        level: 1,
         trader: { id: 'trader-1', name: 'Prapor' },
       },
     ]);
@@ -136,6 +137,60 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
         compareMethod: '>=',
         value: 0.2,
         trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('splits trader requirements on tasksAdd entries', async () => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'tasksadd-split-test-v1' },
+      tasksAdd: {
+        'new-task': {
+          id: 'new-task',
+          name: 'Added Task',
+          traderRequirements: [
+            {
+              id: 'add.1',
+              requirementType: 'level',
+              compareMethod: '>=',
+              value: 2,
+              trader: { id: 'trader-2', name: 'Therapist' },
+            },
+            {
+              id: 'add.2',
+              requirementType: 'reputation',
+              compareMethod: '>=',
+              value: 0.3,
+              trader: { id: 'trader-2', name: 'Therapist' },
+            },
+          ],
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay(
+      { data: { tasks: [{ id: 'existing-task', name: 'Existing' }] } },
+      { gameMode: 'pve', bypassCache: true }
+    );
+    const added = result.data?.tasks?.find((task) => task.id === 'new-task') as
+      Record<string, unknown> | undefined;
+    expect(added?.traderLevelRequirements).toEqual([
+      {
+        id: 'add.1',
+        requirementType: 'level',
+        compareMethod: '>=',
+        value: 2,
+        level: 2,
+        trader: { id: 'trader-2', name: 'Therapist' },
+      },
+    ]);
+    expect(added?.traderRequirements).toEqual([
+      {
+        id: 'add.2',
+        requirementType: 'reputation',
+        compareMethod: '>=',
+        value: 0.3,
+        trader: { id: 'trader-2', name: 'Therapist' },
       },
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);

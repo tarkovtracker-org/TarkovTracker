@@ -758,10 +758,6 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
     trader: adaptTraderRef(raw.trader, context),
   });
 }
-// The upstream API discriminates trader requirements by `requirementType`:
-// `level` entries gate trader loyalty level (`value` = level), `reputation`
-// entries gate standing (`value` = standing). Split them into the two Task
-// fields so availability and progress checks compare against the right metric.
 const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
 function pushTraderRequirement(
   adapted: (TraderRequirement & { level?: number }) | undefined,
