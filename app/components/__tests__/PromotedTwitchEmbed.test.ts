@@ -65,15 +65,38 @@ describe('PromotedTwitchEmbed', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-  it('fetches the config once and does not check live status or poll when disabled', async () => {
+  it('fetches config without checking or polling live status when disabled', async () => {
     twitchConfig.enabled = false;
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
     const wrapper = await mountEmbed();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
     expect(fetchMock).not.toHaveBeenCalledWith('/api/twitch/live', expect.anything());
-    expect(setIntervalSpy).not.toHaveBeenCalled();
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 300_000);
+    expect(setIntervalSpy).not.toHaveBeenCalledWith(expect.any(Function), 60_000);
     expect(wrapper.find('iframe').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('refreshes config for a continuously visible tab while the stream is disabled', async () => {
+    twitchConfig.enabled = false;
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const wrapper = await mountEmbed();
+    twitchConfig = {
+      channel: 'replacement',
+      displayName: 'Replacement',
+      enabled: true,
+      version: 2,
+    };
+    const configCallback = setIntervalSpy.mock.calls.find((call) => call[1] === 300_000)?.[0] as
+      (() => void) | undefined;
+    configCallback?.();
+    await flushPromises();
+    await nextTick();
+    expect(fetchMock.mock.calls.filter((call) => call[0] === '/api/twitch/config')).toHaveLength(2);
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
+      query: { channel: 'replacement' },
+    });
+    expect(wrapper.find('iframe').attributes('src')).toContain('channel=replacement');
     wrapper.unmount();
   });
   it('renders the player iframe when the channel is live', async () => {
@@ -119,13 +142,15 @@ describe('PromotedTwitchEmbed', () => {
     expect(sessionStorage.getItem('tt-twitch-dismissed')).toBeNull();
     wrapper.unmount();
   });
-  it('polls only live status on an interval and never re-fetches config', async () => {
+  it('polls live status independently from the slower config refresh', async () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
     const wrapper = await mountEmbed();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls.filter((call) => call[0] === '/api/twitch/config')).toHaveLength(1);
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 60_000);
-    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    const pollCallback = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === 60_000
+    )?.[0] as () => void;
     pollCallback();
     await flushPromises();
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -229,7 +254,9 @@ describe('PromotedTwitchEmbed', () => {
       }
       return Promise.resolve(twitchConfig);
     });
-    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    const pollCallback = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === 60_000
+    )?.[0] as () => void;
     pollCallback();
     pollCallback();
     await flushPromises();
@@ -251,7 +278,9 @@ describe('PromotedTwitchEmbed', () => {
       }
       return Promise.resolve(twitchConfig);
     });
-    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    const pollCallback = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === 60_000
+    )?.[0] as () => void;
     pollCallback();
     usePromotedTwitch().applyConfig({
       channel: 'replacement',
@@ -279,7 +308,9 @@ describe('PromotedTwitchEmbed', () => {
       }
       return Promise.resolve(twitchConfig);
     });
-    const pollCallback = setIntervalSpy.mock.calls[0]?.[0] as () => void;
+    const pollCallback = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === 60_000
+    )?.[0] as () => void;
     pollCallback();
     usePromotedTwitch().applyConfig({
       channel: 'replacement',
@@ -335,6 +366,23 @@ describe('PromotedTwitchEmbed', () => {
     );
     wrapper.unmount();
   });
+  it('logs live-status failures with action and channel context', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const error = new Error('offline');
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/twitch/config' ? Promise.resolve(twitchConfig) : Promise.reject(error)
+    );
+    const wrapper = await mountEmbed();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[PromotedTwitchEmbed] Failed to check promoted stream status',
+      {
+        action: 'check_promoted_twitch_live',
+        channel: 'teststreamer',
+        error,
+      }
+    );
+    wrapper.unmount();
+  });
   it('stops polling while the tab is hidden and resumes with a refresh on focus', async () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
@@ -356,7 +404,8 @@ describe('PromotedTwitchEmbed', () => {
       expect(fetchMock.mock.calls.length).toBeGreaterThan(callsWhileHidden);
       expect(fetchMock.mock.calls[callsWhileHidden]?.[0]).toBe('/api/twitch/config');
       expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', expect.anything());
-      expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+      expect(setIntervalSpy.mock.calls.filter((call) => call[1] === 300_000)).toHaveLength(2);
+      expect(setIntervalSpy.mock.calls.filter((call) => call[1] === 60_000)).toHaveLength(2);
     } finally {
       if (originalDescriptor) {
         Object.defineProperty(document, 'hidden', originalDescriptor);

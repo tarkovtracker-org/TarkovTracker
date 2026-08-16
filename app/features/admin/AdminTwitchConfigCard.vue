@@ -141,7 +141,7 @@
           {{
             t(
               'admin.twitch_config_description',
-              'Set the Twitch channel promoted in the corner of the site. Visitors pick up the change within a couple of minutes.'
+              'Set the Twitch channel promoted in the corner of the site. Visitors pick up the change within five minutes.'
             )
           }}
         </p>

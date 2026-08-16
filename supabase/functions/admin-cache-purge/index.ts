@@ -255,7 +255,9 @@ function scheduleBackgroundTask(task: () => Promise<unknown>): void {
     return;
   }
   try {
-    void EdgeRuntime.waitUntil(task());
+    void EdgeRuntime.waitUntil(task()).catch((error) => {
+      console.error('[admin-cache-purge] Delayed purge task rejected:', error);
+    });
   } catch (error) {
     console.error('[admin-cache-purge] Failed to schedule delayed purge:', error);
   }

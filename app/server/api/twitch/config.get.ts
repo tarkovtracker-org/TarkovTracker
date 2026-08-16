@@ -4,7 +4,7 @@ import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSu
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('twitch-config');
 const CACHE_TAG = 'promoted-twitch-config';
-const EDGE_CACHE_TTL_SECONDS = 2_592_000;
+const EDGE_CACHE_TTL_SECONDS = 3_600;
 const CACHE_HEADERS = {
   'cache-control': `public, max-age=300, s-maxage=${EDGE_CACHE_TTL_SECONDS}`,
   'cloudflare-cdn-cache-control': `public, max-age=${EDGE_CACHE_TTL_SECONDS}`,

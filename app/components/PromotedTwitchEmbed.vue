@@ -72,6 +72,7 @@
   import { usePromotedTwitch, type PromotedTwitchConfig } from '@/composables/usePromotedTwitch';
   import { logger } from '@/utils/logger';
   const DISMISS_KEY = 'tt-twitch-dismissed';
+  const CONFIG_REFRESH_INTERVAL_MS = 300_000;
   const POLL_INTERVAL_MS = 60_000;
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
@@ -90,6 +91,7 @@
   const dismissed = ref(false);
   const isExpanded = ref(true);
   const playerUrl = ref('');
+  let configTimer: ReturnType<typeof setInterval> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let liveInFlight: {
     channel: string;
@@ -222,7 +224,12 @@
           query: { channel: requestedChannel },
         });
         applyLiveResult(requestedChannel, requestedGeneration, data.isLive);
-      } catch {
+      } catch (error) {
+        logger.warn('[PromotedTwitchEmbed] Failed to check promoted stream status', {
+          action: 'check_promoted_twitch_live',
+          channel: requestedChannel,
+          error,
+        });
         discardLiveResult(requestedChannel, requestedGeneration);
       }
     })();
@@ -243,6 +250,19 @@
     },
     { immediate: true }
   );
+  const stopConfigPolling = (): void => {
+    if (configTimer) {
+      clearInterval(configTimer);
+      configTimer = null;
+    }
+  };
+  const startConfigPolling = (): void => {
+    stopConfigPolling();
+    if (document.hidden) return;
+    configTimer = setInterval(() => {
+      void refreshConfig();
+    }, CONFIG_REFRESH_INTERVAL_MS);
+  };
   const stopPolling = (): void => {
     if (pollTimer) {
       clearInterval(pollTimer);
@@ -268,10 +288,12 @@
   });
   const handleVisibility = (): void => {
     if (document.hidden) {
+      stopConfigPolling();
       stopPolling();
       return;
     }
     void refreshConfig();
+    startConfigPolling();
     if (enabled.value) {
       void checkLive();
       startPolling();
@@ -283,6 +305,7 @@
     } catch {}
     document.addEventListener('visibilitychange', handleVisibility);
     await refreshConfig();
+    startConfigPolling();
     if (enabled.value) {
       await checkLive();
       startPolling();
@@ -290,6 +313,7 @@
   });
   onUnmounted(() => {
     document.removeEventListener('visibilitychange', handleVisibility);
+    stopConfigPolling();
     stopPolling();
   });
 </script>

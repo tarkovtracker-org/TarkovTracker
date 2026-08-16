@@ -50,7 +50,7 @@
     "supporter_override_disabled_description": "Disabled active supporter access.",
     "supporter_override_failed_description": "Could not update supporter access.",
     "twitch_config_title": "Twitch Stream",
-    "twitch_config_description": "Set the Twitch channel promoted in the corner of the site. Visitors pick up the change within a couple of minutes.",
+    "twitch_config_description": "Set the Twitch channel promoted in the corner of the site. Visitors pick up the change within five minutes.",
     "twitch_channel_label": "Channel",
     "twitch_channel_placeholder": "Twitch channel name",
     "twitch_display_name_label": "Display name",
