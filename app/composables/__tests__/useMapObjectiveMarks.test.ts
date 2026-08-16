@@ -141,8 +141,6 @@ describe('useMapObjectiveMarks', () => {
       'task-1': { self: true },
       'task-2': { self: true },
     };
-    // pinnedTaskIds contains the *objective* id used above ('task-2' is both the
-    // pinned task's id AND the objective id on the unrelated task-1) plus task-2 itself.
     pinnedTaskIds.value = ['task-2'];
     const mapId = computed(() => 'customs');
     const shouldShowCompletedObjectives = computed(() => false);
@@ -153,9 +151,7 @@ describe('useMapObjectiveMarks', () => {
     });
     const markFromTask1 = mapObjectiveMarks.value.find((mark) => mark.id === 'task-2');
     const markFromTask2 = mapObjectiveMarks.value.find((mark) => mark.id === 'obj-2');
-    // mark.id here is obj.id ('task-2'), belonging to task-1 which is NOT pinned.
     expect(markFromTask1?.pinned).toBe(false);
-    // mark for task-2's own objective ('obj-2') IS pinned because task-2 is pinned.
     expect(markFromTask2?.pinned).toBe(true);
   });
   it('keeps marks for unpinned tasks (map-level pinned filtering is applied downstream)', async () => {

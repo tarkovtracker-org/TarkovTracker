@@ -1,10 +1,3 @@
-/**
- * Hashing utilities for map objective marks.
- *
- * `getMarksHash` produces a cheap, allocation-light fingerprint of the marks
- * relevant to a given map. It is used by LeafletMap.vue to skip re-rendering
- * markers when nothing that affects them has changed.
- */
 export interface MapZone {
   map: { id: string };
   outline: Array<{ x: number; z: number }>;
@@ -23,6 +16,11 @@ export interface MapMark {
 }
 const FNV1A_OFFSET_BASIS = 0x811c9dc5;
 const FNV1A_PRIME = 0x01000193;
+const compareCodeUnits = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
 const updateFnv1a = (hash: number, value: string | number): number => {
   const token = typeof value === 'number' ? String(value) : value;
   for (let i = 0; i < token.length; i++) {
@@ -53,10 +51,8 @@ export function getMarksHash(marks: MapMark[], mapId: string): string {
   hash = updateFnv1a(hash, marks.length);
   for (const mark of marks) {
     hash = updateFnv1a(hash, mark.id ?? '');
-    // pinned affects marker rendering (fill colour), so it must be folded in here too.
-    // Any field that changes how a mark is drawn — not just its identity — belongs in this hash.
     hash = updateFnv1a(hash, mark.pinned ? '1' : '0');
-    const sortedUsers = [...(mark.users ?? [])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const sortedUsers = [...(mark.users ?? [])].sort(compareCodeUnits);
     hash = updateFnv1a(hash, sortedUsers.length);
     for (const user of sortedUsers) {
       hash = updateFnv1a(hash, user);
