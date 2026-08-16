@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
   applyLocaleOverlay,
@@ -16,6 +16,9 @@ const stubOverlayFetch = (overlay: unknown) => {
   vi.stubGlobal('fetch', fetchMock as typeof fetch);
   return fetchMock;
 };
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 describe('deepMerge id-keyed arrays', () => {
   it('deep merges plain-object patches by id and leaves non-object patches unchanged', () => {
     const target = {
