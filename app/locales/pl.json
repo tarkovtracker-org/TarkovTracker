@@ -57,6 +57,8 @@
     "twitch_display_name_placeholder": "Wyświetlana nazwa kanału",
     "twitch_config_saved_title": "Konfiguracja Twitch została zaktualizowana",
     "twitch_config_saved_description": "Promowany strumień jest teraz {channel}.",
+    "twitch_config_saved_with_warning_title": "Konfiguracja Twitch zapisana",
+    "twitch_config_saved_with_warning_description": "Konfiguracja została zapisana, ale użytkownicy mogą nadal widzieć poprzednią wartość.",
     "twitch_config_failed_description": "Nie można zaktualizować konfiguracji Twitch.",
     "twitch_config_load_failed_title": "Konfiguracja Twitch niedostępna",
     "twitch_config_load_failed_description": "Nie można załadować bieżącej konfiguracji Twitch.",
