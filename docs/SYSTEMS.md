@@ -914,7 +914,9 @@ flowchart LR
    the commit cannot refill the cache after both purges. If the immediate tag and URL purges both
    fail, the route returns the committed config with `cacheInvalidated: false`; the admin UI applies
    the saved value locally and shows an explicit warning instead of encouraging a duplicate database
-   write. A delayed purge failure is logged without changing the already returned save result.
+   write. The edge function records Twitch-only invalidations as `twitch_config_cache_purge`, not the
+   `cache_purge` action consumed by Tarkov game-data cache metadata. A delayed purge failure is logged
+   without changing the already returned save result.
 4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
    of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
@@ -984,8 +986,12 @@ flowchart LR
   recovery path when invalidation fails.
 - Mounted clients must refresh config every five minutes while visible and on mount/focus so remote
   enable, disable, and channel changes reach continuously open tabs. Config refreshes and live-status
-  polling stop while the tab is hidden. Older config versions and stale live-request generations must
-  never overwrite the latest shared configuration or player state.
+  checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
+  Older config versions and stale live-request generations must never overwrite the latest shared
+  configuration or player state.
+- Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`
+  action is reserved for `all` and `tarkov-data` purges because `/api/tarkov/cache-meta` treats its
+  latest successful row as a signal to clear browser game-data caches.
 
 ## 11. Boot-time asset-failure recovery
 

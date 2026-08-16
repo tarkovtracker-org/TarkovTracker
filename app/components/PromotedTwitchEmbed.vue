@@ -101,8 +101,10 @@
   let configInFlight: Promise<void> | null = null;
   let configVersion = 0;
   let hasResolvedConfig = false;
+  let isMounted = false;
   let liveGeneration = 0;
   const { config: sharedConfig } = usePromotedTwitch();
+  const canRunVisibleWork = (): boolean => isMounted && !document.hidden;
   const buildPlayerUrl = (): string => {
     const params = new URLSearchParams({
       channel: channel.value,
@@ -168,7 +170,12 @@
     displayName.value = resolveDisplayName(data.displayName);
     enabled.value = data.enabled;
     hasResolvedConfig = true;
-    if (shouldCheckChangedChannel(channelChanged, data.enabled, enabledChanged)) void checkLive();
+    if (
+      canRunVisibleWork() &&
+      shouldCheckChangedChannel(channelChanged, data.enabled, enabledChanged)
+    ) {
+      void checkLive();
+    }
   };
   const refreshConfig = (): Promise<void> => {
     configInFlight ??= (async () => {
@@ -258,7 +265,7 @@
   };
   const startConfigPolling = (): void => {
     stopConfigPolling();
-    if (document.hidden) return;
+    if (!canRunVisibleWork()) return;
     configTimer = setInterval(() => {
       void refreshConfig();
     }, CONFIG_REFRESH_INTERVAL_MS);
@@ -271,20 +278,24 @@
   };
   const startPolling = (): void => {
     stopPolling();
-    if (!enabled.value || document.hidden) return;
+    if (!enabled.value || !canRunVisibleWork()) return;
     pollTimer = setInterval(() => {
       void checkLive();
     }, POLL_INTERVAL_MS);
   };
   watch(enabled, (next) => {
     liveGeneration += 1;
-    if (next) {
-      startPolling();
-      void checkLive();
-    } else {
+    if (!next) {
       stopPolling();
       hidePlayer();
+      return;
     }
+    if (!canRunVisibleWork()) {
+      stopPolling();
+      return;
+    }
+    startPolling();
+    void checkLive();
   });
   const handleVisibility = (): void => {
     if (document.hidden) {
@@ -300,11 +311,13 @@
     }
   };
   onMounted(async () => {
+    isMounted = true;
     try {
       dismissed.value = sessionStorage.getItem(DISMISS_KEY) === '1';
     } catch {}
     document.addEventListener('visibilitychange', handleVisibility);
     await refreshConfig();
+    if (!canRunVisibleWork()) return;
     startConfigPolling();
     if (enabled.value) {
       await checkLive();
@@ -312,6 +325,7 @@
     }
   });
   onUnmounted(() => {
+    isMounted = false;
     document.removeEventListener('visibilitychange', handleVisibility);
     stopConfigPolling();
     stopPolling();

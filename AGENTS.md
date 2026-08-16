@@ -224,8 +224,9 @@ Naming:
   only writer. `/api/twitch/config` is edge-cached with the `promoted-twitch-config` tag and is
   invalidated by the `admin-cache-purge` edge function after a committed admin update. A successful
   immediate tag purge (with purge-by-URL fallback) schedules the same purge six seconds later to
-  clear stale in-flight fills. Purge failures return the committed config with an explicit warning
-  flag so clients reconcile without repeating the write. Config responses carry the settings version
+  clear stale in-flight fills. Twitch-only purges use a distinct audit action so game-data cache
+  metadata never interprets them as Tarkov-data invalidations. Purge failures return the committed
+  config with an explicit warning flag so clients reconcile without repeating the write. Config responses carry the settings version
   so stale browser cache entries cannot overwrite a newer admin save. Mounted embeds refresh the
   config every five minutes while visible and on tab focus; those requests are served by the edge
   cache between fills. The admin form disables browser caching when loading config so it cannot

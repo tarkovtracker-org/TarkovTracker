@@ -45,6 +45,11 @@ const TARKOV_LANGUAGES = [
 ];
 const TARKOV_GAME_MODES = ['regular', 'pve'];
 type PurgeType = 'all' | 'tarkov-data' | 'twitch-config';
+const PURGE_AUDIT_ACTION: Record<PurgeType, string> = {
+  all: 'cache_purge',
+  'tarkov-data': 'cache_purge',
+  'twitch-config': 'twitch_config_cache_purge',
+};
 interface PurgeRequest {
   purgeType: PurgeType;
 }
@@ -403,7 +408,7 @@ Deno.serve(async (req) => {
     await logAdminAction(
       supabase,
       user.id,
-      'cache_purge',
+      PURGE_AUDIT_ACTION[purgeType],
       {
         purgeType: purgeType,
         success: purgeResult.success,

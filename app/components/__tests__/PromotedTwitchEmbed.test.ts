@@ -77,6 +77,40 @@ describe('PromotedTwitchEmbed', () => {
     expect(wrapper.find('iframe').exists()).toBe(false);
     wrapper.unmount();
   });
+  it('does not start polling after unmount while the initial config is pending', async () => {
+    let resolveConfig: ((value: typeof twitchConfig) => void) | undefined;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/twitch/config') {
+        return new Promise((resolve) => {
+          resolveConfig = resolve;
+        });
+      }
+      return Promise.resolve(liveResult);
+    });
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const { default: PromotedTwitchEmbed } = await import('@/components/PromotedTwitchEmbed.vue');
+    const wrapper = mount(PromotedTwitchEmbed, {
+      global: {
+        stubs: {
+          ClientOnly: { template: '<div><slot /></div>' },
+          UButton: UButtonStub,
+          UIcon: UIconStub,
+        },
+      },
+    });
+    await nextTick();
+    expect(fetchMock).toHaveBeenCalledWith('/api/twitch/config');
+    wrapper.unmount();
+    resolveConfig?.({
+      channel: 'replacement',
+      displayName: 'Replacement',
+      enabled: true,
+      version: 2,
+    });
+    await flushPromises();
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/twitch/live', expect.anything());
+  });
   it('refreshes config for a continuously visible tab while the stream is disabled', async () => {
     twitchConfig.enabled = false;
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
@@ -382,6 +416,70 @@ describe('PromotedTwitchEmbed', () => {
       }
     );
     wrapper.unmount();
+  });
+  it('defers a shared enable until a hidden tab regains focus', async () => {
+    twitchConfig.enabled = false;
+    const wrapper = await mountEmbed();
+    let hidden = true;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      usePromotedTwitch().applyConfig({
+        channel: 'teststreamer',
+        displayName: 'TestStreamer',
+        enabled: true,
+        version: 2,
+      });
+      await flushPromises();
+      await nextTick();
+      expect(fetchMock).not.toHaveBeenCalledWith('/api/twitch/live', expect.anything());
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+      expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
+        query: { channel: 'teststreamer' },
+      });
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(document, 'hidden', originalDescriptor);
+      } else {
+        delete (document as { hidden?: boolean }).hidden;
+      }
+      wrapper.unmount();
+    }
+  });
+  it('defers a shared channel change until a hidden tab regains focus', async () => {
+    const wrapper = await mountEmbed();
+    let hidden = true;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      const callsWhileHidden = fetchMock.mock.calls.length;
+      usePromotedTwitch().applyConfig({
+        channel: 'replacement',
+        displayName: 'Replacement',
+        enabled: true,
+        version: 2,
+      });
+      await flushPromises();
+      await nextTick();
+      expect(fetchMock).toHaveBeenCalledTimes(callsWhileHidden);
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+      expect(fetchMock).toHaveBeenLastCalledWith('/api/twitch/live', {
+        query: { channel: 'replacement' },
+      });
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(document, 'hidden', originalDescriptor);
+      } else {
+        delete (document as { hidden?: boolean }).hidden;
+      }
+      wrapper.unmount();
+    }
   });
   it('stops polling while the tab is hidden and resumes with a refresh on focus', async () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
