@@ -318,7 +318,8 @@
     "reset_all_data": "Alle Daten zurücksetzen",
     "import_failed": "Import fehlgeschlagen",
     "delete_archived_run": "Archivierten Lauf löschen",
-    "validation_error": "Validierungsfehler"
+    "validation_error": "Validierungsfehler",
+    "got_it": "Verstanden"
   },
   "page_help": {
     "button": "Hilfe",
@@ -503,15 +504,43 @@
       "shared_extract": "Gemeinsamer Extrakt (beide Fraktionen)",
       "coop_extract": "Co-op-Extrakt (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Vergrößern",
+      "zoom_out": "Verkleinern",
+      "reset_view": "Ansicht zurücksetzen",
+      "open_fullscreen": "Karte im Vollbild öffnen",
+      "exit_fullscreen": "Vollbild beenden",
+      "drag_to_resize": "Ziehen, um Karte zu skalieren",
+      "switch_floor": "Boden wechseln (Strg + Scroll)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "Zum Verschieben",
-        "zoom_keys": "Zum Zoomen",
-        "click": "Zum Klicken am Cursor",
-        "reset": "Ansicht zurücksetzen",
-        "cycle_floors": "+ Scrollen zum Ebenenwechsel",
-        "zoom": "+ Scrollen zum Zoomen"
+      "help": {
+        "pan": "oder ziehen zum Pan",
+        "zoom": "zoomen",
+        "reset": "um die Ansicht zurückzusetzen",
+        "cycle_floors": "um Böden zu fahren",
+        "floor_panel": "oder verwenden Sie die Bodenplatte",
+        "click_at_cursor": "um am Cursor zu klicken",
+        "click_marker": "Klicken Sie auf einen Marker für Details",
+        "fullscreen": "Den Vollbild-Button in den Kartensteuerungen verwenden",
+        "resize": "Ziehen Sie den unteren Rand der Karte um die Größe zu ändern"
       }
+    },
+    "help": {
+      "title": "Kartensteuerung",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Stockwerke",
+        "interact": "Interact",
+        "view": "View"
+      }
+    },
+    "hint": {
+      "title": "Quick map controls",
+      "drag_to_pan": "Drag to pan",
+      "shift_scroll_zoom": "Shift + Scroll to zoom",
+      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
+      "all_controls": "All controls"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -910,7 +939,9 @@
       "loading": "Lade Aufgaben",
       "map": {
         "resize_handle": "Kartenhöhe anpassen",
-        "toggle_panel": "Kartenbereich ein-/ausblenden",
+        "show_map": "Show map",
+        "hide_map": "Hide map",
+        "fullscreen_label": "Full screen",
         "required_items_summary": "Benötigte Gegenstände für aktive Aufgaben",
         "required_keys_summary": "Benötigte Schlüssel für aktive Aufgaben",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "{count} kartenziel-erledigte Aufgaben auf dieser Karte ausgeblendet.",
         "map_complete_tasks_showing": "{count} kartenziel-erledigte Aufgaben werden auf dieser Karte angezeigt.",
         "map_complete_tasks_toggle_show": "Ausgeblendete anzeigen",
-        "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden"
+        "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden",
+        "map_hidden_hint": "Map hidden — click to show",
+        "raid_time_tooltip": "Current in-game raid time"
       },
       "pinned_tasks_section": "Angeheftete Aufgaben",
       "focused_task_section": "Fokussierte Aufgabe",
