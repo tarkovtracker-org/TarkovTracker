@@ -318,7 +318,8 @@
     "reset_all_data": "Resetuj wszystkie dane",
     "import_failed": "Importowanie nie powiodło się",
     "delete_archived_run": "Usuń zarchiwizowane uruchomienie",
-    "validation_error": "Błąd weryfikacji"
+    "validation_error": "Błąd weryfikacji",
+    "got_it": "Zrozumiałe"
   },
   "page_help": {
     "button": "Pomoc",
@@ -503,15 +504,43 @@
       "shared_extract": "Shared Extract (Either Faction)",
       "coop_extract": "Co-op Extract (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Powiększ",
+      "zoom_out": "Pomniejsz",
+      "reset_view": "Reset view",
+      "open_fullscreen": "Otwórz pełny ekran mapy",
+      "exit_fullscreen": "Wyjdź z pełnego ekranu",
+      "drag_to_resize": "Przeciągnij, aby zmienić rozmiar mapy",
+      "switch_floor": "Przełącz piętro (Ctrl + przewijanie)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "to Pan",
-        "zoom_keys": "to Zoom",
-        "click": "to Click at Cursor",
-        "reset": "to Reset View",
-        "cycle_floors": "+ Scroll to Cycle Floors",
-        "zoom": "+ Scroll to Zoom"
+      "help": {
+        "pan": "lub przeciągnij do panewki",
+        "zoom": "powiększyć",
+        "reset": "zresetować widok",
+        "cycle_floors": "Cykl podłogi",
+        "floor_panel": "lub użyj podłogi",
+        "click_at_cursor": "aby kliknąć na kursor",
+        "click_marker": "Kliknij znacznik po szczegóły",
+        "fullscreen": "Użyj przycisku pełnoekranowego na mapie",
+        "resize": "Przeciągnij dolną krawędź mapy, aby zmienić rozmiar"
       }
+    },
+    "help": {
+      "title": "Sterowanie mapą",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Floors",
+        "interact": "Interakcja",
+        "view": "Widok"
+      }
+    },
+    "hint": {
+      "title": "Szybkie ustawienia mapy",
+      "drag_to_pan": "Przeciągnij do panewki",
+      "shift_scroll_zoom": "Przesuń + przewiń do przybliżenia",
+      "ctrl_scroll_floors": "Ctrl + przewiń aby zmienić podłogę",
+      "all_controls": "Wszystkie ustawienia"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -910,7 +939,9 @@
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",
-        "toggle_panel": "Toggle map panel",
+        "show_map": "Pokaż mapę",
+        "hide_map": "Ukryj mapę",
+        "fullscreen_label": "Pełny ekran",
         "required_items_summary": "Required items for active tasks",
         "required_keys_summary": "Required keys for active tasks",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "{count} tasks hidden on this map.",
         "map_complete_tasks_showing": "{count} map-complete tasks shown on this map.",
         "map_complete_tasks_toggle_show": "Show hidden",
-        "map_complete_tasks_toggle_hide": "Hide map-complete"
+        "map_complete_tasks_toggle_hide": "Hide map-complete",
+        "map_hidden_hint": "Mapa ukryta — kliknij, aby wyświetlić",
+        "raid_time_tooltip": "Bieżący czas deszczu w grze"
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",
