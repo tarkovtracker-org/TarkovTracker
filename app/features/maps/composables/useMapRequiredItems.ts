@@ -57,10 +57,15 @@ const dedupeKeyGroup = (group: TarkovItem[]): TarkovItem[] =>
   });
 const normalizeKeyGroup = (group: TarkovItem[]): TarkovItem[] =>
   dedupeKeyGroup(group).sort(compareByDisplayName);
+const compareCodeUnits = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
 const keyGroupId = (group: TarkovItem[]): string =>
   group
-    .map((key) => key.id)
-    .sort()
+    .map((key) => key.id ?? '')
+    .sort(compareCodeUnits)
     .join('|');
 const collectKeyGroups = (objective: TaskObjective): TarkovItem[][] =>
   (objective.requiredKeys ?? []).map(normalizeKeyGroup).filter((group) => group.length > 0);
