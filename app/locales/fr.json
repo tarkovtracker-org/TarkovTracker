@@ -531,16 +531,16 @@
       "groups": {
         "navigate": "Navigate",
         "floors": "Étages",
-        "interact": "Interact",
-        "view": "View"
+        "interact": "Interagir",
+        "view": "Voir"
       }
     },
     "hint": {
-      "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
-      "all_controls": "All controls"
+      "title": "Contrôles de la carte rapide",
+      "drag_to_pan": "Glisser pour faire une casserole",
+      "shift_scroll_zoom": "Maj + Défiler pour zoomer",
+      "ctrl_scroll_floors": "Ctrl + Défiler pour changer de sol",
+      "all_controls": "Tous les contrôles"
     },
     "aria": {
       "tooltip_density": "Densité des infobulles"
@@ -939,9 +939,9 @@
       "loading": "Chargement des quêtes",
       "map": {
         "resize_handle": "Ajuster la hauteur de la carte",
-        "show_map": "Show map",
-        "hide_map": "Hide map",
-        "fullscreen_label": "Full screen",
+        "show_map": "Afficher la carte",
+        "hide_map": "Cacher la carte",
+        "fullscreen_label": "Plein écran",
         "required_items_summary": "Objets requis pour les tâches actives",
         "required_keys_summary": "Clés requises pour les tâches actives",
         "time_period": {
@@ -955,8 +955,8 @@
         "map_complete_tasks_showing": "{count} tâches terminées sur cette carte sont affichées.",
         "map_complete_tasks_toggle_show": "Afficher masquées",
         "map_complete_tasks_toggle_hide": "Masquer terminées carte",
-        "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "map_hidden_hint": "Carte masquée - cliquez pour afficher",
+        "raid_time_tooltip": "Temps de raid actuel en jeu"
       },
       "pinned_tasks_section": "Quêtes épinglées",
       "focused_task_section": "Quête ciblée",
