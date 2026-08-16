@@ -887,7 +887,7 @@ flowchart LR
     Write --> Audit[(admin_audit_log)]
     Write -->|purge tag after commit| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
     Embed[PromotedTwitchEmbed] -->|once per mount + focus| Read[GET /api/twitch/config]
-    Read --> Edge[Edge cache, 1y TTL]
+    Read --> Edge[Edge cache, 1h TTL]
     Edge --> Settings
     Edge --> Fallback[Public runtime config fallback]
     Embed -->|every 60s while enabled| Live[GET /api/twitch/live]
