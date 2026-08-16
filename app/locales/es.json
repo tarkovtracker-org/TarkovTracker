@@ -57,6 +57,8 @@
     "twitch_display_name_placeholder": "Nombre para mostrar canal",
     "twitch_config_saved_title": "Configuración de Twitch actualizada",
     "twitch_config_saved_description": "La transmisión promocionada es ahora {channel}.",
+    "twitch_config_saved_with_warning_title": "Configuración de Twitch guardada",
+    "twitch_config_saved_with_warning_description": "La configuración fue guardada, pero los visitantes en caché pueden ver el valor anterior.",
     "twitch_config_failed_description": "No se pudo actualizar la configuración de Twitch.",
     "twitch_config_load_failed_title": "Configuración de Twitch no disponible",
     "twitch_config_load_failed_description": "No se pudo cargar la configuración actual de Twitch.",
