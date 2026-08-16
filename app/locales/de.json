@@ -531,16 +531,16 @@
       "groups": {
         "navigate": "Navigate",
         "floors": "Stockwerke",
-        "interact": "Interact",
-        "view": "View"
+        "interact": "Interagieren",
+        "view": "Ansicht"
       }
     },
     "hint": {
-      "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
-      "all_controls": "All controls"
+      "title": "Schnellkarten-Steuerung",
+      "drag_to_pan": "In Pfanne ziehen",
+      "shift_scroll_zoom": "Shift + Scrollen zum Zoomen",
+      "ctrl_scroll_floors": "Strg + Scrollen um Etagen zu wechseln",
+      "all_controls": "Alle Steuerelemente"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -939,9 +939,9 @@
       "loading": "Lade Aufgaben",
       "map": {
         "resize_handle": "Kartenhöhe anpassen",
-        "show_map": "Show map",
-        "hide_map": "Hide map",
-        "fullscreen_label": "Full screen",
+        "show_map": "Karte anzeigen",
+        "hide_map": "Karte ausblenden",
+        "fullscreen_label": "Vollbild",
         "required_items_summary": "Benötigte Gegenstände für aktive Aufgaben",
         "required_keys_summary": "Benötigte Schlüssel für aktive Aufgaben",
         "time_period": {
@@ -955,8 +955,8 @@
         "map_complete_tasks_showing": "{count} kartenziel-erledigte Aufgaben werden auf dieser Karte angezeigt.",
         "map_complete_tasks_toggle_show": "Ausgeblendete anzeigen",
         "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden",
-        "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "map_hidden_hint": "Karte versteckt — klicke zum Anzeigen",
+        "raid_time_tooltip": "Aktuelle Schlachtzugszeit im Spiel"
       },
       "pinned_tasks_section": "Angeheftete Aufgaben",
       "focused_task_section": "Fokussierte Aufgabe",
