@@ -531,16 +531,16 @@
       "groups": {
         "navigate": "Navigate",
         "floors": "Piani",
-        "interact": "Interact",
-        "view": "View"
+        "interact": "Interagisci",
+        "view": "Visualizza"
       }
     },
     "hint": {
-      "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
-      "all_controls": "All controls"
+      "title": "Controlli delle mappe rapide",
+      "drag_to_pan": "Trascina per pan",
+      "shift_scroll_zoom": "Maiusc + Scorri per ingrandire",
+      "ctrl_scroll_floors": "Ctrl + Scorrimento per cambiare piano",
+      "all_controls": "Tutti i controlli"
     },
     "aria": {
       "tooltip_density": "Densità dei suggerimenti"
@@ -939,9 +939,9 @@
       "loading": "Caricamento missioni",
       "map": {
         "resize_handle": "Ridimensiona altezza mappa",
-        "show_map": "Show map",
-        "hide_map": "Hide map",
-        "fullscreen_label": "Full screen",
+        "show_map": "Mostra mappa",
+        "hide_map": "Nascondi mappa",
+        "fullscreen_label": "Schermo intero",
         "required_items_summary": "Oggetti richiesti per le missioni attive",
         "required_keys_summary": "Chiavi richieste per le missioni attive",
         "time_period": {
@@ -955,8 +955,8 @@
         "map_complete_tasks_showing": "{count} missioni complete per mappa mostrate.",
         "map_complete_tasks_toggle_show": "Mostra nascoste",
         "map_complete_tasks_toggle_hide": "Nascondi complete per mappa",
-        "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "map_hidden_hint": "Mappa nascosta — clicca per mostrare",
+        "raid_time_tooltip": "Tempo di incursione corrente"
       },
       "pinned_tasks_section": "Missioni in evidenza",
       "focused_task_section": "Missioni focus",
