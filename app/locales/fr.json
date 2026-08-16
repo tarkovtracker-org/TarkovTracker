@@ -57,6 +57,8 @@
     "twitch_display_name_placeholder": "Nom d'affichage du canal",
     "twitch_config_saved_title": "Configuration Twitch mise à jour",
     "twitch_config_saved_description": "Le flux promu est maintenant {channel}.",
+    "twitch_config_saved_with_warning_title": "Configuration Twitch enregistrée",
+    "twitch_config_saved_with_warning_description": "La configuration a été enregistrée, mais les visiteurs en cache peuvent toujours voir la valeur précédente.",
     "twitch_config_failed_description": "Impossible de mettre à jour la configuration de Twitch.",
     "twitch_config_load_failed_title": "Configuration Twitch indisponible",
     "twitch_config_load_failed_description": "Impossible de charger la configuration actuelle de Twitch.",
