@@ -1,11 +1,84 @@
 import { getObjectiveEquipmentItems } from '@/features/tasks/task-objective-equipment';
 import { useProgressStore } from '@/stores/useProgress';
 import type { ComputedRef } from '#imports';
-import type { TarkovItem, Task } from '@/types/tarkov';
+import type { TarkovItem, Task, TaskObjective } from '@/types/tarkov';
 interface MapRequiredItemsOptions {
   mapId: ComputedRef<string>;
   tasks: ComputedRef<Task[]>;
 }
+interface EquipmentCount {
+  item: TarkovItem;
+  count: number;
+}
+const itemDisplayName = (item: TarkovItem | undefined): string => {
+  if (!item) return '';
+  if (item.shortName) return item.shortName;
+  return item.name ?? '';
+};
+const compareByDisplayName = (a: TarkovItem | undefined, b: TarkovItem | undefined): number =>
+  itemDisplayName(a).localeCompare(itemDisplayName(b));
+const compareByShortName = (a: TarkovItem, b: TarkovItem): number =>
+  (a.shortName ?? '').localeCompare(b.shortName ?? '');
+const bumpEquipmentCount = (
+  itemCounts: Map<string, EquipmentCount>,
+  key: string,
+  item: TarkovItem,
+  addCount: number
+): void => {
+  const existing = itemCounts.get(key);
+  if (existing) {
+    existing.count += addCount;
+    return;
+  }
+  itemCounts.set(key, { item, count: addCount });
+};
+const addObjectiveEquipment = (
+  itemCounts: Map<string, EquipmentCount>,
+  objective: TaskObjective
+): void => {
+  const addCount = objective.count ?? 1;
+  for (const item of getObjectiveEquipmentItems(objective, 'bring')) {
+    if (item.id) {
+      bumpEquipmentCount(itemCounts, item.id, item, addCount);
+    }
+  }
+};
+const aggregateEquipment = (objectives: TaskObjective[]): EquipmentCount[] => {
+  const itemCounts = new Map<string, EquipmentCount>();
+  for (const objective of objectives) {
+    addObjectiveEquipment(itemCounts, objective);
+  }
+  return Array.from(itemCounts.values()).sort((a, b) => compareByShortName(a.item, b.item));
+};
+const dedupeKeyGroup = (group: TarkovItem[]): TarkovItem[] =>
+  group.filter((key, index, groupItems) => {
+    if (!key.id) return false;
+    return groupItems.findIndex((candidate) => candidate.id === key.id) === index;
+  });
+const normalizeKeyGroup = (group: TarkovItem[]): TarkovItem[] =>
+  dedupeKeyGroup(group).sort(compareByDisplayName);
+const keyGroupId = (group: TarkovItem[]): string =>
+  group
+    .map((key) => key.id)
+    .sort()
+    .join('|');
+const collectKeyGroups = (objective: TaskObjective): TarkovItem[][] =>
+  (objective.requiredKeys ?? []).map(normalizeKeyGroup).filter((group) => group.length > 0);
+const addKeyGroup = (groups: Map<string, TarkovItem[]>, group: TarkovItem[]): void => {
+  const groupId = keyGroupId(group);
+  if (!groups.has(groupId)) {
+    groups.set(groupId, group);
+  }
+};
+const aggregateKeyGroups = (objectives: TaskObjective[]): TarkovItem[][] => {
+  const groups = new Map<string, TarkovItem[]>();
+  for (const objective of objectives) {
+    for (const group of collectKeyGroups(objective)) {
+      addKeyGroup(groups, group);
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => compareByDisplayName(a[0], b[0]));
+};
 export function useMapRequiredItems({ mapId, tasks }: MapRequiredItemsOptions): {
   equipment: ComputedRef<TarkovItem[]>;
   equipmentCounts: ComputedRef<Record<string, number>>;
@@ -22,50 +95,7 @@ export function useMapRequiredItems({ mapId, tasks }: MapRequiredItemsOptions): 
       )
     )
   );
-  const aggregatedItems = computed(() => {
-    const itemCounts = new Map<string, { item: TarkovItem; count: number }>();
-    for (const objective of eligibleObjectives.value) {
-      const equipItems = getObjectiveEquipmentItems(objective, 'bring');
-      for (const item of equipItems) {
-        if (!item.id) continue;
-        const addCount = objective.count ?? 1;
-        const existing = itemCounts.get(item.id);
-        if (existing) {
-          existing.count += addCount;
-        } else {
-          itemCounts.set(item.id, { item, count: addCount });
-        }
-      }
-    }
-    return Array.from(itemCounts.values()).sort((a, b) =>
-      (a.item.shortName || '').localeCompare(b.item.shortName || '')
-    );
-  });
-  const keyGroups = computed(() => {
-    const groups = new Map<string, TarkovItem[]>();
-    for (const objective of eligibleObjectives.value) {
-      for (const group of objective.requiredKeys ?? []) {
-        const uniqueGroup = group.filter((key, index, groupItems) => {
-          if (!key.id) return false;
-          return groupItems.findIndex((candidate) => candidate.id === key.id) === index;
-        });
-        if (!uniqueGroup.length) continue;
-        uniqueGroup.sort((a, b) =>
-          (a.shortName || a.name || '').localeCompare(b.shortName || b.name || '')
-        );
-        const groupId = uniqueGroup
-          .map((key) => key.id)
-          .sort()
-          .join('|');
-        if (!groups.has(groupId)) {
-          groups.set(groupId, uniqueGroup);
-        }
-      }
-    }
-    return Array.from(groups.values()).sort((a, b) =>
-      (a[0]?.shortName || a[0]?.name || '').localeCompare(b[0]?.shortName || b[0]?.name || '')
-    );
-  });
+  const aggregatedItems = computed(() => aggregateEquipment(eligibleObjectives.value));
   const equipment = computed(() => aggregatedItems.value.map((entry) => entry.item));
   const equipmentCounts = computed(() => {
     const counts: Record<string, number> = {};
@@ -76,6 +106,7 @@ export function useMapRequiredItems({ mapId, tasks }: MapRequiredItemsOptions): 
     }
     return counts;
   });
+  const keyGroups = computed(() => aggregateKeyGroups(eligibleObjectives.value));
   const hasContent = computed(() => equipment.value.length > 0 || keyGroups.value.length > 0);
   return { equipment, equipmentCounts, keyGroups, hasContent };
 }
